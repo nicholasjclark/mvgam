@@ -1,5 +1,5 @@
 Package: mvgam
-Title: What the Package Does (One Line, Title Case)
+Title: Multivariate generalised additive models for discrete time series
 Version: 0.0.0.9000
 Authors@R: 
     person(given = "First",
