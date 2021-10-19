@@ -1,4 +1,4 @@
-#### Testing the mgjagam function ####
+#### Testing the mvjagam function ####
 # Utility functions, too specific to put into the package but useful for our study
 plot_mvgam_season = function(out_gam_mod, series, data_test, data_train,
                              xlab = 'Season'){
@@ -42,24 +42,38 @@ plot_mvgam_gdd = function(out_gam_mod, series, data_test, data_train,
                                                                                  levels(data_train$series)[series])])))
   Xp <- predict(out_gam_mod$mgcv_model, newdata = pred_dat, type = 'lpmatrix')
   betas <- MCMCchains(out_gam_mod$jags_output, 'b')
-  plot(Xp %*% betas[1,] ~ pred_dat$cum_gdd,
-       ylim = range(Xp %*% betas[1,] + 1.5,
-                    Xp %*% betas[1,] - 1.5),
-
-       col = rgb(150, 0, 0, max = 255, alpha = 10), type = 'l',
+  preds <- matrix(NA, nrow = 1000, ncol = length(pred_dat$cum_gdd))
+  for(i in 1:1000){
+    preds[i,] <- rnbinom(length(pred_dat$cum_gdd), mu = exp(Xp %*% betas[i,]),
+                         size = MCMCvis::MCMCsummary(out_gam_mod$jags_output, 'r')$mean)
+  }
+  int <- apply(preds,
+               2, hpd, 0.95)
+  preds_last <- preds[1,]
+  plot(preds_last ~ pred_dat$cum_gdd,
+       type = 'l', ylim = c(0, max(int) + 2),
+       col = rgb(1,0,0, alpha = 0),
        ylab = paste0('Predicted peak count for ', levels(data_train$series)[series]),
        xlab = 'Cumulative growing degree days')
-  for(i in 2:1000){
-    lines(Xp %*% betas[i,] ~ pred_dat$cum_gdd,
+  int[int<0] <- 0
+  polygon(c(pred_dat$cum_gdd, rev(pred_dat$cum_gdd)),
+          c(int[1,],rev(int[3,])),
+          col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
+  int <- apply(preds,
+               2, hpd, 0.68)
+  int[int<0] <- 0
+  polygon(c(pred_dat$cum_gdd, rev(pred_dat$cum_gdd)),
+          c(int[1,],rev(int[3,])),
+          col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
+  lines(int[2,] ~ pred_dat$cum_gdd, col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
 
-          col = rgb(150, 0, 0, max = 255, alpha = 10))
-  }
   rug(data_train$cum_gdd[which(data_train$series ==
                                  levels(data_train$series)[series])])
 }
 
 #### NEON mv_gam ####
 library(mvgam)
+library(dplyr)
 data("all_neon_tick_data")
 
 # Prep data for modelling
@@ -106,16 +120,20 @@ if(species == 'Ambloyomma_americanum'){
                        dplyr::distinct()) -> model_dat
 }
 
-# Set indicator for whether time point is 'in-season' or not (trends won't contribute during
-# off season, as counts generally go to zero during this time)
+
 model_dat = model_dat %>%
+  # Set indicator for whether time point is 'in-season' or not (trends won't contribute during
+  # off season, as counts generally go to zero during this time)
   dplyr::mutate(in_season = ifelse(season >=3 & season <= 22, 1, 0)) %>%
+  # Only include a small set of sites for now (11 series in total from three sites)
   dplyr::filter(siteID %in% c('SERC', 'TALL', 'UKFS'),
                 Year_orig <= 2019) %>%
+  # ID variables need to be factors for JAGS modelling
   dplyr::mutate(plotID = factor(plotID),
                 siteID = factor(siteID),
                 series = factor(series))
 
+# Split into training and testing
 data_train = model_dat[1:(floor(nrow(model_dat) * 0.9)),]
 data_test = model_dat[((floor(nrow(model_dat) * 0.9)) + 1):nrow(model_dat),]
 (nrow(data_train) + nrow(data_test)) == nrow(model_dat)
@@ -157,6 +175,8 @@ hyp3 = y ~
 
 # 4. Is there evidence for global seasonality but each plot's seasonal pattern deviates
 # based on even more local conditions than above (i.e. plot-level is not as informative)?
+# If evidence of gdd effects, can also let use a global smoother and then site-level
+# deviations for a 'hierarchical' setup
 hyp4 = y ~
   siteID +
   s(cum_gdd, by = siteID, k = 3) +
@@ -165,31 +185,35 @@ hyp4 = y ~
   # Series-level deviations from global pattern
   s(season, by = series, m = 1, k = 8) - 1
 
-# If evidence of gdd effects, can also let use a global smoother and then site-level
-# deviations for a 'hierarchical' setup
+# Additional parameters for the model
 use_mv <- T
 out_gam_mod <- mvjagam(formula = hyp1,
                         data_train = data_train,
                         data_test = data_test,
-                        n.adapt = 1000,
-                        n.burnin = 1000,
-                        n.iter = 1000,
-                        thin = 1,
-                        auto_update = FALSE,
+                        n.adapt = 2000,
+                        n.burnin = 5000,
+                        n.iter = 5000,
+                        thin = 5,
+                        # auto_update attempts to update until some reasonable convergence, but can
+                        # be slow!!
+                        auto_update = TRUE,
                         use_mv = use_mv,
                         use_nb = FALSE,
                         # Laplace distribution emphasizes our prior that smooths should not be overly wiggly
                         # unless the data supports this
                         rho_prior = 'ddexp(5, 0.25)T(-12, 12)',
+                        # Prior is that latent trends should have positive autocorrelation
                         phi_prior = 'dbeta(2,2)',
                         tau_prior = 'dunif(0.1, 100)')
 
 # View the modified JAGS model file
 out_gam_mod$model_file
 
-# Traces of key parameters
+# Summary of key parameters
 library(MCMCvis)
+MCMCvis::MCMCsummary(out_gam_mod$jags_output, c('phi', 'rho'))
 
+# Traces of key parameters
 # Negative binomial size parameter (set to 10,000 if use_nb = FALSE)
 MCMCtrace(out_gam_mod$jags_output, c('r'), pdf = F, n.eff = T)
 
@@ -198,7 +222,7 @@ out_gam_mod$smooth_param_details # rhos are the logged versions of the lambdas
 MCMCtrace(out_gam_mod$jags_output, c('rho'), pdf = F, n.eff = T)
 
 # AR1 persistence coefficients for latent dynamic factors (or for each
-# series if use_mv = FALSE)
+# individual series if use_mv = FALSE)
 MCMCtrace(out_gam_mod$jags_output, c('phi'), pdf = F, n.eff = T)
 
 # Precision for latent dynamic factors (if using latent factors)
@@ -207,24 +231,6 @@ MCMCtrace(out_gam_mod$jags_output, c('tau_fac'), pdf = F, n.eff = T)
 # Precision for latent trends (if using independent Gaussian trends)
 MCMCtrace(out_gam_mod$jags_output, c('tau'), pdf = F, n.eff = T)
 dev.off()
-
-# Plot useful posterior quantities for a specific series
-opar <- par()
-par(mfrow = c(3, 1))
-
-# Total number of series in the set
-length(unique(data_train$series))
-series = 1
-plot_mvgam_season(out_gam_mod, series = series, data_test = data_test,
-                  data_train = data_train, xlab = 'Epidemiological week')
-plot_mvgam_fc(out_gam_mod, series = series, data_test = data_test,
-              data_train = data_train)
-plot_mvgam_trend(out_gam_mod, series = series, data_test = data_test,
-                 data_train = data_train)
-par(opar)
-
-plot_mvgam_gdd(out_gam_mod, series = series, data_test = data_test,
-               data_train = data_train, xlab = 'Epidemiological week')
 
 if(use_mv){
   if(length(unique(data_train$series)) > 5){
@@ -283,3 +289,23 @@ summary(as.vector(as.matrix(mean_correlations)))
 # 2. Smaller precisions for tau_fac (i.e. larger variance for latent dynamic factors)
 MCMCsummary(out_gam_mod$jags_output, 'tau_fac')
 
+# 3. Visual evidence of seasonality in latent trends
+# Total number of series in the set
+length(unique(data_train$series))
+series = 6
+opar <- par()
+par(mfrow = c(3, 1))
+# Plot the estimated seasonality function
+plot_mvgam_season(out_gam_mod, series = series, data_test = data_test,
+                  data_train = data_train, xlab = 'Epidemiological week')
+# Plot the posterior predictions for the training and testing sets
+plot_mvgam_fc(out_gam_mod, series = series, data_test = data_test,
+              data_train = data_train)
+# Plot the estimated latent trend component
+plot_mvgam_trend(out_gam_mod, series = series, data_test = data_test,
+                 data_train = data_train)
+par(opar)
+
+# Plot the estimated cumulative growing degree days function
+plot_mvgam_gdd(out_gam_mod, series = series, data_test = data_test,
+               data_train = data_train, xlab = 'Epidemiological week')

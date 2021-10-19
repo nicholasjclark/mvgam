@@ -168,6 +168,7 @@ mvjagam = function(formula,
 
   if(use_mv){
     if(length(unique(data_train$series)) <= 5){
+      cat('Fitting a multivariate GAM with fully estimated covariance for the latent trends...\n')
       modification <- c("model {
 
                         ## GAM linear predictor
@@ -251,6 +252,7 @@ mvjagam = function(formula,
       model_file <- textConnection(model_file)
     } else {
       #### Use the latent variable approach to estimate dependencies when n_series is large
+      cat('Fitting a multivariate GAM with latent dynamic factors for the trends...\n')
       modification <- c("model {
 
                         ## GAM linear predictor
@@ -366,7 +368,8 @@ mvjagam = function(formula,
                        dplyr::select(year, season) %>%
                        dplyr::distinct() %>%
                        dplyr::arrange(year, season) %>%
-                       dplyr::mutate(time = dplyr::row_number())) %>%
+                       dplyr::mutate(time = dplyr::row_number()),
+                     by = c('season', 'year')) %>%
     dplyr::pull(time)
 
   # Add an outcome variable
@@ -400,11 +403,13 @@ mvjagam = function(formula,
                                      dplyr::select(-time, -series, -outcome))
 
   if(use_mv){
-    # We use a Wishart prior for the state space multivariate precision matrix
+    if(length(unique(data_train$series)) <= 5){
+    # We use a Wishart prior for the state space multivariate precision matrix when
+    # estimating the full covariance
     ss_jagam$jags.data$diag_mat <- diag(ss_jagam$jags.data$n_series)
     ss_jagam$jags.data$zeros <- rep(0, ss_jagam$jags.data$n_series)
+    }
   }
-
 
   # Set use_nb to 0 for approximate Poisson; otherwise to 1 for Negative Binomial
   if(use_nb){
@@ -420,8 +425,12 @@ mvjagam = function(formula,
   ss_jagam$jags.ini$rho[ss_jagam$jags.ini$rho > 12] <- 11.99
   ss_jagam$jags.ini$rho[ss_jagam$jags.ini$rho < 12] <- -11.99
 
-  # Number of latent variables to use
-  ss_jagam$jags.data$n_lv <- floor(ss_jagam$jags.data$n_series / 2)
+  # Number of latent variables to use if n_series > 5 and use_mv = TRUE
+  if(use_mv){
+    if(length(unique(data_train$series)) > 5){
+      ss_jagam$jags.data$n_lv <- floor(ss_jagam$jags.data$n_series / 2)
+    }
+    }
 
   # Binary indicator of in_season
   ss_jagam$jags.data$in_season <- rbind(data_train, data_test) %>%
@@ -445,14 +454,14 @@ mvjagam = function(formula,
   # Gather posterior samples for the specified parameters
   if(!use_mv){
     param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
-               'tau', 'trend', 'p_resid')
+               'tau', 'trend')
   } else {
     if(length(unique(data_train$series)) <= 5){
       param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
-                 'tau', 'trend', 'p_resid', 'cor')
+                 'tau', 'trend', 'cor')
     } else {
       param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
-                 'trend', 'p_resid', 'lv_coefs', 'tau_fac')
+                 'trend', 'lv_coefs', 'tau_fac')
     }
 
   }
@@ -462,19 +471,25 @@ mvjagam = function(formula,
                                      n.iter = n.iter,
                                      thin = thin)
   if(auto_update){
-  # Update until reasonable convergence (exclude 'cor' as it will have some 0 neffs)
-  mod_summary <- MCMCvis::MCMCsummary(out_gam_mod, c('rho', 'b', 'phi', 'tau'))
+  # Update until reasonable convergence in the form of Rhat and ESS
+    if(!use_mv){
+      update_params <- c('rho', 'b', 'phi', 'tau')
+    } else {
+      update_params <- c('rho', 'b', 'phi')
+    }
+  mod_summary <- MCMCvis::MCMCsummary(out_gam_mod, update_params)
   for(i in 1:3){
-    if(quantile(mod_summary$Rhat, 0.85, na.rm = T) < 1 &
-       quantile(mod_summary$n.eff, 0.15) > 100){
+    if(quantile(mod_summary$Rhat, 0.85, na.rm = T) <= 1.2 &
+       quantile(mod_summary$n.eff, 0.15) >= 100){
       break;
     }
-    update(gam_mod, 5000)
+    cat('Convergence not reached. Extending burnin...\n')
+    update(gam_mod, n.burnin)
     out_gam_mod <- rjags::coda.samples(gam_mod,
                                        variable.names = param,
                                        n.iter = n.iter,
                                        thin = thin)
-    mod_summary <- MCMCvis::MCMCsummary(out_gam_mod, c('rho', 'b', 'phi', 'tau'))
+    mod_summary <- MCMCvis::MCMCsummary(out_gam_mod, update_params)
   }
   }
 
