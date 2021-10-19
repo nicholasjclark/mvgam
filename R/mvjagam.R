@@ -105,6 +105,15 @@ mvjagam = function(formula,
   base_model <- base_model[-lines_remove]
   base_model[grep('rho\\[i\\] ~', base_model)] <- paste0('   rho[i] ~ ', rho_prior)
 
+  # Any parametric effects in the gam need to get more sensible priors
+  if(any(grepl('Parametric effect priors', base_model))){
+    base_model[grep('Parametric effect priors',
+                    base_model) + 1] <- paste0('  for (i in 1:',
+                                               length(ss_gam$pterms),
+                                               ') { b[i] ~ dnorm(0, 0.1) }')
+
+  }
+
   # Add replacement lines for trends and linear predictor
   if(!use_mv){
     modification <- c("model {
@@ -273,7 +282,9 @@ mvjagam = function(formula,
                         }
 
                         ## Latent factors evolve as AR1 time series
-                        tau_fac ~ dnorm(50, 0.01)T(0.01,)
+                        tau_fac_raw ~ dnorm(50, 0.01)T(0.01,)
+                        xi ~ dunif(0.1, 10)
+                        tau_fac <- tau_fac_raw * xi
                         for(j in 1:n_lv){
                            LV[1, j] ~ dnorm(0, tau_fac)
                         }
@@ -286,7 +297,7 @@ mvjagam = function(formula,
 
                         # AR1 persistence coefficients for latent factors
                         for (s in 1:n_lv){
-                         phi[s] ~ dunif(0, 1)
+                         phi[s] ~ dunif(0, 1);
                         }
 
                         ## Latent factor loadings, with identifiability constraints (Hui et al 2015)
@@ -355,7 +366,7 @@ mvjagam = function(formula,
           sep = "\n")
       model_file <- readLines(fil, n = -1)
 
-      # Update and prior distribution choices
+      # Update further prior distributions
       model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('   phi[s] ~ ', phi_prior)
       model_file[grep('tau\\[s\\] ~', model_file)] <- paste0('   tau[s] ~ ', tau_prior)
       model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
@@ -365,7 +376,7 @@ mvjagam = function(formula,
 
   }
 
-  # Covariate datafrme including training and testing observations
+  # Covariate dataframe including training and testing observations
   X <- data.frame(rbind(ss_jagam$jags.data$X,
                         predict(ss_gam, newdata = data_test, type = 'lpmatrix')))
 

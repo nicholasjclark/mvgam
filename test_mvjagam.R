@@ -26,6 +26,7 @@ plot_mvgam_season = function(out_gam_mod, series, data_test, data_train,
 }
 
 plot_mvgam_gdd = function(out_gam_mod, series, data_test, data_train,
+                          mean_gdd, sd_gdd,
                           xlab = 'Season'){
 
   pred_dat <- expand.grid(series = levels(data_train$series)[series],
@@ -50,24 +51,25 @@ plot_mvgam_gdd = function(out_gam_mod, series, data_test, data_train,
   int <- apply(preds,
                2, hpd, 0.95)
   preds_last <- preds[1,]
-  plot(preds_last ~ pred_dat$cum_gdd,
+  covar_vals <- (pred_dat$cum_gdd * sd_gdd) + mean_gdd
+  plot(preds_last ~ covar_vals,
        type = 'l', ylim = c(0, max(int) + 2),
        col = rgb(1,0,0, alpha = 0),
        ylab = paste0('Predicted peak count for ', levels(data_train$series)[series]),
        xlab = 'Cumulative growing degree days')
   int[int<0] <- 0
-  polygon(c(pred_dat$cum_gdd, rev(pred_dat$cum_gdd)),
+  polygon(c(covar_vals, rev(covar_vals)),
           c(int[1,],rev(int[3,])),
           col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
   int <- apply(preds,
                2, hpd, 0.68)
   int[int<0] <- 0
-  polygon(c(pred_dat$cum_gdd, rev(pred_dat$cum_gdd)),
+  polygon(c(covar_vals, rev(covar_vals)),
           c(int[1,],rev(int[3,])),
           col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
-  lines(int[2,] ~ pred_dat$cum_gdd, col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
+  lines(int[2,] ~ covar_vals, col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
 
-  rug(data_train$cum_gdd[which(data_train$series ==
+  rug(((data_train$cum_gdd * sd_gdd) + mean_gdd)[which(data_train$series ==
                                  levels(data_train$series)[series])])
 }
 
@@ -133,6 +135,11 @@ model_dat = model_dat %>%
                 siteID = factor(siteID),
                 series = factor(series))
 
+# Scale the environmental covariate and store the mean and sd for later plotting
+sd_gdd <- sd(model_dat$cum_gdd)
+mean_gdd <- mean(model_dat$cum_gdd)
+model_dat$cum_gdd <- (model_dat$cum_gdd - mean_gdd) / sd_gdd
+
 # Split into training and testing
 data_train = model_dat[1:(floor(nrow(model_dat) * 0.9)),]
 data_test = model_dat[((floor(nrow(model_dat) * 0.9)) + 1):nrow(model_dat),]
@@ -189,7 +196,7 @@ hyp4 = y ~
 use_mv <- T
 
 # First simulate from the model's prior distributions
-out_gam_sim <- mvjagam(formula = hyp3,
+out_gam_sim <- mvjagam(formula = hyp1,
                        data_train = data_train,
                        data_test = data_test,
                        prior_simulation = TRUE,
@@ -207,10 +214,10 @@ out_gam_sim <- mvjagam(formula = hyp3,
                        tau_prior = 'dunif(0.1, 100)')
 
 # Now condition the model on the observed data
-out_gam_mod <- mvjagam(formula = hyp3,
+out_gam_mod <- mvjagam(formula = hyp1,
                         data_train = data_train,
                         data_test = data_test,
-                        n.adapt = 2000,
+                        n.adapt = 1000,
                         n.burnin = 5000,
                         n.iter = 5000,
                         thin = 10,
@@ -227,7 +234,7 @@ out_gam_mod <- mvjagam(formula = hyp3,
                         tau_prior = 'dunif(0.1, 100)')
 
 # View the modified JAGS model file
-out_gam_mod$model_file
+writeLines(out_gam_mod$model_file)
 
 # Summary of key parameters
 library(MCMCvis)
@@ -267,7 +274,7 @@ MCMCtrace(out_gam_mod$jags_output, c('tau_fac'),
           n.eff = TRUE,
           Rhat = TRUE,
           priors = MCMCvis::MCMCchains(out_gam_sim$jags_output, 'tau_fac'),
-          post_zm = FALSE)
+          post_zm = T)
 
 # Precision for latent trends (if using independent Gaussian trends)
 MCMCtrace(out_gam_mod$jags_output, c('tau'),
@@ -356,8 +363,10 @@ plot_mvgam_trend(out_gam_mod, series = series, data_test = data_test,
 par(opar)
 
 #### Other aspects to investigate ####
-# Plot the estimated cumulative growing degree days function
+# Plot the estimated cumulative growing degree days function, with a rug at the bottom
+# to show the observed values of the covariate for this particular series
 plot_mvgam_gdd(out_gam_mod, series = series, data_test = data_test,
+               mean_gdd = mean_gdd, sd_gdd = sd_gdd,
                data_train = data_train, xlab = 'Epidemiological week')
 
 # Need to calculate discrete rank probability score for out of sample forecasts from each model
