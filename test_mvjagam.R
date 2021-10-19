@@ -144,7 +144,7 @@ data_test = model_dat[((floor(nrow(model_dat) * 0.9)) + 1):nrow(model_dat),]
 null_hyp = y ~ siteID + s(cum_gdd, by = siteID, k = 3) - 1
 
 # 1. Do all series share same seasonal pattern, with any remaining variation due to
-# non-seasonal local variation?
+# non-seasonal local variation captured by the trends?
 hyp1 = y ~
   siteID +
   s(cum_gdd, by = siteID, k = 3) +
@@ -187,23 +187,43 @@ hyp4 = y ~
 
 # Additional parameters for the model
 use_mv <- T
-out_gam_mod <- mvjagam(formula = hyp1,
+
+# First simulate from the model's prior distributions
+out_gam_sim <- mvjagam(formula = hyp3,
+                       data_train = data_train,
+                       data_test = data_test,
+                       prior_simulation = TRUE,
+                       n.adapt = 1000,
+                       n.burnin = 1000,
+                       n.iter = 1000,
+                       thin = 2,
+                       use_mv = use_mv,
+                       use_nb = FALSE,
+                       # Laplace distribution emphasizes our prior that smooths should not be overly wiggly
+                       # unless the data supports this
+                       rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
+                       # Prior is that latent trends should have positive autocorrelation
+                       phi_prior = 'dbeta(2,2)',
+                       tau_prior = 'dunif(0.1, 100)')
+
+# Now condition the model on the observed data
+out_gam_mod <- mvjagam(formula = hyp3,
                         data_train = data_train,
                         data_test = data_test,
                         n.adapt = 2000,
                         n.burnin = 5000,
                         n.iter = 5000,
-                        thin = 5,
+                        thin = 10,
                         # auto_update attempts to update until some reasonable convergence, but can
                         # be slow!!
-                        auto_update = TRUE,
+                        auto_update = FALSE,
                         use_mv = use_mv,
                         use_nb = FALSE,
-                        # Laplace distribution emphasizes our prior that smooths should not be overly wiggly
+                        # Laplace distribution emphasizes prior that smooths should not be overly wiggly
                         # unless the data supports this
-                        rho_prior = 'ddexp(5, 0.25)T(-12, 12)',
+                        rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
                         # Prior is that latent trends should have positive autocorrelation
-                        phi_prior = 'dbeta(2,2)',
+                        phi_prior = 'dbeta(2, 2)',
                         tau_prior = 'dunif(0.1, 100)')
 
 # View the modified JAGS model file
@@ -213,23 +233,49 @@ out_gam_mod$model_file
 library(MCMCvis)
 MCMCvis::MCMCsummary(out_gam_mod$jags_output, c('phi', 'rho'))
 
-# Traces of key parameters
+# Traces of key parameters, with prior distributions overlain to investigate
+# how informative the data are for each parameter of interest
 # Negative binomial size parameter (set to 10,000 if use_nb = FALSE)
-MCMCtrace(out_gam_mod$jags_output, c('r'), pdf = F, n.eff = T)
+MCMCtrace(out_gam_mod$jags_output, params = c('r'),
+          pdf = F,
+          n.eff = TRUE,
+          Rhat = TRUE,
+          priors = MCMCvis::MCMCchains(out_gam_sim$jags_output, 'r'),
+          post_zm = FALSE)
 
 # Penalties of smooth components (smaller means an effect is more nonlinear)
 out_gam_mod$smooth_param_details # rhos are the logged versions of the lambdas
-MCMCtrace(out_gam_mod$jags_output, c('rho'), pdf = F, n.eff = T)
+MCMCtrace(out_gam_mod$jags_output, c('rho'),
+          pdf = F,
+          n.eff = TRUE,
+          Rhat = TRUE,
+          priors = MCMCvis::MCMCchains(out_gam_sim$jags_output, 'rho'),
+          post_zm = FALSE)
 
 # AR1 persistence coefficients for latent dynamic factors (or for each
 # individual series if use_mv = FALSE)
-MCMCtrace(out_gam_mod$jags_output, c('phi'), pdf = F, n.eff = T)
+MCMCtrace(out_gam_mod$jags_output, c('phi'),
+          pdf = F,
+          n.eff = TRUE,
+          Rhat = TRUE,
+          priors = MCMCvis::MCMCchains(out_gam_sim$jags_output, 'phi'),
+          post_zm = FALSE)
 
 # Precision for latent dynamic factors (if using latent factors)
-MCMCtrace(out_gam_mod$jags_output, c('tau_fac'), pdf = F, n.eff = T)
+MCMCtrace(out_gam_mod$jags_output, c('tau_fac'),
+          pdf = F,
+          n.eff = TRUE,
+          Rhat = TRUE,
+          priors = MCMCvis::MCMCchains(out_gam_sim$jags_output, 'tau_fac'),
+          post_zm = FALSE)
 
 # Precision for latent trends (if using independent Gaussian trends)
-MCMCtrace(out_gam_mod$jags_output, c('tau'), pdf = F, n.eff = T)
+MCMCtrace(out_gam_mod$jags_output, c('tau'),
+          pdf = F,
+          n.eff = TRUE,
+          Rhat = TRUE,
+          priors = MCMCvis::MCMCchains(out_gam_sim$jags_output, 'tau'),
+          post_zm = FALSE)
 dev.off()
 
 if(use_mv){
@@ -283,16 +329,19 @@ if(use_mv){
 }
 
 #### If GAM component is LESS supported, we should see evidence in the form of: ####
-# 1. Stronger residual correlations, suggesting we are missing some site-level structure
+# 1. Poorer convergence of smoothing parameter estimates, suggesting the model
+# is more 'mis-specified' and harder to fit
+
+# 2. Stronger residual correlations, suggesting we are missing some site-level structure
 summary(as.vector(as.matrix(mean_correlations)))
 
-# 2. Smaller precisions for tau_fac (i.e. larger variance for latent dynamic factors)
+# 3. Smaller precisions for tau_fac (i.e. larger variance for latent dynamic factors)
 MCMCsummary(out_gam_mod$jags_output, 'tau_fac')
 
-# 3. Visual evidence of seasonality in latent trends
+# 4. Visual evidence of seasonality in latent trends
 # Total number of series in the set
 length(unique(data_train$series))
-series = 6
+series = 4
 opar <- par()
 par(mfrow = c(3, 1))
 # Plot the estimated seasonality function

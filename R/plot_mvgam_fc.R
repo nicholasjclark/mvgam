@@ -1,7 +1,7 @@
 #'Plot mvjagam posterior predictions for a specified series
 #'@param out_gam_mod \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param data_train A\code{dataframe} containing the model response variable and covariates
+#'@param data_train A \code{dataframe} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
 #''y' (the discrete outcomes; NAs allowed)
 #''series' (character or factor index of the series IDs)
@@ -12,7 +12,7 @@
 #'during this time but they continue to evolve, allowing the trend from the past season to continue evolving rather than forcing
 #'it to zero
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
-#'@param data_test \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
+#'@param data_test A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}
 #'@export
 plot_mvgam_fc = function(out_gam_mod, series, data_test, data_train){

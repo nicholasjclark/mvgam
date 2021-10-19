@@ -11,10 +11,10 @@ plot_mvgam_trend(out_gam_mod, series, data_test, data_train)
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
-\item{data_test}{\code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
+\item{data_test}{A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
 addition to any other variables included in the linear predictor of \code{formula}}
 
-\item{data_train}{A\code{dataframe} containing the model response variable and covariates
+\item{data_train}{A \code{dataframe} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
 'y' (the discrete outcomes; NAs allowed)
 'series' (character or factor index of the series IDs)

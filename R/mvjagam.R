@@ -8,7 +8,7 @@
 #'@param formula A \code{character} string specifying the GAM formula. These are exactly like the formula
 #'for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).
-#'@param data_train A\code{dataframe} containing the model response variable and covariates
+#'@param data_train A \code{dataframe} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
 #''y' (the discrete outcomes; NAs allowed)
 #''series' (character or factor index of the series IDs)
@@ -19,8 +19,10 @@
 #'during this time but they continue to evolve, allowing the trend from the past season to continue evolving rather than forcing
 #'it to zero
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
-#'@param data_test \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
+#'@param data_test A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}
+#'@param prior_simulation \code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
+#'simulations from prior distributions are returned
 #'@param use_nb \code{logical} If \code{TRUR}, use a Negative Binomial likelihood with estimated
 #'overdispersion parameter r;
 #'if \code{FALSE}, set r to \code{10,000} to approximate the Poisson distribution
@@ -54,6 +56,7 @@
 mvjagam = function(formula,
                     data_train,
                     data_test,
+                    prior_simulation = FALSE,
                     use_nb = TRUE,
                     use_mv = FALSE,
                     n.adapt = 1000,
@@ -68,10 +71,13 @@ mvjagam = function(formula,
                     tau_prior = 'dunif(1, 100)'){
 
   # Fill in any NA's with arbitrary values so the observations aren't dropped when jags data is created
+  if(prior_simulation){
+    data_train$y <- rep(NA, length(data_train$y))
+  }
   orig_y <- data_train$y
   data_train$y[which(is.na(data_train$y))] <- floor(sample(seq(0,50),
-                                                           length(which(is.na(data_train$y))),
-                                                           T))
+                                                             length(which(is.na(data_train$y))),
+                                                             T))
 
   # Estimate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the JAGS model later on
@@ -266,7 +272,7 @@ mvjagam = function(formula,
                         }
 
                         ## Latent factors evolve as AR1 time series
-                        tau_fac ~ dnorm(50, 0.05)T(0.01,)
+                        tau_fac ~ dnorm(50, 0.01)T(0.01,)
                         for(j in 1:n_lv){
                            LV[1, j] ~ dnorm(0, tau_fac)
                         }

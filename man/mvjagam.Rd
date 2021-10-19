@@ -8,6 +8,7 @@ mvjagam(
   formula,
   data_train,
   data_test,
+  prior_simulation = FALSE,
   use_nb = TRUE,
   use_mv = FALSE,
   n.adapt = 1000,
@@ -27,7 +28,7 @@ mvjagam(
 for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).}
 
-\item{data_train}{A\code{dataframe} containing the model response variable and covariates
+\item{data_train}{A \code{dataframe} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
 'y' (the discrete outcomes; NAs allowed)
 'series' (character or factor index of the series IDs)
@@ -39,8 +40,11 @@ during this time but they continue to evolve, allowing the trend from the past s
 it to zero
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
-\item{data_test}{\code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
+\item{data_test}{A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
 addition to any other variables included in the linear predictor of \code{formula}}
+
+\item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
+simulations from prior distributions are returned}
 
 \item{use_nb}{\code{logical} If \code{TRUR}, use a Negative Binomial likelihood with estimated
 overdispersion parameter r;
