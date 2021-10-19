@@ -355,6 +355,12 @@ plot_mvgam_trend(out_gam_mod, series = series, data_test = data_test,
                  data_train = data_train)
 par(opar)
 
+#### Other aspects to investigate ####
 # Plot the estimated cumulative growing degree days function
 plot_mvgam_gdd(out_gam_mod, series = series, data_test = data_test,
                data_train = data_train, xlab = 'Epidemiological week')
+
+# Need to calculate discrete rank probability score for out of sample forecasts from each model
+
+# Consider adding an AR(frequency) term so that current trend also depends on the trend's value from one year
+# ago (i.e. here we have frequency 26, so we could have an AR(1, 26) model for the trend)

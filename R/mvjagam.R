@@ -29,7 +29,8 @@
 #'@param use_mv \code{logical} If \code{TRUE} and the total number of series is \code{<=5},
 #'a multivariate gaussian distribution is used for the state space trend errors. If \code{TRUE} and the total number
 #'of series is \code{>5}, a set of latent dynamic factors is estimated to capture possible dependencies in the state
-#'space trends. If \code{FALSE}, independent gaussian distributions are used for the trends
+#'space trends. Currently, the total number of factors included will be approximately half the number of unique
+#'series in the dataset. If \code{FALSE}, independent gaussian distributions are used for the trends
 #'@param n.chains \code{integer} the number of parallel chains for the model
 #'@param n.adapt \code{integer} the number of iterations for adaptation. See adapt for details.
 #'If \code{n.adapt} = 0 then no adaptation takes place
