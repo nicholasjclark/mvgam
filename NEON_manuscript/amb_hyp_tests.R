@@ -65,10 +65,10 @@ rho_prior = 'ddexp(5, 0.2)T(-12, 12)'
 phi_prior = 'dbeta(2,2)'
 
 # Fit multivariate and univariate versions of each hypothesis
-n.adapt = 100
-n.burnin = 100
-n.iter = 100
-thin = 1
+n.adapt = 5000
+n.burnin = 25000
+n.iter = 5000
+thin = 5
 
 fit_null <- fit_mvgam(data_train = all_data$data_train,
                   data_test = all_data$data_test,
