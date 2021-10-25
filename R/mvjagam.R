@@ -36,7 +36,7 @@
 #'If \code{n.adapt} = 0 then no adaptation takes place
 #'@param n.iter \code{integer} the number of iterations of the Markov chain to run
 #'@param auto_update \code{logical} If \code{TRUE}, the model is run for up to \code{3} additional sets of
-#'\code{n.iter} iterations, or until the lower 15% of effective sample sizes reaches \code{100}
+#'\code{n.iter} iterations, or until the lower 15th percentile of effective sample sizes reaches \code{100}
 #'@param phi_prior \code{character} specifying (in JAGS syntax) the prior distributions for the AR1 coefficients in the
 #'latent trends
 #'@param rho_prior \code{character} specifying (in JAGS syntax) the prior distributions for the smooth penalty parameters
@@ -107,11 +107,16 @@ mvjagam = function(formula,
 
   # Any parametric effects in the gam need to get more sensible priors
   if(any(grepl('Parametric effect priors', base_model))){
+
+    in_parenth <- regmatches(base_model[grep('Parametric effect priors',
+                               base_model) + 1],
+               gregexpr( "(?<=\\().+?(?=\\))", base_model[grep('Parametric effect priors',
+                                                               base_model) + 1], perl = T))[[1]][1]
+    n_terms <- as.numeric(sub(".*:", "", in_parenth))
     base_model[grep('Parametric effect priors',
                     base_model) + 1] <- paste0('  for (i in 1:',
-                                               length(ss_gam$pterms),
+                                               n_terms,
                                                ') { b[i] ~ dnorm(0, 0.1) }')
-
   }
 
   # Add replacement lines for trends and linear predictor

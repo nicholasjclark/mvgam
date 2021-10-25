@@ -16,9 +16,13 @@
 #'addition to any other variables included in the linear predictor of \code{formula}
 #'@export
 plot_mvgam_fc = function(out_gam_mod, series, data_test, data_train){
-  pred_indices <- seq(0, length(out_gam_mod$ytimes),
-                      length.out = NCOL(out_gam_mod$ytimes) + 1)
-  preds <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'ypred')[,pred_indices[series]:pred_indices[series + 1]]
+  ends <- seq(0, dim(MCMCvis::MCMCchains(out_gam_mod$jags_output, 'ypred'))[2],
+              length.out = NCOL(out_gam_mod$ytimes) + 1)
+  starts <- ends + 1
+  starts <- c(1, starts[-c(1, (NCOL(out_gam_mod$ytimes)+1))])
+  ends <- ends[-1]
+
+  preds <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'ypred')[,starts[series]:ends[series]]
   preds_last <- preds[1,]
   int <- apply(preds,
                2, hpd, 0.95)

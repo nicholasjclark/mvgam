@@ -1,149 +1,10 @@
 #### Testing the mvjagam function ####
-# Utility functions, too specific to put into the package but useful for our study
-plot_mvgam_season = function(out_gam_mod, series, data_test, data_train,
-                             xlab = 'Season'){
-
-  pred_dat <- expand.grid(series = levels(data_train$series)[series],
-                          season = seq(min(data_train$season),
-                                       max(data_train$season), length.out = 100),
-                          year = mean(data_train$year),
-                          cum_gdd = mean(data_train$cum_gdd, na.rm = T),
-                          siteID = as.character(unique(data_train$siteID[which(data_train$series ==
-                                                                                 levels(data_train$series)[series])])))
-  Xp <- predict(out_gam_mod$mgcv_model, newdata = pred_dat, type = 'lpmatrix')
-  betas <- MCMCchains(out_gam_mod$jags_output, 'b')
-  plot(Xp %*% betas[1,] ~ pred_dat$season, ylim = range(Xp %*% betas[1,] + 1.5,
-                                                        Xp %*% betas[1,] - 1.5),
-
-       col = rgb(150, 0, 0, max = 255, alpha = 10), type = 'l',
-       ylab = paste0('F(season) for ', levels(data_train$series)[series]),
-       xlab = xlab)
-  for(i in 2:1000){
-    lines(Xp %*% betas[i,] ~ pred_dat$season,
-
-          col = rgb(150, 0, 0, max = 255, alpha = 10))
-  }
-}
-
-plot_mvgam_gdd = function(out_gam_mod, series, data_test, data_train,
-                          mean_gdd, sd_gdd,
-                          xlab = 'Season'){
-
-  pred_dat <- expand.grid(series = levels(data_train$series)[series],
-                          season = 20,
-                          in_season = 1,
-                          year = mean(data_train$year),
-                          cum_gdd = seq(min(data_train$cum_gdd[which(data_train$series ==
-                                                                       levels(data_train$series)[series])],
-                                            na.rm = T),
-                                        max(data_train$cum_gdd[which(data_train$series ==
-                                                                       levels(data_train$series)[series])],
-                                            na.rm = T), length.out = 100),
-                          siteID = as.character(unique(data_train$siteID[which(data_train$series ==
-                                                                                 levels(data_train$series)[series])])))
-  Xp <- predict(out_gam_mod$mgcv_model, newdata = pred_dat, type = 'lpmatrix')
-  betas <- MCMCchains(out_gam_mod$jags_output, 'b')
-  preds <- matrix(NA, nrow = 1000, ncol = length(pred_dat$cum_gdd))
-  for(i in 1:1000){
-    preds[i,] <- rnbinom(length(pred_dat$cum_gdd), mu = exp(Xp %*% betas[i,]),
-                         size = MCMCvis::MCMCsummary(out_gam_mod$jags_output, 'r')$mean)
-  }
-  int <- apply(preds,
-               2, hpd, 0.95)
-  preds_last <- preds[1,]
-  covar_vals <- (pred_dat$cum_gdd * sd_gdd) + mean_gdd
-  plot(preds_last ~ covar_vals,
-       type = 'l', ylim = c(0, max(int) + 2),
-       col = rgb(1,0,0, alpha = 0),
-       ylab = paste0('Predicted peak count for ', levels(data_train$series)[series]),
-       xlab = 'Cumulative growing degree days')
-  int[int<0] <- 0
-  polygon(c(covar_vals, rev(covar_vals)),
-          c(int[1,],rev(int[3,])),
-          col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
-  int <- apply(preds,
-               2, hpd, 0.68)
-  int[int<0] <- 0
-  polygon(c(covar_vals, rev(covar_vals)),
-          c(int[1,],rev(int[3,])),
-          col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
-  lines(int[2,] ~ covar_vals, col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
-
-  rug(((data_train$cum_gdd * sd_gdd) + mean_gdd)[which(data_train$series ==
-                                 levels(data_train$series)[series])])
-}
 
 #### NEON mv_gam ####
 library(mvgam)
 library(dplyr)
 data("all_neon_tick_data")
 
-# Prep data for modelling
-species = 'Ambloyomma_americanum'
-
-if(species == 'Ambloyomma_americanum'){
-
-  plotIDs <- c('SCBI_013', 'SERC_001', 'SERC_005', 'SERC_006',
-               'SERC_002', 'SERC_012', 'KONZ_025', 'UKFS_001',
-               'UKFS_004', 'UKFS_003', 'ORNL_002', 'ORNL_040',
-               'ORNL_008', 'ORNL_007', 'ORNL_009', 'ORNL_003',
-               'TALL_001', 'TALL_008', 'TALL_002')
-  model_dat <- all_neon_tick_data %>%
-    dplyr::mutate(target = amblyomma_americanum) %>%
-    dplyr::select(Year, epiWeek, plotID, target) %>%
-    dplyr::mutate(epiWeek = as.numeric(epiWeek)) %>%
-    dplyr::filter(Year > 2014 & Year < 2021) %>%
-    dplyr::mutate(Year_orig = Year)
-
-  model_dat %>%
-    dplyr::full_join(expand.grid(plotID = unique(model_dat$plotID),
-                                 Year_orig = unique(model_dat$Year_orig),
-                                 epiWeek = seq(1, 52))) %>%
-    dplyr::left_join(all_neon_tick_data %>%
-                       dplyr::select(siteID, plotID) %>%
-                       dplyr::distinct()) %>%
-    # Remove winter tick abundances as we are not interested in modelling them
-    dplyr::filter(epiWeek > 14) %>%
-    dplyr::filter(epiWeek < 41) %>%
-    dplyr::mutate(series = plotID,
-                  season = epiWeek - 14,
-                  year = as.vector(scale(Year_orig)),
-                  y = target) %>%
-    dplyr::select(-Year, -epiWeek, -target) %>%
-    dplyr::ungroup() %>%
-    dplyr::arrange(Year_orig, season, series) -> model_dat
-
-  model_dat %>%
-    dplyr::left_join(all_neon_tick_data %>%
-                       dplyr::ungroup() %>%
-                       dplyr::select(Year, siteID, cum_sdd, cum_gdd) %>%
-                       dplyr::mutate(Year_orig = Year) %>%
-                       dplyr::select(-Year) %>%
-                       dplyr::distinct()) -> model_dat
-}
-
-
-model_dat = model_dat %>%
-  # Set indicator for whether time point is 'in-season' or not (trends won't contribute during
-  # off season, as counts generally go to zero during this time)
-  dplyr::mutate(in_season = ifelse(season >=3 & season <= 22, 1, 0)) %>%
-  # Only include a small set of sites for now (11 series in total from three sites)
-  dplyr::filter(siteID %in% c('SERC', 'TALL', 'UKFS'),
-                Year_orig <= 2019) %>%
-  # ID variables need to be factors for JAGS modelling
-  dplyr::mutate(plotID = factor(plotID),
-                siteID = factor(siteID),
-                series = factor(series))
-
-# Scale the environmental covariate and store the mean and sd for later plotting
-sd_gdd <- sd(model_dat$cum_gdd)
-mean_gdd <- mean(model_dat$cum_gdd)
-model_dat$cum_gdd <- (model_dat$cum_gdd - mean_gdd) / sd_gdd
-
-# Split into training and testing
-data_train = model_dat[1:(floor(nrow(model_dat) * 0.9)),]
-data_test = model_dat[((floor(nrow(model_dat) * 0.9)) + 1):nrow(model_dat),]
-(nrow(data_train) + nrow(data_test)) == nrow(model_dat)
 
 # Hypothesis testing
 # NULL. There is no seasonal pattern to be estimated, and we simply let the latent
@@ -369,7 +230,13 @@ plot_mvgam_gdd(out_gam_mod, series = series, data_test = data_test,
                mean_gdd = mean_gdd, sd_gdd = sd_gdd,
                data_train = data_train, xlab = 'Epidemiological week')
 
-# Need to calculate discrete rank probability score for out of sample forecasts from each model
+# Calculate Discrete Rank Probability Score and nominal coverage of 90% credible interval for
+# each unique series
+all_drps <- do.call(rbind, lapply(seq_len(length(unique(data_train$series))), function(series){
+  calculate_drps(out_gam_mod = out_gam_mod, data_test = data_test,
+                 data_train = data_train, series = series, interval_width = 0.9)
+}))
+
 
 # Consider adding an AR(frequency) term so that current trend also depends on the trend's value from one year
 # ago (i.e. here we have frequency 26, so we could have an AR(1, 26) model for the trend)
