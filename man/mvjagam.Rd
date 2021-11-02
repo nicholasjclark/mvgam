@@ -11,16 +11,17 @@ mvjagam(
   prior_simulation = FALSE,
   use_nb = TRUE,
   use_mv = FALSE,
+  use_lv = FALSE,
+  n_lv,
   n.adapt = 1000,
   n.chains = 2,
   n.burnin = 5000,
   n.iter = 2000,
   thin = 2,
   auto_update = TRUE,
-  phi_prior = "dbeta(1, 1)",
-  rho_prior = "dunif(-12, 12)",
+  phi_prior,
   r_prior = "dexp(0.001)",
-  tau_prior = "dunif(1, 100)"
+  tau_prior
 )
 }
 \arguments{
@@ -50,11 +51,11 @@ simulations from prior distributions are returned}
 overdispersion parameter r;
 if \code{FALSE}, set r to \code{10,000} to approximate the Poisson distribution}
 
-\item{use_mv}{\code{logical} If \code{TRUE} and the total number of series is \code{<=5},
-a multivariate gaussian distribution is used for the state space trend errors. If \code{TRUE} and the total number
-of series is \code{>5}, a set of latent dynamic factors is estimated to capture possible dependencies in the state
-space trends. Currently, the total number of factors included will be approximately half the number of unique
-series in the dataset. If \code{FALSE}, independent gaussian distributions are used for the trends}
+\item{use_mv}{\code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
+latent trends. If \code{FALSE}, estimate covarying errors in the latent trends}
+
+\item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_mv == TRUE}
+and the total number of series is \code{>5}. Defaults to \code{floor(n_series / 2)}}
 
 \item{n.adapt}{\code{integer} the number of iterations for adaptation. See adapt for details.
 If \code{n.adapt} = 0 then no adaptation takes place}
@@ -64,12 +65,10 @@ If \code{n.adapt} = 0 then no adaptation takes place}
 \item{n.iter}{\code{integer} the number of iterations of the Markov chain to run}
 
 \item{auto_update}{\code{logical} If \code{TRUE}, the model is run for up to \code{3} additional sets of
-\code{n.iter} iterations, or until the lower 15\% of effective sample sizes reaches \code{100}}
+\code{n.iter} iterations, or until the lower 15th percentile of effective sample sizes reaches \code{100}}
 
-\item{phi_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the AR1 coefficients in the
+\item{phi_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the drift terms in the
 latent trends}
-
-\item{rho_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the smooth penalty parameters}
 
 \item{r_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
 overdispersion parameter}

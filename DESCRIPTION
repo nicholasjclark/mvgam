@@ -9,7 +9,7 @@ Authors@R:
 Description: Multivariate Bayesian Generalised Additive Models for discrete time series
 Maintainer: Nicholas J Clark <nicholas.j.clark1214@gmail.com>
 License: MIT + file LICENSE
-Depends: R (>= 4.0.0), mgcv, rjags
+Depends: R (>= 3.6.0), mgcv, rjags
 Imports: parallel,
     coda,
     MCMCpack,

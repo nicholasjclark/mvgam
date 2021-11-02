@@ -203,6 +203,7 @@ prep_neon_data = function(species = 'Ambloyomma_americanum', split_prop = 0.9){
                  'TALL_001', 'TALL_008', 'TALL_002')
     model_dat <- all_neon_tick_data %>%
       dplyr::mutate(target = amblyomma_americanum) %>%
+      dplyr::filter(plotID %in% plotIDs) %>%
       dplyr::select(Year, epiWeek, plotID, target) %>%
       dplyr::mutate(epiWeek = as.numeric(epiWeek)) %>%
       dplyr::filter(Year > 2014 & Year < 2021) %>%
@@ -253,6 +254,7 @@ prep_neon_data = function(species = 'Ambloyomma_americanum', split_prop = 0.9){
                  'SERC_001','SERC_005','SERC_006','SERC_012','ORNL_007')
     model_dat <- all_neon_tick_data %>%
       dplyr::mutate(target = ixodes_scapularis) %>%
+      dplyr::filter(plotID %in% plotIDs) %>%
       dplyr::select(Year, epiWeek, plotID, target) %>%
       dplyr::mutate(epiWeek = as.numeric(epiWeek)) %>%
       dplyr::filter(Year > 2014 & Year < 2021) %>%
@@ -316,13 +318,14 @@ fit_mvgam = function(data_train,
                      formula_name,
                      use_nb = TRUE,
                      use_mv = TRUE,
-                     rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
-                     phi_prior = 'dbeta(2,2)',
-                     tau_prior = 'dunif(0.1, 100)',
+                     n_lv = 3,
+                     phi_prior,
+                     tau_prior,
                      n.adapt = 1000,
                      n.burnin = 1000,
                      n.iter = 1000,
                      thin = 2,
+                     auto_update = FALSE,
                      interval_width = 0.9){
 
   # Cndition the model on the observed data
@@ -333,10 +336,10 @@ fit_mvgam = function(data_train,
                          n.burnin = n.burnin,
                          n.iter = n.iter,
                          thin = thin,
-                         auto_update = F,
+                         auto_update = auto_update,
                          use_mv = use_mv,
+                         n_lv = n_lv,
                          use_nb = use_nb,
-                         rho_prior = rho_prior,
                          phi_prior = phi_prior,
                          tau_prior = tau_prior)
 
@@ -357,7 +360,7 @@ fit_mvgam = function(data_train,
   n_lv <- dim(lv_coefs)[2]
   n_samples <- prod(dim(lv_coefs)[3:4])
 
-  # Get arrat of latend variable loadings
+  # Get array of latent variable loadings
   coef_array <- array(NA, dim = c(n_series, n_lv, n_samples))
   for(i in 1:n_series){
     for(j in 1:n_lv){
@@ -395,7 +398,7 @@ fit_mvgam = function(data_train,
   resid_corr_summary <- summary(as.vector(as.matrix(mean_correlations)))
 
   # 3. Smaller precisions for tau_fac (i.e. larger variance for latent dynamic factors)
-  tau_factor_summary <- MCMCsummary(out_gam_mod$jags_output, 'tau_fac', HPD = TRUE)
+  tau_factor_summary <- MCMCvis::MCMCsummary(out_gam_mod$jags_output, 'tau_fac', HPD = TRUE)
   } else {
     resid_corr_plot <- NULL
     resid_corr_summary <- NULL

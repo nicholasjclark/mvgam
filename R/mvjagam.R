@@ -31,15 +31,18 @@
 #'of series is \code{>5}, a set of latent dynamic factors is estimated to capture possible dependencies in the state
 #'space trends. Currently, the total number of factors included will be approximately half the number of unique
 #'series in the dataset. If \code{FALSE}, independent gaussian distributions are used for the trends
+#'@param use_mv \code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
+#'latent trends. If \code{FALSE}, estimate covarying errors in the latent trends
+#'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_mv == TRUE}
+#'and the total number of series is \code{>5}. Defaults to \code{floor(n_series / 2)}
 #'@param n.chains \code{integer} the number of parallel chains for the model
 #'@param n.adapt \code{integer} the number of iterations for adaptation. See adapt for details.
 #'If \code{n.adapt} = 0 then no adaptation takes place
 #'@param n.iter \code{integer} the number of iterations of the Markov chain to run
 #'@param auto_update \code{logical} If \code{TRUE}, the model is run for up to \code{3} additional sets of
 #'\code{n.iter} iterations, or until the lower 15th percentile of effective sample sizes reaches \code{100}
-#'@param phi_prior \code{character} specifying (in JAGS syntax) the prior distributions for the AR1 coefficients in the
+#'@param phi_prior \code{character} specifying (in JAGS syntax) the prior distributions for the drift terms in the
 #'latent trends
-#'@param rho_prior \code{character} specifying (in JAGS syntax) the prior distributions for the smooth penalty parameters
 #'@param r_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
 #'overdispersion parameter
 #'@param tau_prior \code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
@@ -60,16 +63,17 @@ mvjagam = function(formula,
                     prior_simulation = FALSE,
                     use_nb = TRUE,
                     use_mv = FALSE,
+                    use_lv = FALSE,
+                    n_lv,
                     n.adapt = 1000,
                     n.chains = 2,
                     n.burnin = 5000,
                     n.iter = 2000,
                     thin = 2,
                     auto_update = TRUE,
-                    phi_prior = 'dbeta(1, 1)',
-                    rho_prior = 'dunif(-12, 12)',
+                    phi_prior,
                     r_prior = 'dexp(0.001)',
-                    tau_prior = 'dunif(1, 100)'){
+                    tau_prior){
 
   # Fill in any NA's with arbitrary values so the observations aren't dropped when jags data is created
   if(prior_simulation){
@@ -94,7 +98,8 @@ mvjagam = function(formula,
                           family = poisson(),
                            drop.unused.levels = FALSE,
                           file = 'base_gam.txt',
-                          sp.prior = 'log.uniform')
+                          sp.prior = 'gamma',
+                          diagonalize = F)
 
   # Read in the base (unmodified) jags model file
   base_model <- suppressWarnings(readLines('base_gam.txt'))
@@ -103,7 +108,6 @@ mvjagam = function(formula,
   # the modified state space representation
   lines_remove <- c(1:grep('## response', base_model))
   base_model <- base_model[-lines_remove]
-  base_model[grep('rho\\[i\\] ~', base_model)] <- paste0('   rho[i] ~ ', rho_prior)
 
   # Any parametric effects in the gam need to get more sensible priors
   if(any(grepl('Parametric effect priors', base_model))){
@@ -140,13 +144,13 @@ mvjagam = function(formula,
 
                                    for (i in 2:n){
                                    for (s in 1:n_series){
-                                   trend[i, s] ~ dnorm(trend[i - 1, s] * phi[s], tau[s])
+                                   trend[i, s] ~ dnorm(phi[s] + trend[i - 1, s], tau[s])
                                    }
                                    }
 
                                    for (s in 1:n_series){
-                                   phi[s] ~ dunif(-0.9, 0.9)
-                                   tau[s] ~ dexp(0.5)
+                                   phi[s] ~ dnorm(0, 10)
+                                   tau[s] ~ dgamma(0.05, 0.005)
                                    }
 
                                    ## Negative binomial likelihood functions
@@ -179,17 +183,29 @@ mvjagam = function(formula,
         sep = "\n")
     model_file <- readLines(fil, n = -1)
 
-    # Update and prior distribution choices
-    model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('   phi[s] ~ ', phi_prior)
-    model_file[grep('tau\\[s\\] ~', model_file)] <- paste0('   tau[s] ~ ', tau_prior)
-    model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
+    # Update further prior distributions
+    if(!missing(phi_prior)){
+      model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('   phi[s] ~ ', phi_prior)
+    }
+
+    if(!missing(tau_prior)){
+      model_file[grep('tau\\[s\\] ~', model_file)] <- paste0('   tau[s] ~ ', tau_prior)
+    }
+
+    if(!missing(r_prior)){
+      model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
+    }
 
     model_file <- textConnection(model_file)
   }
 
   if(use_mv){
-    if(length(unique(data_train$series)) <= 5){
-      cat('Fitting a multivariate GAM with fully estimated covariance for the latent trends...\n')
+    if(missing(use_lv)){
+      use_lv = TRUE
+    }
+
+    if(!use_lv){
+      cat('Fitting a multivariate GAM with covariance for the latent trend errors...\n')
       modification <- c("model {
 
                         ## GAM linear predictor
@@ -202,12 +218,12 @@ mvjagam = function(formula,
                         }
                         }
 
-                        ## AR1 state space trends with possible covarying errors
+                        ## RW + drift state space trends with possible covarying errors
                         trend[1, 1:n_series] ~ dmnorm(zeros, tau[ , ])
 
                         for (i in 2:n){
                         for (s in 1:n_series){
-                        trend_mus[i, s] <- trend[i - 1, s] * phi[s]
+                        trend_mus[i, s] <- trend[i - 1, s] + phi[s]
                         }
                         }
 
@@ -215,9 +231,9 @@ mvjagam = function(formula,
                         trend[i, 1:n_series] ~ dmnorm(trend_mus[i, ], tau[ , ]);
                         }
 
-                        # AR1 persistence coefficients
+                        # RW drift coefficients
                         for (s in 1:n_series){
-                        phi[s] ~ dunif(-0.9, 0.9)
+                         phi[s] ~ dnorm(0, 10)
                         }
 
                         # Wishart is appropriate conjugate prior for dmnorm precision
@@ -230,9 +246,6 @@ mvjagam = function(formula,
                         for(j in 1:n_series){
                         cor[i, j] <- Covar.raw[i, j] / sqrt(Covar.raw[i, i] * Covar.raw[j, j])
                         }
-                        sigma[i] <- abs(xi[i]) * sqrt(Covar.raw[i, i])
-                        # Redundant scaling factor improves sampling efficiency
-                        xi[i] ~ dunif(0, 100)
                         }
 
                         ## Negative binomial likelihood functions
@@ -266,104 +279,94 @@ mvjagam = function(formula,
       model_file <- readLines(fil, n = -1)
 
       # Update and prior distribution choices
-      model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('   phi[s] ~ ', phi_prior)
-      model_file[grep('tau\\[s\\] ~', model_file)] <- paste0('   tau[s] ~ ', tau_prior)
-      model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
+      if(!missing(phi_prior)){
+        model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('   phi[s] ~ ', phi_prior)
+      }
+
+      if(!missing(tau_prior)){
+        model_file[grep('tau\\[s\\] ~', model_file)] <- paste0('   tau[s] ~ ', tau_prior)
+      }
+
+      if(!missing(r_prior)){
+        model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
+      }
 
       model_file <- textConnection(model_file)
     } else {
       #### Use the latent variable approach to estimate dependencies when n_series is large
       cat('Fitting a multivariate GAM with latent dynamic factors for the trends...\n')
-      modification <- c("model {
+      modification <- c(
+        "model {
 
-                        ## GAM linear predictor
-                        eta <- X %*% b
+        ## GAM linear predictor
+        eta <- X %*% b
 
-                        ## Mean expectations
-                        for (i in 1:n) {
-                        for (s in 1:n_series) {
-                        mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s] * in_season[i])
-                        }
-                        }
+        ## Mean expectations
+        for (i in 1:n) {
+        for (s in 1:n_series) {
+        mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s] * in_season[i])
+        }
+        }
 
-                        ## Latent factors evolve as AR1 time series
-                        tau_fac_raw ~ dnorm(50, 0.01)T(0.01,)
-                        xi ~ dunif(0.1, 10)
-                        tau_fac <- tau_fac_raw * xi
-                        for(j in 1:n_lv){
-                           LV[1, j] ~ dnorm(0, tau_fac)
-                        }
+        ## Latent factors evolve as RW + drift time series with precision / variance = 1
+        tau_fac ~ dgamma(0.05, 0.005)
+        for(j in 1:n_lv){
+         LV[1, j] ~ dnorm(0, tau_fac)
+        }
+        for(i in 2:n){
+         for(j in 1:n_lv){
+          LV[i, j] ~ dnorm(LV[i - 1, j] + phi[j], tau_fac)
+         }
+        }
 
-                        for(i in 2:n){
-                         for(j in 1:n_lv){
-                           LV[i, j] ~ dnorm(LV[i - 1, j] * phi[j], tau_fac)
-                         }
-                        }
+        ## Drift coefficients for latent factors
+        for (s in 1:n_lv){
+          phi[s] ~ dnorm(0, 10)
+        }
 
-                        # AR1 persistence coefficients for latent factors
-                        for (s in 1:n_lv){
-                         phi[s] ~ dunif(0, 1);
-                        }
+        ## Latent factor loadings are penalized to allow loadings for entire factors to be
+        ## effectively dropped, reducing overfitting
+        for (j in 1:n_lv){
+         penalty[j] ~ dt(0, 1, 1)T(0, )
+         for (s in 1:n_series){
+          lv_coefs[s, j] ~ dnorm(0, (1/lv_tau) * (1/penalty[j]))T(-1, 1);
+         }
+        }
+        lv_tau ~ dt(0, 1, 1)T(0, )
 
-                        ## Latent factor loadings, with identifiability constraints (Hui et al 2015)
-                        ## Upper diagonal 0
-                        for(i in 1:(n_lv - 1)){
-                           for(j in (i + 1):n_lv){
-                             lv_coefs[i, j] <- 0
-                            }
-                         }
+        ## Trend evolution for the series depends on latent factors;
+        ## fix the precision here as it may become unidentifiable when estimating
+        ## precision for the latent factors
+        for (i in 1:n){
+        for (s in 1:n_series){
+        #trend[i, s] ~ dnorm(inprod(lv_coefs[s,], LV[i,]), 100)
+         trend[i, s] <- inprod(lv_coefs[s,], LV[i,])
+        }
+        }
 
-                        ## Positive sign constraints on diagonal elements
-                        for(i in 1:n_lv) {
-                          lv_coefs[i, i]  ~ dunif(0, 1)
-                        }
+        ## Negative binomial likelihood functions
+        for (i in 1:n) {
+        for (s in 1:n_series) {
+        y[i, s] ~ dnegbin(rate[i, s], r);
+        rate[i, s] <- ifelse((r / (r + mu[i, s])) < min_eps, min_eps,
+        (r / (r + mu[i, s])))
+        }
+        }
 
-                        ## Lower diagonal free
-                        for(i in 2:n_lv){
-                          for(j in 1:(i - 1)){
-                           lv_coefs[i, j] ~ dunif(-1, 1)
-                           }
-                        }
+        ## Set overdispersion parameter to 10000 if not using nb;
+        ## this approximates the Poisson distribution
+        r1 ~ dgamma(0.01, 0.01)
+        r2 <- 10000
+        r_indicator <- ifelse(use_nb > 0, 1, 0)
+        r <- (r1 * r_indicator) + (r2 * (1 - r_indicator))
 
-                        ## Other elements also free
-                        for(i in (n_lv + 1):n_series) {
-                         for(j in 1:n_lv){
-                          lv_coefs[i, j] ~ dunif(-1, 1)
-                          }
-                        }
-
-                        ## Trend evolution for the series depends on latent factors;
-                        ## fix the precision here as it may become unidentifiable when estimating
-                        ## precision for the latent factors
-                        for (i in 1:n){
-                         for (s in 1:n_series){
-                          trend[i, s] ~ dnorm(inprod(lv_coefs[s,], LV[i,]), 100)
-                         }
-                        }
-
-                        ## Negative binomial likelihood functions
-                        for (i in 1:n) {
-                         for (s in 1:n_series) {
-                          y[i, s] ~ dnegbin(rate[i, s], r);
-                          rate[i, s] <- ifelse((r / (r + mu[i, s])) < min_eps, min_eps,
-                          (r / (r + mu[i, s])))
-                         }
-                        }
-
-                        ## Set overdispersion parameter to 10000 if not using nb;
-                        ## this approximates the Poisson distribution
-                        r1 ~ dgamma(0.01, 0.01)
-                        r2 <- 10000
-                        r_indicator <- ifelse(use_nb > 0, 1, 0)
-                        r <- (r1 * r_indicator) + (r2 * (1 - r_indicator))
-
-                        ## Posterior predictions
-                        for (i in 1:n) {
-                        for (s in 1:n_series) {
-                        ypred[i, s] ~ dnegbin(rate[i, s], r)
-                        }
-                        }
-                        ")
+        ## Posterior predictions
+        for (i in 1:n) {
+        for (s in 1:n_series) {
+        ypred[i, s] ~ dnegbin(rate[i, s], r)
+        }
+        }
+        ")
 
       # Create the joined model file
       fil <- tempfile(fileext = ".xt")
@@ -372,9 +375,17 @@ mvjagam = function(formula,
       model_file <- readLines(fil, n = -1)
 
       # Update further prior distributions
-      model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('   phi[s] ~ ', phi_prior)
-      model_file[grep('tau\\[s\\] ~', model_file)] <- paste0('   tau[s] ~ ', tau_prior)
-      model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
+      if(!missing(phi_prior)){
+        model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('   phi[s] ~ ', phi_prior)
+      }
+
+      if(!missing(tau_prior)){
+       model_file[grep('tau\\[s\\] ~', model_file)] <- paste0('   tau[s] ~ ', tau_prior)
+      }
+
+      if(!missing(r_prior)){
+       model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
+      }
 
       model_file <- textConnection(model_file)
     }
@@ -426,7 +437,7 @@ mvjagam = function(formula,
                                      dplyr::select(-time, -series, -outcome))
 
   if(use_mv){
-    if(length(unique(data_train$series)) <= 5){
+    if(!use_lv){
     # We use a Wishart prior for the state space multivariate precision matrix when
     # estimating the full covariance
     ss_jagam$jags.data$diag_mat <- diag(ss_jagam$jags.data$n_series)
@@ -450,8 +461,16 @@ mvjagam = function(formula,
 
   # Number of latent variables to use if n_series > 5 and use_mv = TRUE
   if(use_mv){
-    if(length(unique(data_train$series)) > 5){
-      ss_jagam$jags.data$n_lv <- floor(ss_jagam$jags.data$n_series / 2)
+    if(use_lv){
+      if(missing(n_lv)){
+        ss_jagam$jags.data$n_lv <- floor(ss_jagam$jags.data$n_series / 2)
+      } else {
+        ss_jagam$jags.data$n_lv <- n_lv
+      }
+      ss_jagam$jags.ini$tau_fac <- 1
+      ss_jagam$jags.ini$lv_coefs_raw <- matrix(0,
+                                           nrow = ss_jagam$jags.data$n_series,
+                                           ncol = ss_jagam$jags.data$n_lv)
     }
     }
 
@@ -479,12 +498,12 @@ mvjagam = function(formula,
     param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
                'tau', 'trend')
   } else {
-    if(length(unique(data_train$series)) <= 5){
+    if(!use_lv){
       param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
                  'tau', 'trend', 'cor')
     } else {
       param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
-                 'trend', 'lv_coefs', 'tau_fac')
+                 'trend', 'lv_coefs', 'tau_fac', 'penalty')
     }
 
   }
@@ -496,9 +515,9 @@ mvjagam = function(formula,
   if(auto_update){
   # Update until reasonable convergence in the form of Rhat and ESS
     if(!use_mv){
-      update_params <- c('rho', 'b', 'phi', 'tau')
+      update_params <- c('rho', 'b', 'tau')
     } else {
-      update_params <- c('rho', 'b', 'phi')
+      update_params <- c('rho', 'b')
     }
   mod_summary <- MCMCvis::MCMCsummary(out_gam_mod, update_params)
   for(i in 1:3){

@@ -6,6 +6,83 @@ library(dplyr)
 data("all_neon_tick_data")
 
 
+n_series = 4
+n_trends = 2
+sim_data <- sim_mvgam(T = 100,
+                      n_series = n_series,
+                      n_trends = n_trends,
+                      trend_alphas = sample(c(-0.5, -1, 1, 0.5), n_trends, T),
+                      trend_rel = 0.3,
+                      size_obs = rep(5, n_series),
+                      mu_obs = sample(seq(3, 9), n_series, T),
+                      train_prop = 0.85)
+plot(sim_data$true_seasonality, type = 'l')
+
+test <- mvjagam(data_train = sim_data$data_train,
+                data_test = sim_data$data_test,
+                formula = y ~ s(season, k = 12, m = 2, bs = 'cc') - 1,
+                use_nb = TRUE,
+                use_mv = T,
+                n_lv = 2,
+                n.adapt = 1000,
+                n.burnin = 1000,
+                n.iter = 1000,
+                thin = 1,
+                auto_update = F)
+plot_mvgam_fc(out_gam_mod = test, series = 1, data_test = sim_data$data_test,
+              data_train = sim_data$data_train)
+plot_mvgam_fc(out_gam_mod = test, series = 2, data_test = sim_data$data_test,
+              data_train = sim_data$data_train)
+plot_mvgam_fc(out_gam_mod = test, series = 3, data_test = sim_data$data_test,
+              data_train = sim_data$data_train)
+plot_mvgam_trend(out_gam_mod = test, series = 1, data_test = sim_data$data_test,
+                 data_train = sim_data$data_train)
+plot_mvgam_trend(out_gam_mod = test, series = 2, data_test = sim_data$data_test,
+                 data_train = sim_data$data_train)
+plot_mvgam_trend(out_gam_mod = test, series = 3, data_test = sim_data$data_test,
+                 data_train = sim_data$data_train)
+samps <- jags.samples(test$jags_model,
+                      variable.names = 'lv_coefs',
+                      n.iter = 1000, thin = 1)
+lv_coefs <- samps$lv_coefs
+n_series <- dim(lv_coefs)[1]
+n_lv <- dim(lv_coefs)[2]
+n_samples <- prod(dim(lv_coefs)[3:4])
+
+# Get array of latent variable loadings
+coef_array <- array(NA, dim = c(n_series, n_lv, n_samples))
+for(i in 1:n_series){
+  for(j in 1:n_lv){
+    coef_array[i, j, ] <- c(lv_coefs[i, j, , 1],
+                            lv_coefs[i, j, , 2])
+  }
+}
+
+# Posterior correlations based on latent variable loadings
+correlations <- array(NA, dim = c(n_series, n_series, n_samples))
+for(i in 1:n_samples){
+  correlations[,,i] <- cov2cor(tcrossprod(coef_array[,,i]))
+}
+mean_correlations <- apply(correlations, c(1,2), function(x) quantile(x, 0.5))
+
+# Plot the mean posterior correlations
+mean_correlations[upper.tri(mean_correlations)] <- NA
+mean_correlations <- data.frame(mean_correlations)
+rownames(mean_correlations) <- colnames(mean_correlations) <- levels(sim_data$data_train$series)
+
+ggplot(mean_correlations %>%
+                            tibble::rownames_to_column("series1") %>%
+                            tidyr::pivot_longer(-c(series1), names_to = "series2", values_to = "Correlation"),
+                          aes(x = series1, y = series2)) + geom_tile(aes(fill = Correlation)) +
+  scale_fill_gradient2(low="darkred", mid="white", high="darkblue",
+                       midpoint = 0,
+                       breaks = seq(-1,1,length.out = 5),
+                       limits = c(-1, 1),
+                       name = 'Residual\ncorrelation') + labs(x = '', y = '') + theme_dark() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1))
+sim_data$true_corrs
+
+
 # Hypothesis testing
 # NULL. There is no seasonal pattern to be estimated, and we simply let the latent
 # factors and site-level effects of growing days influence the series dynamics

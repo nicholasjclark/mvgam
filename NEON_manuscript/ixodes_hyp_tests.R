@@ -23,52 +23,34 @@ hyp1 = y ~
   # Global cyclic seasonality term (smooth)
   s(season, k = 12, m = 2, bs = 'cc') - 1
 
-# 2. Do all series share same seasonal pattern but with different magnitudes
-# (i.e. random intercepts per series)?
+# 2. Is there evidence for global seasonality but each site's seasonal pattern deviates
+# based on more local conditions?
 hyp2 = y ~
   siteID +
   s(cum_gdd, by = siteID, k = 3) +
-  s(season, k = 12, m = 2, bs = 'cc') +
-  # Hierarchical variable intercepts
-  s(series, bs = 're') - 1
-
-# 3. Is there evidence for global seasonality but each site's seasonal pattern deviates
-# based on more local conditions?
-hyp3 = y ~
-  siteID +
-  s(cum_gdd, by = siteID, k = 3) +
-  s(season, k = 4, m = 2, bs = 'cc') +
-  s(series, bs = 're') +
+  s(season, k = 6, m = 2, bs = 'cc') +
   # Site-level deviations from global pattern, which can be wiggly (m=1 to reduce concurvity);
   # If these dominate, they will have smaller smoothing parameters and the global seasonality
   # will become less important (larger smoothing parameter). Sites with the smallest smooth
   # parameters are those that deviate the most from the global seasonality
   s(season, by = siteID, m = 1, k = 8) - 1
 
-# 4. Is there evidence for global seasonality but each plot's seasonal pattern deviates
-# based on even more local conditions than above (i.e. plot-level is not as informative)?
+# 3. Is there evidence for global seasonality but each plot's seasonal pattern deviates
+# based on even more local conditions than above (i.e. site-level is not as informative)?
 # If evidence of gdd effects, can also let use a global smoother and then site-level
 # deviations for a 'hierarchical' setup
-hyp4 = y ~
+hyp3 = y ~
   siteID +
   s(cum_gdd, by = siteID, k = 3) +
-  s(season, k = 4, m = 2, bs = 'cc') +
-  s(series, bs = 're') +
+  s(season, k = 6, m = 2, bs = 'cc') +
   # Series-level deviations from global pattern
   s(season, by = series, m = 1, k = 8) - 1
 
-# Laplace distribution emphasizes our prior that smooths should not be overly wiggly
-# unless the data supports this
-rho_prior = 'ddexp(5, 0.2)T(-12, 12)'
-
-# Prior is that latent trends should have positive autocorrelation
-phi_prior = 'dbeta(2,2)'
-
 # Fit multivariate and univariate versions of each hypothesis
-n.adapt = 5000
-n.burnin = 25000
-n.iter = 5000
-thin = 5
+n.adapt = 2000
+n.burnin = 1000
+n.iter = 1000
+thin = 1
 
 fit_null <- fit_mvgam(data_train = all_data$data_train,
                   data_test = all_data$data_test,
@@ -76,13 +58,11 @@ fit_null <- fit_mvgam(data_train = all_data$data_train,
                   formula_name = 'Null_hyp',
                   use_nb = TRUE,
                   use_mv = F,
-                  rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
-                  phi_prior = 'dbeta(2,2)',
-                  tau_prior = 'dunif(0.1, 100)',
                   n.adapt = n.adapt,
                   n.burnin = n.burnin,
                   n.iter = n.iter,
                   thin = thin,
+                  auto_update = TRUE,
                   interval_width = 0.9)
 fit_null_mv <- fit_mvgam(data_train = all_data$data_train,
                       data_test = all_data$data_test,
@@ -90,43 +70,63 @@ fit_null_mv <- fit_mvgam(data_train = all_data$data_train,
                       formula_name = 'Null_hyp_mv',
                       use_nb = TRUE,
                       use_mv = T,
-                      rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
-                      phi_prior = 'dbeta(2,2)',
-                      tau_prior = 'dunif(0.1, 100)',
+                      n_lv = 4,
                       n.adapt = n.adapt,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
+                      auto_update = T,
                       interval_width = 0.9)
-
 fit_hyp1 <- fit_mvgam(data_train = all_data$data_train,
                       data_test = all_data$data_test,
                       formula = hyp1,
                       formula_name = 'Hyp1',
                       use_nb = TRUE,
                       use_mv = F,
-                      rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
-                      phi_prior = 'dbeta(2,2)',
-                      tau_prior = 'dunif(0.1, 100)',
                       n.adapt = n.adapt,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
+                      auto_update = F,
                       interval_width = 0.9)
+fit_hyp1$out_gam_mod$smooth_param_details
+MCMCvis::MCMCtrace(fit_hyp1$out_gam_mod$jags_output, c('rho', 'b'), pdf = F,
+                   n.eff = T)
+plot_mvgam_fc(out_gam_mod = fit_hyp1$out_gam_mod, data_test = all_data$data_test,
+              data_train = all_data$data_train,
+              series = 3)
+plot_mvgam_trend(out_gam_mod = fit_hyp1$out_gam_mod, data_test = all_data$data_test,
+              data_train = all_data$data_train,
+              series = 3)
+library(MCMCvis)
+plot_mvgam_season(out_gam_mod = fit_hyp1$out_gam_mod, data_test = all_data$data_test,
+              data_train = all_data$data_train,
+              series = 5)
 fit_hyp1_mv <- fit_mvgam(data_train = all_data$data_train,
                       data_test = all_data$data_test,
                       formula = hyp1,
                       formula_name = 'Hyp1_mv',
                       use_nb = TRUE,
                       use_mv = T,
-                      rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
-                      phi_prior = 'dbeta(2,2)',
-                      tau_prior = 'dunif(0.1, 100)',
+                      n_lv = 4,
                       n.adapt = n.adapt,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
+                      auto_update = F,
                       interval_width = 0.9)
+summary(MCMCvis::MCMCsummary(fit_hyp1_mv$out_gam_mod$jags_output, c('rho', 'b'))$Rhat)
+summary(MCMCvis::MCMCsummary(fit_hyp1_mv$out_gam_mod$jags_output, c('rho', 'b'))$n.eff)
+MCMCvis::MCMCtrace(fit_hyp1_mv$out_gam_mod$jags_output, c('rho', 'b'), pdf = F,
+                   n.eff = T, Rhat = T)
+MCMCvis::MCMCtrace(fit_hyp1_mv$out_gam_mod$jags_output, c('lv_coefs'), pdf = F,
+                   n.eff = T, Rhat = T)
+plot_mvgam_fc(out_gam_mod = fit_hyp1_mv$out_gam_mod, data_test = all_data$data_test,
+              data_train = all_data$data_train,
+              series = 5)
+plot_mvgam_trend(out_gam_mod = fit_hyp1_mv$out_gam_mod, data_test = all_data$data_test,
+                  data_train = all_data$data_train,
+                  series = 5)
 
 fit_hyp2 <- fit_mvgam(data_train = all_data$data_train,
                       data_test = all_data$data_test,
@@ -134,13 +134,12 @@ fit_hyp2 <- fit_mvgam(data_train = all_data$data_train,
                       formula_name = 'Hyp2',
                       use_nb = TRUE,
                       use_mv = F,
-                      rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
-                      phi_prior = 'dbeta(2,2)',
-                      tau_prior = 'dunif(0.1, 100)',
+                      n_lv = 4,
                       n.adapt = n.adapt,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
+                      auto_update = TRUE,
                       interval_width = 0.9)
 fit_hyp2_mv <- fit_mvgam(data_train = all_data$data_train,
                       data_test = all_data$data_test,
@@ -148,13 +147,12 @@ fit_hyp2_mv <- fit_mvgam(data_train = all_data$data_train,
                       formula_name = 'Hyp2_mv',
                       use_nb = TRUE,
                       use_mv = T,
-                      rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
-                      phi_prior = 'dbeta(2,2)',
-                      tau_prior = 'dunif(0.1, 100)',
+                      n_lv = 4,
                       n.adapt = n.adapt,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
+                      auto_update = TRUE,
                       interval_width = 0.9)
 
 fit_hyp3 <- fit_mvgam(data_train = all_data$data_train,
@@ -163,13 +161,11 @@ fit_hyp3 <- fit_mvgam(data_train = all_data$data_train,
                       formula_name = 'Hyp3',
                       use_nb = TRUE,
                       use_mv = F,
-                      rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
-                      phi_prior = 'dbeta(2,2)',
-                      tau_prior = 'dunif(0.1, 100)',
                       n.adapt = n.adapt,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
+                      auto_update = TRUE,
                       interval_width = 0.9)
 fit_hyp3_mv <- fit_mvgam(data_train = all_data$data_train,
                       data_test = all_data$data_test,
@@ -177,43 +173,21 @@ fit_hyp3_mv <- fit_mvgam(data_train = all_data$data_train,
                       formula_name = 'Hyp3_mv',
                       use_nb = TRUE,
                       use_mv = T,
-                      rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
-                      phi_prior = 'dbeta(2,2)',
-                      tau_prior = 'dunif(0.1, 100)',
+                      n_lv = 4,
                       n.adapt = n.adapt,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
+                      auto_update = TRUE,
                       interval_width = 0.9)
 
-fit_hyp4 <- fit_mvgam(data_train = all_data$data_train,
-                      data_test = all_data$data_test,
-                      formula = hyp4,
-                      formula_name = 'Hyp4',
-                      use_nb = TRUE,
-                      use_mv = F,
-                      rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
-                      phi_prior = 'dbeta(2,2)',
-                      tau_prior = 'dunif(0.1, 100)',
-                      n.adapt = n.adapt,
-                      n.burnin = n.burnin,
-                      n.iter = n.iter,
-                      thin = thin,
-                      interval_width = 0.9)
-fit_hyp4_mv <- fit_mvgam(data_train = all_data$data_train,
-                         data_test = all_data$data_test,
-                         formula = hyp4,
-                         formula_name = 'Hyp4_mv',
-                         use_nb = TRUE,
-                         use_mv = T,
-                         rho_prior = 'ddexp(5, 0.2)T(-12, 12)',
-                         phi_prior = 'dbeta(2,2)',
-                         tau_prior = 'dunif(0.1, 100)',
-                         n.adapt = n.adapt,
-                         n.burnin = n.burnin,
-                         n.iter = n.iter,
-                         thin = thin,
-                         interval_width = 0.9)
+# Save models
+dir.create('NEON_manuscript/Results', recursive = T, showWarnings = F)
+save(fit_null, fit_null_mv,
+     fit_hyp1, fit_hyp1_mv,
+     fit_hyp2, fit_hyp2_mv,
+     fit_hyp3, fit_hyp3_mv,
+     file = 'NEON_manuscript/Results/ixodes_models.rda')
 
 ## Post-process to investigate results
 rbind(fit_null$DRPS_scores,
@@ -223,9 +197,7 @@ rbind(fit_null$DRPS_scores,
       fit_hyp2$DRPS_scores,
       fit_hyp2_mv$DRPS_scores,
       fit_hyp3$DRPS_scores,
-      fit_hyp3_mv$DRPS_scores,
-      fit_hyp4$DRPS_scores,
-      fit_hyp4_mv$DRPS_scores) %>%
+      fit_hyp3_mv$DRPS_scores) %>%
   dplyr::ungroup() %>%
   dplyr::filter(!is.na(Truth)) %>%
   dplyr::group_by(Series) %>%
@@ -245,13 +217,11 @@ plot_dat %>%
 plot_dat$Formula <- factor(plot_dat$Formula, levels = rev(c('Null_hyp', 'Null_hyp_mv',
                                                             'Hyp1', 'Hyp1_mv',
                                                             'Hyp2', 'Hyp2_mv',
-                                                            'Hyp3', 'Hyp3_mv',
-                                                            'Hyp4', 'Hyp4_mv')))
+                                                            'Hyp3', 'Hyp3_mv')))
 plot_dat_ranks$Formula <- factor(plot_dat_ranks$Formula, levels = rev(c('Null_hyp', 'Null_hyp_mv',
                                                                         'Hyp1', 'Hyp1_mv',
                                                                         'Hyp2', 'Hyp2_mv',
-                                                                        'Hyp3', 'Hyp3_mv',
-                                                                        'Hyp4', 'Hyp4_mv')))
+                                                                        'Hyp3', 'Hyp3_mv')))
 # Calculate empirical coverage of 90% prediction intervals
 coverages <- plot_dat %>%
   dplyr::group_by(Formula) %>%
@@ -298,49 +268,15 @@ cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()
 
 pdf('NEON_manuscript/Figures/Ixodes_sitewise_analysis.pdf',
-    width = 6.25, height = 3)
-ggplot(plot_dat %>% dplyr::filter(Formula %in% c('Hyp4', 'Hyp4_mv')),
+    width = 6.25, height = 4)
+ggplot(plot_dat %>% dplyr::filter(Formula %in% c('Null_hyp_mv','Hyp1_mv', 'Hyp2_mv','Hyp3_mv')),
        aes(y = scale_drps,x = Series, fill = Formula))+
   geom_hline(yintercept=1, size = 1.1)+
   geom_violin(scale = 'width', draw_quantiles = 0.5) +
-  scale_fill_discrete(type = c(viridis::plasma(7)[4], 'white'), name = '')  +
+  scale_fill_discrete(type = c(viridis::plasma(n=10, begin = 0.15, end = 1)[c(4,6,8,10)]), name = '')  +
   coord_flip() +theme_dark() +
   guides(fill = guide_legend(reverse = T)) +
-  labs(y = 'DFOSR discrete rank probability score (scaled)', x = '') +
-  theme(panel.background = element_rect(fill = "gray80"),
-        panel.grid.minor = element_blank())
-dev.off()
-
-# Plotting variances of latent trends
-rbind(rbind(fit_null_mv$tau_factor_summary,
-            fit_hyp1_mv$tau_factor_summary,
-            fit_hyp2_mv$tau_factor_summary,
-            fit_hyp3_mv$tau_factor_summary,
-            fit_hyp4_mv$tau_factor_summary) %>%
-        dplyr::mutate(Trend_var = (1/Tau_fac_lower)^2),
-      rbind(fit_null_mv$tau_factor_summary,
-            fit_hyp1_mv$tau_factor_summary,
-            fit_hyp2_mv$tau_factor_summary,
-            fit_hyp3_mv$tau_factor_summary,
-            fit_hyp4_mv$tau_factor_summary) %>%
-        dplyr::mutate(Trend_var = (1/Tau_fac_upper)^2)) -> factor_vars
-
-factor_vars$Formula <- factor(factor_vars$Formula, levels = rev(c('Null_hyp', 'Null_hyp_mv',
-                                                                  'Hyp1', 'Hyp1_mv',
-                                                                  'Hyp2', 'Hyp2_mv',
-                                                                  'Hyp3', 'Hyp3_mv',
-                                                                  'Hyp4', 'Hyp4_mv')))
-pdf('NEON_manuscript/Figures/Ixodes_trendvariance.pdf',
-    width = 4.25, height = 3)
-ggplot(data = factor_vars, aes(x= Trend_var,
-                               y= Formula, fill = Formula,
-                               colour = Formula)) +
-  geom_line(aes(group = Formula), size = 1)+
-  geom_point(size=3) +
-  theme_dark() + theme(legend.position = 'None') +
-  labs(y = '', x = 'Dynamic trend variance (95% HPD interval)') +
-  scale_colour_viridis(discrete = T, option = 'plasma', begin = 0.35, end = 1) +
-  scale_fill_viridis(discrete = T, option = 'plasma', begin = 0.35, end = 1, name = '') +
+  labs(y = 'Discrete rank probability score (scaled)', x = '') +
   theme(panel.background = element_rect(fill = "gray80"),
         panel.grid.minor = element_blank())
 dev.off()
@@ -369,7 +305,7 @@ plot2 <- ggplot(fit_hyp2_mv$mean_correlations %>%
                        breaks = seq(-1,1,length.out = 5),
                        limits = c(-1, 1),
                        name = 'Residual\ncorrelation') +
-  labs(x = '', y = '', title = 'Global seasonality,\nRandom intercepts') +
+  labs(x = '', y = '', title = 'Global seasonality,\nSite seasonality') +
   theme_dark() +
   theme(axis.text.x = element_blank(),
         axis.text.y = element_blank(),
@@ -384,39 +320,21 @@ plot3 <- ggplot(fit_hyp3_mv$mean_correlations %>%
                        breaks = seq(-1,1,length.out = 5),
                        limits = c(-1, 1),
                        name = 'Residual\ncorrelation') +
-  labs(x = '', y = '', title = 'Global + site seasonality,\nRandom intercepts') +
+  labs(x = '', y = '', title = 'Global seasonality,\nPlot seasonality') +
   theme_dark() +
   theme(axis.text.x = element_text(angle = 45, hjust=1),
-        title = element_text(size = 9))
-
-plot4 <- ggplot(fit_hyp4_mv$mean_correlations %>%
-                  tibble::rownames_to_column("series1") %>%
-                  tidyr::pivot_longer(-c(series1), names_to = "series2", values_to = "Correlation"),
-                aes(x = series1, y = series2)) + geom_tile(aes(fill = Correlation)) +
-  scale_fill_gradient2(low="darkred", mid="white", high="darkblue",
-                       midpoint = 0,
-                       breaks = seq(-1,1,length.out = 5),
-                       limits = c(-1, 1),
-                       name = 'Residual\ncorrelation') +
-  labs(x = '', y = '', title = 'Global + plot seasonality,\nRandom intercepts') +
-  theme_dark() +
-  theme(axis.text.x = element_text(angle = 45, hjust=1),
-        axis.text.y = element_blank(),
         title = element_text(size = 9))
 
 
 pdf('NEON_manuscript/Figures/Ixodes_trendcorrelations.pdf',
     width = 6.25, height = 5)
-cowplot::plot_grid(cowplot::plot_grid(plot1 + theme(legend.position = 'none'),
+cowplot::plot_grid(plot1 + theme(legend.position = 'none'),
                    plot2 + theme(legend.position = 'none'),
                    plot3 + theme(legend.position = 'none'),
-                   plot4 + theme(legend.position = 'none'),
+                   cowplot::get_legend(plot1),
                    rel_widths = c(1, 0.8),
                    rel_heights = c(0.8, 1),
-                   ncol = 2),
-                   cowplot::get_legend(plot1),
-                   ncol = 2,
-                   rel_widths = c(1,0.15))
+                   ncol = 2)
 dev.off()
 
 # Plot PIT histograms
@@ -427,9 +345,7 @@ data.frame(rbind(fit_null$PIT_scores,
       fit_hyp2$PIT_scores,
       fit_hyp2_mv$PIT_scores,
       fit_hyp3$PIT_scores,
-      fit_hyp3_mv$PIT_scores,
-      fit_hyp4$PIT_scores,
-      fit_hyp4_mv$PIT_scores)) %>%
+      fit_hyp3_mv$PIT_scores)) %>%
   dplyr::group_by(Formula) %>%
   dplyr::summarise_all(mean) -> plot_dat
 
@@ -442,8 +358,7 @@ blank <- function(x = 1, y = 1, type = "n", xlab = "", ylab = "",
 formulas <- c('Null_hyp', 'Null_hyp_mv',
               'Hyp1', 'Hyp1_mv',
               'Hyp2', 'Hyp2_mv',
-              'Hyp3', 'Hyp3_mv',
-              'Hyp4', 'Hyp4_mv')
+              'Hyp3', 'Hyp3_mv')
 colours <- rev(viridis::plasma(n = 10, begin = 0.35, end = 1))
 
 pdf('NEON_manuscript/Figures/Ixodes_PITs.pdf',
@@ -480,3 +395,60 @@ pit_points <- data.frame(plot_dat %>%
 invisible()
 dev.off()
 
+# Plot forecasts from select multivariate models
+dir.create('NEON_manuscript/Figures/Ixodes_forecasts', recursive = T, showWarnings = F)
+for(i in seq_along(levels(all_data$data_train$series))){
+  pdf(paste0('NEON_manuscript/Figures/Ixodes_forecasts/', levels(all_data$data_train$series)[i],
+      '.pdf'))
+  par(mfrow = c(4,1),
+      mai = c(.38,.4,.45,.05),
+      mgp = c(2, 1, 0))
+  plot_mvgam_fc(out_gam_mod = fit_null_mv$out_gam_mod, data_test = all_data$data_test,
+                data_train = all_data$data_train,
+                series = i)
+  mtext(side = 3, 'Null_hyp_mv', cex = 1,
+        line = 1.55)
+  plot_mvgam_fc(out_gam_mod = fit_hyp1_mv$out_gam_mod, data_test = all_data$data_test,
+                data_train = all_data$data_train,
+                series = i)
+  mtext(side = 3, 'Hyp1_mv', cex = 1,
+        line = 1.35)
+  plot_mvgam_fc(out_gam_mod = fit_hyp2_mv$out_gam_mod, data_test = all_data$data_test,
+                data_train = all_data$data_train,
+                series = i)
+  mtext(side = 3, 'Hyp2_mv', cex = 1,
+        line = 1.55)
+  plot_mvgam_fc(out_gam_mod = fit_hyp3_mv$out_gam_mod, data_test = all_data$data_test,
+                data_train = all_data$data_train,
+                series = i)
+  mtext(side = 3, 'Hyp3_mv', cex = 1,
+        line = 1.55)
+  invisible()
+  dev.off()
+}
+MCMCvis::MCMCtrace(fit_null_mv$out_gam_mod$jags_output, c('rho','penalty','phi'), pdf = F,
+                   n.eff = T)
+MCMCvis::MCMCtrace(fit_null_mv$out_gam_mod$jags_output, c('lv_coefs'), pdf = F,
+                   n.eff = T)
+MCMCvis::MCMCsummary(fit_null_mv$out_gam_mod$jags_output, c('lv_coefs'))
+plot_mvgam_fc(out_gam_mod = fit_null_mv$out_gam_mod, data_test = all_data$data_test,
+              data_train = all_data$data_train,
+              series = 3)
+fit_null_mv$resid_corr_plot
+fit_null$rho_summary
+fit_null_mv$rho_summary
+fit_hyp1$rho_summary
+fit_hyp1_mv$rho_summary
+fit_hyp2$rho_summary
+fit_hyp2_mv$rho_summary
+fit_hyp3$rho_summary
+fit_hyp3_mv$rho_summary
+
+plot_mvgam_fc(out_gam_mod = fit_hyp1$out_gam_mod, data_test = all_data$data_test,
+              data_train = all_data$data_train,
+              series = 4)
+plot_mvgam_trend(out_gam_mod = fit_hyp1$out_gam_mod, data_test = all_data$data_test,
+              data_train = all_data$data_train,
+              series = 4)
+MCMCvis::MCMCtrace(fit_hyp1$out_gam_mod$jags_output, c('phi'), pdf = F,
+                   n.eff = T)
