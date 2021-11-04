@@ -1,5 +1,5 @@
 #'Plot mvjagam latent trend for a specified series
-#'@param out_gam_mod \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param data_train A \code{dataframe} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
@@ -15,10 +15,10 @@
 #'@param data_test A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}
 #'@export
-plot_mvgam_trend = function(out_gam_mod, series, data_test, data_train){
-  pred_indices <- seq(0, length(out_gam_mod$ytimes),
-                      length.out = NCOL(out_gam_mod$ytimes) + 1)
-  preds <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'trend')[,pred_indices[series]:pred_indices[series + 1]]
+plot_mvgam_trend = function(object, series, data_test, data_train){
+  pred_indices <- seq(0, length(object$ytimes),
+                      length.out = NCOL(object$ytimes) + 1)
+  preds <- MCMCvis::MCMCchains(object$jags_output, 'trend')[,pred_indices[series]:pred_indices[series + 1]]
   preds_last <- preds[1,]
   plot(preds_last,
        type = 'l', ylim = range(preds),
@@ -36,6 +36,6 @@ plot_mvgam_trend = function(out_gam_mod, series, data_test, data_train){
           c(int[1,],rev(int[3,])),
           col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
   lines(int[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
-  abline(v = NROW(data_train) / NCOL(out_gam_mod$ytimes))
+  abline(v = NROW(data_train) / NCOL(object$ytimes))
 
 }

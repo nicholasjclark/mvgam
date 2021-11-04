@@ -12,7 +12,7 @@ mvjagam(
   use_nb = TRUE,
   use_mv = FALSE,
   use_lv = FALSE,
-  n_lv,
+  n_lv = 5,
   n.adapt = 1000,
   n.chains = 2,
   n.burnin = 5000,
@@ -34,11 +34,12 @@ required by the GAM \code{formula}. Should include columns:
 'y' (the discrete outcomes; NAs allowed)
 'series' (character or factor index of the series IDs)
 'season' (numeric index of the seasonal time point for each observation; should not have any missing)
-'year' the numeric index for year
+'year' the numeric index for year, and
 'in_season' indicator for whether the observation is in season or not. If the counts tend to go to zero
-during the off season (as in tick counts for example), setting this to zero can be useful as trends won't contribute during
-during this time but they continue to evolve, allowing the trend from the past season to continue evolving rather than forcing
-it to zero
+during the off season (as in tick counts for example), setting 'in_season' to zero cduring these seasonal periods
+can be useful as trends won't contribute during
+during this time but they continue to evolve, allowing the trend to continue evolving rather than forcing
+it to zero during the off-season
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
 \item{data_test}{A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
@@ -51,11 +52,16 @@ simulations from prior distributions are returned}
 overdispersion parameter r;
 if \code{FALSE}, set r to \code{10,000} to approximate the Poisson distribution}
 
-\item{use_mv}{\code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
+\item{use_mv}{\code{logical} If \code{TRUE} and \code{use_lv = FALSE},
+a multivariate gaussian distribution is used for the state space trend errors. If \code{TRUE} and \code{use_lv = TRUE},
+space trends. If \code{FALSE}, independent gaussian distributions are used for the trend errors}
+
+\item{use_lv}{\code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
 latent trends. If \code{FALSE}, estimate covarying errors in the latent trends}
 
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_mv == TRUE}
-and the total number of series is \code{>5}. Defaults to \code{floor(n_series / 2)}}
+and \code{use_lv == TRUE}. Defaults to \code{5}, which should provide enough information to estimate
+correlations among latend factor loadings}
 
 \item{n.adapt}{\code{integer} the number of iterations for adaptation. See adapt for details.
 If \code{n.adapt} = 0 then no adaptation takes place}
@@ -84,7 +90,8 @@ unsampled covariate values), the names of the smooth parameters and the matrix o
 \description{
 This function estimates the posterior distribution for a multivariate GAM that includes
 smooth seasonality and possible other smooth functions specified in the GAM formula. State-space latent trends
-are estimated for each series, with a number of options for specifying the structures of the trends
+(random walks with drift)are estimated for each series, with a number of options for specifying the
+structures of the trends
 }
 \details{
 A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent

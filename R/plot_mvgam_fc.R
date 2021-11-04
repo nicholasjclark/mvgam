@@ -1,5 +1,5 @@
 #'Plot mvjagam posterior predictions for a specified series
-#'@param out_gam_mod \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param data_train A \code{dataframe} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
@@ -15,14 +15,14 @@
 #'@param data_test A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}
 #'@export
-plot_mvgam_fc = function(out_gam_mod, series, data_test, data_train){
-  ends <- seq(0, dim(MCMCvis::MCMCchains(out_gam_mod$jags_output, 'ypred'))[2],
-              length.out = NCOL(out_gam_mod$ytimes) + 1)
+plot_mvgam_fc = function(object, series, data_test, data_train){
+  ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
+              length.out = NCOL(object$ytimes) + 1)
   starts <- ends + 1
-  starts <- c(1, starts[-c(1, (NCOL(out_gam_mod$ytimes)+1))])
+  starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
   ends <- ends[-1]
 
-  preds <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'ypred')[,starts[series]:ends[series]]
+  preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
   preds_last <- preds[1,]
   int <- apply(preds,
                2, hpd, 0.95)
@@ -50,6 +50,6 @@ plot_mvgam_fc = function(out_gam_mod, series, data_test, data_train){
            dplyr::distinct() %>%
            dplyr::arrange(year, season) %>%
            dplyr::pull(y), pch = 16)
-  abline(v = NROW(data_train) / NCOL(out_gam_mod$ytimes))
+  abline(v = NROW(data_train) / NCOL(object$ytimes))
 
 }

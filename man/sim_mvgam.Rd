@@ -8,18 +8,23 @@ sim_mvgam(
   T = 100,
   n_series = 3,
   n_trends = 2,
-  trend_alphas = rep(0, 2),
-  trend_rel = 0.2,
+  trend_alphas,
+  trend_rel,
   freq = 12,
   size_obs = c(0.5, 0.5, 1),
-  mu_obs = c(3, 4, 5),
-  train_prop = 0.7
+  mu_obs = c(6, 9, 12),
+  prop_missing = 0,
+  train_prop
 )
 }
 \arguments{
 \item{T}{\code{integer}. Number of observations (timepoints)}
 
 \item{n_series}{\code{integer}. Number of discrete time series}
+
+\item{n_trends}{\code{integer}. Number of latent dynamic factors (as random walks with drift) for generating the series' trends}
+
+\item{trend_alphas}{\code{vector} of drift terms for the latent factors}
 
 \item{trend_rel}{\code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}}
 
@@ -29,10 +34,16 @@ sim_mvgam(
 
 \item{mu_obs}{\code{vector} of negative binomial mu parameters for the series}
 
+\item{prop_missing}{\code{numeric} stating proportion of observations that are missing}
+
 \item{train_prop}{\code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}}
 }
+\value{
+A \code{list} object containing outputs needed for \code{mvjagam}, including 'data_train' and 'data_test',
+as well as some additional information about the simulated seasonality and trend dependencies
+}
 \description{
-This function estimates the posterior distribution for a multivariate GAM that includes
-smooth seasonality and possible other smooth functions specified in the GAM formula. State-space latent trends
-are estimated for each series, with a number of options for specifying the structures of the trends
+This function simulates discrete time series data for fitting a multivariate GAM that includes
+shared seasonality and dependence on state-space latent dynamic factors. Random dependencies among series, i.e.
+correlations in their long-term trends, are included in the form of correlated loadings on the latent dynamic factors
 }

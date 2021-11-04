@@ -2,7 +2,8 @@
 #'
 #'This function estimates the posterior distribution for a multivariate GAM that includes
 #'smooth seasonality and possible other smooth functions specified in the GAM formula. State-space latent trends
-#'are estimated for each series, with a number of options for specifying the structures of the trends
+#'(random walks with drift)are estimated for each series, with a number of options for specifying the
+#'structures of the trends
 #'
 #'
 #'@param formula A \code{character} string specifying the GAM formula. These are exactly like the formula
@@ -13,11 +14,12 @@
 #''y' (the discrete outcomes; NAs allowed)
 #''series' (character or factor index of the series IDs)
 #''season' (numeric index of the seasonal time point for each observation; should not have any missing)
-#''year' the numeric index for year
+#''year' the numeric index for year, and
 #''in_season' indicator for whether the observation is in season or not. If the counts tend to go to zero
-#'during the off season (as in tick counts for example), setting this to zero can be useful as trends won't contribute during
-#'during this time but they continue to evolve, allowing the trend from the past season to continue evolving rather than forcing
-#'it to zero
+#'during the off season (as in tick counts for example), setting 'in_season' to zero cduring these seasonal periods
+#'can be useful as trends won't contribute during
+#'during this time but they continue to evolve, allowing the trend to continue evolving rather than forcing
+#'it to zero during the off-season
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
 #'@param data_test A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}
@@ -26,15 +28,15 @@
 #'@param use_nb \code{logical} If \code{TRUR}, use a Negative Binomial likelihood with estimated
 #'overdispersion parameter r;
 #'if \code{FALSE}, set r to \code{10,000} to approximate the Poisson distribution
-#'@param use_mv \code{logical} If \code{TRUE} and the total number of series is \code{<=5},
-#'a multivariate gaussian distribution is used for the state space trend errors. If \code{TRUE} and the total number
-#'of series is \code{>5}, a set of latent dynamic factors is estimated to capture possible dependencies in the state
-#'space trends. Currently, the total number of factors included will be approximately half the number of unique
-#'series in the dataset. If \code{FALSE}, independent gaussian distributions are used for the trends
-#'@param use_mv \code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
+#'@param use_mv \code{logical} If \code{TRUE} and \code{use_lv = FALSE},
+#'a multivariate gaussian distribution is used for the state space trend errors. If \code{TRUE} and \code{use_lv = TRUE},
+#a set of latent dynamic factors is estimated to capture possible dependencies in the state
+#'space trends. If \code{FALSE}, independent gaussian distributions are used for the trend errors
+#'@param use_lv \code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
 #'latent trends. If \code{FALSE}, estimate covarying errors in the latent trends
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_mv == TRUE}
-#'and the total number of series is \code{>5}. Defaults to \code{floor(n_series / 2)}
+#'and \code{use_lv == TRUE}. Defaults to \code{5}, which should provide enough information to estimate
+#'correlations among latend factor loadings
 #'@param n.chains \code{integer} the number of parallel chains for the model
 #'@param n.adapt \code{integer} the number of iterations for adaptation. See adapt for details.
 #'If \code{n.adapt} = 0 then no adaptation takes place
@@ -64,7 +66,7 @@ mvjagam = function(formula,
                     use_nb = TRUE,
                     use_mv = FALSE,
                     use_lv = FALSE,
-                    n_lv,
+                    n_lv = 5,
                     n.adapt = 1000,
                     n.chains = 2,
                     n.burnin = 5000,
@@ -308,7 +310,7 @@ mvjagam = function(formula,
         }
         }
 
-        ## Latent factors evolve as RW + drift time series with precision / variance = 1
+        ## Latent factors evolve as RW + drift time series with shared precision
         tau_fac ~ dgamma(0.05, 0.005)
         for(j in 1:n_lv){
          LV[1, j] ~ dnorm(0, tau_fac)
@@ -324,8 +326,8 @@ mvjagam = function(formula,
           phi[s] ~ dnorm(0, 10)
         }
 
-        ## Latent factor loadings are penalized to allow loadings for entire factors to be
-        ## effectively dropped, reducing overfitting
+        ## Latent factor loadings are penalized using a regularized horseshoe prior
+        ## to allow loadings for entire factors to be effectively dropped, reducing overfitting
         for (j in 1:n_lv){
          penalty[j] ~ dt(0, 1, 1)T(0, )
          for (s in 1:n_series){
@@ -334,12 +336,9 @@ mvjagam = function(formula,
         }
         lv_tau ~ dt(0, 1, 1)T(0, )
 
-        ## Trend evolution for the series depends on latent factors;
-        ## fix the precision here as it may become unidentifiable when estimating
-        ## precision for the latent factors
+        ## Trend evolution for the series depends on latent factors
         for (i in 1:n){
         for (s in 1:n_series){
-        #trend[i, s] ~ dnorm(inprod(lv_coefs[s,], LV[i,]), 100)
          trend[i, s] <- inprod(lv_coefs[s,], LV[i,])
         }
         }
@@ -468,9 +467,6 @@ mvjagam = function(formula,
         ss_jagam$jags.data$n_lv <- n_lv
       }
       ss_jagam$jags.ini$tau_fac <- 1
-      ss_jagam$jags.ini$lv_coefs_raw <- matrix(0,
-                                           nrow = ss_jagam$jags.data$n_series,
-                                           ncol = ss_jagam$jags.data$n_lv)
     }
     }
 

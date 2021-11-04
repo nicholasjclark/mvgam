@@ -4,10 +4,10 @@
 \alias{plot_mvgam_trend}
 \title{Plot mvjagam latent trend for a specified series}
 \usage{
-plot_mvgam_trend(out_gam_mod, series, data_test, data_train)
+plot_mvgam_trend(object, series, data_test, data_train)
 }
 \arguments{
-\item{out_gam_mod}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvjagam}}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 

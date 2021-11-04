@@ -10,12 +10,16 @@ Description: Multivariate Bayesian Generalised Additive Models for discrete time
 Maintainer: Nicholas J Clark <nicholas.j.clark1214@gmail.com>
 License: MIT + file LICENSE
 Depends: R (>= 3.6.0), mgcv, rjags
-Imports: parallel,
+Imports: 
+    parallel,
+    forecast,
+    smooth,
     coda,
     MCMCpack,
     runjags,
     MCMCvis,
-    dplyr
+    dplyr,
+    magrittr
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
