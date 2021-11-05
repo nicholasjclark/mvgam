@@ -35,8 +35,8 @@
 #'@param use_lv \code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
 #'latent trends. If \code{FALSE}, estimate covarying errors in the latent trends
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_mv == TRUE}
-#'and \code{use_lv == TRUE}. Defaults to \code{5}, which should provide enough information to estimate
-#'correlations among latend factor loadings
+#'and \code{use_lv == TRUE}. Cannot be \code{>n_series}. Defaults to \code{min(5, floor(n_series / 2))},
+#'which should provide enough information to estimate correlations among latend factor loadings
 #'@param n.chains \code{integer} the number of parallel chains for the model
 #'@param n.adapt \code{integer} the number of iterations for adaptation. See adapt for details.
 #'If \code{n.adapt} = 0 then no adaptation takes place
@@ -327,14 +327,42 @@ mvjagam = function(formula,
         }
 
         ## Latent factor loadings are penalized using a regularized horseshoe prior
-        ## to allow loadings for entire factors to be effectively dropped, reducing overfitting
+        ## to allow loadings for entire factors to be effectively dropped, reducing overfitting. Still
+        ## need to impose identifiability constraints by setting upper diagonal to zero
+
+        ## Global shrinkage penalty
+        lv_tau ~ dt(0, 1, 1)T(0, )
+
+        ## Shrinkage penalties for each factor
         for (j in 1:n_lv){
          penalty[j] ~ dt(0, 1, 1)T(0, )
-         for (s in 1:n_series){
-          lv_coefs[s, j] ~ dnorm(0, (1/lv_tau) * (1/penalty[j]))T(-1, 1);
+        }
+
+        ## Upper triangle of loading matrix set to zero
+        for(j in 1:(n_lv - 1)){
+          for(j2 in (j + 1):n_lv){
+           lv_coefs[j, j2] <- 0
+          }
+         }
+
+        ## Positive constraints on loading diagonals
+        for(j in 1:n_lv) {
+         lv_coefs[j, j] ~ dnorm(0, (1/lv_tau) * (1/penalty[j]))T(0, 1);
+        }
+
+        ## Lower diagonal free
+        for(j in 2:n_lv){
+         for(j2 in 1:(j - 1)){
+          lv_coefs[j, j2] ~ dnorm(0, (1/lv_tau) * (1/penalty[j2]))T(-1, 1);
+         }
+       }
+
+        ## Other elements also free
+        for(j in (n_lv + 1):n_series) {
+         for(j2 in 1:n_lv){
+          lv_coefs[j, j2] ~ dnorm(0, (1/lv_tau) * (1/penalty[j2]))T(-1, 1);
          }
         }
-        lv_tau ~ dt(0, 1, 1)T(0, )
 
         ## Trend evolution for the series depends on latent factors
         for (i in 1:n){
@@ -462,9 +490,12 @@ mvjagam = function(formula,
   if(use_mv){
     if(use_lv){
       if(missing(n_lv)){
-        ss_jagam$jags.data$n_lv <- floor(ss_jagam$jags.data$n_series / 2)
+        ss_jagam$jags.data$n_lv <- min(5, floor(ss_jagam$jags.data$n_series / 2))
       } else {
         ss_jagam$jags.data$n_lv <- n_lv
+      }
+      if(n_lv > n_series){
+        stop('Number of latent variables cannot be greater than number of series')
       }
       ss_jagam$jags.ini$tau_fac <- 1
     }

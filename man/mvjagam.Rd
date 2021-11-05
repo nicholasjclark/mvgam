@@ -60,8 +60,8 @@ space trends. If \code{FALSE}, independent gaussian distributions are used for t
 latent trends. If \code{FALSE}, estimate covarying errors in the latent trends}
 
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_mv == TRUE}
-and \code{use_lv == TRUE}. Defaults to \code{5}, which should provide enough information to estimate
-correlations among latend factor loadings}
+and \code{use_lv == TRUE}. Cannot be \code{>n_series}. Defaults to \code{min(5, floor(n_series / 2))},
+which should provide enough information to estimate correlations among latend factor loadings}
 
 \item{n.adapt}{\code{integer} the number of iterations for adaptation. See adapt for details.
 If \code{n.adapt} = 0 then no adaptation takes place}

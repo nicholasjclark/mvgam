@@ -4,7 +4,7 @@ library(dplyr)
 
 # Simulate data
 n_series = 5
-sim_data <- sim_mvgam(T = 100,
+sim_data <- sim_mvgam(T = 70,
                       n_series = n_series,
                       prop_missing = 0.15,
                       train_prop = 0.85,
@@ -21,7 +21,7 @@ test <- mvjagam(data_train = sim_data$data_train,
                 formula = y ~ s(season, k = 12, m = 2, bs = 'cc') - 1,
                 use_nb = TRUE,
                 use_mv = T,
-                n_lv = 5,
+                n_lv = min(5, n_series - 1),
                 n.adapt = 1000,
                 n.burnin = 2000,
                 n.iter = 1000,
@@ -36,9 +36,9 @@ test2 <- mvjagam(data_train = sim_data$data_train,
                   s(season, by = series, m = 1, k = 10) - 1,
                 use_nb = TRUE,
                 use_mv = T,
-                n_lv = 5,
+                n_lv = min(5, n_series - 1),
                 n.adapt = 1000,
-                n.burnin = 2000,
+                n.burnin = 3000,
                 n.iter = 1000,
                 thin = 1,
                 auto_update = F)
@@ -88,7 +88,7 @@ ggplot(mean_correlations %>%
   theme(axis.text.x = element_text(angle = 45, hjust=1))
 round(sim_data$true_corrs, 4)
 
-# Compare to truth by calculating proportion of true associations (>0.1) that were correctly detected
+# Compare to truth by calculating proportion of true associations (>0.2) that were correctly detected
 truth <- sim_data$true_corrs
 truth[abs(truth) < 0.2] <- 0
 truth[upper.tri(truth)] <- NA

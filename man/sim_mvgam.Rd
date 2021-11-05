@@ -7,12 +7,12 @@
 sim_mvgam(
   T = 100,
   n_series = 3,
-  n_trends = 2,
-  trend_alphas,
+  seasonality = "shared",
+  n_trends = 15,
   trend_rel,
   freq = 12,
-  size_obs = c(0.5, 0.5, 1),
-  mu_obs = c(6, 9, 12),
+  size_obs,
+  mu_obs,
   prop_missing = 0,
   train_prop
 )
@@ -22,9 +22,10 @@ sim_mvgam(
 
 \item{n_series}{\code{integer}. Number of discrete time series}
 
-\item{n_trends}{\code{integer}. Number of latent dynamic factors (as random walks with drift) for generating the series' trends}
+\item{seasonality}{\code{character}. Either \code{shared}, meaning that all series share the exact same seasonal pattern,
+or \code{hierarchical}, meaning that there is a global seasonality but each series' pattern can deviate slightly}
 
-\item{trend_alphas}{\code{vector} of drift terms for the latent factors}
+\item{n_trends}{\code{integer}. Number of latent dynamic factors (as random walks with drift) for generating the series' trends}
 
 \item{trend_rel}{\code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}}
 
