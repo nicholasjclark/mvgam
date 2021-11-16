@@ -3,15 +3,18 @@ library(mvgam)
 library(dplyr)
 
 # Simulate data
+set.seed(20)
 n_series = 5
-sim_data <- sim_mvgam(T = 70,
+sim_data <- sim_mvgam(T = 120,
                       n_series = n_series,
-                      prop_missing = 0.15,
+                      prop_missing = 0.05,
                       train_prop = 0.85,
                       seasonality = 'hierarchical')
+
+# Inspect empirical trend correlations
 round(sim_data$true_corrs, 4)
 
-# The stable seasonal pattern
+# Plot the stable seasonal pattern
 plot(sim_data$global_seasonality, type = 'l')
 
 # Fit the multivariate gam with a shared seasonal pattern. Use at least 5 latent factors
@@ -22,8 +25,8 @@ test <- mvjagam(data_train = sim_data$data_train,
                 use_nb = TRUE,
                 use_mv = T,
                 n_lv = min(5, n_series - 1),
-                n.adapt = 1000,
-                n.burnin = 2000,
+                n.adapt = 2000,
+                n.burnin = 5000,
                 n.iter = 1000,
                 thin = 1,
                 auto_update = F)
@@ -37,8 +40,8 @@ test2 <- mvjagam(data_train = sim_data$data_train,
                 use_nb = TRUE,
                 use_mv = T,
                 n_lv = min(5, n_series - 1),
-                n.adapt = 1000,
-                n.burnin = 3000,
+                n.adapt = 2000,
+                n.burnin = 5000,
                 n.iter = 1000,
                 thin = 1,
                 auto_update = F)

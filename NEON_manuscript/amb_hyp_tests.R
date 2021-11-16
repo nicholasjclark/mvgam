@@ -46,19 +46,13 @@ hyp3 = y ~
   # Series-level deviations from global pattern
   s(season, by = series, m = 1, k = 8) - 1
 
-# Laplace distribution emphasizes our prior that smooths should not be overly wiggly
-# unless the data supports this
-rho_prior = 'ddexp(5, 0.2)T(-12, 12)'
-
-# Prior is that latent trends should have positive autocorrelation
-phi_prior = 'dbeta(2,2)'
-
 # Fit multivariate and univariate versions of each hypothesis
-n.adapt = 25000
-n.burnin = 25000
-n.iter = 2000
+n.adapt = 500
+n.burnin = 500
+n.iter = 1000
 thin = 2
 
+# Use default priors for latent drift terms and for smooth penalties
 fit_null <- fit_mvgam(data_train = all_data$data_train,
                   data_test = all_data$data_test,
                   formula = null_hyp,

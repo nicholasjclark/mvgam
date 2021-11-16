@@ -35,7 +35,7 @@ sim_mvgam = function(T = 100,
   trend_alphas <- rnorm(n_trends, sd = 0.15)
 
   if(missing(trend_rel)){
-    trend_rel <- 0.1
+    trend_rel <- 0.2
   }
 
   if(!seasonality %in% c('shared', 'hierarchical')){
