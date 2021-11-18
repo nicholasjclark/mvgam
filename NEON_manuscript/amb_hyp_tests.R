@@ -8,7 +8,7 @@ data("all_neon_tick_data")
 source('NEON_manuscript/neon_utility_functions.R')
 
 # Prep data
-all_data <- prep_neon_data(species = 'Ambloyomma_americanum', split_prop = 0.9)
+all_data <- prep_neon_data(species = 'Ambloyomma_americanum', split_prop = 0.8)
 
 #### Set hypothtesis formulae ####
 # NULL. There is no seasonal pattern to be estimated, and we simply let the latent
@@ -46,11 +46,10 @@ hyp3 = y ~
   # Series-level deviations from global pattern
   s(season, by = series, m = 1, k = 8) - 1
 
-# Fit multivariate and univariate versions of each hypothesis
-n.adapt = 500
-n.burnin = 500
-n.iter = 1000
-thin = 2
+# Fit each hypothesis
+n.burnin = 75000
+n.iter = 5000
+thin = 5
 
 # Use default priors for latent drift terms and for smooth penalties
 fit_null <- fit_mvgam(data_train = all_data$data_train,
@@ -59,24 +58,11 @@ fit_null <- fit_mvgam(data_train = all_data$data_train,
                   formula_name = 'Null_hyp',
                   use_nb = TRUE,
                   use_mv = F,
-                  n.adapt = n.adapt,
                   n.burnin = n.burnin,
                   n.iter = n.iter,
                   thin = thin,
-                  auto_update = TRUE,
+                  auto_update = FALSE,
                   interval_width = 0.9)
-fit_null_mv <- fit_mvgam(data_train = all_data$data_train,
-                      data_test = all_data$data_test,
-                      formula = null_hyp,
-                      formula_name = 'Null_hyp_mv',
-                      use_nb = TRUE,
-                      use_mv = T,
-                      n.adapt = n.adapt,
-                      n.burnin = n.burnin,
-                      n.iter = n.iter,
-                      thin = thin,
-                      auto_update = TRUE,
-                      interval_width = 0.9)
 
 fit_hyp1 <- fit_mvgam(data_train = all_data$data_train,
                       data_test = all_data$data_test,
@@ -84,23 +70,10 @@ fit_hyp1 <- fit_mvgam(data_train = all_data$data_train,
                       formula_name = 'Hyp1',
                       use_nb = TRUE,
                       use_mv = F,
-                      n.adapt = n.adapt,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
-                      auto_update = TRUE,
-                      interval_width = 0.9)
-fit_hyp1_mv <- fit_mvgam(data_train = all_data$data_train,
-                      data_test = all_data$data_test,
-                      formula = hyp1,
-                      formula_name = 'Hyp1_mv',
-                      use_nb = TRUE,
-                      use_mv = T,
-                      n.adapt = n.adapt,
-                      n.burnin = n.burnin,
-                      n.iter = n.iter,
-                      thin = thin,
-                      auto_update = TRUE,
+                      auto_update = FALSE,
                       interval_width = 0.9)
 
 fit_hyp2 <- fit_mvgam(data_train = all_data$data_train,
@@ -109,23 +82,10 @@ fit_hyp2 <- fit_mvgam(data_train = all_data$data_train,
                       formula_name = 'Hyp2',
                       use_nb = TRUE,
                       use_mv = F,
-                      n.adapt = n.adapt,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
-                      auto_update = TRUE,
-                      interval_width = 0.9)
-fit_hyp2_mv <- fit_mvgam(data_train = all_data$data_train,
-                      data_test = all_data$data_test,
-                      formula = hyp2,
-                      formula_name = 'Hyp2_mv',
-                      use_nb = TRUE,
-                      use_mv = T,
-                      n.adapt = n.adapt,
-                      n.burnin = n.burnin,
-                      n.iter = n.iter,
-                      thin = thin,
-                      auto_update = TRUE,
+                      auto_update = FALSE,
                       interval_width = 0.9)
 
 fit_hyp3 <- fit_mvgam(data_train = all_data$data_train,
@@ -134,42 +94,25 @@ fit_hyp3 <- fit_mvgam(data_train = all_data$data_train,
                       formula_name = 'Hyp3',
                       use_nb = TRUE,
                       use_mv = F,
-                      n.adapt = n.adapt,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
-                      auto_update = TRUE,
-                      interval_width = 0.9)
-fit_hyp3_mv <- fit_mvgam(data_train = all_data$data_train,
-                      data_test = all_data$data_test,
-                      formula = hyp3,
-                      formula_name = 'Hyp3_mv',
-                      use_nb = TRUE,
-                      use_mv = T,
-                      n.adapt = n.adapt,
-                      n.burnin = n.burnin,
-                      n.iter = n.iter,
-                      thin = thin,
-                      auto_update = TRUE,
+                      auto_update = FALSE,
                       interval_width = 0.9)
 
 # Save models
 dir.create('NEON_manuscript/Results', recursive = T, showWarnings = F)
-save(fit_null, fit_null_mv,
-     fit_hyp1, fit_hyp1_mv,
-     fit_hyp2, fit_hyp2_mv,
-     fit_hyp3, fit_hyp3_mv,
+save(fit_null,
+     fit_hyp1,
+     fit_hyp2,
+     fit_hyp3,
      file = 'NEON_manuscript/Results/amb_models.rda')
 
 ## Post-process to investigate results
 rbind(fit_null$DRPS_scores,
-      fit_null_mv$DRPS_scores,
       fit_hyp1$DRPS_scores,
-      fit_hyp1_mv$DRPS_scores,
       fit_hyp2$DRPS_scores,
-      fit_hyp2_mv$DRPS_scores,
-      fit_hyp3$DRPS_scores,
-      fit_hyp3_mv$DRPS_scores) %>%
+      fit_hyp3$DRPS_scores) %>%
   dplyr::ungroup() %>%
   dplyr::filter(!is.na(Truth)) %>%
   dplyr::group_by(Series) %>%
@@ -226,7 +169,7 @@ ggplot(plot_dat_ranks,
               draw_quantiles = c(0.5), scale = 'width', colour = 'black') +
   geom_jitter(alpha = 0.5, height = 0.1, width = 0.3, colour = 'black', size = 0.25) +
   ylim(0.5,7.5) +
-  scale_y_continuous(breaks = seq(1,10)) +
+  scale_y_continuous(breaks = seq(1,4)) +
   scale_colour_viridis(discrete = T, option = 'plasma', begin = 0.35, end = 1) +
   scale_fill_viridis(discrete = T, option = 'plasma', begin = 0.35, end = 1, name = '') +
   theme_dark() + theme(legend.position = 'None') + coord_flip() +
@@ -240,10 +183,10 @@ cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()
 
 pdf('NEON_manuscript/Figures/Amb_sitewise_analysis.pdf',
-    width = 6.25, height = 4.25)
-ggplot(plot_dat %>% dplyr::filter(Formula %in% c('Null_hyp_mv','Hyp1_mv', 'Hyp2_mv','Hyp3_mv')),
+    width = 6.25, height = 4)
+ggplot(plot_dat %>% dplyr::filter(Formula %in% c('Null_hyp','Hyp1', 'Hyp2','Hyp3')),
        aes(y = scale_drps,x = Series, fill = Formula))+
-  geom_hline(yintercept=1, size = 1.1)+
+  geom_hline(yintercept=0, size = 1.1)+
   geom_violin(scale = 'width', draw_quantiles = 0.5) +
   scale_fill_discrete(type = c(viridis::plasma(n=10, begin = 0.15, end = 1)[c(4,6,8,10)]), name = '')  +
   coord_flip() +theme_dark() +
@@ -254,7 +197,7 @@ ggplot(plot_dat %>% dplyr::filter(Formula %in% c('Null_hyp_mv','Hyp1_mv', 'Hyp2_
 dev.off()
 
 # Plot changing residual correlations from latent factor models
-plot1 <- ggplot(fit_hyp1_mv$mean_correlations %>%
+plot1 <- ggplot(fit_hyp1$mean_correlations %>%
                   tibble::rownames_to_column("series1") %>%
                   tidyr::pivot_longer(-c(series1), names_to = "series2", values_to = "Correlation"),
                 aes(x = series1, y = series2)) + geom_tile(aes(fill = Correlation)) +
@@ -266,10 +209,9 @@ plot1 <- ggplot(fit_hyp1_mv$mean_correlations %>%
   labs(x = '', y = '', title = '\nGlobal seasonality') +
   theme_dark() +
   theme(axis.text.x = element_blank(),
-        axis.text.y = element_text(size = 7),
         title = element_text(size = 9))
 
-plot2 <- ggplot(fit_hyp2_mv$mean_correlations %>%
+plot2 <- ggplot(fit_hyp2$mean_correlations %>%
                   tibble::rownames_to_column("series1") %>%
                   tidyr::pivot_longer(-c(series1), names_to = "series2", values_to = "Correlation"),
                 aes(x = series1, y = series2)) + geom_tile(aes(fill = Correlation)) +
@@ -284,7 +226,7 @@ plot2 <- ggplot(fit_hyp2_mv$mean_correlations %>%
         axis.text.y = element_blank(),
         title = element_text(size = 9))
 
-plot3 <- ggplot(fit_hyp3_mv$mean_correlations %>%
+plot3 <- ggplot(fit_hyp3$mean_correlations %>%
                   tibble::rownames_to_column("series1") %>%
                   tidyr::pivot_longer(-c(series1), names_to = "series2", values_to = "Correlation"),
                 aes(x = series1, y = series2)) + geom_tile(aes(fill = Correlation)) +
@@ -301,26 +243,20 @@ plot3 <- ggplot(fit_hyp3_mv$mean_correlations %>%
 
 pdf('NEON_manuscript/Figures/Amb_trendcorrelations.pdf',
     width = 6.25, height = 5)
-cowplot::plot_grid(cowplot::plot_grid(plot1 + theme(legend.position = 'none'),
-                                      plot2 + theme(legend.position = 'none'),
-                                      plot3 + theme(legend.position = 'none'),
-                                      rel_widths = c(1, 0.8),
-                                      rel_heights = c(0.8, 1),
-                                      ncol = 2),
+cowplot::plot_grid(plot1 + theme(legend.position = 'none'),
+                   plot2 + theme(legend.position = 'none'),
+                   plot3 + theme(legend.position = 'none'),
                    cowplot::get_legend(plot1),
-                   ncol = 2,
-                   rel_widths = c(1,0.15))
+                   rel_widths = c(1, 0.85),
+                   rel_heights = c(0.8, 1),
+                   ncol = 2)
 dev.off()
 
 # Plot PIT histograms
 data.frame(rbind(fit_null$PIT_scores,
-                 fit_null_mv$PIT_scores,
                  fit_hyp1$PIT_scores,
-                 fit_hyp1_mv$PIT_scores,
                  fit_hyp2$PIT_scores,
-                 fit_hyp2_mv$PIT_scores,
-                 fit_hyp3$PIT_scores,
-                 fit_hyp3_mv$PIT_scores)) %>%
+                 fit_hyp3$PIT_scores)) %>%
   dplyr::group_by(Formula) %>%
   dplyr::summarise_all(mean) -> plot_dat
 
@@ -330,15 +266,15 @@ blank <- function(x = 1, y = 1, type = "n", xlab = "", ylab = "",
        xaxt = xaxt, yaxt = yaxt, bty = bty, ...)
 }
 
-formulas <- c('Null_hyp', 'Null_hyp_mv',
-              'Hyp1', 'Hyp1_mv',
-              'Hyp2', 'Hyp2_mv',
-              'Hyp3', 'Hyp3_mv')
-colours <- rev(viridis::plasma(n = 10, begin = 0.35, end = 1))
+formulas <- c('Null_hyp',
+              'Hyp1',
+              'Hyp2',
+              'Hyp3')
+colours <- rev(viridis::plasma(n = 4, begin = 0.35, end = 1))
 
 pdf('NEON_manuscript/Figures/Amb_PITs.pdf',
-    width = 6.25, height = 4.75)
-par(mfrow = c(2, 5),
+    width = 6.25, height = 3.75)
+par(mfrow = c(1, 4),
     mai = c(.38,.35,.45,.05),
     mgp = c(2, 1, 0))
 for(i in seq_along(formulas)){
@@ -356,8 +292,8 @@ for(i in seq_along(formulas)){
        cex.axis = 1.25, xpd = NA)
   axis(2, at = seq(0, 3.5, 0.5), labels = FALSE, tck = -0.01)
   axis(2, at = seq(0, 3.5, 1), labels = FALSE, tck = -0.025)
-  if(i == 8){
-    mtext(side = 1, "Probability Integral Transform", cex = 1,
+  if(i == 3){
+    mtext(side = 1, "Probability Integral Transform                    ", cex = 1,
           line = 1.75)
   }
 
@@ -375,27 +311,34 @@ dir.create('NEON_manuscript/Figures/Amb_forecasts', recursive = T, showWarnings 
 for(i in seq_along(levels(all_data$data_train$series))){
   pdf(paste0('NEON_manuscript/Figures/Amb_forecasts/', levels(all_data$data_train$series)[i],
              '.pdf'))
-  par(mfrow = c(3,1),
+  par(mfrow = c(4,1),
       mai = c(.38,.4,.45,.05),
       mgp = c(2, 1, 0))
-  plot_mvgam_fc(out_gam_mod = fit_null_mv$out_gam_mod, data_test = all_data$data_test,
+  plot_mvgam_fc(object = fit_null$out_gam_mod, data_test = all_data$data_test,
                 data_train = all_data$data_train,
                 series = i)
-  mtext(side = 3, 'Null_hyp_mv', cex = 1,
+  mtext(side = 3, 'Null', cex = 1,
         line = 1.55)
-  plot_mvgam_fc(out_gam_mod = fit_hyp1_mv$out_gam_mod, data_test = all_data$data_test,
+  plot_mvgam_fc(object = fit_hyp1$out_gam_mod, data_test = all_data$data_test,
                 data_train = all_data$data_train,
                 series = i)
-  mtext(side = 3, 'Hyp1_mv', cex = 1,
+  mtext(side = 3, 'Hyp1', cex = 1,
         line = 1.35)
-  plot_mvgam_fc(out_gam_mod = fit_hyp3_mv$out_gam_mod, data_test = all_data$data_test,
+  plot_mvgam_fc(object = fit_hyp2$out_gam_mod, data_test = all_data$data_test,
                 data_train = all_data$data_train,
                 series = i)
-  mtext(side = 3, 'Hyp3_mv', cex = 1,
+  mtext(side = 3, 'Hyp2', cex = 1,
+        line = 1.55)
+  plot_mvgam_fc(object = fit_hyp3$out_gam_mod, data_test = all_data$data_test,
+                data_train = all_data$data_train,
+                series = i)
+  mtext(side = 3, 'Hyp3', cex = 1,
         line = 1.55)
   invisible()
   dev.off()
 }
 
-
-
+fit_null$rho_summary
+fit_hyp1$rho_summary
+fit_hyp2$rho_summary
+fit_hyp3$rho_summary

@@ -23,7 +23,7 @@
 sim_mvgam = function(T = 100,
                      n_series = 3,
                      seasonality = 'shared',
-                     n_trends = 15,
+                     n_trends = 5,
                      trend_rel,
                      freq = 12,
                      size_obs,
@@ -80,12 +80,8 @@ sim_mvgam = function(T = 100,
   diag(corMat) <- 1
   stddev <- rep(1, n_series)
   Sigma <- stddev %*% t(stddev) * corMat
-
-  # p <- qr.Q(qr(matrix(rnorm(n_series ^ 2, sd = 1), n_series)))
-  # Sigma <- crossprod(p, p*(n_series:1))
-
   loadings <- MASS::mvrnorm(n = n_trends, mu = rep(0, n_series),
-                            Sigma = as.matrix(Matrix::nearPD(Sigma)$mat), empirical = T)
+                            Sigma = as.matrix(Matrix::nearPD(Sigma)$mat))
 
   # Simulate the shared seasonal pattern
   stl_season <- stl(smooth::sim.es(model="ANA",frequency=freq,obs = T + 5,

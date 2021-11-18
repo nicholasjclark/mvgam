@@ -8,7 +8,7 @@ sim_mvgam(
   T = 100,
   n_series = 3,
   seasonality = "shared",
-  n_trends = 15,
+  n_trends = 5,
   trend_rel,
   freq = 12,
   size_obs,

@@ -35,11 +35,8 @@
 #'@param use_lv \code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
 #'latent trends. If \code{FALSE}, estimate covarying errors in the latent trends
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_mv == TRUE}
-#'and \code{use_lv == TRUE}. Cannot be \code{>n_series}. Defaults to \code{min(5, floor(n_series / 2))},
-#'which should provide enough information to estimate correlations among latend factor loadings
+#'and \code{use_lv == TRUE}. Cannot be \code{>n_series}. Defaults to \code{min(5, floor(n_series / 2))}
 #'@param n.chains \code{integer} the number of parallel chains for the model
-#'@param n.adapt \code{integer} the number of iterations for adaptation. See adapt for details.
-#'If \code{n.adapt} = 0 then no adaptation takes place
 #'@param n.iter \code{integer} the number of iterations of the Markov chain to run
 #'@param auto_update \code{logical} If \code{TRUE}, the model is run for up to \code{3} additional sets of
 #'\code{n.iter} iterations, or until the lower 15th percentile of effective sample sizes reaches \code{100}
@@ -67,7 +64,6 @@ mvjagam = function(formula,
                     use_mv = FALSE,
                     use_lv = FALSE,
                     n_lv = 5,
-                    n.adapt = 1000,
                     n.chains = 2,
                     n.burnin = 5000,
                     n.iter = 2000,
@@ -135,8 +131,14 @@ mvjagam = function(formula,
                                    ## Mean expectations
                                    for (i in 1:n) {
                                    for (s in 1:n_series) {
-                                   mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s] * in_season[i])
+                                   mu[i, s] <- exp(gam_comp[s] * eta[ytimes[i, s]] +
+                                                   trend_comp[s] * trend[i, s] * in_season[i])
                                    }
+                                   }
+                                   # Ensure trend does not completely dominate unless supported by data
+                                   for (s in 1:n_series) {
+                                   gam_comp[s] ~ dbeta(2,2)
+                                   trend_comp[s] <- 1 - gam_comp[s]
                                    }
 
                                    ## AR1 state space trends
@@ -216,8 +218,14 @@ mvjagam = function(formula,
                         ## Mean expectations
                         for (i in 1:n) {
                         for (s in 1:n_series) {
-                        mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s] * in_season[i])
+                        mu[i, s] <- exp(gam_comp[s] * eta[ytimes[i, s]] +
+                                        trend_comp[s] * trend[i, s] * in_season[i])
                         }
+                        }
+                        # Ensure trend does not completely dominate unless supported by data
+                        for (s in 1:n_series) {
+                        gam_comp[s] ~ dbeta(2,2)
+                        trend_comp[s] <- 1 - gam_comp[s]
                         }
 
                         ## RW + drift state space trends with possible covarying errors
@@ -306,8 +314,15 @@ mvjagam = function(formula,
         ## Mean expectations
         for (i in 1:n) {
         for (s in 1:n_series) {
-        mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s] * in_season[i])
+        mu[i, s] <- exp(gam_comp[s] * eta[ytimes[i, s]] +
+                        trend_comp[s] * trend[i, s] * in_season[i])
         }
+        }
+
+        # Ensure trend does not completely dominate unless supported by data
+        for (s in 1:n_series) {
+          gam_comp[s] ~ dbeta(2,2)
+          trend_comp[s] <- 1 - gam_comp[s]
         }
 
         ## Latent factors evolve as RW + drift time series with shared precision
@@ -494,7 +509,7 @@ mvjagam = function(formula,
       } else {
         ss_jagam$jags.data$n_lv <- n_lv
       }
-      if(n_lv > n_series){
+      if(ss_jagam$jags.data$n_lv > ss_jagam$jags.data$n_series){
         stop('Number of latent variables cannot be greater than number of series')
       }
       ss_jagam$jags.ini$tau_fac <- 1
@@ -508,29 +523,32 @@ mvjagam = function(formula,
     dplyr::arrange(year, season) %>%
     dplyr::pull(in_season)
 
-  # Initiate adaptation of the model
+  # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS
+  # will take a while to optimise the samplers, so long adaptation with little 'burnin'
+  # is more crucial than little adaptation but long 'burnin' https://mmeredith.net/blog/2016/Adapt_or_burn.htm
   load.module("glm")
   gam_mod <- jags.model(model_file,
                         data = ss_jagam$jags.data,
                         inits = ss_jagam$jags.ini,
                         n.chains = n.chains,
-                        n.adapt = n.adapt)
+                        n.adapt = 0)
   unlink('base_gam.txt')
 
   # Update the model for the burnin period
-  update(gam_mod, n.burnin)
+  adapt(gam_mod, n.iter = n.burnin, end.adaptation = TRUE)
 
   # Gather posterior samples for the specified parameters
   if(!use_mv){
     param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
-               'tau', 'trend')
+               'tau', 'trend', 'gam_comp', 'trend_comp')
   } else {
     if(!use_lv){
       param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
-                 'tau', 'trend', 'cor')
+                 'tau', 'trend', 'cor','gam_comp', 'trend_comp')
     } else {
       param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
-                 'trend', 'lv_coefs', 'tau_fac', 'penalty')
+                 'trend', 'lv_coefs', 'tau_fac', 'penalty',
+                 'gam_comp', 'trend_comp')
     }
 
   }

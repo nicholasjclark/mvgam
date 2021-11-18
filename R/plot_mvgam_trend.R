@@ -20,8 +20,10 @@ plot_mvgam_trend = function(object, series, data_test, data_train){
                       length.out = NCOL(object$ytimes) + 1)
   preds <- MCMCvis::MCMCchains(object$jags_output, 'trend')[,pred_indices[series]:pred_indices[series + 1]]
   preds_last <- preds[1,]
+  int <- apply(preds,
+               2, hpd, 0.98)
   plot(preds_last,
-       type = 'l', ylim = range(preds),
+       type = 'l', ylim = range(int),
        col = rgb(1,0,0, alpha = 0),
        ylab = paste0('Estimated trend for ', levels(data_train$series)[series]),
        xlab = 'Time')
