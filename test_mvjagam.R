@@ -2,30 +2,28 @@
 library(mvgam)
 library(dplyr)
 
-# Simulate data
-set.seed(20)
-n_series = 5
+# Simulate data with shared seasonal structure and correlated trends
+set.seed(110)
+n_series = 6
 sim_data <- sim_mvgam(T = 120,
                       n_series = n_series,
-                      prop_missing = 0.05,
+                      prop_missing = 0.25,
                       train_prop = 0.85,
-                      seasonality = 'hierarchical')
+                      seasonality = 'shared')
 
 # Inspect empirical trend correlations
 round(sim_data$true_corrs, 4)
 
-# Plot the stable seasonal pattern
+# Plot the global seasonal pattern
 plot(sim_data$global_seasonality, type = 'l')
 
-# Fit the multivariate gam with a shared seasonal pattern. Use at least 5 latent factors
-# to allow for more precise calculation of trend covariances among series
+# Fit the multivariate gam with a shared seasonal pattern
 test <- mvjagam(data_train = sim_data$data_train,
                 data_test = sim_data$data_test,
                 formula = y ~ s(season, k = 12, m = 2, bs = 'cc') - 1,
                 use_nb = TRUE,
                 use_mv = T,
-                n_lv = min(5, n_series - 1),
-                n.adapt = 2000,
+                n_lv = 6,
                 n.burnin = 5000,
                 n.iter = 1000,
                 thin = 1,
@@ -33,21 +31,31 @@ test <- mvjagam(data_train = sim_data$data_train,
 mod_dic <- dic.samples(test$jags_model, 500)
 
 # Try equivalent model that allows series' seasonality to deviate smoothly from global seasonality
+# test2 <- mvjagam(data_train = sim_data$data_train,
+#                 data_test = sim_data$data_test,
+#                 formula = y ~ s(season, k = 8, m = 2, bs = 'cc') +
+#                   s(season, by = series, m = 1, k = 10) - 1,
+#                 use_nb = TRUE,
+#                 use_mv = T,
+#                 n.adapt = 2000,
+#                 n.burnin = 5000,
+#                 n.iter = 1000,
+#                 thin = 1,
+#                 auto_update = F)
+
+# Equivalent univariate trend model
 test2 <- mvjagam(data_train = sim_data$data_train,
                 data_test = sim_data$data_test,
-                formula = y ~ s(season, k = 8, m = 2, bs = 'cc') +
-                  s(season, by = series, m = 1, k = 10) - 1,
+                formula = y ~ s(season, k = 12, m = 2, bs = 'cc') - 1,
                 use_nb = TRUE,
-                use_mv = T,
-                n_lv = min(5, n_series - 1),
-                n.adapt = 2000,
+                use_mv = F,
                 n.burnin = 5000,
                 n.iter = 1000,
                 thin = 1,
                 auto_update = F)
 mod2_dic <- dic.samples(test2$jags_model, 500)
 
-# Model 2 should fit better
+# Which model fits better in terms of DIC?
 hpd(mod_dic$deviance, 0.5)
 hpd(mod2_dic$deviance, 0.5)
 
@@ -71,6 +79,9 @@ plot_mvgam_trend(object = test2, series = 3, data_test = sim_data$data_test,
 plot_mvgam_trend(object = test2, series = 4, data_test = sim_data$data_test,
                  data_train = sim_data$data_train)
 
+# Plot estimates of trend relative importance per series (default for simulations is 0.2)
+MCMCvis::MCMCtrace(test2$jags_output, 'trend_comp', pdf = F)
+
 # Calculate latent trend correlations
 correlations <- lv_correlations(object = test2, data_train = sim_data$data_train)
 
@@ -89,6 +100,8 @@ ggplot(mean_correlations %>%
                        limits = c(-1, 1),
                        name = 'Trend\ncorrelation') + labs(x = '', y = '') + theme_dark() +
   theme(axis.text.x = element_text(angle = 45, hjust=1))
+
+# True trend correlations
 round(sim_data$true_corrs, 4)
 
 # Compare to truth by calculating proportion of true associations (>0.2) that were correctly detected
@@ -107,3 +120,6 @@ corr_dif_signs[upper.tri(corr_dif_signs)] <- NA
 data.frame(correlations_wrong = length(which(abs(corr_dif_signs) > 0)),
            total_correlations = length(which(abs(truth) > 0)))
 
+#### Even when using a fairly large number of series (14) with reasonable missingness (25%),
+# we still find that the univariate model does nearly as well when estimating trend correlations. Need
+# to use DRPS to see at what point a multivariate model is worth the extra computational cost

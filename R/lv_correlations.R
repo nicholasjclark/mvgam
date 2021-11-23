@@ -1,7 +1,7 @@
 #'Calculate trend correlations based on mvjagam latent factor loadings
 #'
-#'This function uses samples of latent dynamic factor loadings for each series from a fitted
-#'mvjagam model and calculates correlations among series' trends
+#'This function uses samples of latent trends for each series from a fitted
+#'mvjagam model to calculates correlations among series' trends
 #'
 #'
 #'@param object \code{list} object returned from \code{mvjagam}
@@ -20,29 +20,28 @@
 #'@export
 lv_correlations = function(object, data_train){
   samps <- jags.samples(object$jags_model,
-                        variable.names = 'lv_coefs',
+                        variable.names = 'trend',
                         n.iter = 1000, thin = 5)
-  lv_coefs <- samps$lv_coefs
-  n_series <- dim(lv_coefs)[1]
-  n_lv <- dim(lv_coefs)[2]
-  n_samples <- prod(dim(lv_coefs)[3:4])
+  trends <- samps$trend
+  n_series <- dim(trends)[2]
+  n_samples <- dim(trends)[3]
+  n_chains <- dim(trends)[4]
 
-  # Get array of latent variable loadings
-  coef_array <- array(NA, dim = c(n_series, n_lv, n_samples))
-  for(i in 1:n_series){
-    for(j in 1:n_lv){
-      coef_array[i, j, ] <- c(lv_coefs[i, j, , 1],
-                              lv_coefs[i, j, , 2])
-    }
+  # Get list of trend correlation estimates
+  get_cors = function(trends, n_samples, chain){
+    trend_cors <- lapply(seq_len(n_samples), function(x){
+      cov2cor(cov(trends[, , x, chain]))
+    })
+    trend_cors
   }
 
-  # Posterior correlations based on latent variable loadings
-  correlations <- array(NA, dim = c(n_series, n_series, n_samples))
-  for(i in 1:n_samples){
-    correlations[,,i] <- cov2cor(cov(t(coef_array[,,1])))
-  }
-  mean_correlations <- apply(correlations, c(1,2), function(x) quantile(x, 0.5))
+  all_trend_cors <- do.call(c, lapply(seq_len(n_chains), function(chain){
+    get_cors(trends, n_samples, chain)
+  }))
+
+  # Calculate posterior mean correlations
+  mean_correlations <- Reduce(`+`, all_trend_cors) / length(all_trend_cors)
   rownames(mean_correlations) <- colnames(mean_correlations) <- levels(data_train$series)
 
-  list(mean_correlations = mean_correlations, posterior_correlations = correlations)
+  list(mean_correlations = mean_correlations, posterior_correlations = all_trend_cors)
 }

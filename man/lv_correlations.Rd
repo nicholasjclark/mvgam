@@ -25,6 +25,6 @@ Any other variables to be included in the linear predictor of \code{formula} mus
 A \code{list} object containing the mean posterior correlations and the full array of posterior correlations
 }
 \description{
-This function uses samples of latent dynamic factor loadings for each series from a fitted
-mvjagam model and calculates correlations among series' trends
+This function uses samples of latent trends for each series from a fitted
+mvjagam model to calculates correlations among series' trends
 }

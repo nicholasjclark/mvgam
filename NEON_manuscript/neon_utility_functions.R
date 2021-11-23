@@ -130,15 +130,16 @@ plot_mvgam_season = function(out_gam_mod, series, data_test, data_train,
                           siteID = as.character(unique(data_train$siteID[which(data_train$series ==
                                                                                  levels(data_train$series)[series])])))
   Xp <- predict(out_gam_mod$mgcv_model, newdata = pred_dat, type = 'lpmatrix')
-  betas <- MCMCchains(out_gam_mod$jags_output, 'b')
-  plot(Xp %*% betas[1,] ~ pred_dat$season, ylim = range(Xp %*% betas[1,] + 1.5,
-                                                        Xp %*% betas[1,] - 1.5),
+  betas <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'b')
+  gam_comps <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'gam_comp')[,series]
+  plot(gam_comps[1] * (Xp %*% betas[1,]) ~ pred_dat$season, ylim = range(gam_comps[1] * (Xp %*% betas[1,]) + 2.5,
+                                                                         gam_comps[1] * (Xp %*% betas[1,]) - 2.5),
 
        col = rgb(150, 0, 0, max = 255, alpha = 10), type = 'l',
        ylab = paste0('F(season) for ', levels(data_train$series)[series]),
        xlab = xlab)
   for(i in 2:1000){
-    lines(Xp %*% betas[i,] ~ pred_dat$season,
+    lines(gam_comps[i] * (Xp %*% betas[i,]) ~ pred_dat$season,
 
           col = rgb(150, 0, 0, max = 255, alpha = 10))
   }
@@ -161,10 +162,11 @@ plot_mvgam_gdd = function(out_gam_mod, series, data_test, data_train,
                           siteID = as.character(unique(data_train$siteID[which(data_train$series ==
                                                                                  levels(data_train$series)[series])])))
   Xp <- predict(out_gam_mod$mgcv_model, newdata = pred_dat, type = 'lpmatrix')
-  betas <- MCMCchains(out_gam_mod$jags_output, 'b')
+  betas <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'b')
+  gam_comps <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'gam_comp')[,series]
   preds <- matrix(NA, nrow = 1000, ncol = length(pred_dat$cum_gdd))
   for(i in 1:1000){
-    preds[i,] <- rnbinom(length(pred_dat$cum_gdd), mu = exp(Xp %*% betas[i,]),
+    preds[i,] <- rnbinom(length(pred_dat$cum_gdd), mu = exp(gam_comps[i] * (Xp %*% betas[i,])),
                          size = MCMCvis::MCMCsummary(out_gam_mod$jags_output, 'r')$mean)
   }
   int <- apply(preds,
@@ -181,7 +183,7 @@ plot_mvgam_gdd = function(out_gam_mod, series, data_test, data_train,
           c(int[1,],rev(int[3,])),
           col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
   int <- apply(preds,
-               2, hpd, 0.68)
+               2, hpd, 0.8)
   int[int<0] <- 0
   polygon(c(covar_vals, rev(covar_vals)),
           c(int[1,],rev(int[3,])),
@@ -308,7 +310,8 @@ prep_neon_data = function(species = 'Ambloyomma_americanum', split_prop = 0.9){
   data_train = model_dat[1:(floor(nrow(model_dat) * split_prop)),]
   data_test = model_dat[((floor(nrow(model_dat) * split_prop)) + 1):nrow(model_dat),]
 
-  list(data_train = data_train, data_test = data_test, species = species)
+  list(data_train = data_train, data_test = data_test,
+       species = species, sd_gdd = sd_gdd, mean_gdd = mean_gdd)
 
 }
 
@@ -321,7 +324,6 @@ fit_mvgam = function(data_train,
                      n_lv = 5,
                      phi_prior,
                      tau_prior,
-                     n.adapt = 1000,
                      n.burnin = 1000,
                      n.iter = 1000,
                      thin = 2,
@@ -332,7 +334,6 @@ fit_mvgam = function(data_train,
   out_gam_mod <- mvjagam(formula = formula,
                          data_train = data_train,
                          data_test = data_test,
-                         n.adapt = n.adapt,
                          n.burnin = n.burnin,
                          n.iter = n.iter,
                          thin = thin,
@@ -350,60 +351,28 @@ fit_mvgam = function(data_train,
                                        c('rho'), HPD = TRUE)
 
   # 2. Stronger residual correlations, suggesting we are missing some site-level structure
-  # Calculate the correlation matrix from the latent variables
-  if(use_mv){
-  samps <- jags.samples(out_gam_mod$jags_model,
-                        variable.names = 'lv_coefs',
-                        n.iter = n.iter, thin = 1)
-  lv_coefs <- samps$lv_coefs
-  n_series <- dim(lv_coefs)[1]
-  n_lv <- dim(lv_coefs)[2]
-  n_samples <- prod(dim(lv_coefs)[3:4])
+  # Calculate the correlation matrix from the latent trends
+    correlations <- lv_correlations(object = out_gam_mod, data_train = data_train)
 
-  # Get array of latent variable loadings
-  coef_array <- array(NA, dim = c(n_series, n_lv, n_samples))
-  for(i in 1:n_series){
-    for(j in 1:n_lv){
-      coef_array[i, j, ] <- c(lv_coefs[i, j, , 1],
-                              lv_coefs[i, j, , 2])
-    }
-  }
+    # Plot trend correlations
+    library(ggplot2)
+    mean_correlations <- correlations$mean_correlations
+    mean_correlations[upper.tri(mean_correlations)] <- NA
+    mean_correlations <- data.frame(mean_correlations)
+    resid_corr_plot <- ggplot(mean_correlations %>%
+             tibble::rownames_to_column("series1") %>%
+             tidyr::pivot_longer(-c(series1), names_to = "series2", values_to = "Correlation"),
+           aes(x = series1, y = series2)) + geom_tile(aes(fill = Correlation)) +
+      scale_fill_gradient2(low="darkred", mid="white", high="darkblue",
+                           midpoint = 0,
+                           breaks = seq(-1,1,length.out = 5),
+                           limits = c(-1, 1),
+                           name = 'Trend\ncorrelation') + labs(x = '', y = '') + theme_dark() +
+      theme(axis.text.x = element_text(angle = 45, hjust=1))
 
-  # Variances of each series' latent trend are fixed at (1/100)^2
-  eps_res <- rep((1/100)^2, n_series)
-
-  # Posterior correlations based on latent variable loadings
-  correlations <- array(NA, dim = c(n_series, n_series, n_samples))
-  for(i in 1:n_samples){
-    correlations[,,i] <- cov2cor(tcrossprod(coef_array[,,i]) + diag(eps_res))
-  }
-  mean_correlations <- apply(correlations, c(1,2), function(x) quantile(x, 0.5))
-
-  # Plot the mean posterior correlations
-  mean_correlations[upper.tri(mean_correlations)] <- NA
-  mean_correlations <- data.frame(mean_correlations)
-  rownames(mean_correlations) <- colnames(mean_correlations) <- levels(data_train$series)
-
-  resid_corr_plot <- ggplot(mean_correlations %>%
-           tibble::rownames_to_column("series1") %>%
-           tidyr::pivot_longer(-c(series1), names_to = "series2", values_to = "Correlation"),
-         aes(x = series1, y = series2)) + geom_tile(aes(fill = Correlation)) +
-    scale_fill_gradient2(low="darkred", mid="white", high="darkblue",
-                         midpoint = 0,
-                         breaks = seq(-1,1,length.out = 5),
-                         limits = c(-1, 1),
-                         name = 'Residual\ncorrelation') + labs(x = '', y = '') + theme_dark() +
-    theme(axis.text.x = element_text(angle = 45, hjust=1))
 
   resid_corr_summary <- summary(as.vector(as.matrix(mean_correlations)))
 
-  # 3. Smaller precisions for tau_fac (i.e. larger variance for latent dynamic factors)
-  tau_factor_summary <- MCMCvis::MCMCsummary(out_gam_mod$jags_output, 'tau_fac', HPD = TRUE)
-  } else {
-    resid_corr_plot <- NULL
-    resid_corr_summary <- NULL
-    tau_factor_summary <- NULL
-  }
 
   # 4. Poorer forecasts
   # Calculate Discrete Rank Probability Score and nominal coverage of 90% credible interval for
@@ -421,7 +390,6 @@ fit_mvgam = function(data_train,
   })))
   all_pit$Formula = formula_name
 
-  if(use_mv){
     out <- list(out_gam_mod = out_gam_mod,
                 rho_summary = data.frame('rhat_lower' = as.vector(summary(rho_summary$Rhat)[3]),
                                          'rhat_upper' = as.vector(summary(rho_summary$Rhat)[4]),
@@ -433,20 +401,8 @@ fit_mvgam = function(data_train,
                                                 'Corr_upper' = as.vector(resid_corr_summary[5]),
                                                 'Formula' = formula_name),
                 mean_correlations = mean_correlations,
-                tau_factor_summary = data.frame('Tau_fac_lower' = unname(as.vector(tau_factor_summary[3])),
-                                                'Tau_fac_upper' = unname(as.vector(tau_factor_summary[4])),
-                                                'Formula' = formula_name),
                 DRPS_scores = all_drps,
                 PIT_scores = all_pit)
-  } else {
-    out <- list(out_gam_mod = out_gam_mod,
-                rho_summary = data.frame('rhat_lower' = as.vector(summary(rho_summary$Rhat)[3]),
-                                         'rhat_upper' = as.vector(summary(rho_summary$Rhat)[4]),
-                                         'n_eff_lower' = as.vector(summary(rho_summary$n.eff)[3]),
-                                         'n_eff_upper' = as.vector(summary(rho_summary$n.eff)[4]),
-                                         'Formula' = formula_name),
-                DRPS_scores = all_drps,
-                PIT_scores = all_pit)
-  }
+return(out)
 
 }
