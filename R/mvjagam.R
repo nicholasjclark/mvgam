@@ -572,7 +572,7 @@ mvjagam = function(formula,
       break;
     }
     cat('Convergence not reached. Extending burnin...\n')
-    update(gam_mod, n.burnin)
+    update(gam_mod, min(5000, n.burnin))
     out_gam_mod <- rjags::coda.samples(gam_mod,
                                        variable.names = param,
                                        n.iter = n.iter,

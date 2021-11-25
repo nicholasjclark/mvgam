@@ -12,6 +12,8 @@ License: MIT + file LICENSE
 Depends: R (>= 3.6.0), mgcv, rjags
 Imports: 
     parallel,
+    lubridate,
+    zoo,
     smooth,
     coda,
     MCMCpack,

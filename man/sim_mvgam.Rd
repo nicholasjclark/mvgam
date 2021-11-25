@@ -40,7 +40,7 @@ or \code{hierarchical}, meaning that there is a global seasonality but each seri
 \item{train_prop}{\code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}}
 }
 \value{
-A \code{list} object containing outputs needed for \code{mvjagam}, including 'data_train' and 'data_test',
+A \code{list} object containing outputs needed for \code{\link{mvjagam}}, including 'data_train' and 'data_test',
 as well as some additional information about the simulated seasonality and trend dependencies
 }
 \description{

@@ -47,11 +47,8 @@ hyp3 = y ~
   s(season, by = series, m = 1, k = 8) - 1
 
 # Fit each hypothesis
-<<<<<<< HEAD
 n.burnin = 100000
-=======
 n.burnin = 40000
->>>>>>> d12b9de9c762f2b4baa001a8f9e0d6879def571c
 n.iter = 5000
 thin = 5
 
@@ -347,10 +344,8 @@ fit_null$rho_summary
 fit_hyp1$rho_summary
 fit_hyp2$rho_summary
 fit_hyp3$rho_summary
-<<<<<<< HEAD
+
 MCMCvis::MCMCtrace(fit_hyp3$out_gam_mod$jags_output, 'trend_comp', pdf = F)
 plot_mvgam_trend(object = fit_hyp3$out_gam_mod, data_test = all_data$data_test,
                  data_train = all_data$data_train,
                  series = 6)
-=======
->>>>>>> d12b9de9c762f2b4baa001a8f9e0d6879def571c

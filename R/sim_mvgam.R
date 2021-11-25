@@ -16,7 +16,7 @@
 #'@param mu_obs \code{vector} of negative binomial mu parameters for the series
 #'@param prop_missing \code{numeric} stating proportion of observations that are missing
 #'@param train_prop \code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}
-#'@return A \code{list} object containing outputs needed for \code{mvjagam}, including 'data_train' and 'data_test',
+#'@return A \code{list} object containing outputs needed for \code{\link{mvjagam}}, including 'data_train' and 'data_test',
 #'as well as some additional information about the simulated seasonality and trend dependencies
 #'@export
 
@@ -109,7 +109,8 @@ sim_mvgam = function(T = 100,
       obs <- scale01(invlogit(as.vector(scale(as.vector(loadings[,x] %*%  t(trends))) * trend_rel) +
                                 glob_season * (1 - trend_rel)))
     } else {
-      yseason <- as.vector(scale(stl(ts(rnorm(T, glob_season, sd = 3), frequency = freq), 'periodic')$time.series[,1]))
+      yseason <- as.vector(scale(stl(ts(rnorm(T, glob_season, sd = 2),
+                                        frequency = freq), 'periodic')$time.series[,1]))
       obs <- scale01(invlogit(as.vector(scale(as.vector(loadings[,x] %*%  t(trends))) * trend_rel) +
                                  yseason * (1 - trend_rel)))
     }

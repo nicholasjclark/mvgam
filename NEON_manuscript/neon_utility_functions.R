@@ -56,8 +56,8 @@ calculate_pit = function(out_gam_mod, series, data_test, data_train){
   return(pit_hist)
 }
 
-calculate_drps = function(out_gam_mod, series, data_test, data_train, interval_width){
-  # Need to calculate discrete rank probability score for out of sample forecasts from each model
+calculate_drps = function(out_gam_mod, pred_matrix = NULL, series, data_test, data_train, interval_width){
+
   drps_score <- function(truth, fc, interval_width = 0.9){
     nsum <- 1000
     Fy = ecdf(fc)
@@ -102,8 +102,12 @@ calculate_drps = function(out_gam_mod, series, data_test, data_train, interval_w
     dplyr::arrange(year, season) %>%
     dplyr::pull(y)
 
-  preds <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'ypred')[,starts[series]:ends[series]]
-  preds <- t(preds[, (last_obs +1):NCOL(preds)])
+  if(is.null(pred_matrix)){
+    preds <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'ypred')[,starts[series]:ends[series]]
+    preds <- t(preds[, (last_obs +1):NCOL(preds)])
+  } else {
+    preds <- t(pred_matrix[, (last_obs +1):NCOL(pred_matrix)])
+  }
 
   if(any(!is.na(truth))){
     DRPS <- data.frame(drps_mcmc_object(truth, preds))
