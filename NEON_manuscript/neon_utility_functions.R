@@ -141,12 +141,19 @@ plot_mvgam_season = function(out_gam_mod, series, data_test, data_train,
 
        col = rgb(150, 0, 0, max = 255, alpha = 10), type = 'l',
        ylab = paste0('F(season) for ', levels(data_train$series)[series]),
-       xlab = xlab)
+       xlab = xlab, xaxt = 'n')
+  axis(1, at = seq(0, 26, by = 5), labels = seq(0, 26, by = 5) + 14, cex.axis = 1)
+  rect(xleft = 4, xright = 18, ybottom = -100, ytop = 100, col = 'gray90',
+       border = NA)
+  abline(h = 0, lwd=1)
+  text(x=11,y=max(gam_comps[1] * (Xp %*% betas[1,]) + 2.3), labels = 'Peak tick season')
   for(i in 2:1000){
     lines(gam_comps[i] * (Xp %*% betas[i,]) ~ pred_dat$season,
 
           col = rgb(150, 0, 0, max = 255, alpha = 10))
   }
+  box()
+
 }
 
 plot_mvgam_gdd = function(out_gam_mod, series, data_test, data_train,
@@ -195,7 +202,8 @@ plot_mvgam_gdd = function(out_gam_mod, series, data_test, data_train,
   lines(int[2,] ~ covar_vals, col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
 
   rug(((data_train$cum_gdd * sd_gdd) + mean_gdd)[which(data_train$series ==
-                                                         levels(data_train$series)[series])])
+                                                         levels(data_train$series)[series])],
+      lwd = 1.75, ticksize = 0.025)
 }
 
 prep_neon_data = function(species = 'Ambloyomma_americanum', split_prop = 0.9){
@@ -334,7 +342,7 @@ fit_mvgam = function(data_train,
                      auto_update = FALSE,
                      interval_width = 0.9){
 
-  # Cndition the model on the observed data
+  # Condition the model on the observed data
   out_gam_mod <- mvjagam(formula = formula,
                          data_train = data_train,
                          data_test = data_test,

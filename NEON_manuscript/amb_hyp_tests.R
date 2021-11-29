@@ -47,11 +47,8 @@ hyp3 = y ~
   s(season, by = series, m = 1, k = 8) - 1
 
 # Fit each hypothesis
-<<<<<<< HEAD
 n.burnin = 100000
-=======
 n.burnin = 75000
->>>>>>> d12b9de9c762f2b4baa001a8f9e0d6879def571c
 n.iter = 5000
 thin = 5
 
@@ -61,11 +58,8 @@ fit_null <- fit_mvgam(data_train = all_data$data_train,
                   formula = null_hyp,
                   formula_name = 'Null_hyp',
                   use_nb = TRUE,
-<<<<<<< HEAD
                   use_mv = T,
-=======
                   use_mv = F,
->>>>>>> d12b9de9c762f2b4baa001a8f9e0d6879def571c
                   n.burnin = n.burnin,
                   n.iter = n.iter,
                   thin = thin,
@@ -77,11 +71,8 @@ fit_hyp1 <- fit_mvgam(data_train = all_data$data_train,
                       formula = hyp1,
                       formula_name = 'Hyp1',
                       use_nb = TRUE,
-<<<<<<< HEAD
                       use_mv = T,
-=======
                       use_mv = F,
->>>>>>> d12b9de9c762f2b4baa001a8f9e0d6879def571c
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
@@ -93,11 +84,8 @@ fit_hyp2 <- fit_mvgam(data_train = all_data$data_train,
                       formula = hyp2,
                       formula_name = 'Hyp2',
                       use_nb = TRUE,
-<<<<<<< HEAD
                       use_mv = T,
-=======
                       use_mv = F,
->>>>>>> d12b9de9c762f2b4baa001a8f9e0d6879def571c
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
@@ -109,11 +97,8 @@ fit_hyp3 <- fit_mvgam(data_train = all_data$data_train,
                       formula = hyp3,
                       formula_name = 'Hyp3',
                       use_nb = TRUE,
-<<<<<<< HEAD
                       use_mv = T,
-=======
                       use_mv = F,
->>>>>>> d12b9de9c762f2b4baa001a8f9e0d6879def571c
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
@@ -225,7 +210,7 @@ plot1 <- ggplot(fit_hyp1$mean_correlations %>%
                        midpoint = 0,
                        breaks = seq(-1,1,length.out = 5),
                        limits = c(-1, 1),
-                       name = 'Residual\ncorrelation') +
+                       name = 'Trend\ncorrelation') +
   labs(x = '', y = '', title = '\nGlobal seasonality') +
   theme_dark() +
   theme(axis.text.x = element_blank(),
@@ -239,7 +224,7 @@ plot2 <- ggplot(fit_hyp2$mean_correlations %>%
                        midpoint = 0,
                        breaks = seq(-1,1,length.out = 5),
                        limits = c(-1, 1),
-                       name = 'Residual\ncorrelation') +
+                       name = 'Trend\ncorrelation') +
   labs(x = '', y = '', title = 'Global seasonality,\nSite seasonality') +
   theme_dark() +
   theme(axis.text.x = element_blank(),
@@ -254,7 +239,7 @@ plot3 <- ggplot(fit_hyp3$mean_correlations %>%
                        midpoint = 0,
                        breaks = seq(-1,1,length.out = 5),
                        limits = c(-1, 1),
-                       name = 'Residual\ncorrelation') +
+                       name = 'Trend\ncorrelation') +
   labs(x = '', y = '', title = 'Global seasonality,\nPlot seasonality') +
   theme_dark() +
   theme(axis.text.x = element_text(angle = 45, hjust=1),
@@ -362,7 +347,3 @@ fit_null$rho_summary
 fit_hyp1$rho_summary
 fit_hyp2$rho_summary
 fit_hyp3$rho_summary
-<<<<<<< HEAD
-MCMCvis::MCMCtrace(fit_hyp3$out_gam_mod$jags_output, 'trend_comp', pdf = F)
-=======
->>>>>>> d12b9de9c762f2b4baa001a8f9e0d6879def571c

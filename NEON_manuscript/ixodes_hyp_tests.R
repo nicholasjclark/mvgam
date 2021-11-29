@@ -180,11 +180,11 @@ ggplot(plot_dat_ranks,
         panel.grid.minor = element_blank()) -> plot2
 
 dir.create('NEON_manuscript/Figures', recursive = T, showWarnings = F)
-pdf('NEON_manuscript/Figures/Ixodes_performances.pdf', width = 6.25, height = 5)
+pdf('NEON_manuscript/Figures/Fig3_Ixodes_performances.pdf', width = 6.25, height = 5)
 cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()
 
-pdf('NEON_manuscript/Figures/Ixodes_sitewise_analysis.pdf',
+pdf('NEON_manuscript/Figures/FigS3_Ixodes_sitewise_analysis.pdf',
     width = 6.25, height = 4)
 ggplot(plot_dat %>% dplyr::filter(Formula %in% c('Null_hyp','Hyp1', 'Hyp2','Hyp3')),
        aes(y = scale_drps,x = Series, fill = Formula))+
@@ -198,7 +198,7 @@ ggplot(plot_dat %>% dplyr::filter(Formula %in% c('Null_hyp','Hyp1', 'Hyp2','Hyp3
         panel.grid.minor = element_blank())
 dev.off()
 
-# Plot changing residual correlations from latent factor models
+# Plot changing trend correlations from latent factor models
 plot1 <- ggplot(fit_hyp1$mean_correlations %>%
                   tibble::rownames_to_column("series1") %>%
                   tidyr::pivot_longer(-c(series1), names_to = "series2", values_to = "Correlation"),
@@ -207,7 +207,7 @@ plot1 <- ggplot(fit_hyp1$mean_correlations %>%
                        midpoint = 0,
                        breaks = seq(-1,1,length.out = 5),
                        limits = c(-1, 1),
-                       name = 'Residual\ncorrelation') +
+                       name = 'Trend\ncorrelation') +
   labs(x = '', y = '', title = '\nGlobal seasonality') +
   theme_dark() +
   theme(axis.text.x = element_blank(),
@@ -221,7 +221,7 @@ plot2 <- ggplot(fit_hyp2$mean_correlations %>%
                        midpoint = 0,
                        breaks = seq(-1,1,length.out = 5),
                        limits = c(-1, 1),
-                       name = 'Residual\ncorrelation') +
+                       name = 'Trend\ncorrelation') +
   labs(x = '', y = '', title = 'Global seasonality,\nSite seasonality') +
   theme_dark() +
   theme(axis.text.x = element_blank(),
@@ -236,14 +236,14 @@ plot3 <- ggplot(fit_hyp3$mean_correlations %>%
                        midpoint = 0,
                        breaks = seq(-1,1,length.out = 5),
                        limits = c(-1, 1),
-                       name = 'Residual\ncorrelation') +
+                       name = 'Trend\ncorrelation') +
   labs(x = '', y = '', title = 'Global seasonality,\nPlot seasonality') +
   theme_dark() +
   theme(axis.text.x = element_text(angle = 45, hjust=1),
         title = element_text(size = 9))
 
 
-pdf('NEON_manuscript/Figures/Ixodes_trendcorrelations.pdf',
+pdf('NEON_manuscript/Figures/FigS5_Ixodes_trendcorrelations.pdf',
     width = 6.25, height = 5)
 cowplot::plot_grid(plot1 + theme(legend.position = 'none'),
                    plot2 + theme(legend.position = 'none'),
@@ -274,7 +274,7 @@ formulas <- c('Null_hyp',
               'Hyp3')
 colours <- rev(viridis::plasma(n = 4, begin = 0.35, end = 1))
 
-pdf('NEON_manuscript/Figures/Ixodes_PITs.pdf',
+pdf('NEON_manuscript/Figures/FigS4_Ixodes_PITs.pdf',
     width = 6.25, height = 3.75)
 par(mfrow = c(1, 4),
     mai = c(.38,.35,.45,.05),
@@ -344,8 +344,3 @@ fit_null$rho_summary
 fit_hyp1$rho_summary
 fit_hyp2$rho_summary
 fit_hyp3$rho_summary
-
-MCMCvis::MCMCtrace(fit_hyp3$out_gam_mod$jags_output, 'trend_comp', pdf = F)
-plot_mvgam_trend(object = fit_hyp3$out_gam_mod, data_test = all_data$data_test,
-                 data_train = all_data$data_train,
-                 series = 6)

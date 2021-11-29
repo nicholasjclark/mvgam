@@ -5,14 +5,14 @@ source('NEON_manuscript/neon_utility_functions.R')
 
 # Use hierarchical seasonality for all;
 # trend components: 0.3 and 0.7
-# N_series: 8, 16
+# N_series: 4, 12
 # Overdispersion: 0.5, 100
-# Length: 5 years and 10 years
-# Missingness: 10%, 30%
+# Length: 6 years
+# Missingness: none, 10%, 50%
 set.seed(110)
-run_parameters <- expand.grid(n_series = c(4, 8),
-                              T = c(60, 120),
-                              prop_missing = c(0.1, 0.5),
+run_parameters <- expand.grid(n_series = c(4, 12),
+                              T = c(72),
+                              prop_missing = c(0, 0.1, 0.5),
                               trend_rel = c(0.3, 0.7),
                               stringsAsFactors = F)
 
@@ -33,7 +33,7 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                   formula = y ~ s(series, bs = 're') - 1,
                   use_nb = TRUE,
                   use_mv = T,
-                  n.burnin = 15000,
+                  n.burnin = 30000,
                   n.iter = 5000,
                   thin = 5,
                   auto_update = T)
@@ -108,7 +108,7 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                                         s(season, by = series, m = 1, k = 8) - 1,
                         use_nb = TRUE,
                         use_mv = T,
-                      n.burnin = 35000,
+                      n.burnin = 60000,
                       n.iter = 5000,
                       thin = 5,
                       auto_update = T)
@@ -173,4 +173,3 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
 
 })
 save(sim_results, file = 'NEON_manuscript/Results/sim_results.rda')
-purrr::map(sim_results, 'model_efficiencies')

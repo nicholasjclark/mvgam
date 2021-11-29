@@ -4,7 +4,7 @@
 \alias{plot_mvgam_fc}
 \title{Plot mvjagam posterior predictions for a specified series}
 \usage{
-plot_mvgam_fc(object, series, data_test, data_train)
+plot_mvgam_fc(object, series, data_test, data_train, hide_xlabels = FALSE)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
@@ -25,6 +25,9 @@ during the off season (as in tick counts for example), setting this to zero can 
 during this time but they continue to evolve, allowing the trend from the past season to continue evolving rather than forcing
 it to zero
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
+
+\item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
+\code{axis} from base \code{R}}
 }
 \description{
 Plot mvjagam posterior predictions for a specified series

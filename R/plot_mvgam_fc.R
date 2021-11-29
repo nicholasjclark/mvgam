@@ -14,8 +14,10 @@
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
 #'@param data_test A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}
+#'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
+#'\code{axis} from base \code{R}
 #'@export
-plot_mvgam_fc = function(object, series, data_test, data_train){
+plot_mvgam_fc = function(object, series, data_test, data_train, hide_xlabels = FALSE){
   ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
               length.out = NCOL(object$ytimes) + 1)
   starts <- ends + 1
@@ -26,11 +28,21 @@ plot_mvgam_fc = function(object, series, data_test, data_train){
   preds_last <- preds[1,]
   int <- apply(preds,
                2, hpd, 0.95)
-  plot(preds_last,
-       type = 'l', ylim = c(0, max(int) + 2),
-       col = rgb(1,0,0, alpha = 0),
-       ylab = paste0('Estimated counts for ', levels(data_train$series)[series]),
-       xlab = 'Time')
+
+  if(hide_xlabels){
+    plot(preds_last,
+         type = 'l', ylim = c(0, max(int) + 2),
+         col = rgb(1,0,0, alpha = 0),
+         ylab = paste0('Estimated counts for ', levels(data_train$series)[series]),
+         xlab = '', xaxt = 'n')
+  } else {
+    plot(preds_last,
+         type = 'l', ylim = c(0, max(int) + 2),
+         col = rgb(1,0,0, alpha = 0),
+         ylab = paste0('Estimated counts for ', levels(data_train$series)[series]),
+         xlab = 'Time')
+  }
+
   int[int<0] <- 0
   polygon(c(seq(1:(NCOL(int))), rev(seq(1:NCOL(int)))),
           c(int[1,],rev(int[3,])),
@@ -50,6 +62,6 @@ plot_mvgam_fc = function(object, series, data_test, data_train){
            dplyr::distinct() %>%
            dplyr::arrange(year, season) %>%
            dplyr::pull(y), pch = 16)
-  abline(v = NROW(data_train) / NCOL(object$ytimes))
+  abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
 
 }
