@@ -10,7 +10,6 @@ mvjagam(
   data_test,
   prior_simulation = FALSE,
   use_nb = TRUE,
-  use_mv = FALSE,
   use_lv = FALSE,
   n_lv = 5,
   n.chains = 2,
@@ -20,7 +19,8 @@ mvjagam(
   auto_update = TRUE,
   phi_prior,
   r_prior = "dexp(0.001)",
-  tau_prior
+  tau_prior,
+  upper_bounds
 )
 }
 \arguments{
@@ -41,8 +41,8 @@ during this time but they continue to evolve, allowing the trend to continue evo
 it to zero during the off-season
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
-\item{data_test}{A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
-addition to any other variables included in the linear predictor of \code{formula}}
+\item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season', 'year' and
+'in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}}
 
 \item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 simulations from prior distributions are returned}
@@ -51,14 +51,10 @@ simulations from prior distributions are returned}
 overdispersion parameter r;
 if \code{FALSE}, set r to \code{10,000} to approximate the Poisson distribution}
 
-\item{use_mv}{\code{logical} If \code{TRUE} and \code{use_lv = FALSE},
-a multivariate gaussian distribution is used for the state space trend errors. If \code{TRUE} and \code{use_lv = TRUE},
-space trends. If \code{FALSE}, independent gaussian distributions are used for the trend errors}
-
 \item{use_lv}{\code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
 latent trends. If \code{FALSE}, estimate covarying errors in the latent trends}
 
-\item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_mv == TRUE}
+\item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}
 and \code{use_lv == TRUE}. Cannot be \code{>n_series}. Defaults to \code{min(5, floor(n_series / 2))}}
 
 \item{n.chains}{\code{integer} the number of parallel chains for the model}
@@ -75,7 +71,12 @@ latent trends}
 overdispersion parameter}
 
 \item{tau_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
-precisions used for the latent trends (ignored if \code{use_mv == TRUE})}
+precisions used for the latent trends (ignored if \code{use_lv == TRUE})}
+
+\item{upper_bounds}{Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
+this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
+is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
+truncation entirely (i.e. there is no upper bound for each series)}
 }
 \value{
 A \code{list} object containing JAGS model output, the text representation of the model file,
@@ -85,8 +86,8 @@ unsampled covariate values), the names of the smooth parameters and the matrix o
 \description{
 This function estimates the posterior distribution for a multivariate GAM that includes
 smooth seasonality and possible other smooth functions specified in the GAM formula. State-space latent trends
-(random walks with drift)are estimated for each series, with a number of options for specifying the
-structures of the trends
+(random walks with drift) are estimated for each series, two options for specifying the
+structures of the trends (either as latent dynamic factors or independent trends)
 }
 \details{
 A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent

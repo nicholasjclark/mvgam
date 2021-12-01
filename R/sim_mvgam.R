@@ -61,7 +61,7 @@ sim_mvgam = function(T = 100,
     for (t in 2:(T+2)) {
       trend[t] <- rnorm(
         1,
-        trend_alphas[x] +  trend[t - 1],
+        trend_alphas[x] + trend[t - 1],
         1
       )
     }

@@ -11,8 +11,8 @@ plot_mvgam_fc(object, series, data_test, data_train, hide_xlabels = FALSE)
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
-\item{data_test}{A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
-addition to any other variables included in the linear predictor of \code{formula}}
+\item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season', 'year' and
+'in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}}
 
 \item{data_train}{A \code{dataframe} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:

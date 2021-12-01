@@ -2,8 +2,8 @@
 #'
 #'This function estimates the posterior distribution for a multivariate GAM that includes
 #'smooth seasonality and possible other smooth functions specified in the GAM formula. State-space latent trends
-#'(random walks with drift)are estimated for each series, with a number of options for specifying the
-#'structures of the trends
+#'(random walks with drift) are estimated for each series, two options for specifying the
+#'structures of the trends (either as latent dynamic factors or independent trends)
 #'
 #'
 #'@param formula A \code{character} string specifying the GAM formula. These are exactly like the formula
@@ -21,20 +21,16 @@
 #'during this time but they continue to evolve, allowing the trend to continue evolving rather than forcing
 #'it to zero during the off-season
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
-#'@param data_test A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
-#'addition to any other variables included in the linear predictor of \code{formula}
+#'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season', 'year' and
+#''in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}
 #'@param prior_simulation \code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 #'simulations from prior distributions are returned
 #'@param use_nb \code{logical} If \code{TRUR}, use a Negative Binomial likelihood with estimated
 #'overdispersion parameter r;
 #'if \code{FALSE}, set r to \code{10,000} to approximate the Poisson distribution
-#'@param use_mv \code{logical} If \code{TRUE} and \code{use_lv = FALSE},
-#'a multivariate gaussian distribution is used for the state space trend errors. If \code{TRUE} and \code{use_lv = TRUE},
-#a set of latent dynamic factors is estimated to capture possible dependencies in the state
-#'space trends. If \code{FALSE}, independent gaussian distributions are used for the trend errors
 #'@param use_lv \code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
 #'latent trends. If \code{FALSE}, estimate covarying errors in the latent trends
-#'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_mv == TRUE}
+#'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}
 #'and \code{use_lv == TRUE}. Cannot be \code{>n_series}. Defaults to \code{min(5, floor(n_series / 2))}
 #'@param n.chains \code{integer} the number of parallel chains for the model
 #'@param n.iter \code{integer} the number of iterations of the Markov chain to run
@@ -45,7 +41,11 @@
 #'@param r_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
 #'overdispersion parameter
 #'@param tau_prior \code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
-#'precisions used for the latent trends (ignored if \code{use_mv == TRUE})
+#'precisions used for the latent trends (ignored if \code{use_lv == TRUE})
+#'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
+#'this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
+#'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
+#'truncation entirely (i.e. there is no upper bound for each series)
 #'@details A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent
 #'AR1 state space trends. The model parameters are esimated in a Bayesian framework using Gibbs sampling
 #'in \code{\link[rjags]{jags.model}}.
@@ -61,7 +61,6 @@ mvjagam = function(formula,
                     data_test,
                     prior_simulation = FALSE,
                     use_nb = TRUE,
-                    use_mv = FALSE,
                     use_lv = FALSE,
                     n_lv = 5,
                     n.chains = 2,
@@ -71,14 +70,15 @@ mvjagam = function(formula,
                     auto_update = TRUE,
                     phi_prior,
                     r_prior = 'dexp(0.001)',
-                    tau_prior){
+                    tau_prior,
+                    upper_bounds){
 
   # Fill in any NA's with arbitrary values so the observations aren't dropped when jags data is created
   if(prior_simulation){
     data_train$y <- rep(NA, length(data_train$y))
   }
   orig_y <- data_train$y
-  data_train$y[which(is.na(data_train$y))] <- floor(sample(seq(0,50),
+  data_train$y[which(is.na(data_train$y))] <- floor(sample(seq(min(data_train$y, na.rm = T), max(data_train$y, na.rm = T)),
                                                              length(which(is.na(data_train$y))),
                                                              T))
 
@@ -122,7 +122,7 @@ mvjagam = function(formula,
   }
 
   # Add replacement lines for trends and linear predictor
-  if(!use_mv){
+  if(!use_lv){
     modification <- c("model {
 
                                    ## GAM linear predictor
@@ -137,7 +137,7 @@ mvjagam = function(formula,
                                    }
                                    # Ensure trend does not completely dominate unless supported by data
                                    for (s in 1:n_series) {
-                                   gam_comp[s] ~ dbeta(2,2)
+                                   gam_comp[s] ~ dbeta(3,1)
                                    trend_comp[s] <- 1 - gam_comp[s]
                                    }
 
@@ -160,7 +160,7 @@ mvjagam = function(formula,
                                    ## Negative binomial likelihood functions
                                    for (i in 1:n) {
                                    for (s in 1:n_series) {
-                                   y[i, s] ~ dnegbin(rate[i, s], r);
+                                   y[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s]);
                                    rate[i, s] <- ifelse((r / (r + mu[i, s])) < min_eps, min_eps,
                                                         (r / (r + mu[i, s])))
                                    }
@@ -176,7 +176,7 @@ mvjagam = function(formula,
                                    ## Posterior predictions
                                    for (i in 1:n) {
                                    for (s in 1:n_series) {
-                                   ypred[i, s] ~ dnegbin(rate[i, s], r)
+                                   ypred[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s])
                                    }
                                    }
                                    ")
@@ -200,110 +200,27 @@ mvjagam = function(formula,
       model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
     }
 
+    if(!use_nb){
+      if(missing(upper_bounds)){
+        model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])'
+        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])'
+      } else {
+        model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+      }
+    } else {
+      if(missing(upper_bounds)){
+        model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dnegbin(rate[i, s], r)'
+        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dnegbin(rate[i, s], r)'
+      }
+    }
+
     model_file <- textConnection(model_file)
   }
 
-  if(use_mv){
-    if(missing(use_lv)){
-      use_lv = TRUE
-    }
+  if(use_lv){
 
-    if(!use_lv){
-      cat('Fitting a multivariate GAM with covariance for the latent trend errors...\n')
-      modification <- c("model {
-
-                        ## GAM linear predictor
-                        eta <- X %*% b
-
-                        ## Mean expectations
-                        for (i in 1:n) {
-                        for (s in 1:n_series) {
-                        mu[i, s] <- exp(gam_comp[s] * eta[ytimes[i, s]] +
-                                        trend_comp[s] * trend[i, s] * in_season[i])
-                        }
-                        }
-                        # Ensure trend does not completely dominate unless supported by data
-                        for (s in 1:n_series) {
-                        gam_comp[s] ~ dbeta(2,2)
-                        trend_comp[s] <- 1 - gam_comp[s]
-                        }
-
-                        ## RW + drift state space trends with possible covarying errors
-                        trend[1, 1:n_series] ~ dmnorm(zeros, tau[ , ])
-
-                        for (i in 2:n){
-                        for (s in 1:n_series){
-                        trend_mus[i, s] <- trend[i - 1, s] + phi[s]
-                        }
-                        }
-
-                        for (i in 2:n){
-                        trend[i, 1:n_series] ~ dmnorm(trend_mus[i, ], tau[ , ]);
-                        }
-
-                        # RW drift coefficients
-                        for (s in 1:n_series){
-                         phi[s] ~ dnorm(0, 10)
-                        }
-
-                        # Wishart is appropriate conjugate prior for dmnorm precision
-                        # df = n_series + 1 sets uniform distribution on correlation parameters
-                        tau[1:n_series, 1:n_series] ~ dwish(diag_mat[ , ], n_series + 1)
-
-                        # Scaled residual correlation matrix (between -1 and 1; Gelman & Hill 2007)
-                        Covar.raw[1:n_series, 1:n_series] <- inverse(tau[ , ])
-                        for(i in 1:n_series){
-                        for(j in 1:n_series){
-                        cor[i, j] <- Covar.raw[i, j] / sqrt(Covar.raw[i, i] * Covar.raw[j, j])
-                        }
-                        }
-
-                        ## Negative binomial likelihood functions
-                        for (i in 1:n) {
-                        for (s in 1:n_series) {
-                        y[i, s] ~ dnegbin(rate[i, s], r);
-                        rate[i, s] <- ifelse((r / (r + mu[i, s])) < min_eps, min_eps,
-                        (r / (r + mu[i, s])))
-                        }
-                        }
-
-                        ## Set overdispersion parameter to 10000 if not using nb;
-                        ## this approximates the Poisson distribution
-                        r1 ~ dgamma(0.01, 0.01)
-                        r2 <- 10000
-                        r_indicator <- ifelse(use_nb > 0, 1, 0)
-                        r <- (r1 * r_indicator) + (r2 * (1 - r_indicator))
-
-                        ## Posterior predictions
-                        for (i in 1:n) {
-                        for (s in 1:n_series) {
-                        ypred[i, s] ~ dnegbin(rate[i, s], r)
-                        }
-                        }
-                        ")
-
-      # Create the joined model file
-      fil <- tempfile(fileext = ".xt")
-      cat(c(readLines(textConnection(modification)), base_model), file = fil,
-          sep = "\n")
-      model_file <- readLines(fil, n = -1)
-
-      # Update and prior distribution choices
-      if(!missing(phi_prior)){
-        model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('   phi[s] ~ ', phi_prior)
-      }
-
-      if(!missing(tau_prior)){
-        model_file[grep('tau\\[s\\] ~', model_file)] <- paste0('   tau[s] ~ ', tau_prior)
-      }
-
-      if(!missing(r_prior)){
-        model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
-      }
-
-      model_file <- textConnection(model_file)
-    } else {
-      #### Use the latent variable approach to estimate dependencies when n_series is large
+      #### Use the latent variable approach to estimate dependent trends
       cat('Fitting a multivariate GAM with latent dynamic factors for the trends...\n')
       modification <- c(
         "model {
@@ -321,8 +238,8 @@ mvjagam = function(formula,
 
         # Ensure trend does not completely dominate unless supported by data
         for (s in 1:n_series) {
-          gam_comp[s] ~ dbeta(2,2)
-          trend_comp[s] <- 1 - gam_comp[s]
+        gam_comp[s] ~ dbeta(3,1)
+        trend_comp[s] <- 1 - gam_comp[s]
         }
 
         ## Latent factors evolve as RW + drift time series with shared precision
@@ -363,7 +280,7 @@ mvjagam = function(formula,
 
         ## Positive constraints on loading diagonals
         for(j in 1:n_lv) {
-         lv_coefs[j, j] ~ dnorm(0, (1/lv_tau) * (1/penalty[j]))T(0, 1);
+         lv_coefs[j, j] ~ dnorm(0, (1/lv_tau) * (1/penalty[j]))T(0, );
         }
 
         ## Lower diagonal free
@@ -390,9 +307,9 @@ mvjagam = function(formula,
         ## Negative binomial likelihood functions
         for (i in 1:n) {
         for (s in 1:n_series) {
-        y[i, s] ~ dnegbin(rate[i, s], r);
+        y[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s]);
         rate[i, s] <- ifelse((r / (r + mu[i, s])) < min_eps, min_eps,
-        (r / (r + mu[i, s])))
+                            (r / (r + mu[i, s])))
         }
         }
 
@@ -406,7 +323,7 @@ mvjagam = function(formula,
         ## Posterior predictions
         for (i in 1:n) {
         for (s in 1:n_series) {
-        ypred[i, s] ~ dnegbin(rate[i, s], r)
+        ypred[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s])
         }
         }
         ")
@@ -430,30 +347,59 @@ mvjagam = function(formula,
        model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
       }
 
+      if(!use_nb){
+        if(missing(upper_bounds)){
+          model_file[grep('y[i, s] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])'
+          model_file[grep('ypred[i, s] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])'
+        } else {
+          model_file[grep('y[i, s] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+          model_file[grep('ypred[i, s] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+        }
+      } else {
+        if(missing(upper_bounds)){
+          model_file[grep('y[i, s] ~', model_file)] <- 'y[i, s] ~ dnegbin(rate[i, s], r)'
+          model_file[grep('ypred[i, s] ~', model_file)] <- 'ypred[i, s] ~ dnegbin(rate[i, s], r)'
+        }
+      }
+
       model_file <- textConnection(model_file)
-    }
 
   }
 
   # Covariate dataframe including training and testing observations
-  X <- data.frame(rbind(ss_jagam$jags.data$X,
-                        predict(ss_gam, newdata = data_test, type = 'lpmatrix')))
+  if(!missing(data_test)){
+    X <- data.frame(rbind(ss_jagam$jags.data$X,
+                          predict(ss_gam, newdata = data_test, type = 'lpmatrix')))
 
-  # Add a time variable
-  X$time <- rbind(data_train, data_test[,1:ncol(data_train)]) %>%
-    dplyr::left_join(rbind(data_train, data_test[,1:ncol(data_train)]) %>%
-                       dplyr::select(year, season) %>%
-                       dplyr::distinct() %>%
-                       dplyr::arrange(year, season) %>%
-                       dplyr::mutate(time = dplyr::row_number()),
-                     by = c('season', 'year')) %>%
-    dplyr::pull(time)
+    # Add a time variable
+    X$time <- rbind(data_train, data_test[,1:ncol(data_train)]) %>%
+      dplyr::left_join(rbind(data_train, data_test[,1:ncol(data_train)]) %>%
+                         dplyr::select(year, season) %>%
+                         dplyr::distinct() %>%
+                         dplyr::arrange(year, season) %>%
+                         dplyr::mutate(time = dplyr::row_number()),
+                       by = c('season', 'year')) %>%
+      dplyr::pull(time)
 
-  # Add an outcome variable
-  X$outcome <- c(orig_y, rep(NA, NROW(data_test)))
+    # Add an outcome variable
+    X$outcome <- c(orig_y, rep(NA, NROW(data_test)))
 
-  # Add a series identifier variable
-  X$series <- as.numeric(rbind(data_train, data_test)$series)
+    # Add a series identifier variable
+    X$series <- as.numeric(rbind(data_train, data_test)$series)
+
+  } else {
+    X <- data.frame(ss_jagam$jags.data$X)
+    X$time <- data_train %>%
+      dplyr::left_join(data_train %>%
+                         dplyr::select(year, season) %>%
+                         dplyr::distinct() %>%
+                         dplyr::arrange(year, season) %>%
+                         dplyr::mutate(time = dplyr::row_number()),
+                       by = c('season', 'year')) %>%
+      dplyr::pull(time)
+    X$outcome <- c(orig_y)
+    X$series <- as.numeric(data_train$series)
+  }
 
   # Arrange by time then by series
   X %>%
@@ -476,16 +422,10 @@ mvjagam = function(formula,
   # Other necessary variables for JAGS
   ss_jagam$jags.data$n <- NROW(ytimes)
   ss_jagam$jags.data$n_series <- NCOL(ytimes)
-  ss_jagam$jags.data$X = as.matrix(X %>%
+  ss_jagam$jags.data$X <- as.matrix(X %>%
                                      dplyr::select(-time, -series, -outcome))
-
-  if(use_mv){
-    if(!use_lv){
-    # We use a Wishart prior for the state space multivariate precision matrix when
-    # estimating the full covariance
-    ss_jagam$jags.data$diag_mat <- diag(ss_jagam$jags.data$n_series)
-    ss_jagam$jags.data$zeros <- rep(0, ss_jagam$jags.data$n_series)
-    }
+  if(!missing(upper_bounds)){
+    ss_jagam$jags.data$upper_bound <- upper_bounds
   }
 
   # Set use_nb to 0 for approximate Poisson; otherwise to 1 for Negative Binomial
@@ -498,13 +438,15 @@ mvjagam = function(formula,
   # Machine epsilon for minimum allowable non-zero rate
   ss_jagam$jags.data$min_eps <- .Machine$double.eps
 
+  # Initial gam_components
+  ss_jagam$jags.ini$gam_comp <- rep(1, NCOL(ytimes))
+
   # Ensure inits fall within prior bounds for rho
   ss_jagam$jags.ini$rho[ss_jagam$jags.ini$rho > 12] <- 11.99
   ss_jagam$jags.ini$rho[ss_jagam$jags.ini$rho < 12] <- -11.99
 
-  # Number of latent variables to use if n_series > 5 and use_mv = TRUE
-  if(use_mv){
-    if(use_lv){
+  # Number of latent variables to use
+  if(use_lv){
       if(missing(n_lv)){
         ss_jagam$jags.data$n_lv <- min(5, floor(ss_jagam$jags.data$n_series / 2))
       } else {
@@ -514,15 +456,24 @@ mvjagam = function(formula,
         stop('Number of latent variables cannot be greater than number of series')
       }
       ss_jagam$jags.ini$tau_fac <- 1
-    }
-    }
+      ss_jagam$jags.ini$penalty_shape <- 0.02
+  }
 
   # Binary indicator of in_season
-  ss_jagam$jags.data$in_season <- rbind(data_train, data_test) %>%
+  if(!missing(data_test)){
+    ss_jagam$jags.data$in_season <- rbind(data_train, data_test) %>%
     dplyr::select(year, season, in_season) %>%
     dplyr::distinct() %>%
     dplyr::arrange(year, season) %>%
     dplyr::pull(in_season)
+
+  } else {
+    ss_jagam$jags.data$in_season <- data_train %>%
+      dplyr::select(year, season, in_season) %>%
+      dplyr::distinct() %>%
+      dplyr::arrange(year, season) %>%
+      dplyr::pull(in_season)
+  }
 
   # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS
   # will take a while to optimise the samplers, so long adaptation with little 'burnin'
@@ -539,28 +490,22 @@ mvjagam = function(formula,
   adapt(gam_mod, n.iter = n.burnin, end.adaptation = TRUE)
 
   # Gather posterior samples for the specified parameters
-  if(!use_mv){
+  if(!use_lv){
     param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
                'tau', 'trend', 'gam_comp', 'trend_comp')
   } else {
-    if(!use_lv){
-      param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
-                 'tau', 'trend', 'cor','gam_comp', 'trend_comp')
-    } else {
-      param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
+    param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi', 'LV',
                  'trend', 'lv_coefs', 'tau_fac', 'penalty',
                  'gam_comp', 'trend_comp')
-    }
-
   }
 
   out_gam_mod <- coda.samples(gam_mod,
-                                     variable.names = param,
-                                     n.iter = n.iter,
-                                     thin = thin)
+                              variable.names = param,
+                              n.iter = n.iter,
+                              thin = thin)
   if(auto_update){
   # Update until reasonable convergence in the form of Rhat and ESS
-    if(!use_mv){
+    if(!use_lv){
       update_params <- c('rho', 'b', 'tau')
     } else {
       update_params <- c('rho', 'b')
@@ -584,13 +529,26 @@ mvjagam = function(formula,
   model_file <- readLines(fil, n = -1)
   unlink(fil)
 
+  if(missing(upper_bounds)){
+    upper_bounds <- NULL
+  }
+
+  if(use_lv){
+    n_lv <- ss_jagam$jags.data$n_lv
+  } else {
+    n_lv <- NULL
+  }
+
   return(list(jags_output = out_gam_mod,
               model_file = model_file,
               mgcv_model = ss_gam,
               jags_model = gam_mod,
               smooth_param_details = base_model[sort(c(grep('## prior for', base_model),
                                                        grep('## prior for', base_model)+1))],
-              ytimes = ytimes))
+              ytimes = ytimes,
+              use_lv = use_lv,
+              n_lv = n_lv,
+              upper_bounds = upper_bounds))
 
 
 }

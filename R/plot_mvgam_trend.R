@@ -12,8 +12,8 @@
 #'during this time but they continue to evolve, allowing the trend from the past season to continue evolving rather than forcing
 #'it to zero
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
-#'@param data_test A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
-#'addition to any other variables included in the linear predictor of \code{formula}
+#'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season', 'year' and
+#''in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
 #'@export
@@ -53,6 +53,9 @@ plot_mvgam_trend = function(object, series, data_test, data_train, hide_xlabels 
           c(int[1,],rev(int[3,])),
           col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
   lines(int[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
-  abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
+
+  if(!missing(data_test)){
+    abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
+  }
 
 }

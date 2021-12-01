@@ -41,23 +41,25 @@ plot_mvgam_uncertainty = function(object, series, data_test, data_train, legend_
   # Extract trend estimates
   trend <- MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[series]:ends[series]]
   trend <- trend[,(NROW(data_train) / NCOL(object$ytimes)+1):NCOL(trend)]
+  n_samples <- NROW(trend)
+  size <- MCMCvis::MCMCsummary(object$jags_output, 'r')$mean
 
   # Full uncertainty interval
-  preds <- matrix(NA, nrow = 1000, ncol = NROW(series_test))
-  for(i in 1:1000){
+  preds <- matrix(NA, nrow = n_samples, ncol = NROW(series_test))
+  for(i in 1:n_samples){
     preds[i,] <- rnbinom(NROW(series_test), mu = exp(gam_comps[i] * (Xp %*% betas[i,]) +
                                                        ((1 - gam_comps[i]) * trend[i,])),
-                         size = MCMCvis::MCMCsummary(object$jags_output, 'r')$mean)
+                         size = size)
   }
   full_int <- apply(preds,
                     2, hpd, 0.8)
   full_int[full_int<0] <- 0
 
   # GAM only interval
-  preds <- matrix(NA, nrow = 1000, ncol = NROW(series_test))
-  for(i in 1:1000){
+  preds <- matrix(NA, nrow = n_samples, ncol = NROW(series_test))
+  for(i in 1:n_samples){
     preds[i,] <- rnbinom(NROW(series_test), mu = exp(gam_comps[i] * (Xp %*% betas[i,])),
-                         size = MCMCvis::MCMCsummary(object$jags_output, 'r')$mean)
+                         size = size)
   }
   gam_int <- apply(preds,
                    2, hpd, 0.8)

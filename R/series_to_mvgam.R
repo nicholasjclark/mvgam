@@ -85,7 +85,22 @@ series_to_mvgam <- function(series, freq, train_prop = 0.85){
                         in_season = 1) %>%
     dplyr::arrange(year, season, series)
 
-  # Split into training and testing and return
-  return(list(data_train = mvgam_data[1:(floor(nrow(mvgam_data) * train_prop)),],
-              data_test = mvgam_data[((floor(nrow(mvgam_data) * train_prop)) + 1):nrow(mvgam_data),]))
+
+ mvgam_data %>%
+    dplyr::left_join(mvgam_data %>%
+                       dplyr::select(year, season) %>%
+                       dplyr::distinct() %>%
+                       dplyr::arrange(year, season) %>%
+                       dplyr::mutate(time = dplyr::row_number()),
+                     by = c('season', 'year')) -> mvgam_data
+
+ # Split into training and testing and return
+ last_time <- floor(max(mvgam_data$time) * train_prop)
+
+  return(list(data_train = mvgam_data %>%
+                dplyr::filter(time <= last_time) %>%
+                dplyr::select(-time),
+              data_test = mvgam_data %>%
+                dplyr::filter(time > last_time) %>%
+                dplyr::select(-time)))
 }
