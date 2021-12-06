@@ -8,18 +8,6 @@ lv_correlations(object, data_train)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
-
-\item{data_train}{A \code{dataframe} containing the model response variable and covariates
-required by the GAM \code{formula}. Should include columns:
-'y' (the discrete outcomes; NAs allowed)
-'series' (character or factor index of the series IDs)
-'season' (numeric index of the seasonal time point for each observation; should not have any missing)
-'year' the numeric index for year
-'in_season' indicator for whether the observation is in season or not. If the counts tend to go to zero
-during the off season (as in tick counts for example), setting this to zero can be useful as trends won't contribute during
-during this time but they continue to evolve, allowing the trend from the past season to continue evolving rather than forcing
-it to zero
-Any other variables to be included in the linear predictor of \code{formula} must also be present}
 }
 \value{
 A \code{list} object containing the mean posterior correlations and the full array of posterior correlations

@@ -4,7 +4,13 @@
 \alias{pfilter_mvgam_fc}
 \title{Forecast from a particle filtered mvjagam object}
 \usage{
-pfilter_mvgam_fc(file_path = "pfilter", n_cores = 2, data_test)
+pfilter_mvgam_fc(
+  file_path = "pfilter",
+  n_cores = 2,
+  data_test,
+  legend_position = "topleft",
+  return_forecasts = FALSE
+)
 }
 \arguments{
 \item{file_path}{\code{character} string specifying the file path where the particles have been saved}
@@ -13,10 +19,22 @@ pfilter_mvgam_fc(file_path = "pfilter", n_cores = 2, data_test)
 
 \item{data_test}{A \code{dataframe} of test data containing at least 'series', 'season', 'year' and
 'in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}}
+
+\item{legend_position}{The location may also be specified by setting x to a single keyword from the
+list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
+This places the legend on the inside of the plot frame at the given location.}
+
+\item{return_forecasts}{\code{logical}. If \code{TRUE}, the returned list object will contain plots of forecasts
+as well as the forecast objects (each as a \code{matrix} of dimension \code{n_particles} x \code{horizon})}
+}
+\value{
+A named \code{list} contaning functions that call base \code{R} plots of each series' forecast. Optionally
+the actual forecasts are returned within the \code{list} as a separate \code{list} of \code{matrices}
 }
 \description{
-This function generates a forecast from a set of particles that each captures a unique proposal about
+This function generates a forecast from a set of particles that each capture a unique proposal about
 the current state of the system that was modelled in the mvjagam object. The covariate and timepoint information
-from \code{data_test} is used to generate the gam component forecast, while the trends are run forward in time
-according to their state space dynamics
+from \code{data_test} is used to generate the GAM component forecast, while the trends are run forward in time
+according to their state space dynamics. The forecast is a weighted ensemble, with weights determined by
+each particle's proposal likelihood prior to the most recent assimilation step
 }

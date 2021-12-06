@@ -1,23 +1,13 @@
 #'Plot mvjagam posterior predictions for a specified series
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param data_train A \code{dataframe} containing the model response variable and covariates
-#'required by the GAM \code{formula}. Should include columns:
-#''y' (the discrete outcomes; NAs allowed)
-#''series' (character or factor index of the series IDs)
-#''season' (numeric index of the seasonal time point for each observation; should not have any missing)
-#''year' the numeric index for year
-#''in_season' indicator for whether the observation is in season or not. If the counts tend to go to zero
-#'during the off season (as in tick counts for example), setting this to zero can be useful as trends won't contribute during
-#'during this time but they continue to evolve, allowing the trend from the past season to continue evolving rather than forcing
-#'it to zero
-#'Any other variables to be included in the linear predictor of \code{formula} must also be present
 #'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season', 'year' and
 #''in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
 #'@export
-plot_mvgam_fc = function(object, series, data_test, data_train, hide_xlabels = FALSE){
+plot_mvgam_fc = function(object, series, data_test, hide_xlabels = FALSE){
+  data_train <- object$obs_data
   ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
               length.out = NCOL(object$ytimes) + 1)
   starts <- ends + 1

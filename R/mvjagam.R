@@ -99,6 +99,8 @@ mvjagam = function(formula,
                           sp.prior = 'gamma',
                           diagonalize = F)
 
+  data_train$y <- orig_y
+
   # Read in the base (unmodified) jags model file
   base_model <- suppressWarnings(readLines('base_gam.txt'))
 
@@ -137,7 +139,7 @@ mvjagam = function(formula,
                                    }
                                    # Ensure trend does not completely dominate unless supported by data
                                    for (s in 1:n_series) {
-                                   gam_comp[s] ~ dbeta(3,1)
+                                   gam_comp[s] ~ dbeta(1,1)
                                    trend_comp[s] <- 1 - gam_comp[s]
                                    }
 
@@ -238,7 +240,7 @@ mvjagam = function(formula,
 
         # Ensure trend does not completely dominate unless supported by data
         for (s in 1:n_series) {
-        gam_comp[s] ~ dbeta(3,1)
+        gam_comp[s] ~ dbeta(1,1)
         trend_comp[s] <- 1 - gam_comp[s]
         }
 
@@ -349,16 +351,16 @@ mvjagam = function(formula,
 
       if(!use_nb){
         if(missing(upper_bounds)){
-          model_file[grep('y[i, s] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])'
-          model_file[grep('ypred[i, s] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])'
+          model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])'
+          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])'
         } else {
-          model_file[grep('y[i, s] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
-          model_file[grep('ypred[i, s] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+          model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
         }
       } else {
         if(missing(upper_bounds)){
-          model_file[grep('y[i, s] ~', model_file)] <- 'y[i, s] ~ dnegbin(rate[i, s], r)'
-          model_file[grep('ypred[i, s] ~', model_file)] <- 'ypred[i, s] ~ dnegbin(rate[i, s], r)'
+          model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dnegbin(rate[i, s], r)'
+          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dnegbin(rate[i, s], r)'
         }
       }
 
@@ -439,7 +441,7 @@ mvjagam = function(formula,
   ss_jagam$jags.data$min_eps <- .Machine$double.eps
 
   # Initial gam_components
-  ss_jagam$jags.ini$gam_comp <- rep(1, NCOL(ytimes))
+  #ss_jagam$jags.ini$gam_comp <- rep(1, NCOL(ytimes))
 
   # Ensure inits fall within prior bounds for rho
   ss_jagam$jags.ini$rho[ss_jagam$jags.ini$rho > 12] <- 11.99
@@ -456,7 +458,7 @@ mvjagam = function(formula,
         stop('Number of latent variables cannot be greater than number of series')
       }
       ss_jagam$jags.ini$tau_fac <- 1
-      ss_jagam$jags.ini$penalty_shape <- 0.02
+      #ss_jagam$jags.ini$penalty_shape <- 0.02
   }
 
   # Binary indicator of in_season
@@ -548,7 +550,8 @@ mvjagam = function(formula,
               ytimes = ytimes,
               use_lv = use_lv,
               n_lv = n_lv,
-              upper_bounds = upper_bounds))
+              upper_bounds = upper_bounds,
+              obs_data = data_train))
 
 
 }

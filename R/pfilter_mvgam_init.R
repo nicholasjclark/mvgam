@@ -1,68 +1,44 @@
 #'Initiate particles for online filtering from a fitted mvjagam object
 #'
 #'This function generates a set of particles that each captures a unique proposal about
-#'the current state of the system that was modelled in the mvjagam object. The next observation is assimilated
-#'and particles are weighted by their proposal's discrete rank probability score
+#'the current state of the system. The next observation is assimilated
+#'and particles are weighted by their proposal's multivariate composite likelihood when considering the next
+#'observation in \code{data_assim} (i.e. the next season's observation for each series)
 #'
 #'@param object \code{list} object returned from \code{mvjagam}
-#'@param data_train A \code{dataframe} containing the model response variable and covariates
-#'required by the GAM \code{formula}. Should include columns:
-#''y' (the discrete outcomes; NAs allowed)
-#''series' (character or factor index of the series IDs)
-#''season' (numeric index of the seasonal time point for each observation; should not have any missing)
-#''year' the numeric index for year, and
-#''in_season' indicator for whether the observation is in season or not. If the counts tend to go to zero
-#'during the off season (as in tick counts for example), setting 'in_season' to zero cduring these seasonal periods
-#'can be useful as trends won't contribute during
-#'during this time but they continue to evolve, allowing the trend to continue evolving rather than forcing
-#'it to zero during the off-season
-#'Any other variables to be included in the linear predictor of \code{formula} must also be present
-#'@param data_assim A \code{dataframe} of test data containing at least one more observation (beyond the last observation
-#'seen by the model in \code{object} to be assimilated by the particle filter. Should at least contain 'series', 'season', 'year' and
-#''in_season' for the one-step ahead horizon, in addition to any other variables included in the linear predictor of \code{object}
-#'@param n_particles \code{integer} specifying the number of unique particles to generate for tracking the latent system state
+#'@param data_assim A \code{dataframe} of test data containing at least one more observation per series
+#'(beyond the last observation seen by the model in \code{object} to be assimilated by the particle filter.
+#'Should at least contain 'series', 'season', 'year' and in_season' for the one-step ahead horizon,
+#'in addition to any other variables included in the linear predictor of \code{object}
+#'@param n_particles \code{integer} specifying the number of unique particles to generate for tracking the
+#'latent system state
 #'@param file_path \code{character} string specifying the file path for saving the initiated particles
+#'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
 #'@export
 pfilter_mvgam_init = function(object,
-                              data_train,
                               data_assim,
                               n_particles = 1000,
-                              file_path = 'pfilter'){
+                              file_path = 'pfilter',
+                              n_cores = 2){
 
-# Function to calculate Discrete Rank Probability Score
-drps_score <- function(truth, fc){
-  nsum <- 1000
-  Fy = ecdf(fc)
-  ysum <- 0:nsum
-  indicator <- ifelse(ysum - truth >= 0, 1, 0)
-  score <- sum((indicator - Fy(ysum))^2)
-
-  return(score)
-}
-
-#### 1. Calculate predictive distribution from the GAM component ####
-# Generate linear predictor matrix for the next timepoint (NOTE, all series must have observations
-# for the next timepoint, even if they are NAs!!!!)
+#### 1. Generate linear predictor matrix for the next timepoint and extract last trend estimates
+# (NOTE, all series must have observations for the next timepoint, even if they are NAs!!!!) ####
+data_train <- object$obs_data
 n_series <- NCOL(object$ytimes)
+
+# Next observation for assimilation when forming particles (ensure data_assim has been arranged correctly)
+data_assim %>%
+  dplyr::arrange(year, season, series) -> data_assim
 series_test <- data_assim[1:n_series,]
 
 if(length(unique(series_test$season)) > 1){
   stop('data_assim should have one observation per series for the next seasonal timepoint')
 }
 
+# Linear predictor matrix for the next observation
 Xp <- predict(object$mgcv_model,
               newdata = series_test,
               type = 'lpmatrix')
-
-# Extract beta coefs and gam_contributions
-betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
-gam_comps <- MCMCvis::MCMCchains(object$jags_output, 'gam_comp')
-
-# GAM component linear predictions
-gam_preds <- matrix(NA, nrow = dim(betas)[1], ncol = NROW(series_test))
-for(i in 1:dim(betas)[1]){
-  gam_preds[i,] <- gam_comps[i,] * (Xp %*% betas[i,])
-}
 
 # Extract last trend / latent variable and precision estimates
 if(object$use_lv){
@@ -77,8 +53,8 @@ if(object$use_lv){
     lv_estimates[,NCOL(lv_estimates)]
   }))
 
-  tau <- as.numeric(hpd(MCMCvis::MCMCchains(object$jags_output, 'tau_fac'), 0.7)[2])
-
+  taus <- MCMCvis::MCMCchains(object$jags_output, 'tau_fac')
+  trends <- NULL
 } else {
   ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'trend'))[2],
               length.out = n_series + 1)
@@ -90,41 +66,37 @@ if(object$use_lv){
     trend_estimates[,NCOL(trend_estimates)]
   }))
 
-  tau <- as.numeric(apply(MCMCvis::MCMCchains(object$jags_output, 'tau'), 2, function(x) hpd(x, 0.7)[2]))
-
+  taus <- MCMCvis::MCMCchains(object$jags_output, 'tau')
+  lvs <- NULL
 }
 
-# If use_lv, extract latent variable loadings for generating the trend forecasts
+# If use_lv, extract latent variable loadings
 if(object$use_lv){
-
-  lv_coefs <- do.call(rbind, lapply(seq_len(n_series), function(series){
+  lv_coefs <- lapply(seq_len(n_series), function(series){
     lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
-    lv_coefs <- MCMCvis::MCMCchains(object$jags_output, 'lv_coefs')[,lv_indices]
-
-    # Calculate posterior mode for each coefficient as we cannot estimate static variables with our
-    # particle filter
-    as.numeric(apply(lv_coefs, 2, function(x) hpd(x, 0.7)[2]))
-  }))
+    MCMCvis::MCMCchains(object$jags_output, 'lv_coefs')[,lv_indices]
+  })
+} else {
+  lv_coefs <- NULL
 }
 
-# Extract phi estimates for latent trend drift terms
-phi <- MCMCvis::MCMCchains(object$jags_output, 'phi')
+# Beta coefficients for GAM component
+betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
+
+# GAM component weights
+gam_comps <- MCMCvis::MCMCchains(object$jags_output, 'gam_comp')
+
+# Phi estimates for latent trend drift terms
+phis <- MCMCvis::MCMCchains(object$jags_output, 'phi')
 
 # Negative binomial size estimate
-size <- MCMCvis::MCMCsummary(object$jags_output, 'r')$mean
-
-# Extract upper bound for the series if specified
-if(!is.null(object$upper_bounds)){
-  upper_bounds <- object$upper_bounds
-} else {
-  upper_bounds <- NULL
-}
+sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
 
 # Generate sample sequence for n_particles
-if(n_particles < dim(phi)[1]){
-  sample_seq <- sample(seq_len(dim(phi)[1]), size = n_particles, replace = F)
+if(n_particles < dim(phis)[1]){
+  sample_seq <- sample(seq_len(dim(phis)[1]), size = n_particles, replace = F)
 } else {
-  sample_seq <- sample(seq_len(dim(phi)[1]), size = n_particles, replace = T)
+  sample_seq <- sample(seq_len(dim(phis)[1]), size = n_particles, replace = T)
 }
 
 #### 2. Generate particles and calculate their proposal weights ####
@@ -132,107 +104,150 @@ use_lv = object$use_lv
 truth = series_test$y
 last_assim = c(unique(series_test$season), unique(series_test$year))
 
-particles <- lapply(sample_seq, function(x){
+cl <- parallel::makePSOCKcluster(n_cores)
+setDefaultCluster(cl)
+clusterExport(NULL, c('use_lv',
+                      'Xp',
+                      'betas',
+                      'series_test',
+                      'gam_comps',
+                      'truth',
+                      'last_assim',
+                      'taus',
+                      'phis',
+                      'lvs',
+                      'lv_coefs',
+                      'trends',
+                      'sizes',
+                      'n_series',
+                      'n_particles'),
+              envir = environment())
 
+pbapply::pboptions(type = "none")
+
+particles <- pbapply::pblapply(sample_seq, function(x){
   if(use_lv){
   # Sample a last state estimate for the latent variables
-  last_lv <- lvs[sample(1:NROW(lvs), 1, T), ]
+  samp_index <- x
+  last_lv <- lvs[samp_index, ]
 
   # Sample drift parameters
-  phi <- phi[sample(1:NROW(lvs), 1, T), ]
+  phi <- phis[samp_index, ]
 
-  # Run the latent variables forward one timestep
-  next_lvs <- do.call(cbind, lapply(seq_len(NCOL(lvs)), function(x){
-    rnorm(1, phi[x] + last_lv[x], 1 / tau)
+  # Sample lv precision
+  tau <- taus[samp_index,]
+
+  # Sample lv loadings
+  lv_coefs <- do.call(rbind, lapply(seq_len(n_series), function(series){
+    lv_coefs[[series]][samp_index,]
   }))
 
-  # Multiply with loadings to generate the series' forecast trend states
+  # Sample beta coefs and GAM contributions
+  betas <- betas[samp_index, ]
+  gam_comp <- gam_comps[samp_index, ]
+
+  # Sample a negative binomial size parameter
+  size <- sizes[samp_index, ]
+
+  # Run the latent variables forward one timestep
+  next_lvs <- do.call(cbind, lapply(seq_len(NCOL(lvs)), function(lv){
+    rnorm(1, phi[lv] + last_lv[lv], sqrt(1 / tau))
+  }))
+
+  # Multiply lv states with loadings to generate each series' forecast trend state
   trends <- as.numeric(next_lvs %*% t(lv_coefs))
 
-  # Calculate forecast distributions for the particle
-  series_fcs <- lapply(seq_len(n_series), function(series){
-    trend_preds <- trends[series] * (1 - gam_comps[,series])
-    full_preds <- matrix(NA, nrow = length(trend_preds), ncol = 1)
-    for(i in 1:length(trend_preds)){
-      trunc_preds <- rnbinom(1, mu = exp(gam_preds[i, series] + trend_preds[i]),
-                             size = size)
+  # Calculate weight for the particle in the form of a composite likelihood
+  weight <- prod(unlist(lapply(seq_len(n_series), function(series){
 
-      if(!is.null(upper_bounds)){
-        trunc_preds[trunc_preds > upper_bounds[series]] <- upper_bounds[series]
-      }
-
-      full_preds[i,] <- trunc_preds
+    if(is.na(truth[series])){
+      weight <- 1
+    } else {
+      weight <- dnbinom(truth[series], size = size,
+                        mu = exp((gam_comp[series] *
+                                    (Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
+                                   (trends[series] * (1 - gam_comp[series]))))
     }
-    full_preds
-  })
+    weight
+  })), na.rm = T)
+  n_lv <- NCOL(lvs)
 
   } else {
     next_lvs = NULL
     n_lv = NULL
     lv_coefs = NULL
 
-    # Sample a last state estimate for the trends
-    last_trend <- trends[sample(1:NROW(trends), 1, T), ]
+    # Sample index for the particle
+    samp_index <- x
+
+    # Sample beta coefs and GAM contributions
+    betas <- betas[samp_index, ]
+    gam_comp <- gam_comps[samp_index, ]
+
+    # Sample last state estimates for the trends
+    last_trend <- trends[samp_index, ]
 
     # Sample drift parameters
-    phi <- phi[sample(1:NROW(trends), 1, T), ]
+    phi <- phis[samp_index, ]
 
-    # Run the latent variables forward one timestep
+    # Sample trend precisions
+    tau <- taus[samp_index,]
+
+    # Sample a negative binomial size parameter
+    size <- sizes[samp_index, ]
+
+    # Run the trends forward one timestep
     trends <- do.call(cbind, lapply(seq_len(NCOL(trends)), function(x){
-      rnorm(1, phi[x] + last_trend[x], 1 / tau[x])
+      rnorm(1, phi[x] + last_trend[x], sqrt(1 / tau[x]))
     }))
 
-    # Calculate forecast distributions for the particle
-    series_fcs <- lapply(seq_len(n_series), function(series){
-      trend_preds <- trends[series] * (1 - gam_comps[,series])
-      full_preds <- matrix(NA, nrow = length(trend_preds), ncol = 1)
-      for(i in 1:length(trend_preds)){
-        trunc_preds <- rnbinom(1, mu = exp(gam_preds[i, series] + trend_preds[i]),
-                               size = size)
+    # Calculate weight for the particle in the form of a composite likelihood
+    weight <- prod(unlist(lapply(seq_len(n_series), function(series){
 
-        if(!is.null(upper_bounds)){
-          trunc_preds[trunc_preds > upper_bounds[series]] <- upper_bounds[series]
-        }
-
-        full_preds[i,] <- trunc_preds
+      if(is.na(truth[series])){
+        weight <- 1
+      } else {
+        weight <- dnbinom(truth[series], size = size,
+                          mu = exp((gam_comp[series] *
+                                      (Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
+                                     (trends[series] * (1 - gam_comp[series]))))
       }
-      full_preds
-    })
-
+      weight
+    })), na.rm = T)
 }
 
-# Calculate weight for the particle in the form of 1 / sum(DRPS)
-  weight <- sum(unlist(lapply(seq_len(n_series), function(series){
-
-    if(is.na(truth[series])){
-      weight <- 1
-    } else {
-      weight <- 1 / drps_score(truth[series], series_fcs[[series]])
-    }
-    weight
-  })), na.rm = T)
-
-
+  # Store important particle-specific information for later filtering
 list(use_lv = use_lv,
      n_lv = n_lv,
      lv_states = next_lvs,
      lv_coefs = lv_coefs,
-     size = size,
-     upper_bounds = upper_bounds,
-     tau = tau,
+     betas = as.numeric(betas),
+     gam_comp = as.numeric(gam_comp),
+     size = as.numeric(size),
+     tau = as.numeric(tau),
      phi = as.numeric(phi),
      trend_states = as.numeric(trends),
      weight = weight,
      ess = n_particles,
      last_assim = last_assim)
 
-})
+}, cl = cl)
+stopCluster(cl)
 
-# Save outputs for later online filtering
+# Calculate ESS and save outputs for later online filtering
 mgcv_model <- object$mgcv_model
+data_train$assimilated <- 'no'
+series_test$assimilated <- 'yes'
+data_train %>%
+  dplyr::bind_rows(series_test) -> obs_data
+weights <- (unlist(lapply(seq_along(particles), function(x){
+  tail(particles[[x]]$weight, 1)})))
+weights <- weights / sum(weights)
+ess <- 1 / sum(weights^2)
 dir.create(file_path, recursive = T, showWarnings = F)
-cat('Saving particles to', paste0(file_path, '/particles.rda'), '\n')
-save(particles, mgcv_model, betas, gam_comps, last_assim,
-     ess = n_particles, file = paste0(file_path, '/particles.rda'))
+cat('Saving particles to', paste0(file_path, '/particles.rda'), '\n',
+    'ESS =',  ess, '\n')
+save(particles, mgcv_model, obs_data, betas, gam_comps, last_assim,
+     ess = ess, file = paste0(file_path, '/particles.rda'))
 }
 
