@@ -5,6 +5,7 @@
 # 2. include option to inspect uncertainty contributions when forecasting from particle filter
 # 3. include some diagnostics on particle filter heterogeneity in weights etc...
 # 4. compare particle filtered vs re-calibrated forecast for some simulations or trends / neon data
+# 5. add generic plot_smooth functions to show the GAM partial effects, with names
 
 library(mvgam)
 library(dplyr)
@@ -63,11 +64,11 @@ trends_data <- series_to_mvgam(series, freq = 12, train_prop = 0.9)
 trends_mod <- mvjagam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
                  formula = y ~ s(season, k = 6, m = 2, bs = 'cc') +
-                   s(season, by = series, k = 10) - 1,
+                   s(season, by = series, k = 10, m = 1) - 1,
                  use_lv = T,
                  n_lv = 3,
                  use_nb = T,
-                 n.burnin = 5000,
+                 n.burnin = 500,
                  n.iter = 1000,
                  thin = 1,
                  upper_bounds = rep(100, length(terms)),
@@ -129,11 +130,17 @@ ggplot(mean_correlations %>%
 
 # Initiate particles by assimilating the next observation in data_test
 library(mvgam)
-pfilter_mvgam_init(object = trends_mod, data_assim = trends_data$data_test,
-                   n_particles = 100000, n_cores = 5)
+pfilter_mvgam_init(object = trends_mod,
+                   data_assim = trends_data$data_test,
+                   n_particles = 1000, n_cores = 2)
+
+# Assimilate next observation
+pfilter_mvgam_online(data_assim = trends_data$data_test[1:(length(unique(trends_data$data_test$series)) * 2),],
+                     file_path = 'pfilter')
+
 
 # Forecast from particles using the covariate information in remaining data_test observations
-fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 5,
+fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 2,
                        data_test = trends_data$data_test,
                        return_forecasts = T)
 

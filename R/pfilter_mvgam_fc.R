@@ -45,8 +45,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     dplyr::arrange(year, season, series) -> data_test
   last_row <- max(which(data_test$season == last_assim[1] & data_test$year == last_assim[2]))
   series_test <- data_test[(last_row + 1):NROW(data_test),]
-
-  n_series <- length(particles[[1]]$trend_states)
+  n_series <- (length(levels(data_test$series)))
   fc_horizon <- NROW(series_test) / n_series
 
   # Generate linear predictor matrix

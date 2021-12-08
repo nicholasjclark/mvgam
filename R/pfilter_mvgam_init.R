@@ -171,6 +171,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     weight
   })), na.rm = T)
   n_lv <- NCOL(lvs)
+  trends <- NULL
 
   } else {
     next_lvs = NULL
@@ -226,7 +227,7 @@ list(use_lv = use_lv,
      size = as.numeric(size),
      tau = as.numeric(tau),
      phi = as.numeric(phi),
-     trend_states = as.numeric(trends),
+     trend_states = trends,
      weight = weight,
      ess = n_particles,
      last_assim = last_assim)
@@ -247,7 +248,7 @@ ess <- 1 / sum(weights^2)
 dir.create(file_path, recursive = T, showWarnings = F)
 cat('Saving particles to', paste0(file_path, '/particles.rda'), '\n',
     'ESS =',  ess, '\n')
-save(particles, mgcv_model, obs_data, betas, gam_comps, last_assim,
+save(particles, mgcv_model, obs_data, last_assim,
      ess = ess, file = paste0(file_path, '/particles.rda'))
 }
 

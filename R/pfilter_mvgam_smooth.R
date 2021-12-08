@@ -1,0 +1,335 @@
+#'Assimilate new observations into a fitted mvgam model using resampling and kernel smoothing
+#'
+#'This function operates on a new observatio in \code{next_assim} to update the
+#'posterior forecast distribution. The next observation is assimilated
+#'and particles weights are updated in light of their most recent their  multivariate composite likelihood.
+#'Low weight particles are smoothed towards the high weight state space using kernel smoothing, and options are
+#'given for using resampling of high weight particles when Effective Sample Size falls below a
+#'user-specified threshold
+#'
+#'@param particles A \code{list} of particles that have been run up to one observation prior to the observation
+#'in \code{next_assim}
+#'@param mgcv_model A \code{\link[mgcv]{gam}} model returned through a call to \code{link{mvjagam}}
+#'@param next_assim A \code{dataframe} of test data containing at one more observation per series
+#'(beyond the last observation seen by the model when initialising particles with
+#' \code{\link{pfilter_mvgam_init}} or in previous calls to \code{pfilter_mvgam_online}.
+#'Should at least contain 'series', 'season', 'year' and in_season' for the one-step ahead horizon,
+#'in addition to any other variables included in the linear predictor of \code{object}
+#'@param threshold \code{proportional numeric} specifying the Effective Sample Size limit under which
+#'resampling of particles will be triggered (calculated as \code{ESS / n_particles}).
+#'Should be between \code{0} and \code{1}
+#'@param use_resampling \code{logical} specifying whether resampling should be used when ESS falls below
+#'the specified \code{threshold}
+#'@param kernel_lambda \code{proportional numeric} specifying the strength of kernel smoothing to use when
+#'pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}
+#'@param file_path \code{character} string specifying the file path for locating the particles
+#'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
+#'@export
+pfilter_mvgam_smooth = function(particles,
+                                mgcv_model,
+                                next_assim,
+                                threshold = 0.15,
+                                n_cores = 2,
+                                use_resampling = TRUE,
+                                kernel_lambda = 1){
+
+  # Linear predictor matrix for the next observation
+  Xp <- predict(mgcv_model,
+                newdata = next_assim,
+                type = 'lpmatrix')
+
+  use_lv <- particles[[1]]$use_lv
+  last_assim = c(unique(next_assim$season), unique(next_assim$year))
+
+  # Update importance weights in light of most recent observation by runnning particles
+  # up to the current timepoint
+  library(parallel)
+  cl <- makePSOCKcluster(n_cores)
+  setDefaultCluster(cl)
+  clusterExport(NULL, c('Xp',
+                        'use_lv',
+                        'particles',
+                        'next_assim'),
+                envir = environment())
+
+  pbapply::pboptions(type = "none")
+  particles <- pbapply::pblapply(seq_along(particles), function(x){
+    n_series <- length(particles[[x]]$phi)
+
+    if(use_lv){
+
+      # Run the latent variables forward one timestep
+      lv_states <- unlist(lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
+        rnorm(1, particles[[x]]$phi[lv] +
+                particles[[x]]$lv_states[lv],
+              sqrt(1 / particles[[x]]$tau))
+      }))
+
+      # Multiply lv states with loadings to generate each series' forecast trend state
+      trend_states <- as.numeric(lv_states %*% t(particles[[x]]$lv_coefs))
+
+
+    } else {
+
+
+      ## fill in for non lv model
+
+    }
+
+   particle_weight <- prod(unlist(lapply(seq_len(n_series), function(series){
+
+    if(is.na(next_assim$y[series])){
+      series_weight <- 1
+    } else {
+      series_weight <- dnbinom(next_assim$y[series],
+                        size = particles[[x]]$size,
+                        mu = exp((particles[[x]]$gam_comp[series] *
+                                    (Xp[which(as.numeric(next_assim$series) == series),] %*%
+                                       particles[[x]]$betas)) +
+                                   (trend_states[series] *
+                                      (1 - particles[[x]]$gam_comp[series]))))
+    }
+    series_weight
+  })), na.rm = T)
+
+   if(use_lv){
+     trend_states <- NULL
+   }
+
+   # Update particle weight using a condensation algorithm
+   weight <- particle_weight * particles[[x]]$weight
+   list(use_lv = use_lv,
+        n_lv = particles[[x]]$n_lv,
+        lv_states = lv_states,
+        lv_coefs = particles[[x]]$lv_coefs,
+        betas = particles[[x]]$betas,
+        gam_comp = particles[[x]]$gam_comp,
+        size = particles[[x]]$size,
+        tau = particles[[x]]$tau,
+        phi = particles[[x]]$phi,
+        trend_states = trend_states,
+        weight = particle_weight,
+        ess = particles[[x]]$ess,
+        last_assim = c(unique(next_assim$season), unique(next_assim$year)))
+  }, cl = cl)
+  stopCluster(cl)
+
+  weights <- (unlist(lapply(seq_along(particles), function(x){
+    tail(particles[[x]]$weight, 1)})))
+  index <- sample.int(length(weights), length(weights),
+                      replace = TRUE,
+                      prob = weights + 0.0001)
+
+  # Use effective sample size of weights to decide whether to resample particles
+  # i.e. when there is too much disparity in weights
+  if(length(unique(weights)) == 1){
+    # When all weights are identical, a resample has just taken place so don't resample here
+    cat('Effective sample size is', length(weights), '...\n\n')
+    norm_weights <- weights / sum(weights)
+    ess <- length(weights)
+    next_update_seq <- seq(1:length(weights))
+    re_weight = F
+  } else{
+    # Else calculate normalised weights and effective sample size; resample if ESS falls below
+    # threshold
+    norm_weights <- weights / sum(weights)
+    ess <- 1 / sum(norm_weights^2)
+    cat('Effective sample size is', ess, '...\n\n')
+    if(ess - (length(norm_weights) * threshold) < 0){
+      next_update_seq <- index
+      re_weight = T
+    } else{
+      next_update_seq <- seq(1:length(weights))
+      re_weight <- F
+    }
+  }
+
+  # If resampling is not specified by user, keep the current full set of particles and only
+  # use kernel smoothing
+  if(!use_resampling){
+    re_weight <- F
+    next_update_seq <- seq(1:length(weights))
+  }
+
+  if(length(unique(weights)) > 100){
+    use_smoothing <- TRUE
+    cat('Smoothing particles ...\n\n')
+
+    if(use_lv){
+      # Extract means and covariances of lv states and lv loadings
+      # from highest weighted particles for kernel smoothing
+      best_lv <- do.call(rbind, purrr::map(particles, 'lv_states')[which(norm_weights >=
+                                                                        quantile(norm_weights, prob = 0.75, na.rm = T))])
+
+      best_lv_coefs <- purrr::map(particles, 'lv_coefs')[which(norm_weights >=
+                                                                 quantile(norm_weights, prob = 0.75, na.rm = T))]
+      best_lv_coefs <-do.call(rbind, lapply(seq_along(best_lv_coefs), function(x){
+        as.vector(best_lv_coefs[[x]])
+      }))
+
+      best_lv_cov <- cov(as.matrix(best_lv))
+      best_lv_means <- apply(best_lv, 2, mean)
+
+      best_lv_coefs_cov <- cov(as.matrix(best_lv_coefs))
+      best_lv_coefs_means <- apply(best_lv_coefs, 2, mean)
+
+      best_trend_cov <- NULL
+      best_trend_means <- NULL
+      rm(best_lv, best_lv_coefs)
+
+    } else {
+
+      ## fill in for non lv model
+
+      best_lv_cov <- NULL
+      best_lv_means <- NULL
+      best_lv_coefs_cov <- NULL
+      best_lv_coefs_means <- NULL
+    }
+
+  } else {
+    use_smoothing <- FALSE
+    best_lv_cov <- NULL
+    best_lv_means <- NULL
+    best_lv_coefs_cov <- NULL
+    best_lv_coefs_means <- NULL
+    re_weight <- FALSE
+  }
+
+  library(parallel)
+  cl <- makePSOCKcluster(n_cores)
+  setDefaultCluster(cl)
+  clusterExport(NULL, c('use_smoothing',
+                        'best_lv_cov',
+                        'best_lv_means',
+                        'best_lv_coefs_cov',
+                        'best_lv_coefs_means',
+                        'best_trend_cov',
+                        'best_trend_means',
+                        'use_lv',
+                        'ess',
+                        'norm_weights',
+                        'particles',
+                        'kernel_lambda',
+                        're_weight'),
+                envir = environment())
+
+  clusterEvalQ(cl, library(MASS))
+  pbapply::pboptions(type = "none")
+
+  # Perform kernel smoothing and mutation of particles. Argument next_update_seq is determined by whether
+  # or not the user wants to resample and what the ESS currently is
+  particles <- pbapply::pblapply(next_update_seq, function(x){
+
+    # No major changes when smoothing not in effect as all weights are very similar
+    if(!use_smoothing){
+
+      if(use_lv){
+        lv_evolve <- particles[[x]]$lv_states
+        lv_coefs_evolve <- particles[[x]]$lv_coefs
+        particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
+        trend_evolve <- NULL
+
+      } else {
+
+        ## fill in for non lv model
+        lv_evolve <- NULL
+        lv_coefs_evolve <- NULL
+        particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
+
+      }
+
+
+    } else {
+
+      # Else particles can be kernel smooothed towards higher likelihood space
+      # For kernel smoothing, how much a particle may be pulled towards the high-likelihood
+      # space is determined  by its last fitness estimate (weight)
+      # Particles with low weight (less than 10th percentile) are pulled more strongly towards the
+      # state space of the high weight particles. Particles with moderate weights are only moderatly
+      # shifted, while high weight particles are not moved by much
+      weight <- norm_weights[x]
+      if(weight < quantile(norm_weights, prob = 0.1, na.rm = T)){
+        evolve <- 0.95 * kernel_lambda
+
+      } else if(weight < quantile(norm_weights, prob = 0.4, na.rm = T) &
+                weight > quantile(norm_weights, prob = 0.1, na.rm = T)){
+        evolve <- 0.75 * kernel_lambda
+
+      } else if(weight <  quantile(norm_weights, prob = 0.75, na.rm = T) &
+                weight > quantile(norm_weights, prob = 0.4, na.rm = T)){
+        evolve <- 0.65 * kernel_lambda
+
+      } else {
+        evolve <- 0.25 * kernel_lambda
+      }
+      if(weight < quantile(norm_weights, prob = 0.75, na.rm = T)){
+
+        if(use_lv){
+          lv_evolve <- particles[[x]]$lv_states
+          lv_coefs_evolve <- particles[[x]]$lv_coefs
+          phi_evolve <- particles[[x]]$phi
+          particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
+
+          # Smooth latent variable states
+          lv_evolve <- particles[[x]]$lv_states +
+            evolve*(best_lv_means - particles[[x]]$lv_states) +
+            (MASS::mvrnorm(n = 1, mu = rep(0, length(best_lv_means)),
+                           Sigma = best_lv_cov) * sqrt(1 - evolve^2))
+
+          # Smooth latent variable loadings
+          lv_coefs_evolve <- as.vector(particles[[x]]$lv_coefs) +
+            evolve*(best_lv_coefs_means - particles[[x]]$lv_coefs) +
+            (MASS::mvrnorm(n = 1, mu = rep(0, length(best_lv_coefs_means)),
+                           Sigma = best_lv_coefs_cov) * sqrt(1 - evolve^2))
+
+          phi_evolve <- particles[[x]]$phi
+          particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
+          trend_evolve <- NULL
+        } else {
+
+          ## fill in for non lv model
+          lv_evolve <- NULL
+          lv_coefs_evolve <- NULL
+        }
+
+
+        # If this is a high weight particle let the particle explore
+        # new parameter spaces more freely so that adaptation can continue
+      } else {
+
+        if(use_lv){
+          lv_evolve <- particles[[x]]$lv_states + rnorm(length(particles[[x]]$lv_states), 0, 5e-3)
+          lv_coefs_evolve <- particles[[x]]$lv_coefs
+          trend_evolve <- NULL
+        } else {
+          lv_evolve <- NULL
+          lv_coefs_evolve <- NULL
+
+        }
+        particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
+      }
+    }
+
+    # Return the updated particle
+    list(use_lv = use_lv,
+         n_lv = particles[[x]]$n_lv,
+         lv_states = lv_evolve,
+         lv_coefs = lv_coefs_evolve,
+         betas = particles[[x]]$betas,
+         gam_comp = particles[[x]]$gam_comp,
+         size = particles[[x]]$size,
+         tau = particles[[x]]$tau,
+         phi = particles[[x]]$phi,
+         trend_states = trend_evolve,
+         weight = particle_weight,
+         ess = ess,
+         last_assim = particles[[x]]$last_assim)
+
+
+
+  }, cl = cl)
+  stopCluster(cl)
+
+  particles
+}
