@@ -1,17 +1,6 @@
 #'Plot mvjagam forecast uncertainty contributions for a specified series
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param data_train A \code{dataframe} containing the model response variable and covariates
-#'required by the GAM \code{formula}. Should include columns:
-#''y' (the discrete outcomes; NAs allowed)
-#''series' (character or factor index of the series IDs)
-#''season' (numeric index of the seasonal time point for each observation; should not have any missing)
-#''year' the numeric index for year
-#''in_season' indicator for whether the observation is in season or not. If the counts tend to go to zero
-#'during the off season (as in tick counts for example), setting this to zero can be useful as trends won't contribute during
-#'during this time but they continue to evolve, allowing the trend from the past season to continue evolving rather than forcing
-#'it to zero
-#'Any other variables to be included in the linear predictor of \code{formula} must also be present
 #'@param data_test A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
@@ -20,8 +9,9 @@
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
 #'@export
-plot_mvgam_uncertainty = function(object, series, data_test, data_train, legend_position = 'topleft',
+plot_mvgam_uncertainty = function(object, series, data_test, legend_position = 'topleft',
                                   hide_xlabels = FALSE){
+  data_train <- object$obs_data
   ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
               length.out = NCOL(object$ytimes) + 1)
   starts <- ends + 1
@@ -38,9 +28,15 @@ plot_mvgam_uncertainty = function(object, series, data_test, data_train, legend_
   betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
   gam_comps <- MCMCvis::MCMCchains(object$jags_output, 'gam_comp')[,series]
 
-  # Extract trend estimates
+  # Extract current trend estimates
   trend <- MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[series]:ends[series]]
-  trend <- trend[,(NROW(data_train) / NCOL(object$ytimes)+1):NCOL(trend)]
+
+  if(length(unique(data_train$series)) == 1){
+    trend <- matrix(trend[, NCOL(trend)])
+  } else {
+    trend <- trend[,(NROW(data_train) / NCOL(object$ytimes)+1):NCOL(trend)]
+  }
+
   n_samples <- NROW(trend)
   size <- MCMCvis::MCMCsummary(object$jags_output, 'r')$mean
 

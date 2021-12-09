@@ -13,6 +13,7 @@
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
 #'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
 #'This places the legend on the inside of the plot frame at the given location.
+#'@param ylim Optional \code{vector} of y-axis limits (min, max). The same limits will be used for all plots
 #'@param return_forecasts \code{logical}. If \code{TRUE}, the returned list object will contain plots of forecasts
 #'as well as the forecast objects (each as a \code{matrix} of dimension \code{n_particles} x \code{horizon})
 #'@return A named \code{list} contaning functions that call base \code{R} plots of each series' forecast. Optionally
@@ -22,6 +23,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                             n_cores = 2,
                             data_test,
                             legend_position = 'topleft',
+                            ylim,
                             return_forecasts = FALSE){
 
   if(file.exists(paste0(file_path, '/particles.rda'))){
@@ -38,6 +40,10 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
       states[t] <- rnorm(1, phi + states[t - 1], sqrt(1 / tau))
     }
     states[-1]
+  }
+
+  if(missing(ylim)){
+    ylim <- c(NA, NA)
   }
 
   # Get all observations that have not yet been assimilated
@@ -132,7 +138,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   obs_data %>%
     dplyr::arrange(year, season, series) -> obs_data
 
-  plot_series_fc = function(series, preds){
+  plot_series_fc = function(series, preds, ylim){
     all_obs <- obs_data$y[which(as.numeric(obs_data$series) == series)]
     assimilated <- obs_data$assimilated[which(as.numeric(obs_data$series) == series)]
     preds_last <- c(all_obs, preds[1,])
@@ -145,8 +151,12 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
       upper_lim <- max(c(all_obs, int[3,]), na.rm = T) + 4
     }
 
+    if(is.na(ylim[1])){
+      ylim <- c(0, upper_lim)
+    }
+
     plot(preds_last,
-         type = 'l', ylim = c(0, upper_lim),
+         type = 'l', ylim = ylim,
          col = rgb(1,0,0, alpha = 0),
          ylab = paste0('Estimated counts for ', levels(obs_data$series)[series]),
          xlab = 'Time')
@@ -177,7 +187,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   }
 
   fc_plots <- lapply(seq_len(n_series), function(series){
-    function(){plot_series_fc(series, preds = series_fcs[[series]])}
+    function(){plot_series_fc(series, preds = series_fcs[[series]], ylim)}
   })
   names(fc_plots) <- levels(obs_data$series)
 

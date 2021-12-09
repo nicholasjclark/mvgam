@@ -8,7 +8,6 @@ plot_mvgam_uncertainty(
   object,
   series,
   data_test,
-  data_train,
   legend_position = "topleft",
   hide_xlabels = FALSE
 )
@@ -20,18 +19,6 @@ plot_mvgam_uncertainty(
 
 \item{data_test}{A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
 addition to any other variables included in the linear predictor of \code{formula}}
-
-\item{data_train}{A \code{dataframe} containing the model response variable and covariates
-required by the GAM \code{formula}. Should include columns:
-'y' (the discrete outcomes; NAs allowed)
-'series' (character or factor index of the series IDs)
-'season' (numeric index of the seasonal time point for each observation; should not have any missing)
-'year' the numeric index for year
-'in_season' indicator for whether the observation is in season or not. If the counts tend to go to zero
-during the off season (as in tick counts for example), setting this to zero can be useful as trends won't contribute during
-during this time but they continue to evolve, allowing the trend from the past season to continue evolving rather than forcing
-it to zero
-Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
 \item{legend_position}{The location may also be specified by setting x to a single keyword from the
 list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
