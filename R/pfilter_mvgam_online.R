@@ -24,7 +24,7 @@ pfilter_mvgam_online = function(data_assim,
                                 file_path = 'pfilter',
                                 threshold = 0.5,
                                 use_resampling = TRUE,
-                                kernel_lambda = 1,
+                                kernel_lambda = 0.5,
                                 n_cores = parallel::detectCores() - 1){
 
   # Load the particles and key objects for tracking last assimilation dates
@@ -74,9 +74,6 @@ pfilter_mvgam_online = function(data_assim,
                                           kernel_lambda = kernel_lambda,
                                           n_cores = n_cores)
 
-        # Keep track of effective sample size
-        ess <- c(ess, particles[[1]]$ess)
-
         # Update observation history with last assimilations
         data_assim$assimilated[starts[i]:ends[i]] <- 'yes'
         obs_data %>%
@@ -85,8 +82,16 @@ pfilter_mvgam_online = function(data_assim,
   last_assim <- c(tail(obs_data$season, 1),
                 tail(obs_data$year, 1))
       cat('Last assimilation time was', last_assim, '\n\n')
+
+      # Keep track of effective sample size
+      weights <- (unlist(lapply(seq_along(particles), function(x){
+        tail(particles[[x]]$weight, 1)})))
+      weights <- weights / sum(weights)
+      new_ess <- 1 / sum(weights^2)
+      ess <- c(ess, new_ess)
+
       cat('Saving particles to', paste0(file_path, '/particles.rda'), '\n',
-          'ESS =',  tail(ess, 1), '\n')
+          'ESS =',  new_ess, '\n')
       save(particles, mgcv_model, obs_data, last_assim,
            ess = ess, file = paste0(file_path, '/particles.rda'))
 

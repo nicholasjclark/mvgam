@@ -68,7 +68,7 @@ trends_mod <- mvjagam(data_train = trends_data$data_train,
                  use_lv = T,
                  n_lv = 3,
                  use_nb = T,
-                 n.burnin = 500,
+                 n.burnin = 5000,
                  n.iter = 1000,
                  thin = 1,
                  upper_bounds = rep(100, length(terms)),
@@ -132,29 +132,37 @@ ggplot(mean_correlations %>%
 library(mvgam)
 pfilter_mvgam_init(object = trends_mod,
                    data_assim = trends_data$data_test,
-                   n_particles = 1000, n_cores = 2)
+                   n_particles = 5000, n_cores = 5)
 
 # Assimilate next observation
 pfilter_mvgam_online(data_assim = trends_data$data_test[1:(length(unique(trends_data$data_test$series)) * 2),],
-                     file_path = 'pfilter')
+                     file_path = 'pfilter', n_cores = 5,
+                     kernel_lambda = 1)
 
 
 # Forecast from particles using the covariate information in remaining data_test observations
-fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 2,
+fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 5,
                        data_test = trends_data$data_test,
                        return_forecasts = T)
 
 # Inspect forecasts for a few series
+par(mfrow = c(1, 2))
 plot_mvgam_fc(object = trends_mod, series = 1)
 fc$fc_plots$`dog tick`()
+par(mfrow = c(1, 2))
 plot_mvgam_fc(object = trends_mod, series = 2)
 fc$fc_plots$`la nina`()
+par(mfrow = c(1, 2))
 plot_mvgam_fc(object = trends_mod, series = 3)
 fc$fc_plots$`remove tick`()
+par(mfrow = c(1, 2))
 plot_mvgam_fc(object = trends_mod, series = 4)
 fc$fc_plots$`tick bite`()
+par(mfrow = c(1, 2))
 plot_mvgam_fc(object = trends_mod, series = 5)
 fc$fc_plots$`tick paralysis`()
+par(mfrow = c(1,1))
+
 
 # Remove the particles
 unlink('pfilter', recursive = T)

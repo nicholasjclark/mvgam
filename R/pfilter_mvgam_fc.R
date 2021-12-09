@@ -139,7 +139,8 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     int <- apply(preds,
                   2, hpd, 0.9)
     if(!is.null(particles[[1]]$upper_bounds)){
-      upper_lim <- particles[[1]]$upper_bounds[series]
+      upper_lim <- min(c(particles[[1]]$upper_bounds[series],
+                         (max(c(all_obs, int[3,]), na.rm = T) + 4)))
     } else {
       upper_lim <- max(c(all_obs, int[3,]), na.rm = T) + 4
     }

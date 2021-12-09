@@ -100,9 +100,10 @@ if(n_particles < dim(phis)[1]){
 }
 
 #### 2. Generate particles and calculate their proposal weights ####
-use_lv = object$use_lv
-truth = series_test$y
-last_assim = c(unique(series_test$season), unique(series_test$year))
+use_lv <- object$use_lv
+truth <- series_test$y
+last_assim <- c(unique(series_test$season), unique(series_test$year))
+upper_bounds <- object$upper_bounds
 
 cl <- parallel::makePSOCKcluster(n_cores)
 setDefaultCluster(cl)
@@ -120,7 +121,8 @@ clusterExport(NULL, c('use_lv',
                       'trends',
                       'sizes',
                       'n_series',
-                      'n_particles'),
+                      'n_particles',
+                      'upper_bounds'),
               envir = environment())
 
 pbapply::pboptions(type = "none")
@@ -229,7 +231,7 @@ list(use_lv = use_lv,
      phi = as.numeric(phi),
      trend_states = trends,
      weight = weight,
-     ess = n_particles,
+     upper_bounds = upper_bounds,
      last_assim = last_assim)
 
 }, cl = cl)

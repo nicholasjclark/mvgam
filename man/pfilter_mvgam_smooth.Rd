@@ -11,7 +11,7 @@ pfilter_mvgam_smooth(
   threshold = 0.15,
   n_cores = 2,
   use_resampling = TRUE,
-  kernel_lambda = 1
+  kernel_lambda = 0.5
 )
 }
 \arguments{

@@ -11,48 +11,15 @@
 #'
 hpd <- function(x, coverage = 0.95)
 {
-  x <- as.matrix(x)
-  out <- matrix(NA, nrow = ncol(x), ncol = 3)
-  rownames(out) <- dimnames(x)[[2]]
-  colnames(out) <- c("mode", "lower", "upper")
+  x <- as.mcmc(x)
+  interval <- coda::HPDinterval(x, prob = coverage)
+  interval_med <- as.vector(coda::HPDinterval(x, prob = 0.5))
+  interval_med <- mean(as.vector(interval_med))
+  out <- matrix(NA, ncol = 3, nrow = 1)
+  colnames(out) <- c("lower", "mode", "upper")
+  out[1,2] <- interval_med
+  out[1,1] <- as.vector(interval)[1]
+  out[1,3] <- as.vector(interval)[2]
 
-  f <- function(p) {
-    if (p == density.range[2]) {
-      set.coverage <- 0
-    }
-    else {
-      p.upper <- min(y.density$y[y.density$y > p])
-      p.lower <- max(y.density$y[y.density$y <= p])
-      cov.upper <- sum(y.counts[y.density$y >= p.upper]) / sum(y.counts)
-      cov.lower <- sum(y.counts[y.density$y >= p.lower]) / sum(y.counts)
-      c <- (p.upper - p)/(p.upper - p.lower)
-      set.coverage <- c * cov.upper + (1 - c) * cov.lower
-    }
-    return(set.coverage - coverage)
-  }
-
-  for (i in 1:ncol(x)) {
-    y <- unclass(x[,i])
-    y.density <- stats::density(y, n=1024)
-    m <- length(y.density$x)
-
-    ## Find the midpoint
-    out[i,1] <- y.density$x[which.max(y.density$y)]
-    dx <- diff(range(y.density$x)) / m
-    breaks <- c(y.density$x[1] - dx / 2, y.density$x + dx /2)
-    y.counts <- hist(y, breaks = breaks, plot = FALSE)$counts
-    density.range <- range(y.density$y)
-    uniroot.out <- stats::uniroot(f, density.range)
-
-    ## Assuming that we have a single interval, find the limits
-    out[i,2:3] <- range(y.density$x[y.density$y > uniroot.out$root])
-
-    ## Check!
-    if (sum(abs(diff(y.density$y > uniroot.out$root))) != 2) {
-      warning("HPD set is not a closed interval")
-    }
-  }
-  out <- c(out[2], out[1], out[3])
-  names(out) <- c('lower', 'median', 'upper')
   return(out)
 }

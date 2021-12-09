@@ -9,7 +9,7 @@ pfilter_mvgam_online(
   file_path = "pfilter",
   threshold = 0.5,
   use_resampling = TRUE,
-  kernel_lambda = 1,
+  kernel_lambda = 0.5,
   n_cores = parallel::detectCores() - 1
 )
 }

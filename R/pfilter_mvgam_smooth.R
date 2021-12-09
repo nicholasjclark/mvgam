@@ -31,7 +31,7 @@ pfilter_mvgam_smooth = function(particles,
                                 threshold = 0.15,
                                 n_cores = 2,
                                 use_resampling = TRUE,
-                                kernel_lambda = 1){
+                                kernel_lambda = 0.5){
 
   # Linear predictor matrix for the next observation
   Xp <- predict(mgcv_model,
@@ -70,9 +70,12 @@ pfilter_mvgam_smooth = function(particles,
 
 
     } else {
-
-
-      ## fill in for non lv model
+      # Run the trends forward one timestep
+      trend_states <- do.call(cbind, lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
+        rnorm(1, particles[[x]]$phi[series] + particles[[x]]$trend_states[series],
+              sqrt(1 / particles[[x]]$tau[series]))
+      }))
+      lv_states <- NULL
 
     }
 
@@ -109,7 +112,7 @@ pfilter_mvgam_smooth = function(particles,
         phi = particles[[x]]$phi,
         trend_states = trend_states,
         weight = particle_weight,
-        ess = particles[[x]]$ess,
+        upper_bounds = particles[[x]]$upper_bounds,
         last_assim = c(unique(next_assim$season), unique(next_assim$year)))
   }, cl = cl)
   stopCluster(cl)
@@ -178,13 +181,17 @@ pfilter_mvgam_smooth = function(particles,
       rm(best_lv, best_lv_coefs)
 
     } else {
-
-      ## fill in for non lv model
+      best_trend <- do.call(rbind, purrr::map(particles,
+                                              'trend_states')[which(norm_weights >=
+                                                                      quantile(norm_weights, prob = 0.75, na.rm = T))])
+      best_trend_cov <- cov(as.matrix(best_trend))
+      best_trend_means <- apply(best_trend, 2, mean)
 
       best_lv_cov <- NULL
       best_lv_means <- NULL
       best_lv_coefs_cov <- NULL
       best_lv_coefs_means <- NULL
+      rm(best_trend)
     }
 
   } else {
@@ -231,14 +238,12 @@ pfilter_mvgam_smooth = function(particles,
         trend_evolve <- NULL
 
       } else {
-
-        ## fill in for non lv model
+        trend_evolve <- particles[[x]]$trend_states
         lv_evolve <- NULL
         lv_coefs_evolve <- NULL
         particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
 
       }
-
 
     } else {
 
@@ -266,9 +271,6 @@ pfilter_mvgam_smooth = function(particles,
       if(weight < quantile(norm_weights, prob = 0.75, na.rm = T)){
 
         if(use_lv){
-          lv_evolve <- particles[[x]]$lv_states
-          lv_coefs_evolve <- particles[[x]]$lv_coefs
-          phi_evolve <- particles[[x]]$phi
           particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
 
           # Smooth latent variable states
@@ -283,16 +285,19 @@ pfilter_mvgam_smooth = function(particles,
             (MASS::mvrnorm(n = 1, mu = rep(0, length(best_lv_coefs_means)),
                            Sigma = best_lv_coefs_cov) * sqrt(1 - evolve^2))
 
-          phi_evolve <- particles[[x]]$phi
-          particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
           trend_evolve <- NULL
-        } else {
 
-          ## fill in for non lv model
+        } else {
+          # Smooth trend states
+          trend_evolve <- particles[[x]]$trend_states +
+            evolve*(best_trend_means - particles[[x]]$trend_states) +
+            (MASS::mvrnorm(n = 1, mu = rep(0, length(best_trend_means)),
+                           Sigma = best_trend_cov) * sqrt(1 - evolve^2))
+
+          particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
           lv_evolve <- NULL
           lv_coefs_evolve <- NULL
         }
-
 
         # If this is a high weight particle let the particle explore
         # new parameter spaces more freely so that adaptation can continue
@@ -305,6 +310,7 @@ pfilter_mvgam_smooth = function(particles,
         } else {
           lv_evolve <- NULL
           lv_coefs_evolve <- NULL
+          trend_evolve <- particles[[x]]$trend_states + rnorm(length(particles[[x]]$trend_states), 0, 5e-3)
 
         }
         particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
@@ -323,10 +329,8 @@ pfilter_mvgam_smooth = function(particles,
          phi = particles[[x]]$phi,
          trend_states = trend_evolve,
          weight = particle_weight,
-         ess = ess,
+         upper_bounds = particles[[x]]$upper_bounds,
          last_assim = particles[[x]]$last_assim)
-
-
 
   }, cl = cl)
   stopCluster(cl)
