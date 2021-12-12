@@ -14,12 +14,8 @@
 #'resampling of particles will be triggered (calculated as \code{ESS / n_particles}) if \code{use_resampling == TRUE}.
 #'Should be between \code{0} and \code{1}
 #'@param use_resampling \code{logical} specifying whether resampling should be used when ESS falls below
-#'the specified \code{threshold}. Note that resampling can result in loss of the original model's diversity of
-#'GAM beta coefficients, which may have undesirable consequences for the forecast distribution. If
-#'\code{use_resampling} is \code{TRUE}, some effort is made to remedy this by assigning randomly sampled draws of
-#'beta coefficients from the original model's distribution to each particle. This does not however guarantee that there
-#'will be no loss of diversity, especially if successive resamples take place. Default for this option is therefore
-#'\code{FALSE}
+#'the specified \code{threshold}. Default for this option is \code{FALSE}, relying instead on kernel smoothing only
+#'to maintain particle diversity
 #'@param kernel_lambda \code{proportional numeric} specifying the strength of kernel smoothing to use when
 #'pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}
 #'@param file_path \code{character} string specifying the file path for locating the particles

@@ -1,8 +1,8 @@
 #'Assimilate new observations into a fitted mvgam model using resampling and kernel smoothing
 #'
-#'This function operates on a new observatio in \code{next_assim} to update the
+#'This function operates on a new observation in \code{next_assim} to update the
 #'posterior forecast distribution. The next observation is assimilated
-#'and particles weights are updated in light of their most recent their  multivariate composite likelihood.
+#'and particle weights are updated in light of their most recent their multivariate composite likelihood.
 #'Low weight particles are smoothed towards the high weight state space using kernel smoothing, and options are
 #'given for using resampling of high weight particles when Effective Sample Size falls below a
 #'user-specified threshold
@@ -171,10 +171,10 @@ pfilter_mvgam_smooth = function(particles,
       # Extract means and covariances of lv states and lv loadings
       # from highest weighted particles for kernel smoothing
       best_lv <- do.call(rbind, purrr::map(particles, 'lv_states')[which(norm_weights >=
-                                                                        quantile(norm_weights, prob = 0.75, na.rm = T))])
+                                                                        quantile(norm_weights, prob = 0.8, na.rm = T))])
 
       best_lv_coefs <- purrr::map(particles, 'lv_coefs')[which(norm_weights >=
-                                                                 quantile(norm_weights, prob = 0.75, na.rm = T))]
+                                                                 quantile(norm_weights, prob = 0.8, na.rm = T))]
       best_lv_coefs <-do.call(rbind, lapply(seq_along(best_lv_coefs), function(x){
         as.vector(best_lv_coefs[[x]])
       }))
@@ -196,7 +196,7 @@ pfilter_mvgam_smooth = function(particles,
     } else {
       best_trend <- do.call(rbind, purrr::map(particles,
                                               'trend_states')[which(norm_weights >=
-                                                                      quantile(norm_weights, prob = 0.75, na.rm = T))])
+                                                                      quantile(norm_weights, prob = 0.8, na.rm = T))])
       best_trend_cov <- cov(as.matrix(best_trend))
       best_trend_means <- apply(best_trend, 2, mean)
 
@@ -223,7 +223,7 @@ pfilter_mvgam_smooth = function(particles,
 
   weight_thres.1 <- quantile(norm_weights, prob = 0.1, na.rm = T)
   weight_thres.4 <- quantile(norm_weights, prob = 0.4, na.rm = T)
-  weight_thres.75 <- quantile(norm_weights, prob = 0.75, na.rm = T)
+  weight_thres.85 <- quantile(norm_weights, prob = 0.85, na.rm = T)
 
   library(parallel)
   cl <- makePSOCKcluster(n_cores)
@@ -245,7 +245,7 @@ pfilter_mvgam_smooth = function(particles,
                         're_weight',
                         'weight_thres.1',
                         'weight_thres.4',
-                        'weight_thres.75'),
+                        'weight_thres.85'),
                 envir = environment())
 
   clusterEvalQ(cl, library(MASS))
@@ -288,16 +288,16 @@ pfilter_mvgam_smooth = function(particles,
 
       } else if(weight < weight_thres.4 &
                 weight > weight_thres.1){
-        evolve <- 0.85 * kernel_lambda
+        evolve <- 0.75 * kernel_lambda
 
-      } else if(weight < weight_thres.75 &
+      } else if(weight < weight_thres.85 &
                 weight > weight_thres.4){
-        evolve <- 0.7 * kernel_lambda
+        evolve <- 0.5 * kernel_lambda
 
       } else {
-        evolve <- 0.3 * kernel_lambda
+        evolve <- 0.25 * kernel_lambda
       }
-      if(weight < weight_thres.75){
+      if(weight < weight_thres.85){
 
         if(use_lv){
           particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))

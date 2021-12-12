@@ -74,14 +74,20 @@ if(object$use_lv){
 if(object$use_lv){
   lv_coefs <- lapply(seq_len(n_series), function(series){
     lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
-    MCMCvis::MCMCchains(object$jags_output, 'lv_coefs')[,lv_indices]
+    as.matrix(MCMCvis::MCMCchains(object$jags_output, 'lv_coefs')[,lv_indices])
   })
 } else {
   lv_coefs <- NULL
 }
 
 # Beta coefficients for GAM component
-betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
+betas_orig <- MCMCvis::MCMCchains(object$jags_output, 'b')
+betas <- matrix(NA, nrow = dim(betas_orig)[1],
+                ncol = NCOL(MCMCvis::MCMCchains(object$jags_output, 'b')))
+betas_hpd <- apply(betas_orig, 2, function(x) hpd(x)[2])
+for(i in 1:dim(betas_orig)[1]){
+  betas[i,] <- betas_hpd
+}
 
 # GAM component weights
 gam_comps <- MCMCvis::MCMCchains(object$jags_output, 'gam_comp')
@@ -90,7 +96,8 @@ gam_comps <- MCMCvis::MCMCchains(object$jags_output, 'gam_comp')
 phis <- MCMCvis::MCMCchains(object$jags_output, 'phi')
 
 # Negative binomial size estimate
-sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
+sizes <- as.matrix(rep(hpd(MCMCvis::MCMCchains(object$jags_output, 'r'))[2],
+                       dim(betas_orig)[1]))
 
 # Generate sample sequence for n_particles
 if(n_particles < dim(phis)[1]){
@@ -128,6 +135,7 @@ clusterExport(NULL, c('use_lv',
 pbapply::pboptions(type = "none")
 
 particles <- pbapply::pblapply(sample_seq, function(x){
+  cat('running',x,'\n')
   if(use_lv){
   # Sample a last state estimate for the latent variables
   samp_index <- x

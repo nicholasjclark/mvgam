@@ -9,6 +9,7 @@ pfilter_mvgam_fc(
   n_cores = 2,
   data_test,
   legend_position = "topleft",
+  ylim,
   return_forecasts = FALSE
 )
 }
@@ -23,6 +24,8 @@ pfilter_mvgam_fc(
 \item{legend_position}{The location may also be specified by setting x to a single keyword from the
 list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
 This places the legend on the inside of the plot frame at the given location.}
+
+\item{ylim}{Optional \code{vector} of y-axis limits (min, max). The same limits will be used for all plots}
 
 \item{return_forecasts}{\code{logical}. If \code{TRUE}, the returned list object will contain plots of forecasts
 as well as the forecast objects (each as a \code{matrix} of dimension \code{n_particles} x \code{horizon})}

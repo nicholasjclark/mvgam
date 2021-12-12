@@ -46,9 +46,9 @@ pulling low weight particles toward the high likelihood state space. Should be b
 \item{file_path}{\code{character} string specifying the file path for locating the particles}
 }
 \description{
-This function operates on a new observatio in \code{next_assim} to update the
+This function operates on a new observation in \code{next_assim} to update the
 posterior forecast distribution. The next observation is assimilated
-and particles weights are updated in light of their most recent their  multivariate composite likelihood.
+and particle weights are updated in light of their most recent their multivariate composite likelihood.
 Low weight particles are smoothed towards the high weight state space using kernel smoothing, and options are
 given for using resampling of high weight particles when Effective Sample Size falls below a
 user-specified threshold

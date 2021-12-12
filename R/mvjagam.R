@@ -139,7 +139,7 @@ mvjagam = function(formula,
                                    }
                                    # Ensure trend does not completely dominate unless supported by data
                                    for (s in 1:n_series) {
-                                   gam_comp[s] ~ dbeta(1,1)
+                                   gam_comp[s] <- 0.5
                                    trend_comp[s] <- 1 - gam_comp[s]
                                    }
 
@@ -240,7 +240,7 @@ mvjagam = function(formula,
 
         # Ensure trend does not completely dominate unless supported by data
         for (s in 1:n_series) {
-        gam_comp[s] ~ dbeta(1,1)
+        gam_comp[s] <- 0.5
         trend_comp[s] <- 1 - gam_comp[s]
         }
 

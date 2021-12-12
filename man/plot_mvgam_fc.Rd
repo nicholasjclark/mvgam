@@ -4,7 +4,7 @@
 \alias{plot_mvgam_fc}
 \title{Plot mvjagam posterior predictions for a specified series}
 \usage{
-plot_mvgam_fc(object, series, data_test, hide_xlabels = FALSE)
+plot_mvgam_fc(object, series, data_test, hide_xlabels = FALSE, ylim)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
@@ -16,6 +16,8 @@ plot_mvgam_fc(object, series, data_test, hide_xlabels = FALSE)
 
 \item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 \code{axis} from base \code{R}}
+
+\item{ylim}{Optional \code{vector} of y-axis limits (min, max)}
 }
 \description{
 Plot mvjagam posterior predictions for a specified series

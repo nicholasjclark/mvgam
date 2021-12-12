@@ -32,8 +32,8 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                   data_test = sim_data$data_test,
                   formula = y ~ s(series, bs = 're') - 1,
                   use_nb = TRUE,
-                  use_mv = T,
-                  n.burnin = 30000,
+                  use_lv = F,
+                  n.burnin = 60000,
                   n.iter = 5000,
                   thin = 5,
                   auto_update = T)
@@ -107,8 +107,8 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                         formula = y ~ s(season, k = 4, m = 2, bs = 'cc') +
                                         s(season, by = series, m = 1, k = 8) - 1,
                         use_nb = TRUE,
-                        use_mv = T,
-                      n.burnin = 60000,
+                        use_lv = T,
+                      n.burnin = 90000,
                       n.iter = 5000,
                       thin = 5,
                       auto_update = T)
