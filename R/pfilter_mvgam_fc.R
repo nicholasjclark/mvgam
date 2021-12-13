@@ -63,7 +63,6 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   cl <- parallel::makePSOCKcluster(n_cores)
   setDefaultCluster(cl)
   clusterExport(NULL, c('particles',
-                        'betas_orig',
                         'Xp',
                         'sim_rwdrift',
                         'series_test',
@@ -126,7 +125,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                       prob = weights + 0.0001)
 
   # Weighted forecast for each series
-  fc_samples <- sample(index, 10000, T)
+  fc_samples <- sample(index, 5000, T)
   series_fcs <- lapply(seq_len(n_series), function(series){
     indexed_forecasts <- do.call(rbind, lapply(seq_along(fc_samples), function(x){
       particle_fcs[[fc_samples[x]]][[series]]

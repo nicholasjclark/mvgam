@@ -24,18 +24,16 @@ plot_mvgam_gdd(fit_hyp3$out_gam_mod, series = 1,
                sd_gdd = all_data$sd_gdd)
 plot_mvgam_fc(fit_hyp3$out_gam_mod, series = 1,
                   data_test = all_data$data_test,
-                  data_train = all_data$data_train, hide_xlabels = TRUE)
+              hide_xlabels = TRUE)
 axis(1, at = seq(0, dim(fit_hyp3$out_gam_mod$ytimes)[1],
                  b = 26), labels = seq(2015, 2020), cex.axis = 1)
 text(x=NROW(all_data$data_train) / NCOL(fit_hyp3$out_gam_mod$ytimes) + 8,
      y=75, labels = 'Forecast horizon', srt = -90)
 plot_mvgam_trend(fit_hyp3$out_gam_mod, series = 1,
               data_test = all_data$data_test,
-              data_train = all_data$data_train,
               hide_xlabels = TRUE)
 axis(1, at = seq(0, dim(fit_hyp3$out_gam_mod$ytimes)[1],
                  b = 26), labels = seq(2015, 2020), cex.axis = 1)
-text(x = 48.5, y = -30, labels = 'Trend component = 0.28\n(0.11 - 0.52)')
 dev.off()
 
 # Plot some of the varying seasonal shapes from the Amblyomma model

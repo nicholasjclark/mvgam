@@ -2,10 +2,8 @@
 
 # TO DO:
 # 1. Look into using NIMBLE for better computational efficiency
-# 2. include option to inspect uncertainty contributions when forecasting from particle filter
 # 3. include some diagnostics on particle filter heterogeneity in weights etc...
 # 4. compare particle filtered vs re-calibrated forecast for some simulations or trends / neon data
-# 5. add generic plot_smooth functions to show the GAM partial effects, with names
 
 library(mvgam)
 library(dplyr)
@@ -30,20 +28,22 @@ mod <- mvjagam(data_train = fake_data$data_train,
                   thin = 1,
                   auto_update = F)
 
+# Summary plots
+plot_mvgam_smooth(mod, series=1, 'season')
 plot_mvgam_fc(mod, series = 1)
 plot_mvgam_trend(mod, series = 1)
 plot_mvgam_uncertainty(mod, series=1, data_test = fake_data$data_test)
 
 # Initiate particles by assimilating the next observation in data_test
-pfilter_mvgam_init(object = mod, n_particles = 5000, n_cores = 3,
+pfilter_mvgam_init(object = mod, n_particles = 80000, n_cores = 4,
                    data_assim = fake_data$data_test)
 
-# Assimilate next three observations
-pfilter_mvgam_online(data_assim = fake_data$data_test[1:9,], n_cores = 3,
+# Assimilate some observations
+pfilter_mvgam_online(data_assim = fake_data$data_test[1:3,], n_cores = 4,
                      kernel_lambda = 1)
 
 # Forecast from particles using the covariate information in remaining data_test observations
-fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 3,
+fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 4,
                        data_test = fake_data$data_test, ylim = c(0, 70))
 par(mfrow=c(1,2))
 plot_mvgam_fc(mod, series = 1, data_test = fake_data$data_test,
@@ -79,7 +79,7 @@ trends_mod <- mvjagam(data_train = trends_data$data_train,
                  use_lv = T,
                  n_lv = 3,
                  use_nb = T,
-                 n.burnin = 1000,
+                 n.burnin = 5000,
                  n.iter = 1000,
                  thin = 1,
                  upper_bounds = rep(100, length(terms)),
@@ -98,6 +98,12 @@ plot_mvgam_trend(object = trends_mod, series = 2)
 plot_mvgam_trend(object = trends_mod, series = 3)
 par(mfrow = c(1,1))
 
+# Plot partial smooths of seasonality for each series
+plot_mvgam_smooth(object = trends_mod, series = 1, smooth = 'season')
+plot_mvgam_smooth(object = trends_mod, series = 2, smooth = 'season')
+plot_mvgam_smooth(object = trends_mod, series = 3, smooth = 'season')
+plot_mvgam_smooth(object = trends_mod, series = 4, smooth = 'season')
+
 # Inspect traces of smooth penalties
 trends_mod$smooth_param_details
 MCMCvis::MCMCtrace(trends_mod$jags_output, 'rho', pdf = F, n.eff = TRUE)
@@ -105,19 +111,12 @@ MCMCvis::MCMCtrace(trends_mod$jags_output, 'rho', pdf = F, n.eff = TRUE)
 # Plot uncertainty components
 par(mfrow = c(3, 2))
 plot_mvgam_uncertainty(object = trends_mod, series = 1, data_test = trends_data$data_test,
-                       data_train = trends_data$data_train,
                        legend_position = 'bottomleft')
 plot_mvgam_uncertainty(object = trends_mod, series = 2, data_test = trends_data$data_test,
-                       data_train = trends_data$data_train,
                        legend_position = 'bottomleft')
 plot_mvgam_uncertainty(object = trends_mod, series = 3, data_test = trends_data$data_test,
-                       data_train = trends_data$data_train,
                        legend_position = 'bottomleft')
 plot_mvgam_uncertainty(object = trends_mod, series = 4, data_test = trends_data$data_test,
-                       data_train = trends_data$data_train,
-                       legend_position = 'bottomleft')
-plot_mvgam_uncertainty(object = trends_mod, series = 5, data_test = trends_data$data_test,
-                       data_train = trends_data$data_train,
                        legend_position = 'bottomleft')
 par(mfrow = c(1,1))
 
@@ -140,10 +139,9 @@ ggplot(mean_correlations %>%
   theme(axis.text.x = element_text(angle = 45, hjust=1))
 
 # Initiate particles by assimilating the next observation in data_test
-library(mvgam)
 pfilter_mvgam_init(object = trends_mod,
                    data_assim = trends_data$data_test,
-                   n_particles = 50000, n_cores = 3)
+                   n_particles = 100000, n_cores = 4)
 
 # Assimilate next two observations per series as a test
 pfilter_mvgam_online(data_assim = trends_data$data_test[1:(length(unique(trends_data$data_test$series)) * 3),],
@@ -152,7 +150,7 @@ pfilter_mvgam_online(data_assim = trends_data$data_test[1:(length(unique(trends_
 
 
 # Forecast from particles using the covariate information in remaining data_test observations
-fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 3,
+fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 4,
                        data_test = trends_data$data_test,
                        return_forecasts = T, ylim = c(0, 100))
 
@@ -198,7 +196,7 @@ set.seed(110)
 n_series = 3
 sim_data <- sim_mvgam(T = 120,
                       n_series = n_series,
-                      trend_rel = 0.4,
+                      trend_rel = 0.1,
                       prop_missing = 0.25,
                       train_prop = 0.85,
                       seasonality = 'shared')
@@ -220,7 +218,7 @@ plot_mvgam_uncertainty(series=2,
                        object = test)
 
 # Initiate particles by assimilating the next observation in data_test
-pfilter_mvgam_init(object = test, n_particles = 5000, n_cores = 3,
+pfilter_mvgam_init(object = test, n_particles = 20000, n_cores = 3,
                    data_assim = sim_data$data_test)
 # Forecast from particles using the covariate information in remaining data_test observations
 fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 3,
