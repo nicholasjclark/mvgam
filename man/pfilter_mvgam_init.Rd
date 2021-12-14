@@ -16,7 +16,7 @@ pfilter_mvgam_init(
 \item{object}{\code{list} object returned from \code{mvjagam}}
 
 \item{data_assim}{A \code{dataframe} of test data containing at least one more observation per series
-(beyond the last observation seen by the model in \code{object} to be assimilated by the particle filter.
+(beyond the last observation seen by the model in \code{object}) to be assimilated by the particle filter.
 Should at least contain 'series', 'season', 'year' and in_season' for the one-step ahead horizon,
 in addition to any other variables included in the linear predictor of \code{object}}
 
@@ -27,9 +27,14 @@ latent system state}
 
 \item{n_cores}{\code{integer} specifying number of cores for generating particle forecasts in parallel}
 }
+\value{
+A \code{list} object of \code{length = n_particles} containing information on parameters and
+current state estimates for each particle is generated and saved, along with other important information
+from the original model, to an \code{.rda} object in \code{file_path}
+}
 \description{
 This function generates a set of particles that each captures a unique proposal about
-the current state of the system. The next observation is assimilated
-and particles are weighted by their proposal's multivariate composite likelihood when considering the next
-observation in \code{data_assim} (i.e. the next season's observation for each series)
+the current state of the system. The next observation in \code{data_assim} is assimilated
+and particles are weighted by their proposal's multivariate composite likelihood to update the model's
+forecast distribution
 }

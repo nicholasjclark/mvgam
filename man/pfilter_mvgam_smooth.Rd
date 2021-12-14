@@ -45,6 +45,10 @@ pulling low weight particles toward the high likelihood state space. Should be b
 
 \item{file_path}{\code{character} string specifying the file path for locating the particles}
 }
+\value{
+A \code{list} object of \code{length = n_particles} containing information on parameters and
+current state estimates for each particle
+}
 \description{
 This function operates on a new observation in \code{next_assim} to update the
 posterior forecast distribution. The next observation is assimilated

@@ -81,7 +81,8 @@ truncation entirely (i.e. there is no upper bound for each series)}
 \value{
 A \code{list} object containing JAGS model output, the text representation of the model file,
 the mgcv model output (for easily generating simulations at
-unsampled covariate values), the names of the smooth parameters and the matrix of indices for each series
+unsampled covariate values), the names of the smooth parameters, Dunn-Smyth residuals for each
+series and information needed for other functions in the package
 }
 \description{
 This function estimates the posterior distribution for a multivariate GAM that includes
@@ -91,6 +92,10 @@ structures of the trends (either as latent dynamic factors or independent trends
 }
 \details{
 A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent
-AR1 state space trends. The model parameters are esimated in a Bayesian framework using Gibbs sampling
-in \code{\link[rjags]{jags.model}}.
+random walk state space trends. The model parameters are esimated in a Bayesian framework using Gibbs sampling
+in \code{\link[rjags]{jags.model}}. For the time being, all series are assumed to have the same overdispersion
+parameters when using a negative binomial distribution, though this will be relaxed in future versions. For each
+series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
+medians of posterior predictions. If the fitted model is appropriate then Dunn-Smyth residuals will be
+standard normal in distribution and no autocorrelation will be evident
 }

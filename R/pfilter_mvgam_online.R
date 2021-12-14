@@ -20,6 +20,9 @@
 #'pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}
 #'@param file_path \code{character} string specifying the file path for locating the particles
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
+#'@return A \code{list} object of \code{length = n_particles} containing information on parameters and
+#'current state estimates for each particle is generated and saved, along with other important information
+#'from the original model, to an \code{.rda} object in \code{file_path}
 #'@export
 pfilter_mvgam_online = function(data_assim,
                                 file_path = 'pfilter',

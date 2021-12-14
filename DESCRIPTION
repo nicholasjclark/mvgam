@@ -6,7 +6,11 @@ Authors@R:
            family = "Clark",
            role = c("aut", "cre"),
            email = "nicholas.j.clark1214@.com")
-Description: Multivariate Bayesian Generalised Additive Models for discrete time series
+Description: This package is for fitting Bayesian Generalised Additive Models to sets of discrete time series. 
+             The primary purpose of this package is to build a version of dynamic linear models that incorporates 
+             the flexibility of GAMs for the linear predictor as well as latent trend components that can be useful 
+             for time series analysis and forecasting. The package also includes utilities for online updating of 
+             forecast distributions using a recursive particle filter
 Maintainer: Nicholas J Clark <nicholas.j.clark1214@gmail.com>
 License: MIT + file LICENSE
 Depends: R (>= 3.6.0), mgcv, rjags, parallel

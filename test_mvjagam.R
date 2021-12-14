@@ -20,34 +20,38 @@ rm(series)
 
 mod <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,
-               formula = y ~ s(season, bs = c('cc')) +
-                 s(year) + ti(season, year) - 1,
+               formula = y ~ s(season, bs = c('cc')),
                 use_nb = T,
                   n.burnin = 1000,
                   n.iter = 1000,
                   thin = 1,
                   auto_update = F)
 
-# Summary plots
+
+# Summary plots and diagnostics
+plot(mod$resids$Air)
+lines(mod$resids$Air)
+acf(mod$resids$Air)
+pacf(mod$resids$Air)
 plot_mvgam_smooth(mod, series=1, 'season')
 plot_mvgam_fc(mod, series = 1)
 plot_mvgam_trend(mod, series = 1)
 plot_mvgam_uncertainty(mod, series=1, data_test = fake_data$data_test)
 
 # Initiate particles by assimilating the next observation in data_test
-pfilter_mvgam_init(object = mod, n_particles = 80000, n_cores = 4,
+pfilter_mvgam_init(object = mod, n_particles = 40000, n_cores = 3,
                    data_assim = fake_data$data_test)
 
 # Assimilate some observations
-pfilter_mvgam_online(data_assim = fake_data$data_test[1:3,], n_cores = 4,
+pfilter_mvgam_online(data_assim = fake_data$data_test[1:3,], n_cores = 3,
                      kernel_lambda = 1)
 
 # Forecast from particles using the covariate information in remaining data_test observations
-fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 4,
-                       data_test = fake_data$data_test, ylim = c(0, 70))
+fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 3,
+                       data_test = fake_data$data_test, ylim = c(0, 40))
 par(mfrow=c(1,2))
 plot_mvgam_fc(mod, series = 1, data_test = fake_data$data_test,
-              ylim = c(0, 70))
+              ylim = c(0, 40))
 fc$Air()
 
 # Remove the particles
@@ -84,6 +88,19 @@ trends_mod <- mvjagam(data_train = trends_data$data_train,
                  thin = 1,
                  upper_bounds = rep(100, length(terms)),
                  auto_update = F)
+
+# Look at Dunn-Smyth residuals for some series
+hist(trends_mod$resids$`dog tick`)
+plot(trends_mod$resids$`dog tick`)
+lines(trends_mod$resids$`dog tick`)
+acf(trends_mod$resids$`dog tick`)
+pacf(trends_mod$resids$`dog tick`)
+
+hist(trends_mod$resids$`la nina`)
+plot(trends_mod$resids$`la nina`)
+lines(trends_mod$resids$`la nina`)
+acf(trends_mod$resids$`la nina`)
+pacf(trends_mod$resids$`la nina`)
 
 # Plot posterior predictive distributions
 par(mfrow = c(3, 1))

@@ -1,9 +1,17 @@
-#'Plot mvjagam credible intervals for a series-specific smooth term. At present, only univariate smooth plots
-#'are allowed (no smooth interactions can be plotted)
+#'Plot mvjagam smooth terms
+#'
+#'This function plots credible intervals for a series-specific smooth term on the scale of the linear predictor
+#'
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param newdata Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season', 'year',
 #'in addition to any other variables included in the linear predictor of the original model's \code{formula}
+#'@details Smooth functions are shown as the expectation from the GAM component of the linear predictor across
+#'a sequence of 100 values between the variable's \code{min} and \code{max}, while holding all other variables either at
+#'their means (for numeric varibles) or at the first level (factor variables). At present, only univariate smooth plots
+#'are allowed (no smooth interactions can be plotted). For more nuanced visualisation, supply
+#'\code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model
+#'@return A base \code{R} graphics plot
 #'@export
 plot_mvgam_smooth = function(object, series, smooth, newdata){
 
@@ -29,7 +37,7 @@ plot_mvgam_smooth = function(object, series, smooth, newdata){
   # sequence for the smooth of interest
   mean_not_fac = function(x){
     if(is.factor(x)){
-      x <- x
+      x <- levels(x)[1]
     } else {
       x <- mean(x, na.rm = T)
     }
@@ -39,7 +47,12 @@ plot_mvgam_smooth = function(object, series, smooth, newdata){
       dplyr::select(c(series, year, smooth_terms)) %>%
       dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
       dplyr::mutate_at(c('year', smooth_terms)[c('year', smooth_terms) != smooth], mean_not_fac) -> pred_dat
-    pred_dat[,smooth] <- seq(min(pred_dat[,smooth]), max(pred_dat[,smooth]), length.out = NROW(pred_dat))
+
+   pred_dat%>%dplyr::select(-smooth) %>% dplyr::distinct() %>%
+      dplyr::bind_cols(smooth.var = seq(min(pred_dat[,smooth]), max(pred_dat[,smooth]), length.out = 100)) -> pred_dat
+     colnames(pred_dat) <- gsub('smooth.var', smooth, colnames(pred_dat))
+
+    #pred_dat[,smooth] <- seq(min(pred_dat[,smooth]), max(pred_dat[,smooth]), length.out = NROW(pred_dat))
   } else {
     pred_dat <- newdata
   }
@@ -63,19 +76,18 @@ plot_mvgam_smooth = function(object, series, smooth, newdata){
                2, hpd, 0.95)
   preds_last <- preds[1,]
   plot(preds_last ~ pred_vals,
-       type = 'l', ylim = c(min(int) - 2, max(int) + 2),
+       type = 'l', ylim = c(min(int) - sd(preds), max(int) + sd(preds)),
        col = rgb(1,0,0, alpha = 0),
-       ylab = paste0('F(', smooth, ') for ', unique(pred_dat$series)),
+       ylab = paste0('s(', smooth, ') for ', unique(pred_dat$series)),
        xlab = smooth)
-  abline(h = 0, lwd=1)
   polygon(c(pred_vals, rev(pred_vals)),
-          c(int[1,],rev(int[3,])),
+          c(int[1,], rev(int[3,])),
           col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
 
   int <- apply(preds,
                2, hpd, 0.8)
   polygon(c(pred_vals, rev(pred_vals)),
-          c(int[1,],rev(int[3,])),
+          c(int[1,], rev(int[3,])),
           col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
   lines(int[2,] ~ pred_vals, col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
 

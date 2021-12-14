@@ -35,6 +35,11 @@ pulling low weight particles toward the high likelihood state space. Should be b
 
 \item{n_cores}{\code{integer} specifying number of cores for generating particle forecasts in parallel}
 }
+\value{
+A \code{list} object of \code{length = n_particles} containing information on parameters and
+current state estimates for each particle is generated and saved, along with other important information
+from the original model, to an \code{.rda} object in \code{file_path}
+}
 \description{
 This function operates sequentially on new observations in \code{data_assim} to update the
 posterior forecast distribution. It is a wrapper that calls \code{\link{pfilter_mvgam_smooth}}.

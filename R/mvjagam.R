@@ -2,8 +2,8 @@
 #'
 #'This function estimates the posterior distribution for a multivariate GAM that includes
 #'smooth seasonality and possible other smooth functions specified in the GAM formula. State-space latent trends
-#'(random walks with drift) are estimated for each series, two options for specifying the
-#'structures of the trends (either as latent dynamic factors or independent trends)
+#'(random walks with drift) are estimated for each series, with currently two options for specifying the
+#'structures of the trends (either as latent dynamic factors to capture trend dependencies, or as independent trends)
 #'
 #'
 #'@param formula A \code{character} string specifying the GAM formula. These are exactly like the formula
@@ -13,13 +13,12 @@
 #'required by the GAM \code{formula}. Should include columns:
 #''y' (the discrete outcomes; NAs allowed)
 #''series' (character or factor index of the series IDs)
-#''season' (numeric index of the seasonal time point for each observation; should not have any missing)
+#''season' (numeric index of the seasonal time point for each observation)
 #''year' the numeric index for year, and
-#''in_season' indicator for whether the observation is in season or not. If the counts tend to go to zero
-#'during the off season (as in tick counts for example), setting 'in_season' to zero cduring these seasonal periods
-#'can be useful as trends won't contribute during
-#'during this time but they continue to evolve, allowing the trend to continue evolving rather than forcing
-#'it to zero during the off-season
+#''in_season', an indicator for whether the observation is in season or not. If the counts tend to go to zero
+#'during the off season (as in tick counts for example), setting 'in_season' to zero during these seasonal periods
+#'can be useful as trends won't contribute
+#'during this time but they will continue to evolve rather than being forced to zero during each off-season
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
 #'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season', 'year' and
 #''in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}
@@ -47,12 +46,17 @@
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 #'truncation entirely (i.e. there is no upper bound for each series)
 #'@details A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent
-#'AR1 state space trends. The model parameters are esimated in a Bayesian framework using Gibbs sampling
-#'in \code{\link[rjags]{jags.model}}.
+#'random walk state space trends. The model parameters are esimated in a Bayesian framework using Gibbs sampling
+#'in \code{\link[rjags]{jags.model}}. For the time being, all series are assumed to have the same overdispersion
+#'parameters when using a negative binomial distribution, though this will be relaxed in future versions. For each
+#'series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
+#'medians of posterior predictions. If the fitted model is appropriate then Dunn-Smyth residuals will be
+#'standard normal in distribution and no autocorrelation will be evident
 #'
 #'@return A \code{list} object containing JAGS model output, the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
-#'unsampled covariate values), the names of the smooth parameters and the matrix of indices for each series
+#'unsampled covariate values), the names of the smooth parameters, Dunn-Smyth residuals for each
+#'series and information needed for other functions in the package
 #'
 #'@export
 
@@ -440,9 +444,6 @@ mvjagam = function(formula,
   # Machine epsilon for minimum allowable non-zero rate
   ss_jagam$jags.data$min_eps <- .Machine$double.eps
 
-  # Initial gam_components
-  #ss_jagam$jags.ini$gam_comp <- rep(1, NCOL(ytimes))
-
   # Ensure inits fall within prior bounds for rho
   ss_jagam$jags.ini$rho[ss_jagam$jags.ini$rho > 12] <- 11.99
   ss_jagam$jags.ini$rho[ss_jagam$jags.ini$rho < 12] <- -11.99
@@ -458,7 +459,6 @@ mvjagam = function(formula,
         stop('Number of latent variables cannot be greater than number of series')
       }
       ss_jagam$jags.ini$tau_fac <- 1
-      #ss_jagam$jags.ini$penalty_shape <- 0.02
   }
 
   # Binary indicator of in_season
@@ -541,6 +541,37 @@ mvjagam = function(formula,
     n_lv <- NULL
   }
 
+  # Get Dunn-Smyth Residuals based on median predictions from the model
+  ds_resids = function(truth, fitted, size){
+    dsres_out <- matrix(NA, length(truth), 1)
+    for(i in 1:length(truth)){
+      a <- pnbinom(as.vector(truth[i]) - 1, mu = fitted[i], size = size)
+      b <- pnbinom(as.vector(truth[i]), mu = fitted[i], size = size)
+      u <- runif(n = 1, min = a, max = b)
+      dsres_out[i, ] <- qnorm(u)
+    }
+    dsres_out
+  }
+
+  ends <- seq(0, dim(MCMCvis::MCMCchains(out_gam_mod, 'ypred'))[2],
+              length.out = NCOL(ytimes) + 1)
+  starts <- ends + 1
+  starts <- c(1, starts[-c(1, (NCOL(ytimes)+1))])
+  ends <- ends[-1]
+  size <- MCMCvis::MCMCsummary(out_gam_mod, 'r')$mean
+
+  series_resids <- lapply(seq_len(NCOL(ytimes)), function(series){
+    n_obs <- data_train %>%
+      dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
+      nrow()
+    preds <- apply(MCMCvis::MCMCchains(out_gam_mod, 'ypred')[,starts[series]:ends[series]],
+                   2, function(x) hpd(x)[2])
+    suppressWarnings(ds_resids(truth = as.vector(ys_mat[1:n_obs,series]),
+                               fitted = preds[1:n_obs],
+                               size = size))
+  })
+  names(series_resids) <- levels(data_train$series)
+
   return(list(jags_output = out_gam_mod,
               model_file = model_file,
               mgcv_model = ss_gam,
@@ -548,6 +579,7 @@ mvjagam = function(formula,
               smooth_param_details = base_model[sort(c(grep('## prior for', base_model),
                                                        grep('## prior for', base_model)+1))],
               ytimes = ytimes,
+              resids = series_resids,
               use_lv = use_lv,
               n_lv = n_lv,
               upper_bounds = upper_bounds,
