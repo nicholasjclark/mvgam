@@ -15,7 +15,6 @@ Maintainer: Nicholas J Clark <nicholas.j.clark1214@gmail.com>
 License: MIT + file LICENSE
 Depends: R (>= 3.6.0), mgcv, rjags, parallel
 Imports: 
-    parallel,
     pbapply,
     lubridate,
     MASS,

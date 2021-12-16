@@ -1,7 +1,7 @@
 #### Simulation component of mvgam / NEON manuscript ####
 library(mvgam)
 library(dplyr)
-source('NEON_manuscript/neon_utility_functions.R')
+source('neon_utility_functions.R')
 
 # Use hierarchical seasonality for all;
 # trend components: 0.3 and 0.7
@@ -172,4 +172,5 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
        model_efficiencies = model_efficiency)
 
 })
-save(sim_results, file = 'NEON_manuscript/Results/sim_results.rda')
+dir.create('Results')
+save(sim_results, file = 'Results/sim_results.rda')

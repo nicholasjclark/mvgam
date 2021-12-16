@@ -51,10 +51,10 @@ if(object$use_lv){
   starts <- ends + 1
   starts <- c(1, starts[-c(1, (n_lv + 1))])
   ends <- ends[-1]
-  lvs <- do.call(cbind, lapply(seq_len(n_lv), function(lv){
+  lvs <- lapply(seq_len(n_lv), function(lv){
     lv_estimates <- MCMCvis::MCMCchains(object$jags_output, 'LV')[,starts[lv]:ends[lv]]
-    lv_estimates[,NCOL(lv_estimates)]
-  }))
+    lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
+  })
 
   taus <- MCMCvis::MCMCchains(object$jags_output, 'tau_fac')
   trends <- NULL
@@ -64,10 +64,10 @@ if(object$use_lv){
   starts <- ends + 1
   starts <- c(1, starts[-c(1, (n_series + 1))])
   ends <- ends[-1]
-  trends <- do.call(cbind, lapply(seq_len(n_series), function(series){
+  trends <- lapply(seq_len(n_series), function(series){
     trend_estimates <- MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[series]:ends[series]]
-    trend_estimates[,NCOL(trend_estimates)]
-  }))
+    trend_estimates[,(NCOL(trend_estimates)-2):(NCOL(trend_estimates))]
+  })
 
   taus <- MCMCvis::MCMCchains(object$jags_output, 'tau')
   lvs <- NULL
@@ -98,6 +98,11 @@ gam_comps <- MCMCvis::MCMCchains(object$jags_output, 'gam_comp')
 # Phi estimates for latent trend drift terms
 phis <- MCMCvis::MCMCchains(object$jags_output, 'phi')
 
+# AR term estimates
+ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
+ar2s <- MCMCvis::MCMCchains(object$jags_output, 'ar2')
+ar3s <- MCMCvis::MCMCchains(object$jags_output, 'ar3')
+
 # Negative binomial size estimate
 sizes <- as.matrix(rep(hpd(MCMCvis::MCMCchains(object$jags_output, 'r'))[2],
                        dim(betas_orig)[1]))
@@ -126,6 +131,9 @@ clusterExport(NULL, c('use_lv',
                       'last_assim',
                       'taus',
                       'phis',
+                      'ar1s',
+                      'ar2s',
+                      'ar3s',
                       'lvs',
                       'lv_coefs',
                       'trends',
@@ -142,10 +150,15 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   if(use_lv){
   # Sample a last state estimate for the latent variables
   samp_index <- x
-  last_lv <- lvs[samp_index, ]
+  last_lvs <- lapply(seq_along(lvs), function(lv){
+    lvs[[lv]][samp_index, ]
+  })
 
-  # Sample drift parameters
+  # Sample drift and AR parameters
   phi <- phis[samp_index, ]
+  ar1 <- ar1s[samp_index, ]
+  ar2 <- ar2s[samp_index, ]
+  ar3 <- ar3s[samp_index, ]
 
   # Sample lv precision
   tau <- taus[samp_index,]
@@ -163,12 +176,22 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   size <- sizes[samp_index, ]
 
   # Run the latent variables forward one timestep
-  next_lvs <- do.call(cbind, lapply(seq_len(NCOL(lvs)), function(lv){
-    rnorm(1, phi[lv] + last_lv[lv], sqrt(1 / tau))
+  next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
+    rnorm(1, phi[lv] + ar1[lv] * last_lvs[[lv]][3] +
+            ar2[lv] * last_lvs[[lv]][2] +
+            ar3[lv] * last_lvs[[lv]][1], sqrt(1 / tau))
   }))
 
   # Multiply lv states with loadings to generate each series' forecast trend state
   trends <- as.numeric(next_lvs %*% t(lv_coefs))
+
+  # Include previous two states for each lv
+  next_lvs <- lapply(seq_along(lvs), function(lv){
+    as.vector(c(as.numeric(last_lvs[[lv]][2]),
+                as.numeric(last_lvs[[lv]][3]),
+                next_lvs[lv]))
+  })
+  names(next_lvs) <- paste0('lv', seq(1:length(lvs)))
 
   # Calculate weight for the particle in the form of a composite likelihood
   weight <- prod(unlist(lapply(seq_len(n_series), function(series){
@@ -183,7 +206,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     }
     weight
   })), na.rm = T)
-  n_lv <- NCOL(lvs)
+  n_lv <- length(lvs)
   trends <- NULL
 
   } else {
@@ -199,10 +222,15 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     gam_comp <- gam_comps[samp_index, ]
 
     # Sample last state estimates for the trends
-    last_trend <- trends[samp_index, ]
+    last_trends <- lapply(seq_along(trends), function(trend){
+      trends[[trend]][samp_index, ]
+    })
 
-    # Sample drift parameters
+    # Sample AR parameters
     phi <- phis[samp_index, ]
+    ar1 <- ar1s[samp_index, ]
+    ar2 <- ar2s[samp_index, ]
+    ar3 <- ar3s[samp_index, ]
 
     # Sample trend precisions
     tau <- taus[samp_index,]
@@ -211,8 +239,10 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     size <- sizes[samp_index, ]
 
     # Run the trends forward one timestep
-    trends <- do.call(cbind, lapply(seq_len(NCOL(trends)), function(x){
-      rnorm(1, phi[x] + last_trend[x], sqrt(1 / tau[x]))
+    trends <- do.call(cbind, lapply(seq_along(trends), function(trend){
+      rnorm(1, phi[trend] + ar1[trend] * last_trends[[trend]][3] +
+              ar2[trend] * last_trends[[trend]][2] +
+              ar3[trend] * last_trends[[trend]][1], sqrt(1 / tau[trend]))
     }))
 
     # Calculate weight for the particle in the form of a composite likelihood
@@ -228,6 +258,12 @@ particles <- pbapply::pblapply(sample_seq, function(x){
       }
       weight
     })), na.rm = T)
+
+    # Include previous two states for each trend
+    trends <- lapply(seq_len(n_series), function(trend){
+      as.vector(c(last_trends[[trend]][2], last_trends[[trend]][3], trends[trend]))
+    })
+    names(trends) <- paste0('series', seq_len(n_series))
 }
 
   # Store important particle-specific information for later filtering
@@ -240,6 +276,9 @@ list(use_lv = use_lv,
      size = as.numeric(size),
      tau = as.numeric(tau),
      phi = as.numeric(phi),
+     ar1 = as.numeric(ar1),
+     ar2 = as.numeric(ar2),
+     ar3 = as.numeric(ar3),
      trend_states = trends,
      weight = weight,
      upper_bounds = upper_bounds,

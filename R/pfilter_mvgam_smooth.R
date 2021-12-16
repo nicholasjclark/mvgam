@@ -50,7 +50,6 @@ pfilter_mvgam_smooth = function(particles,
 
   # Update importance weights in light of most recent observation by runnning particles
   # up to the current timepoint
-  library(parallel)
   cl <- makePSOCKcluster(n_cores)
   setDefaultCluster(cl)
   clusterExport(NULL, c('Xp',
@@ -68,21 +67,43 @@ pfilter_mvgam_smooth = function(particles,
       # Run the latent variables forward one timestep
       lv_states <- unlist(lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
         rnorm(1, particles[[x]]$phi[lv] +
-                particles[[x]]$lv_states[lv],
+                particles[[x]]$ar1[lv] * particles[[x]]$lv_states[[lv]][3] +
+                particles[[x]]$ar2[lv] * particles[[x]]$lv_states[[lv]][2] +
+                particles[[x]]$ar3[lv] * particles[[x]]$lv_states[[lv]][1],
               sqrt(1 / particles[[x]]$tau))
       }))
 
       # Multiply lv states with loadings to generate each series' forecast trend state
       trend_states <- as.numeric(lv_states %*% t(particles[[x]]$lv_coefs))
 
+      # Include previous two states for each lv
+      next_lvs <- lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
+        as.vector(c(particles[[x]]$lv_states[[lv]][2],
+                    particles[[x]]$lv_states[[lv]][3],
+                    lv_states[lv]))
+      })
+      names(next_lvs) <- paste0('lv', seq(1:length(lv_states)))
+      next_trends <- NULL
 
     } else {
       # Run the trends forward one timestep
-      trend_states <- do.call(cbind, lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
-        rnorm(1, particles[[x]]$phi[series] + particles[[x]]$trend_states[series],
+      trend_states <- unlist(lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
+        rnorm(1, particles[[x]]$phi[series] +
+                particles[[x]]$ar1[series] * particles[[x]]$trend_states[[series]][3] +
+                particles[[x]]$ar2[series] * particles[[x]]$trend_states[[series]][2] +
+                particles[[x]]$ar3[series] * particles[[x]]$trend_states[[series]][1],
               sqrt(1 / particles[[x]]$tau[series]))
       }))
-      lv_states <- NULL
+
+      # Include previous two states for each trend
+      next_trends <- lapply(seq_len(n_series), function(trend){
+        as.vector(c(particles[[x]]$trend_states[[trend]][2],
+                    particles[[x]]$trend_states[[trend]][3],
+                    trend_states[trend]))
+      })
+      names(next_trends) <- paste0('series', seq_len(n_series))
+
+      next_lvs <- NULL
 
     }
 
@@ -110,14 +131,17 @@ pfilter_mvgam_smooth = function(particles,
    weight <- particle_weight * particles[[x]]$weight
    list(use_lv = use_lv,
         n_lv = particles[[x]]$n_lv,
-        lv_states = lv_states,
+        lv_states = next_lvs,
         lv_coefs = particles[[x]]$lv_coefs,
         betas = particles[[x]]$betas,
         gam_comp = particles[[x]]$gam_comp,
         size = particles[[x]]$size,
         tau = particles[[x]]$tau,
         phi = particles[[x]]$phi,
-        trend_states = trend_states,
+        ar1 = particles[[x]]$ar1,
+        ar2 = particles[[x]]$ar2,
+        ar3 = particles[[x]]$ar3,
+        trend_states = next_trends,
         weight = particle_weight,
         upper_bounds = particles[[x]]$upper_bounds,
         last_assim = c(unique(next_assim$season), unique(next_assim$year)))
@@ -165,19 +189,20 @@ pfilter_mvgam_smooth = function(particles,
     orig_betas <- do.call(rbind, purrr::map(particles, 'betas'))
   }
 
-  if(length(unique(weights)) > 100){
+  if(length(unique(index)) > 100){
     use_smoothing <- TRUE
     cat('Smoothing particles ...\n\n')
 
     if(use_lv){
-      # Extract means and covariances of lv states and lv loadings
-      # from highest weighted particles for kernel smoothing
-      best_lv <- do.call(rbind, purrr::map(particles, 'lv_states')[which(norm_weights >=
-                                                                        quantile(norm_weights, prob = 0.8, na.rm = T))])
+      # Extract weighted means and covariances of lv states and lv loadings for kernel smoothing
+      best_lv <- do.call(rbind, lapply(index, function(j){
+        unlist(particles[[j]]$lv_states)
+        }))
 
-      best_lv_coefs <- purrr::map(particles, 'lv_coefs')[which(norm_weights >=
-                                                                 quantile(norm_weights, prob = 0.8, na.rm = T))]
-      best_lv_coefs <-do.call(rbind, lapply(seq_along(best_lv_coefs), function(x){
+      best_lv_coefs <- lapply(index, function(j){
+        particles[[j]]$lv_coefs
+      })
+      best_lv_coefs <- do.call(rbind, lapply(seq_along(best_lv_coefs), function(x){
         as.vector(best_lv_coefs[[x]])
       }))
 
@@ -196,9 +221,9 @@ pfilter_mvgam_smooth = function(particles,
       rm(best_lv, best_lv_coefs)
 
     } else {
-      best_trend <- do.call(rbind, purrr::map(particles,
-                                              'trend_states')[which(norm_weights >=
-                                                                      quantile(norm_weights, prob = 0.8, na.rm = T))])
+      best_trend <- do.call(rbind, lapply(index, function(j){
+        unlist(particles[[j]]$trend_states)
+      }))
       best_trend_cov <- cov(as.matrix(best_trend))
       best_trend_means <- apply(best_trend, 2, mean)
 
@@ -265,13 +290,20 @@ pfilter_mvgam_smooth = function(particles,
         lv_coefs_evolve <- particles[[x]]$lv_coefs
         particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
         trend_evolve <- NULL
+        phi_evolve <- particles[[x]]$phi
+        ar1_evolve <- particles[[x]]$ar1
+        ar2_evolve <- particles[[x]]$ar2
+        ar3_evolve <- particles[[x]]$ar3
 
       } else {
         trend_evolve <- particles[[x]]$trend_states
         lv_evolve <- NULL
         lv_coefs_evolve <- NULL
         particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
-
+        phi_evolve <- particles[[x]]$phi
+        ar1_evolve <- particles[[x]]$ar1
+        ar2_evolve <- particles[[x]]$ar2
+        ar3_evolve <- particles[[x]]$ar3
       }
 
     } else {
@@ -286,15 +318,15 @@ pfilter_mvgam_smooth = function(particles,
       # any dependencies in states
       weight <- norm_weights[x]
       if(weight < weight_thres.1){
-        evolve <- 1 * kernel_lambda
+        evolve <- 0.9 * kernel_lambda
 
       } else if(weight < weight_thres.4 &
                 weight > weight_thres.1){
-        evolve <- 0.75 * kernel_lambda
+        evolve <- 0.6 * kernel_lambda
 
       } else if(weight < weight_thres.85 &
                 weight > weight_thres.4){
-        evolve <- 0.5 * kernel_lambda
+        evolve <- 0.3 * kernel_lambda
 
       } else {
         evolve <- 0.25 * kernel_lambda
@@ -305,9 +337,17 @@ pfilter_mvgam_smooth = function(particles,
           particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
 
           # Smooth latent variable states
-          lv_evolve <- particles[[x]]$lv_states +
-            evolve*(best_lv_means - particles[[x]]$lv_states) +
+          lv_evolve <- unlist(particles[[x]]$lv_states) +
+            evolve*(best_lv_means - unlist(particles[[x]]$lv_states)) +
             (lv_draws[x,] * sqrt(1 - evolve^2))
+
+          # Put latent variable states back in list format
+          lv_begins <- seq(1, length(lv_evolve), by = length(particles[[x]]$lv_states))
+          lv_ends <- lv_begins + 2
+
+          lv_evolve <- lapply(seq_along(particles[[x]]$lv_states), function(lv){
+            lv_evolve[lv_begins[lv]:lv_ends[lv]]
+          })
 
           # Smooth latent variable loadings
           lv_coefs_evolve <- as.vector(particles[[x]]$lv_coefs) +
@@ -316,44 +356,56 @@ pfilter_mvgam_smooth = function(particles,
 
           trend_evolve <- NULL
           phi_evolve <- particles[[x]]$phi
+          ar1_evolve <- particles[[x]]$ar1
+          ar2_evolve <- particles[[x]]$ar2
+          ar3_evolve <- particles[[x]]$ar3
 
         } else {
           # Smooth trend states
-          trend_evolve <- particles[[x]]$trend_states +
-            evolve*(best_trend_means - particles[[x]]$trend_states) +
+          trend_evolve <- unlist(particles[[x]]$trend_states) +
+            evolve*(best_trend_means - unlist(particles[[x]]$trend_states)) +
             (trend_draws[x,] * sqrt(1 - evolve^2))
+
+          # Put trend states back in list format
+          trend_begins <- seq(1, length(trend_evolve), by = length(particles[[x]]$trend_states))
+          trend_ends <- trend_begins + 2
+
+          trend_evolve <- lapply(seq_along(particles[[x]]$trend_states), function(trend){
+            trend_evolve[trend_begins[trend]:trend_ends[trend]]
+          })
 
           particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
           lv_evolve <- NULL
           lv_coefs_evolve <- NULL
           phi_evolve <- particles[[x]]$phi
+          ar1_evolve <- particles[[x]]$ar1
+          ar2_evolve <- particles[[x]]$ar2
+          ar3_evolve <- particles[[x]]$ar3
         }
 
-        # If this is a high weight particle give it some minor freedom to explore
-        # new state spaces so that adaptation can continue
+        # If this is a high weight particle leave it where it is
       } else {
 
         if(use_lv){
-          lv_evolve <- particles[[x]]$lv_states + rnorm(length(particles[[x]]$lv_states), 0, 5e-3)
+          lv_evolve <- particles[[x]]$lv_states
           lv_coefs_evolve <- particles[[x]]$lv_coefs
           trend_evolve <- NULL
         } else {
           lv_evolve <- NULL
           lv_coefs_evolve <- NULL
-          trend_evolve <- particles[[x]]$trend_states + rnorm(length(particles[[x]]$trend_states), 0, 5e-3)
+          trend_evolve <- particles[[x]]$trend_states
 
         }
         particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
-        phi_evolve <- particles[[x]]$phi + rnorm(length(particles[[x]]$phi), 0, 5e-2)
+        phi_evolve <- particles[[x]]$phi
+        ar1_evolve <- particles[[x]]$ar1
+        ar2_evolve <- particles[[x]]$ar2
+        ar3_evolve <- particles[[x]]$ar3
       }
     }
 
-    # Return the updated particle, preserving original beta distribution if resampling
-    if(use_resampling){
-      betas <- orig_betas[sample(1:NROW(orig_betas), 1, F), ]
-    } else {
-      betas <- particles[[x]]$betas
-    }
+    # Return the updated particle, preserving original betas
+    betas <- particles[[x]]$betas
 
     list(use_lv = use_lv,
          n_lv = particles[[x]]$n_lv,
@@ -364,6 +416,9 @@ pfilter_mvgam_smooth = function(particles,
          size = particles[[x]]$size,
          tau = particles[[x]]$tau,
          phi = phi_evolve,
+         ar1 = ar1_evolve,
+         ar2 = ar2_evolve,
+         ar3 = ar3_evolve,
          trend_states = trend_evolve,
          weight = particle_weight,
          upper_bounds = particles[[x]]$upper_bounds,

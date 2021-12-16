@@ -47,8 +47,8 @@ hyp3 = y ~
   s(season, by = series, m = 1, k = 8) - 1
 
 # Fit each hypothesis
-n.burnin = 1000
-n.iter = 1000
+n.burnin = 100000
+n.iter = 5000
 thin = 1
 
 fit_null <- fit_mvgam(data_train = all_data$data_train,
@@ -316,22 +316,18 @@ for(i in seq_along(levels(all_data$data_train$series))){
       mai = c(.38,.4,.45,.05),
       mgp = c(2, 1, 0))
   plot_mvgam_fc(object = fit_null$out_gam_mod, data_test = all_data$data_test,
-                data_train = all_data$data_train,
                 series = i)
   mtext(side = 3, 'Null', cex = 1,
         line = 1.55)
   plot_mvgam_fc(object = fit_hyp1$out_gam_mod, data_test = all_data$data_test,
-                data_train = all_data$data_train,
                 series = i)
   mtext(side = 3, 'Hyp1', cex = 1,
         line = 1.35)
   plot_mvgam_fc(object = fit_hyp2$out_gam_mod, data_test = all_data$data_test,
-                data_train = all_data$data_train,
                 series = i)
   mtext(side = 3, 'Hyp2', cex = 1,
         line = 1.55)
   plot_mvgam_fc(object = fit_hyp3$out_gam_mod, data_test = all_data$data_test,
-                data_train = all_data$data_train,
                 series = i)
   mtext(side = 3, 'Hyp3', cex = 1,
         line = 1.55)

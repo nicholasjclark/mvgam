@@ -12,6 +12,7 @@ mvjagam(
   use_nb = TRUE,
   use_lv = FALSE,
   n_lv = 5,
+  trend_model = "RW",
   n.chains = 2,
   n.burnin = 5000,
   n.iter = 2000,
@@ -32,13 +33,12 @@ to specify that the linear predictor depends on smooth functions of predictors (
 required by the GAM \code{formula}. Should include columns:
 'y' (the discrete outcomes; NAs allowed)
 'series' (character or factor index of the series IDs)
-'season' (numeric index of the seasonal time point for each observation; should not have any missing)
+'season' (numeric index of the seasonal time point for each observation)
 'year' the numeric index for year, and
-'in_season' indicator for whether the observation is in season or not. If the counts tend to go to zero
-during the off season (as in tick counts for example), setting 'in_season' to zero cduring these seasonal periods
-can be useful as trends won't contribute during
-during this time but they continue to evolve, allowing the trend to continue evolving rather than forcing
-it to zero during the off-season
+'in_season', an indicator for whether the observation is in season or not. If the counts tend to go to zero
+during the off season (as in tick counts for example), setting 'in_season' to zero during these seasonal periods
+can be useful as trends won't contribute
+during this time but they will continue to evolve rather than being forced to zero during each off-season
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
 \item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season', 'year' and
@@ -56,6 +56,10 @@ latent trends. If \code{FALSE}, estimate covarying errors in the latent trends}
 
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}
 and \code{use_lv == TRUE}. Cannot be \code{>n_series}. Defaults to \code{min(5, floor(n_series / 2))}}
+
+\item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
+'RW' (random walk with drift), 'AR1' (AR1 model without intercept), 'AR2' (AR2 model without intercept) or
+'AR3' (AR3 model without intercept)}
 
 \item{n.chains}{\code{integer} the number of parallel chains for the model}
 
@@ -87,8 +91,8 @@ series and information needed for other functions in the package
 \description{
 This function estimates the posterior distribution for a multivariate GAM that includes
 smooth seasonality and possible other smooth functions specified in the GAM formula. State-space latent trends
-(random walks with drift) are estimated for each series, two options for specifying the
-structures of the trends (either as latent dynamic factors or independent trends)
+(random walks with drift) are estimated for each series, with currently two options for specifying the
+structures of the trends (either as latent dynamic factors to capture trend dependencies, or as independent trends)
 }
 \details{
 A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent

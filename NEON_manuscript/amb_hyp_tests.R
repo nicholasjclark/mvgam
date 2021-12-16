@@ -48,7 +48,6 @@ hyp3 = y ~
 
 # Fit each hypothesis
 n.burnin = 100000
-n.burnin = 75000
 n.iter = 5000
 thin = 5
 

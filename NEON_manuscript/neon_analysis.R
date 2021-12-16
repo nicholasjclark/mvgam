@@ -1,7 +1,7 @@
 #### NEON analysis / figures script ####
 load('NEON_manuscript/Results/ixodes_models.rda')
 
-# Hypothesis 3 was the most well-supported of the tested models
+# Hypothesis 2 was the most well-supported of the tested models
 # Plot some results for particular series
 source('NEON_manuscript/neon_utility_functions.R')
 library(mvgam)
@@ -14,22 +14,22 @@ pdf('NEON_manuscript/Figures/Fig4_ixodes_example.pdf', width = 6.25, height = 5.
 par(mfrow = c(2, 2),
     mgp = c(2.5, 1, 0),
     mai = c(0.6, 0.6, 0.2, 0.2))
-plot_mvgam_season(fit_hyp3$out_gam_mod, series = 1,
+plot_mvgam_season(fit_hyp2$out_gam_mod, series = 1,
                   data_test = all_data$data_test,
                   data_train = all_data$data_train, xlab = 'Epidemiological week')
-plot_mvgam_gdd(fit_hyp3$out_gam_mod, series = 1,
+plot_mvgam_gdd(fit_hyp2$out_gam_mod, series = 1,
                data_test = all_data$data_test,
                data_train = all_data$data_train,
                mean_gdd = all_data$mean_gdd,
                sd_gdd = all_data$sd_gdd)
-plot_mvgam_fc(fit_hyp3$out_gam_mod, series = 1,
+plot_mvgam_fc(fit_hyp2$out_gam_mod, series = 1,
                   data_test = all_data$data_test,
               hide_xlabels = TRUE)
 axis(1, at = seq(0, dim(fit_hyp3$out_gam_mod$ytimes)[1],
                  b = 26), labels = seq(2015, 2020), cex.axis = 1)
 text(x=NROW(all_data$data_train) / NCOL(fit_hyp3$out_gam_mod$ytimes) + 8,
      y=75, labels = 'Forecast horizon', srt = -90)
-plot_mvgam_trend(fit_hyp3$out_gam_mod, series = 1,
+plot_mvgam_trend(fit_hyp2$out_gam_mod, series = 1,
               data_test = all_data$data_test,
               hide_xlabels = TRUE)
 axis(1, at = seq(0, dim(fit_hyp3$out_gam_mod$ytimes)[1],

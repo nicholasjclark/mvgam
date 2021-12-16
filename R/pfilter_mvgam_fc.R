@@ -32,14 +32,26 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     stop('file_path either does not exist or does not contain a .rda particle list')
   }
 
-  # Function to simulate trends / latent factors ahead using random walks with drift
-  sim_rwdrift = function(phi, tau, state, h){
-    states <- rep(NA, length = h + 1)
-    states[1] <- state
-    for (t in 2:(h + 1)) {
-      states[t] <- rnorm(1, phi + states[t - 1], sqrt(1 / tau))
+  # Extract particle weights and create importance sampling index
+  weights <- (unlist(lapply(seq_along(particles), function(x){
+    tail(particles[[x]]$weight, 1)})))
+  weights <- weights / max(weights)
+  index <- sample.int(length(weights), length(weights), replace = TRUE,
+                      prob = weights + 0.0001)
+  fc_samples <- sample(index, min(10000, length(weights)), T)
+
+  # Function to simulate trends / latent factors ahead using ar3 model
+  sim_ar3 = function(phi, ar1, ar2, ar3, tau, state, h){
+    states <- rep(NA, length = h + 3)
+    states[1] <- state[1]
+    states[2] <- state[2]
+    states[3] <- state[3]
+    for (t in 4:(h + 3)) {
+      states[t] <- rnorm(1, phi + ar1*states[t - 1] +
+                           ar2*states[t - 2] +
+                           ar3*states[t - 3], sqrt(1 / tau))
     }
-    states[-1]
+    states[-c(1:3)]
   }
 
   if(missing(ylim)){
@@ -64,7 +76,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   setDefaultCluster(cl)
   clusterExport(NULL, c('particles',
                         'Xp',
-                        'sim_rwdrift',
+                        'sim_ar3',
                         'series_test',
                         'fc_horizon',
                         'n_series',
@@ -72,17 +84,20 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                 envir = environment())
 
   pbapply::pboptions(type = "none")
-  particle_fcs <- pbapply::pblapply(seq_along(particles), function(x){
+  particle_fcs <- pbapply::pblapply(fc_samples, function(x){
     use_lv <- particles[[x]]$use_lv
 
     if(use_lv){
 
       # Run the latent variables forward fc_horizon timesteps
       lv_preds <- do.call(rbind, lapply(seq_len(particles[[x]]$n_lv), function(lv){
-        sim_rwdrift(phi = particles[[x]]$phi[lv],
-                    tau = particles[[x]]$tau,
-                    state = particles[[x]]$lv_states[lv],
-                    h = fc_horizon)
+        sim_ar3(phi = particles[[x]]$phi[lv],
+                ar1 = particles[[x]]$ar1[lv],
+                ar2 = particles[[x]]$ar2[lv],
+                ar3 = particles[[x]]$ar3[lv],
+                tau = particles[[x]]$tau,
+                state = particles[[x]]$lv_states[[lv]],
+                h = fc_horizon)
       }))
       series_fcs <- lapply(seq_len(n_series), function(series){
         trend_preds <- as.numeric(t(lv_preds) %*% particles[[x]]$lv_coefs[series,]) *
@@ -99,10 +114,13 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     } else {
       # Run the trends forward fc_horizon timesteps
       series_fcs <- lapply(seq_len(n_series), function(series){
-          trend_preds <- sim_rwdrift(phi = particles[[x]]$phi[series],
-                                        tau = particles[[x]]$tau[series],
-                                        state = particles[[x]]$trend_states[series],
-                                        h = fc_horizon) * (1 - particles[[x]]$gam_comp[series])
+          trend_preds <- sim_ar3(phi = particles[[x]]$phi[series],
+                                 ar1 = particles[[x]]$ar1[series],
+                                 ar2 = particles[[x]]$ar2[series],
+                                 ar3 = particles[[x]]$ar3[series],
+                                 tau = particles[[x]]$tau[series],
+                                 state = particles[[x]]$trend_states[[series]],
+                                 h = fc_horizon) * (1 - particles[[x]]$gam_comp[series])
             fc <-  rnbinom(fc_horizon,
                                mu = exp(as.vector(particles[[x]]$gam_comp[series] *
                                                     (Xp[which(as.numeric(series_test$series) == series),] %*%
@@ -117,18 +135,11 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   }, cl = cl)
   stopCluster(cl)
 
-  # Extract particle weights and create importance sampling index
-  weights <- (unlist(lapply(seq_along(particles), function(x){
-    tail(particles[[x]]$weight, 1)})))
-  weights <- weights / max(weights)
-  index <- sample.int(length(weights), length(weights), replace = TRUE,
-                      prob = weights + 0.0001)
 
   # Weighted forecast for each series
-  fc_samples <- sample(index, 5000, T)
   series_fcs <- lapply(seq_len(n_series), function(series){
-    indexed_forecasts <- do.call(rbind, lapply(seq_along(fc_samples), function(x){
-      particle_fcs[[fc_samples[x]]][[series]]
+    indexed_forecasts <- do.call(rbind, lapply(seq_along(particle_fcs), function(x){
+      particle_fcs[[x]][[series]]
     }))
     indexed_forecasts
   })
@@ -143,7 +154,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     assimilated <- obs_data$assimilated[which(as.numeric(obs_data$series) == series)]
     preds_last <- c(all_obs, preds[1,])
     int <- apply(preds,
-                  2, hpd, 0.9)
+                  2, hpd, 0.95)
     if(!is.null(particles[[1]]$upper_bounds)){
       upper_lim <- min(c(particles[[1]]$upper_bounds[series],
                          (max(c(all_obs, int[3,]), na.rm = T) + 4)))
