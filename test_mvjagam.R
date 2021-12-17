@@ -22,13 +22,13 @@ rm(series)
 mod <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,
                formula = y ~ s(season, bs = c('cc')),
-                use_nb = T,
+               family = 'poisson',
                use_lv = F,
                trend_model = 'AR3',
-                  n.burnin = 1000,
-                  n.iter = 1000,
-                  thin = 1,
-                  auto_update = F)
+               n.burnin = 1000,
+               n.iter = 1000,
+               thin = 1,
+               auto_update = F)
 
 
 # Summary plots and diagnostics
@@ -40,7 +40,9 @@ plot_mvgam_smooth(mod, series=1, 'season')
 plot_mvgam_fc(mod, series = 1)
 plot_mvgam_trend(mod, series = 1)
 plot_mvgam_uncertainty(mod, series=1, data_test = fake_data$data_test)
-MCMCvis::MCMCtrace(mod$jags_output, c('phi', 'ar1', 'ar2', 'ar3', 'tau'), pdf = F)
+MCMCvis::MCMCtrace(mod$jags_output, c('phi', 'ar1', 'ar2', 'ar3'), pdf = F,
+                   n.eff = T)
+par(mfrow=c(1,1))
 
 # Initiate particles by assimilating the next observation in data_test
 pfilter_mvgam_init(object = mod, n_particles = 5000, n_cores = 2,
@@ -90,7 +92,7 @@ trends_mod <- mvjagam(data_train = trends_data$data_train,
                  use_lv = T,
                  trend_model = 'AR3',
                  n_lv = 3,
-                 use_nb = T,
+                 family = 'nb',
                  n.burnin = 15000,
                  n.iter = 1000,
                  thin = 1,

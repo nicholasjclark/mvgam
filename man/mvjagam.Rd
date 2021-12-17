@@ -9,7 +9,7 @@ mvjagam(
   data_train,
   data_test,
   prior_simulation = FALSE,
-  use_nb = TRUE,
+  family = "nb",
   use_lv = FALSE,
   n_lv = 5,
   trend_model = "RW",
@@ -47,9 +47,7 @@ Any other variables to be included in the linear predictor of \code{formula} mus
 \item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 simulations from prior distributions are returned}
 
-\item{use_nb}{\code{logical} If \code{TRUR}, use a Negative Binomial likelihood with estimated
-overdispersion parameter r;
-if \code{FALSE}, set r to \code{10,000} to approximate the Poisson distribution}
+\item{family}{\code{character}. Must be either 'nb' (for Negative Binomial) or 'poisson'}
 
 \item{use_lv}{\code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
 latent trends. If \code{FALSE}, estimate covarying errors in the latent trends}
@@ -91,7 +89,7 @@ series and information needed for other functions in the package
 \description{
 This function estimates the posterior distribution for a multivariate GAM that includes
 smooth seasonality and possible other smooth functions specified in the GAM formula. State-space latent trends
-(random walks with drift) are estimated for each series, with currently two options for specifying the
+are estimated for each series, with currently two options for specifying the
 structures of the trends (either as latent dynamic factors to capture trend dependencies, or as independent trends)
 }
 \details{

@@ -2,7 +2,7 @@
 #'
 #'This function estimates the posterior distribution for a multivariate GAM that includes
 #'smooth seasonality and possible other smooth functions specified in the GAM formula. State-space latent trends
-#'(random walks with drift) are estimated for each series, with currently two options for specifying the
+#'are estimated for each series, with currently two options for specifying the
 #'structures of the trends (either as latent dynamic factors to capture trend dependencies, or as independent trends)
 #'
 #'
@@ -24,9 +24,7 @@
 #''in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}
 #'@param prior_simulation \code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 #'simulations from prior distributions are returned
-#'@param use_nb \code{logical} If \code{TRUR}, use a Negative Binomial likelihood with estimated
-#'overdispersion parameter r;
-#'if \code{FALSE}, set r to \code{10,000} to approximate the Poisson distribution
+#'@param family \code{character}. Must be either 'nb' (for Negative Binomial) or 'poisson'
 #'@param use_lv \code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
 #'latent trends. If \code{FALSE}, estimate covarying errors in the latent trends
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}
@@ -67,7 +65,7 @@ mvjagam = function(formula,
                     data_train,
                     data_test,
                     prior_simulation = FALSE,
-                    use_nb = TRUE,
+                    family = 'nb',
                     use_lv = FALSE,
                     n_lv = 5,
                     trend_model = 'RW',
@@ -83,11 +81,9 @@ mvjagam = function(formula,
 
   # Check arguments
   trend_model <- match.arg(arg = trend_model, choices = c("RW", "AR1", "AR2", "AR3"))
+  family <- match.arg(arg = family, choices = c("nb", "poisson"))
 
   # Fill in any NA's with arbitrary values so the observations aren't dropped when jags data is created
-  if(prior_simulation){
-    data_train$y <- rep(NA, length(data_train$y))
-  }
   orig_y <- data_train$y
   data_train$y[which(is.na(data_train$y))] <- floor(sample(seq(min(data_train$y, na.rm = T), max(data_train$y, na.rm = T)),
                                                              length(which(is.na(data_train$y))),
@@ -110,13 +106,17 @@ mvjagam = function(formula,
                           sp.prior = 'gamma',
                           diagonalize = F)
 
-  data_train$y <- orig_y
+  # Fill with NAs if this is a simulation from the priors
+  if(prior_simulation){
+    data_train$y <- rep(NA, length(data_train$y))
+  } else {
+    data_train$y <- orig_y
+  }
 
   # Read in the base (unmodified) jags model file
   base_model <- suppressWarnings(readLines('base_gam.txt'))
 
-  # Need to remove lines from the linear predictor section and replace with
-  # the modified state space representation
+  # Remove lines from the linear predictor section
   lines_remove <- c(1:grep('## response', base_model))
   base_model <- base_model[-lines_remove]
 
@@ -131,10 +131,10 @@ mvjagam = function(formula,
     base_model[grep('Parametric effect priors',
                     base_model) + 1] <- paste0('  for (i in 1:',
                                                n_terms,
-                                               ') { b[i] ~ dnorm(0, 0.1) }')
+                                               ') { b[i] ~ dnorm(0, 1) }')
   }
 
-  # Add replacement lines for trends and linear predictor
+  # Add replacement lines for trends and the linear predictor
   if(!use_lv){
     modification <- c("model {
 
@@ -148,6 +148,8 @@ mvjagam = function(formula,
                       trend_comp[s] * trend[i, s] * in_season[i])
                       }
                       }
+
+                      ### Redundant but keeping in for now ###
                       # Ensure trend does not completely dominate unless supported by data
                       for (s in 1:n_series) {
                       gam_comp[s] <- 0.5
@@ -193,13 +195,7 @@ mvjagam = function(formula,
                       (r / (r + mu[i, s])))
                       }
                       }
-
-                      ## Set overdispersion parameter to 10000 if not using nb;
-                      ## this approximates the Poisson distribution
-                      r1 ~ dgamma(0.01, 0.01)
-                      r2 <- 10000
-                      r_indicator <- ifelse(use_nb > 0, 1, 0)
-                      r <- (r1 * r_indicator) + (r2 * (1 - r_indicator))
+                      r ~ dgamma(0.01, 0.01)
 
                       ## Posterior predictions
                       for (i in 1:n) {
@@ -228,7 +224,7 @@ mvjagam = function(formula,
       model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
     }
 
-    if(!use_nb){
+    if(family == 'poisson'){
       if(missing(upper_bounds)){
         model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])'
         model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])'
@@ -236,6 +232,8 @@ mvjagam = function(formula,
         model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
         model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
       }
+      model_file[grep('r ~', model_file)] <- 'r <- 10000'
+
     } else {
       if(missing(upper_bounds)){
         model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dnegbin(rate[i, s], r)'
@@ -368,13 +366,7 @@ mvjagam = function(formula,
                             (r / (r + mu[i, s])))
         }
         }
-
-        ## Set overdispersion parameter to 10000 if not using nb;
-        ## this approximates the Poisson distribution
-        r1 ~ dgamma(0.01, 0.01)
-        r2 <- 10000
-        r_indicator <- ifelse(use_nb > 0, 1, 0)
-        r <- (r1 * r_indicator) + (r2 * (1 - r_indicator))
+        r ~ dgamma(0.01, 0.01)
 
         ## Posterior predictions
         for (i in 1:n) {
@@ -403,7 +395,7 @@ mvjagam = function(formula,
        model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
       }
 
-      if(!use_nb){
+      if(family == 'poisson'){
         if(missing(upper_bounds)){
           model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])'
           model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])'
@@ -411,6 +403,8 @@ mvjagam = function(formula,
           model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
           model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
         }
+        model_file[grep('r ~', model_file)] <- 'r <- 10000'
+
       } else {
         if(missing(upper_bounds)){
           model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dnegbin(rate[i, s], r)'
@@ -499,13 +493,6 @@ mvjagam = function(formula,
     ss_jagam$jags.data$upper_bound <- upper_bounds
   }
 
-  # Set use_nb to 0 for approximate Poisson; otherwise to 1 for Negative Binomial
-  if(use_nb){
-    ss_jagam$jags.data$use_nb <- 1
-  } else {
-    ss_jagam$jags.data$use_nb <- 0
-  }
-
   # Machine epsilon for minimum allowable non-zero rate
   ss_jagam$jags.data$min_eps <- .Machine$double.eps
 
@@ -516,7 +503,7 @@ mvjagam = function(formula,
   # Number of latent variables to use
   if(use_lv){
       if(missing(n_lv)){
-        ss_jagam$jags.data$n_lv <- min(5, floor(ss_jagam$jags.data$n_series / 2))
+        ss_jagam$jags.data$n_lv <- min(2, floor(ss_jagam$jags.data$n_series / 2))
       } else {
         ss_jagam$jags.data$n_lv <- n_lv
       }
@@ -653,6 +640,4 @@ mvjagam = function(formula,
               n_lv = n_lv,
               upper_bounds = upper_bounds,
               obs_data = data_train))
-
-
 }

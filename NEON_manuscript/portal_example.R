@@ -76,7 +76,7 @@ df_gam_mod <- mvjagam(data_train = PP_data$data_train,
                formula = y ~ s(season, bs = c('cc'), k = 8) +
                  s(year, bs = 'gp', k = 4) + ti(season, year),
                trend_model = 'AR3',
-               use_nb = F,
+               family = 'poisson',
                n.burnin = 10000,
                n.iter = 2000,
                thin = 2,
@@ -106,7 +106,7 @@ fits <- t(matrix(fits, nrow = dims_needed[1], ncol = dims_needed[2]))
 # Plotting 90% and 68% HPD intervals
 par(mfrow=c(1,2))
 cred_ints <- apply(fits, 2, function(x) hpd(x, 0.9))
-yupper <- max(cred_ints)
+yupper <- 100
 plot(cred_ints[3,] ~ seq(1:NCOL(cred_ints)), type = 'l',
      col = rgb(1,0,0, alpha = 0),
      ylim = c(0, yupper),
