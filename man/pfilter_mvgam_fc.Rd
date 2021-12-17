@@ -8,6 +8,7 @@ pfilter_mvgam_fc(
   file_path = "pfilter",
   n_cores = 2,
   data_test,
+  plot_legend = TRUE,
   legend_position = "topleft",
   ylim,
   return_forecasts = FALSE
@@ -21,7 +22,10 @@ pfilter_mvgam_fc(
 \item{data_test}{A \code{dataframe} of test data containing at least 'series', 'season', 'year' and
 'in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}}
 
-\item{legend_position}{The location may also be specified by setting x to a single keyword from the
+\item{plot_legend}{\code{logical} stating whether to include a legend to highlight which observations
+were used for calibration and which were assimilated by the particle filter}
+
+\item{legend_position}{The legend location may be specified by setting x to a single keyword from the
 list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
 This places the legend on the inside of the plot frame at the given location.}
 

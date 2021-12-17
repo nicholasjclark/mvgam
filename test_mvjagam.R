@@ -2,6 +2,7 @@
 
 # TO DO:
 # 1. Stop when all data assimilated (return NULL)
+# 2. How can users compare models (deviance)?
 # 3. include some diagnostics on particle filter heterogeneity in weights etc...
 # 4. compare particle filtered vs re-calibrated forecast for some simulations or trends / neon data
 
@@ -22,9 +23,8 @@ mod <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,
                formula = y ~ s(season, bs = c('cc')),
                 use_nb = T,
-               use_lv = T,
-               n_lv = 1,
-               trend_model = 'RW',
+               use_lv = F,
+               trend_model = 'AR3',
                   n.burnin = 1000,
                   n.iter = 1000,
                   thin = 1,
@@ -57,6 +57,8 @@ par(mfrow=c(1,2))
 plot_mvgam_fc(mod, series = 1, data_test = fake_data$data_test,
               ylim = c(0, 40))
 fc$Air()
+points(c(fake_data$data_train$y,
+         fake_data$data_test$y), pch = 16)
 
 # Remove the particles
 unlink('pfilter', recursive = T)
@@ -79,16 +81,17 @@ series <- xts::xts(x = gtest[,-1], order.by = gtest$date)
 plot(series, legend.loc = 'topleft')
 trends_data <- series_to_mvgam(series, freq = 12, train_prop = 0.9)
 
-# mvgam model with hierarchical seasonality
+# mvgam model with hierarchical seasonality, recognising known upper bounds for
+# Google trends (cannot go above 100)
 trends_mod <- mvjagam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
                  formula = y ~ s(season, k = 6, m = 2, bs = 'cc') +
                    s(season, by = series, k = 10, m = 1) - 1,
                  use_lv = T,
-                 trend_model = 'AR1',
+                 trend_model = 'AR3',
                  n_lv = 3,
                  use_nb = T,
-                 n.burnin = 1000,
+                 n.burnin = 15000,
                  n.iter = 1000,
                  thin = 1,
                  upper_bounds = rep(100, length(terms)),
@@ -133,11 +136,11 @@ trends_mod$smooth_param_details
 MCMCvis::MCMCtrace(trends_mod$jags_output, 'rho', pdf = F, n.eff = TRUE)
 
 # Inspect traces of latent variable AR components and lv penalties
-MCMCvis::MCMCtrace(trends_mod$jags_output, c('ar1'), pdf = F, n.eff = TRUE)
+MCMCvis::MCMCtrace(trends_mod$jags_output, c('phi','ar1','ar2','ar3'), pdf = F, n.eff = TRUE)
 MCMCvis::MCMCtrace(trends_mod$jags_output, c('lv_coefs'), pdf = F, n.eff = TRUE)
 
 # Plot uncertainty components
-par(mfrow = c(3, 2))
+par(mfrow = c(2, 2))
 plot_mvgam_uncertainty(object = trends_mod, series = 1, data_test = trends_data$data_test,
                        legend_position = 'bottomleft')
 plot_mvgam_uncertainty(object = trends_mod, series = 2, data_test = trends_data$data_test,
@@ -169,93 +172,52 @@ ggplot(mean_correlations %>%
 # Initiate particles by assimilating the next observation in data_test
 pfilter_mvgam_init(object = trends_mod,
                    data_assim = trends_data$data_test,
-                   n_particles = 30000, n_cores = 5)
+                   n_particles = 30000, n_cores = 3)
 
 # Assimilate next two observations per series as a test
-pfilter_mvgam_online(data_assim = trends_data$data_test[1:(length(unique(trends_data$data_test$series)) * 3),],
-                     file_path = 'pfilter', n_cores = 5,
+pfilter_mvgam_online(data_assim =
+                       trends_data$data_test[1:(length(unique(trends_data$data_test$series)) * 3),],
+                     file_path = 'pfilter', n_cores = 3,
                      kernel_lambda = 1)
 
-
 # Forecast from particles using the covariate information in remaining data_test observations
-fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 5,
+fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 3,
                        data_test = trends_data$data_test,
                        return_forecasts = T, ylim = c(0, 100))
 
-# Compare to a scenario in which we simply refit the original model as new data come in
-trends_mod2 <- mvjagam(data_train = trends_data$data_train %>%
-                         dplyr::bind_rows(trends_data$data_test[1:(3*length(terms)),]),
-                       data_test = trends_data$data_test[((3*length(terms))+1):NROW(trends_data$data_test),],
-                      formula = y ~ s(season, k = 6, m = 2, bs = 'cc') +
-                        s(season, by = series, k = 10, m = 1) - 1,
-                      use_lv = T,
-                      n_lv = 3,
-                      use_nb = T,
-                      trend_model = 'AR1',
-                      n.burnin = 1000,
-                      n.iter = 1000,
-                      thin = 1,
-                      upper_bounds = rep(100, length(terms)),
-                      auto_update = F)
-
-# Inspect forecasts for a few series
-par(mfrow = c(1, 2))
-plot_mvgam_fc(object = trends_mod2, series = 1, ylim = c(0, 100),
-              data_test = trends_data$data_test[((3*length(terms))+1):NROW(trends_data$data_test),])
+# Inspect forecasts for a few series and overlay true values in the test horizon
 fc$fc_plots$`dog tick`()
+points(rbind(trends_data$data_train, trends_data$data_test) %>%
+         dplyr::filter(series == 'dog tick') %>%
+         dplyr::select(year, season, y) %>%
+         dplyr::distinct() %>%
+         dplyr::arrange(year, season) %>%
+         dplyr::pull(y), pch = 16)
 
-plot_mvgam_fc(object = trends_mod, series = 2, ylim = c(0, 100),
-              data_test = trends_data$data_test[((3*length(terms))+1):NROW(trends_data$data_test),])
 fc$fc_plots$`la nina`()
+points(rbind(trends_data$data_train, trends_data$data_test) %>%
+         dplyr::filter(series == 'la nina') %>%
+         dplyr::select(year, season, y) %>%
+         dplyr::distinct() %>%
+         dplyr::arrange(year, season) %>%
+         dplyr::pull(y), pch = 16)
 
-plot_mvgam_fc(object = trends_mod, series = 3, ylim = c(0, 100),
-              data_test = trends_data$data_test[((3*length(terms))+1):NROW(trends_data$data_test),])
 fc$fc_plots$`tick bite`()
+points(rbind(trends_data$data_train, trends_data$data_test) %>%
+         dplyr::filter(series == 'tick bite') %>%
+         dplyr::select(year, season, y) %>%
+         dplyr::distinct() %>%
+         dplyr::arrange(year, season) %>%
+         dplyr::pull(y), pch = 16)
 
-plot_mvgam_fc(object = trends_mod, series = 4, ylim = c(0, 100),
-              data_test = trends_data$data_test[((3*length(terms))+1):NROW(trends_data$data_test),])
 fc$fc_plots$`tick paralysis`()
+points(rbind(trends_data$data_train, trends_data$data_test) %>%
+         dplyr::filter(series == 'tick paralysis') %>%
+         dplyr::select(year, season, y) %>%
+         dplyr::distinct() %>%
+         dplyr::arrange(year, season) %>%
+         dplyr::pull(y), pch = 16)
 par(mfrow = c(1,1))
 
 # Remove the particles
 unlink('pfilter', recursive = T)
-
-# Simulate data with shared seasonal structure and correlated trends
-set.seed(110)
-n_series = 3
-sim_data <- sim_mvgam(T = 120,
-                      n_series = n_series,
-                      trend_rel = 0.1,
-                      prop_missing = 0.25,
-                      train_prop = 0.85,
-                      seasonality = 'shared')
-
-# Fit the multivariate gam with a shared seasonal pattern
-test <- mvjagam(data_train = sim_data$data_train,
-                data_test = sim_data$data_test,
-                formula = y ~ s(season, k = 12, m = 2, bs = 'cc') - 1,
-                use_nb = TRUE,
-                use_lv = T,
-                n.burnin = 1000,
-                n.iter = 1000,
-                thin = 1,
-                auto_update = F)
-
-# Inspect contributions to forecast uncertainty for each series
-plot_mvgam_uncertainty(series=2,
-                       data_test = sim_data$data_test,
-                       object = test)
-
-# Initiate particles by assimilating the next observation in data_test
-pfilter_mvgam_init(object = test, n_particles = 20000, n_cores = 3,
-                   data_assim = sim_data$data_test)
-# Forecast from particles using the covariate information in remaining data_test observations
-fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 3,
-                       data_test = sim_data$data_test,
-                       return_forecasts = T)
-# Inspect forecasts for a few series
-par(mfrow = c(1, 2))
-plot_mvgam_fc(test, series = 1, data_test = sim_data$data_test)
-fc$fc_plots$series_1()
-plot_mvgam_fc(test, series = 2, data_test = sim_data$data_test)
-fc$fc_plots$series_2()

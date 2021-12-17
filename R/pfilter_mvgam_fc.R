@@ -10,7 +10,9 @@
 #''in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
 #'@param file_path \code{character} string specifying the file path where the particles have been saved
-#'@param legend_position The location may also be specified by setting x to a single keyword from the
+#'@param plot_legend \code{logical} stating whether to include a legend to highlight which observations
+#'were used for calibration and which were assimilated by the particle filter
+#'@param legend_position The legend location may be specified by setting x to a single keyword from the
 #'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
 #'This places the legend on the inside of the plot frame at the given location.
 #'@param ylim Optional \code{vector} of y-axis limits (min, max). The same limits will be used for all plots
@@ -22,6 +24,7 @@
 pfilter_mvgam_fc = function(file_path = 'pfilter',
                             n_cores = 2,
                             data_test,
+                            plot_legend = TRUE,
                             legend_position = 'topleft',
                             ylim,
                             return_forecasts = FALSE){
@@ -149,7 +152,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   obs_data %>%
     dplyr::arrange(year, season, series) -> obs_data
 
-  plot_series_fc = function(series, preds, ylim){
+  plot_series_fc = function(series, preds, ylim, plot_legend = TRUE){
     all_obs <- obs_data$y[which(as.numeric(obs_data$series) == series)]
     assimilated <- obs_data$assimilated[which(as.numeric(obs_data$series) == series)]
     preds_last <- c(all_obs, preds[1,])
@@ -191,14 +194,17 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
            y = all_obs[which(assimilated == 'no')], pch = 16)
     points(x = which(assimilated == 'yes'), y = all_obs[which(assimilated == 'yes')],
            pch = 8, col = rgb(150, 0, 0, max = 255))
-    legend(legend_position,legend=c("Calibration","Assimilation"),
-           bg = 'white',
-           col=c('black',
-                 rgb(150, 0, 0, max = 255)),pch = c(16, 8))
+
+    if(plot_legend){
+      legend(legend_position,legend=c("Calibration","Assimilation"),
+             bg = 'white',
+             col=c('black',
+                   rgb(150, 0, 0, max = 255)),pch = c(16, 8))
+    }
   }
 
   fc_plots <- lapply(seq_len(n_series), function(series){
-    function(){plot_series_fc(series, preds = series_fcs[[series]], ylim)}
+    function(){plot_series_fc(series, preds = series_fcs[[series]], ylim, plot_legend)}
   })
   names(fc_plots) <- levels(obs_data$series)
 

@@ -58,8 +58,8 @@ latent trends. If \code{FALSE}, estimate covarying errors in the latent trends}
 and \code{use_lv == TRUE}. Cannot be \code{>n_series}. Defaults to \code{min(5, floor(n_series / 2))}}
 
 \item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
-'RW' (random walk with drift), 'AR1' (AR1 model without intercept), 'AR2' (AR2 model without intercept) or
-'AR3' (AR3 model without intercept)}
+'RW' (random walk with drift), 'AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
+'AR3' (AR3 model with intercept)}
 
 \item{n.chains}{\code{integer} the number of parallel chains for the model}
 

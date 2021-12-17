@@ -32,8 +32,8 @@
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}
 #'and \code{use_lv == TRUE}. Cannot be \code{>n_series}. Defaults to \code{min(5, floor(n_series / 2))}
 #'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
-#''RW' (random walk with drift), 'AR1' (AR1 model without intercept), 'AR2' (AR2 model without intercept) or
-#''AR3' (AR3 model without intercept)
+#''RW' (random walk with drift), 'AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
+#''AR3' (AR3 model with intercept)
 #'@param n.chains \code{integer} the number of parallel chains for the model
 #'@param n.iter \code{integer} the number of iterations of the Markov chain to run
 #'@param auto_update \code{logical} If \code{TRUE}, the model is run for up to \code{3} additional sets of
@@ -179,9 +179,9 @@ mvjagam = function(formula,
                       ## AR components
                       for (s in 1:n_series){
                       phi[s] ~ dnorm(0, 10)
-                      ar1[s] ~ dnorm(0, 10^-2)
-                      ar2[s] ~ dnorm(0, 10^-2)
-                      ar3[s] ~ dnorm(0, 10^-2)
+                      ar1[s] ~ dnorm(0, 10)
+                      ar2[s] ~ dnorm(0, 10)
+                      ar3[s] ~ dnorm(0, 10)
                       tau[s] ~ dgamma(0.1, 0.001)
                       }
 
@@ -250,18 +250,12 @@ mvjagam = function(formula,
     }
 
     if(trend_model == 'AR1'){
-      model_file[grep('phi\\[s\\] ~', model_file)] <- 'phi[s] <- 0'
       model_file[grep('ar2\\[s\\] ~', model_file)] <- 'ar2[s] <- 0'
       model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
     }
 
     if(trend_model == 'AR2'){
-      model_file[grep('phi\\[s\\] ~', model_file)] <- 'phi[s] <- 0'
       model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
-    }
-
-    if(trend_model == 'AR3'){
-      model_file[grep('phi\\[s\\] ~', model_file)] <- 'phi[s] <- 0'
     }
 
     model_file <- textConnection(model_file)
@@ -314,10 +308,10 @@ mvjagam = function(formula,
 
         ## AR components
         for (s in 1:n_lv){
-        phi[s] ~ dnorm(0, 10^-2)
-        ar1[s] ~ dnorm(0, 10^-2)
-        ar2[s] ~ dnorm(0, 10^-2)
-        ar3[s] ~ dnorm(0, 10^-2)
+        phi[s] ~ dnorm(0, 10)
+        ar1[s] ~ dnorm(0, 10)
+        ar2[s] ~ dnorm(0, 10)
+        ar3[s] ~ dnorm(0, 10)
         }
 
         ## Latent factor loadings are penalized using a regularized horseshoe prior
@@ -431,18 +425,12 @@ mvjagam = function(formula,
       }
 
       if(trend_model == 'AR1'){
-        model_file[grep('phi\\[s\\] ~', model_file)] <- 'phi[s] <- 0'
         model_file[grep('ar2\\[s\\] ~', model_file)] <- 'ar2[s] <- 0'
         model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
       }
 
       if(trend_model == 'AR2'){
-        model_file[grep('phi\\[s\\] ~', model_file)] <- 'phi[s] <- 0'
         model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
-      }
-
-      if(trend_model == 'AR3'){
-        model_file[grep('phi\\[s\\] ~', model_file)] <- 'phi[s] <- 0'
       }
 
       model_file <- textConnection(model_file)
