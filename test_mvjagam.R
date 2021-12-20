@@ -1,8 +1,6 @@
 #### Testing the mvjagam function ####
 
 # TO DO:
-# 1. Stop when all data assimilated (return NULL)
-# 2. How can users compare models (deviance)?
 # 3. include some diagnostics on particle filter heterogeneity in weights etc...
 # 4. compare particle filtered vs re-calibrated forecast for some simulations or trends / neon data
 
@@ -22,14 +20,33 @@ rm(series)
 mod <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,
                formula = y ~ s(season, bs = c('cc')),
-               family = 'poisson',
+               family = 'nb',
                use_lv = F,
                trend_model = 'AR3',
-               n.burnin = 1000,
+               n.burnin = 4000,
                n.iter = 1000,
                thin = 1,
                auto_update = F)
 
+# An awful model to test the model comparison functions
+fake_data$data_train$fake_cov <- rnorm(NROW(fake_data$data_train))
+fake_data$data_test$fake_cov <- rnorm(NROW(fake_data$data_test))
+mod2 <- mvjagam(data_train = fake_data$data_train,
+               data_test = fake_data$data_test,
+               formula = y ~ s(fake_cov, k = 3),
+               family = 'nb',
+               use_lv = F,
+               trend_model = 'RW',
+               n.burnin = 10,
+               n.iter = 100,
+               thin = 1,
+               auto_update = F)
+
+# Testing rolling DRPS evaluation
+roll_eval_mvgam(mod, n_samples = 1000,
+                fc_horizon = 5, n_cores = 2)
+roll_eval_mvgam(mod2, n_samples = 1000,
+                fc_horizon = 5, n_cores = 2)
 
 # Summary plots and diagnostics
 plot(mod$resids$Air)
@@ -37,7 +54,7 @@ lines(mod$resids$Air)
 acf(mod$resids$Air)
 pacf(mod$resids$Air)
 plot_mvgam_smooth(mod, series=1, 'season')
-plot_mvgam_fc(mod, series = 1)
+plot_mvgam_fc(mod2, series = 1)
 plot_mvgam_trend(mod, series = 1)
 plot_mvgam_uncertainty(mod, series=1, data_test = fake_data$data_test)
 MCMCvis::MCMCtrace(mod$jags_output, c('phi', 'ar1', 'ar2', 'ar3'), pdf = F,
@@ -45,7 +62,7 @@ MCMCvis::MCMCtrace(mod$jags_output, c('phi', 'ar1', 'ar2', 'ar3'), pdf = F,
 par(mfrow=c(1,1))
 
 # Initiate particles by assimilating the next observation in data_test
-pfilter_mvgam_init(object = mod, n_particles = 5000, n_cores = 2,
+pfilter_mvgam_init(object = mod, n_particles = 10000, n_cores = 2,
                    data_assim = fake_data$data_test)
 
 # Assimilate some observations
@@ -93,11 +110,42 @@ trends_mod <- mvjagam(data_train = trends_data$data_train,
                  trend_model = 'AR3',
                  n_lv = 3,
                  family = 'nb',
-                 n.burnin = 15000,
+                 n.burnin = 5000,
                  n.iter = 1000,
                  thin = 1,
                  upper_bounds = rep(100, length(terms)),
                  auto_update = F)
+
+# Poor model for comparison
+trends_mod2 <- mvjagam(data_train = trends_data$data_train,
+                      data_test = trends_data$data_test,
+                      formula = y ~ s(season, k = 3, bs = 'cc') - 1,
+                      use_lv = T,
+                      trend_model = 'RW',
+                      n_lv = 2,
+                      family = 'poisson',
+                      n.burnin = 50,
+                      n.iter = 500,
+                      thin = 1,
+                      upper_bounds = rep(100, length(terms)),
+                      auto_update = F)
+
+mod_eval <- roll_eval_mvgam(object = trends_mod, n_samples = 1000,
+                            fc_horizon = 5, n_cores = 2)
+mod2_eval <- roll_eval_mvgam(object = trends_mod2, n_samples = 1000,
+                            fc_horizon = 5, n_cores = 2)
+
+# Total sum of rolling forecast evaluation DRPS (lower is better)
+mod_eval$sum_drps
+mod2_eval$sum_drps
+
+# Summaries of DRPS
+mod_eval$drps_summary
+mod2_eval$drps_summary
+
+# Summary by forecast horizon
+mod_eval$drps_horizon_summary
+mod2_eval$drps_horizon_summary
 
 # Look at Dunn-Smyth residuals for some series
 hist(trends_mod$resids$`dog tick`)

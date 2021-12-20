@@ -26,9 +26,9 @@
 #'simulations from prior distributions are returned
 #'@param family \code{character}. Must be either 'nb' (for Negative Binomial) or 'poisson'
 #'@param use_lv \code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
-#'latent trends. If \code{FALSE}, estimate covarying errors in the latent trends
-#'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}
-#'and \code{use_lv == TRUE}. Cannot be \code{>n_series}. Defaults to \code{min(5, floor(n_series / 2))}
+#'latent trends. If \code{FALSE}, estimate independent latent trends
+#'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
+#'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(5, floor(n_series / 2))}
 #'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
 #''RW' (random walk with drift), 'AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
 #''AR3' (AR3 model with intercept)
@@ -47,9 +47,9 @@
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 #'truncation entirely (i.e. there is no upper bound for each series)
 #'@details A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent
-#'random walk state space trends. The model parameters are esimated in a Bayesian framework using Gibbs sampling
+#'state space trends. The model parameters are esimated in a Bayesian framework using Gibbs sampling
 #'in \code{\link[rjags]{jags.model}}. For the time being, all series are assumed to have the same overdispersion
-#'parameters when using a negative binomial distribution, though this will be relaxed in future versions. For each
+#'parameter when using a negative binomial distribution, though this will be relaxed in future versions. For each
 #'series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
 #'medians of posterior predictions. If the fitted model is appropriate then Dunn-Smyth residuals will be
 #'standard normal in distribution and no autocorrelation will be evident

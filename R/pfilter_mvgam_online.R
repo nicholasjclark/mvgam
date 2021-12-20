@@ -47,12 +47,16 @@ pfilter_mvgam_online = function(data_assim,
       TRUE ~ 'no'
       )) -> data_assim
 
+  # Stop if all observations already assimilated
+  if(all(data_assim$assimilated == 'yes')){
+    cat('All observations in data_assim have already been assimilated')
+
+  } else {
+
     if(any(data_assim$assimilated == 'yes')){
       cat('Particles have already assimilated one or more observations. Skipping these\n\n')
     }
-    if(all(data_assim$assimilated == 'no')){
-      stop('All observations in data_assim have already been assimilated')
-    }
+
 
   # Assimilate full set of observations using a for loop
   cat('Assimilating the next', NROW(data_assim %>%
@@ -99,4 +103,5 @@ pfilter_mvgam_online = function(data_assim,
       save(particles, mgcv_model, obs_data, last_assim,
            ess = ess, file = paste0(file_path, '/particles.rda'))
 
+    }
 }
