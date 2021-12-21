@@ -20,7 +20,7 @@
 #'the coverages at each evaluation)
 #'@export
 roll_eval_mvgam = function(object,
-                           n_evaluations,
+                           n_evaluations = 5,
                            evaluation_seq,
                            n_samples = 5000,
                            fc_horizon = 3,
@@ -36,7 +36,6 @@ roll_eval_mvgam = function(object,
 
   # Generate evaluation sequence if not supplied
   if(missing(evaluation_seq)){
-    n_evaluations <- 5
     evaluation_seq <- floor(seq(from = 3, to = (max(all_timepoints) - fc_horizon),
                                 length.out = n_evaluations))
   }
@@ -60,32 +59,39 @@ roll_eval_mvgam = function(object,
   })
 
   # Take sum of DRPS at each evaluation point for multivariate models
+  sum_or_na = function(x){
+    if(all(is.na(x))){
+      NA
+    } else {
+      sum(x, na.rm = T)
+    }
+  }
   evals_df <- do.call(rbind, do.call(rbind, evals)) %>%
     dplyr::group_by(eval_season, eval_year, eval_horizon) %>%
-    dplyr::summarise(drps = sum(drps),
-                     in_interval = mean(in_interval))
+    dplyr::summarise(drps = sum_or_na(drps),
+                     in_interval = mean(in_interval, na.rm = T))
 
   # Calculate summary statistics for each series
   tidy_evals <- lapply(seq_len(length(levels(object$obs_data$series))), function(series){
     all_evals <- do.call(rbind, purrr::map(evals, levels(object$obs_data$series)[series]))
-    list(sum_drps = sum(all_evals$drps),
+    list(sum_drps = sum_or_na(all_evals$drps),
          drps_summary = summary(all_evals$drps),
          drps_horizon_summary = all_evals %>%
            dplyr::group_by(eval_horizon) %>%
-           dplyr::summarise(mean_drps = mean(drps)),
-         interval_coverage = mean(all_evals$in_interval),
+           dplyr::summarise(mean_drps = mean(drps, na.rm = T)),
+         interval_coverage = mean(all_evals$in_interval, na.rm = T),
          all_drps = all_evals)
 
   })
   names(tidy_evals) <- levels(object$obs_data$series)
 
   # Return series-specific summaries and the total summary statistics
-  return(list(sum_drps = sum(evals_df$drps),
+  return(list(sum_drps = sum_or_na(evals_df$drps),
               drps_summary = summary(evals_df$drps),
               drps_horizon_summary = evals_df %>%
                 dplyr::group_by(eval_horizon) %>%
-                dplyr::summarise(mean_drps = mean(drps)),
-              interval_coverage = mean(evals_df$in_interval),
+                dplyr::summarise(mean_drps = mean(drps, na.rm = T)),
+              interval_coverage = mean(evals_df$in_interval, na.rm = T),
               series_evals = tidy_evals))
 
 }

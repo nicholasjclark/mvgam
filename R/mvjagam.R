@@ -14,14 +14,10 @@
 #''y' (the discrete outcomes; NAs allowed)
 #''series' (character or factor index of the series IDs)
 #''season' (numeric index of the seasonal time point for each observation)
-#''year' the numeric index for year, and
-#''in_season', an indicator for whether the observation is in season or not. If the counts tend to go to zero
-#'during the off season (as in tick counts for example), setting 'in_season' to zero during these seasonal periods
-#'can be useful as trends won't contribute
-#'during this time but they will continue to evolve rather than being forced to zero during each off-season
+#' and 'year' the numeric index for year.
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
-#'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season', 'year' and
-#''in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}
+#'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season', and 'year'
+#'in addition to any other variables included in the linear predictor of \code{formula}
 #'@param prior_simulation \code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 #'simulations from prior distributions are returned
 #'@param family \code{character}. Must be either 'nb' (for Negative Binomial) or 'poisson'
@@ -145,7 +141,7 @@ mvjagam = function(formula,
                       for (i in 1:n) {
                       for (s in 1:n_series) {
                       mu[i, s] <- exp(gam_comp[s] * eta[ytimes[i, s]] +
-                      trend_comp[s] * trend[i, s] * in_season[i])
+                      trend_comp[s] * trend[i, s])
                       }
                       }
 
@@ -273,7 +269,7 @@ mvjagam = function(formula,
         for (i in 1:n) {
         for (s in 1:n_series) {
         mu[i, s] <- exp(gam_comp[s] * eta[ytimes[i, s]] +
-                        trend_comp[s] * trend[i, s] * in_season[i])
+                        trend_comp[s] * trend[i, s])
         }
         }
 
@@ -511,22 +507,6 @@ mvjagam = function(formula,
         stop('Number of latent variables cannot be greater than number of series')
       }
       ss_jagam$jags.ini$tau_fac <- 1
-  }
-
-  # Binary indicator of in_season
-  if(!missing(data_test)){
-    ss_jagam$jags.data$in_season <- rbind(data_train, data_test) %>%
-    dplyr::select(year, season, in_season) %>%
-    dplyr::distinct() %>%
-    dplyr::arrange(year, season) %>%
-    dplyr::pull(in_season)
-
-  } else {
-    ss_jagam$jags.data$in_season <- data_train %>%
-      dplyr::select(year, season, in_season) %>%
-      dplyr::distinct() %>%
-      dplyr::arrange(year, season) %>%
-      dplyr::pull(in_season)
   }
 
   # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS

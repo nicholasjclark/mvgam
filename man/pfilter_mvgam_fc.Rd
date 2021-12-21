@@ -19,8 +19,8 @@ pfilter_mvgam_fc(
 
 \item{n_cores}{\code{integer} specifying number of cores for generating particle forecasts in parallel}
 
-\item{data_test}{A \code{dataframe} of test data containing at least 'series', 'season', 'year' and
-'in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}}
+\item{data_test}{A \code{dataframe} of test data containing at least 'series', 'season' and 'year',
+in addition to any other variables included in the linear predictor of \code{formula}}
 
 \item{plot_legend}{\code{logical} stating whether to include a legend to highlight which observations
 were used for calibration and which were assimilated by the particle filter}

@@ -4,7 +4,7 @@
 #'
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param newdata Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season', 'year',
+#'@param newdata Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
 #'in addition to any other variables included in the linear predictor of the original model's \code{formula}
 #'@details Smooth functions are shown as the expectation from the GAM component of the linear predictor across
 #'a sequence of 100 values between the variable's \code{min} and \code{max}, while holding all other variables either at
@@ -13,7 +13,7 @@
 #'\code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model
 #'@return A base \code{R} graphics plot
 #'@export
-plot_mvgam_smooth = function(object, series, smooth, newdata){
+plot_mvgam_smooth = function(object, series = 1, smooth, newdata){
 
   data_train <- object$obs_data
   smooth_terms <- unique(gsub("[\\(\\)]", "", regmatches(paste(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
@@ -46,7 +46,8 @@ plot_mvgam_smooth = function(object, series, smooth, newdata){
     data_train %>%
       dplyr::select(c(series, year, smooth_terms)) %>%
       dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-      dplyr::mutate_at(c('year', smooth_terms)[c('year', smooth_terms) != smooth], mean_not_fac) -> pred_dat
+      dplyr::mutate_at(c('year', smooth_terms)[c('year', smooth_terms) != smooth], mean_not_fac) %>%
+      dplyr::mutate(series = !!(levels(data_train$series)[series])) -> pred_dat
 
    pred_dat%>%dplyr::select(-smooth) %>% dplyr::distinct() %>%
       dplyr::bind_cols(smooth.var = seq(min(pred_dat[,smooth]), max(pred_dat[,smooth]), length.out = 100)) -> pred_dat

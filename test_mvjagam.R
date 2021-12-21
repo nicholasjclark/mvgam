@@ -1,9 +1,4 @@
 #### Testing the mvjagam function ####
-
-# TO DO:
-# 3. include some diagnostics on particle filter heterogeneity in weights etc...
-# 4. compare particle filtered vs re-calibrated forecast for some simulations or trends / neon data
-
 library(mvgam)
 library(dplyr)
 
@@ -17,6 +12,8 @@ colnames(series) <- c('Air')
 fake_data <- series_to_mvgam(series, freq = 12, train_prop = 0.75)
 rm(series)
 
+# Fit a well-specified model in which the GAM component captures the repeated
+# seasonality and the latent trend captures AR parameters up to order 3
 mod <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,
                formula = y ~ s(season, bs = c('cc')),
@@ -28,7 +25,8 @@ mod <- mvjagam(data_train = fake_data$data_train,
                thin = 1,
                auto_update = F)
 
-# An awful model to test the model comparison functions
+# Fit a mis-specified model for testing the model comparison functions by
+# smoothing on a white noise covariate
 fake_data$data_train$fake_cov <- rnorm(NROW(fake_data$data_train))
 fake_data$data_test$fake_cov <- rnorm(NROW(fake_data$data_test))
 mod2 <- mvjagam(data_train = fake_data$data_train,
@@ -38,25 +36,34 @@ mod2 <- mvjagam(data_train = fake_data$data_train,
                use_lv = F,
                trend_model = 'RW',
                n.burnin = 10,
-               n.iter = 100,
+               n.iter = 1000,
                thin = 1,
                auto_update = F)
 
-# Testing rolling DRPS evaluation
-roll_eval_mvgam(mod, n_samples = 1000,
-                fc_horizon = 5, n_cores = 2)
-roll_eval_mvgam(mod2, n_samples = 1000,
-                fc_horizon = 5, n_cores = 2)
+# Compare the models using rolling forecast DRPS evaluation
+compare_mvgams(mod, mod2, fc_horizon = 12,
+               n_evaluations = 15)
 
-# Summary plots and diagnostics
+# Summary plots and diagnostics for the preferred model (Model 1)
+# Check Dunn-Smyth residuals for autocorrelation
 plot(mod$resids$Air)
 lines(mod$resids$Air)
 acf(mod$resids$Air)
 pacf(mod$resids$Air)
-plot_mvgam_smooth(mod, series=1, 'season')
-plot_mvgam_fc(mod2, series = 1)
-plot_mvgam_trend(mod, series = 1)
-plot_mvgam_uncertainty(mod, series=1, data_test = fake_data$data_test)
+
+# Plot the estimated seasonality smooth function
+plot_mvgam_smooth(mod, smooth = 'season')
+
+# Plot the posterior distribution of in-sample and out-of-sample predictions
+plot_mvgam_fc(mod, series = 1, data_test = fake_data$data_test)
+
+# Plot the estimated latent trend
+plot_mvgam_trend(mod, series = 1, data_test = fake_data$data_test)
+
+# Plot estimated contributions to forecast uncertainty
+plot_mvgam_uncertainty(mod, series = 1, data_test = fake_data$data_test)
+
+# Plot estimated trend parameters
 MCMCvis::MCMCtrace(mod$jags_output, c('phi', 'ar1', 'ar2', 'ar3'), pdf = F,
                    n.eff = T)
 par(mfrow=c(1,1))
@@ -130,24 +137,12 @@ trends_mod2 <- mvjagam(data_train = trends_data$data_train,
                       upper_bounds = rep(100, length(terms)),
                       auto_update = F)
 
-mod_eval <- roll_eval_mvgam(object = trends_mod, n_samples = 1000,
-                            fc_horizon = 5, n_cores = 2)
-mod2_eval <- roll_eval_mvgam(object = trends_mod2, n_samples = 1000,
-                            fc_horizon = 5, n_cores = 2)
+# Compare the models using rolling forecast DRPS evaluation
+par(mfrow = c(1,1))
+compare_mvgams(trends_mod, trends_mod2, fc_horizon = 12,
+               n_evaluations = 20)
 
-# Total sum of rolling forecast evaluation DRPS (lower is better)
-mod_eval$sum_drps
-mod2_eval$sum_drps
-
-# Summaries of DRPS
-mod_eval$drps_summary
-mod2_eval$drps_summary
-
-# Summary by forecast horizon
-mod_eval$drps_horizon_summary
-mod2_eval$drps_horizon_summary
-
-# Look at Dunn-Smyth residuals for some series
+# Look at Dunn-Smyth residuals for some series from preferred model (Model 1)
 hist(trends_mod$resids$`dog tick`)
 plot(trends_mod$resids$`dog tick`)
 lines(trends_mod$resids$`dog tick`)
@@ -185,9 +180,11 @@ plot_mvgam_smooth(object = trends_mod, series = 4, smooth = 'season')
 trends_mod$smooth_param_details
 MCMCvis::MCMCtrace(trends_mod$jags_output, 'rho', pdf = F, n.eff = TRUE)
 
-# Inspect traces of latent variable AR components and lv penalties
-MCMCvis::MCMCtrace(trends_mod$jags_output, c('phi','ar1','ar2','ar3'), pdf = F, n.eff = TRUE)
-MCMCvis::MCMCtrace(trends_mod$jags_output, c('lv_coefs'), pdf = F, n.eff = TRUE)
+# Inspect traces of latent variable AR components and lv loadings
+MCMCvis::MCMCtrace(trends_mod$jags_output, c('phi','ar1','ar2','ar3'),
+                   pdf = F, n.eff = TRUE)
+MCMCvis::MCMCtrace(trends_mod$jags_output, c('lv_coefs'), pdf = F,
+                   n.eff = TRUE)
 
 # Plot uncertainty components
 par(mfrow = c(2, 2))

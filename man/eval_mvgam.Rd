@@ -38,3 +38,6 @@ we have only observed data up to the evaluation timepoint and would like to gene
 latent trends. Evaluation involves calculating the Discrete Rank Probability Score and a binary indicator
 for whether or not the true value lies within the forecast's 90\% prediction interval
 }
+\seealso{
+\code{roll_eval_mvgam}, \code{compare_mvgams}
+}

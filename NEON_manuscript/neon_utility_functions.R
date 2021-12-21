@@ -162,7 +162,6 @@ plot_mvgam_gdd = function(out_gam_mod, series, data_test, data_train,
 
   pred_dat <- expand.grid(series = levels(data_train$series)[series],
                           season = 20,
-                          in_season = 1,
                           year = mean(data_train$year),
                           cum_gdd = seq(min(data_train$cum_gdd[which(data_train$series ==
                                                                        levels(data_train$series)[series])],
@@ -250,9 +249,6 @@ prep_neon_data = function(species = 'Ambloyomma_americanum', split_prop = 0.9){
                          dplyr::distinct()) -> model_dat
 
     model_dat = model_dat %>%
-      # Set indicator for whether time point is 'in-season' or not (trends won't contribute during
-      # off season, as counts generally go to zero during this time)
-      dplyr::mutate(in_season = ifelse(season >=3 & season <= 22, 1, 0)) %>%
       # Only include sites that have multiple plots
       dplyr::filter(siteID %in% c('SERC', 'TALL', 'UKFS', 'ORNL'),
                     Year_orig <= 2019) %>%
@@ -301,9 +297,6 @@ prep_neon_data = function(species = 'Ambloyomma_americanum', split_prop = 0.9){
                          dplyr::distinct()) -> model_dat
 
     model_dat = model_dat %>%
-      # Set indicator for whether time point is 'in-season' or not (trends won't contribute during
-      # off season, as counts generally go to zero during this time)
-      dplyr::mutate(in_season = ifelse(season >=3 & season <= 22, 1, 0)) %>%
       # Only include sites that have multiple plots
       dplyr::filter(siteID %in% c('SERC', 'BLAN', 'SCBI'),
                     Year_orig <= 2019) %>%

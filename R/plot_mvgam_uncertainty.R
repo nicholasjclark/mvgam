@@ -1,7 +1,7 @@
 #'Plot mvjagam forecast uncertainty contributions for a specified series
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param data_test A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
+#'@param data_test A \code{dataframe} containing at least 'series', 'season' and 'year' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
 #'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".

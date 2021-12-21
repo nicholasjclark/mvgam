@@ -6,8 +6,8 @@
 #'according to their state space dynamics. The forecast is a weighted ensemble, with weights determined by
 #'each particle's proposal likelihood prior to the most recent assimilation step
 #'
-#'@param data_test A \code{dataframe} of test data containing at least 'series', 'season', 'year' and
-#''in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}
+#'@param data_test A \code{dataframe} of test data containing at least 'series', 'season' and 'year',
+#'in addition to any other variables included in the linear predictor of \code{formula}
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
 #'@param file_path \code{character} string specifying the file path where the particles have been saved
 #'@param plot_legend \code{logical} stating whether to include a legend to highlight which observations

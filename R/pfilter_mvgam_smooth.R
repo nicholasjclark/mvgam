@@ -13,7 +13,7 @@
 #'@param next_assim A \code{dataframe} of test data containing at one more observation per series
 #'(beyond the last observation seen by the model when initialising particles with
 #' \code{\link{pfilter_mvgam_init}} or in previous calls to \code{pfilter_mvgam_online}.
-#'Should at least contain 'series', 'season', 'year' and in_season' for the one-step ahead horizon,
+#'Should at least contain 'series', 'season' and 'year' for the one-step ahead horizon,
 #'in addition to any other variables included in the linear predictor of \code{object}
 #'@param threshold \code{proportional numeric} specifying the Effective Sample Size limit under which
 #'resampling of particles will be triggered (calculated as \code{ESS / n_particles}) if \code{use_resampling == TRUE}.

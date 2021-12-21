@@ -34,15 +34,11 @@ required by the GAM \code{formula}. Should include columns:
 'y' (the discrete outcomes; NAs allowed)
 'series' (character or factor index of the series IDs)
 'season' (numeric index of the seasonal time point for each observation)
-'year' the numeric index for year, and
-'in_season', an indicator for whether the observation is in season or not. If the counts tend to go to zero
-during the off season (as in tick counts for example), setting 'in_season' to zero during these seasonal periods
-can be useful as trends won't contribute
-during this time but they will continue to evolve rather than being forced to zero during each off-season
+and 'year' the numeric index for year.
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
-\item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season', 'year' and
-'in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}}
+\item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season', and 'year'
+in addition to any other variables included in the linear predictor of \code{formula}}
 
 \item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 simulations from prior distributions are returned}

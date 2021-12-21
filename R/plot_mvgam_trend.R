@@ -1,8 +1,8 @@
 #'Plot mvjagam latent trend for a specified series
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season', 'year' and
-#''in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}
+#'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season' and 'year'
+#'forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
 #'@export

@@ -4,14 +4,14 @@
 \alias{plot_mvgam_smooth}
 \title{Plot mvjagam smooth terms}
 \usage{
-plot_mvgam_smooth(object, series, smooth, newdata)
+plot_mvgam_smooth(object, series = 1, smooth, newdata)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
-\item{newdata}{Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season', 'year',
+\item{newdata}{Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
 in addition to any other variables included in the linear predictor of the original model's \code{formula}}
 }
 \value{

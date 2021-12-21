@@ -47,8 +47,8 @@ hyp3 = y ~
   s(season, by = series, m = 1, k = 8) - 1
 
 # Fit each hypothesis
-n.burnin = 100000
-n.iter = 5000
+n.burnin = 2000
+n.iter = 2000
 thin = 1
 
 fit_null <- fit_mvgam(data_train = all_data$data_train,
@@ -74,6 +74,13 @@ fit_hyp1 <- fit_mvgam(data_train = all_data$data_train,
                       thin = thin,
                       auto_update = F,
                       interval_width = 0.9)
+
+par(mfrow = c(1,1))
+compare_mvgams(model1 = fit_null$out_gam_mod,
+               model2 = fit_hyp1$out_gam_mod,
+               fc_horizon = 6,
+               n_evaluations = 20, n_samples = 1000,
+               n_cores = 2)
 
 fit_hyp2 <- fit_mvgam(data_train = all_data$data_train,
                       data_test = all_data$data_test,

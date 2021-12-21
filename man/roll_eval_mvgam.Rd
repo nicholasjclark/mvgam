@@ -6,7 +6,7 @@
 \usage{
 roll_eval_mvgam(
   object,
-  n_evaluations,
+  n_evaluations = 5,
   evaluation_seq,
   n_samples = 5000,
   fc_horizon = 3,

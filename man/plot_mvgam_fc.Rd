@@ -11,8 +11,8 @@ plot_mvgam_fc(object, series, data_test, hide_xlabels = FALSE, ylim)
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
-\item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season', 'year' and
-'in_season' for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}}
+\item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season' and 'year'
+for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}}
 
 \item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 \code{axis} from base \code{R}}

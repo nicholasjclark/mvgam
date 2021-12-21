@@ -17,7 +17,7 @@ plot_mvgam_uncertainty(
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
-\item{data_test}{A \code{dataframe} containing at least 'series', 'season', 'year' and 'in_season' for the forecast horizon, in
+\item{data_test}{A \code{dataframe} containing at least 'series', 'season' and 'year' for the forecast horizon, in
 addition to any other variables included in the linear predictor of \code{formula}}
 
 \item{legend_position}{The location may also be specified by setting x to a single keyword from the

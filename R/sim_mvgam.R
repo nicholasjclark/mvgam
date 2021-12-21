@@ -126,8 +126,7 @@ sim_mvgam = function(T = 100,
   sim_data = data.frame(y = obs_ys,
                         season = rep(rep(seq(1, freq), ceiling(T/freq))[1:T], n_series),
                         year = rep(sort(rep(seq(1, ceiling(T/freq)), freq))[1:T], n_series),
-                        series = as.factor(paste0('series_', sort(rep(seq(1, n_series), T)))),
-                        in_season = 1) %>%
+                        series = as.factor(paste0('series_', sort(rep(seq(1, n_series), T))))) %>%
     dplyr::arrange(year, season, series)
 
   list(data_train = sim_data[1:(floor(nrow(sim_data) * train_prop)),],

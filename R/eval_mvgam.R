@@ -17,6 +17,7 @@
 #'@param fc_horizon \code{integer} specifying the length of the forecast horizon for evaluating forecasts
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
 #'@return A \code{list} object containing information on specific evaluations for each series
+#'@seealso \code{roll_eval_mvgam}, \code{compare_mvgams}
 #'@export
 eval_mvgam = function(object,
                       n_samples = 5000,
@@ -300,19 +301,22 @@ eval_mvgam = function(object,
   # Wrapper to operate on all observations in fc_horizon
   drps_mcmc_object <- function(truth, fc, interval_width = 0.9){
     indices_keep <- which(!is.na(truth))
-    scores <- matrix(NA, nrow = max(indices_keep), ncol = 2)
-    for(i in indices_keep){
-      scores[i,] <- drps_score(truth = as.vector(truth)[i],
-                               fc = fc[i,], interval_width)
+    if(length(indices_keep) == 0){
+      scores = data.frame('drps' = rep(NA, length(truth)),
+                          'interval' = rep(NA, length(truth)))
+    } else {
+      scores <- matrix(NA, nrow = length(truth), ncol = 2)
+      for(i in indices_keep){
+        scores[i,] <- drps_score(truth = as.vector(truth)[i],
+                                 fc = fc[i,], interval_width)
+      }
     }
-    # Truths further away get more weight
-    scores[,1] <- scores[,1] * log(indices_keep + 1)
     scores
   }
 
   # Calculate DRPS and interval coverage per series
   series_drps <- lapply(seq_len(n_series), function(series){
-    DRPS <- data.frame(drps_mcmc_object(series_truths[[series]],
+    DRPS <- data.frame(drps_mcmc_object(as.vector(as.matrix(series_truths[[series]])),
                                         series_fcs[[series]]))
     colnames(DRPS) <- c('drps','in_interval')
     DRPS$eval_horizon <- seq(1, fc_horizon)
