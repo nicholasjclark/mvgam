@@ -50,13 +50,28 @@ roll_eval_mvgam = function(object,
   }
 
   # Loop across evaluation sequence and calculate evaluation metrics
-  evals <- lapply(evaluation_seq, function(timepoint){
+  cl <- parallel::makePSOCKcluster(n_cores)
+  setDefaultCluster(cl)
+  clusterExport(NULL, c('all_timepoints',
+                        'evaluation_seq',
+                        'object',
+                        'n_samples',
+                        'fc_horizon',
+                        'eval_mvgam'),
+                envir = environment())
+  parallel::clusterEvalQ(cl, library(mgcv))
+  parallel::clusterEvalQ(cl, library(coda))
+
+  pbapply::pboptions(type = "none")
+  evals <- pbapply::pblapply(evaluation_seq, function(timepoint){
     eval_mvgam(object = object,
                n_samples = n_samples,
-               n_cores = n_cores,
+               n_cores = 1,
                eval_timepoint = timepoint,
                fc_horizon = fc_horizon)
-  })
+  },
+  cl = cl)
+  stopCluster(cl)
 
   # Take sum of DRPS at each evaluation point for multivariate models
   sum_or_na = function(x){
@@ -66,6 +81,7 @@ roll_eval_mvgam = function(object,
       sum(x, na.rm = T)
     }
   }
+
   evals_df <- do.call(rbind, do.call(rbind, evals)) %>%
     dplyr::group_by(eval_season, eval_year, eval_horizon) %>%
     dplyr::summarise(drps = sum_or_na(drps),

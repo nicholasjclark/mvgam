@@ -141,6 +141,8 @@ eval_mvgam = function(object,
   }
 
   # Run particles forward in time to generate their forecasts
+  if(n_cores > 1){
+
   cl <- parallel::makePSOCKcluster(n_cores)
   setDefaultCluster(cl)
   clusterExport(NULL, c('use_lv',
@@ -258,6 +260,102 @@ eval_mvgam = function(object,
     series_fcs
   }, cl = cl)
   stopCluster(cl)
+
+  } else {
+    particle_fcs <- lapply(sample_seq, function(x){
+
+      if(use_lv){
+        # Sample a last state estimate for the latent variables
+        samp_index <- x
+        last_lvs <- lapply(seq_along(lvs), function(lv){
+          lvs[[lv]][samp_index, ]
+        })
+
+        # Sample drift and AR parameters
+        phi <- phis[samp_index, ]
+        ar1 <- ar1s[samp_index, ]
+        ar2 <- ar2s[samp_index, ]
+        ar3 <- ar3s[samp_index, ]
+
+        # Sample lv precision
+        tau <- taus[samp_index,]
+
+        # Sample lv loadings
+        lv_coefs <- do.call(rbind, lapply(seq_len(n_series), function(series){
+          lv_coefs[[series]][samp_index,]
+        }))
+
+        # Sample beta coefs
+        betas <- betas[samp_index, ]
+
+        # Sample a negative binomial size parameter
+        size <- sizes[samp_index, ]
+
+        # Run the latent variables forward fc_horizon timesteps
+        lv_preds <- do.call(rbind, lapply(seq_len(n_lv), function(lv){
+          sim_ar3(phi = phi[lv],
+                  ar1 = ar1[lv],
+                  ar2 = ar2[lv],
+                  ar3 = ar3[lv],
+                  tau = tau,
+                  state = last_lvs[[lv]],
+                  h = fc_horizon)
+        }))
+
+        series_fcs <- lapply(seq_len(n_series), function(series){
+          trend_preds <- as.numeric(t(lv_preds) %*% lv_coefs[series,])
+          trunc_preds <- rnbinom(fc_horizon,
+                                 mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                                       betas)) + (trend_preds)),
+                                 size = size)
+          trunc_preds
+        })
+
+      } else {
+        # Run the trends forward fc_horizon timesteps
+        # Sample index for the particle
+        samp_index <- x
+
+        # Sample beta coefs
+        betas <- betas[samp_index, ]
+
+        # Sample last state estimates for the trends
+        last_trends <- lapply(seq_along(trends), function(trend){
+          trends[[trend]][samp_index, ]
+        })
+
+        # Sample AR parameters
+        phi <- phis[samp_index, ]
+        ar1 <- ar1s[samp_index, ]
+        ar2 <- ar2s[samp_index, ]
+        ar3 <- ar3s[samp_index, ]
+
+        # Sample trend precisions
+        tau <- taus[samp_index,]
+
+        # Sample a negative binomial size parameter
+        size <- sizes[samp_index, ]
+
+        series_fcs <- lapply(seq_len(n_series), function(series){
+          trend_preds <- sim_ar3(phi = phi[series],
+                                 ar1 = ar1[series],
+                                 ar2 = ar2[series],
+                                 ar3 = ar3[series],
+                                 tau = tau[series],
+                                 state = last_trends[[series]],
+                                 h = fc_horizon)
+          fc <-  rnbinom(fc_horizon,
+                         mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                               betas)) + (trend_preds)),
+                         size = size)
+          fc
+        })
+      }
+
+      series_fcs
+    })
+
+  }
 
   # Final forecast distribution
   series_fcs <- lapply(seq_len(n_series), function(series){

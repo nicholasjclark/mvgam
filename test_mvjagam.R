@@ -20,7 +20,7 @@ mod <- mvjagam(data_train = fake_data$data_train,
                family = 'nb',
                use_lv = F,
                trend_model = 'AR3',
-               n.burnin = 5000,
+               n.burnin = 10000,
                auto_update = F)
 
 # Fit a mis-specified model for testing the model comparison functions by
@@ -30,7 +30,7 @@ fake_data$data_test$fake_cov <- rnorm(NROW(fake_data$data_test))
 mod2 <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,
                formula = y ~ s(fake_cov, k = 3),
-               family = 'nb',
+               family = 'poisson',
                use_lv = F,
                trend_model = 'RW',
                n.burnin = 10,
@@ -39,8 +39,8 @@ mod2 <- mvjagam(data_train = fake_data$data_train,
                auto_update = F)
 
 # Compare the models using rolling forecast DRPS evaluation
-compare_mvgams(mod, mod2, fc_horizon = 12,
-               n_evaluations = 15)
+compare_mvgams(mod, mod2, fc_horizon = 6,
+               n_evaluations = 25, n_cores = 4)
 
 # Summary plots and diagnostics for the preferred model (Model 1)
 # Check Dunn-Smyth residuals for autocorrelation
@@ -48,13 +48,6 @@ plot(mod$resids$Air)
 lines(mod$resids$Air)
 acf(mod$resids$Air)
 pacf(mod$resids$Air)
-
-test <- gam(y ~ s(season, bs = c('cc')),
-            data = fake_data$data_train,
-            family = nb())
-autoplot(forecast(ets(residuals(test), model = 'AAN', damped = T)))
-autoplot(forecast(Arima(residuals(test), order = c(3,0,0),
-                        include.drift = T)))
 
 # Plot the estimated seasonality smooth function
 plot_mvgam_smooth(mod, smooth = 'season')
