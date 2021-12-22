@@ -12,6 +12,7 @@
 #'are allowed (no smooth interactions can be plotted). For more nuanced visualisation, supply
 #'\code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model
 #'@return A base \code{R} graphics plot
+#'@seealso \code{\link[mgcv]{plot.gam}}
 #'@export
 plot_mvgam_smooth = function(object, series = 1, smooth, newdata){
 
@@ -63,13 +64,12 @@ plot_mvgam_smooth = function(object, series = 1, smooth, newdata){
 
   # Extract GAM coefficients
   betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
-  gam_comps <- MCMCvis::MCMCchains(object$jags_output, 'gam_comp')[,series]
 
   # Predictions
   pred_vals <- as.vector(as.matrix(pred_dat[,smooth]))
-  preds <- matrix(NA, nrow = length(gam_comps), ncol = length(pred_vals))
-  for(i in 1:length(gam_comps)){
-    preds[i,] <- gam_comps[i] * (Xp %*% betas[i,])
+  preds <- matrix(NA, nrow = NROW(betas), ncol = length(pred_vals))
+  for(i in 1:NROW(betas)){
+    preds[i,] <- (Xp %*% betas[i,])
   }
 
   # Plot 95% and 68% credible intervals

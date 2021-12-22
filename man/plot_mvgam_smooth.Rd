@@ -27,3 +27,6 @@ their means (for numeric varibles) or at the first level (factor variables). At 
 are allowed (no smooth interactions can be plotted). For more nuanced visualisation, supply
 \code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model
 }
+\seealso{
+\code{\link[mgcv]{plot.gam}}
+}

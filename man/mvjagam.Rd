@@ -2,7 +2,7 @@
 % Please edit documentation in R/mvjagam.R
 \name{mvjagam}
 \alias{mvjagam}
-\title{Fit a Bayesian multivariate GAM to a set of discrete time series}
+\title{Fit a Bayesian multivariate dynamic GAM to a set of discrete time series}
 \usage{
 mvjagam(
   formula,
@@ -19,7 +19,8 @@ mvjagam(
   thin = 2,
   auto_update = TRUE,
   phi_prior,
-  r_prior = "dexp(0.001)",
+  ar_prior,
+  r_prior,
   tau_prior,
   upper_bounds
 )
@@ -31,22 +32,24 @@ to specify that the linear predictor depends on smooth functions of predictors (
 
 \item{data_train}{A \code{dataframe} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
-'y' (the discrete outcomes; NAs allowed)
+'y' (the discrete outcomes; \code{NA}s allowed)
 'series' (character or factor index of the series IDs)
 'season' (numeric index of the seasonal time point for each observation)
 and 'year' the numeric index for year.
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
 \item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season', and 'year'
-in addition to any other variables included in the linear predictor of \code{formula}}
+in addition to any other variables included in the linear predictor of \code{formula}. If included, the
+observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
+simulations can be obtained}
 
 \item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 simulations from prior distributions are returned}
 
 \item{family}{\code{character}. Must be either 'nb' (for Negative Binomial) or 'poisson'}
 
-\item{use_lv}{\code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
-latent trends. If \code{FALSE}, estimate independent latent trends}
+\item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
+latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series}
 
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
 Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(5, floor(n_series / 2))}}
@@ -55,18 +58,25 @@ Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(5, floor(n_series 
 'RW' (random walk with drift), 'AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
 'AR3' (AR3 model with intercept)}
 
-\item{n.chains}{\code{integer} the number of parallel chains for the model}
+\item{n.chains}{\code{integer} specifying the number of parallel chains for the model}
 
-\item{n.iter}{\code{integer} the number of iterations of the Markov chain to run}
+\item{n.burnin}{\code{integer} specifying the number of iterations of the Markov chain to run during
+adaptive mode to tune sampling algorithms}
 
-\item{auto_update}{\code{logical} If \code{TRUE}, the model is run for up to \code{3} additional sets of
-\code{n.iter} iterations, or until the lower 15th percentile of effective sample sizes reaches \code{100}}
+\item{n.iter}{\code{integer} specifying the number of iterations of the Markov chain to run for sampling the posterior distribution}
 
-\item{phi_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the drift terms in the
-latent trends}
+\item{auto_update}{\code{logical}. If \code{TRUE}, the model is run for up to \code{15,000} additional
+iterations, or until the lower 10th percentile of effective sample sizes for the GAM smoothing
+parameters and beta coefficients reaches \code{100}}
+
+\item{phi_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the drift terms/intercepts
+in the latent trends}
+
+\item{ar_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the AR terms
+in the latent trends}
 
 \item{r_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
-overdispersion parameter}
+overdispersion parameter. Ignored if \code{family = 'poisson'}}
 
 \item{tau_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
 precisions used for the latent trends (ignored if \code{use_lv == TRUE})}
@@ -84,16 +94,24 @@ series and information needed for other functions in the package
 }
 \description{
 This function estimates the posterior distribution for a multivariate GAM that includes
-smooth seasonality and possible other smooth functions specified in the GAM formula. State-space latent trends
-are estimated for each series, with currently two options for specifying the
-structures of the trends (either as latent dynamic factors to capture trend dependencies, or as independent trends)
+smooth functions, specified in the GAM formula, and state-space latent trends, specified by trend_model.
+There are currently two options for specifying the structures of the trends (either as latent
+dynamic factors to capture trend dependencies in a reduced dimension format, or as independent trends)
 }
 \details{
 A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent
-state space trends. The model parameters are esimated in a Bayesian framework using Gibbs sampling
+state space trends. Prior distributions for most important terms can be altered by the user to inspect model
+sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
+accordingly. The model parameters are esimated in a Bayesian framework using Gibbs sampling
 in \code{\link[rjags]{jags.model}}. For the time being, all series are assumed to have the same overdispersion
 parameter when using a negative binomial distribution, though this will be relaxed in future versions. For each
 series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
 medians of posterior predictions. If the fitted model is appropriate then Dunn-Smyth residuals will be
 standard normal in distribution and no autocorrelation will be evident
+}
+\seealso{
+\code{\link[rjags]{jags.model}}, \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
+}
+\author{
+Nicholas J Clark
 }

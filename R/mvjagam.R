@@ -1,9 +1,9 @@
-#'Fit a Bayesian multivariate GAM to a set of discrete time series
+#'Fit a Bayesian multivariate dynamic GAM to a set of discrete time series
 #'
 #'This function estimates the posterior distribution for a multivariate GAM that includes
-#'smooth seasonality and possible other smooth functions specified in the GAM formula. State-space latent trends
-#'are estimated for each series, with currently two options for specifying the
-#'structures of the trends (either as latent dynamic factors to capture trend dependencies, or as independent trends)
+#'smooth functions, specified in the GAM formula, and state-space latent trends, specified by trend_model.
+#'There are currently two options for specifying the structures of the trends (either as latent
+#'dynamic factors to capture trend dependencies in a reduced dimension format, or as independent trends)
 #'
 #'
 #'@param formula A \code{character} string specifying the GAM formula. These are exactly like the formula
@@ -11,31 +11,38 @@
 #'to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).
 #'@param data_train A \code{dataframe} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
-#''y' (the discrete outcomes; NAs allowed)
+#''y' (the discrete outcomes; \code{NA}s allowed)
 #''series' (character or factor index of the series IDs)
 #''season' (numeric index of the seasonal time point for each observation)
 #' and 'year' the numeric index for year.
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
 #'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season', and 'year'
-#'in addition to any other variables included in the linear predictor of \code{formula}
+#'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
+#'observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
+#'simulations can be obtained
 #'@param prior_simulation \code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 #'simulations from prior distributions are returned
 #'@param family \code{character}. Must be either 'nb' (for Negative Binomial) or 'poisson'
-#'@param use_lv \code{logical} If \code{TRUE}, use latent dynamic factors to estimate correlations in series'
-#'latent trends. If \code{FALSE}, estimate independent latent trends
+#'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
+#'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
 #'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(5, floor(n_series / 2))}
 #'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
 #''RW' (random walk with drift), 'AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
 #''AR3' (AR3 model with intercept)
-#'@param n.chains \code{integer} the number of parallel chains for the model
-#'@param n.iter \code{integer} the number of iterations of the Markov chain to run
-#'@param auto_update \code{logical} If \code{TRUE}, the model is run for up to \code{3} additional sets of
-#'\code{n.iter} iterations, or until the lower 15th percentile of effective sample sizes reaches \code{100}
-#'@param phi_prior \code{character} specifying (in JAGS syntax) the prior distributions for the drift terms in the
-#'latent trends
+#'@param n.chains \code{integer} specifying the number of parallel chains for the model
+#'@param n.burnin \code{integer} specifying the number of iterations of the Markov chain to run during
+#'adaptive mode to tune sampling algorithms
+#'@param n.iter \code{integer} specifying the number of iterations of the Markov chain to run for sampling the posterior distribution
+#'@param auto_update \code{logical}. If \code{TRUE}, the model is run for up to \code{15,000} additional
+#'iterations, or until the lower 10th percentile of effective sample sizes for the GAM smoothing
+#'parameters and beta coefficients reaches \code{100}
+#'@param phi_prior \code{character} specifying (in JAGS syntax) the prior distribution for the drift terms/intercepts
+#'in the latent trends
+#'@param ar_prior \code{character} specifying (in JAGS syntax) the prior distribution for the AR terms
+#'in the latent trends
 #'@param r_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
-#'overdispersion parameter
+#'overdispersion parameter. Ignored if \code{family = 'poisson'}
 #'@param tau_prior \code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
 #'precisions used for the latent trends (ignored if \code{use_lv == TRUE})
 #'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
@@ -43,13 +50,18 @@
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 #'truncation entirely (i.e. there is no upper bound for each series)
 #'@details A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent
-#'state space trends. The model parameters are esimated in a Bayesian framework using Gibbs sampling
+#'state space trends. Prior distributions for most important terms can be altered by the user to inspect model
+#'sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
+#'accordingly. The model parameters are esimated in a Bayesian framework using Gibbs sampling
 #'in \code{\link[rjags]{jags.model}}. For the time being, all series are assumed to have the same overdispersion
 #'parameter when using a negative binomial distribution, though this will be relaxed in future versions. For each
 #'series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
 #'medians of posterior predictions. If the fitted model is appropriate then Dunn-Smyth residuals will be
 #'standard normal in distribution and no autocorrelation will be evident
 #'
+#'@author Nicholas J Clark
+#'
+#'@seealso \code{\link[rjags]{jags.model}}, \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
 #'@return A \code{list} object containing JAGS model output, the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
 #'unsampled covariate values), the names of the smooth parameters, Dunn-Smyth residuals for each
@@ -71,7 +83,8 @@ mvjagam = function(formula,
                     thin = 2,
                     auto_update = TRUE,
                     phi_prior,
-                    r_prior = 'dexp(0.001)',
+                    ar_prior,
+                    r_prior,
                     tau_prior,
                     upper_bounds){
 
@@ -140,16 +153,8 @@ mvjagam = function(formula,
                       ## Mean expectations
                       for (i in 1:n) {
                       for (s in 1:n_series) {
-                      mu[i, s] <- exp(gam_comp[s] * eta[ytimes[i, s]] +
-                      trend_comp[s] * trend[i, s])
+                      mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
                       }
-                      }
-
-                      ### Redundant but keeping in for now ###
-                      # Ensure trend does not completely dominate unless supported by data
-                      for (s in 1:n_series) {
-                      gam_comp[s] <- 0.5
-                      trend_comp[s] <- 1 - gam_comp[s]
                       }
 
                       ## State space trends
@@ -191,7 +196,7 @@ mvjagam = function(formula,
                       (r / (r + mu[i, s])))
                       }
                       }
-                      r ~ dgamma(0.01, 0.01)
+                      r ~ dexp(0.001)
 
                       ## Posterior predictions
                       for (i in 1:n) {
@@ -210,6 +215,12 @@ mvjagam = function(formula,
     # Update further prior distributions
     if(!missing(phi_prior)){
       model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('   phi[s] ~ ', phi_prior)
+    }
+
+    if(!missing(ar_prior)){
+      model_file[grep('ar1\\[s\\] ~', model_file)] <- paste0('   ar1[s] ~ ', ar_prior)
+      model_file[grep('ar2\\[s\\] ~', model_file)] <- paste0('   ar2[s] ~ ', ar_prior)
+      model_file[grep('ar3\\[s\\] ~', model_file)] <- paste0('   ar3[s] ~ ', ar_prior)
     }
 
     if(!missing(tau_prior)){
@@ -268,15 +279,8 @@ mvjagam = function(formula,
         ## Mean expectations
         for (i in 1:n) {
         for (s in 1:n_series) {
-        mu[i, s] <- exp(gam_comp[s] * eta[ytimes[i, s]] +
-                        trend_comp[s] * trend[i, s])
+        mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
         }
-        }
-
-        # Ensure trend does not completely dominate unless supported by data
-        for (s in 1:n_series) {
-        gam_comp[s] <- 0.5
-        trend_comp[s] <- 1 - gam_comp[s]
         }
 
         ## Latent factors evolve as time series with shared precision
@@ -315,11 +319,10 @@ mvjagam = function(formula,
         ## Global shrinkage penalty (half cauchy)
         lv_tau ~ dt(0, 1, 1)T(0, )
 
-        ## Shrinkage penalties for each factor
+        ## Shrinkage penalties for each factor (half cauchy)
         for (j in 1:n_lv){
-         penalty[j] ~ dgamma(penalty_shape, 0.001)
+         penalty[j] ~ dt(0, 1, 1)T(0, )
         }
-        penalty_shape ~ dunif(0.001, 1)
 
         ## Upper triangle of loading matrix set to zero
         for(j in 1:(n_lv - 1)){
@@ -362,7 +365,7 @@ mvjagam = function(formula,
                             (r / (r + mu[i, s])))
         }
         }
-        r ~ dgamma(0.01, 0.01)
+        r ~ dexp(0.001)
 
         ## Posterior predictions
         for (i in 1:n) {
@@ -381,6 +384,12 @@ mvjagam = function(formula,
       # Update further prior distributions
       if(!missing(phi_prior)){
         model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('   phi[s] ~ ', phi_prior)
+      }
+
+      if(!missing(ar_prior)){
+        model_file[grep('ar1\\[s\\] ~', model_file)] <- paste0('   ar1[s] ~ ', ar_prior)
+        model_file[grep('ar2\\[s\\] ~', model_file)] <- paste0('   ar2[s] ~ ', ar_prior)
+        model_file[grep('ar3\\[s\\] ~', model_file)] <- paste0('   ar3[s] ~ ', ar_prior)
       }
 
       if(!missing(tau_prior)){
@@ -526,12 +535,10 @@ mvjagam = function(formula,
   # Gather posterior samples for the specified parameters
   if(!use_lv){
     param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
-               'tau', 'trend', 'gam_comp', 'trend_comp',
-               'ar1', 'ar2', 'ar3')
+               'tau', 'trend', 'ar1', 'ar2', 'ar3')
   } else {
     param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi', 'LV',
-                 'trend', 'lv_coefs', 'tau_fac', 'penalty',
-                 'gam_comp', 'trend_comp',
+               'trend', 'lv_coefs', 'tau_fac', 'penalty',
                'ar1', 'ar2', 'ar3')
   }
 
@@ -549,7 +556,7 @@ mvjagam = function(formula,
   mod_summary <- MCMCvis::MCMCsummary(out_gam_mod, update_params)
   for(i in 1:3){
     if(quantile(mod_summary$Rhat, 0.85, na.rm = T) <= 1.2 &
-       quantile(mod_summary$n.eff, 0.15) >= 100){
+       quantile(mod_summary$n.eff, 0.1) >= 100){
       break;
     }
     cat('Convergence not reached. Extending burnin...\n')

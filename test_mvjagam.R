@@ -20,9 +20,7 @@ mod <- mvjagam(data_train = fake_data$data_train,
                family = 'nb',
                use_lv = F,
                trend_model = 'AR3',
-               n.burnin = 4000,
-               n.iter = 1000,
-               thin = 1,
+               n.burnin = 5000,
                auto_update = F)
 
 # Fit a mis-specified model for testing the model comparison functions by
@@ -50,6 +48,13 @@ plot(mod$resids$Air)
 lines(mod$resids$Air)
 acf(mod$resids$Air)
 pacf(mod$resids$Air)
+
+test <- gam(y ~ s(season, bs = c('cc')),
+            data = fake_data$data_train,
+            family = nb())
+autoplot(forecast(ets(residuals(test), model = 'AAN', damped = T)))
+autoplot(forecast(Arima(residuals(test), order = c(3,0,0),
+                        include.drift = T)))
 
 # Plot the estimated seasonality smooth function
 plot_mvgam_smooth(mod, smooth = 'season')

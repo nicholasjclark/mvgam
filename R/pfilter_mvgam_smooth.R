@@ -114,11 +114,10 @@ pfilter_mvgam_smooth = function(particles,
     } else {
       series_weight <- dnbinom(next_assim$y[series],
                         size = particles[[x]]$size,
-                        mu = exp((particles[[x]]$gam_comp[series] *
+                        mu = exp((
                                     (Xp[which(as.numeric(next_assim$series) == series),] %*%
                                        particles[[x]]$betas)) +
-                                   (trend_states[series] *
-                                      (1 - particles[[x]]$gam_comp[series]))))
+                                   (trend_states[series])))
     }
     series_weight
   })), na.rm = T)
@@ -134,7 +133,6 @@ pfilter_mvgam_smooth = function(particles,
         lv_states = next_lvs,
         lv_coefs = particles[[x]]$lv_coefs,
         betas = particles[[x]]$betas,
-        gam_comp = particles[[x]]$gam_comp,
         size = particles[[x]]$size,
         tau = particles[[x]]$tau,
         phi = particles[[x]]$phi,
@@ -412,7 +410,6 @@ pfilter_mvgam_smooth = function(particles,
          lv_states = lv_evolve,
          lv_coefs = lv_coefs_evolve,
          betas = betas,
-         gam_comp = particles[[x]]$gam_comp,
          size = particles[[x]]$size,
          tau = particles[[x]]$tau,
          phi = phi_evolve,

@@ -2,10 +2,16 @@
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season' and 'year'
-#'for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}
+#'for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
+#'included, the test values are shown as points on the plot to help visualise the accuracy of the model's forecast.
+#'Note this is only useful if the same \code{data_test} was also included when fitting the original model.
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
 #'@param ylim Optional \code{vector} of y-axis limits (min, max)
+#'@details Posterior predictions are drawn from the fitted \code{mvjagam} and used to calculate 95 percent and
+#'68 percent highest posterior density credible intervals. These are plotted along with the true observed data
+#'that was used to train the model.
+#'@return A base \code{R} graphics plot
 #'@export
 plot_mvgam_fc = function(object, series, data_test, hide_xlabels = FALSE, ylim){
 

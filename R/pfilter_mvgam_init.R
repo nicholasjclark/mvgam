@@ -92,9 +92,6 @@ for(i in 1:dim(betas_orig)[1]){
   betas[i,] <- betas_hpd
 }
 
-# GAM component weights
-gam_comps <- MCMCvis::MCMCchains(object$jags_output, 'gam_comp')
-
 # Phi estimates for latent trend drift terms
 phis <- MCMCvis::MCMCchains(object$jags_output, 'phi')
 
@@ -126,7 +123,6 @@ clusterExport(NULL, c('use_lv',
                       'Xp',
                       'betas',
                       'series_test',
-                      'gam_comps',
                       'truth',
                       'last_assim',
                       'taus',
@@ -168,9 +164,8 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     lv_coefs[[series]][samp_index,]
   }))
 
-  # Sample beta coefs and GAM contributions
+  # Sample beta coefs
   betas <- betas[samp_index, ]
-  gam_comp <- gam_comps[samp_index, ]
 
   # Sample a negative binomial size parameter
   size <- sizes[samp_index, ]
@@ -200,9 +195,8 @@ particles <- pbapply::pblapply(sample_seq, function(x){
       weight <- 1
     } else {
       weight <- dnbinom(truth[series], size = size,
-                        mu = exp((gam_comp[series] *
-                                    (Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                   (trends[series] * (1 - gam_comp[series]))))
+                        mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
+                                   (trends[series])))
     }
     weight
   })), na.rm = T)
@@ -217,9 +211,8 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     # Sample index for the particle
     samp_index <- x
 
-    # Sample beta coefs and GAM contributions
+    # Sample beta coefs
     betas <- betas[samp_index, ]
-    gam_comp <- gam_comps[samp_index, ]
 
     # Sample last state estimates for the trends
     last_trends <- lapply(seq_along(trends), function(trend){
@@ -252,9 +245,8 @@ particles <- pbapply::pblapply(sample_seq, function(x){
         weight <- 1
       } else {
         weight <- dnbinom(truth[series], size = size,
-                          mu = exp((gam_comp[series] *
-                                      (Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                     (trends[series] * (1 - gam_comp[series]))))
+                          mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
+                                     (trends[series])))
       }
       weight
     })), na.rm = T)
@@ -272,7 +264,6 @@ list(use_lv = use_lv,
      lv_states = next_lvs,
      lv_coefs = lv_coefs,
      betas = as.numeric(betas),
-     gam_comp = as.numeric(gam_comp),
      size = as.numeric(size),
      tau = as.numeric(tau),
      phi = as.numeric(phi),

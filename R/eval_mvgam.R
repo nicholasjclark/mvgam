@@ -102,9 +102,6 @@ eval_mvgam = function(object,
   # Beta coefficients for GAM component
   betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
 
-  # GAM component weights
-  gam_comps <- MCMCvis::MCMCchains(object$jags_output, 'gam_comp')
-
   # Phi estimates for latent trend drift terms
   phis <- MCMCvis::MCMCchains(object$jags_output, 'phi')
 
@@ -152,7 +149,6 @@ eval_mvgam = function(object,
                         'data_assim',
                         'Xp',
                         'betas',
-                        'gam_comps',
                         'taus',
                         'phis',
                         'ar1s',
@@ -192,9 +188,8 @@ eval_mvgam = function(object,
         lv_coefs[[series]][samp_index,]
       }))
 
-      # Sample beta coefs and GAM contributions
+      # Sample beta coefs
       betas <- betas[samp_index, ]
-      gam_comp <- gam_comps[samp_index, ]
 
       # Sample a negative binomial size parameter
       size <- sizes[samp_index, ]
@@ -211,13 +206,10 @@ eval_mvgam = function(object,
       }))
 
       series_fcs <- lapply(seq_len(n_series), function(series){
-        trend_preds <- as.numeric(t(lv_preds) %*% lv_coefs[series,]) *
-          (1 - gam_comp[series])
+        trend_preds <- as.numeric(t(lv_preds) %*% lv_coefs[series,])
         trunc_preds <- rnbinom(fc_horizon,
-                               mu = exp(as.vector(gam_comp[series] *
-                                                    (Xp[which(as.numeric(data_assim$series) == series),] %*%
-                                                       betas)) +
-                                          (trend_preds)),
+                               mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                                       betas)) + (trend_preds)),
                                size = size)
         trunc_preds
       })
@@ -227,9 +219,8 @@ eval_mvgam = function(object,
       # Sample index for the particle
       samp_index <- x
 
-      # Sample beta coefs and GAM contributions
+      # Sample beta coefs
       betas <- betas[samp_index, ]
-      gam_comp <- gam_comps[samp_index, ]
 
       # Sample last state estimates for the trends
       last_trends <- lapply(seq_along(trends), function(trend){
@@ -255,12 +246,10 @@ eval_mvgam = function(object,
                                ar3 = ar3[series],
                                tau = tau[series],
                                state = last_trends[[series]],
-                               h = fc_horizon) * (1 - gam_comp[series])
+                               h = fc_horizon)
         fc <-  rnbinom(fc_horizon,
-                       mu = exp(as.vector(gam_comp[series] *
-                                            (Xp[which(as.numeric(data_assim$series) == series),] %*%
-                                               betas)) +
-                                  (trend_preds)),
+                       mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                               betas)) + (trend_preds)),
                        size = size)
         fc
       })

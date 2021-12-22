@@ -103,11 +103,9 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                 h = fc_horizon)
       }))
       series_fcs <- lapply(seq_len(n_series), function(series){
-        trend_preds <- as.numeric(t(lv_preds) %*% particles[[x]]$lv_coefs[series,]) *
-          (1 - particles[[x]]$gam_comp[series])
+        trend_preds <- as.numeric(t(lv_preds) %*% particles[[x]]$lv_coefs[series,])
         trunc_preds <- rnbinom(fc_horizon,
-                               mu = exp(as.vector(particles[[x]]$gam_comp[series] *
-                                                    (Xp[which(as.numeric(series_test$series) == series),] %*%
+                               mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
                                                        particles[[x]]$betas)) +
                                           (trend_preds)),
                                size = particles[[x]]$size)
@@ -123,12 +121,10 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                                  ar3 = particles[[x]]$ar3[series],
                                  tau = particles[[x]]$tau[series],
                                  state = particles[[x]]$trend_states[[series]],
-                                 h = fc_horizon) * (1 - particles[[x]]$gam_comp[series])
+                                 h = fc_horizon)
             fc <-  rnbinom(fc_horizon,
-                               mu = exp(as.vector(particles[[x]]$gam_comp[series] *
-                                                    (Xp[which(as.numeric(series_test$series) == series),] %*%
-                                                       particles[[x]]$betas)) +
-                                          (trend_preds)),
+                               mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                                                       particles[[x]]$betas)) + (trend_preds)),
                                size = particles[[x]]$size)
           fc
       })

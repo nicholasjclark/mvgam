@@ -24,9 +24,8 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
   Xp <- predict(object$mgcv_model, newdata = series_test,
                 type = 'lpmatrix')
 
-  # Extract beta coefs and gam_contributions
+  # Extract beta coefs
   betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
-  gam_comps <- MCMCvis::MCMCchains(object$jags_output, 'gam_comp')[,series]
 
   # Extract current trend estimates
   trend <- MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[series]:ends[series]]
@@ -43,8 +42,7 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
   # Full uncertainty interval
   preds <- matrix(NA, nrow = n_samples, ncol = NROW(series_test))
   for(i in 1:n_samples){
-    preds[i,] <- rnbinom(NROW(series_test), mu = exp(gam_comps[i] * (Xp %*% betas[i,]) +
-                                                       ((1 - gam_comps[i]) * trend[i,])),
+    preds[i,] <- rnbinom(NROW(series_test), mu = exp(Xp %*% betas[i,] + trend[i,]),
                          size = size)
   }
   full_int <- apply(preds,
@@ -54,7 +52,7 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
   # GAM only interval
   preds <- matrix(NA, nrow = n_samples, ncol = NROW(series_test))
   for(i in 1:n_samples){
-    preds[i,] <- rnbinom(NROW(series_test), mu = exp(gam_comps[i] * (Xp %*% betas[i,])),
+    preds[i,] <- rnbinom(NROW(series_test), mu = exp(Xp %*% betas[i,]),
                          size = size)
   }
   gam_int <- apply(preds,
