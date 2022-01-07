@@ -10,7 +10,7 @@ library(mvgam)
 all_data <- prep_neon_data(species = 'Ixodes_scapularis', split_prop = 0.8)
 
 # Make plots for manuscript
-pdf('NEON_manuscript/Figures/Fig4_ixodes_example.pdf', width = 6.25, height = 5.85)
+pdf('NEON_manuscript/Figures/Fig5_ixodes_example.pdf', width = 6.25, height = 5.85)
 par(mfrow = c(2, 2),
     mgp = c(2.5, 1, 0),
     mai = c(0.6, 0.6, 0.2, 0.2))
@@ -39,7 +39,7 @@ dev.off()
 # Plot some of the varying seasonal shapes from the Amblyomma model
 load('NEON_manuscript/Results/amb_models.rda')
 all_data <- prep_neon_data(species = 'Ambloyomma_americanum', split_prop = 0.8)
-pdf('NEON_manuscript/Figures/Fig5_amb_seasonalities.pdf', width = 6.25, height = 5.85)
+pdf('NEON_manuscript/Figures/Fig6_amb_seasonalities.pdf', width = 6.25, height = 5.85)
 par(mfrow = c(2, 2),
     mgp = c(2.5, 1, 0),
     mai = c(0.6, 0.6, 0.2, 0.2))
@@ -58,14 +58,13 @@ for(i in c(1, 6, 9, 15)){
 dev.off()
 
 # Plot some of the different uncertainty decompositions for Amblyomma model
-pdf('NEON_manuscript/Figures/Fig6_amb_uncertainties.pdf', width = 6.25, height = 5.85)
+pdf('NEON_manuscript/Figures/Fig7_amb_uncertainties.pdf', width = 6.25, height = 5.85)
 par(mfrow = c(2, 2),
     mgp = c(2.5, 1, 0),
     mai = c(0.6, 0.6, 0.2, 0.2))
 for(i in c(4, 6, 9, 15)){
   plot_mvgam_uncertainty(fit_hyp3$out_gam_mod, series = i,
                           data_test = all_data$data_test,
-                          data_train = all_data$data_train,
                          legend_position = 'bottomleft')
 
 }

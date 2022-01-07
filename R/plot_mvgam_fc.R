@@ -7,13 +7,14 @@
 #'Note this is only useful if the same \code{data_test} was also included when fitting the original model.
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
+#'@param ylab Optional \code{character} string specifying the y-axis label
 #'@param ylim Optional \code{vector} of y-axis limits (min, max)
 #'@details Posterior predictions are drawn from the fitted \code{mvjagam} and used to calculate 95 percent and
 #'68 percent highest posterior density credible intervals. These are plotted along with the true observed data
 #'that was used to train the model.
 #'@return A base \code{R} graphics plot
 #'@export
-plot_mvgam_fc = function(object, series, data_test, hide_xlabels = FALSE, ylim){
+plot_mvgam_fc = function(object, series, data_test, hide_xlabels = FALSE, ylab, ylim){
 
   data_train <- object$obs_data
   ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
@@ -31,17 +32,21 @@ plot_mvgam_fc = function(object, series, data_test, hide_xlabels = FALSE, ylim){
     ylim <- c(0, max(int) + 2)
   }
 
+  if(missing(ylab)){
+    ylab <- paste0('Estimated counts for ', levels(data_train$series)[series])
+  }
+
   if(hide_xlabels){
     plot(preds_last,
          type = 'l', ylim = ylim ,
          col = rgb(1,0,0, alpha = 0),
-         ylab = paste0('Estimated counts for ', levels(data_train$series)[series]),
+         ylab = ylab,
          xlab = '', xaxt = 'n')
   } else {
     plot(preds_last,
          type = 'l', ylim = ylim,
          col = rgb(1,0,0, alpha = 0),
-         ylab = paste0('Estimated counts for ', levels(data_train$series)[series]),
+         ylab = ylab,
          xlab = 'Time')
   }
 

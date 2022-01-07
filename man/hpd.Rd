@@ -12,8 +12,8 @@ hpd(x, coverage = 0.95)
 \item{coverage}{\code{numeric} value specifying the width of the HPD interval. Default is 0.95}
 }
 \value{
-A \code{list} containing the reconciled forecast distributions for each series in \code{y}. Each element in
-the \code{vector} with three values: lower estimate, median estimate and upper estimate of the HPD interval
+A \code{matrix} containing the estimated lower, and upper bounds of the interval along with the estimated
+mode
 }
 \description{
 This function uses estimated densities to calculate HPD intevals. Code originally supplied by Martyn Plummer

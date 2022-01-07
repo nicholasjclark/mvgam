@@ -1,4 +1,105 @@
 #### Simulation analysis ####
+# Simulate a series with a nonlinear trend to visualise how a spline extrapolates
+library(mvgam)
+library(xts)
+library(forecast)
+data("AirPassengers")
+set.seed(1e8)
+dat <- floor(AirPassengers + cumsum(rnorm(length(AirPassengers),
+                                          sd = 35)))
+dat <- dat + abs(min(dat))
+series <- ts(dat, start = c(1949, 1), frequency = 12)
+fake_data <- series_to_mvgam(series, freq = 365, train_prop = 0.74)
+
+# Fit a GAM to the data using mgcv; use a wiggly Gaussian Process smooth for the
+# trend and a cyclic smooth for the seasonality
+gam_mod <- gam(y ~ s(year, k = 9, bs = 'tp') +
+                 s(season, bs = 'cc', k = 10) +
+                 ti(season, year),
+               data = fake_data$data_train,
+               family = nb(),
+               method = 'REML')
+
+# Calculate predictions for the mgcv model to inspect extrapolation behaviour
+Xp <- predict(gam_mod, newdata = rbind(fake_data$data_train,
+                                       fake_data$data_test), type = 'lpmatrix')
+vc <- vcov(gam_mod)
+sim <- MASS::mvrnorm(1000,
+                     mu = coef(gam_mod), Sigma = vc)
+dims_needed <- dim(exp(Xp %*% t(sim)))
+fits <- rnbinom(n = prod(dims_needed), mu = as.vector(exp(Xp %*% t(sim))),
+                size = gam_mod$family$getTheta(TRUE))
+fits <- t(matrix(fits, nrow = dims_needed[1], ncol = dims_needed[2]))
+
+# Plot the smooth function and forecast 95% and 68% HPD intervals
+pdf('NEON_manuscript/Figures/Fig1_extrapolation_example.pdf', width = 6.25, height = 5.85)
+par(mfrow = c(2, 2),
+    mgp = c(2.5, 1, 0),
+    mai = c(0.6, 0.6, 0.2, 0.2))
+plot(gam_mod, select = 1, shade = T, main = '2nd derivative penalty')
+cred_ints <- apply(fits, 2, function(x) hpd(x, 0.95))
+ylims <- c(0,
+           max(cred_ints) + 2)
+plot(cred_ints[3,] ~ seq(1:NCOL(cred_ints)), type = 'l',
+     col = rgb(1,0,0, alpha = 0),
+     ylim = ylims,
+     ylab = 'Predicted counts',
+     xlab = 'Time')
+polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
+        c(cred_ints[1,],rev(cred_ints[3,])),
+        col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
+cred_ints <- apply(fits, 2, function(x) hpd(x, 0.68))
+polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
+        c(cred_ints[1,],rev(cred_ints[3,])),
+        col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
+lines(cred_ints[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
+lines(as.vector(series))
+abline(v = NROW(fake_data$data_train),
+       lty = 'dashed')
+text(x=NROW(fake_data$data_train) + 5,
+     y=3000, labels = 'Forecast horizon', srt = -90)
+
+# Repeat by shifting the training window slightly so see how the extrapolation of the
+# mgcv model is simply reacting to autocorrelation
+fake_data <- series_to_mvgam(series, freq = 365, train_prop = 0.74)
+gam_mod <- gam(y ~ s(year, k = 9, bs = 'tp', m = 1) +
+                 s(season, bs = 'cc', k = 10) +
+                 ti(season, year),
+               data = fake_data$data_train,
+               family = nb(),
+               method = 'REML')
+plot(gam_mod, select = 1, shade = T, main = '1st derivative penalty')
+Xp <- predict(gam_mod, newdata = rbind(fake_data$data_train,
+                                       fake_data$data_test), type = 'lpmatrix')
+vc <- vcov(gam_mod)
+sim <- MASS::mvrnorm(1000,
+                     mu = coef(gam_mod), Sigma = vc)
+dims_needed <- dim(exp(Xp %*% t(sim)))
+fits <- rnbinom(n = prod(dims_needed), mu = as.vector(exp(Xp %*% t(sim))),
+                size = gam_mod$family$getTheta(TRUE))
+fits <- t(matrix(fits, nrow = dims_needed[1], ncol = dims_needed[2]))
+cred_ints <- apply(fits, 2, function(x) hpd(x, 0.95))
+ylims <- c(0,
+           max(cred_ints) + 2)
+plot(cred_ints[3,] ~ seq(1:NCOL(cred_ints)), type = 'l',
+     col = rgb(1,0,0, alpha = 0),
+     ylim = ylims,
+     ylab = 'Predicted counts',
+     xlab = 'Time')
+polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
+        c(cred_ints[1,],rev(cred_ints[3,])),
+        col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
+cred_ints <- apply(fits, 2, function(x) hpd(x, 0.68))
+polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
+        c(cred_ints[1,],rev(cred_ints[3,])),
+        col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
+lines(cred_ints[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
+lines(as.vector(series))
+abline(v = NROW(fake_data$data_train),
+       lty = 'dashed')
+dev.off()
+
+#### Analysis plots from the simulation component ####
 load('NEON_manuscript/Results/sim_results.rda')
 run_parameters <- expand.grid(n_series = c(4, 12),
                               T = c(72),
@@ -81,7 +182,7 @@ ggplot(drps_plot_dat %>%
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
   theme_bw() + coord_flip() + labs(x = '', y = 'Normalised DRPS calibration (lower is better)',
                                    title = 'Strong trend') -> plot2
-pdf('NEON_manuscript/Figures/Fig1_simulation_drps_missing_plot.pdf')
+pdf('NEON_manuscript/Figures/Fig2_simulation_drps_missing_plot.pdf')
 cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()
 
@@ -154,6 +255,6 @@ ggplot(coverage_plot_dat %>%
   ylim(0, 1) +
   theme_bw() + coord_flip() + labs(x = '', y = '90% interval coverage',
                                    title = 'Strong trend') -> plot2
-pdf('NEON_manuscript/Figures/Fig2_simulation_coverage_nseries_plot.pdf')
+pdf('NEON_manuscript/Figures/Fig3_simulation_coverage_nseries_plot.pdf')
 cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()

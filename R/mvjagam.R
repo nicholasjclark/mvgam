@@ -9,6 +9,10 @@
 #'@param formula A \code{character} string specifying the GAM formula. These are exactly like the formula
 #'for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).
+#'@param knots An optional \code{list} containing user specified knot values to be used for basis construction.
+#'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
+#'(note that the number of knots is not always just k). Different terms can use different numbers of knots,
+#'unless they share a covariate.
 #'@param data_train A \code{dataframe} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
 #''y' (the discrete outcomes; \code{NA}s allowed)
@@ -50,10 +54,15 @@
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 #'truncation entirely (i.e. there is no upper bound for each series)
 #'@details A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent
-#'state space trends. Prior distributions for most important terms can be altered by the user to inspect model
+#'state space trends. Prior distributions for most important model parameters can be altered by the user to inspect model
 #'sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 #'accordingly. The model parameters are esimated in a Bayesian framework using Gibbs sampling
-#'in \code{\link[rjags]{jags.model}}. For the time being, all series are assumed to have the same overdispersion
+#'in \code{\link[rjags]{jags.model}}. When using a dynamic factor model for the trends, factor loadings are given
+#'regularized horseshoe priors to theoretically allow some factors to be dropped from the model by squeezing loadings for
+#'an entire factor to zero. This is done to help protect against selecting too many latent factors than are needed to
+#'capture dependencies in the data, so it can often be advantageous to set n_lv to a slightly larger number. However
+#'larger numbers of factors do come with additional computational costs so these should be balanced as well.
+#'For the time being, all series are assumed to have the same overdispersion
 #'parameter when using a negative binomial distribution, though this will be relaxed in future versions. For each
 #'series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
 #'medians of posterior predictions. If the fitted model is appropriate then Dunn-Smyth residuals will be
@@ -70,6 +79,7 @@
 #'@export
 
 mvjagam = function(formula,
+                   knots,
                     data_train,
                     data_test,
                     prior_simulation = FALSE,
@@ -100,20 +110,40 @@ mvjagam = function(formula,
 
   # Estimate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the JAGS model later on
-  ss_gam <- mgcv::gam(formula(formula),
-                      data = data_train,
-                      method = "REML",
-                      family = poisson(),
-                      drop.unused.levels = FALSE)
+  if(!missing(knots)){
+    ss_gam <- mgcv::gam(formula(formula),
+                        data = data_train,
+                        method = "REML",
+                        family = poisson(),
+                        drop.unused.levels = FALSE,
+                        knots = knots)
+  } else {
+    ss_gam <- mgcv::gam(formula(formula),
+                        data = data_train,
+                        method = "REML",
+                        family = poisson(),
+                        drop.unused.levels = FALSE)
+  }
 
   # Make jags file and appropriate data structures
-  ss_jagam <- mgcv::jagam(formula,
-                          data = data_train,
-                          family = poisson(),
-                           drop.unused.levels = FALSE,
-                          file = 'base_gam.txt',
-                          sp.prior = 'gamma',
-                          diagonalize = F)
+  if(!missing(knots)){
+    ss_jagam <- mgcv::jagam(formula,
+                            data = data_train,
+                            family = poisson(),
+                            drop.unused.levels = FALSE,
+                            file = 'base_gam.txt',
+                            sp.prior = 'gamma',
+                            diagonalize = F,
+                            knots = knots)
+  } else {
+    ss_jagam <- mgcv::jagam(formula,
+                            data = data_train,
+                            family = poisson(),
+                            drop.unused.levels = FALSE,
+                            file = 'base_gam.txt',
+                            sp.prior = 'gamma',
+                            diagonalize = F)
+  }
 
   # Fill with NAs if this is a simulation from the priors
   if(prior_simulation){
@@ -314,14 +344,20 @@ mvjagam = function(formula,
 
         ## Latent factor loadings are penalized using a regularized horseshoe prior
         ## to allow loadings for entire factors to be 'dropped', reducing overfitting. Still
-        ## need to impose identifiability constraints by setting upper diagonal to zero
+        ## need to impose identifiability constraints
 
-        ## Global shrinkage penalty (half cauchy)
-        lv_tau ~ dt(0, 1, 1)T(0, )
+        ## Global shrinkage penalty (half cauchy, following Gelman et
+        ## al. 2008: A weakly informative default prior distribution for logistic and other
+        ## regression models)
+        lv_tau ~ dscaled.gamma(0.5, 5)
 
-        ## Shrinkage penalties for each factor (half cauchy)
+        ## Shrinkage penalties for each factor, which are also half cuachy to allow
+        ## the entire factor's set of coefficients to be squeezed toward zero if supported by
+        ## the data. The prior for individual factor penalties allows each factor to possibly
+        ## have a relatively large penalty, which shrinks the prior for that factor's loadings
+        ## substantially
         for (j in 1:n_lv){
-         penalty[j] ~ dt(0, 1, 1)T(0, )
+         penalty[j] ~ dscaled.gamma(0.5, 0.5)
         }
 
         ## Upper triangle of loading matrix set to zero
@@ -333,20 +369,20 @@ mvjagam = function(formula,
 
         ## Positive constraints on loading diagonals
         for(j in 1:n_lv) {
-         lv_coefs[j, j] ~ dnorm(0, (1/lv_tau) * (1/penalty[j]))T(0, );
+         lv_coefs[j, j] ~ dnorm(0, lv_tau * penalty[j])T(0, 1);
         }
 
         ## Lower diagonal free
         for(j in 2:n_lv){
          for(j2 in 1:(j - 1)){
-          lv_coefs[j, j2] ~ dnorm(0, (1/lv_tau) * (1/penalty[j2]))T(-1, 1);
+          lv_coefs[j, j2] ~ dnorm(0, lv_tau * penalty[j2])T(-1, 1);
          }
        }
 
         ## Other elements also free
         for(j in (n_lv + 1):n_series) {
          for(j2 in 1:n_lv){
-          lv_coefs[j, j2] ~ dnorm(0, (1/lv_tau) * (1/penalty[j2]))T(-1, 1);
+          lv_coefs[j, j2] ~ dnorm(0, lv_tau * penalty[j2])T(-1, 1);
          }
         }
 
@@ -615,7 +651,12 @@ mvjagam = function(formula,
   })
   names(series_resids) <- levels(data_train$series)
 
-  return(list(jags_output = out_gam_mod,
+  return(list(call = formula,
+              family = ifelse(family == 'nb',
+                              'Negative Binomial',
+                              'Poisson'),
+              pregam = ss_jagam$pregam,
+              jags_output = out_gam_mod,
               model_file = model_file,
               mgcv_model = ss_gam,
               jags_model = gam_mod,

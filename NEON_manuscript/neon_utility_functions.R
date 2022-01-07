@@ -135,9 +135,8 @@ plot_mvgam_season = function(out_gam_mod, series, data_test, data_train,
                                                                                  levels(data_train$series)[series])])))
   Xp <- predict(out_gam_mod$mgcv_model, newdata = pred_dat, type = 'lpmatrix')
   betas <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'b')
-  gam_comps <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'gam_comp')[,series]
-  plot(gam_comps[1] * (Xp %*% betas[1,]) ~ pred_dat$season, ylim = range(gam_comps[1] * (Xp %*% betas[1,]) + 2.5,
-                                                                         gam_comps[1] * (Xp %*% betas[1,]) - 2.5),
+  plot((Xp %*% betas[1,]) ~ pred_dat$season, ylim = range((Xp %*% betas[1,]) + 2.5,
+                                                                         (Xp %*% betas[1,]) - 2.5),
 
        col = rgb(150, 0, 0, max = 255, alpha = 10), type = 'l',
        ylab = paste0('F(season) for ', levels(data_train$series)[series]),
@@ -146,9 +145,9 @@ plot_mvgam_season = function(out_gam_mod, series, data_test, data_train,
   rect(xleft = 4, xright = 18, ybottom = -100, ytop = 100, col = 'gray90',
        border = NA)
   abline(h = 0, lwd=1)
-  text(x=11,y=max(gam_comps[1] * (Xp %*% betas[1,]) + 2.3), labels = 'Peak tick season')
+  text(x=11,y=max((Xp %*% betas[1,]) + 2.3), labels = 'Peak tick season')
   for(i in 2:1000){
-    lines(gam_comps[i] * (Xp %*% betas[i,]) ~ pred_dat$season,
+    lines((Xp %*% betas[i,]) ~ pred_dat$season,
 
           col = rgb(150, 0, 0, max = 255, alpha = 10))
   }
@@ -173,10 +172,9 @@ plot_mvgam_gdd = function(out_gam_mod, series, data_test, data_train,
                                                                                  levels(data_train$series)[series])])))
   Xp <- predict(out_gam_mod$mgcv_model, newdata = pred_dat, type = 'lpmatrix')
   betas <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'b')
-  gam_comps <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'gam_comp')[,series]
   preds <- matrix(NA, nrow = 1000, ncol = length(pred_dat$cum_gdd))
   for(i in 1:1000){
-    preds[i,] <- rnbinom(length(pred_dat$cum_gdd), mu = exp(gam_comps[i] * (Xp %*% betas[i,])),
+    preds[i,] <- rnbinom(length(pred_dat$cum_gdd), mu = exp((Xp %*% betas[i,])),
                          size = MCMCvis::MCMCsummary(out_gam_mod$jags_output, 'r')$mean)
   }
   int <- apply(preds,

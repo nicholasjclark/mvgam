@@ -17,11 +17,18 @@ rm(series)
 mod <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,
                formula = y ~ s(season, bs = c('cc')),
+               knots = list(season = c(0.5, 12.5)),
                family = 'nb',
                use_lv = F,
                trend_model = 'AR3',
-               n.burnin = 10000,
+               n.burnin = 1000,
                auto_update = F)
+
+# Check the model summary and plot the smooth term
+summary_mvgam(mod)
+summary(mod$mgcv_model)
+plot_mvgam_resids(mod, 1)
+plot_mvgam_smooth(mod, 1, 'season')
 
 # Fit a mis-specified model for testing the model comparison functions by
 # smoothing on a white noise covariate
@@ -37,22 +44,16 @@ mod2 <- mvjagam(data_train = fake_data$data_train,
                n.iter = 1000,
                thin = 1,
                auto_update = F)
+summary_mvgam(mod2)
+plot_mvgam_smooth(mod2, 1, 'fake_cov')
+plot_mvgam_resids(mod2)
 
 # Compare the models using rolling forecast DRPS evaluation
 compare_mvgams(mod, mod2, fc_horizon = 6,
-               n_evaluations = 25, n_cores = 4)
-
-# Summary plots and diagnostics for the preferred model (Model 1)
-# Check Dunn-Smyth residuals for autocorrelation
-plot(mod$resids$Air)
-lines(mod$resids$Air)
-acf(mod$resids$Air)
-pacf(mod$resids$Air)
-
-# Plot the estimated seasonality smooth function
-plot_mvgam_smooth(mod, smooth = 'season')
+               n_evaluations = 30, n_cores = 3)
 
 # Plot the posterior distribution of in-sample and out-of-sample predictions
+# with true observations overlaid as points
 plot_mvgam_fc(mod, series = 1, data_test = fake_data$data_test)
 
 # Plot the estimated latent trend
@@ -70,8 +71,8 @@ par(mfrow=c(1,1))
 pfilter_mvgam_init(object = mod, n_particles = 10000, n_cores = 2,
                    data_assim = fake_data$data_test)
 
-# Assimilate some observations
-pfilter_mvgam_online(data_assim = fake_data$data_test[1:2,], n_cores = 2,
+# Assimilate some of the next out of sample observations
+pfilter_mvgam_online(data_assim = fake_data$data_test[1:7,], n_cores = 2,
                      kernel_lambda = 1)
 
 # Forecast from particles using the covariate information in remaining data_test observations
@@ -111,47 +112,44 @@ trends_mod <- mvjagam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
                  formula = y ~ s(season, k = 6, m = 2, bs = 'cc') +
                    s(season, by = series, k = 10, m = 1) - 1,
+                 knots = list(season = c(0.5, 12.5)),
                  use_lv = T,
                  trend_model = 'AR3',
                  n_lv = 3,
                  family = 'nb',
-                 n.burnin = 5000,
+                 n.burnin = 1000,
                  n.iter = 1000,
                  thin = 1,
                  upper_bounds = rep(100, length(terms)),
                  auto_update = F)
+summary_mvgam(trends_mod)
 
-# Poor model for comparison
+# A fixed seasonality model for comparison
 trends_mod2 <- mvjagam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
-                      formula = y ~ s(season, k = 3, bs = 'cc') - 1,
+                      formula = y ~ s(season, k = 6, bs = 'cc') - 1,
+                      knots = list(season = c(0.5, 12.5)),
                       use_lv = T,
-                      trend_model = 'RW',
-                      n_lv = 2,
-                      family = 'poisson',
-                      n.burnin = 50,
-                      n.iter = 500,
+                      trend_model = 'AR3',
+                      n_lv = 3,
+                      family = 'nb',
+                      n.burnin = 1000,
+                      n.iter = 1000,
                       thin = 1,
                       upper_bounds = rep(100, length(terms)),
                       auto_update = F)
+summary_mvgam(trends_mod2)
 
-# Compare the models using rolling forecast DRPS evaluation
+# Compare the models using rolling forecast DRPS evaluation. Here we focus on
+# near-term forecasts (horizon = 3) when comparing model performances
 par(mfrow = c(1,1))
-compare_mvgams(trends_mod, trends_mod2, fc_horizon = 12,
-               n_evaluations = 20)
+compare_mvgams(trends_mod, trends_mod2, fc_horizon = 3,
+               n_cores = 3, n_evaluations = 20, n_samples = 2500)
 
 # Look at Dunn-Smyth residuals for some series from preferred model (Model 1)
-hist(trends_mod$resids$`dog tick`)
-plot(trends_mod$resids$`dog tick`)
-lines(trends_mod$resids$`dog tick`)
-acf(trends_mod$resids$`dog tick`)
-pacf(trends_mod$resids$`dog tick`)
-
-hist(trends_mod$resids$`la nina`)
-plot(trends_mod$resids$`la nina`)
-lines(trends_mod$resids$`la nina`)
-acf(trends_mod$resids$`la nina`)
-pacf(trends_mod$resids$`la nina`)
+plot_mvgam_resids(trends_mod, 1)
+plot_mvgam_resids(trends_mod, 2)
+plot_mvgam_resids(trends_mod, 3)
 
 # Plot posterior predictive distributions
 par(mfrow = c(4, 1))

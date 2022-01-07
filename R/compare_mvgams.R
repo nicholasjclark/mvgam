@@ -51,6 +51,11 @@ rownames(model_summary) <- c('Model 1', 'Model 2')
 cat('DRPS summaries per model (lower is better)\n')
 print(model_summary)
 
+# Print 90% interval coverages for each model
+cat('\n90% interval coverages per model (closer to 0.9 is better)\n')
+cat('Model 1', mod1_eval$interval_coverage, '\n')
+cat('Model 2', mod2_eval$interval_coverage)
+
 # Set up plotting loop and return summary plots of DRPS
 ask <- TRUE
 
@@ -68,12 +73,13 @@ if(i == 1){
                     mod2_eval$drps_horizon_summary$mean_drps)
   colnames(plot_dat) <- seq(1:NCOL(plot_dat))
   barplot(plot_dat,
+          ylim = c(0, max(plot_dat, na.rm = T) * 1.5),
           beside = T,
           xlab = 'Forecast horizon',
           ylab = 'Mean DRPS',
           col = c("darkgrey",  "black"),
           legend.text = c('Model 1', 'Model 2'),
-          args.legend = list(x = "topleft"))
+          args.legend = list(x = "top"))
 }
 
   if(ask){

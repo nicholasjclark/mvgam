@@ -6,6 +6,7 @@
 \usage{
 mvjagam(
   formula,
+  knots,
   data_train,
   data_test,
   prior_simulation = FALSE,
@@ -29,6 +30,11 @@ mvjagam(
 \item{formula}{A \code{character} string specifying the GAM formula. These are exactly like the formula
 for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).}
+
+\item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
+For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
+(note that the number of knots is not always just k). Different terms can use different numbers of knots,
+unless they share a covariate.}
 
 \item{data_train}{A \code{dataframe} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
@@ -100,10 +106,15 @@ dynamic factors to capture trend dependencies in a reduced dimension format, or 
 }
 \details{
 A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent
-state space trends. Prior distributions for most important terms can be altered by the user to inspect model
+state space trends. Prior distributions for most important model parameters can be altered by the user to inspect model
 sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 accordingly. The model parameters are esimated in a Bayesian framework using Gibbs sampling
-in \code{\link[rjags]{jags.model}}. For the time being, all series are assumed to have the same overdispersion
+in \code{\link[rjags]{jags.model}}. When using a dynamic factor model for the trends, factor loadings are given
+regularized horseshoe priors to theoretically allow some factors to be dropped from the model by squeezing loadings for
+an entire factor to zero. This is done to help protect against selecting too many latent factors than are needed to
+capture dependencies in the data, so it can often be advantageous to set n_lv to a slightly larger number. However
+larger numbers of factors do come with additional computational costs so these should be balanced as well.
+For the time being, all series are assumed to have the same overdispersion
 parameter when using a negative binomial distribution, though this will be relaxed in future versions. For each
 series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
 medians of posterior predictions. If the fitted model is appropriate then Dunn-Smyth residuals will be

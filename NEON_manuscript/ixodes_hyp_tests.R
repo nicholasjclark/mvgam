@@ -186,7 +186,7 @@ ggplot(plot_dat_ranks,
         panel.grid.minor = element_blank()) -> plot2
 
 dir.create('NEON_manuscript/Figures', recursive = T, showWarnings = F)
-pdf('NEON_manuscript/Figures/Fig3_Ixodes_performances.pdf', width = 6.25, height = 5)
+pdf('NEON_manuscript/Figures/Fig4_Ixodes_performances.pdf', width = 6.25, height = 5)
 cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()
 

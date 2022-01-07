@@ -46,8 +46,8 @@ series_to_mvgam <- function(series, freq, train_prop = 0.85){
 
   # Extract information on years and seasons from the series object
   if(type == 'ts'){
-    dates <- lubridate::date(time(zoo::as.zoo(series)))
-    years <- lubridate::year(time(zoo::as.zoo(series)))
+    dates <- lubridate::date_decimal(as.numeric(time(series)))
+    years <- lubridate::year(dates)
     seasons <- as.vector(1 + ((time(series) %% 1) * frequency(series)))
   }
 
@@ -81,8 +81,7 @@ series_to_mvgam <- function(series, freq, train_prop = 0.85){
                         season = rep(seasons, n_series),
                         year = rep(years, n_series),
                         date = rep(dates, n_series),
-                        series = as.factor(sort(rep(series_names, T))),
-                        in_season = 1) %>%
+                        series = as.factor(sort(rep(series_names, T)))) %>%
     dplyr::arrange(year, season, series)
 
 

@@ -395,7 +395,7 @@ eval_mvgam = function(object,
       scores <- matrix(NA, nrow = length(truth), ncol = 2)
       for(i in indices_keep){
         scores[i,] <- drps_score(truth = as.vector(truth)[i],
-                                 fc = fc[i,], interval_width)
+                                 fc = fc[,i], interval_width)
       }
     }
     scores
