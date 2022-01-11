@@ -489,11 +489,11 @@ mvjagam = function(formula,
                        by = c('season', 'year')) %>%
       dplyr::pull(time)
 
-    # Add an outcome variable
-    X$outcome <- c(orig_y, rep(NA, NROW(data_test)))
-
     # Add a series identifier variable
     X$series <- as.numeric(rbind(data_train, data_test)$series)
+
+    # Add an outcome variable
+    X$outcome <- c(orig_y, rep(NA, NROW(data_test)))
 
   } else {
     X <- data.frame(ss_jagam$jags.data$X)
@@ -556,6 +556,43 @@ mvjagam = function(formula,
       ss_jagam$jags.ini$tau_fac <- 1
   }
 
+  # Initial values of zero for the AR parameters
+  if(use_lv){
+    ss_jagam$jags.ini$phi <- rep(0, ss_jagam$jags.data$n_lv)
+  } else {
+    ss_jagam$jags.ini$phi <- rep(0, NCOL(ytimes))
+  }
+
+  if(trend_model == 'AR1'){
+    if(use_lv){
+      ss_jagam$jags.ini$ar1 <- rep(0, ss_jagam$jags.data$n_lv)
+    } else {
+      ss_jagam$jags.ini$ar1 <- rep(0, NCOL(ytimes))
+    }
+  }
+
+  if(trend_model == 'AR2'){
+    if(use_lv){
+      ss_jagam$jags.ini$ar1 <- rep(0, ss_jagam$jags.data$n_lv)
+      ss_jagam$jags.ini$ar2 <- rep(0, ss_jagam$jags.data$n_lv)
+    } else {
+      ss_jagam$jags.ini$ar1 <- rep(0, NCOL(ytimes))
+      ss_jagam$jags.ini$ar2 <- rep(0, NCOL(ytimes))
+    }
+  }
+
+  if(trend_model == 'AR3'){
+    if(use_lv){
+      ss_jagam$jags.ini$ar1 <- rep(0, ss_jagam$jags.data$n_lv)
+      ss_jagam$jags.ini$ar2 <- rep(0, ss_jagam$jags.data$n_lv)
+      ss_jagam$jags.ini$ar3 <- rep(0, ss_jagam$jags.data$n_lv)
+    } else {
+      ss_jagam$jags.ini$ar1 <- rep(0, NCOL(ytimes))
+      ss_jagam$jags.ini$ar2 <- rep(0, NCOL(ytimes))
+      ss_jagam$jags.ini$ar3 <- rep(0, NCOL(ytimes))
+    }
+  }
+
   # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS
   # will take a while to optimise the samplers, so long adaptation with little 'burnin'
   # is more crucial than little adaptation but long 'burnin' https://mmeredith.net/blog/2016/Adapt_or_burn.htm
@@ -584,6 +621,7 @@ mvjagam = function(formula,
                               variable.names = param,
                               n.iter = n.iter,
                               thin = thin)
+
   if(auto_update){
   # Update until reasonable convergence in the form of Rhat and ESS
     if(!use_lv){
