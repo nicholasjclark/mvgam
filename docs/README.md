@@ -50,11 +50,11 @@ acf(lynx_full$population, main = '')
 
 <img src="README-unnamed-chunk-2-2.png" style="display: block; margin: auto;" />
 
-There is a clear ~19-year cyclic pattern to the data, so create a
-`season` term that can be used to model this effect and give a better
-representation of the data generating process. Also put the year term on
-a more manageable
-scale
+Along with serial autocorrelation, there is a clear ~19-year cyclic
+pattern to the data. Create a `season` term that can be used to model
+this effect and give a better representation of the data generating
+process than we would likely get with a linear
+model
 
 ``` r
 plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'))
@@ -64,7 +64,6 @@ plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'))
 
 ``` r
 lynx_full$season <- (lynx_full$year %%19) + 1
-lynx_full$year <- lynx_full$year - 1820
 ```
 
 For `mvgam` models, the response needs to be labelled `y` and we also
@@ -85,9 +84,10 @@ lynx_test = lynx_full[51:60, ]
 
 Now fit an `mvgam` model; it fits a GAM in which a smooth function for
 `season` is estimated jointly with a full time series model for the
-errors, rather than smoothing splines that do not incorporate a concept
-of the future. We estimate the model in `JAGS` using MCMC sampling (Note
-that `JAGS` 4.3.0 is required; installation links are found
+errors (in this case an `AR1` process with drift), rather than relying
+on smoothing splines that do not incorporate a concept of the future. We
+estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0
+is required; installation links are found
 [here](https://sourceforge.net/projects/mcmc-jags/files/))
 
 ``` r
@@ -115,7 +115,8 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
 #> Initializing model
 ```
 
-Calculate the out of sample forecast from the fitted `mvgam` model
+Calculate the out of sample forecast from the fitted `mvgam` model and
+visualise 95% and 68% credible intervals
 
 ``` r
 fits <- MCMCvis::MCMCchains(lynx_mvgam$jags_output, 'ypred')
@@ -162,32 +163,32 @@ summary_mvgam(lynx_mvgam)
 #> 
 #> GAM smooth term approximate significances:
 #>             edf Ref.df Chi.sq p-value    
-#> s(season) 7.978  8.000  36253  <2e-16 ***
+#> s(season) 7.979  8.000  40458  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> GAM coefficient (beta) estimates:
 #>                   2.5%         50%       97.5% Rhat n.eff
-#> (Intercept)  5.3778428  5.69782430  5.95102294 1.07    12
-#> s(season).1 -0.3471822  0.09882264  0.48456384 1.27    33
-#> s(season).2  1.3413825  1.72176726  2.38525870 1.08    17
-#> s(season).3  0.5249929  1.01665901  1.65196252 1.21    16
-#> s(season).4 -1.4576163 -0.84438089 -0.10879032 1.24    36
-#> s(season).5 -1.1648239 -0.56586987  0.07648062 1.06    48
-#> s(season).6  0.2334058  1.16659400  1.81325772 1.69    14
-#> s(season).7  0.6366030  1.32740024  2.04689632 1.69    13
-#> s(season).8 -0.9587274 -0.48180794 -0.00259909 1.08    61
+#> (Intercept)  5.2327261  5.90555676  6.41648596 5.80    11
+#> s(season).1 -0.3341314  0.07612528  0.54393485 1.44    33
+#> s(season).2  1.1421534  1.62550119  2.21594976 1.23    14
+#> s(season).3  0.5113878  1.01639646  1.44288388 1.18    27
+#> s(season).4 -1.5940307 -0.89036790 -0.22801676 1.09    36
+#> s(season).5 -1.2599718 -0.48259075  0.27137120 1.07    32
+#> s(season).6  0.7846668  1.50338951  1.98501727 1.45    31
+#> s(season).7  1.0603531  1.62925714  2.23957396 1.80    22
+#> s(season).8 -1.0919476 -0.53655932 -0.04014946 2.09    84
 #> 
 #> GAM smoothing parameter (rho) estimates:
-#>                2.5%     50%    97.5% Rhat n.eff
-#> s(season) 0.4739263 1.71701 2.697784 1.03   529
+#>                2.5%      50%   97.5% Rhat n.eff
+#> s(season) 0.3111182 1.537744 2.50944    1   466
 #> 
 #> Latent trend drift and AR parameter estimates:
-#>          2.5%       50%     97.5% Rhat n.eff
-#> phi 0.1159796 0.3295268 0.5929237    1    89
-#> ar1 0.4730427 0.6681016 0.8482631    1  1610
-#> ar2 0.0000000 0.0000000 0.0000000  NaN     0
-#> ar3 0.0000000 0.0000000 0.0000000  NaN     0
+#>           2.5%       50%     97.5% Rhat n.eff
+#> phi 0.03210732 0.2733117 0.5867815 2.12   374
+#> ar1 0.45454363 0.6685544 0.8656271 1.23  1098
+#> ar2 0.00000000 0.0000000 0.0000000  NaN     0
+#> ar3 0.00000000 0.0000000 0.0000000  NaN     0
 #> 
 ```
 
@@ -212,8 +213,8 @@ plot_mvgam_fc(lynx_mvgam, data_test = lynx_test)
 
 <img src="README-unnamed-chunk-10-1.png" style="display: block; margin: auto;" />
 
-And the estimated
-trend
+And the estimated latent trend
+component
 
 ``` r
 plot_mvgam_trend(lynx_mvgam, data_test = lynx_test)
@@ -293,15 +294,15 @@ mod2_eval <- eval_mvgam(lynx_mvgam_poor, eval_timepoint = 10, fc_horizon = 10)
 
 Summary statistics of the two models’ out of sample Discrete Rank
 Probability Score (DRPS) indicate that the well-specified model performs
-markedly better (far lower DRPS)
+markedly better (far lower DRPS) for this evaluation timepoint
 
 ``` r
 summary(mod1_eval$series1$drps)
 #>     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-#>   0.9354   9.6769  79.3408  89.2733 165.1480 218.9671
+#>   0.1086   2.6782  90.0482  94.0215 152.8506 280.4758
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   59.08   97.83  280.83  313.22  452.64  748.09
+#>   69.87  133.97  255.73  318.67  450.68  745.18
 ```
 
 Nominal coverages for both models’ 90% prediction intervals
@@ -315,4 +316,7 @@ mean(mod2_eval$series1$in_interval)
 
 The `compare_mvgams` function automates this process by rolling along a
 set of timepoints for each model, ensuring a more in-depth evaluation of
-each competing model at the same set of timepoints
+each competing model at the same set of timepoints. There are many more
+extended uses for `mvgam` models, including the ability to fit dynamic
+factor processes for analysing and forecasting sets of multivariate
+discrete time series

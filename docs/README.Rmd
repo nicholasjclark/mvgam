@@ -38,7 +38,7 @@ plot(lynx_full$population, type = 'l', ylab = 'Lynx trappings',
 acf(lynx_full$population, main = '')
 ```
 
-There is a clear ~19-year cyclic pattern to the data, so create a `season` term that can be used to model this effect and give a better representation of the data generating process than we would likely get with a linear model
+Along with serial autocorrelation, there is a clear ~19-year cyclic pattern to the data. Create a `season` term that can be used to model this effect and give a better representation of the data generating process than we would likely get with a linear model
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'))
 lynx_full$season <- (lynx_full$year %%19) + 1
