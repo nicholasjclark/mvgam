@@ -85,7 +85,7 @@ mvjagam = function(formula,
                     prior_simulation = FALSE,
                     family = 'nb',
                     use_lv = FALSE,
-                    n_lv = 5,
+                    n_lv,
                     trend_model = 'RW',
                     n.chains = 2,
                     n.burnin = 5000,
@@ -111,18 +111,20 @@ mvjagam = function(formula,
   # Estimate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the JAGS model later on
   if(!missing(knots)){
-    ss_gam <- mgcv::gam(formula(formula),
+    ss_gam <- mgcv::bam(formula(formula),
                         data = data_train,
-                        method = "REML",
+                        method = "fREML",
                         family = poisson(),
                         drop.unused.levels = FALSE,
-                        knots = knots)
+                        knots = knots,
+                        nthreads = parallel::detectCores()-1)
   } else {
-    ss_gam <- mgcv::gam(formula(formula),
+    ss_gam <- mgcv::bam(formula(formula),
                         data = data_train,
-                        method = "REML",
+                        method = "fREML",
                         family = poisson(),
-                        drop.unused.levels = FALSE)
+                        drop.unused.levels = FALSE,
+                        nthreads = parallel::detectCores()-1)
   }
 
   # Make jags file and appropriate data structures

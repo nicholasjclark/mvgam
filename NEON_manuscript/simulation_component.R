@@ -6,7 +6,6 @@ source('neon_utility_functions.R')
 # Use hierarchical seasonality for all;
 # trend components: 0.3 and 0.7
 # N_series: 4, 12
-# Overdispersion: 0.5, 100
 # Length: 6 years
 # Missingness: none, 10%, 50%
 set.seed(110)
@@ -22,7 +21,7 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
   sim_data <- sim_mvgam(T = run_parameters$T[x],
                         n_series = run_parameters$n_series[x],
                         prop_missing = run_parameters$prop_missing[x],
-                        train_prop = 0.85,
+                        train_prop = 0.833,
                         trend_rel = run_parameters$trend_rel[x],
                         seasonality = 'hierarchical')
 
@@ -30,10 +29,10 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
   t <- Sys.time()
   nullmod <- mvjagam(data_train = sim_data$data_train,
                   data_test = sim_data$data_test,
-                  formula = y ~ s(series, bs = 're') - 1,
-                  use_nb = TRUE,
+                  formula = y ~ s(series, bs = 're'),
+                  family = 'nb',
                   use_lv = F,
-                  n.burnin = 60000,
+                  n.burnin = 25000,
                   n.iter = 5000,
                   thin = 5,
                   auto_update = T)
@@ -103,12 +102,13 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
   # Fit a multivariate gam with hierarchical seasonality
   t <- Sys.time()
   hier_mod <- mvjagam(data_train = sim_data$data_train,
-                        data_test = sim_data$data_test,
-                        formula = y ~ s(season, k = 4, m = 2, bs = 'cc') +
-                                        s(season, by = series, m = 1, k = 8) - 1,
-                        use_nb = TRUE,
-                        use_lv = T,
-                      n.burnin = 90000,
+                      data_test = sim_data$data_test,
+                      formula = y ~ s(season, k = 4, m = 2, bs = 'cc') +
+                                        s(season, by = series, m = 1, k = 8),
+                      family = 'nb',
+                      trend_model = 'AR3',
+                      use_lv = T,
+                      n.burnin = 25000,
                       n.iter = 5000,
                       thin = 5,
                       auto_update = T)
@@ -132,10 +132,10 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                                                              correlations$mean_correlations))
 
   # Fit a standard mgcv version of the hierarchical model as a final comparison, including
-  # non-wiggly series-specific year smooths
+  # non-wiggly series-specific year smooths with penalty on the first derivative
   mgcv_hier_mod <- gam(y ~ s(season, k = 4, m = 2, bs = 'cc') +
                          s(season, by = series, m = 1, k = 8) +
-                         s(year, by = series, k = 3, bs = 'gp'),
+                         s(year, by = series, k = 3, bs = 'gp', m = 1),
                        family = nb(), data = sim_data$data_train)
 
   # Extract posterior predictions from the mgcv model and calculate out of sample DRPS

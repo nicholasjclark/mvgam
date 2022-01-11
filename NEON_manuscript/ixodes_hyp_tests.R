@@ -10,7 +10,7 @@ source('NEON_manuscript/neon_utility_functions.R')
 # Prep data
 all_data <- prep_neon_data(species = 'Ixodes_scapularis', split_prop = 0.8)
 
-#### Set hypothtesis formulae ####
+#### Set hypothesis formulae ####
 # NULL. There is no seasonal pattern to be estimated, and we simply let the latent
 # factors and site-level effects of growing days influence the series dynamics
 null_hyp = y ~ siteID + s(cum_gdd, by = siteID, k = 3) - 1
@@ -47,9 +47,9 @@ hyp3 = y ~
   s(season, by = series, m = 1, k = 8) - 1
 
 # Fit each hypothesis
-n.burnin = 2000
-n.iter = 2000
-thin = 1
+n.burnin = 1000
+n.iter = 5000
+thin = 5
 
 fit_null <- fit_mvgam(data_train = all_data$data_train,
                   data_test = all_data$data_test,
@@ -74,13 +74,6 @@ fit_hyp1 <- fit_mvgam(data_train = all_data$data_train,
                       thin = thin,
                       auto_update = F,
                       interval_width = 0.9)
-
-par(mfrow = c(1,1))
-compare_mvgams(model1 = fit_null$out_gam_mod,
-               model2 = fit_hyp1$out_gam_mod,
-               fc_horizon = 6,
-               n_evaluations = 20, n_samples = 1000,
-               n_cores = 2)
 
 fit_hyp2 <- fit_mvgam(data_train = all_data$data_train,
                       data_test = all_data$data_test,

@@ -47,9 +47,9 @@ hyp3 = y ~
   s(season, by = series, m = 1, k = 8) - 1
 
 # Fit each hypothesis
-n.burnin = 1000
-n.iter = 1000
-thin = 1
+n.burnin = 100000
+n.iter = 5000
+thin = 5
 
 # Use default priors for latent drift terms and for smooth penalties
 fit_null <- fit_mvgam(data_train = all_data$data_train,

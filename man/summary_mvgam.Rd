@@ -22,9 +22,7 @@ so summaries for the \code{rho} parameters may include more penalty terms than t
 the original model formula. The function also returns an approximate smooth term
 significance table, but note that this signficance comes with the usual caveats associated with calculations
 of p-values for smooth terms in \code{\link[mcgv]{summary.gam}} (i.e. all p-values are computed without
-considering uncertainty in the smoothing parameter estimates), with the added challenge that
-Estimated Degrees of Freedom (edf) for each smooth term are taken from a call to \code{\link[mcgv]{gam}}
-that does not include the latent trend component of the model.
+considering uncertainty in the smoothing parameter estimates).
 }
 \author{
 Nicholas J Clark
