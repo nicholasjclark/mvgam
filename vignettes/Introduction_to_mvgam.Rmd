@@ -49,10 +49,10 @@ lynx_full$y <- lynx_full$population
 lynx_full$series <- factor('series1')
 ```
 
-Split the data into training (first 74 years) and testing (next 10 years of data) to evaluate multi-step ahead forecasts
+Split the data into training (first 50 years) and testing (next 10 years of data) to evaluate multi-step ahead forecasts
 ```{r}
-lynx_train = lynx_full[1:75, ]
-lynx_test = lynx_full[76:85, ]
+lynx_train = lynx_full[1:50, ]
+lynx_test = lynx_full[51:60, ]
 ```
 
 The best-forecasting model in the course was with nonlinear smooths of lags 1 and 2; we use those here is that we also include a cyclic smooth for the 19-year cycles as this seems like an important feature, as well as a yearly smooth for the long-term trend with penalty on the first derivative to prevent linear extrapolation into the future
@@ -112,10 +112,10 @@ recurse_nonlin = function(model, lagged_vals, h){
 }
 ```
 
-Create the GAM's forecast distribution by generating `1000` simulated forecast paths. Each path is fed the true observed values for the last two lags of the first out of sample timepoint, but they can deviate when simulating ahead depending on their particular draw of possible coefficients. Note, this is a bit slow and could easily be parallelised to speed up computations
+Create the GAM's forecast distribution by generating `200` simulated forecast paths. Each path is fed the true observed values for the last two lags of the first out of sample timepoint, but they can deviate when simulating ahead depending on their particular draw of possible coefficients. Note, this is a bit slow and could easily be parallelised to speed up computations
 ```{r}
-gam_sims <- matrix(NA, nrow = 1000, ncol = 10)
-for(i in 1:1000){
+gam_sims <- matrix(NA, nrow = 200, ncol = 10)
+for(i in 1:200){
   gam_sims[i,] <- recurse_nonlin(lynx_mgcv,
                                  lagged_vals = c(lynx_test$lag1[1],
                                                  lynx_test$lag2[1]),
@@ -153,9 +153,9 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR1',
-               n.burnin = 60000,
-               n.iter = 10000,
-               thin = 10,
+               n.burnin = 10000,
+               n.iter = 5000,
+               thin = 5,
                auto_update = F)
 ```
 
@@ -220,9 +220,9 @@ lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
                formula = y ~ s(season, bs = 'gp', k = 3),
                family = 'poisson',
                trend_model = 'RW',
-               n.burnin = 10000,
-               n.iter = 5000,
-               thin = 5,
+               n.burnin = 1000,
+               n.iter = 1000,
+               thin = 1,
                auto_update = F)
 
 ```
