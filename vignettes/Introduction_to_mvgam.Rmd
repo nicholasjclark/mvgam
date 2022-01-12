@@ -12,7 +12,15 @@ knitr::opts_chunk$set(echo = TRUE)
 options(rmarkdown.html_vignette.check_title = FALSE)
 ```
 
-In this vignette we will introduce dynamic Generalised Additive Models and some of the key utility functions provided in `mvgam`. First a univariate example to show how challenging it can be to forecast ahead with conventional GAMs and how `mvgam` overcomes these challenges. We begin by replicating the lynx analysis from [2018 Ecological Society of America workshop on GAMs](https://noamross.github.io/mgcv-esa-2018/) that was hosted by Eric Pedersen, David L. Miller, Gavin Simpson, and Noam Ross, with some minor adjustments. First, load the data and plot the series as well as its estimated autocorrelation function
+In this vignette we will introduce dynamic Generalised Additive Models and some of the key utility functions provided in `mvgam`. Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a discrete response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Asssuming $\boldsymbol{y}$ is drawn from an exponential distribution (such as Poisson or Negative Binomial) with a log link function, the linear predictor for a dynamic GAM is written as:
+
+$$log(\tilde{\boldsymbol{y}}_{t})={\boldsymbol{B}}_0+\sum\limits_{i=1}^I\boldsymbol{s}_{i,t}\boldsymbol{x}_{i,t}+\boldsymbol{z}_{t}\,,$$
+Here $\boldsymbol{B}_{0}$ is the unknown intercept, the $\boldsymbol{s}$'s are unknown smooth functions of the covariates ($\boldsymbol{x}$'s) and $\boldsymbol{z}$ is a dynamic latent trend component. Each smooth function $\boldsymbol{s}_{i}$ is composed of spline like basis expansions whose coefficients, which must be estimated, control the shape of the functional relationship between $\boldsymbol{x}_{i}$ and $log(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity, with a larger set of basis functions allowing greater flexibility. Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson or Negative Binomial) that accommodate ecological features such as zero-inflation, and that they can be formulated to include hierarchical smoothing for multivariate responses. For the dynamic component, in its most basic form we assume a random walk with drift:
+
+$$\boldsymbol{z}_{t}=\phi+\boldsymbol{z}_{t-1}+\boldsymbol{e}_{t}\,,$$
+where $\phi$ is the estimated drift parameter and $\boldsymbol{e}$ is drawn from a zero-centred Gaussian distribution. This model is easily modified to include autoregressive terms, which `mvgam` accomodates up to `order = 3`.
+
+In this vignette we demonstrate the model and some of the key functions used to interrogate `mvgam` objects. First a univariate example to show how challenging it can be to forecast ahead with conventional GAMs and how `mvgam` overcomes these challenges. We begin by replicating the lynx analysis from [2018 Ecological Society of America workshop on GAMs](https://noamross.github.io/mgcv-esa-2018/) that was hosted by Eric Pedersen, David L. Miller, Gavin Simpson, and Noam Ross, with some minor adjustments. First, load the data and plot the series as well as its estimated autocorrelation function
 ```{r, fig.show='hold', fig.align='center'}
 library(mvgam)
 data(lynx)
@@ -72,7 +80,7 @@ lynx_mgcv = gam(population ~ s(season, bs = 'cc', k = 19) +
 ```
 
 Inspect the model's summary and estimated smooth functions for the season, year and lag terms
-```{r}
+```{r, fig.show='hold', fig.align='center'}
 summary(lynx_mgcv)
 plot(lynx_mgcv, select = 1)
 plot(lynx_mgcv, select = 2)
@@ -245,7 +253,7 @@ summary(mod1_eval$series1$drps)
 summary(mod2_eval$series1$drps)
 ```
 
-Nominal coverages for both models' 90% prediction intervals
+Nominal coverages for both models' 90% prediction intervals. We expect both to have decent interval coverage in these experiments so this metric isn't quite as useful as DRPS, but it could become useful if later versions of `mvgam` allow for a wider range of response distributions
 ```{r}
 mean(mod1_eval$series1$in_interval)
 mean(mod2_eval$series1$in_interval)
