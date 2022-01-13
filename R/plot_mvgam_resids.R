@@ -40,8 +40,10 @@ qqline(object$resids[[series]], col = 2)
 # ACF plot
 acf(object$resids[[series]], main = 'ACF', na.action = na.pass)
 
-# PACF plot
-pacf(object$resids[[series]], main = 'pACF', na.action = na.pass)
+# PACF plot (only works if there are no missing values in the residual series)
+if(!any(is.na(object$resids[[series]]))){
+  pacf(object$resids[[series]], main = 'pACF', na.action = na.fail)
+}
 
 invisible()
 par(.pardefault)

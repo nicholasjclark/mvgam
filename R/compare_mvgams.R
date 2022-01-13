@@ -79,7 +79,7 @@ if(i == 1){
           ylab = 'Mean DRPS',
           col = c("darkgrey",  "black"),
           legend.text = c('Model 1', 'Model 2'),
-          args.legend = list(x = "top"))
+          args.legend = list(x = "top", ncol = 2))
 }
 
   if(ask){

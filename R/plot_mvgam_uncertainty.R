@@ -39,11 +39,10 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
   n_samples <- NROW(trend)
   size <- MCMCvis::MCMCsummary(object$jags_output, 'r')$mean
 
-  # Full uncertainty interval
+  # Full uncertainty interval for the mean
   preds <- matrix(NA, nrow = n_samples, ncol = NROW(series_test))
   for(i in 1:n_samples){
-    preds[i,] <- rnbinom(NROW(series_test), mu = exp(Xp %*% betas[i,] + trend[i,]),
-                         size = size)
+    preds[i,] <- Xp %*% betas[i,] + trend[i,]
   }
   full_int <- apply(preds,
                     2, hpd, 0.8)
@@ -52,8 +51,7 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
   # GAM only interval
   preds <- matrix(NA, nrow = n_samples, ncol = NROW(series_test))
   for(i in 1:n_samples){
-    preds[i,] <- rnbinom(NROW(series_test), mu = exp(Xp %*% betas[i,]),
-                         size = size)
+    preds[i,] <- Xp %*% betas[i,]
   }
   gam_int <- apply(preds,
                    2, hpd, 0.8)

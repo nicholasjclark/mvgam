@@ -13,7 +13,7 @@ all_data <- prep_neon_data(species = 'Ambloyomma_americanum', split_prop = 0.8)
 #### Set hypothtesis formulae ####
 # NULL. There is no seasonal pattern to be estimated, and we simply let the latent
 # factors and site-level effects of growing days influence the series dynamics
-null_hyp = y ~ siteID + s(cum_gdd, by = siteID, k = 3) - 1
+null_hyp = y ~ siteID + s(cum_gdd, by = siteID, k = 3)
 
 # 1. Do all series share same seasonal pattern, with any remaining variation due to
 # non-seasonal local variation captured by the trends?
@@ -21,19 +21,19 @@ hyp1 = y ~
   siteID +
   s(cum_gdd, by = siteID, k = 3) +
   # Global cyclic seasonality term (smooth)
-  s(season, k = 12, m = 2, bs = 'cc') - 1
+  s(season, k = 26, m = 2, bs = 'cc')
 
 # 2. Is there evidence for global seasonality but each site's seasonal pattern deviates
 # based on more local conditions?
 hyp2 = y ~
   siteID +
   s(cum_gdd, by = siteID, k = 3) +
-  s(season, k = 4, m = 2, bs = 'cc') +
+  s(season, k = 26, m = 2, bs = 'cc') +
   # Site-level deviations from global pattern, which can be wiggly (m=1 to reduce concurvity);
   # If these dominate, they will have smaller smoothing parameters and the global seasonality
   # will become less important (larger smoothing parameter). Sites with the smallest smooth
   # parameters are those that deviate the most from the global seasonality
-  s(season, by = siteID, m = 1, k = 8) - 1
+  s(season, by = siteID, m = 1, k = 6)
 
 # 3. Is there evidence for global seasonality but each plot's seasonal pattern deviates
 # based on even more local conditions than above (i.e. site-level is not as informative)?
@@ -42,14 +42,14 @@ hyp2 = y ~
 hyp3 = y ~
   siteID +
   s(cum_gdd, by = siteID, k = 3) +
-  s(season, k = 4, m = 2, bs = 'cc') +
+  s(season, k = 26, m = 2, bs = 'cc') +
   # Series-level deviations from global pattern
-  s(season, by = series, m = 1, k = 8) - 1
+  s(season, by = series, m = 1, k = 4)
 
 # Fit each hypothesis
-n.burnin = 100000
-n.iter = 5000
-thin = 5
+n.burnin = 50000
+n.iter = 2000
+thin = 2
 
 # Use default priors for latent drift terms and for smooth penalties
 fit_null <- fit_mvgam(data_train = all_data$data_train,
@@ -58,6 +58,7 @@ fit_null <- fit_mvgam(data_train = all_data$data_train,
                   formula_name = 'Null_hyp',
                   family = 'nb',
                   use_lv = T,
+                  n_lv = 5,
                   n.burnin = n.burnin,
                   n.iter = n.iter,
                   thin = thin,
@@ -68,8 +69,10 @@ fit_hyp1 <- fit_mvgam(data_train = all_data$data_train,
                       data_test = all_data$data_test,
                       formula = hyp1,
                       formula_name = 'Hyp1',
+                      knots = list(season = c(0.5, 26.5)),
                       family = 'nb',
                       use_lv = T,
+                      n_lv = 5,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
@@ -80,8 +83,10 @@ fit_hyp2 <- fit_mvgam(data_train = all_data$data_train,
                       data_test = all_data$data_test,
                       formula = hyp2,
                       formula_name = 'Hyp2',
+                      knots = list(season = c(0.5, 26.5)),
                       family = 'nb',
                       use_lv = T,
+                      n_lv = 5,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
@@ -93,7 +98,9 @@ fit_hyp3 <- fit_mvgam(data_train = all_data$data_train,
                       formula = hyp3,
                       formula_name = 'Hyp3',
                       family = 'nb',
+                      knots = list(season = c(0.5, 26.5)),
                       use_lv = T,
+                      n_lv = 5,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,

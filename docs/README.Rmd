@@ -19,11 +19,8 @@ The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Gen
   
 ## Installation
 Install the development version from `GitHub` using:
+`devtools::install_github("nicholasjclark/mvgam")`
 
-``` r
-# install.packages("devtools")
-devtools::install_github("nicholasjclark/mvgam")
-```
 ## Brief introduction to the package
 
 We can explore the model’s primary functions using a test dataset that
@@ -56,7 +53,7 @@ lynx_train = lynx_full[1:50, ]
 lynx_test = lynx_full[51:60, ]
 ```
 
-Now fit an `mvgam` model; it fits a GAM in which a smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process with drift), rather than relying on smoothing splines that do not incorporate a concept of the future. We estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
+Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process with drift), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
 ```{r}
 lynx_mvgam <- mvjagam(data_train = lynx_train,
                data_test = lynx_test,
@@ -64,13 +61,13 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               n.burnin = 20000,
+               n.burnin = 40000,
                n.iter = 10000,
                thin = 10,
                auto_update = F)
 ```
 
-Calculate the out of sample forecast from the fitted `mvgam` model and visualise 95% and 68% credible intervals
+Calculate the out of sample forecast from the fitted `mvgam` model and visualise. All of the following plots show 95% and 68% highest posterior density credible intervals (shaded regions) as well as the posterior median (dashed line)
 ```{r, fig.width=5, fig.height=4, fig.align='center'}
 fits <- MCMCvis::MCMCchains(lynx_mvgam$jags_output, 'ypred')
 fits <- fits[,(NROW(lynx_mvgam$obs_data)+1):(NROW(lynx_mvgam$obs_data)+10)]
@@ -113,17 +110,17 @@ And the estimated latent trend component
 plot_mvgam_trend(lynx_mvgam, data_test = lynx_test)
 ```
 
-A key aspect of ecological forecasting is to understand [how different components of a model contribute to forecast uncertainty](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589). We can estimate contributions to forecast uncertainty for the GAM smooth functions and the latent trend using `mvgam`
+A key aspect of ecological forecasting is to understand [how different components of a model contribute to forecast uncertainty](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589). We can estimate relative contributions to forecast uncertainty for the GAM component and the latent trend component using `mvgam`
 ```{r, fig.width=5, fig.height=4, fig.align='center'}
 plot_mvgam_uncertainty(lynx_mvgam, data_test = lynx_test)
 ```
 
-Both components contribute to forecast uncertainty, suggesting we would still need some more work to learn about factors driving the dynamics of the system. But we will leave the model as-is for this example. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's residuals, which are posterior medians of Dunn-Smyth randomised quantile residuals so should follow approximate normality. We are primarily looking for a lack of autocorrelation, which would suggest our AR2 model is appropriate for the latent trend
+Both components contribute to forecast uncertainty, suggesting we would still need some more work to learn about factors driving the dynamics of the system. But we will leave the model as-is for this example. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's residuals, which are posterior medians of Dunn-Smyth randomised quantile residuals so should follow approximate normality. We are primarily looking for a lack of autocorrelation, which would suggest our AR3 model is appropriate for the latent trend
 ```{r, fig.width=6, fig.height=6, fig.align='center'}
 plot_mvgam_resids(lynx_mvgam)
 ```
 
-Another useful utility of `mvgam` is the ability to use rolling window forecasts to evaluate competing models that may represent different hypotheses about the series dynamics. Here we will fit a poorly specified model to showcase how this evaluation works
+Another useful utility of `mvgam` is the ability to use rolling window forecasts to evaluate competing models that may represent different hypotheses about the series dynamics. Here we will fit a poorly specified model to showcase how this evaluation works. In this model, we ignore the cyclic pattern of seasonality and force it to be fairly non-wiggly. We also use a random walk process for the trend
 ```{r}
 lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
                data_test = lynx_test,

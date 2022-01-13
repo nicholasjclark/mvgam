@@ -26,13 +26,19 @@
 #'simulations can be obtained
 #'@param prior_simulation \code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 #'simulations from prior distributions are returned
+#'@param return_jags_data \code{logical}. If \code{TRUE}, the list of data that is needed to fit the \code{JAGS}
+#'model is returned, along with the initial values for smooth and AR parameters, once the model is fitted.
+#'This will be helpful if users wish to modify the model file to add
+#'other stochastic elements that are not currently avaiable in \code{mvgam}. Default is \code{FALSE} to reduce
+#'the size of the returned object
 #'@param family \code{character}. Must be either 'nb' (for Negative Binomial) or 'poisson'
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
 #'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(5, floor(n_series / 2))}
 #'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
-#''RW' (random walk with drift), 'AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
+#''None' (modelled as a Gaussian static white noise process), 'RW' (random walk with drift),
+#''AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
 #''AR3' (AR3 model with intercept)
 #'@param n.chains \code{integer} specifying the number of parallel chains for the model
 #'@param n.burnin \code{integer} specifying the number of iterations of the Markov chain to run during
@@ -73,59 +79,67 @@
 #'@seealso \code{\link[rjags]{jags.model}}, \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
 #'@return A \code{list} object containing JAGS model output, the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
-#'unsampled covariate values), the names of the smooth parameters, Dunn-Smyth residuals for each
-#'series and information needed for other functions in the package
+#'unsampled covariate values), Dunn-Smyth residuals for each series and other key information needed
+#'for other functions in the package
 #'
 #'@export
 
 mvjagam = function(formula,
                    knots,
-                    data_train,
-                    data_test,
-                    prior_simulation = FALSE,
-                    family = 'nb',
-                    use_lv = FALSE,
-                    n_lv,
-                    trend_model = 'RW',
-                    n.chains = 2,
-                    n.burnin = 5000,
-                    n.iter = 2000,
-                    thin = 2,
-                    auto_update = TRUE,
-                    phi_prior,
-                    ar_prior,
-                    r_prior,
-                    tau_prior,
-                    upper_bounds){
+                   data_train,
+                   data_test,
+                   prior_simulation = FALSE,
+                   return_jags_data = FALSE,
+                   family = 'nb',
+                   use_lv = FALSE,
+                   n_lv,
+                   trend_model = 'RW',
+                   n.chains = 2,
+                   n.burnin = 5000,
+                   n.iter = 2000,
+                   thin = 2,
+                   auto_update = TRUE,
+                   phi_prior,
+                   ar_prior,
+                   r_prior,
+                   tau_prior,
+                   upper_bounds){
 
   # Check arguments
-  trend_model <- match.arg(arg = trend_model, choices = c("RW", "AR1", "AR2", "AR3"))
+  trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1", "AR2", "AR3"))
   family <- match.arg(arg = family, choices = c("nb", "poisson"))
 
-  # Fill in any NA's with arbitrary values so the observations aren't dropped when jags data is created
+  # If there are missing values in y, use predictions from an initial mgcv model to fill
+  # these in so that initial values can be more accurate and we maintain the true
+  # size of the training dataset
   orig_y <- data_train$y
-  data_train$y[which(is.na(data_train$y))] <- floor(sample(seq(min(data_train$y, na.rm = T), max(data_train$y, na.rm = T)),
-                                                             length(which(is.na(data_train$y))),
-                                                             T))
 
-  # Estimate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
-  # when simulating from the JAGS model later on
-  if(!missing(knots)){
-    ss_gam <- mgcv::bam(formula(formula),
-                        data = data_train,
-                        method = "fREML",
-                        family = poisson(),
-                        drop.unused.levels = FALSE,
-                        knots = knots,
-                        nthreads = parallel::detectCores()-1)
-  } else {
-    ss_gam <- mgcv::bam(formula(formula),
-                        data = data_train,
-                        method = "fREML",
-                        family = poisson(),
-                        drop.unused.levels = FALSE,
-                        nthreads = parallel::detectCores()-1)
-  }
+    if(!missing(knots)){
+
+      # Estimate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
+      # when simulating from the JAGS model later on
+      ss_gam <- mgcv::bam(formula(formula),
+                          data = data_train,
+                          method = "fREML",
+                          family = poisson(),
+                          drop.unused.levels = FALSE,
+                          knots = knots,
+                          nthreads = parallel::detectCores()-1)
+    } else {
+      ss_gam <- mgcv::bam(formula(formula),
+                          data = data_train,
+                          method = "fREML",
+                          family = poisson(),
+                          drop.unused.levels = FALSE,
+                          nthreads = parallel::detectCores()-1)
+    }
+
+  # Fill in missing observations in data_train so the size of the dataset is correct when
+  # building the JAGS model
+  data_train$y[which(is.na(data_train$y))] <- round(predict(ss_gam,
+                                                              newdata = data_train,
+                                                              type = 'response'), 0)[which(is.na(data_train$y))]
+
 
   # Make jags file and appropriate data structures
   if(!missing(knots)){
@@ -278,6 +292,13 @@ mvjagam = function(formula,
         model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dnegbin(rate[i, s], r)'
         model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dnegbin(rate[i, s], r)'
       }
+    }
+
+    if(trend_model == 'None'){
+      model_file[grep('phi\\[s\\] ~', model_file)] <- 'phi[s] <- 0'
+      model_file[grep('ar1\\[s\\] ~', model_file)] <- 'ar1[s] <- 0'
+      model_file[grep('ar2\\[s\\] ~', model_file)] <- 'ar2[s] <- 0'
+      model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
     }
 
     if(trend_model == 'RW'){
@@ -455,6 +476,13 @@ mvjagam = function(formula,
         }
       }
 
+      if(trend_model == 'None'){
+        model_file[grep('phi\\[s\\] ~', model_file)] <- 'phi[s] <- 0'
+        model_file[grep('ar1\\[s\\] ~', model_file)] <- 'ar1[s] <- 0'
+        model_file[grep('ar2\\[s\\] ~', model_file)] <- 'ar2[s] <- 0'
+        model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
+      }
+
       if(trend_model == 'RW'){
         model_file[grep('ar1\\[s\\] ~', model_file)] <- 'ar1[s] <- 1'
         model_file[grep('ar2\\[s\\] ~', model_file)] <- 'ar2[s] <- 0'
@@ -557,10 +585,12 @@ mvjagam = function(formula,
   }
 
   # Initial values of zero for the AR parameters
-  if(use_lv){
-    ss_jagam$jags.ini$phi <- rep(0, ss_jagam$jags.data$n_lv)
-  } else {
-    ss_jagam$jags.ini$phi <- rep(0, NCOL(ytimes))
+  if(!trend_model == 'None'){
+    if(use_lv){
+      ss_jagam$jags.ini$phi <- rep(0, ss_jagam$jags.data$n_lv)
+    } else {
+      ss_jagam$jags.ini$phi <- rep(0, NCOL(ytimes))
+    }
   }
 
   if(trend_model == 'AR1'){
@@ -658,13 +688,27 @@ mvjagam = function(formula,
     n_lv <- NULL
   }
 
-  # Get Dunn-Smyth Residuals based on median predictions from the model
-  ds_resids = function(truth, fitted, size){
+  # Get Dunn-Smyth Residuals based on median predictions from the model;
+  # if the truth is NA at a certain point, we use a random draw from the model's
+  # posterior
+  ds_resids = function(truth, fitted, draw, size){
     dsres_out <- matrix(NA, length(truth), 1)
     for(i in 1:length(truth)){
-      a <- pnbinom(as.vector(truth[i]) - 1, mu = fitted[i], size = size)
-      b <- pnbinom(as.vector(truth[i]), mu = fitted[i], size = size)
+      if(is.na(truth[i])){
+        a <- pnbinom(as.vector(draw[i]) - 1, mu = fitted[i], size = size)
+        b <- pnbinom(as.vector(draw[i]), mu = fitted[i], size = size)
+      } else {
+        a <- pnbinom(as.vector(truth[i]) - 1, mu = fitted[i], size = size)
+        b <- pnbinom(as.vector(truth[i]), mu = fitted[i], size = size)
+      }
+
       u <- runif(n = 1, min = a, max = b)
+      if(u <= 0){
+        u <- 0.0001
+      }
+      if(u >=1){
+        u <- 0.9999
+      }
       dsres_out[i, ] <- qnorm(u)
     }
     resids <- dsres_out[,1]
@@ -683,29 +727,52 @@ mvjagam = function(formula,
     n_obs <- data_train %>%
       dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
       nrow()
-    preds <- apply(MCMCvis::MCMCchains(out_gam_mod, 'ypred')[,starts[series]:ends[series]],
+    preds <- MCMCvis::MCMCchains(out_gam_mod, 'ypred')[,starts[series]:ends[series]]
+    draw <- preds[sample(seq(1, NROW(preds)), 1), ]
+    preds <- apply(preds,
                    2, function(x) hpd(x)[2])
     suppressWarnings(ds_resids(truth = as.vector(ys_mat[1:n_obs,series]),
                                fitted = preds[1:n_obs],
+                               draw = draw,
                                size = size))
   })
   names(series_resids) <- levels(data_train$series)
 
-  return(list(call = formula,
-              family = ifelse(family == 'nb',
-                              'Negative Binomial',
-                              'Poisson'),
-              pregam = ss_jagam$pregam,
-              jags_output = out_gam_mod,
-              model_file = model_file,
-              mgcv_model = ss_gam,
-              jags_model = gam_mod,
-              smooth_param_details = base_model[sort(c(grep('## prior for', base_model),
-                                                       grep('## prior for', base_model)+1))],
-              ytimes = ytimes,
-              resids = series_resids,
-              use_lv = use_lv,
-              n_lv = n_lv,
-              upper_bounds = upper_bounds,
-              obs_data = data_train))
+  if(return_jags_data){
+    output <- list(call = formula,
+                   family = ifelse(family == 'nb',
+                                   'Negative Binomial',
+                                   'Poisson'),
+                   pregam = ss_jagam$pregam,
+                   jags_output = out_gam_mod,
+                   model_file = model_file,
+                   jags_data = ss_jagam$jags.data,
+                   jags_inits = ss_jagam$jags.ini,
+                   mgcv_model = ss_gam,
+                   jags_model = gam_mod,
+                   ytimes = ytimes,
+                   resids = series_resids,
+                   use_lv = use_lv,
+                   n_lv = n_lv,
+                   upper_bounds = upper_bounds,
+                   obs_data = data_train)
+  } else {
+    output <- list(call = formula,
+                   family = ifelse(family == 'nb',
+                                   'Negative Binomial',
+                                   'Poisson'),
+                   pregam = ss_jagam$pregam,
+                   jags_output = out_gam_mod,
+                   model_file = model_file,
+                   mgcv_model = ss_gam,
+                   jags_model = gam_mod,
+                   ytimes = ytimes,
+                   resids = series_resids,
+                   use_lv = use_lv,
+                   n_lv = n_lv,
+                   upper_bounds = upper_bounds,
+                   obs_data = data_train)
+  }
+
+  return(output)
 }

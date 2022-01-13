@@ -2,113 +2,22 @@
 library(mvgam)
 library(dplyr)
 
-# Test that the series_to_mvgam function works to show how ts or xts objects can easily
-# be converted into the correct format
-library(xts)
-library(forecast)
-data("AirPassengers")
-series <- xts::as.xts(floor(AirPassengers))
-colnames(series) <- c('Air')
-fake_data <- series_to_mvgam(series, freq = 12, train_prop = 0.75)
-
-plot(series)
-hist(series)
-plot(stl(series, s.window = 'periodic'))
-
-autoplot(forecast(ets(series)))
-rm(series)
-
-# Fit a well-specified model in which the GAM component captures the repeated
-# seasonality and the latent trend captures AR parameters up to order 3
-mod <- mvjagam(data_train = fake_data$data_train,
-               data_test = fake_data$data_test,
-               formula = y ~ s(season, bs = c('cc'), k = 12),
-               knots = list(season = c(0.5, 12.5)),
-               family = 'nb',
-               use_lv = F,
-               trend_model = 'AR3',
-               n.burnin = 5000,
-               auto_update = F)
-
-# Check the model summary and plot the smooth term
-summary_mvgam(mod)
-summary(mod$mgcv_model)
-plot_mvgam_resids(mod, 1)
-plot_mvgam_smooth(mod, 1, 'season')
-
-# Compare the model's forecast to one from an automatic exponential smoothing model
-par(mfrow = c(1,2))
-ets_fc <- forecast(ets(series), h = NROW(fake_data$data_test))
-plot_mvgam_fc(mod, ylim = c(min(ets_fc$x),
-                            max(ets_fc$upper)))
-plot(ets_fc)
-
-# Fit a mis-specified model for testing the model comparison functions by
-# smoothing on a white noise covariate
-fake_data$data_train$fake_cov <- rnorm(NROW(fake_data$data_train))
-fake_data$data_test$fake_cov <- rnorm(NROW(fake_data$data_test))
-mod2 <- mvjagam(data_train = fake_data$data_train,
-               data_test = fake_data$data_test,
-               formula = y ~ s(fake_cov, k = 3),
-               family = 'poisson',
-               use_lv = F,
-               trend_model = 'RW',
-               n.burnin = 10,
-               n.iter = 1000,
-               thin = 1,
-               auto_update = F)
-summary_mvgam(mod2)
-plot_mvgam_smooth(mod2, 1, 'fake_cov')
-plot_mvgam_resids(mod2)
-
-# Compare the models using rolling forecast DRPS evaluation
-compare_mvgams(mod, mod2, fc_horizon = 6,
+compare_mvgams(mod, mod_notrend, fc_horizon = 6,
                n_evaluations = 30, n_cores = 3)
 
-# Plot the posterior distribution of in-sample and out-of-sample predictions
-# with true observations overlaid as points
-plot_mvgam_fc(mod, series = 1, data_test = fake_data$data_test)
-
-# Plot the estimated latent trend
-plot_mvgam_trend(mod, series = 1, data_test = fake_data$data_test)
-
-# Plot estimated contributions to forecast uncertainty
-plot_mvgam_uncertainty(mod, series = 1, data_test = fake_data$data_test)
-
-# Plot estimated trend parameters
-MCMCvis::MCMCtrace(mod$jags_output, c('phi', 'ar1', 'ar2', 'ar3'), pdf = F,
-                   n.eff = T)
-par(mfrow=c(1,1))
-
-# Initiate particles by assimilating the next observation in data_test
-pfilter_mvgam_init(object = mod, n_particles = 10000, n_cores = 2,
-                   data_assim = fake_data$data_test)
-
-# Assimilate some of the next out of sample observations
-pfilter_mvgam_online(data_assim = fake_data$data_test[1:7,], n_cores = 2,
-                     kernel_lambda = 1)
-
-# Forecast from particles using the covariate information in remaining data_test observations
-fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 2,
-                       data_test = fake_data$data_test,
-                       ylim = c(0, max(fake_data$data_test$y)*1.25))
-par(mfrow=c(1,2))
-plot_mvgam_fc(mod, series = 1, data_test = fake_data$data_test,
-              ylim = c(0, max(fake_data$data_test$y)*1.25))
-fc$Air()
-points(c(fake_data$data_train$y,
-         fake_data$data_test$y), pch = 16)
-
-# Remove the particles
-unlink('pfilter', recursive = T)
-
 # Google Trends example; tick paralysis and related search interests in Queensland, Australia
+if(!require(gtrendsR)){
+  install.packages('gtrendsR')
+}
+
 terms = c("tick bite",
           "tick paralysis",
           "dog tick", "la nina")
 trends <- gtrendsR::gtrends(terms, geo = "AU-QLD",
                             time = "all", onlyInterest = T)
 
+# Google Trends modified their algorithm post 2012, so filter the series to only include
+# observations after this point in time
 trends$interest_over_time %>%
   tidyr::spread(keyword, hits) %>%
   dplyr::select(-geo, -time, -gprop, -category) %>%
@@ -116,49 +25,52 @@ trends$interest_over_time %>%
   dplyr::mutate(year = lubridate::year(date)) %>%
   dplyr::filter(year > 2012) %>%
   dplyr::select(-year)-> gtest
+
+# Convert to an xts object and then to mvgam format
 series <- xts::xts(x = gtest[,-1], order.by = gtest$date)
 plot(series, legend.loc = 'topleft')
 trends_data <- series_to_mvgam(series, freq = 12, train_prop = 0.9)
 
 # mvgam model with hierarchical seasonality, recognising known upper bounds for
-# Google trends (cannot go above 100)
+# Google trends series (cannot go above 100). Here we assume the trends can be represented using
+# two latent factors that each follow an AR1 process
 trends_mod <- mvjagam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
-                 formula = y ~ s(season, k = 6, m = 2, bs = 'cc') +
-                   s(season, by = series, k = 10, m = 1) - 1,
-                 knots = list(season = c(0.5, 12.5)),
-                 use_lv = T,
-                 trend_model = 'AR3',
-                 n_lv = 3,
-                 family = 'nb',
-                 n.burnin = 1000,
-                 n.iter = 1000,
-                 thin = 1,
-                 upper_bounds = rep(100, length(terms)),
-                 auto_update = F)
-summary_mvgam(trends_mod)
-
-# A fixed seasonality model for comparison
-trends_mod2 <- mvjagam(data_train = trends_data$data_train,
-                      data_test = trends_data$data_test,
-                      formula = y ~ s(season, k = 6, bs = 'cc') - 1,
+                      formula = y ~ s(season, k = 12, m = 2, bs = 'cc') +
+                        s(season, by = series, k = 5, m = 1),
                       knots = list(season = c(0.5, 12.5)),
                       use_lv = T,
-                      trend_model = 'AR3',
-                      n_lv = 3,
+                      trend_model = 'AR1',
+                      n_lv = 2,
                       family = 'nb',
-                      n.burnin = 1000,
-                      n.iter = 1000,
-                      thin = 1,
+                      n.burnin = 10000,
+                      n.iter = 5000,
+                      thin = 5,
+                      upper_bounds = rep(100, length(terms)),
+                      auto_update = F)
+summary_mvgam(trends_mod)
+
+# A simpler model with only one latent factor for comparisons
+trends_mod2 <- mvjagam(data_train = trends_data$data_train,
+                      data_test = trends_data$data_test,
+                      formula = y ~ s(season, k = 12, m = 2, bs = 'cc') +
+                        s(season, by = series, k = 5, m = 1),
+                      knots = list(season = c(0.5, 12.5)),
+                      use_lv = T,
+                      trend_model = 'AR1',
+                      n_lv = 1,
+                      family = 'nb',
+                      n.burnin = 10000,
+                      n.iter = 5000,
+                      thin = 5,
                       upper_bounds = rep(100, length(terms)),
                       auto_update = F)
 summary_mvgam(trends_mod2)
 
 # Compare the models using rolling forecast DRPS evaluation. Here we focus on
 # near-term forecasts (horizon = 3) when comparing model performances
-par(mfrow = c(1,1))
 compare_mvgams(trends_mod, trends_mod2, fc_horizon = 3,
-               n_cores = 3, n_evaluations = 20, n_samples = 2500)
+               n_cores = 4, n_evaluations = 20, n_samples = 2500)
 
 # Look at Dunn-Smyth residuals for some series from preferred model (Model 1)
 plot_mvgam_resids(trends_mod, 1)

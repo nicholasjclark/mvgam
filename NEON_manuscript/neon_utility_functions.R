@@ -139,12 +139,11 @@ plot_mvgam_season = function(out_gam_mod, series, data_test, data_train,
                                                                          (Xp %*% betas[1,]) - 2.5),
 
        col = rgb(150, 0, 0, max = 255, alpha = 10), type = 'l',
-       ylab = paste0('F(season) for ', levels(data_train$series)[series]),
+       ylab = paste0('s(season) for ', levels(data_train$series)[series]),
        xlab = xlab, xaxt = 'n')
   axis(1, at = seq(0, 26, by = 5), labels = seq(0, 26, by = 5) + 14, cex.axis = 1)
   rect(xleft = 4, xright = 18, ybottom = -100, ytop = 100, col = 'gray90',
        border = NA)
-  abline(h = 0, lwd=1)
   text(x=11,y=max((Xp %*% betas[1,]) + 2.3), labels = 'Peak tick season')
   for(i in 2:1000){
     lines((Xp %*% betas[i,]) ~ pred_dat$season,
@@ -327,6 +326,7 @@ fit_mvgam = function(data_train,
                      n_lv = 5,
                      phi_prior,
                      tau_prior,
+                     knots,
                      n.burnin = 1000,
                      n.iter = 1000,
                      thin = 2,
@@ -334,18 +334,35 @@ fit_mvgam = function(data_train,
                      interval_width = 0.9){
 
   # Condition the model on the observed data
-  out_gam_mod <- mvjagam(formula = formula,
-                         data_train = data_train,
-                         data_test = data_test,
-                         n.burnin = n.burnin,
-                         n.iter = n.iter,
-                         thin = thin,
-                         auto_update = auto_update,
-                         use_lv = use_lv,
-                         n_lv = n_lv,
-                         family = family,
-                         phi_prior = phi_prior,
-                         tau_prior = tau_prior)
+  if(missing(knots)){
+    out_gam_mod <- mvjagam(formula = formula,
+                           data_train = data_train,
+                           data_test = data_test,
+                           n.burnin = n.burnin,
+                           n.iter = n.iter,
+                           thin = thin,
+                           auto_update = auto_update,
+                           use_lv = use_lv,
+                           n_lv = n_lv,
+                           family = family,
+                           phi_prior = phi_prior,
+                           tau_prior = tau_prior)
+  } else {
+    out_gam_mod <- mvjagam(formula = formula,
+                           data_train = data_train,
+                           data_test = data_test,
+                           n.burnin = n.burnin,
+                           n.iter = n.iter,
+                           knots = knots,
+                           thin = thin,
+                           auto_update = auto_update,
+                           use_lv = use_lv,
+                           n_lv = n_lv,
+                           family = family,
+                           phi_prior = phi_prior,
+                           tau_prior = tau_prior)
+  }
+
 
   #### If GAM component is LESS supported, we should see evidence in the form of: ####
   # 1. Poorer convergence of smoothing parameter estimates, suggesting the model

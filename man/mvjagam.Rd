@@ -10,9 +10,10 @@ mvjagam(
   data_train,
   data_test,
   prior_simulation = FALSE,
+  return_jags_data = FALSE,
   family = "nb",
   use_lv = FALSE,
-  n_lv = 5,
+  n_lv,
   trend_model = "RW",
   n.chains = 2,
   n.burnin = 5000,
@@ -52,6 +53,12 @@ simulations can be obtained}
 \item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 simulations from prior distributions are returned}
 
+\item{return_jags_data}{\code{logical}. If \code{TRUE}, the list of data that is needed to fit the \code{JAGS}
+model is returned, along with the initial values for smooth and AR parameters, once the model is fitted.
+This will be helpful if users wish to modify the model file to add
+other stochastic elements that are not currently avaiable in \code{mvgam}. Default is \code{FALSE} to reduce
+the size of the returned object}
+
 \item{family}{\code{character}. Must be either 'nb' (for Negative Binomial) or 'poisson'}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
@@ -61,7 +68,8 @@ latent trends in a reduced dimension format. If \code{FALSE}, estimate independe
 Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(5, floor(n_series / 2))}}
 
 \item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
-'RW' (random walk with drift), 'AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
+'None' (modelled as a Gaussian static white noise process), 'RW' (random walk with drift),
+'AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
 'AR3' (AR3 model with intercept)}
 
 \item{n.chains}{\code{integer} specifying the number of parallel chains for the model}
@@ -95,8 +103,8 @@ truncation entirely (i.e. there is no upper bound for each series)}
 \value{
 A \code{list} object containing JAGS model output, the text representation of the model file,
 the mgcv model output (for easily generating simulations at
-unsampled covariate values), the names of the smooth parameters, Dunn-Smyth residuals for each
-series and information needed for other functions in the package
+unsampled covariate values), Dunn-Smyth residuals for each series and other key information needed
+for other functions in the package
 }
 \description{
 This function estimates the posterior distribution for a multivariate GAM that includes
