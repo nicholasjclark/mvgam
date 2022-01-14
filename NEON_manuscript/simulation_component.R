@@ -1,19 +1,25 @@
 #### Simulation component of mvgam / NEON manuscript ####
 library(mvgam)
 library(dplyr)
-source('neon_utility_functions.R')
+source('NEON_manuscript/neon_utility_functions.R')
 
 # Use hierarchical seasonality for all;
 # trend components: 0.3 and 0.7
 # N_series: 4, 12
 # Length: 6 years
 # Missingness: none, 10%, 50%
-set.seed(110)
 run_parameters <- expand.grid(n_series = c(4, 12),
                               T = c(72),
                               prop_missing = c(0, 0.1, 0.5),
                               trend_rel = c(0.3, 0.7),
                               stringsAsFactors = F)
+
+# Run each simulation scenario 5 times (a total of 60 simulations)
+run_parameters <- rbind(run_parameters,
+                        run_parameters,
+                        run_parameters,
+                        run_parameters,
+                        run_parameters)
 
 # Run models and extract performance indicators
 sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
@@ -31,11 +37,11 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                   data_test = sim_data$data_test,
                   formula = y ~ s(series, bs = 're'),
                   family = 'nb',
-                  use_lv = F,
-                  n.burnin = 25000,
+                  use_lv = T,
+                  n.burnin = 10000,
                   n.iter = 5000,
                   thin = 5,
-                  auto_update = T)
+                  auto_update = F)
   difftime(Sys.time(), t, units = "mins")[[1]] -> comp_time
 
   # Record model computational times and summary of key effective sample sizes
@@ -103,15 +109,15 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
   t <- Sys.time()
   hier_mod <- mvjagam(data_train = sim_data$data_train,
                       data_test = sim_data$data_test,
-                      formula = y ~ s(season, k = 4, m = 2, bs = 'cc') +
-                                        s(season, by = series, m = 1, k = 8),
+                      formula = y ~ s(season, k = 12, m = 2, bs = 'cc') +
+                                        s(season, by = series, m = 1, k = 4),
+                      knots = list(season = c(0.5, 12.5)),
                       family = 'nb',
-                      trend_model = 'AR3',
                       use_lv = T,
-                      n.burnin = 25000,
+                      n.burnin = 10000,
                       n.iter = 5000,
                       thin = 5,
-                      auto_update = T)
+                      auto_update = F)
   difftime(Sys.time(), t, units = "mins")[[1]] -> comp_time
 
   # Extract all performance information
@@ -133,9 +139,10 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
 
   # Fit a standard mgcv version of the hierarchical model as a final comparison, including
   # non-wiggly series-specific year smooths with penalty on the first derivative
-  mgcv_hier_mod <- gam(y ~ s(season, k = 4, m = 2, bs = 'cc') +
-                         s(season, by = series, m = 1, k = 8) +
+  mgcv_hier_mod <- gam(y ~ s(season, k = 12, m = 2, bs = 'cc') +
+                         s(season, by = series, m = 1, k = 4) +
                          s(year, by = series, k = 3, bs = 'gp', m = 1),
+                       knots = list(season = c(0.5, 12.5)),
                        family = nb(), data = sim_data$data_train)
 
   # Extract posterior predictions from the mgcv model and calculate out of sample DRPS

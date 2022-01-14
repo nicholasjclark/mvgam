@@ -9,6 +9,14 @@ library(mvgam)
 # Prep Ixodes data
 all_data <- prep_neon_data(species = 'Ixodes_scapularis', split_prop = 0.8)
 
+for(i in 1:8){
+  plot_mvgam_gdd(fit_hyp2$out_gam_mod, series = i,
+                 data_test = all_data$data_test,
+                 data_train = all_data$data_train,
+                 mean_gdd = all_data$mean_gdd,
+                 sd_gdd = all_data$sd_gdd)
+}
+
 # Make plots for manuscript
 pdf('NEON_manuscript/Figures/Fig5_ixodes_example.pdf', width = 6.25, height = 5.85)
 par(mfrow = c(2, 2),
@@ -27,8 +35,8 @@ plot_mvgam_fc(fit_hyp2$out_gam_mod, series = 6,
               hide_xlabels = TRUE)
 axis(1, at = seq(0, dim(fit_hyp3$out_gam_mod$ytimes)[1],
                  b = 26), labels = seq(2015, 2020), cex.axis = 1)
-text(x=NROW(all_data$data_train) / NCOL(fit_hyp3$out_gam_mod$ytimes) + 8,
-     y=75, labels = 'Forecast horizon', srt = -90)
+text(x=NROW(all_data$data_train) / NCOL(fit_hyp2$out_gam_mod$ytimes) + 6.5,
+     y=30, labels = 'Forecast horizon', srt = -90)
 plot_mvgam_trend(fit_hyp2$out_gam_mod, series = 6,
               data_test = all_data$data_test,
               hide_xlabels = TRUE)
@@ -43,16 +51,16 @@ pdf('NEON_manuscript/Figures/Fig6_amb_seasonalities.pdf', width = 6.25, height =
 par(mfrow = c(2, 2),
     mgp = c(2.5, 1, 0),
     mai = c(0.6, 0.6, 0.2, 0.2))
-for(i in c(1, 6, 9, 15)){
-  if(i %in% c(13, 15)){
-    plot_mvgam_season(fit_hyp3$out_gam_mod, series = i,
-                      data_test = all_data$data_test,
-                      data_train = all_data$data_train, xlab = 'Epidemiological week')
-  } else {
-    plot_mvgam_season(fit_hyp3$out_gam_mod, series = i,
-                      data_test = all_data$data_test,
-                      data_train = all_data$data_train, xlab = '')
-  }
+for(i in c(1, 7, 13, 16)){
+
+ plot_mvgam_smooth(fit_hyp3$out_gam_mod, series = i,
+                      smooth = 'season',
+                   newdata = expand.grid(series = levels(fit_hyp3$out_gam_mod$obs_data$series)[i],
+                                         season = seq(1, 26, length.out = 100),
+                                         cum_gdd = 0,
+                                         siteID = unique(fit_hyp3$out_gam_mod$obs_data$siteID[which(
+                                           as.numeric(fit_hyp3$out_gam_mod$obs_data$series) == i
+                                         )])))
 
 }
 dev.off()
@@ -62,7 +70,7 @@ pdf('NEON_manuscript/Figures/Fig7_amb_uncertainties.pdf', width = 6.25, height =
 par(mfrow = c(2, 2),
     mgp = c(2.5, 1, 0),
     mai = c(0.6, 0.6, 0.2, 0.2))
-for(i in c(4, 6, 9, 15)){
+for(i in c(1, 7, 13, 16)){
   plot_mvgam_uncertainty(fit_hyp3$out_gam_mod, series = i,
                           data_test = all_data$data_test,
                          legend_position = 'bottomleft')

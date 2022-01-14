@@ -50,7 +50,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth, newdata){
       dplyr::mutate_at(c('year', smooth_terms)[c('year', smooth_terms) != smooth], mean_not_fac) %>%
       dplyr::mutate(series = !!(levels(data_train$series)[series])) -> pred_dat
 
-   pred_dat%>%dplyr::select(-smooth) %>% dplyr::distinct() %>%
+   pred_dat %>% dplyr::select(-smooth) %>% dplyr::distinct() %>%
       dplyr::bind_cols(smooth.var = seq(min(pred_dat[,smooth]), max(pred_dat[,smooth]), length.out = 100)) -> pred_dat
      colnames(pred_dat) <- gsub('smooth.var', smooth, colnames(pred_dat))
 

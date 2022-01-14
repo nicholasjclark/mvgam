@@ -227,11 +227,11 @@ mvjagam = function(formula,
 
                       ## AR components
                       for (s in 1:n_series){
-                      phi[s] ~ dnorm(0, 10)
-                      ar1[s] ~ dnorm(0, 10)
-                      ar2[s] ~ dnorm(0, 10)
-                      ar3[s] ~ dnorm(0, 10)
-                      tau[s] ~ dgamma(0.1, 0.001)
+                       phi[s] ~ dnorm(0, 10)
+                       ar1[s] ~ dnorm(0, 10)
+                       ar2[s] ~ dnorm(0, 10)
+                       ar3[s] ~ dnorm(0, 10)
+                       tau[s] ~ dgamma(0.1, 0.001)
                       }
 
                       ## Negative binomial likelihood functions
