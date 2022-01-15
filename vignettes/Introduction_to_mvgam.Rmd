@@ -63,18 +63,23 @@ lynx_full$y <- lynx_full$population
 lynx_full$series <- factor('series1')
 ```
 
-Split the data into training (first 50 years) and testing (next 10 years of data) to evaluate multi-step ahead forecasts
+Split the data into training (first 40 years) and testing (next 10 years of data) to evaluate multi-step ahead forecasts
 ```{r}
-lynx_train = lynx_full[1:50, ]
-lynx_test = lynx_full[51:60, ]
+lynx_train = lynx_full[1:40, ]
+lynx_test = lynx_full[41:50, ]
 ```
 
-The best-forecasting model in the course was with nonlinear smooths of lags 1 and 2; we use those here is that we also include a cyclic smooth for the 19-year cycles as this seems like an important feature, as well as a yearly smooth for the long-term trend with penalty on the first derivative to prevent linear extrapolation into the future
+The best-forecasting model in the course was with nonlinear smooths of lags 1 and 2; we use those here is that we also include a cyclic smooth for the 19-year cycles as this seems like an important feature, as well as a yearly smooth for the long-term trend. Following advice from Gavin Simpson's blog post about the [unpredictable and tricky behaviour's of smooths when extrapolating](https://fromthebottomoftheheap.net/2020/06/03/extrapolating-with-gams/), we fit a cubic B spline for the trend with a mix of penalties to try and reign in wacky extrapolation behaviours, and we extend the penalty to cover the years that we wish to predict. This will hopefully give us better uncertainty estimates for the forecast
 ```{r}
-lynx_mgcv = gam(population ~ s(season, bs = 'cc', k = 19) +
-                 s(year, k = 3, m = 1) + s(lag1, k = 5) +
+lynx_mgcv = gam(population ~ 
+                  s(season, bs = 'cc', k = 19) +
+                  s(year, bs = 'bs', m = c(3, 2, 1, 0)) + 
+                  s(lag1, k = 5) +
                   s(lag2, k = 5),
-               knots = list(season = c(0.5, 19.5)),
+               knots = list(season = c(0.5, 19.5),
+                            year = seq(min(lynx_train$year),
+                                       max(lynx_test$year),
+                                       length.out = 4)),
                 data = lynx_train, family = "poisson",
                 method = "REML")
 ```
@@ -126,10 +131,10 @@ recurse_nonlin = function(model, lagged_vals, h){
 }
 ```
 
-Create the GAM's forecast distribution by generating `200` simulated forecast paths. Each path is fed the true observed values for the last two lags of the first out of sample timepoint, but they can deviate when simulating ahead depending on their particular draw of possible coefficients. Note, this is a bit slow and could easily be parallelised to speed up computations
+Create the GAM's forecast distribution by generating `1000` simulated forecast paths. Each path is fed the true observed values for the last two lags of the first out of sample timepoint, but they can deviate when simulating ahead depending on their particular draw of possible coefficients. Note, this is a bit slow and could easily be parallelised to speed up computations
 ```{r}
-gam_sims <- matrix(NA, nrow = 200, ncol = 10)
-for(i in 1:200){
+gam_sims <- matrix(NA, nrow = 1000, ncol = 10)
+for(i in 1:1000){
   gam_sims[i,] <- recurse_nonlin(lynx_mgcv,
                                  lagged_vals = c(lynx_test$lag1[1],
                                                  lynx_test$lag2[1]),
@@ -140,7 +145,7 @@ for(i in 1:200){
 Plot the mgcv model's out of sample forecast for the next 10 years ahead
 ```{r, fig.width=5, fig.height=4, fig.align='center'}
 cred_ints <- apply(gam_sims, 2, function(x) hpd(x, 0.95))
-yupper <- max(lynx_full$population) * 1.25
+yupper <- max(cred_ints) * 1.25
 plot(cred_ints[3,] ~ seq(1:NCOL(cred_ints)), type = 'l',
      col = rgb(1,0,0, alpha = 0),
      ylim = c(0, yupper),
@@ -159,25 +164,64 @@ points(lynx_test$population[1:10], pch = 16)
 lines(lynx_test$population[1:10])
 ```
 
-A decent forecast? The shape is certainly correct, but the 95% uncertainty intervals are far too narrow due to the interpolation of the precisely estimated lag smooth functions and the flat extrapolation of the yearly smooth. Now fit an `mvgam` model; it fits a similar model to the above but with a full time series model for the errors (in this case an `AR3` process), rather than smoothing splines that do not incorporate a concept of the future. We also exclude the `year` term to reduce any possible extrapolation and because latent trend model will capture this temporal variation. We estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
+A decent forecast? The shape is certainly correct, but the 95% uncertainty intervals are too wide (i.e. our upper interval extends to up to 8 times the maximum number of trappings that have ever been recorded up to this point). This is almost entirely due to the extrapolation behaviour of the B spline, as the lag smooth functions are not encountering values very far outside the ranges they've already been trained on so they are resorting mostly to interpolation.
+
+Ok so that is not a terrible start, but what if we remove the yearly trend and let the lag smooths capture more of the temporal dependencies? Will that improve the forecast distribution? Run a second model and plot the forecast (note that this plot will be on quite a different y-axis scale compared to the first plot above)
+```{r, fig.width=5, fig.height=4, fig.align='center'}
+lynx_mgcv2 = gam(population ~ 
+                  s(season, bs = 'cc', k = 19) +
+                  s(lag1, k = 5) +
+                  s(lag2, k = 5),
+                data = lynx_train, family = "poisson",
+                method = "REML")
+coef_sim <- gam.mh(lynx_mgcv2)$bs
+gam_sims <- matrix(NA, nrow = 1000, ncol = 10)
+for(i in 1:1000){
+  gam_sims[i,] <- recurse_nonlin(lynx_mgcv2,
+                                 lagged_vals = c(lynx_test$lag1[1],
+                                                 lynx_test$lag2[1]),
+                                 h = 10)
+}
+cred_ints <- apply(gam_sims, 2, function(x) hpd(x, 0.95))
+yupper <- max(cred_ints) * 1.25
+plot(cred_ints[3,] ~ seq(1:NCOL(cred_ints)), type = 'l',
+     col = rgb(1,0,0, alpha = 0),
+     ylim = c(0, yupper),
+     ylab = 'Predicted lynx trappings',
+     xlab = 'Forecast horizon',
+     main = 'mgcv')
+polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
+        c(cred_ints[1,],rev(cred_ints[3,])),
+        col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
+cred_ints <- apply(gam_sims, 2, function(x) hpd(x, 0.68))
+polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
+        c(cred_ints[1,],rev(cred_ints[3,])),
+        col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
+lines(cred_ints[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
+points(lynx_test$population[1:10], pch = 16)
+lines(lynx_test$population[1:10])
+```
+
+This forecast is highly overconfident, with very unrealistic uncertainty intervals due to the interpolation behaviours of the lag smooths. You can certainly keep trying different formulations (our experience is that the B spline variant above produces the best forecasts from any tested `mgcv` model, but we did not test an exhaustive set), but hopefully it is clear that forecasting using splines is tricky business and it is likely that each time you do it you'll end up honing in on different combinations of penalties, knot selections etc.... Now we will fit an `mvgam` model for comparison. This model fits a similar model to the `mgcv` model directly above but with a full time series model for the errors (in this case an `AR1` process), rather than smoothing splines that do not incorporate a concept of the future. We do not use a `year` term to reduce any possible extrapolation and because the latent dynamic component should capture this temporal variation. We estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
 ```{r}
 lynx_mvgam <- mvjagam(data_train = lynx_train,
                data_test = lynx_test,
                formula = y ~ s(season, bs = 'cc', k = 19),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
-               trend_model = 'AR3',
-               n.burnin = 10000,
+               trend_model = 'AR1',
+               n.burnin = 20000,
                n.iter = 5000,
                thin = 5,
                auto_update = F)
 ```
 
-Calculate the out of sample forecast from the fitted `mvgam` model
+Calculate the out of sample forecast from the fitted `mvgam` model and plot
 ```{r, fig.width=5, fig.height=4, fig.align='center'}
 fits <- MCMCvis::MCMCchains(lynx_mvgam$jags_output, 'ypred')
 fits <- fits[,(NROW(lynx_mvgam$obs_data)+1):(NROW(lynx_mvgam$obs_data)+10)]
 cred_ints <- apply(fits, 2, function(x) hpd(x, 0.95))
+yupper <- max(cred_ints) * 1.25
 plot(cred_ints[3,] ~ seq(1:NCOL(cred_ints)), type = 'l',
      col = rgb(1,0,0, alpha = 0),
      ylim = c(0, yupper),
@@ -196,12 +240,12 @@ points(lynx_test$population[1:10], pch = 16)
 lines(lynx_test$population[1:10])
 ```
 
-The `mvgam` has much more realistic uncertainty than the `mgcv` version, with all out of sample observations falling within the model's 95% credible intervals. Of course this is just one out of sample test of the model, and to really determine which model is most appropriate for forecasting we would want to run many of these tests using a [rolling window approach](https://robjhyndman.com/hyndsight/tscv/). Have a look at this model's summary to see what is being estimated (note that longer MCMC runs would probably be needed to increase effective sample sizes)
+The `mvgam` has much more realistic uncertainty than the `mgcv` versions above, with all out of sample observations falling within the model's 95% credible intervals. Of course this is just one out of sample comparison, and to really determine which model is most appropriate for forecasting we would want to run many of these tests using a [rolling window approach](https://robjhyndman.com/hyndsight/tscv/). Have a look at this model's summary to see what is being estimated (note that longer MCMC runs would probably be needed to increase effective sample sizes)
 ```{r}
 summary_mvgam(lynx_mvgam)
 ```
 
-Now inspect each model's estimated smooth for the 19-year cyclic pattern. Note that the `mvgam` smooth plot is on a different scale compared to the `mgcv` plot, but interpretation is similar. The `mgcv` smooth is much wigglier, likely because it is compensating for the any remaining autocorrelation not captured by the lag smooths. We could probably remedy this by reducing `k` in the seasonal smooth for the `mgcv` model (in practice this works well, but leaving `k` larger for the `mvgam`'s seasonal smooth is recommended as our experience is that this tends to lead to better performance and convergence)
+Now inspect each model's estimated smooth for the 19-year cyclic pattern. Note that the `mvgam` smooth plot is on a different scale compared to the `mgcv` plot, but interpretation is similar. The `mgcv` smooth is much wigglier, likely because it is compensating for any remaining autocorrelation not captured by the lag smooths. We could probably remedy this by reducing `k` in the seasonal smooth for the `mgcv` model (in practice this works well, but leaving `k` larger for the `mvgam`'s seasonal smooth is recommended as our experience is that this tends to lead to better performance and convergence)
 ```{r, fig.show='hold', fig.align='center'}
 plot(lynx_mgcv, select=1, shade=T)
 plot_mvgam_smooth(lynx_mvgam, 1, 'season')
@@ -222,7 +266,7 @@ A key aspect of ecological forecasting is to understand [how different component
 plot_mvgam_uncertainty(lynx_mvgam, data_test = lynx_test)
 ```
 
-Both components contribute to forecast uncertainty, suggesting we would still need some more work to learn about factors driving the dynamics of the system. But we will leave the model as-is for this example. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's residuals, which are posterior medians of Dunn-Smyth randomised quantile residuals so should follow approximate normality. We are primarily looking for a lack of autocorrelation, which would suggest our AR2 model is appropriate for the latent trend
+Both components contribute to forecast uncertainty, with the trend component contributing more over time (as it should since this is the stochastic forecast component). This suggests we would still need some more work to learn about factors driving the dynamics of the system. But we will leave the model as-is for this example. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's residuals, which are posterior medians of Dunn-Smyth randomised quantile residuals so should follow approximate normality. We are primarily looking for a lack of autocorrelation, which would suggest our AR2 model is appropriate for the latent trend
 ```{r, fig.width=6, fig.height=6, fig.align='center'}
 plot_mvgam_resids(lynx_mvgam)
 ```
@@ -231,9 +275,9 @@ Another useful utility of `mvgam` is the ability to use rolling window forecasts
 ```{r}
 lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
                data_test = lynx_test,
-               formula = y ~ s(season, bs = 'gp', k = 3),
+               formula = y ~ s(season) + s(year, bs = 'bs', m = c(3,2,1,0)),
                family = 'poisson',
-               trend_model = 'RW',
+               trend_model = 'None',
                n.burnin = 1000,
                n.iter = 1000,
                thin = 1,

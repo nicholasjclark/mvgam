@@ -661,8 +661,8 @@ mvjagam = function(formula,
     }
   mod_summary <- MCMCvis::MCMCsummary(out_gam_mod, update_params)
   for(i in 1:3){
-    if(quantile(mod_summary$Rhat, 0.85, na.rm = T) <= 1.2 &
-       quantile(mod_summary$n.eff, 0.1) >= 100){
+    if(quantile(mod_summary$Rhat, 0.75, na.rm = T) <= 1.25 &
+       quantile(mod_summary$n.eff, 0.25) >= 90){
       break;
     }
     cat('Convergence not reached. Extending burnin...\n')
