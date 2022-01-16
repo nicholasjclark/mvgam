@@ -1,9 +1,9 @@
 #### Testing the mvjagam function ####
 library(mvgam)
 library(dplyr)
+library(ggplot2)
 
-compare_mvgams(mod, mod_notrend, fc_horizon = 6,
-               n_evaluations = 30, n_cores = 3)
+
 
 # Google Trends example; tick paralysis and related search interests in Queensland, Australia
 if(!require(gtrendsR)){

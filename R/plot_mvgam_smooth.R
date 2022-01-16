@@ -7,7 +7,7 @@
 #'@param newdata Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
 #'in addition to any other variables included in the linear predictor of the original model's \code{formula}
 #'@details Smooth functions are shown as the expectation from the GAM component of the linear predictor across
-#'a sequence of 100 values between the variable's \code{min} and \code{max}, while holding all other variables either at
+#'a sequence of 500 values between the variable's \code{min} and \code{max}, while holding all other variables either at
 #'their means (for numeric varibles) or at the first level (factor variables). At present, only univariate smooth plots
 #'are allowed (no smooth interactions can be plotted). For more nuanced visualisation, supply
 #'\code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model
@@ -51,10 +51,11 @@ plot_mvgam_smooth = function(object, series = 1, smooth, newdata){
       dplyr::mutate(series = !!(levels(data_train$series)[series])) -> pred_dat
 
    pred_dat %>% dplyr::select(-smooth) %>% dplyr::distinct() %>%
-      dplyr::bind_cols(smooth.var = seq(min(pred_dat[,smooth]), max(pred_dat[,smooth]), length.out = 100)) -> pred_dat
+      dplyr::bind_cols(smooth.var = seq(min(pred_dat[,smooth]),
+                                        max(pred_dat[,smooth]),
+                                        length.out = 500)) -> pred_dat
      colnames(pred_dat) <- gsub('smooth.var', smooth, colnames(pred_dat))
 
-    #pred_dat[,smooth] <- seq(min(pred_dat[,smooth]), max(pred_dat[,smooth]), length.out = NROW(pred_dat))
   } else {
     pred_dat <- newdata
   }
