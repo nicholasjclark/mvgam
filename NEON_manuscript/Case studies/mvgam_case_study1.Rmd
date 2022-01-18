@@ -131,12 +131,13 @@ mod_notrend <- mvjagam(data_train = fake_data$data_train,
                formula = y ~ s(season, bs = c('cc'), k = 12) +
                  s(year, bs = "bs", m = c(3, 2, 1, 0)),
                knots = list(season = c(0.5, 12.5),
-                            year = seq(min(fake_data$data_train$year),
-                                       max(fake_data$data_test$year),
-                                       length.out = 4)),
+                            year = c(min(fake_data$data_train$year) - 1,
+                                     min(fake_data$data_train$year),
+                                     max(fake_data$data_train$year),
+                                     max(fake_data$data_test$year))),
                family = 'nb',
                trend_model = 'None',
-               n.burnin = 5000,
+               n.burnin = 15000,
                auto_update = F)
 ```
 
@@ -150,7 +151,7 @@ The "trend" model in this case is just the estimated static residual process
 plot_mvgam_trend(mod_notrend, 1)
 ```
 
-Here is the smooth for `year` over the training and testing values, which highlights how the B spline is starting to extrapolate in in a strange way
+Here is the smooth for `year` over the training and testing values, which highlights how the B spline is starting to extrapolate
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 plot_mvgam_smooth(mod_notrend,
                   1,

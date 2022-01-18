@@ -161,6 +161,11 @@ mvjagam = function(formula,
                             diagonalize = F)
   }
 
+  # Update initial values of Betas and lambdas using the full estimates from the
+  # fitted bam model to speed convergence
+  ss_jagam$jags.ini$b <- coef(ss_gam)
+  ss_jagam$jags.ini$lambda <- ss_gam$sp
+
   # Fill with NAs if this is a simulation from the priors
   if(prior_simulation){
     data_train$y <- rep(NA, length(data_train$y))
@@ -231,7 +236,7 @@ mvjagam = function(formula,
                        ar1[s] ~ dnorm(0, 10)
                        ar2[s] ~ dnorm(0, 10)
                        ar3[s] ~ dnorm(0, 10)
-                       tau[s] ~ dgamma(0.1, 0.001)
+                       tau[s] ~ dnorm(0, 0.1)T(0,)
                       }
 
                       ## Negative binomial likelihood functions
@@ -336,24 +341,26 @@ mvjagam = function(formula,
         }
         }
 
-        ## Latent factors evolve as time series with shared precision
-        tau_fac ~ dgamma(0.05, 0.005)
+        ## Latent factors evolve as time series with shared precision;
+        ## the penalty terms are from the regularized horseshoe (below), which
+        ## act here to force any un-needed factors to evolve as flat lines
+        tau_fac ~ dnorm(0, 0.1)T(0,)
         for(j in 1:n_lv){
-         LV[1, j] ~ dnorm(0, tau_fac)
+         LV[1, j] ~ dnorm(0, tau_fac* penalty[j])
         }
 
         for(j in 1:n_lv){
-         LV[2, j] ~ dnorm(phi[j] + ar1[j]*LV[1, j], tau_fac)
+         LV[2, j] ~ dnorm(phi[j] + ar1[j]*LV[1, j], tau_fac* penalty[j])
         }
 
         for(j in 1:n_lv){
-         LV[3, j] ~ dnorm(phi[j] + ar1[j]*LV[2, j] + ar2[j]*LV[1, j], tau_fac)
+         LV[3, j] ~ dnorm(phi[j] + ar1[j]*LV[2, j] + ar2[j]*LV[1, j], tau_fac* penalty[j])
         }
 
         for(i in 4:n){
          for(j in 1:n_lv){
           LV[i, j] ~ dnorm(phi[j] + ar1[j]*LV[i - 1, j] +
-                          ar2[j]*LV[i - 2, j] + ar3[j]*LV[i - 3, j], tau_fac)
+                          ar2[j]*LV[i - 2, j] + ar3[j]*LV[i - 3, j], tau_fac* penalty[j])
          }
         }
 
@@ -582,45 +589,6 @@ mvjagam = function(formula,
         stop('Number of latent variables cannot be greater than number of series')
       }
       ss_jagam$jags.ini$tau_fac <- 1
-  }
-
-  # Initial values of zero for the AR parameters
-  if(!trend_model == 'None'){
-    if(use_lv){
-      ss_jagam$jags.ini$phi <- rep(0, ss_jagam$jags.data$n_lv)
-    } else {
-      ss_jagam$jags.ini$phi <- rep(0, NCOL(ytimes))
-    }
-  }
-
-  if(trend_model == 'AR1'){
-    if(use_lv){
-      ss_jagam$jags.ini$ar1 <- rep(0, ss_jagam$jags.data$n_lv)
-    } else {
-      ss_jagam$jags.ini$ar1 <- rep(0, NCOL(ytimes))
-    }
-  }
-
-  if(trend_model == 'AR2'){
-    if(use_lv){
-      ss_jagam$jags.ini$ar1 <- rep(0, ss_jagam$jags.data$n_lv)
-      ss_jagam$jags.ini$ar2 <- rep(0, ss_jagam$jags.data$n_lv)
-    } else {
-      ss_jagam$jags.ini$ar1 <- rep(0, NCOL(ytimes))
-      ss_jagam$jags.ini$ar2 <- rep(0, NCOL(ytimes))
-    }
-  }
-
-  if(trend_model == 'AR3'){
-    if(use_lv){
-      ss_jagam$jags.ini$ar1 <- rep(0, ss_jagam$jags.data$n_lv)
-      ss_jagam$jags.ini$ar2 <- rep(0, ss_jagam$jags.data$n_lv)
-      ss_jagam$jags.ini$ar3 <- rep(0, ss_jagam$jags.data$n_lv)
-    } else {
-      ss_jagam$jags.ini$ar1 <- rep(0, NCOL(ytimes))
-      ss_jagam$jags.ini$ar2 <- rep(0, NCOL(ytimes))
-      ss_jagam$jags.ini$ar3 <- rep(0, NCOL(ytimes))
-    }
   }
 
   # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS

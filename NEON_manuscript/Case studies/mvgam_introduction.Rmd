@@ -71,7 +71,7 @@ lynx_train = lynx_full[1:40, ]
 lynx_test = lynx_full[41:50, ]
 ```
 
-The best-forecasting model in the course was with nonlinear smooths of lags 1 and 2; we use those here is that we also include a cyclic smooth for the 19-year cycles as this seems like an important feature, as well as a yearly smooth for the long-term trend. Following advice from Gavin Simpson's blog post about the [unpredictable and tricky behaviour's of smooths when extrapolating](https://fromthebottomoftheheap.net/2020/06/03/extrapolating-with-gams/), we fit a cubic B spline for the trend with a mix of penalties to try and reign in wacky extrapolation behaviours, and we extend the penalty to cover the years that we wish to predict. This will hopefully give us better uncertainty estimates for the forecast
+The best-forecasting model in the course was with nonlinear smooths of lags 1 and 2; we use those here is that we also include a cyclic smooth for the 19-year cycles as this seems like an important feature, as well as a yearly smooth for the long-term trend. Following advice from Gavin Simpson's blog post about the [unpredictable and tricky behaviour's of smooths when extrapolating](https://fromthebottomoftheheap.net/2020/06/03/extrapolating-with-gams/), we fit a cubic B spline for the trend with a mix of penalties and we extend the penalty to cover the years that we wish to predict, both of which are done to try and reign in any wacky extrapolation behaviours. This will hopefully give us better uncertainty estimates for the forecast
 ```{r}
 lynx_mgcv = gam(population ~ 
                   s(season, bs = 'cc', k = 19) +
@@ -79,9 +79,10 @@ lynx_mgcv = gam(population ~
                   s(lag1, k = 5) +
                   s(lag2, k = 5),
                knots = list(season = c(0.5, 19.5),
-                            year = seq(min(lynx_train$year),
-                                       max(lynx_test$year),
-                                       length.out = 4)),
+                            year = c(min(lynx_train$year)-1,
+                                     min(lynx_train$year),
+                                     max(lynx_train$year),
+                                     max(lynx_test$year))),
                 data = lynx_train, family = "poisson",
                 method = "REML")
 ```
@@ -171,9 +172,9 @@ points(lynx_test$population[1:10], pch = 16)
 lines(lynx_test$population[1:10])
 ```
 
-A decent forecast? The shape is certainly correct, but the 95% uncertainty intervals are far too wide (i.e. our upper interval extends to up to 8 times the maximum number of trappings that have ever been recorded up to this point). This is almost entirely due to the extrapolation behaviour of the B spline, as the lag smooth functions are not encountering values very far outside the ranges they've already been trained on so they are resorting mostly to interpolation.
+A decent forecast? The shape is certainly correct, but the 95% uncertainty intervals are far too wide (i.e. our upper interval extends to up to 8 times the maximum number of trappings that have ever been recorded up to this point). This is almost entirely due to the extrapolation behaviour of the B spline, as the lag smooth functions are not encountering values very far outside the ranges they've already been trained on so they are resorting mostly to interpolation. On that topic, interpolation is also a problem for the B spline in some situations. For example, if some of the observations in the testing data are in a year that was also included in training, these observations will be interpolated from the yearly B spline smooth (often with overconfidence), while the uncertainty will quickly grow once we hit years that are outside the training intervals.
 
-Ok so that is not a terrible start, but what if we remove the yearly trend and let the lag smooths capture more of the temporal dependencies? Will that improve the forecast distribution? Run a second model and plot the forecast (note that this plot will be on quite a different y-axis scale compared to the first plot above)
+Ok so that is not a terrible start, but what if we remove the yearly trend and let the lag smooths capture more of the temporal dependencies? Will that improve the forecast distribution? Run a second model and plot the forecast
 ```{r, fig.width=5, fig.height=4, fig.align='center'}
 lynx_mgcv2 = gam(population ~ 
                   s(season, bs = 'cc', k = 19) +
@@ -209,7 +210,7 @@ points(lynx_test$population[1:10], pch = 16)
 lines(lynx_test$population[1:10])
 ```
 
-This forecast is highly overconfident, with very unrealistic uncertainty intervals due to the interpolation behaviours of the lag smooths. You can certainly keep trying different formulations (our experience is that the B spline variant above produces the best forecasts from any tested `mgcv` model, but we did not test an exhaustive set), but hopefully it is clear that forecasting using splines is tricky business and it is likely that each time you do it you'll end up honing in on different combinations of penalties, knot selections etc.... Now we will fit an `mvgam` model for comparison. This model fits a similar model to the `mgcv` model directly above but with a full time series model for the errors (in this case an `AR1` process), rather than smoothing splines that do not incorporate a concept of the future. We do not use a `year` term to reduce any possible extrapolation and because the latent dynamic component should capture this temporal variation. We estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
+This forecast is highly overconfident, with very unrealistic uncertainty intervals due to the interpolation behaviours of the lag smooths. You can certainly keep trying different formulations (our experience is that the B spline variant above produces the best probabilstic forecasts from any tested `mgcv` model, but we did not test an exhaustive set), but hopefully it is clear that forecasting using splines is tricky business and it is likely that each time you do it you'll end up honing in on different combinations of penalties, knot selections etc.... Now we will fit an `mvgam` model for comparison. This model fits a similar model to the `mgcv` model directly above but with a full time series model for the errors (in this case an `AR1` process), rather than smoothing splines that do not incorporate a concept of the future. We do not use a `year` term to reduce any possible extrapolation and because the latent dynamic component should capture this temporal variation. We estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
 ```{r}
 lynx_mvgam <- mvjagam(data_train = lynx_train,
                data_test = lynx_test,
@@ -305,7 +306,7 @@ summary(mod1_eval$series1$drps)
 summary(mod2_eval$series1$drps)
 ```
 
-Nominal coverages for both models' 90% prediction intervals. We expect both to have decent interval coverage in these experiments so this metric isn't quite as useful as DRPS, but it could become useful if later versions of `mvgam` allow for a wider range of response distributions
+Nominal coverages for both models' 90% prediction intervals
 ```{r}
 mean(mod1_eval$series1$in_interval)
 mean(mod2_eval$series1$in_interval)

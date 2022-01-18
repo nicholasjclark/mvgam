@@ -22,7 +22,8 @@ so summaries for the \code{rho} parameters may include more penalty terms than t
 the original model formula. The function also returns an approximate smooth term
 significance table, but note that this signficance comes with the usual caveats associated with calculations
 of p-values for smooth terms in \code{\link[mcgv]{summary.gam}} (i.e. all p-values are computed without
-considering uncertainty in the smoothing parameter estimates).
+considering uncertainty in the smoothing parameter estimates). The significances are calculated following
+Wood (2013) Biometrika 100(1), 221-228
 }
 \author{
 Nicholas J Clark

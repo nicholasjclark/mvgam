@@ -4,6 +4,7 @@
 #'
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
+#'@param smooth \code{character} specifying the smooth term to be plotted
 #'@param newdata Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
 #'in addition to any other variables included in the linear predictor of the original model's \code{formula}
 #'@details Smooth functions are shown as the expectation from the GAM component of the linear predictor across

@@ -10,7 +10,8 @@
 #'the original model formula. The function also returns an approximate smooth term
 #'significance table, but note that this signficance comes with the usual caveats associated with calculations
 #'of p-values for smooth terms in \code{\link[mcgv]{summary.gam}} (i.e. all p-values are computed without
-#'considering uncertainty in the smoothing parameter estimates).
+#'considering uncertainty in the smoothing parameter estimates). The significances are calculated following
+#'Wood (2013) Biometrika 100(1), 221-228
 #'@return A \code{list} is printed on-screen showing the summaries for the model
 #'@export
 summary_mvgam = function(object){
@@ -300,11 +301,10 @@ if(object$family == 'Negative Binomial'){
 coef_names <- names(object$mgcv_model$coefficients)
 m <- length(object$mgcv_model$smooth)
 useR <- TRUE
-residual.df<-length(object$y)-sum(object$edf)
+residual.df <- length(object$y) - sum(object$edf)
 est.disp <- object$mgcv_model$scale.estimated
 
 df <- edf1 <- edf <- s.pv <- chi.sq <- array(0, m)
-if (m>0) { # form test statistics for each smooth
   ## Bayesian p-values required
   if (useR)  X <- object$mgcv_model$R else {
     sub.samp <- max(1000,2*length(object$coefficients))
@@ -324,6 +324,7 @@ if (m>0) { # form test statistics for each smooth
 
   # Median beta params for smooths and their covariances
   V <- cov(MCMCvis::MCMCchains(object$jags_output, 'b'))
+  object$mgcv_model$Ve <- V
   object$mgcv_model$Vp <- V
   object$mgcv_model$Vc <- V
   p <- MCMCvis::MCMCsummary(object$jags_output, 'b')[,c(4)]
@@ -343,16 +344,25 @@ if (m>0) { # form test statistics for each smooth
     Xt <- X[start:stop,start:stop,drop=FALSE]
     fx <- if (inherits(object$mgcv_model$smooth[[i]],"tensor.smooth")&&
               !is.null(object$mgcv_model$smooth[[i]]$fx)) all(object$mgcv_model$smooth[[i]]$fx) else object$mgcv_model$smooth[[i]]$fixed
-    if (!fx&&object$mgcv_model$smooth[[i]]$null.space.dim==0&&!is.null(object$mgcv_model$R)) { ## random effect or fully penalized term
-      res <- reTest(object$mgcv_model,i)
-    } else { ## Inverted Nychka interval statistics
-      rdf <- -1
-      res <- testStat(p[start:stop],Xt,V,min(ncol(Xt),edf1i),type=0,res.df = residual.df)
-    }
+    # if (!fx&&object$mgcv_model$smooth[[i]]$null.space.dim==0&&!is.null(object$mgcv_model$R)) { ## random effect or fully penalized term
+    #   res <- reTest(object$mgcv_model,i)
+    # } else { ## Inverted Nychka interval statistics
+    #   rdf <- -1
+    #   res <- testStat(p[start:stop],Xt,V,min(ncol(Xt),edf1i),type=0,res.df = residual.df)
+    # }
+
+    # Complicated to test the parametric hypothesis given by the null space of the component’s
+    # smoothing penalty, which is the default in mgcv for fully penalized smooths when the
+    # estimate of the frequentist covariance matrix is present. In our case, we do not have this
+    # estimate so we rely on the method from Wood 2013 (Biometrika) to test for approximate
+    # significance (i.e. testing for equality to zero), which uses the Bayesian covariance
+    # matrix and our penalty-informed estimated degrees of freedom
+     rdf <- -1
+     res <- testStat(p[start:stop],Xt,V,min(ncol(Xt),edf1i),type=0,res.df = residual.df)
 
     if (!is.null(res)) {
       ii <- ii + 1
-      df[ii] <- res$rank
+      df[ii] <- reTest(object$mgcv_model,i)$rank
       chi.sq[ii] <- res$stat
       s.pv[ii] <- res$pval
       edf1[ii] <- edf1i
@@ -371,8 +381,6 @@ if (m>0) { # form test statistics for each smooth
     s.table <- cbind(edf, df, chi.sq/df, s.pv)
     dimnames(s.table) <- list(names(chi.sq), c("edf", "Ref.df", "F", "p-value"))
   }
-
-}
 
 message('GAM smooth term approximate significances:')
 printCoefmat(s.table, digits = 4, signif.stars = T)
@@ -401,7 +409,7 @@ rownames(rho_coefs) <- rho_names
 print(rho_coefs)
 message()
 
-message("Latent trend drift and AR parameter estimates:")
+message("Latent trend drift (phi) and AR parameter estimates:")
 print(MCMCvis::MCMCsummary(object$jags_output, c('phi', 'ar1',
                                                  'ar2', 'ar3'))[,c(3:7)])
 message()
