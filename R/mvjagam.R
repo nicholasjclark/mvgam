@@ -164,7 +164,11 @@ mvjagam = function(formula,
   # Update initial values of Betas and lambdas using the full estimates from the
   # fitted bam model to speed convergence
   ss_jagam$jags.ini$b <- coef(ss_gam)
-  ss_jagam$jags.ini$lambda <- ss_gam$sp
+
+  if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
+    ss_jagam$jags.ini$lambda <- ss_gam$sp
+    ss_jagam$jags.ini$lambda[log(ss_jagam$jags.ini$lambda) > 10] <- exp(10)
+  }
 
   # Fill with NAs if this is a simulation from the priors
   if(prior_simulation){
@@ -236,7 +240,7 @@ mvjagam = function(formula,
                        ar1[s] ~ dnorm(0, 10)
                        ar2[s] ~ dnorm(0, 10)
                        ar3[s] ~ dnorm(0, 10)
-                       tau[s] ~ dnorm(0, 0.1)T(0,)
+                       tau[s] ~ dgamma(0.01, 0.001)
                       }
 
                       ## Negative binomial likelihood functions
@@ -573,10 +577,6 @@ mvjagam = function(formula,
 
   # Machine epsilon for minimum allowable non-zero rate
   ss_jagam$jags.data$min_eps <- .Machine$double.eps
-
-  # Ensure inits fall within prior bounds for rho
-  ss_jagam$jags.ini$rho[ss_jagam$jags.ini$rho > 12] <- 11.99
-  ss_jagam$jags.ini$rho[ss_jagam$jags.ini$rho < 12] <- -11.99
 
   # Number of latent variables to use
   if(use_lv){
