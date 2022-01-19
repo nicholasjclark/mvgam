@@ -193,73 +193,73 @@ mvjagam = function(formula,
                                                                base_model) + 1], perl = T))[[1]][1]
     n_terms <- as.numeric(sub(".*:", "", in_parenth))
     base_model[grep('Parametric effect priors',
-                    base_model) + 1] <- paste0('  for (i in 1:',
+                    base_model) + 1] <- paste0('for (i in 1:',
                                                n_terms,
-                                               ') { b[i] ~ dnorm(0, 1) }')
+                                               ') { b[i] ~ dnorm(0, 0.25) }')
   }
 
   # Add replacement lines for trends and the linear predictor
   if(!use_lv){
     modification <- c("model {
 
-                      ## GAM linear predictor
-                      eta <- X %*% b
+## GAM linear predictor
+eta <- X %*% b
 
-                      ## Mean expectations
-                      for (i in 1:n) {
-                      for (s in 1:n_series) {
-                      mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
-                      }
-                      }
+## Mean expectations
+for (i in 1:n) {
+ for (s in 1:n_series) {
+  mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
+ }
+}
 
-                      ## State space trends
-                      for(s in 1:n_series) {
-                      trend[1, s] ~ dnorm(0, tau[s])
-                      }
+## State space trends
+for(s in 1:n_series) {
+ trend[1, s] ~ dnorm(0, tau[s])
+}
 
-                      for(s in 1:n_series) {
-                      trend[2, s] ~ dnorm(phi[s] + ar1[s]*trend[1, s], tau[s])
-                      }
+for(s in 1:n_series) {
+ trend[2, s] ~ dnorm(phi[s] + ar1[s]*trend[1, s], tau[s])
+}
 
-                      for(s in 1:n_series) {
-                      trend[3, s] ~ dnorm(phi[s] + ar1[s]*trend[2, s] +
-                                          ar2[s]*trend[1, s], tau[s])
-                      }
+for(s in 1:n_series) {
+ trend[3, s] ~ dnorm(phi[s] + ar1[s]*trend[2, s] +
+                     ar2[s]*trend[1, s], tau[s])
+}
 
-                      for (i in 4:n){
-                      for (s in 1:n_series){
-                      trend[i, s] ~ dnorm(phi[s] + ar1[s]*trend[i - 1, s] +
-                                          ar2[s]*trend[i - 2, s] +
-                                          ar3[s]*trend[i - 3, s], tau[s])
-                      }
-                      }
+for (i in 4:n){
+ for (s in 1:n_series){
+  trend[i, s] ~ dnorm(phi[s] + ar1[s]*trend[i - 1, s] +
+                      ar2[s]*trend[i - 2, s] +
+                      ar3[s]*trend[i - 3, s], tau[s])
+ }
+}
 
-                      ## AR components
-                      for (s in 1:n_series){
-                       phi[s] ~ dnorm(0, 10)
-                       ar1[s] ~ dnorm(0, 10)
-                       ar2[s] ~ dnorm(0, 10)
-                       ar3[s] ~ dnorm(0, 10)
-                       tau[s] ~ dgamma(0.01, 0.001)
-                      }
+## AR components
+for (s in 1:n_series){
+ phi[s] ~ dnorm(0, 10)
+ ar1[s] ~ dnorm(0, 10)
+ ar2[s] ~ dnorm(0, 10)
+ ar3[s] ~ dnorm(0, 10)
+ tau[s] ~ dgamma(0.01, 0.001)
+}
 
-                      ## Negative binomial likelihood functions
-                      for (i in 1:n) {
-                      for (s in 1:n_series) {
-                      y[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s]);
-                      rate[i, s] <- ifelse((r / (r + mu[i, s])) < min_eps, min_eps,
+## Negative binomial likelihood functions
+for (i in 1:n) {
+ for (s in 1:n_series) {
+  y[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s]);
+  rate[i, s] <- ifelse((r / (r + mu[i, s])) < min_eps, min_eps,
                       (r / (r + mu[i, s])))
-                      }
-                      }
-                      r ~ dexp(0.001)
+ }
+}
+r ~ dexp(0.001)
 
-                      ## Posterior predictions
-                      for (i in 1:n) {
-                      for (s in 1:n_series) {
-                      ypred[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s])
-                      }
-                      }
-                      ")
+## Posterior predictions
+for (i in 1:n) {
+ for (s in 1:n_series) {
+   ypred[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s])
+ }
+}
+")
 
     # Create the joined model file
     fil <- tempfile(fileext = ".xt")
@@ -269,63 +269,63 @@ mvjagam = function(formula,
 
     # Update further prior distributions
     if(!missing(phi_prior)){
-      model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('   phi[s] ~ ', phi_prior)
+      model_file[grep('phi\\[s\\] ~', model_file)] <- paste0(' phi[s] ~ ', phi_prior)
     }
 
     if(!missing(ar_prior)){
-      model_file[grep('ar1\\[s\\] ~', model_file)] <- paste0('   ar1[s] ~ ', ar_prior)
-      model_file[grep('ar2\\[s\\] ~', model_file)] <- paste0('   ar2[s] ~ ', ar_prior)
-      model_file[grep('ar3\\[s\\] ~', model_file)] <- paste0('   ar3[s] ~ ', ar_prior)
+      model_file[grep('ar1\\[s\\] ~', model_file)] <- paste0(' ar1[s] ~ ', ar_prior)
+      model_file[grep('ar2\\[s\\] ~', model_file)] <- paste0(' ar2[s] ~ ', ar_prior)
+      model_file[grep('ar3\\[s\\] ~', model_file)] <- paste0(' ar3[s] ~ ', ar_prior)
     }
 
     if(!missing(tau_prior)){
-      model_file[grep('tau\\[s\\] ~', model_file)] <- paste0('   tau[s] ~ ', tau_prior)
+      model_file[grep('tau\\[s\\] ~', model_file)] <- paste0(' tau[s] ~ ', tau_prior)
     }
 
     if(!missing(r_prior)){
-      model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
+      model_file[grep('r1 ~', model_file)] <- paste0('r1 ~ ', r_prior)
     }
 
     if(family == 'poisson'){
       if(missing(upper_bounds)){
-        model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])'
-        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])'
+        model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mu[i, s])'
+        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mu[i, s])'
       } else {
-        model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
-        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+        model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
       }
       model_file[grep('r ~', model_file)] <- 'r <- 10000'
 
     } else {
       if(missing(upper_bounds)){
-        model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dnegbin(rate[i, s], r)'
-        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dnegbin(rate[i, s], r)'
+        model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dnegbin(rate[i, s], r)'
+        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dnegbin(rate[i, s], r)'
       }
     }
 
     if(trend_model == 'None'){
-      model_file[grep('phi\\[s\\] ~', model_file)] <- 'phi[s] <- 0'
-      model_file[grep('ar1\\[s\\] ~', model_file)] <- 'ar1[s] <- 0'
-      model_file[grep('ar2\\[s\\] ~', model_file)] <- 'ar2[s] <- 0'
-      model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
+      model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
+      model_file[grep('ar1\\[s\\] ~', model_file)] <- ' ar1[s] <- 0'
+      model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
+      model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
     }
 
     if(trend_model == 'RW'){
-      model_file[grep('ar1\\[s\\] ~', model_file)] <- 'ar1[s] <- 1'
-      model_file[grep('ar2\\[s\\] ~', model_file)] <- 'ar2[s] <- 0'
-      model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
+      model_file[grep('ar1\\[s\\] ~', model_file)] <- ' ar1[s] <- 1'
+      model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
+      model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
     }
 
     if(trend_model == 'AR1'){
-      model_file[grep('ar2\\[s\\] ~', model_file)] <- 'ar2[s] <- 0'
-      model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
+      model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
+      model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
     }
 
     if(trend_model == 'AR2'){
-      model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
+      model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
     }
 
-    model_file <- textConnection(model_file)
+    model_file_jags <- textConnection(model_file)
   }
 
   if(use_lv){
@@ -509,7 +509,7 @@ mvjagam = function(formula,
         model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
       }
 
-      model_file <- textConnection(model_file)
+      model_file_jags <- textConnection(model_file)
 
   }
 
@@ -595,7 +595,7 @@ mvjagam = function(formula,
   # will take a while to optimise the samplers, so long adaptation with little 'burnin'
   # is more crucial than little adaptation but long 'burnin' https://mmeredith.net/blog/2016/Adapt_or_burn.htm
   load.module("glm")
-  gam_mod <- jags.model(model_file,
+  gam_mod <- jags.model(model_file_jags,
                         data = ss_jagam$jags.data,
                         inits = ss_jagam$jags.ini,
                         n.chains = n.chains,
@@ -643,7 +643,6 @@ mvjagam = function(formula,
   }
   }
 
-  model_file <- readLines(fil, n = -1)
   unlink(fil)
 
   if(missing(upper_bounds)){

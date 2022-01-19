@@ -61,9 +61,9 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               n.burnin = 40000,
-               n.iter = 10000,
-               thin = 10,
+               n.burnin = 5000,
+               n.iter = 5000,
+               thin = 5,
                auto_update = F)
 ```
 
@@ -127,7 +127,7 @@ lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
                formula = y ~ s(season, bs = 'gp', k = 3),
                family = 'poisson',
                trend_model = 'RW',
-               n.burnin = 10000,
+               n.burnin = 5000,
                n.iter = 5000,
                thin = 5,
                auto_update = F)
