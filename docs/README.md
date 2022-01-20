@@ -112,39 +112,55 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
 #> Initializing model
 ```
 
-Calculate the out of sample forecast from the fitted `mvgam` model and
-visualise. All of the following plots show 95% and 68% highest posterior
-density credible intervals (shaded regions) as well as the posterior
-median (dashed line)
+Perform a series of posterior predictive checks to see if the model is
+able to simulate data for the training period that looks realistic and
+unbiased. First, examine simulated kernel densities for posterior
+predictions (`yhat`) and compare to the density of the observations
+(`y`)
 
 ``` r
-fits <- MCMCvis::MCMCchains(lynx_mvgam$jags_output, 'ypred')
-fits <- fits[,(NROW(lynx_mvgam$obs_data)+1):(NROW(lynx_mvgam$obs_data)+10)]
-cred_ints <- apply(fits, 2, function(x) hpd(x, 0.95))
-plot(cred_ints[3,] ~ seq(1:NCOL(cred_ints)), type = 'l',
-     col = rgb(1,0,0, alpha = 0),
-     ylim = c(0, max(lynx_full$population) * 1.25),
-     ylab = '',
-     xlab = 'Forecast horizon',
-     main = 'mvgam')
-polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
-        c(cred_ints[1,],rev(cred_ints[3,])),
-        col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
-cred_ints <- apply(fits, 2, function(x) hpd(x, 0.68))
-polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
-        c(cred_ints[1,],rev(cred_ints[3,])),
-        col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
-lines(cred_ints[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
-points(lynx_test$population[1:10], pch = 16)
-lines(lynx_test$population[1:10])
+plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'density')
 ```
 
 <img src="README-unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
 
-All out of sample observations falling within the model’s 95% credible
-intervals. Have a look at this model’s summary to see what is being
-estimated (note that longer MCMC runs would probably be needed to
-increase effective sample sizes)
+Now plot the distribution of predicted means compared to the observed
+mean
+
+``` r
+plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'mean')
+```
+
+<img src="README-unnamed-chunk-8-1.png" style="display: block; margin: auto;" />
+
+Next examine simulated empirical Cumulative Distribution Functions (CDF)
+for posterior predictions (`yhat`) and compare to the CDF of the
+observations
+(`y`)
+
+``` r
+plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'cdf')
+```
+
+<img src="README-unnamed-chunk-9-1.png" style="display: block; margin: auto;" />
+
+Finally look for any biases in predictions by examining a Probability
+Integral Transform (PIT) histogram. If our predictions are not biased
+one way or another (i.e. not consistently under- or over-predicting),
+this histogram should look roughly
+uniform
+
+``` r
+plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'pit')
+```
+
+<img src="README-unnamed-chunk-10-1.png" style="display: block; margin: auto;" />
+
+All of these plots indicate the model is well calibrated against the
+training data, with no apparent pathological behaviors exhibited. Have a
+look at this model’s summary to see what is being estimated (note that
+longer MCMC runs would probably be needed to increase effective sample
+sizes)
 
 ``` r
 summary_mvgam(lynx_mvgam)
@@ -162,41 +178,41 @@ summary_mvgam(lynx_mvgam)
 #> 
 #> GAM smooth term approximate significances:
 #>             edf Ref.df Chi.sq p-value    
-#> s(season) 15.95  17.00  322.1  <2e-16 ***
+#> s(season) 15.85  17.00  218.1  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> GAM coefficient (beta) estimates:
 #>                    2.5%         50%       97.5% Rhat n.eff
-#> (Intercept)   6.0890931  6.40678520  7.28201449 3.65     6
-#> s(season).1  -1.1867444 -0.70913911 -0.30956895 1.99    34
-#> s(season).2  -0.2294899  0.16378434  0.53491274 1.00    50
-#> s(season).3   0.5735337  1.03687149  1.57466178 1.72    21
-#> s(season).4   1.1064511  1.66632941  2.45197638 2.49    12
-#> s(season).5   1.4556877  2.02677954  2.88052788 3.45    17
-#> s(season).6   0.8254871  1.32652865  1.78714330 2.87    41
-#> s(season).7  -0.4804657 -0.02347489  0.48957456 1.21    42
-#> s(season).8  -1.3308981 -0.72510614 -0.17465198 1.05    34
-#> s(season).9  -1.5749254 -0.92232116 -0.31118894 1.06    45
-#> s(season).10 -1.1218908 -0.54929910  0.00117043 1.06    45
-#> s(season).11 -0.2318544  0.22719748  0.67153941 1.00    39
-#> s(season).12  0.6974442  1.17104906  1.75145208 1.93    24
-#> s(season).13  0.4763915  1.46897262  1.85732784 1.84    20
-#> s(season).14  0.3238041  1.02937675  1.61475555 1.39    12
-#> s(season).15 -0.4553180 -0.01852832  0.60234884 1.06    29
-#> s(season).16 -1.1765045 -0.71239446 -0.18178080 1.53    55
-#> s(season).17 -1.4829938 -1.04284268 -0.53564351 2.23    68
+#> (Intercept)   6.4665142  6.73987828  6.99043722 1.50     9
+#> s(season).1  -1.1185962 -0.74217898 -0.42534429 1.04    53
+#> s(season).2  -0.2562464  0.16843485  0.53347241 1.14    43
+#> s(season).3   0.5250735  1.00087593  1.37110381 1.43    24
+#> s(season).4   1.1996967  1.67623453  2.18679617 1.73    17
+#> s(season).5   1.5850429  2.12767880  2.66898270 1.97    13
+#> s(season).6   0.9471912  1.51232349  1.87613089 1.36    27
+#> s(season).7  -0.3336835  0.15603207  0.65966736 1.02    31
+#> s(season).8  -1.1521107 -0.61817362  0.10658710 1.00    22
+#> s(season).9  -1.4511966 -0.84707603 -0.08351253 1.15    31
+#> s(season).10 -1.2849313 -0.52108654  0.20401902 1.91    43
+#> s(season).11 -0.7531496  0.25139730  0.83973013 2.82    46
+#> s(season).12  0.2341295  1.08796581  1.86929053 2.41    14
+#> s(season).13  0.8657484  1.26174570  1.95761878 1.21    14
+#> s(season).14  0.4691613  1.00311146  1.49883964 1.17    24
+#> s(season).15 -0.5460264  0.01276175  0.44535362 1.08    39
+#> s(season).16 -1.2410690 -0.78104509 -0.18586760 1.01    43
+#> s(season).17 -1.5167008 -1.09951669 -0.69108500 1.02    53
 #> 
 #> GAM smoothing parameter (rho) estimates:
-#>               2.5%      50%   97.5% Rhat n.eff
-#> s(season) 3.608136 4.699668 5.55792 1.29   375
+#>               2.5%      50%    97.5% Rhat n.eff
+#> s(season) 3.692452 4.600328 5.464484 1.01   128
 #> 
 #> Latent trend drift (phi) and AR parameter estimates:
-#>           2.5%         50%     97.5% Rhat n.eff
-#> phi -0.2388935  0.08607851 0.3222556 2.80    69
-#> ar1  0.4258331  0.73163564 1.0316597 1.03   563
-#> ar2 -0.4676518 -0.13088554 0.1964527 1.00  1673
-#> ar3 -0.2983991  0.02179834 0.3245552 1.23    84
+#>           2.5%          50%     97.5% Rhat n.eff
+#> phi -0.1719130 -0.009823285 0.1447212 1.12    80
+#> ar1  0.4352220  0.733593240 1.0194538 1.00   257
+#> ar2 -0.4720862 -0.135948607 0.2103140 1.00  1493
+#> ar3 -0.2535205  0.039589026 0.3331610 1.00   262
 #> 
 ```
 
@@ -209,17 +225,17 @@ similar
 plot_mvgam_smooth(lynx_mvgam, 1, 'season')
 ```
 
-<img src="README-unnamed-chunk-9-1.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-12-1.png" style="display: block; margin: auto;" />
 
-We can also view the mvgam’s posterior predictions for the entire series
-(testing and
+We can also view the mvgam’s posterior retrodictions and predictions for
+the entire series (testing and
 training)
 
 ``` r
 plot_mvgam_fc(lynx_mvgam, data_test = lynx_test)
 ```
 
-<img src="README-unnamed-chunk-10-1.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-13-1.png" style="display: block; margin: auto;" />
 
 And the estimated latent trend
 component
@@ -228,7 +244,37 @@ component
 plot_mvgam_trend(lynx_mvgam, data_test = lynx_test)
 ```
 
-<img src="README-unnamed-chunk-11-1.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-14-1.png" style="display: block; margin: auto;" />
+
+We can also re-do the posterior predictive checks, but this time
+focusing only on the out of sample period. This will give us better
+insight into how the model is performing and whether it is able to
+simulate realistic and unbiased future
+values
+
+``` r
+plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'density', data_test = lynx_test)
+```
+
+<img src="README-unnamed-chunk-15-1.png" style="display: block; margin: auto;" />
+
+``` r
+plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'mean', data_test = lynx_test)
+```
+
+<img src="README-unnamed-chunk-16-1.png" style="display: block; margin: auto;" />
+
+``` r
+plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'cdf', data_test = lynx_test)
+```
+
+<img src="README-unnamed-chunk-17-1.png" style="display: block; margin: auto;" />
+
+``` r
+plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'pit', data_test = lynx_test)
+```
+
+<img src="README-unnamed-chunk-18-1.png" style="display: block; margin: auto;" />
 
 A key aspect of ecological forecasting is to understand [how different
 components of a model contribute to forecast
@@ -241,7 +287,7 @@ GAM component and the latent trend component using
 plot_mvgam_uncertainty(lynx_mvgam, data_test = lynx_test)
 ```
 
-<img src="README-unnamed-chunk-12-1.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-19-1.png" style="display: block; margin: auto;" />
 
 Both components contribute to forecast uncertainty, suggesting we would
 still need some more work to learn about factors driving the dynamics of
@@ -257,7 +303,7 @@ trend
 plot_mvgam_resids(lynx_mvgam)
 ```
 
-<img src="README-unnamed-chunk-13-1.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-20-1.png" style="display: block; margin: auto;" />
 
 Another useful utility of `mvgam` is the ability to use rolling window
 forecasts to evaluate competing models that may represent different
@@ -307,10 +353,10 @@ markedly better (far lower DRPS) for this evaluation timepoint
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   1.887  20.541  63.839  70.928 108.391 171.230
+#>   3.299  27.818  73.694  78.309 122.379 200.461
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   41.83   71.89  309.84  316.34  474.41  760.82
+#>   20.78   88.06  311.57  341.27  539.95  816.53
 ```
 
 Nominal coverages for both models’ 90% prediction intervals

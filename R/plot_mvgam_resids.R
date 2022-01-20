@@ -31,18 +31,30 @@ plot(median_preds[1:length(object$resids[[series]])],
      object$resids[[series]],
      main = 'Resids vs Fitted Values',
      xlab = 'Fitted values',
-     ylab = 'Residuals')
+     ylab = 'Residuals',
+     pch = 16,
+     col = 'white',
+     cex = 1)
+points(x = median_preds[1:length(object$resids[[series]])],
+       y = object$resids[[series]],
+       pch = 16,
+       cex = 0.75,
+       col = 'black')
 
 # Q-Q plot
-qqnorm(object$resids[[series]])
-qqline(object$resids[[series]], col = 2)
+coords <- qqnorm(object$resids[[series]], plot.it = F)
+qqnorm(object$resids[[series]], pch = 16, col = 'white', cex = 1)
+qqline(object$resids[[series]], col = "#8F2727", lwd = 2)
+points(x = coords$x, y = coords$y, pch = 16, col = 'black', cex = 0.75)
 
 # ACF plot
-acf(object$resids[[series]], main = 'ACF', na.action = na.pass)
+acf(object$resids[[series]], main = 'ACF', na.action = na.pass,
+    ci.col = "#8F2727", lwd = 2)
 
 # PACF plot (only works if there are no missing values in the residual series)
 if(!any(is.na(object$resids[[series]]))){
-  pacf(object$resids[[series]], main = 'pACF', na.action = na.fail)
+  pacf(object$resids[[series]], main = 'pACF', na.action = na.fail,
+       ci.col = "#8F2727", lwd = 2)
 }
 
 invisible()

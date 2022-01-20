@@ -7,15 +7,17 @@
 #'@param smooth \code{character} specifying the smooth term to be plotted
 #'@param newdata Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
 #'in addition to any other variables included in the linear predictor of the original model's \code{formula}
-#'@details Smooth functions are shown as the expectation from the GAM component of the linear predictor across
-#'a sequence of 500 values between the variable's \code{min} and \code{max}, while holding all other variables either at
-#'their means (for numeric varibles) or at the first level (factor variables). At present, only univariate smooth plots
+#'@details Smooth functions are shown as empirical quantiles of posterior expectations from the GAM component of the linear
+#'predictor across a sequence of 500 values between the variable's \code{min} and \code{max},
+#'while holding all other variables either at their means (for numeric varibles) or at the first
+#'level (factor variables). At present, only univariate smooth plots
 #'are allowed (no smooth interactions can be plotted). For more nuanced visualisation, supply
 #'\code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model
 #'@return A base \code{R} graphics plot
 #'@seealso \code{\link[mgcv]{plot.gam}}
 #'@export
-plot_mvgam_smooth = function(object, series = 1, smooth, newdata){
+plot_mvgam_smooth = function(object, series = 1, smooth,
+                             newdata){
 
   data_train <- object$obs_data
   smooth_terms <- unique(gsub("[\\(\\)]", "", regmatches(paste(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
@@ -74,28 +76,37 @@ plot_mvgam_smooth = function(object, series = 1, smooth, newdata){
     preds[i,] <- (Xp %*% betas[i,])
   }
 
-  # Plot 95% and 68% credible intervals
-  int <- apply(preds,
-               2, hpd, 0.95)
-  preds_last <- preds[1,]
-  plot(preds_last ~ pred_vals,
-       type = 'l', ylim = c(min(int) - sd(preds), max(int) + sd(preds)),
-       col = rgb(1,0,0, alpha = 0),
+  # Plot quantiles of the smooth function, along with observed values
+  # if specified
+  probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+  cred <- sapply(1:NCOL(preds),
+                 function(n) quantile(preds[,n],
+                                      probs = probs))
+
+  c_light <- c("#DCBCBC")
+  c_light_highlight <- c("#C79999")
+  c_mid <- c("#B97C7C")
+  c_mid_highlight <- c("#A25050")
+  c_dark <- c("#8F2727")
+  c_dark_highlight <- c("#7C0000")
+
+  plot(1, type = "n",
+       xlab = smooth,
        ylab = paste0('s(', smooth, ') for ', unique(pred_dat$series)),
-       xlab = smooth)
-  polygon(c(pred_vals, rev(pred_vals)),
-          c(int[1,], rev(int[3,])),
-          col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
+       xlim = c(min(pred_vals), max(pred_vals)),
+       ylim = c(min(cred) - sd(preds), max(cred) + sd(preds)))
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+          col = c_light, border = NA)
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+          col = c_light_highlight, border = NA)
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+          col = c_mid, border = NA)
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+          col = c_mid_highlight, border = NA)
+  lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
 
-  int <- apply(preds,
-               2, hpd, 0.8)
-  polygon(c(pred_vals, rev(pred_vals)),
-          c(int[1,], rev(int[3,])),
-          col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
-  lines(int[2,] ~ pred_vals, col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
-
-  # Show observed values as a rug
+  # Show observed values of the smooth as a rug
   rug((as.vector(as.matrix(data_train[,smooth])))[which(data_train$series ==
-                                                         levels(data_train$series)[series])],
-      lwd = 1.75, ticksize = 0.025)
+                                                          levels(data_train$series)[series])],
+      lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)
 }

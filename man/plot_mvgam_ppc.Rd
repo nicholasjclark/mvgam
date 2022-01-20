@@ -4,21 +4,28 @@
 \alias{plot_mvgam_ppc}
 \title{Plot mvjagam posterior predictive checks for a specified series}
 \usage{
-plot_mvgam_ppc(object, series, type = "density", n_samples = 500)
+plot_mvgam_ppc(object, data_test, series, type = "density", n_samples = 500)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
 
+\item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season' and 'year'
+for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
+included, the observed values in the test data are compared to the model's forecast distribution for exploring
+biases in model predictions.
+Note this is only useful if the same \code{data_test} was also included when fitting the original model.}
+
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
 \item{type}{\code{character} specifying the type of posterior predictive check to calculate and plot.
-Valid options are: 'density', 'pit' and 'cdf'}
+Valid options are: 'mean', 'density', 'pit' and 'cdf'}
 
 \item{n_samples}{\code{integer} specifying the number of posterior simulations to draw when plotting
-either the kernel density (\code{type == 'density'}) or empirical CDF (\code{type == 'cdf})}
+either the kernel density (\code{type == 'density'}) or empirical CDF (\code{type == 'cdf'})}
 }
 \value{
-A base \code{R} graphics plot showing either kernel density or empirical CDF estimates for
+A base \code{R} graphics plot showing either the predicted vs observed mean for the
+series (for \code{type == 'mean'}), kernel density or empirical CDF estimates for
 posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
 Integral Transform histogram (for \code{type == 'pit'})
 }

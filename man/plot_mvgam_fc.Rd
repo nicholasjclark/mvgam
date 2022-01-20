@@ -30,7 +30,7 @@ A base \code{R} graphics plot
 Plot mvjagam posterior predictions for a specified series
 }
 \details{
-Posterior predictions are drawn from the fitted \code{mvjagam} and used to calculate 95 percent and
-68 percent highest posterior density credible intervals. These are plotted along with the true observed data
+Posterior predictions are drawn from the fitted \code{mvjagam} and used to calculate posterior
+empirical quantiles. These are plotted along with the true observed data
 that was used to train the model.
 }

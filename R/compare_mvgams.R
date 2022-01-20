@@ -63,10 +63,13 @@ for(i in 1:3) {
 if(i == 1){
   barplot(c('model 1' = mod1_eval$sum_drps,
             'model 2' = mod2_eval$sum_drps),
+          col = c("#B97C7C",  "#7C0000"),
+          border = NA,
           ylab = 'Sum DRPS (lower is better)')
 } else if(i == 2){
   boxplot(list('model 1' = mod1_eval$drps_summary,
                'model 2' = mod2_eval$drps_summary),
+          border = c("#B97C7C",  "#7C0000"),
           ylab = 'Sum DRPS per evaluation')
 } else {
   plot_dat <- rbind(mod1_eval$drps_horizon_summary$mean_drps,
@@ -77,9 +80,10 @@ if(i == 1){
           beside = T,
           xlab = 'Forecast horizon',
           ylab = 'Mean DRPS',
-          col = c("darkgrey",  "black"),
+          col = c("#B97C7C",  "#7C0000"),
+          border = NA,
           legend.text = c('Model 1', 'Model 2'),
-          args.legend = list(x = "top", ncol = 2))
+          args.legend = list(x = "top", ncol = 2, border = NA))
 }
 
   if(ask){

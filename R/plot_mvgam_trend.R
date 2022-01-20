@@ -16,33 +16,47 @@ plot_mvgam_trend = function(object, series, data_test, hide_xlabels = FALSE){
 
   preds <- MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[series]:ends[series]]
   preds_last <- preds[1,]
-  int <- apply(preds,
-               2, hpd, 0.98)
+  pred_vals <- seq(1:length(preds_last))
+
+  # Plot quantiles of the smooth function, along with observed values
+  # if specified
+  probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+  cred <- sapply(1:NCOL(preds),
+                 function(n) quantile(preds[,n],
+                                      probs = probs))
+
+  c_light <- c("#DCBCBC")
+  c_light_highlight <- c("#C79999")
+  c_mid <- c("#B97C7C")
+  c_mid_highlight <- c("#A25050")
+  c_dark <- c("#8F2727")
+  c_dark_highlight <- c("#7C0000")
+
   if(hide_xlabels){
-    plot(preds_last,
-         type = 'l', ylim = range(int),
-         col = rgb(1,0,0, alpha = 0),
+    plot(1, type = "n",
+         xlab = '',
+         xaxt = 'n',
          ylab = paste0('Estimated trend for ', levels(data_train$series)[series]),
-         xlab = '', xaxt = 'n')
+         xlim = c(0, length(preds_last)),
+         ylim = range(cred))
+
   } else {
-    plot(preds_last,
-         type = 'l', ylim = range(int),
-         col = rgb(1,0,0, alpha = 0),
+    plot(1, type = "n",
+         xlab = 'Time',
          ylab = paste0('Estimated trend for ', levels(data_train$series)[series]),
-         xlab = 'Time')
+         xlim = c(0, length(preds_last)),
+         ylim = range(cred))
   }
 
-  int <- apply(preds,
-               2, hpd, 0.95)
-  polygon(c(seq(1:(NCOL(int))), rev(seq(1:NCOL(int)))),
-          c(int[1,],rev(int[3,])),
-          col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
-  int <- apply(preds,
-               2, hpd, 0.68)
-  polygon(c(seq(1:(NCOL(int))), rev(seq(1:NCOL(int)))),
-          c(int[1,],rev(int[3,])),
-          col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
-  lines(int[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+          col = c_light, border = NA)
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+          col = c_light_highlight, border = NA)
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+          col = c_mid, border = NA)
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+          col = c_mid_highlight, border = NA)
+  lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
 
   if(!missing(data_test)){
     abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')

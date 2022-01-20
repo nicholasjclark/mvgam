@@ -23,9 +23,10 @@ A base \code{R} graphics plot
 This function plots credible intervals for a series-specific smooth term on the scale of the linear predictor
 }
 \details{
-Smooth functions are shown as the expectation from the GAM component of the linear predictor across
-a sequence of 500 values between the variable's \code{min} and \code{max}, while holding all other variables either at
-their means (for numeric varibles) or at the first level (factor variables). At present, only univariate smooth plots
+Smooth functions are shown as empirical quantiles of posterior expectations from the GAM component of the linear
+predictor across a sequence of 500 values between the variable's \code{min} and \code{max},
+while holding all other variables either at their means (for numeric varibles) or at the first
+level (factor variables). At present, only univariate smooth plots
 are allowed (no smooth interactions can be plotted). For more nuanced visualisation, supply
 \code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model
 }

@@ -165,37 +165,65 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
       ylim <- c(0, upper_lim)
     }
 
-    plot(preds_last,
-         type = 'l', ylim = ylim,
-         col = rgb(1,0,0, alpha = 0),
-         ylab = paste0('Estimated counts for ', levels(obs_data$series)[series]),
-         xlab = 'Time')
+    # Plot quantiles of the forecast distribution
+    probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+    cred <- sapply(1:NCOL(preds),
+                   function(n) quantile(preds[,n],
+                                        probs = probs))
 
-    int[int<0] <- 0
+    c_light <- c("#DCBCBC")
+    c_light_highlight <- c("#C79999")
+    c_mid <- c("#B97C7C")
+    c_mid_highlight <- c("#A25050")
+    c_dark <- c("#8F2727")
+    c_dark_highlight <- c("#7C0000")
+
+    plot(1, type = "n",
+         xlab = 'Time',
+         ylab = paste0('Predictions for ', levels(obs_data$series)[series]),
+         xlim = c(0, length(preds_last)),
+         ylim = ylim)
+
     polygon(c(seq((length(all_obs) + 1), length(preds_last)),
               rev(seq((length(all_obs) + 1), length(preds_last)))),
-            c(int[1,],rev(int[3,])),
-            col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
-    int <- apply(preds,
-                 2, hpd, 0.68)
-    int[int<0] <- 0
+            c(cred[1,], rev(cred[9,])),
+            col = c_light, border = NA)
     polygon(c(seq((length(all_obs) + 1), length(preds_last)),
               rev(seq((length(all_obs) + 1), length(preds_last)))),
-            c(int[1,],rev(int[3,])),
-            col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
-    lines(seq((length(all_obs) + 1), length(preds_last)),
-          int[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
-    lines(all_obs)
+            c(cred[2,], rev(cred[8,])),
+            col = c_light_highlight, border = NA)
+    polygon(c(seq((length(all_obs) + 1), length(preds_last)),
+              rev(seq((length(all_obs) + 1), length(preds_last)))),
+            c(cred[3,], rev(cred[7,])),
+            col = c_mid, border = NA)
+    polygon(c(seq((length(all_obs) + 1), length(preds_last)),
+              rev(seq((length(all_obs) + 1), length(preds_last)))),
+            c(cred[4,], rev(cred[6,])),
+            col = c_mid_highlight, border = NA)
+    lines(seq((length(all_obs) + 1), length(preds_last)), cred[5,], col = c_dark, lwd = 2.5)
+
     points(x = which(assimilated == 'no'),
-           y = all_obs[which(assimilated == 'no')], pch = 16)
+           y = all_obs[which(assimilated == 'no')], pch = 16,
+           col = 'white', cex = 0.65)
+    points(x = which(assimilated == 'no'),
+           y = all_obs[which(assimilated == 'no')], pch = 16,
+           col = 'black', cex = 0.55)
     points(x = which(assimilated == 'yes'), y = all_obs[which(assimilated == 'yes')],
-           pch = 8, col = rgb(150, 0, 0, max = 255))
+           pch = 8, cex = 0.75, col = 'white')
+    points(x = which(assimilated == 'yes'), y = all_obs[which(assimilated == 'yes')],
+           pch = 8, cex = 0.65, col = c_dark)
+    abline(v = max(which(assimilated == 'yes')), lty = 'dashed')
 
     if(plot_legend){
-      legend(legend_position,legend=c("Calibration","Assimilation"),
+      legend(legend_position,
+             cex = 0.9,
+             legend=c("Trained","Assimilated"),
              bg = 'white',
-             col=c('black',
-                   rgb(150, 0, 0, max = 255)),pch = c(16, 8))
+             col = c('black', c_dark),
+             text.col = c('black', c_dark),
+             bty = 'n',
+             pch = c(16, 8),
+             ncol = 1)
     }
   }
 

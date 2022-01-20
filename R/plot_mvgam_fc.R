@@ -9,8 +9,8 @@
 #'\code{axis} from base \code{R}
 #'@param ylab Optional \code{character} string specifying the y-axis label
 #'@param ylim Optional \code{vector} of y-axis limits (min, max)
-#'@details Posterior predictions are drawn from the fitted \code{mvjagam} and used to calculate 95 percent and
-#'68 percent highest posterior density credible intervals. These are plotted along with the true observed data
+#'@details Posterior predictions are drawn from the fitted \code{mvjagam} and used to calculate posterior
+#'empirical quantiles. These are plotted along with the true observed data
 #'that was used to train the model.
 #'@return A base \code{R} graphics plot
 #'@export
@@ -25,42 +25,53 @@ plot_mvgam_fc = function(object, series, data_test, hide_xlabels = FALSE, ylab, 
 
   preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
   preds_last <- preds[1,]
-  int <- apply(preds,
-               2, hpd, 0.95)
+
+  # Plot quantiles of the forecast distribution
+  probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+  cred <- sapply(1:NCOL(preds),
+                 function(n) quantile(preds[,n],
+                                      probs = probs))
+
+  c_light <- c("#DCBCBC")
+  c_light_highlight <- c("#C79999")
+  c_mid <- c("#B97C7C")
+  c_mid_highlight <- c("#A25050")
+  c_dark <- c("#8F2727")
+  c_dark_highlight <- c("#7C0000")
 
   if(missing(ylim)){
-    ylim <- c(0, max(int) + 2)
+    ylim <- c(min(cred), max(cred) + 2)
   }
 
   if(missing(ylab)){
-    ylab <- paste0('Estimated counts for ', levels(data_train$series)[series])
+    ylab <- paste0('Predicitons for ', levels(data_train$series)[series])
   }
 
+  pred_vals <- seq(1:length(preds_last))
   if(hide_xlabels){
-    plot(preds_last,
-         type = 'l', ylim = ylim ,
-         col = rgb(1,0,0, alpha = 0),
+    plot(1, type = "n",
+         xlab = '',
+         xaxt = 'n',
          ylab = ylab,
-         xlab = '', xaxt = 'n')
+         xlim = c(0, length(preds_last)),
+         ylim = ylim)
   } else {
-    plot(preds_last,
-         type = 'l', ylim = ylim,
-         col = rgb(1,0,0, alpha = 0),
+    plot(1, type = "n",
+         xlab = 'Time',
          ylab = ylab,
-         xlab = 'Time')
+         xlim = c(0, length(preds_last)),
+         ylim = ylim)
   }
 
-  int[int<0] <- 0
-  polygon(c(seq(1:(NCOL(int))), rev(seq(1:NCOL(int)))),
-          c(int[1,],rev(int[3,])),
-          col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
-  int <- apply(preds,
-               2, hpd, 0.68)
-  int[int<0] <- 0
-  polygon(c(seq(1:(NCOL(int))), rev(seq(1:NCOL(int)))),
-          c(int[1,],rev(int[3,])),
-          col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
-  lines(int[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+          col = c_light, border = NA)
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+          col = c_light_highlight, border = NA)
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+          col = c_mid, border = NA)
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+          col = c_mid_highlight, border = NA)
+  lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
 
   s_name <- levels(data_train$series)[series]
   if(!missing(data_test)){
@@ -69,7 +80,13 @@ plot_mvgam_fc = function(object, series, data_test, hide_xlabels = FALSE, ylab, 
              dplyr::select(year, season, y) %>%
              dplyr::distinct() %>%
              dplyr::arrange(year, season) %>%
-             dplyr::pull(y), pch = 16)
+             dplyr::pull(y), pch = 16, col = "white", cex = 0.65)
+    points(dplyr::bind_rows(data_train, data_test) %>%
+             dplyr::filter(series == s_name) %>%
+             dplyr::select(year, season, y) %>%
+             dplyr::distinct() %>%
+             dplyr::arrange(year, season) %>%
+             dplyr::pull(y), pch = 16, col = "black", cex = 0.55)
     abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
   } else {
     points(data_train %>%
@@ -77,7 +94,13 @@ plot_mvgam_fc = function(object, series, data_test, hide_xlabels = FALSE, ylab, 
              dplyr::select(year, season, y) %>%
              dplyr::distinct() %>%
              dplyr::arrange(year, season) %>%
-             dplyr::pull(y), pch = 16)
+             dplyr::pull(y),pch = 16, col = "white", cex = 0.6)
+    points(data_train %>%
+            dplyr::filter(series == s_name) %>%
+            dplyr::select(year, season, y) %>%
+            dplyr::distinct() %>%
+            dplyr::arrange(year, season) %>%
+            dplyr::pull(y),pch = 16, col = "black", cex = 0.5)
   }
 
 }

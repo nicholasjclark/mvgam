@@ -1,21 +1,27 @@
 #'Plot mvjagam posterior predictive checks for a specified series
 #'@param object \code{list} object returned from \code{mvjagam}
+#'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season' and 'year'
+#'for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
+#'included, the observed values in the test data are compared to the model's forecast distribution for exploring
+#'biases in model predictions.
+#'Note this is only useful if the same \code{data_test} was also included when fitting the original model.
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param type \code{character} specifying the type of posterior predictive check to calculate and plot.
-#'Valid options are: 'density', 'pit' and 'cdf'
+#'Valid options are: 'mean', 'density', 'pit' and 'cdf'
 #'@param n_samples \code{integer} specifying the number of posterior simulations to draw when plotting
-#'either the kernel density (\code{type == 'density'}) or empirical CDF (\code{type == 'cdf})
+#'either the kernel density (\code{type == 'density'}) or empirical CDF (\code{type == 'cdf'})
 #'@details Posterior predictions are drawn from the fitted \code{mvjagam} and compared against
 #'the empirical distribution of the observed data for a specified series to help evaluate the model's
 #'ability to generate unbiased predictions.
-#'@return A base \code{R} graphics plot showing either kernel density or empirical CDF estimates for
+#'@return A base \code{R} graphics plot showing either the predicted vs observed mean for the
+#'series (for \code{type == 'mean'}), kernel density or empirical CDF estimates for
 #'posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
 #'Integral Transform histogram (for \code{type == 'pit'})
 #'@export
-plot_mvgam_ppc = function(object, series, type = 'density', n_samples = 500){
+plot_mvgam_ppc = function(object, data_test, series, type = 'density', n_samples = 500){
 
   # Check arguments
-  type <- match.arg(arg = type, choices = c("density", "pit", "cdf"))
+  type <- match.arg(arg = type, choices = c("mean","density", "pit", "cdf"))
 
   # Pull out observations and posterior predictions for the specified series
   data_train <- object$obs_data
@@ -26,19 +32,61 @@ plot_mvgam_ppc = function(object, series, type = 'density', n_samples = 500){
   ends <- ends[-1]
 
   s_name <- levels(data_train$series)[series]
-  truths <- data_train %>%
-    dplyr::filter(series == s_name) %>%
-    dplyr::select(year, season, y) %>%
-    dplyr::distinct() %>%
-    dplyr::arrange(year, season) %>%
-    dplyr::pull(y)
 
-  preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
-  preds <- preds[,1:length(truths)]
+  if(!missing(data_test)){
+    truths <- data_test %>%
+      dplyr::filter(series == s_name) %>%
+      dplyr::select(year, season, y) %>%
+      dplyr::distinct() %>%
+      dplyr::arrange(year, season) %>%
+      dplyr::pull(y)
+
+    preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
+    preds <- preds[,((NROW(data_train) / NCOL(object$ytimes))+1):
+                     ((NROW(data_train) / NCOL(object$ytimes))+length(truths))]
+
+  } else {
+    truths <- data_train %>%
+      dplyr::filter(series == s_name) %>%
+      dplyr::select(year, season, y) %>%
+      dplyr::distinct() %>%
+      dplyr::arrange(year, season) %>%
+      dplyr::pull(y)
+
+    preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
+    preds <- preds[,1:length(truths)]
+  }
 
   # Can't deal with missing values in these diagnostic plots
-  preds <- preds[!is.na(truths),1:NCOL(preds)]
+  preds <- preds[, !is.na(truths)]
   truths <- truths[!is.na(truths)]
+
+  if(type == 'mean'){
+    # Plot observed and predicted location (means)
+    pred_means <- apply(preds, 1, mean)
+    obs_mean <- mean(truths)
+    hist(pred_means,
+         xlim = c(min(min(pred_means), min(obs_mean)),
+                  max(max(pred_means), max(obs_mean))),
+         main = '',
+         breaks = seq(min(pred_means), max(pred_means), length.out = 20),
+         border = "#B97C7C",
+         col = "#C79999",
+         ylab = '',
+         xlab = paste0('Predicted mean for ', levels(data_train$series)[series]))
+    abline(v = obs_mean, lwd = 3, col = 'white')
+    abline(v = obs_mean, lwd = 2.5, col = 'black')
+    box()
+
+    legend('topright',
+           legend = c(expression(hat(mu)),
+                      expression(mu)),
+           bg = 'white',
+           col = c("#B97C7C",
+                   'black'),
+           lty = 1, lwd = 2,
+           bty = 'n')
+  }
 
   # Generate a sample sequence and plot
   if(type == 'density'){
@@ -49,20 +97,26 @@ plot_mvgam_ppc = function(object, series, type = 'density', n_samples = 500){
     plot(density(preds[1,]),
          main = '', xlab = '',
          ylim = c(0, ymax),
-         col = rgb(150, 0, 0, max = 255, alpha = 10))
+         ylab = paste0('Density for ', levels(data_train$series)[series]),
+         col = rgb(150, 0, 0, max = 255, alpha = 10),
+         lwd = 0.8)
     for(i in 1:n_samples){
       lines(density(preds[sample_seq[i],]),
-            col = rgb(150, 0, 0, max = 255, alpha = 10))
+            col = rgb(150, 0, 0, max = 255, alpha = 10),
+            lwd = 0.8)
     }
 
-    lines(density(truths), lwd = 3)
+    lines(density(truths), lwd = 3, col = 'white')
+    lines(density(truths), lwd = 2.5, col = 'black')
     legend('topright',
            legend = c(expression(hat(y)),
                       'y'),
            bg = 'white',
-           col = c(rgb(150, 0, 0, max = 255, alpha = 180),
-                   'black'),
-           lty = 1,lwd = 2)
+           col = c(rgb(150, 0, 0, max = 255, alpha = 100),
+                   "black"),
+           lty = 1,
+           lwd = 2,
+           bty = 'n')
   }
 
   if(type == 'cdf'){
@@ -81,27 +135,34 @@ plot_mvgam_ppc = function(object, series, type = 'density', n_samples = 500){
          ylab = '',
          ylim = c(0, 1),
          col = rgb(150, 0, 0, max = 255, alpha = 10),
-         type = 'l')
+         type = 'l', lwd = 0.8)
 
     for(i in 1:n_samples){
       lines(x = plot_x,
             y = ecdf_plotdat(preds[i,],
                              plot_x),
-            col = rgb(150, 0, 0, max = 255, alpha = 10))
+            col = rgb(150, 0, 0, max = 255, alpha = 10),
+            lwd = 0.8)
     }
 
     lines(x = plot_x,
           y = ecdf_plotdat(truths,
                            plot_x),
-          col = 'black',
+          col = 'white',
           lwd = 3)
+    lines(x = plot_x,
+          y = ecdf_plotdat(truths,
+                           plot_x),
+          col = 'black',
+          lwd = 2.5)
     legend('bottomright',
            legend = c(expression(hat(y)),
                       'y'),
            bg = 'white',
            col = c(rgb(150, 0, 0, max = 255, alpha = 180),
                    'black'),
-           lty = 1, lwd = 2)
+           lty = 1, lwd = 2,
+           bty = 'n')
   }
 
   if(type == 'pit'){
@@ -126,8 +187,9 @@ plot_mvgam_ppc = function(object, series, type = 'density', n_samples = 500){
     pit_hist <- (pit_hist / sum(pit_hist)) * 10
 
     barplot(pit_hist,
-            col = rgb(150, 0, 0, max = 255, alpha = 180),
+            col = "#B97C7C",
             border = NA)
     abline(h = 1, lty = 'dashed', lwd = 2)
+    box()
   }
 }
