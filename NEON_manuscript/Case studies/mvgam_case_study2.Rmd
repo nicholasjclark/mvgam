@@ -64,8 +64,7 @@ trends_mod <- mvjagam(data_train = trends_data$data_train,
                       trend_model = 'AR3',
                       n_lv = 3,
                       family = 'nb',
-                      n.burnin = 10,
-                      n.iter = 100,
+                      n.burnin = 2000,
                       upper_bounds = rep(100, length(terms)),
                       auto_update = F)
 ```
@@ -87,7 +86,7 @@ trends_mod2 <- mvjagam(data_train = trends_data$data_train,
                       trend_model = 'AR3',
                       n_lv = 3,
                       family = 'nb',
-                      n.burnin = 10000,
+                      n.burnin = 2000,
                       upper_bounds = rep(100, length(terms)),
                       auto_update = F)
 ```
@@ -217,5 +216,41 @@ plot(stl(ts(as.vector(series$`dog tick`), frequency = 12), 'periodic'))
 plot(stl(ts(as.vector(series$`tick bite`), frequency = 12), 'periodic'))
 ```
 
-Some logical next steps for this analysis would be: trial varying overdispersion parameters for each series (the residual diagnostic plots do suggest that the estimated Negative Binomial overdispersion parameter is more suitable for some series than for others), devise a more goal-specific set of posterior predictive checks (see [this paper by Gelman et al](https://www.jstor.org/stable/2680852?seq=1#metadata_info_tab_contents) and [relevant works by Betancourt](https://betanalpha.github.io/assets/case_studies/principled_bayesian_workflow.html) for examples), compare out of sample Discrete Rank Probability Scores and PIT histograms for this model and simpler versions for the latent trends (i.e. AR2, AR1, Random Walk)
+A logical next step for this analysis would be to trial varying overdispersion parameters for each series. This may be necessary as the residual diagnostic plots and forecast period posterior predictive checks suggest that the estimated Negative Binomial overdispersion parameter is more suitable for some series than for others: 
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_ppc(trends_mod, series = 1, type = 'density', data_test = trends_data$data_test)
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_ppc(trends_mod, series = 1, type = 'mean', data_test = trends_data$data_test)
+```
+
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_ppc(trends_mod, series = 2, type = 'density', data_test = trends_data$data_test)
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_ppc(trends_mod, series = 2, type = 'mean', data_test = trends_data$data_test)
+```
+
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_ppc(trends_mod, series = 3, type = 'density', data_test = trends_data$data_test)
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_ppc(trends_mod, series = 3, type = 'mean', data_test = trends_data$data_test)
+```
+
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_ppc(trends_mod, series = 4, type = 'density', data_test = trends_data$data_test)
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_ppc(trends_mod, series = 4, type = 'mean', data_test = trends_data$data_test)
+```
+
+Other next steps could involve devising a more goal-specific set of posterior predictive checks (see [this paper by Gelman et al](https://www.jstor.org/stable/2680852?seq=1#metadata_info_tab_contents) and [relevant works by Betancourt](https://betanalpha.github.io/assets/case_studies/principled_bayesian_workflow.html) for examples), compare out of sample Discrete Rank Probability Scores for this model and simpler versions for the latent trends (i.e. AR2, AR1, Random Walk)
 

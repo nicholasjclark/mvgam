@@ -45,7 +45,7 @@ plot_mvgam_trace = function(object, param = 'rho'){
     param_names <- gsub('phi', 'drift', param_names)
   }
 
-  MCMCvis::MCMCtrace(trends_mod$jags_output, param,
+  MCMCvis::MCMCtrace(object$jags_output, param,
                      pdf = FALSE,
                      n.eff = TRUE,
                      Rhat = TRUE,

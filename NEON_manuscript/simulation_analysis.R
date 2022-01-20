@@ -11,10 +11,23 @@ dat <- dat + abs(min(dat))
 series <- ts(dat, start = c(1949, 1), frequency = 12)
 fake_data <- series_to_mvgam(series, freq = 365, train_prop = 0.74)
 
-# Fit a GAM to the data using mgcv; use a wiggly Gaussian Process smooth for the
+# Plot the smooth function and forecast 95% and 68% HPD intervals
+pdf('NEON_manuscript/Figures/Fig1_extrapolation_example.pdf', width = 6.25, height = 5.85)
+par(mfrow = c(2, 2),
+    mgp = c(2.5, 1, 0),
+    mai = c(0.6, 0.6, 0.2, 0.2))
+
+c_light <- c("#DCBCBC")
+c_light_highlight <- c("#C79999")
+c_mid <- c("#B97C7C")
+c_mid_highlight <- c("#A25050")
+c_dark <- c("#8F2727")
+c_dark_highlight <- c("#7C0000")
+
+# Fit a GAM to the data using mgcv; use a wiggly thin plate smooth for the
 # trend and a cyclic smooth for the seasonality
 gam_mod <- gam(y ~ s(year, k = 9, bs = 'tp') +
-                 s(season, bs = 'cc', k = 10) +
+                 s(season, bs = 'cc', k = 12) +
                  ti(season, year),
                data = fake_data$data_train,
                family = nb(),
@@ -31,44 +44,95 @@ fits <- rnbinom(n = prod(dims_needed), mu = as.vector(exp(Xp %*% t(sim))),
                 size = gam_mod$family$getTheta(TRUE))
 fits <- t(matrix(fits, nrow = dims_needed[1], ncol = dims_needed[2]))
 
-# Plot the smooth function and forecast 95% and 68% HPD intervals
-pdf('NEON_manuscript/Figures/Fig1_extrapolation_example.pdf', width = 6.25, height = 5.85)
-par(mfrow = c(2, 2),
-    mgp = c(2.5, 1, 0),
-    mai = c(0.6, 0.6, 0.2, 0.2))
-plot(gam_mod, select = 1, shade = T, main = '2nd derivative penalty')
-cred_ints <- apply(fits, 2, function(x) hpd(x, 0.95))
-ylims <- c(0,
-           max(cred_ints) + 2)
-plot(cred_ints[3,] ~ seq(1:NCOL(cred_ints)), type = 'l',
-     col = rgb(1,0,0, alpha = 0),
-     ylim = ylims,
-     ylab = 'Predicted counts',
-     xlab = 'Time')
-polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
-        c(cred_ints[1,],rev(cred_ints[3,])),
-        col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
-cred_ints <- apply(fits, 2, function(x) hpd(x, 0.68))
-polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
-        c(cred_ints[1,],rev(cred_ints[3,])),
-        col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
-lines(cred_ints[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
-lines(as.vector(series))
-abline(v = NROW(fake_data$data_train),
+pred_vals <- seq(min(fake_data$data_train$year),
+                 max(fake_data$data_test$year),
+                 length.out = 500)
+trend_fits <- predict(gam_mod, newdata = expand.grid(year = pred_vals,
+                                                     season = 0),
+                      se.fit = T, type = 'terms')
+ylims <- c(min(trend_fits$fit[,1] - (2*trend_fits$se.fit[,1])),
+           max(trend_fits$fit[,1] + (2*trend_fits$se.fit[,1])))
+plot(1, type = "n",
+     xlab = '',
+     ylab = 's(year)',
+     xlim = c(min(fake_data$data_train$year), max(fake_data$data_test$year)),
+     ylim = ylims)
+cred_95 <- trend_fits$fit[,1] + (2*trend_fits$se.fit[,1])
+cred_05 <- trend_fits$fit[,1] - (2*trend_fits$se.fit[,1])
+polygon(c(pred_vals, rev(pred_vals)), c(cred_05, rev(cred_95)),
+        col = c_light, border = NA)
+lines(pred_vals, trend_fits$fit[,1], col = c_dark, lwd = 2.5)
+abline(v = pred_vals[min(which(pred_vals>max(fake_data$data_train$year)))],
        lty = 'dashed')
-text(x=NROW(fake_data$data_train) + 5,
-     y=3000, labels = 'Forecast horizon', srt = -90)
+text(x=pred_vals[min(which(pred_vals>max(fake_data$data_train$year))) + 20],
+     y=1.2, labels = 'Forecast horizon', srt = -90)
 
-# Repeat by shifting the training window slightly so see how the extrapolation of the
-# mgcv model is simply reacting to autocorrelation
+# Plot quantiles of the forecast distribution
+probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+cred <- sapply(1:NCOL(fits),
+               function(n) quantile(fits[,n],
+                                    probs = probs))
+pred_vals <- seq(min(fake_data$data_train$year),
+                 max(fake_data$data_test$year),
+                 length.out = NCOL(fits))
+ylims <- c(0,
+           max(cred) + 2)
+
+plot(1, type = "n",
+     xlab = '',
+     ylab = 'Predicted counts',
+     xlim = c(min(fake_data$data_train$year), max(fake_data$data_test$year)),
+     ylim = ylims)
+
+polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+        col = c_light, border = NA)
+polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+        col = c_light_highlight, border = NA)
+polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+        col = c_mid, border = NA)
+polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+        col = c_mid_highlight, border = NA)
+lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+points(x = pred_vals, y = as.vector(series),
+       pch = 16, col = 'white', cex = 0.7)
+points(x = pred_vals, y = as.vector(series),
+       pch = 16, col = 'black', cex = 0.6)
+abline(v = pred_vals[NROW(fake_data$data_train)],
+       lty = 'dashed')
+
+# Repeat by using a first derivative penalty
 fake_data <- series_to_mvgam(series, freq = 365, train_prop = 0.74)
 gam_mod <- gam(y ~ s(year, k = 9, bs = 'tp', m = 1) +
-                 s(season, bs = 'cc', k = 10) +
+                 s(season, bs = 'cc', k = 12) +
                  ti(season, year),
                data = fake_data$data_train,
                family = nb(),
                method = 'REML')
-plot(gam_mod, select = 1, shade = T, main = '1st derivative penalty')
+pred_vals <- seq(min(fake_data$data_train$year),
+                 max(fake_data$data_test$year),
+                 length.out = 500)
+trend_fits <- predict(gam_mod, newdata = expand.grid(year = pred_vals,
+                                                     season = 0),
+        se.fit = T, type = 'terms')
+ylims <- c(min(trend_fits$fit[,1] - (2*trend_fits$se.fit[,1])),
+           max(trend_fits$fit[,1] + (2*trend_fits$se.fit[,1])))
+plot(1, type = "n",
+     xlab = '',
+     ylab = 's(year)',
+     xlim = c(min(fake_data$data_train$year), max(fake_data$data_test$year)),
+     ylim = ylims)
+cred_95 <- trend_fits$fit[,1] + (2*trend_fits$se.fit[,1])
+cred_05 <- trend_fits$fit[,1] - (2*trend_fits$se.fit[,1])
+polygon(c(pred_vals, rev(pred_vals)), c(cred_05, rev(cred_95)),
+        col = c_light, border = NA)
+lines(pred_vals, trend_fits$fit[,1], col = c_dark, lwd = 2.5)
+abline(v = pred_vals[min(which(pred_vals>max(fake_data$data_train$year)))],
+       lty = 'dashed')
+
+# Plot the forecast
+pred_vals <- seq(min(fake_data$data_train$year),
+                 max(fake_data$data_test$year),
+                 length.out = NCOL(fits))
 Xp <- predict(gam_mod, newdata = rbind(fake_data$data_train,
                                        fake_data$data_test), type = 'lpmatrix')
 vc <- vcov(gam_mod)
@@ -78,25 +142,33 @@ dims_needed <- dim(exp(Xp %*% t(sim)))
 fits <- rnbinom(n = prod(dims_needed), mu = as.vector(exp(Xp %*% t(sim))),
                 size = gam_mod$family$getTheta(TRUE))
 fits <- t(matrix(fits, nrow = dims_needed[1], ncol = dims_needed[2]))
-cred_ints <- apply(fits, 2, function(x) hpd(x, 0.95))
+cred <- sapply(1:NCOL(fits),
+               function(n) quantile(fits[,n],
+                                    probs = probs))
 ylims <- c(0,
-           max(cred_ints) + 2)
-plot(cred_ints[3,] ~ seq(1:NCOL(cred_ints)), type = 'l',
-     col = rgb(1,0,0, alpha = 0),
-     ylim = ylims,
+           max(cred) + 2)
+plot(1, type = "n",
+     xlab = '',
      ylab = 'Predicted counts',
-     xlab = 'Time')
-polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
-        c(cred_ints[1,],rev(cred_ints[3,])),
-        col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
-cred_ints <- apply(fits, 2, function(x) hpd(x, 0.68))
-polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
-        c(cred_ints[1,],rev(cred_ints[3,])),
-        col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
-lines(cred_ints[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
-lines(as.vector(series))
-abline(v = NROW(fake_data$data_train),
+     xlim = c(min(fake_data$data_train$year), max(fake_data$data_test$year)),
+     ylim = ylims)
+
+polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+        col = c_light, border = NA)
+polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+        col = c_light_highlight, border = NA)
+polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+        col = c_mid, border = NA)
+polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+        col = c_mid_highlight, border = NA)
+lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+points(x = pred_vals, y = as.vector(series),
+       pch = 16, col = 'white', cex = 0.7)
+points(x = pred_vals, y = as.vector(series),
+       pch = 16, col = 'black', cex = 0.6)
+abline(v = pred_vals[NROW(fake_data$data_train)],
        lty = 'dashed')
+
 dev.off()
 
 #### Analysis plots from the simulation component ####

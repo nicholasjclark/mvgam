@@ -83,7 +83,8 @@ if(i == 1){
           col = c("#B97C7C",  "#7C0000"),
           border = NA,
           legend.text = c('Model 1', 'Model 2'),
-          args.legend = list(x = "top", ncol = 2, border = NA))
+          args.legend = list(x = "top", ncol = 2, border = NA,
+                             bty = 'n'))
 }
 
   if(ask){

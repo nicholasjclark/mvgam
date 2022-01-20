@@ -15,6 +15,7 @@ mvjagam(
   use_lv = FALSE,
   n_lv,
   trend_model = "RW",
+  drift = FALSE,
   n.chains = 2,
   n.burnin = 5000,
   n.iter = 2000,
@@ -68,9 +69,14 @@ latent trends in a reduced dimension format. If \code{FALSE}, estimate independe
 Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(5, floor(n_series / 2))}}
 
 \item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
-'None' (modelled as a Gaussian static white noise process), 'RW' (random walk with drift),
+'None' (modelled as a Gaussian static white noise process), 'RW' (random walk with possible drift),
 'AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
 'AR3' (AR3 model with intercept)}
+
+\item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
+trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
+the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
+predictor (which it is by default when calling \code{\link[mcgv]{jagam}}). Therefore this defaults to \code{FALSE}}
 
 \item{n.chains}{\code{integer} specifying the number of parallel chains for the model}
 

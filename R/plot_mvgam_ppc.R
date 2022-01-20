@@ -97,7 +97,7 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', n_samples
     plot(density(preds[1,]),
          main = '', xlab = '',
          ylim = c(0, ymax),
-         ylab = paste0('Density for ', levels(data_train$series)[series]),
+         ylab = paste0('Predictive density for ', levels(data_train$series)[series]),
          col = rgb(150, 0, 0, max = 255, alpha = 10),
          lwd = 0.8)
     for(i in 1:n_samples){
@@ -132,7 +132,7 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', n_samples
          y = ecdf_plotdat(preds[1,],
                           plot_x),
          main = '', xlab = '',
-         ylab = '',
+         ylab = paste0('Predictive CDF for ', levels(data_train$series)[series]),
          ylim = c(0, 1),
          col = rgb(150, 0, 0, max = 255, alpha = 10),
          type = 'l', lwd = 0.8)
@@ -188,6 +188,7 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', n_samples
 
     barplot(pit_hist,
             col = "#B97C7C",
+            xlab = paste0('Predictive PIT for ', levels(data_train$series)[series]),
             border = NA)
     abline(h = 1, lty = 'dashed', lwd = 2)
     box()

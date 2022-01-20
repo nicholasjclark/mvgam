@@ -37,9 +37,13 @@
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
 #'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(5, floor(n_series / 2))}
 #'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
-#''None' (modelled as a Gaussian static white noise process), 'RW' (random walk with drift),
+#''None' (modelled as a Gaussian static white noise process), 'RW' (random walk with possible drift),
 #''AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
 #''AR3' (AR3 model with intercept)
+#'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
+#'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
+#'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
+#'predictor (which it is by default when calling \code{\link[mcgv]{jagam}}). Therefore this defaults to \code{FALSE}
 #'@param n.chains \code{integer} specifying the number of parallel chains for the model
 #'@param n.burnin \code{integer} specifying the number of iterations of the Markov chain to run during
 #'adaptive mode to tune sampling algorithms
@@ -94,6 +98,7 @@ mvjagam = function(formula,
                    use_lv = FALSE,
                    n_lv,
                    trend_model = 'RW',
+                   drift = FALSE,
                    n.chains = 2,
                    n.burnin = 5000,
                    n.iter = 2000,
@@ -325,6 +330,10 @@ for (i in 1:n) {
       model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
     }
 
+    if(!drift){
+      model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
+    }
+
     model_file_jags <- textConnection(model_file)
   }
 
@@ -507,6 +516,10 @@ for (i in 1:n) {
 
       if(trend_model == 'AR2'){
         model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
+      }
+
+      if(!drift){
+        model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
       }
 
       model_file_jags <- textConnection(model_file)
