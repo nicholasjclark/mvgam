@@ -109,8 +109,9 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
   t <- Sys.time()
   hier_mod <- mvjagam(data_train = sim_data$data_train,
                       data_test = sim_data$data_test,
-                      formula = y ~ s(season, k = 12, m = 2, bs = 'cc') +
-                                        s(season, by = series, m = 1, k = 4),
+                      formula = y ~ s(series, bs = 're') +
+                        s(season, k = 12, m = 2, bs = 'cc') +
+                        s(season, by = series, m = 1, k = 4),
                       knots = list(season = c(0.5, 12.5)),
                       family = 'nb',
                       use_lv = T,
@@ -139,7 +140,8 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
 
   # Fit a standard mgcv version of the hierarchical model as a final comparison, including
   # non-wiggly series-specific year smooths with penalty on the first derivative
-  mgcv_hier_mod <- gam(y ~ s(season, k = 12, m = 2, bs = 'cc') +
+  mgcv_hier_mod <- gam(y ~ s(series, bs = 're') +
+                         s(season, k = 12, m = 2, bs = 'cc') +
                          s(season, by = series, m = 1, k = 4) +
                          s(year, by = series, k = 3, bs = 'gp', m = 1),
                        knots = list(season = c(0.5, 12.5)),

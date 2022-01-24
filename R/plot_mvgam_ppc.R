@@ -8,8 +8,9 @@
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param type \code{character} specifying the type of posterior predictive check to calculate and plot.
 #'Valid options are: 'mean', 'density', 'pit' and 'cdf'
-#'@param n_samples \code{integer} specifying the number of posterior simulations to draw when plotting
-#'either the kernel density (\code{type == 'density'}) or empirical CDF (\code{type == 'cdf'})
+#'@param legend_position The location may also be specified by setting x to a single keyword from the
+#'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
+#'This places the legend on the inside of the plot frame at the given location.
 #'@details Posterior predictions are drawn from the fitted \code{mvjagam} and compared against
 #'the empirical distribution of the observed data for a specified series to help evaluate the model's
 #'ability to generate unbiased predictions.
@@ -18,7 +19,7 @@
 #'posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
 #'Integral Transform histogram (for \code{type == 'pit'})
 #'@export
-plot_mvgam_ppc = function(object, data_test, series, type = 'density', n_samples = 500){
+plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_position){
 
   # Check arguments
   type <- match.arg(arg = type, choices = c("mean","density", "pit", "cdf"))
@@ -61,6 +62,14 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', n_samples
   preds <- preds[, !is.na(truths)]
   truths <- truths[!is.na(truths)]
 
+  # Colours needed for plotting quantiles
+  c_light <- c("#DCBCBC")
+  c_light_highlight <- c("#C79999")
+  c_mid <- c("#B97C7C")
+  c_mid_highlight <- c("#A25050")
+  c_dark <- c("#8F2727")
+  c_dark_highlight <- c("#7C0000")
+
   if(type == 'mean'){
     # Plot observed and predicted location (means)
     pred_means <- apply(preds, 1, mean)
@@ -72,17 +81,21 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', n_samples
          breaks = seq(min(pred_means), max(pred_means), length.out = 20),
          border = "#B97C7C",
          col = "#C79999",
-         ylab = '',
+         ylab = 'Density',
          xlab = paste0('Predicted mean for ', levels(data_train$series)[series]))
     abline(v = obs_mean, lwd = 3, col = 'white')
     abline(v = obs_mean, lwd = 2.5, col = 'black')
     box()
 
-    legend('topright',
+    if(missing(legend_position)){
+      legend_position = 'topright'
+    }
+
+    legend(legend_position,
            legend = c(expression(hat(mu)),
                       expression(mu)),
            bg = 'white',
-           col = c("#B97C7C",
+           col = c(c_mid,
                    'black'),
            lty = 1, lwd = 2,
            bty = 'n')
@@ -90,29 +103,53 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', n_samples
 
   # Generate a sample sequence and plot
   if(type == 'density'){
-    sample_seq <- sample(1:NROW(preds), n_samples, T)
-    ymax <- max(c(apply(preds[sample_seq,], 1, function(x) max(density(x)$y))),
-                max(density(truths)$y))
 
-    plot(density(preds[1,]),
-         main = '', xlab = '',
-         ylim = c(0, ymax),
+    probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+
+    max_x <- max(density(preds[,1])$x)
+    min_x <- min(density(preds[,1])$x)
+    pred_densities <- do.call(rbind, (lapply(1:NROW(preds), function(x){
+      dens <- density(preds[x,], from = min_x,
+                      to = max_x)
+      dens$y
+    })))
+
+    cred <- sapply(1:NCOL(pred_densities),
+                   function(n) quantile(pred_densities[,n],
+                                        probs = probs))
+    true_dens <- density(truths, from = min_x,
+                         to = max_x)
+    ymax <- max(c(max(cred),
+                max(true_dens$y)))
+
+    plot(1, type = "n",
+         xlab = '',
          ylab = paste0('Predictive density for ', levels(data_train$series)[series]),
-         col = rgb(150, 0, 0, max = 255, alpha = 10),
-         lwd = 0.8)
-    for(i in 1:n_samples){
-      lines(density(preds[sample_seq[i],]),
-            col = rgb(150, 0, 0, max = 255, alpha = 10),
-            lwd = 0.8)
-    }
+         xlim = c(min_x, max_x),
+         ylim = c(0, ymax))
 
-    lines(density(truths), lwd = 3, col = 'white')
-    lines(density(truths), lwd = 2.5, col = 'black')
-    legend('topright',
+    polygon(c(true_dens$x, rev(true_dens$x)), c(cred[1,], rev(cred[9,])),
+            col = c_light, border = NA)
+    polygon(c(true_dens$x, rev(true_dens$x)), c(cred[2,], rev(cred[8,])),
+            col = c_light_highlight, border = NA)
+    polygon(c(true_dens$x, rev(true_dens$x)), c(cred[3,], rev(cred[7,])),
+            col = c_mid, border = NA)
+    polygon(c(true_dens$x, rev(true_dens$x)), c(cred[4,], rev(cred[6,])),
+            col = c_mid_highlight, border = NA)
+    lines(true_dens$x, cred[5,], col = c_dark, lwd = 2.5)
+
+
+    lines(x = true_dens$x, y = true_dens$y, lwd = 3, col = 'white')
+    lines(x = true_dens$x, y = true_dens$y, lwd = 2.5, col = 'black')
+
+    if(missing(legend_position)){
+      legend_position = 'topright'
+    }
+    legend(legend_position,
            legend = c(expression(hat(y)),
                       'y'),
            bg = 'white',
-           col = c(rgb(150, 0, 0, max = 255, alpha = 100),
+           col = c(c_mid,
                    "black"),
            lty = 1,
            lwd = 2,
@@ -125,25 +162,33 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', n_samples
       func(x)
     }
 
-    sample_seq <- sample(1:NROW(preds), n_samples, T)
     plot_x <- seq(min(truths, na.rm = T),
                   max(truths, na.rm = T))
-    plot(x = plot_x,
-         y = ecdf_plotdat(preds[1,],
-                          plot_x),
-         main = '', xlab = '',
-         ylab = paste0('Predictive CDF for ', levels(data_train$series)[series]),
-         ylim = c(0, 1),
-         col = rgb(150, 0, 0, max = 255, alpha = 10),
-         type = 'l', lwd = 0.8)
 
-    for(i in 1:n_samples){
-      lines(x = plot_x,
-            y = ecdf_plotdat(preds[i,],
-                             plot_x),
-            col = rgb(150, 0, 0, max = 255, alpha = 10),
-            lwd = 0.8)
-    }
+    pred_cdfs <- do.call(rbind, (lapply(1:NROW(preds), function(x){
+      ecdf_plotdat(preds[x,], x = plot_x)
+    })))
+
+    probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+    cred <- sapply(1:NCOL(pred_cdfs),
+                   function(n) quantile(pred_cdfs[,n],
+                                        probs = probs))
+
+    plot(1, type = "n",
+         xlab = '',
+         ylab = paste0('Predictive CDF for ', levels(data_train$series)[series]),
+         xlim = c(min(plot_x), max(plot_x)),
+         ylim = c(0, 1))
+
+    polygon(c(plot_x, rev(plot_x)), c(cred[1,], rev(cred[9,])),
+            col = c_light, border = NA)
+    polygon(c(plot_x, rev(plot_x)), c(cred[2,], rev(cred[8,])),
+            col = c_light_highlight, border = NA)
+    polygon(c(plot_x, rev(plot_x)), c(cred[3,], rev(cred[7,])),
+            col = c_mid, border = NA)
+    polygon(c(plot_x, rev(plot_x)), c(cred[4,], rev(cred[6,])),
+            col = c_mid_highlight, border = NA)
+    lines(plot_x, cred[5,], col = c_dark, lwd = 2.5)
 
     lines(x = plot_x,
           y = ecdf_plotdat(truths,
@@ -155,11 +200,16 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', n_samples
                            plot_x),
           col = 'black',
           lwd = 2.5)
-    legend('bottomright',
+
+    if(missing(legend_position)){
+      legend_position = 'bottomright'
+    }
+
+    legend(legend_position,
            legend = c(expression(hat(y)),
                       'y'),
            bg = 'white',
-           col = c(rgb(150, 0, 0, max = 255, alpha = 180),
+           col = c(c_mid,
                    'black'),
            lty = 1, lwd = 2,
            bty = 'n')

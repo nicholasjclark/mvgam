@@ -123,20 +123,41 @@ mvjagam = function(formula,
 
       # Estimate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
       # when simulating from the JAGS model later on
-      ss_gam <- mgcv::bam(formula(formula),
-                          data = data_train,
-                          method = "fREML",
-                          family = poisson(),
-                          drop.unused.levels = FALSE,
-                          knots = knots,
-                          nthreads = parallel::detectCores()-1)
+      if(family == 'nb'){
+        ss_gam <- mgcv::bam(formula(formula),
+                            data = data_train,
+                            method = "fREML",
+                            family = nb(),
+                            drop.unused.levels = FALSE,
+                            knots = knots,
+                            nthreads = parallel::detectCores()-1)
+      } else {
+        ss_gam <- mgcv::bam(formula(formula),
+                            data = data_train,
+                            method = "fREML",
+                            family = poisson(),
+                            drop.unused.levels = FALSE,
+                            knots = knots,
+                            nthreads = parallel::detectCores()-1)
+      }
+
     } else {
-      ss_gam <- mgcv::bam(formula(formula),
-                          data = data_train,
-                          method = "fREML",
-                          family = poisson(),
-                          drop.unused.levels = FALSE,
-                          nthreads = parallel::detectCores()-1)
+      if(family == 'nb'){
+        ss_gam <- mgcv::bam(formula(formula),
+                            data = data_train,
+                            method = "fREML",
+                            family = nb(),
+                            drop.unused.levels = FALSE,
+                            nthreads = parallel::detectCores()-1)
+      } else {
+        ss_gam <- mgcv::bam(formula(formula),
+                            data = data_train,
+                            method = "fREML",
+                            family = poisson(),
+                            drop.unused.levels = FALSE,
+                            nthreads = parallel::detectCores()-1)
+      }
+
     }
 
   # Fill in missing observations in data_train so the size of the dataset is correct when
@@ -197,10 +218,12 @@ mvjagam = function(formula,
                gregexpr( "(?<=\\().+?(?=\\))", base_model[grep('Parametric effect priors',
                                                                base_model) + 1], perl = T))[[1]][1]
     n_terms <- as.numeric(sub(".*:", "", in_parenth))
+
     base_model[grep('Parametric effect priors',
-                    base_model) + 1] <- paste0('for (i in 1:',
-                                               n_terms,
-                                               ') { b[i] ~ dnorm(0, 0.25) }')
+                      base_model) + 1] <- paste0('for (i in 1:',
+                                                 n_terms,
+                                                 ') { b[i] ~ dnorm(0, 0.1) }')
+
   }
 
   # Add replacement lines for trends and the linear predictor
@@ -217,7 +240,8 @@ for (i in 1:n) {
  }
 }
 
-## State space trends
+
+## State space trend estimates
 for(s in 1:n_series) {
  trend[1, s] ~ dnorm(0, tau[s])
 }
@@ -233,9 +257,7 @@ for(s in 1:n_series) {
 
 for (i in 4:n){
  for (s in 1:n_series){
-  trend[i, s] ~ dnorm(phi[s] + ar1[s]*trend[i - 1, s] +
-                      ar2[s]*trend[i - 2, s] +
-                      ar3[s]*trend[i - 3, s], tau[s])
+  trend[i, s] ~ dnorm(phi[s] + ar1[s]*trend[i - 1, s] + ar2[s]*trend[i - 2, s] + ar3[s]*trend[i - 3, s], tau[s])
  }
 }
 
@@ -309,6 +331,7 @@ for (i in 1:n) {
     }
 
     if(trend_model == 'None'){
+      model_file[grep('trend\\[i, s\\] ~', model_file)] <- ' trend[i, s] <- 0'
       model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
       model_file[grep('ar1\\[s\\] ~', model_file)] <- ' ar1[s] <- 0'
       model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
@@ -333,6 +356,9 @@ for (i in 1:n) {
     if(!drift){
       model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
     }
+
+    # Testing using exponential for the smoothing parameters lambda
+    model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)'
 
     model_file_jags <- textConnection(model_file)
   }
@@ -359,21 +385,21 @@ for (i in 1:n) {
         ## act here to force any un-needed factors to evolve as flat lines
         tau_fac ~ dnorm(0, 0.1)T(0,)
         for(j in 1:n_lv){
-         LV[1, j] ~ dnorm(0, tau_fac* penalty[j])
+         LV[1, j] ~ dnorm(0, tau_fac*penalty[j])
         }
 
         for(j in 1:n_lv){
-         LV[2, j] ~ dnorm(phi[j] + ar1[j]*LV[1, j], tau_fac* penalty[j])
+         LV[2, j] ~ dnorm(phi[j] + ar1[j]*LV[1, j], tau_fac*penalty[j])
         }
 
         for(j in 1:n_lv){
-         LV[3, j] ~ dnorm(phi[j] + ar1[j]*LV[2, j] + ar2[j]*LV[1, j], tau_fac* penalty[j])
+         LV[3, j] ~ dnorm(phi[j] + ar1[j]*LV[2, j] + ar2[j]*LV[1, j], tau_fac*penalty[j])
         }
 
         for(i in 4:n){
          for(j in 1:n_lv){
           LV[i, j] ~ dnorm(phi[j] + ar1[j]*LV[i - 1, j] +
-                          ar2[j]*LV[i - 2, j] + ar3[j]*LV[i - 3, j], tau_fac* penalty[j])
+                          ar2[j]*LV[i - 2, j] + ar3[j]*LV[i - 3, j], tau_fac*penalty[j])
          }
         }
 
@@ -497,6 +523,7 @@ for (i in 1:n) {
       }
 
       if(trend_model == 'None'){
+        model_file[grep('trend\\[i, s\\] ~', model_file)] <- ' trend[i, s] <- 0'
         model_file[grep('phi\\[s\\] ~', model_file)] <- 'phi[s] <- 0'
         model_file[grep('ar1\\[s\\] ~', model_file)] <- 'ar1[s] <- 0'
         model_file[grep('ar2\\[s\\] ~', model_file)] <- 'ar2[s] <- 0'
@@ -521,6 +548,9 @@ for (i in 1:n) {
       if(!drift){
         model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
       }
+
+      # Testing using exponential for the smoothing parameters lambda
+      model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)'
 
       model_file_jags <- textConnection(model_file)
 

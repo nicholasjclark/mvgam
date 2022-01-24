@@ -4,7 +4,7 @@
 \alias{plot_mvgam_ppc}
 \title{Plot mvjagam posterior predictive checks for a specified series}
 \usage{
-plot_mvgam_ppc(object, data_test, series, type = "density", n_samples = 500)
+plot_mvgam_ppc(object, data_test, series, type = "density", legend_position)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
@@ -20,8 +20,9 @@ Note this is only useful if the same \code{data_test} was also included when fit
 \item{type}{\code{character} specifying the type of posterior predictive check to calculate and plot.
 Valid options are: 'mean', 'density', 'pit' and 'cdf'}
 
-\item{n_samples}{\code{integer} specifying the number of posterior simulations to draw when plotting
-either the kernel density (\code{type == 'density'}) or empirical CDF (\code{type == 'cdf'})}
+\item{legend_position}{The location may also be specified by setting x to a single keyword from the
+list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
+This places the legend on the inside of the plot frame at the given location.}
 }
 \value{
 A base \code{R} graphics plot showing either the predicted vs observed mean for the

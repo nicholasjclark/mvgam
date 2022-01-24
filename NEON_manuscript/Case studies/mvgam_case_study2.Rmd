@@ -15,7 +15,90 @@ library(knitr)
 opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
 ```
 
-In this example we will examine multivariate forecasting models using `mvgam`. Here we will access monthly search volume data from `Google Trends`, focusing on relative importances of search terms related to tick paralysis in Queensland, Australia
+In this example we will examine multivariate forecasting models using `mvgam`, which fits GAMs using MCMC sampling via the `JAGS` software (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `K` can be difficult. The approach used by `mvgam` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated independently, we hope that we can guard against specying too large a `K`. But we should test this property to see how it behaves in different scenarios. Begin by simulating `5` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `100` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Negative Binomial distributions
+```{r}
+set.seed(100)
+library(mvgam)
+dat <- sim_mvgam(T = 100, n_series = 5, n_trends = 2,
+                 mu_obs = runif(5, 2, 6),
+                 size_obs = runif(5, 0.5, 2),
+                 trend_rel = 0.6, train_prop = 0.8)
+```
+
+Have a look at the series
+```{r}
+par(mfrow = c(3,2))
+for(i in 1:5){
+  plot(dat$data_train$y[which(as.numeric(dat$data_train$series) == i)], type = 'l',
+       ylab = paste('Series', i), xlab = 'Time')
+}
+par(mfrow = c(1,1))
+```
+
+Clearly there are some correlations in the trends for these series. Now let's fit a well-specified model in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
+```{r}
+mod1 <- mvjagam(data_train = dat$data_train,
+                data_test = dat$data_test,
+                formula = y ~ s(series, bs = 're') +
+                  s(season, bs = c('cc'), k = 12),
+                knots = list(season = c(0.5, 12.5)),
+                use_lv = T,
+                n_lv = 2,
+                family = 'nb',
+                trend_model = 'RW',
+                n.burnin = 3000,
+                n.iter = 1000,
+                thin = 1,
+                auto_update = F)
+```
+
+Look at a few plots. The estimated smooth function
+```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+plot_mvgam_smooth(object = mod1, series = 1, smooth = 'season')
+```
+
+And the true seasonal function in the simulation
+```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+plot(dat$global_seasonality[1:12], type = 'l')
+```
+
+Check whether each factor was retained using the `plot_mvgam_factors` function. Here, each factor is tested against a null hypothesis of white noise by calculating the sum of the factor's 1st derivatives. A factor that has a larger contribution to the series' latent trends will have a larger sum, both because that factor's absolute magnitudes will be larger (due to the weaker penalty on the factor's precision) and because the factor will move around more. By normalising these estimated first derivative sums, it should be apparent whether some factors have been dropped from the model. Here we see that each factor is contributing to the series' latent trends, and the plots show that neither has been forced to evolve as white noise
+```{r}
+plot_mvgam_factors(mod1)
+```
+
+Now we fit the same model but assume that we no nothing about how many factors to use, so we specify the maximum allowed (the total number of series; `5`). Note that this model is computationally more expensive so it will take longer to fit
+```{r}
+mod2 <- mvjagam(data_train = dat$data_train,
+                data_test = dat$data_test,
+                formula = y ~ s(series, bs = 're') +
+                  s(season, bs = c('cc'), k = 12),
+                knots = list(season = c(0.5, 12.5)),
+                use_lv = T,
+                n_lv = 5,
+                family = 'nb',
+                trend_model = 'RW',
+                n.burnin = 3000,
+                n.iter = 1000,
+                thin = 1,
+                auto_update = F)
+```
+
+The same plots as model 1 to see if this model has also fit the data well
+```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+plot_mvgam_smooth(object = mod2, series = 1, smooth = 'season')
+```
+
+```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+plot(dat$global_seasonality[1:12], type = 'l')
+```
+
+Examining the factor contributions gives us some insight into whether we set `n_lv` larger than we perhaps needed to. These contributions can be interpreted similarly to ordination axes when deciding how many latent variables to specify
+```{r}
+plot_mvgam_factors(mod2)
+```
+
+The very weak contributions by some of the factors are a result of the penalisation, which will become more important as the dimensionality of the data grows. Now onto an empirical example. Here we will access monthly search volume data from `Google Trends`, focusing on relative importances of search terms related to tick paralysis in Queensland, Australia
 ```{r message=FALSE, warning = FALSE}
 library(mvgam)
 library(tidyr)
@@ -53,142 +136,197 @@ Plot the series to see how similar their seasonal shapes are over time
 plot(series, legend.loc = 'topleft')
 ```
 
-Now we will fit an `mvgam` model with shared seasonality and random intercepts per series. An advantage of using `JAGS` for sampling is that we can implement truncated likelihood functions to recognise known bounds for particular parameters. As we know that `Google trends` relative search volumes cannot go above `100`, we specify this as the upper bound for each series (note that these truncated likelihoods are much slower to estimate in `JAGS` so only use them if required). Here we assume the dynamic trends can be represented using three latent factors that each follow an `AR3` process, and we assume a Negative Binomial distrubution for the response. At present each series is presumed to show the same degree of overdispersion, but this assumption will be relaxed in future versions
+Now we will fit an `mvgam` model with shared seasonality and random intercepts per series. Our first attempt will ignore any temporal component in the residuals so that we can identidy which GAM predictor combination gives us the best fit, prior to investigating how to deal with any remaining autocorrelation. We assume a Negative Binomial distrubution with shared overdispersion parameter for the response
 ```{r}
-trends_mod <- mvjagam(data_train = trends_data$data_train,
+trends_mod1 <- mvjagam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
                       formula = y ~ s(series, bs = 're') + 
                         s(season, k = 12, m = 2, bs = 'cc'),
                       knots = list(season = c(0.5, 12.5)),
-                      use_lv = T,
-                      trend_model = 'AR3',
-                      n_lv = 3,
+                      trend_model = 'None',
                       family = 'nb',
-                      n.burnin = 2000,
-                      upper_bounds = rep(100, length(terms)),
+                      n.burnin = 4000,
+                      n.iter = 1000,
+                      thin = 1,
                       auto_update = F)
 ```
 
-Have a look at the returned `JAGS` model file to see how the dynamic factors are incorporated. Notice that the precisions of factors, together with each factor's set of loadings, are penalised using a regularised horseshoe prior. This should hopefully protect against specifying too large a number of factors than is needed to represent dependent temporal dynamics
-```{r}
-trends_mod$model_file
-```
-
-Given that these series could potentially be following a hierarchical seasonality, we will also trial a slghtly more complex model with an extra smoothing term per series that allows its seasonal curve to deviate from the global seasonal smooth
+Given that these series could potentially be following a hierarchical seasonality, we will also trial a slghtly more complex model with an extra smoothing term per series that allows its seasonal curve to deviate from the global seasonal smooth. Ignore the warning about repeated smooths, as this is not an issue for estimation.
 ```{r}
 trends_mod2 <- mvjagam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
-                      formula = y ~ s(series, bs = 're') + 
-                        s(season, k = 12, m = 2, bs = 'cc') +
-                        s(season, by = series, k = 5, m = 1),
+                      formula = y ~ s(season, k = 12, m = 2, bs = 'cc') +
+                        s(season, series, k = 5, bs = 'fs', m = 1),
                       knots = list(season = c(0.5, 12.5)),
-                      use_lv = T,
-                      trend_model = 'AR3',
-                      n_lv = 3,
+                      trend_model = 'None',
                       family = 'nb',
-                      n.burnin = 2000,
-                      upper_bounds = rep(100, length(terms)),
+                      n.burnin = 4000,
+                      n.iter = 1000,
+                      thin = 1,
                       auto_update = F)
 ```
 
-Compare the models using rolling forecast DRPS evaluation. Here we focus on near-term forecasts (`fc_horizon = 3`) when comparing model performances
-```{r,  fig.width = 6, fig.height = 5, fig.align='center'}
-compare_mvgams(trends_mod, trends_mod2, fc_horizon = 3,
-               n_cores = 3, n_evaluations = 10)
-```
-
-Model 1 (with shared seasonality) is slightly preferred, suggesting there is not sufficient evidence that the variation in the seasonal curves for these series may not be useful for forecasting. This is likely because the noisiness of these series makes it difficult to estimate their individual seasonanl patterns, while any fluctuations through time can be more readily captured by the flexibility of the latent trends.
-
-Inspect the model summary (note again that p-value approximations are a work in progress here and so may not be totally reliable).
+How can we compare these models to ensure we choose one that performs well and provides useful inferences? Beyond posterior retrodictive and predictive checks, we can take advantage of the fact that `mvgam` fits an `mgcv` model to provide all the necessary penalty matrices, as well as to identify good initial values for smoothing and beta parameters. Because we did not modify this model by adding a trend component (we only specified a Negative Binomial, rather than a Poisson), we can still inspect the usual `mgcv` model comparison routines
 ```{r}
-summary_mvgam(trends_mod)
+anova(trends_mod1$mgcv_model,
+      trends_mod2$mgcv_model, test = 'LRT')
 ```
 
-Look at Dunn-Smyth residuals for some series from this preferred model to ensure the Negative Binomial is appropriate and that our dynamic factor process has captured most of the temporal dependencies in the observations
+```{r}
+AIC(trends_mod1$mgcv_model,
+      trends_mod2$mgcv_model)
+```
+
+```{r}
+summary(trends_mod1$mgcv_model)
+```
+
+```{r}
+summary(trends_mod2$mgcv_model)
+```
+
+WE can also use `JAGS` routines for interrogating models. Which model minimises in-sample DIC?
+```{r}
+dic.samples(trends_mod1$jags_model, 500)
+```
+
+```{r}
+dic.samples(trends_mod2$jags_model, 500)
+```
+
+Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using three latent factors that each follow an AR1 process
+```{r}
+trends_mod3 <- mvjagam(data_train = trends_data$data_train,
+                      data_test = trends_data$data_test,
+                      formula = y ~ s(season, k = 12, m = 2, bs = 'cc') +
+                        s(season, series, k = 5, bs = 'fs', m = 1),
+                      knots = list(season = c(0.5, 12.5)),
+                      trend_model = 'AR1',
+                      use_lv = T,
+                      n_lv = 3,
+                      family = 'nb',
+                      n.burnin = 4000,
+                      n.iter = 1000,
+                      thin = 1,
+                      auto_update = F)
+```
+
+
+Have a look at the returned `JAGS` model file to see how the dynamic factors are incorporated. Notice that the precisions of factors, together with each factor's set of loadings, are penalised using a regularised horseshoe prior
+```{r}
+trends_mod3$model_file
+```
+
+Inspection of the dynamic factors and their relative contributions indicates that the first factor is by far the most important
+```{r}
+plot_mvgam_factors(trends_mod3)
+```
+
+How do forecasts for this model compare to the previous one that did not include any trend component?
+```{r,  fig.width = 6, fig.height = 5, fig.align='center'}
+compare_mvgams(trends_mod2, trends_mod3, fc_horizon = 6,
+               n_cores = 3, n_evaluations = 20)
+```
+
+
+Model 3 (with the dynamic trend) provides far superior forecasts than relying only on the estimated smooths. Inspect the model summary (note again that p-value approximations are a work in progress here and so may not be totally reliable).
+```{r}
+summary_mvgam(trends_mod3)
+```
+
+Look at Dunn-Smyth residuals for some series from this preferred model to ensure that our dynamic factor process has captured most of the temporal dependencies in the observations
 ```{r, fig.width = 7, fig.height = 7, fig.align='center'}
-plot_mvgam_resids(trends_mod, 1)
+plot_mvgam_resids(trends_mod3, 1)
 ```
 
 ```{r, fig.width = 7, fig.height = 7, fig.align='center'}
-plot_mvgam_resids(trends_mod, 2)
+plot_mvgam_resids(trends_mod3, 2)
 ```
 
 ```{r, fig.width = 7, fig.height = 7, fig.align='center'}
-plot_mvgam_resids(trends_mod, 3)
+plot_mvgam_resids(trends_mod3, 3)
 ```
 
 ```{r, fig.width = 7, fig.height = 7, fig.align='center'}
-plot_mvgam_resids(trends_mod, 4)
+plot_mvgam_resids(trends_mod3, 4)
 ```
 
 Perform posterior predictive checks to see if the model is able to simulate data that looks realistic and unbiased by examining simulated kernel densities for posterior predictions (`yhat`) compared to the density of the observations (`y`). This will be particularly useful for examining whether the shared overdispersion parameter is able to produce realistic looking simulations for each individual series.
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod, series = 1, type = 'density')
+plot_mvgam_ppc(trends_mod3, series = 1, type = 'density')
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod, series = 2, type = 'density')
+plot_mvgam_ppc(trends_mod3, series = 2, type = 'density')
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod, series = 3, type = 'density')
+plot_mvgam_ppc(trends_mod3, series = 3, type = 'density')
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod, series = 4, type = 'density')
+plot_mvgam_ppc(trends_mod3, series = 4, type = 'density')
 ```
 
-Look at traceplots for the smoothing parameters (`rho`) and latent trend parameters
+Look at traceplots for the smoothing parameters (`rho`)
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_trace(object = trends_mod, param = 'rho')
-```
-
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_trace(object = trends_mod, param = 'trend')
+plot_mvgam_trace(object = trends_mod3, param = 'rho')
 ```
 
 Plot posterior predictive distributions for the training and testing periods for each series
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_fc(object = trends_mod, series = 1, data_test = trends_data$data_test)
+plot_mvgam_fc(object = trends_mod3, series = 1, data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_fc(object = trends_mod, series = 2, data_test = trends_data$data_test)
+plot_mvgam_fc(object = trends_mod3, series = 2, data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_fc(object = trends_mod, series = 3, data_test = trends_data$data_test)
+plot_mvgam_fc(object = trends_mod3, series = 3, data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_fc(object = trends_mod, series = 4, data_test = trends_data$data_test)
+plot_mvgam_fc(object = trends_mod3, series = 4, data_test = trends_data$data_test)
 ```
 
 Plot posterior distributions for the latent trend estimates, again for the training and testing periods
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_trend(object = trends_mod, series = 1, data_test = trends_data$data_test)
+plot_mvgam_trend(object = trends_mod3, series = 1, data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_trend(object = trends_mod, series = 2, data_test = trends_data$data_test)
+plot_mvgam_trend(object = trends_mod3, series = 2, data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_trend(object = trends_mod, series = 3, data_test = trends_data$data_test)
+plot_mvgam_trend(object = trends_mod3, series = 3, data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_trend(object = trends_mod, series = 4, data_test = trends_data$data_test)
+plot_mvgam_trend(object = trends_mod3, series = 4, data_test = trends_data$data_test)
 ```
 
-Given that we fit a model with a shared seasonal pattern, the seasonal smooths for each series will be identical. Plot it here
+Given that we fit a model with hierarchical seasonality, the seasonal smooths are allowed to differ somewhat
 ```{r, fig.width = 4, fig.height = 3, fig.align='center'}
-plot_mvgam_smooth(object = trends_mod, series = 1, smooth = 'season')
+plot_mvgam_smooth(object = trends_mod3, series = 1, smooth = 'season')
+```
+
+```{r, fig.width = 4, fig.height = 3, fig.align='center'}
+plot_mvgam_smooth(object = trends_mod3, series = 2, smooth = 'season')
+```
+
+```{r, fig.width = 4, fig.height = 3, fig.align='center'}
+plot_mvgam_smooth(object = trends_mod3, series = 3, smooth = 'season')
+```
+
+```{r, fig.width = 4, fig.height = 3, fig.align='center'}
+plot_mvgam_smooth(object = trends_mod3, series = 4, smooth = 'season')
 ```
 
 Plot posterior mean estimates of latent trend correlations. These correlations are more useful than looking at latent factor loadings, for example to inspect ordinations. This is because the orders of the loadings (although constrained for identifiability purposes) can vary from chain to chain
 ```{r}
-correlations <- lv_correlations(object = trends_mod)
+correlations <- lv_correlations(object = trends_mod3)
 ```
 
 ```{r, fig.align='center', fig.width=6, fig.height=4, message=FALSE}
@@ -218,38 +356,38 @@ plot(stl(ts(as.vector(series$`tick bite`), frequency = 12), 'periodic'))
 
 A logical next step for this analysis would be to trial varying overdispersion parameters for each series. This may be necessary as the residual diagnostic plots and forecast period posterior predictive checks suggest that the estimated Negative Binomial overdispersion parameter is more suitable for some series than for others: 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod, series = 1, type = 'density', data_test = trends_data$data_test)
+plot_mvgam_ppc(trends_mod3, series = 1, type = 'density', data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod, series = 1, type = 'mean', data_test = trends_data$data_test)
-```
-
-
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod, series = 2, type = 'density', data_test = trends_data$data_test)
-```
-
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod, series = 2, type = 'mean', data_test = trends_data$data_test)
+plot_mvgam_ppc(trends_mod3, series = 1, type = 'mean', data_test = trends_data$data_test)
 ```
 
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod, series = 3, type = 'density', data_test = trends_data$data_test)
+plot_mvgam_ppc(trends_mod3, series = 2, type = 'density', data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod, series = 3, type = 'mean', data_test = trends_data$data_test)
+plot_mvgam_ppc(trends_mod3, series = 2, type = 'mean', data_test = trends_data$data_test)
 ```
 
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod, series = 4, type = 'density', data_test = trends_data$data_test)
+plot_mvgam_ppc(trends_mod3, series = 3, type = 'density', data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod, series = 4, type = 'mean', data_test = trends_data$data_test)
+plot_mvgam_ppc(trends_mod3, series = 3, type = 'mean', data_test = trends_data$data_test)
+```
+
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_ppc(trends_mod3, series = 4, type = 'density', data_test = trends_data$data_test)
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_ppc(trends_mod3, series = 4, type = 'mean', data_test = trends_data$data_test)
 ```
 
 Other next steps could involve devising a more goal-specific set of posterior predictive checks (see [this paper by Gelman et al](https://www.jstor.org/stable/2680852?seq=1#metadata_info_tab_contents) and [relevant works by Betancourt](https://betanalpha.github.io/assets/case_studies/principled_bayesian_workflow.html) for examples), compare out of sample Discrete Rank Probability Scores for this model and simpler versions for the latent trends (i.e. AR2, AR1, Random Walk)

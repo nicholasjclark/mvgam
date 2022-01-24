@@ -4,9 +4,9 @@ library(mvgam)
 library(xts)
 library(forecast)
 data("AirPassengers")
-set.seed(1e8)
+set.seed(200)
 dat <- floor(AirPassengers + cumsum(rnorm(length(AirPassengers),
-                                          sd = 35)))
+                                          sd = 10)))
 dat <- dat + abs(min(dat))
 series <- ts(dat, start = c(1949, 1), frequency = 12)
 fake_data <- series_to_mvgam(series, freq = 365, train_prop = 0.74)
@@ -64,8 +64,8 @@ polygon(c(pred_vals, rev(pred_vals)), c(cred_05, rev(cred_95)),
 lines(pred_vals, trend_fits$fit[,1], col = c_dark, lwd = 2.5)
 abline(v = pred_vals[min(which(pred_vals>max(fake_data$data_train$year)))],
        lty = 'dashed')
-text(x=pred_vals[min(which(pred_vals>max(fake_data$data_train$year))) + 20],
-     y=1.2, labels = 'Forecast horizon', srt = -90)
+text(x=pred_vals[min(which(pred_vals>max(fake_data$data_train$year))) + 30],
+     y = 0.05, labels = 'Forecast horizon', srt = -90)
 
 # Plot quantiles of the forecast distribution
 probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
@@ -76,7 +76,7 @@ pred_vals <- seq(min(fake_data$data_train$year),
                  max(fake_data$data_test$year),
                  length.out = NCOL(fits))
 ylims <- c(0,
-           max(cred) + 2)
+           max(max(as.vector(series)), max(cred) + 2))
 
 plot(1, type = "n",
      xlab = '',
@@ -104,7 +104,7 @@ abline(v = pred_vals[NROW(fake_data$data_train)],
 fake_data <- series_to_mvgam(series, freq = 365, train_prop = 0.74)
 gam_mod <- gam(y ~ s(year, k = 9, bs = 'tp', m = 1) +
                  s(season, bs = 'cc', k = 12) +
-                 ti(season, year),
+                 ti(season, year, m = c(2, 1)),
                data = fake_data$data_train,
                family = nb(),
                method = 'REML')
@@ -146,7 +146,7 @@ cred <- sapply(1:NCOL(fits),
                function(n) quantile(fits[,n],
                                     probs = probs))
 ylims <- c(0,
-           max(cred) + 2)
+           max(max(as.vector(series)), max(cred) + 2))
 plot(1, type = "n",
      xlab = '',
      ylab = 'Predicted counts',

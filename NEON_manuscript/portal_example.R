@@ -37,7 +37,8 @@ rm(series, portal_dat)
 # to prevent linear extrapolation of the yearly trend when forecasting
 PP_data$data_train$time <- seq(1:NROW(PP_data$data_train))
 gam_mod <- gamm(y ~ s(season, bs = 'cc', k = 8) +
-                 s(year, bs = 'gp', k = 4, m = 1) + ti(season, year),
+                 s(year, bs = 'gp', k = 4, m = 1) + ti(season, year,
+                                                       m = c(2, 1)),
                data = PP_data$data_train,
                family = 'poisson', correlation = corARMA(form = ~ time, p = 3))
 summary(gam_mod$gam)
@@ -70,21 +71,19 @@ forecast::auto.arima(gam_pearson_resids)
 gam.check(gam_mod$gam)
 
 # Now a model using mvgam
-# These models generally require at least 5 - 15K iterations
-# of adaptation to tune the samplers efficiently, so it can be a little slow. Note that
+# Note that
 # the model will predict for the data_test observations by considering the outcomes as
 # missing for these observations. We also incorporate prior knowledge about upper bounds on
 # this series, which exist due to limits on the number of traps used in each trapping session
 PP_data$data_train$time <- NULL
 df_gam_mod <- mvjagam(data_train = PP_data$data_train,
                       data_test = PP_data$data_test,
-               formula = y ~ s(season, bs = c('cc'), k = 8) +
-                 s(year, bs = 'gp', k = 4, m = 1) + ti(season, year),
+               formula = y ~ s(season, bs = c('cc'), k = 12) +
+                 s(year, bs = 'gp', k = 3, m = 1) +
+                 ti(season, year, m = c(2, 1)),
                trend_model = 'AR3',
                family = 'nb',
-               n.burnin = 10000,
-               n.iter = 1000,
-               thin = 1,
+               n.burnin = 1000,
                auto_update = F,
                upper_bounds = 100)
 summary_mvgam(df_gam_mod)
@@ -164,7 +163,7 @@ par(mfrow = c(1,1))
 
 ## Online forecasting from the dynamic gam
 # Initiate particle filter by assimilating the next observation in data_test
-pfilter_mvgam_init(object = df_gam_mod, n_particles = 40000, n_cores = 4,
+pfilter_mvgam_init(object = df_gam_mod, n_particles = 10000, n_cores = 4,
                    data_assim = PP_data$data_test)
 
 # Assimilate some of the next observations in the series using the
@@ -181,6 +180,5 @@ fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 4,
 par(mfrow=c(1,2))
 plot_mvgam_fc(df_gam_mod, 1, data_test = PP_data$data_test, ylim = c(0, 100))
 fc$PP()
-points(c(PP_data$data_train$y,
-             PP_data$data_test$y), pch = 16)
+
 

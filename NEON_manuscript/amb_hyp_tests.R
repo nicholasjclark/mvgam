@@ -13,12 +13,12 @@ all_data <- prep_neon_data(species = 'Ambloyomma_americanum', split_prop = 0.8)
 #### Set hypothtesis formulae ####
 # NULL. There is no seasonal pattern to be estimated, and we simply let the latent
 # factors and site-level effects of growing days influence the series dynamics
-null_hyp = y ~ siteID + s(cum_gdd, by = siteID, k = 3)
+null_hyp = y ~ s(siteID, bs = 're') + s(cum_gdd, by = siteID, k = 3)
 
 # 1. Do all series share same seasonal pattern, with any remaining variation due to
 # non-seasonal local variation captured by the trends?
 hyp1 = y ~
-  siteID +
+  s(siteID, bs = 're') +
   s(cum_gdd, by = siteID, k = 3) +
   # Global cyclic seasonality term (smooth)
   s(season, k = 26, m = 2, bs = 'cc')
@@ -26,7 +26,7 @@ hyp1 = y ~
 # 2. Is there evidence for global seasonality but each site's seasonal pattern deviates
 # based on more local conditions?
 hyp2 = y ~
-  siteID +
+  s(siteID, bs = 're') +
   s(cum_gdd, by = siteID, k = 3) +
   s(season, k = 26, m = 2, bs = 'cc') +
   # Site-level deviations from global pattern, which can be wiggly (m=1 to reduce concurvity);
@@ -40,14 +40,14 @@ hyp2 = y ~
 # If evidence of gdd effects, can also let use a global smoother and then site-level
 # deviations for a 'hierarchical' setup
 hyp3 = y ~
-  siteID +
+  s(siteID, bs = 're') +
   s(cum_gdd, by = siteID, k = 3) +
   s(season, k = 26, m = 2, bs = 'cc') +
   # Series-level deviations from global pattern
-  s(season, by = series, m = 1, k = 4)
+  s(season, by = series, m = 2, k = 4)
 
 # Fit each hypothesis
-n.burnin = 50000
+n.burnin = 10000
 n.iter = 2000
 thin = 2
 
