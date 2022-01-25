@@ -106,8 +106,8 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_po
 
     probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
 
-    max_x <- max(density(preds[,1])$x)
-    min_x <- min(density(preds[,1])$x)
+    max_x <- max(density(preds[1,])$x)
+    min_x <- min(density(preds[1,])$x)
     pred_densities <- do.call(rbind, (lapply(1:NROW(preds), function(x){
       dens <- density(preds[x,], from = min_x,
                       to = max_x)
