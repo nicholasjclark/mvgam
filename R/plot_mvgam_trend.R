@@ -59,7 +59,12 @@ plot_mvgam_trend = function(object, series, data_test, hide_xlabels = FALSE){
   lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
 
   if(!missing(data_test)){
-    abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
+    if(class(data_train) == 'list'){
+      abline(v = length(data_train$y) / NCOL(object$ytimes), lty = 'dashed')
+    } else {
+      abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
+    }
+
   }
 
 }

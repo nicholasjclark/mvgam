@@ -75,6 +75,18 @@ plot_mvgam_fc = function(object, series, data_test, hide_xlabels = FALSE, ylab, 
 
   s_name <- levels(data_train$series)[series]
   if(!missing(data_test)){
+
+    if(class(data_train) == 'list'){
+      data_train <- data.frame(series = data_train$series,
+                          y = data_train$y,
+                          season = data_train$season,
+                          year = data_train$year)
+      data_test <- data.frame(series = data_test$series,
+                               y = data_test$y,
+                               season = data_test$season,
+                               year = data_test$year)
+    }
+
     points(dplyr::bind_rows(data_train, data_test) %>%
              dplyr::filter(series == s_name) %>%
              dplyr::select(year, season, y) %>%
@@ -89,6 +101,13 @@ plot_mvgam_fc = function(object, series, data_test, hide_xlabels = FALSE, ylab, 
              dplyr::pull(y), pch = 16, col = "black", cex = 0.55)
     abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
   } else {
+    if(class(data_train) == 'list'){
+      data_train <- data.frame(series = data_train$series,
+                               y = data_train$y,
+                               season = data_train$season,
+                               year = data_train$year)
+    }
+
     points(data_train %>%
              dplyr::filter(series == s_name) %>%
              dplyr::select(year, season, y) %>%

@@ -27,12 +27,24 @@ roll_eval_mvgam = function(object,
                            n_cores = 2){
 
   # Generate time variable from training data
-  all_timepoints <- (object$obs_data %>%
-                       dplyr::select(year, season) %>%
-                       dplyr::distinct() %>%
-                       dplyr::arrange(year, season) %>%
-                       dplyr::mutate(time = dplyr::row_number())) %>%
-    dplyr::pull(time)
+  if(class(object$obs_data) == 'list'){
+    all_timepoints <- (data.frame(year = object$obs_data$year,
+                                  season = object$obs_data$season)  %>%
+                         dplyr::select(year, season) %>%
+                         dplyr::distinct() %>%
+                         dplyr::arrange(year, season) %>%
+                         dplyr::mutate(time = dplyr::row_number())) %>%
+      dplyr::pull(time)
+
+  } else {
+    all_timepoints <- (object$obs_data %>%
+                         dplyr::select(year, season) %>%
+                         dplyr::distinct() %>%
+                         dplyr::arrange(year, season) %>%
+                         dplyr::mutate(time = dplyr::row_number())) %>%
+      dplyr::pull(time)
+  }
+
 
   # Generate evaluation sequence if not supplied
   if(missing(evaluation_seq)){

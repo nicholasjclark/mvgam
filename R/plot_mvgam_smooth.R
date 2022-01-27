@@ -46,7 +46,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
       x <- mean(x, na.rm = T)
     }
   }
-  if(missing(newdata)){
+  if(missing(newdata) && class(object$obs_data) != 'list'){
     data_train %>%
       dplyr::select(c(series, year, smooth_terms)) %>%
       dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
@@ -59,6 +59,8 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
                                         length.out = 500)) -> pred_dat
      colnames(pred_dat) <- gsub('smooth.var', smooth, colnames(pred_dat))
 
+  } else if(missing(newdata) && class(object$obs_data) == 'list'){
+    pred_dat <- object$obs_data
   } else {
     pred_dat <- newdata
   }
@@ -70,10 +72,24 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
   betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
 
   # Predictions
-  pred_vals <- as.vector(as.matrix(pred_dat[,smooth]))
+  if(class(pred_dat) == 'list'){
+    pred_vals <- as.vector(as.matrix(pred_dat[[smooth]]))
+  } else{
+    pred_vals <- as.vector(as.matrix(pred_dat[,smooth]))
+  }
   preds <- matrix(NA, nrow = NROW(betas), ncol = length(pred_vals))
   for(i in 1:NROW(betas)){
-    preds[i,] <- (Xp %*% betas[i,])
+    if(class(pred_dat) == 'list'){
+      preds[i,] <- (Xp[order(pred_vals),grepl(smooth, names(object$mgcv_model$coefficients))] %*%
+                      betas[i,  grepl(smooth, names(object$mgcv_model$coefficients))])
+    } else {
+      preds[i,] <- (Xp %*% betas[i, ])
+    }
+
+  }
+
+  if(class(pred_dat) == 'list'){
+    pred_vals <- pred_vals[order(pred_vals)]
   }
 
   # Plot quantiles of the smooth function, along with observed values
@@ -106,7 +122,14 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
   lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
 
   # Show observed values of the smooth as a rug
-  rug((as.vector(as.matrix(data_train[,smooth])))[which(data_train$series ==
-                                                          levels(data_train$series)[series])],
-      lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)
+  if(class(object$obs_data) == 'list'){
+    rug((as.vector(as.matrix(pred_dat[[smooth]])))[which(pred_dat[['series']] ==
+                                                            levels(pred_dat[['series']])[series])],
+        lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)
+  } else {
+    rug((as.vector(as.matrix(data_train[,smooth])))[which(data_train$series ==
+                                                            levels(data_train$series)[series])],
+        lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)
+  }
+
 }

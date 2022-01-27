@@ -16,17 +16,7 @@ plot_mvgam_trace = function(object, param = 'rho'){
   param <- match.arg(arg = param, choices = c("rho", "trend", "b", "r"))
 
   if(param == 'rho'){
-    param_names <- unlist(lapply(seq(1:length(object$mgcv_model$smooth)), function(i){
-
-      number_seq <- seq(1:(1 + object$mgcv_model$smooth[[i]]$null.space.dim +
-                             (length(object$mgcv_model$smooth[[i]]$sp) - 1)))
-      number_seq[1] <- ''
-
-      paste0(rep(object$mgcv_model$smooth[[i]]$label,
-                 1 + object$mgcv_model$smooth[[i]]$null.space.dim +
-                   (length(object$mgcv_model$smooth[[i]]$sp) - 1)),
-             number_seq)
-    }))
+    param_names <- object$sp_names
   }
 
   if(param == 'b'){

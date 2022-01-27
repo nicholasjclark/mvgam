@@ -361,7 +361,11 @@ for (i in 1:n) {
 
     # Use informative priors based on the fitted mgcv model to speed convergence
     # and eliminate searching over strange parameter spaces
-    model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(1/sp[i])'
+    if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
+       model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(1/sp[i])'
+    } else {
+      model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)'
+    }
 
     model_file_jags <- textConnection(model_file)
   }
@@ -564,7 +568,11 @@ for (i in 1:n) {
 
       # Use informative priors based on the fitted mgcv model to speed convergence
       # and eliminate searching over strange parameter spaces
-      model_file[grep('lambda\\[i\\] ~', model_file)] <- '    lambda[i] ~ dexp(1/sp[i])'
+      if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
+        model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(1/sp[i])'
+      } else {
+        model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)'
+      }
 
       model_file_jags <- textConnection(model_file)
 
@@ -576,6 +584,31 @@ for (i in 1:n) {
                           predict(ss_gam, newdata = data_test, type = 'lpmatrix')))
 
     # Add a time variable
+    if(class(data_train) == 'list'){
+      temp_dat_train <- data.frame(year = data_train$year,
+                                   series = data_train$series,
+                                   season = data_train$season)
+      temp_dat_test <- data.frame(year = data_test$year,
+                                  series = data_test$series,
+                                  season = data_test$season)
+
+      X$time <- rbind(temp_dat_train, temp_dat_test) %>%
+        dplyr::left_join(rbind(temp_dat_train, temp_dat_test) %>%
+                           dplyr::select(year, season) %>%
+                           dplyr::distinct() %>%
+                           dplyr::arrange(year, season) %>%
+                           dplyr::mutate(time = dplyr::row_number()),
+                         by = c('season', 'year')) %>%
+        dplyr::pull(time)
+
+      # Add a series identifier variable
+      X$series <- as.numeric(rbind(temp_dat_train, temp_dat_test)$series)
+
+      # Add an outcome variable
+      X$outcome <- c(orig_y, rep(NA, NROW(temp_dat_test)))
+
+    } else {
+
     X$time <- rbind(data_train, data_test[,1:ncol(data_train)]) %>%
       dplyr::left_join(rbind(data_train, data_test[,1:ncol(data_train)]) %>%
                          dplyr::select(year, season) %>%
@@ -590,17 +623,33 @@ for (i in 1:n) {
 
     # Add an outcome variable
     X$outcome <- c(orig_y, rep(NA, NROW(data_test)))
+    }
 
   } else {
     X <- data.frame(ss_jagam$jags.data$X)
-    X$time <- data_train %>%
-      dplyr::left_join(data_train %>%
-                         dplyr::select(year, season) %>%
-                         dplyr::distinct() %>%
-                         dplyr::arrange(year, season) %>%
-                         dplyr::mutate(time = dplyr::row_number()),
-                       by = c('season', 'year')) %>%
-      dplyr::pull(time)
+
+    if(class(data_train) == 'list'){
+      temp_dat <- data.frame(year = data_train$year,
+                             season = data_train$season)
+      X$time <- temp_dat %>%
+        dplyr::left_join(temp_dat %>%
+                           dplyr::select(year, season) %>%
+                           dplyr::distinct() %>%
+                           dplyr::arrange(year, season) %>%
+                           dplyr::mutate(time = dplyr::row_number()),
+                         by = c('season', 'year')) %>%
+        dplyr::pull(time)
+    } else {
+      X$time <- data_train %>%
+        dplyr::left_join(data_train %>%
+                           dplyr::select(year, season) %>%
+                           dplyr::distinct() %>%
+                           dplyr::arrange(year, season) %>%
+                           dplyr::mutate(time = dplyr::row_number()),
+                         by = c('season', 'year')) %>%
+        dplyr::pull(time)
+    }
+
     X$outcome <- c(orig_y)
     X$series <- as.numeric(data_train$series)
   }
@@ -631,7 +680,10 @@ for (i in 1:n) {
   if(!missing(upper_bounds)){
     ss_jagam$jags.data$upper_bound <- upper_bounds
   }
-  ss_jagam$jags.data$sp <- ss_gam$sp
+
+  if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
+    ss_jagam$jags.data$sp <- ss_gam$sp
+  }
 
   # Machine epsilon for minimum allowable non-zero rate
   ss_jagam$jags.data$min_eps <- .Machine$double.eps
@@ -749,9 +801,15 @@ for (i in 1:n) {
   size <- MCMCvis::MCMCsummary(out_gam_mod, 'r')$mean
 
   series_resids <- lapply(seq_len(NCOL(ytimes)), function(series){
-    n_obs <- data_train %>%
-      dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-      nrow()
+    if(class(data_train) == 'list'){
+      n_obs <- data.frame(series = data_train$series) %>%
+        dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
+        nrow()
+    } else {
+      n_obs <- data_train %>%
+        dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
+        nrow()
+    }
     preds <- MCMCvis::MCMCchains(out_gam_mod, 'ypred')[,starts[series]:ends[series]]
     draw <- preds[sample(seq(1, NROW(preds)), 1), ]
     preds <- apply(preds,
@@ -763,6 +821,22 @@ for (i in 1:n) {
   })
   names(series_resids) <- levels(data_train$series)
 
+  # Get smooth penalty names in more interpretable format
+  sam <- jags.samples(gam_mod, c("b","rho"), n.iter=10, thin=1)
+  jam <- mgcv::sim2jam(sam, ss_jagam$pregam, edf.type = 1)
+  name_starts <- unlist(purrr:::map(jam$smooth, 'first.sp'))
+  name_ends <- unlist(purrr:::map(jam$smooth, 'last.sp'))
+
+  rho_names <- unlist(lapply(seq(1:length(ss_gam$smooth)), function(i){
+
+    number_seq <- seq(1:(1 + name_ends[i] - name_starts[i]))
+    number_seq[1] <- ''
+
+    paste0(rep(ss_gam$smooth[[i]]$label,
+               length(number_seq)),
+           number_seq)
+  }))
+
   if(return_jags_data){
     output <- list(call = formula,
                    family = ifelse(family == 'nb',
@@ -771,6 +845,7 @@ for (i in 1:n) {
                    pregam = ss_jagam$pregam,
                    jags_output = out_gam_mod,
                    model_file = model_file,
+                   sp_names = rho_names,
                    jags_data = ss_jagam$jags.data,
                    jags_inits = ss_jagam$jags.ini,
                    mgcv_model = ss_gam,
@@ -789,6 +864,7 @@ for (i in 1:n) {
                    pregam = ss_jagam$pregam,
                    jags_output = out_gam_mod,
                    model_file = model_file,
+                   sp_names = rho_names,
                    mgcv_model = ss_gam,
                    jags_model = gam_mod,
                    ytimes = ytimes,

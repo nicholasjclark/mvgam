@@ -30,28 +30,64 @@ eval_mvgam = function(object,
   n_series <- NCOL(object$ytimes)
 
   # Check evaluation timepoint
-  all_times <- (object$obs_data %>%
-                  dplyr::select(year, season) %>%
-                  dplyr::distinct() %>%
-                  dplyr::arrange(year, season) %>%
-                  dplyr::mutate(time = dplyr::row_number())) %>%
-    dplyr::pull(time)
+  if(class(object$obs_data) == 'list'){
+    all_times <- (data.frame(year = object$obs_data$year,
+                                  season = object$obs_data$season)  %>%
+                         dplyr::select(year, season) %>%
+                         dplyr::distinct() %>%
+                         dplyr::arrange(year, season) %>%
+                         dplyr::mutate(time = dplyr::row_number())) %>%
+      dplyr::pull(time)
+
+  } else {
+    all_times <- (object$obs_data %>%
+                         dplyr::select(year, season) %>%
+                         dplyr::distinct() %>%
+                         dplyr::arrange(year, season) %>%
+                         dplyr::mutate(time = dplyr::row_number())) %>%
+      dplyr::pull(time)
+  }
 
   if(!eval_timepoint %in% all_times){
     stop('Evaluation timepoint does not exist in original training data')
   }
 
   # Filter training data to correct point (just following evaluation timepoint)
-  (object$obs_data %>%
-      dplyr::select(year, season) %>%
-      dplyr::distinct() %>%
-      dplyr::arrange(year, season) %>%
-      dplyr::mutate(time = dplyr::row_number())) %>%
-    dplyr::left_join(object$obs_data,
-                     by = c('season', 'year')) %>%
-    dplyr::arrange(year, season, series) %>%
-    dplyr::filter(time > (eval_timepoint ) &
-                    time <= (eval_timepoint + fc_horizon)) -> data_assim
+  if(class(object$obs_data) == 'list'){
+
+    times <- (data.frame(year = object$obs_data$year,
+                season = object$obs_data$season) %>%
+        dplyr::select(year, season) %>%
+        dplyr::distinct() %>%
+        dplyr::arrange(year, season) %>%
+        dplyr::mutate(time = dplyr::row_number())) %>%
+      dplyr::pull(time)
+
+    data_assim <- lapply(object$obs_data, function(x){
+      if(is.matrix(x)){
+        x[which(times > (eval_timepoint) &
+                  times <= (eval_timepoint + fc_horizon)),]
+      } else {
+        x[which(times > (eval_timepoint) &
+                  times <= (eval_timepoint + fc_horizon))]
+      }
+
+    })
+
+
+  } else {
+    (object$obs_data %>%
+       dplyr::select(year, season) %>%
+       dplyr::distinct() %>%
+       dplyr::arrange(year, season) %>%
+       dplyr::mutate(time = dplyr::row_number())) %>%
+      dplyr::left_join(object$obs_data,
+                       by = c('season', 'year')) %>%
+      dplyr::arrange(year, season, series) %>%
+      dplyr::filter(time > (eval_timepoint ) &
+                      time <= (eval_timepoint + fc_horizon)) -> data_assim
+  }
+
 
   # Linear predictor matrix for the evaluation observations
   Xp <- predict(object$mgcv_model,
@@ -368,7 +404,12 @@ eval_mvgam = function(object,
 
   # Evaluate against the truth
   series_truths <- lapply(seq_len(n_series), function(series){
-    data_assim[which(as.numeric(data_assim$series) == series),'y']
+    if(class(object$obs_data) == 'list'){
+      data_assim[['y']][which(as.numeric(data_assim$series) == series)]
+    } else {
+      data_assim[which(as.numeric(data_assim$series) == series),'y']
+    }
+
   })
 
   # Default evaluation metric is the Discrete Rank Probability Score
@@ -407,8 +448,14 @@ eval_mvgam = function(object,
                                         series_fcs[[series]]))
     colnames(DRPS) <- c('drps','in_interval')
     DRPS$eval_horizon <- seq(1, fc_horizon)
-    DRPS$eval_season <- data_assim[which(as.numeric(data_assim$series) == series),]$season
-    DRPS$eval_year <- data_assim[which(as.numeric(data_assim$series) == series),]$year
+    if(class(object$obs_data) == 'list'){
+      DRPS$eval_season <- data_assim[['season']][which(as.numeric(data_assim$series) == series)]
+      DRPS$eval_year <- data_assim[['year']][which(as.numeric(data_assim$series) == series)]
+    } else {
+      DRPS$eval_season <- data_assim[which(as.numeric(data_assim$series) == series),]$season
+      DRPS$eval_year <- data_assim[which(as.numeric(data_assim$series) == series),]$year
+    }
+
     DRPS
   })
   names(series_drps) <- levels(data_assim$series)

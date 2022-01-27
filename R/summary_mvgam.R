@@ -288,7 +288,11 @@ cat(NCOL(object$ytimes), '\n')
 message()
 
 message('N observations per series:')
-cat(NROW(object$obs_data) / NCOL(object$ytimes), '\n')
+if(class(object$obs_data) == 'list'){
+  cat(length(object$obs_data$y) / NCOL(object$ytimes), '\n')
+} else {
+  cat(NROW(object$obs_data) / NCOL(object$ytimes), '\n')
+}
 message()
 
 if(object$family == 'Negative Binomial'){
@@ -394,15 +398,17 @@ message()
 
 message("GAM smoothing parameter (rho) estimates:")
 rho_coefs <- MCMCvis::MCMCsummary(object$jags_output, 'rho')[,c(3:7)]
+
+name_starts <- unlist(purrr:::map(jam$smooth, 'first.sp'))
+name_ends <- unlist(purrr:::map(jam$smooth, 'last.sp'))
+
 rho_names <- unlist(lapply(seq(1:length(object$mgcv_model$smooth)), function(i){
 
-  number_seq <- seq(1:(1 + object$mgcv_model$smooth[[i]]$null.space.dim +
-                      (length(object$mgcv_model$smooth[[i]]$sp) - 1)))
+  number_seq <- seq(1:(1 + name_ends[i] - name_starts[i]))
   number_seq[1] <- ''
 
   paste0(rep(object$mgcv_model$smooth[[i]]$label,
-      1 + object$mgcv_model$smooth[[i]]$null.space.dim +
-        (length(object$mgcv_model$smooth[[i]]$sp) - 1)),
+      length(number_seq)),
       number_seq)
 }))
 rownames(rho_coefs) <- rho_names
