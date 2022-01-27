@@ -101,8 +101,8 @@ mvjagam = function(formula,
                    drift = FALSE,
                    n.chains = 2,
                    n.burnin = 5000,
-                   n.iter = 2000,
-                   thin = 2,
+                   n.iter = 1000,
+                   thin = 1,
                    auto_update = TRUE,
                    phi_prior,
                    ar_prior,
@@ -251,8 +251,7 @@ for(s in 1:n_series) {
 }
 
 for(s in 1:n_series) {
- trend[3, s] ~ dnorm(phi[s] + ar1[s]*trend[2, s] +
-                     ar2[s]*trend[1, s], tau[s])
+ trend[3, s] ~ dnorm(phi[s] + ar1[s]*trend[2, s] + ar2[s]*trend[1, s], tau[s])
 }
 
 for (i in 4:n){
@@ -332,6 +331,9 @@ for (i in 1:n) {
 
     if(trend_model == 'None'){
       model_file[grep('trend\\[i, s\\] ~', model_file)] <- ' trend[i, s] <- 0'
+      model_file[grep('trend\\[1, s\\] ~', model_file)] <- ' trend[1, s] <- 0'
+      model_file[grep('trend\\[2, s\\] ~', model_file)] <- ' trend[2, s] <- 0'
+      model_file[grep('trend\\[3, s\\] ~', model_file)] <- ' trend[3, s] <- 0'
       model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
       model_file[grep('ar1\\[s\\] ~', model_file)] <- ' ar1[s] <- 0'
       model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
@@ -357,8 +359,9 @@ for (i in 1:n) {
       model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
     }
 
-    # Testing using exponential for the smoothing parameters lambda
-    model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)'
+    # Use informative priors based on the fitted mgcv model to speed convergence
+    # and eliminate searching over strange parameter spaces
+    model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(1/sp[i])'
 
     model_file_jags <- textConnection(model_file)
   }
@@ -380,26 +383,24 @@ for (i in 1:n) {
         }
         }
 
-        ## Latent factors evolve as time series with shared precision;
-        ## the penalty terms are from the regularized horseshoe (below), which
-        ## act here to force any un-needed factors to evolve as flat lines
-        tau_fac ~ dnorm(0, 0.1)T(0,)
+        ## Latent factors evolve as time series with penalised precisions;
+        ## the penalty terms force any un-needed factors to evolve as flat lines
         for(j in 1:n_lv){
-         LV[1, j] ~ dnorm(0, tau_fac*penalty[j])
+         LV[1, j] ~ dnorm(0, penalty[j])
         }
 
         for(j in 1:n_lv){
-         LV[2, j] ~ dnorm(phi[j] + ar1[j]*LV[1, j], tau_fac*penalty[j])
+         LV[2, j] ~ dnorm(phi[j] + ar1[j]*LV[1, j], penalty[j])
         }
 
         for(j in 1:n_lv){
-         LV[3, j] ~ dnorm(phi[j] + ar1[j]*LV[2, j] + ar2[j]*LV[1, j], tau_fac*penalty[j])
+         LV[3, j] ~ dnorm(phi[j] + ar1[j]*LV[2, j] + ar2[j]*LV[1, j], penalty[j])
         }
 
         for(i in 4:n){
          for(j in 1:n_lv){
           LV[i, j] ~ dnorm(phi[j] + ar1[j]*LV[i - 1, j] +
-                          ar2[j]*LV[i - 2, j] + ar3[j]*LV[i - 3, j], tau_fac*penalty[j])
+                          ar2[j]*LV[i - 2, j] + ar3[j]*LV[i - 3, j], penalty[j])
          }
         }
 
@@ -420,13 +421,29 @@ for (i in 1:n) {
         ## regression models)
         lv_tau ~ dscaled.gamma(0.5, 5)
 
-        ## Shrinkage penalties for each factor, which are also half cuachy to allow
-        ## the entire factor's set of coefficients to be squeezed toward zero if supported by
+        ## Shrinkage penalties for each factor squeeze the factor to a flat line and squeeze
+        ## the entire factor's set of coefficients toward zero if supported by
         ## the data. The prior for individual factor penalties allows each factor to possibly
         ## have a relatively large penalty, which shrinks the prior for that factor's loadings
-        ## substantially
-        for (j in 1:n_lv){
-         penalty[j] ~ dscaled.gamma(0.5, 0.5)
+        ## substantially. Penalties increase exponentially with the number of factors following
+        ## Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate
+        ## matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291.
+        pi ~ dunif(0, n_lv)
+        X2 ~ dnorm(0, 1)T(0, )
+
+        # eta1 controls the baseline penalty
+        eta1 ~ dunif(-1, 1)
+
+        # eta2 controls how quickly the penalties exponentially increase
+        eta2 ~ dunif(-1, 1)
+
+        for(t in 1:n_lv){
+         X1[t] ~ dnorm(0, 1)T(0, )
+         l.dist[t] <- max(t, pi[])
+         l.weight[t] <- exp(eta2[] * l.dist[t])
+         l.var[t] <- exp(eta1[] * l.dist[t] / 2) * 1
+         theta.prime[t] <- l.weight[t] * X1[t] + (1 - l.weight[t]) * X2[]
+         penalty[t] <- theta.prime[t] * l.var[t]
         }
 
         ## Upper triangle of loading matrix set to zero
@@ -488,17 +505,13 @@ for (i in 1:n) {
 
       # Update further prior distributions
       if(!missing(phi_prior)){
-        model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('   phi[s] ~ ', phi_prior)
+        model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('        phi[s] ~ ', phi_prior)
       }
 
       if(!missing(ar_prior)){
-        model_file[grep('ar1\\[s\\] ~', model_file)] <- paste0('   ar1[s] ~ ', ar_prior)
-        model_file[grep('ar2\\[s\\] ~', model_file)] <- paste0('   ar2[s] ~ ', ar_prior)
-        model_file[grep('ar3\\[s\\] ~', model_file)] <- paste0('   ar3[s] ~ ', ar_prior)
-      }
-
-      if(!missing(tau_prior)){
-       model_file[grep('tau\\[s\\] ~', model_file)] <- paste0('   tau[s] ~ ', tau_prior)
+        model_file[grep('ar1\\[s\\] ~', model_file)] <- paste0('        ar1[s] ~ ', ar_prior)
+        model_file[grep('ar2\\[s\\] ~', model_file)] <- paste0('        ar2[s] ~ ', ar_prior)
+        model_file[grep('ar3\\[s\\] ~', model_file)] <- paste0('        ar3[s] ~ ', ar_prior)
       }
 
       if(!missing(r_prior)){
@@ -507,50 +520,51 @@ for (i in 1:n) {
 
       if(family == 'poisson'){
         if(missing(upper_bounds)){
-          model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])'
-          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])'
+          model_file[grep('y\\[i, s\\] ~', model_file)] <- '       y[i, s] ~ dpois(mu[i, s])'
+          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '       ypred[i, s] ~ dpois(mu[i, s])'
         } else {
-          model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
-          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+          model_file[grep('y\\[i, s\\] ~', model_file)] <- '       y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '       ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
         }
-        model_file[grep('r ~', model_file)] <- 'r <- 10000'
+        model_file[grep('r ~', model_file)] <- '      r <- 10000'
 
       } else {
         if(missing(upper_bounds)){
-          model_file[grep('y\\[i, s\\] ~', model_file)] <- 'y[i, s] ~ dnegbin(rate[i, s], r)'
-          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- 'ypred[i, s] ~ dnegbin(rate[i, s], r)'
+          model_file[grep('y\\[i, s\\] ~', model_file)] <- '       y[i, s] ~ dnegbin(rate[i, s], r)'
+          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '       ypred[i, s] ~ dnegbin(rate[i, s], r)'
         }
       }
 
       if(trend_model == 'None'){
-        model_file[grep('trend\\[i, s\\] ~', model_file)] <- ' trend[i, s] <- 0'
-        model_file[grep('phi\\[s\\] ~', model_file)] <- 'phi[s] <- 0'
-        model_file[grep('ar1\\[s\\] ~', model_file)] <- 'ar1[s] <- 0'
-        model_file[grep('ar2\\[s\\] ~', model_file)] <- 'ar2[s] <- 0'
-        model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
+        model_file[grep('trend\\[i, s\\] ~', model_file)] <- '      trend[i, s] <- 0'
+        model_file[grep('phi\\[s\\] ~', model_file)] <- '         phi[s] <- 0'
+        model_file[grep('ar1\\[s\\] ~', model_file)] <- '        ar1[s] <- 0'
+        model_file[grep('ar2\\[s\\] ~', model_file)] <- '        ar2[s] <- 0'
+        model_file[grep('ar3\\[s\\] ~', model_file)] <- '        ar3[s] <- 0'
       }
 
       if(trend_model == 'RW'){
-        model_file[grep('ar1\\[s\\] ~', model_file)] <- 'ar1[s] <- 1'
-        model_file[grep('ar2\\[s\\] ~', model_file)] <- 'ar2[s] <- 0'
-        model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
+        model_file[grep('ar1\\[s\\] ~', model_file)] <- '        ar1[s] <- 1'
+        model_file[grep('ar2\\[s\\] ~', model_file)] <- '        ar2[s] <- 0'
+        model_file[grep('ar3\\[s\\] ~', model_file)] <- '        ar3[s] <- 0'
       }
 
       if(trend_model == 'AR1'){
-        model_file[grep('ar2\\[s\\] ~', model_file)] <- 'ar2[s] <- 0'
-        model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
+        model_file[grep('ar2\\[s\\] ~', model_file)] <- '        ar2[s] <- 0'
+        model_file[grep('ar3\\[s\\] ~', model_file)] <- '        ar3[s] <- 0'
       }
 
       if(trend_model == 'AR2'){
-        model_file[grep('ar3\\[s\\] ~', model_file)] <- 'ar3[s] <- 0'
+        model_file[grep('ar3\\[s\\] ~', model_file)] <- '        ar3[s] <- 0'
       }
 
       if(!drift){
-        model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
+        model_file[grep('phi\\[s\\] ~', model_file)] <- '        phi[s] <- 0'
       }
 
-      # Testing using exponential for the smoothing parameters lambda
-      model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)'
+      # Use informative priors based on the fitted mgcv model to speed convergence
+      # and eliminate searching over strange parameter spaces
+      model_file[grep('lambda\\[i\\] ~', model_file)] <- '    lambda[i] ~ dexp(1/sp[i])'
 
       model_file_jags <- textConnection(model_file)
 
@@ -617,6 +631,7 @@ for (i in 1:n) {
   if(!missing(upper_bounds)){
     ss_jagam$jags.data$upper_bound <- upper_bounds
   }
+  ss_jagam$jags.data$sp <- ss_gam$sp
 
   # Machine epsilon for minimum allowable non-zero rate
   ss_jagam$jags.data$min_eps <- .Machine$double.eps
@@ -631,7 +646,7 @@ for (i in 1:n) {
       if(ss_jagam$jags.data$n_lv > ss_jagam$jags.data$n_series){
         stop('Number of latent variables cannot be greater than number of series')
       }
-      ss_jagam$jags.ini$tau_fac <- 1
+
   }
 
   # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS
@@ -654,7 +669,7 @@ for (i in 1:n) {
                'tau', 'trend', 'ar1', 'ar2', 'ar3')
   } else {
     param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi', 'LV',
-               'trend', 'lv_coefs', 'tau_fac', 'penalty',
+               'trend', 'lv_coefs', 'penalty',
                'ar1', 'ar2', 'ar3')
   }
 

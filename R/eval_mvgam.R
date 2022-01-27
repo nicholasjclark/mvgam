@@ -71,7 +71,7 @@ eval_mvgam = function(object,
       lv_estimates[,(eval_timepoint - 2):eval_timepoint]
     })
 
-    taus <- MCMCvis::MCMCchains(object$jags_output, 'tau_fac')
+    taus <- MCMCvis::MCMCchains(object$jags_output, 'penalty')
     trends <- NULL
   } else {
     ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'trend'))[2],
@@ -202,7 +202,7 @@ eval_mvgam = function(object,
                 ar1 = ar1[lv],
                 ar2 = ar2[lv],
                 ar3 = ar3[lv],
-                tau = tau,
+                tau = tau[lv],
                 state = last_lvs[[lv]],
                 h = fc_horizon)
       }))
@@ -297,7 +297,7 @@ eval_mvgam = function(object,
                   ar1 = ar1[lv],
                   ar2 = ar2[lv],
                   ar3 = ar3[lv],
-                  tau = tau,
+                  tau = tau[lv],
                   state = last_lvs[[lv]],
                   h = fc_horizon)
         }))

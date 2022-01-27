@@ -75,7 +75,7 @@ cred <- sapply(1:NCOL(fits),
 pred_vals <- seq(min(fake_data$data_train$year),
                  max(fake_data$data_test$year),
                  length.out = NCOL(fits))
-ylims <- c(0,
+ylims <- c(180,
            max(max(as.vector(series)), max(cred) + 2))
 
 plot(1, type = "n",
@@ -145,7 +145,7 @@ fits <- t(matrix(fits, nrow = dims_needed[1], ncol = dims_needed[2]))
 cred <- sapply(1:NCOL(fits),
                function(n) quantile(fits[,n],
                                     probs = probs))
-ylims <- c(0,
+ylims <- c(180,
            max(max(as.vector(series)), max(cred) + 2))
 plot(1, type = "n",
      xlab = '',
@@ -173,11 +173,17 @@ dev.off()
 
 #### Analysis plots from the simulation component ####
 load('NEON_manuscript/Results/sim_results.rda')
-run_parameters <- expand.grid(n_series = c(4, 12),
+run_parameters <- expand.grid(n_series = c(2, 4, 12),
                               T = c(72),
                               prop_missing = c(0, 0.1, 0.5),
                               trend_rel = c(0.3, 0.7),
                               stringsAsFactors = F)
+
+# Run each simulation scenario 4 times (a total of 72 simulations)
+run_parameters <- rbind(run_parameters,
+                        run_parameters,
+                        run_parameters,
+                        run_parameters)
 drps_plot_dat <- do.call(rbind, purrr::map(sim_results, 'model_drps'))
 coverage_plot_dat <- do.call(rbind, purrr::map(sim_results, 'model_coverages'))
 effic_plot_dat <- do.call(rbind, purrr::map(sim_results, 'model_efficiencies'))
@@ -205,24 +211,24 @@ coverage_plot_dat$n_series <- n_series
 library(dplyr)
 drps_plot_dat %>%
   dplyr::mutate(model = dplyr::case_when(
-    model == 'null' ~ 'Nonseasonal GAMDF',
-    model == 'hierarchical' ~ 'Seasonal GAMDF',
+    model == 'null' ~ 'Nonseasonal DGAM',
+    model == 'hierarchical' ~ 'Seasonal DGAM',
     model == 'mgcv_hierarchical' ~ 'Seasonal GAM'
   )) -> drps_plot_dat
 drps_plot_dat$model <- factor(drps_plot_dat$model,
-                              levels = c('Nonseasonal GAMDF',
-                                         'Seasonal GAMDF',
+                              levels = c('Nonseasonal DGAM',
+                                         'Seasonal DGAM',
                                          'Seasonal GAM'))
 
 coverage_plot_dat %>%
   dplyr::mutate(model = dplyr::case_when(
-    model == 'null' ~ 'Nonseasonal GAMDF',
-    model == 'hierarchical' ~ 'Seasonal GAMDF',
+    model == 'null' ~ 'Nonseasonal DGAM',
+    model == 'hierarchical' ~ 'Seasonal DGAM',
     model == 'mgcv_hierarchical' ~ 'Seasonal GAM'
   )) -> coverage_plot_dat
 coverage_plot_dat$model <- factor(coverage_plot_dat$model,
-                              levels = c('Nonseasonal GAMDF',
-                                         'Seasonal GAMDF',
+                              levels = c('Nonseasonal DGAM',
+                                         'Seasonal DGAM',
                                          'Seasonal GAM'))
 
 library(ggplot2)
@@ -233,13 +239,15 @@ prop_names <- c(
   `0.5` = "50% missing"
 )
 n_names <- c(
+  `2` = '2 series',
   `4` = "4 series",
   `12` = "12 series"
 )
 
+drps_plot_dat$drps_med[drps_plot_dat$drps_med > 2] <- 2
 ggplot(drps_plot_dat %>%
          dplyr::filter(trend_rel == 0.3),
-       aes(y = as.numeric(drps_med) * as.numeric(drps_upper), x = model, fill = model)) +
+       aes(y = as.numeric(drps_med), x = model, fill = model)) +
   geom_boxplot() +
   facet_wrap(~prop_missing, labeller = as_labeller(prop_names), scales = 'free_x') +
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
@@ -248,7 +256,7 @@ ggplot(drps_plot_dat %>%
 
 ggplot(drps_plot_dat %>%
          dplyr::filter(trend_rel == 0.7),
-       aes(y = as.numeric(drps_med) * as.numeric(drps_upper), x = model, fill = model)) +
+       aes(y = as.numeric(drps_med), x = model, fill = model)) +
   geom_boxplot() +
   facet_wrap(~prop_missing, labeller = as_labeller(prop_names), scales = 'free_x') +
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
@@ -261,7 +269,7 @@ dev.off()
 
 ggplot(drps_plot_dat %>%
          dplyr::filter(trend_rel == 0.3),
-       aes(y = as.numeric(drps_med) * as.numeric(drps_upper), x = model, fill = model)) +
+       aes(y = as.numeric(drps_med), x = model, fill = model)) +
   geom_boxplot() +
   facet_wrap(~n_series, labeller = as_labeller(n_names), scales = 'free_x') +
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
@@ -270,7 +278,7 @@ ggplot(drps_plot_dat %>%
 
 ggplot(drps_plot_dat %>%
          dplyr::filter(trend_rel == 0.7),
-       aes(y = as.numeric(drps_med) * as.numeric(drps_upper), x = model, fill = model)) +
+       aes(y = as.numeric(drps_med), x = model, fill = model)) +
   geom_boxplot() +
   facet_wrap(~n_series, labeller = as_labeller(n_names), scales = 'free_x') +
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +

@@ -98,7 +98,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                 ar1 = particles[[x]]$ar1[lv],
                 ar2 = particles[[x]]$ar2[lv],
                 ar3 = particles[[x]]$ar3[lv],
-                tau = particles[[x]]$tau,
+                tau = particles[[x]]$tau[lv],
                 state = particles[[x]]$lv_states[[lv]],
                 h = fc_horizon)
       }))

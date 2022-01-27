@@ -15,20 +15,20 @@ library(knitr)
 opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
 ```
 
-In this example we will examine multivariate forecasting models using `mvgam`, which fits GAMs using MCMC sampling via the `JAGS` software (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `K` can be difficult. The approach used by `mvgam` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated independently, we hope that we can guard against specying too large a `K`. But we should test this property to see how it behaves in different scenarios. Begin by simulating `5` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `100` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Negative Binomial distributions
+In this example we will examine multivariate forecasting models using `mvgam`, which fits GAMs using MCMC sampling via the `JAGS` software (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `K` can be difficult. The approach used by `mvgam` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated in an exponentially increasing manner (following Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291), we hope that we can guard against specying too large a `K`. But we should test this property to see how it behaves in different scenarios. Begin by simulating `8` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `100` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Negative Binomial distributions
 ```{r}
 set.seed(100)
 library(mvgam)
-dat <- sim_mvgam(T = 100, n_series = 5, n_trends = 2,
-                 mu_obs = runif(5, 2, 6),
-                 size_obs = runif(5, 0.5, 2),
+dat <- sim_mvgam(T = 100, n_series = 8, n_trends = 2,
+                 mu_obs = runif(8, 2, 6),
+                 size_obs = runif(8, 0.5, 2),
                  trend_rel = 0.6, train_prop = 0.8)
 ```
 
 Have a look at the series
-```{r}
-par(mfrow = c(3,2))
-for(i in 1:5){
+```{r, fig.width = 6, fig.height = 7, fig.align='center'}
+par(mfrow = c(4,2))
+for(i in 1:8){
   plot(dat$data_train$y[which(as.numeric(dat$data_train$series) == i)], type = 'l',
        ylab = paste('Series', i), xlab = 'Time')
 }
@@ -46,9 +46,7 @@ mod1 <- mvjagam(data_train = dat$data_train,
                 n_lv = 2,
                 family = 'nb',
                 trend_model = 'RW',
-                n.burnin = 3000,
-                n.iter = 1000,
-                thin = 1,
+                n.burnin = 2000,
                 auto_update = F)
 ```
 
@@ -67,7 +65,7 @@ Check whether each factor was retained using the `plot_mvgam_factors` function. 
 plot_mvgam_factors(mod1)
 ```
 
-Now we fit the same model but assume that we no nothing about how many factors to use, so we specify the maximum allowed (the total number of series; `5`). Note that this model is computationally more expensive so it will take longer to fit
+Now we fit the same model but assume that we no nothing about how many factors to use, so we specify the maximum allowed (the total number of series; `8`). Note that this model is computationally more expensive so it will take longer to fit
 ```{r}
 mod2 <- mvjagam(data_train = dat$data_train,
                 data_test = dat$data_test,
@@ -75,12 +73,10 @@ mod2 <- mvjagam(data_train = dat$data_train,
                   s(season, bs = c('cc'), k = 12),
                 knots = list(season = c(0.5, 12.5)),
                 use_lv = T,
-                n_lv = 5,
+                n_lv = 8,
                 family = 'nb',
                 trend_model = 'RW',
-                n.burnin = 3000,
-                n.iter = 1000,
-                thin = 1,
+                n.burnin = 2000,
                 auto_update = F)
 ```
 
@@ -145,9 +141,7 @@ trends_mod1 <- mvjagam(data_train = trends_data$data_train,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
                       family = 'nb',
-                      n.burnin = 4000,
-                      n.iter = 1000,
-                      thin = 1,
+                      n.burnin = 5000,
                       auto_update = F)
 ```
 
@@ -160,13 +154,11 @@ trends_mod2 <- mvjagam(data_train = trends_data$data_train,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
                       family = 'nb',
-                      n.burnin = 4000,
-                      n.iter = 1000,
-                      thin = 1,
+                      n.burnin = 5000,
                       auto_update = F)
 ```
 
-How can we compare these models to ensure we choose one that performs well and provides useful inferences? Beyond posterior retrodictive and predictive checks, we can take advantage of the fact that `mvgam` fits an `mgcv` model to provide all the necessary penalty matrices, as well as to identify good initial values for smoothing and beta parameters. Because we did not modify this model by adding a trend component (we only specified a Negative Binomial, rather than a Poisson), we can still inspect the usual `mgcv` model comparison routines
+How can we compare these models to ensure we choose one that performs well and provides useful inferences? Beyond posterior retrodictive and predictive checks, we can take advantage of the fact that `mvgam` fits an `mgcv` model to provide all the necessary penalty matrices, as well as to identify good initial values for smoothing and beta parameters. Because we did not modify this model by adding a trend component we can still inspect the usual `mgcv` model comparison routines
 ```{r}
 anova(trends_mod1$mgcv_model,
       trends_mod2$mgcv_model, test = 'LRT')
@@ -194,7 +186,7 @@ dic.samples(trends_mod1$jags_model, 500)
 dic.samples(trends_mod2$jags_model, 500)
 ```
 
-Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using three latent factors that each follow an AR1 process
+Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow an AR1 process, and we will rely on the exponential penalties to help regularise any un-needed factors by setting `n_lv = 4`
 ```{r}
 trends_mod3 <- mvjagam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
@@ -203,11 +195,10 @@ trends_mod3 <- mvjagam(data_train = trends_data$data_train,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'AR1',
                       use_lv = T,
-                      n_lv = 3,
+                      n_lv = 4,
                       family = 'nb',
-                      n.burnin = 4000,
-                      n.iter = 1000,
-                      thin = 1,
+                      drift = T,
+                      n.burnin = 5000,
                       auto_update = F)
 ```
 
@@ -390,5 +381,5 @@ plot_mvgam_ppc(trends_mod3, series = 4, type = 'density', data_test = trends_dat
 plot_mvgam_ppc(trends_mod3, series = 4, type = 'mean', data_test = trends_data$data_test)
 ```
 
-Other next steps could involve devising a more goal-specific set of posterior predictive checks (see [this paper by Gelman et al](https://www.jstor.org/stable/2680852?seq=1#metadata_info_tab_contents) and [relevant works by Betancourt](https://betanalpha.github.io/assets/case_studies/principled_bayesian_workflow.html) for examples), compare out of sample Discrete Rank Probability Scores for this model and simpler versions for the latent trends (i.e. AR2, AR1, Random Walk)
+Other next steps could involve devising a more goal-specific set of posterior predictive checks (see [this paper by Gelman et al](https://www.jstor.org/stable/2680852?seq=1#metadata_info_tab_contents) and [relevant works by Betancourt](https://betanalpha.github.io/assets/case_studies/principled_bayesian_workflow.html) for examples) and compare out of sample Discrete Rank Probability Scores for this model and other versions for the latent trends (i.e. AR2, AR3, Random Walk)
 

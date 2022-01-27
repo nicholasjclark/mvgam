@@ -70,7 +70,7 @@ pfilter_mvgam_smooth = function(particles,
                 particles[[x]]$ar1[lv] * particles[[x]]$lv_states[[lv]][3] +
                 particles[[x]]$ar2[lv] * particles[[x]]$lv_states[[lv]][2] +
                 particles[[x]]$ar3[lv] * particles[[x]]$lv_states[[lv]][1],
-              sqrt(1 / particles[[x]]$tau))
+              sqrt(1 / particles[[x]]$tau[lv]))
       }))
 
       # Multiply lv states with loadings to generate each series' forecast trend state

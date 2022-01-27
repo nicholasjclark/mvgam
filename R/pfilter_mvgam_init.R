@@ -56,7 +56,7 @@ if(object$use_lv){
     lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
   })
 
-  taus <- MCMCvis::MCMCchains(object$jags_output, 'tau_fac')
+  taus <- MCMCvis::MCMCchains(object$jags_output, 'penalty')
   trends <- NULL
 } else {
   ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'trend'))[2],
@@ -174,7 +174,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
     rnorm(1, phi[lv] + ar1[lv] * last_lvs[[lv]][3] +
             ar2[lv] * last_lvs[[lv]][2] +
-            ar3[lv] * last_lvs[[lv]][1], sqrt(1 / tau))
+            ar3[lv] * last_lvs[[lv]][1], sqrt(1 / tau[lv]))
   }))
 
   # Multiply lv states with loadings to generate each series' forecast trend state

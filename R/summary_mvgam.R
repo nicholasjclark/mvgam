@@ -278,7 +278,7 @@ cat(paste0(object$family, '\n'))
 message()
 
 if(object$use_lv){
-  message("Number of latent factors:")
+  message("N latent factors:")
   cat(object$n_lv, '\n')
   message()
 }

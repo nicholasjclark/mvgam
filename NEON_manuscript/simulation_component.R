@@ -5,18 +5,17 @@ source('NEON_manuscript/neon_utility_functions.R')
 
 # Use hierarchical seasonality for all;
 # trend components: 0.3 and 0.7
-# N_series: 4, 12
+# N_series: 2, 4, 12
 # Length: 6 years
 # Missingness: none, 10%, 50%
-run_parameters <- expand.grid(n_series = c(4, 12),
+run_parameters <- expand.grid(n_series = c(2, 4, 12),
                               T = c(72),
                               prop_missing = c(0, 0.1, 0.5),
                               trend_rel = c(0.3, 0.7),
                               stringsAsFactors = F)
 
-# Run each simulation scenario 5 times (a total of 60 simulations)
+# Run each simulation scenario 4 times (a total of 72 simulations)
 run_parameters <- rbind(run_parameters,
-                        run_parameters,
                         run_parameters,
                         run_parameters,
                         run_parameters)
@@ -38,9 +37,7 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                   formula = y ~ s(series, bs = 're'),
                   family = 'nb',
                   use_lv = T,
-                  n.burnin = 10000,
-                  n.iter = 5000,
-                  thin = 5,
+                  n.burnin = 1000,
                   auto_update = F)
   difftime(Sys.time(), t, units = "mins")[[1]] -> comp_time
 
@@ -80,7 +77,7 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                            dic_lower = NA,
                            dic_med = NA,
                            dic_upper = NA)
-  model_dics[1,] <- c('null', hpd(dic.samples(nullmod$jags_model, 1000)$deviance, 0.9))
+  model_dics[1,] <- c('null', hpd(dic.samples(nullmod$jags_model, 500)$deviance, 0.9))
 
   # Calculate trend correlations
   model_correlations <- data.frame(model = c('null', 'hierarchical'),
@@ -115,9 +112,7 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                       knots = list(season = c(0.5, 12.5)),
                       family = 'nb',
                       use_lv = T,
-                      n.burnin = 10000,
-                      n.iter = 5000,
-                      thin = 5,
+                      n.burnin = 2000,
                       auto_update = F)
   difftime(Sys.time(), t, units = "mins")[[1]] -> comp_time
 
@@ -132,7 +127,7 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
     dplyr::mutate(norm_drps = DRPS * (1 / Horizon))
 
   model_drps[2,] <- c('hierarchical', quantile(all_drps$norm_drps, probs = c(0.1, 0.5, 0.9), na.rm = T))
-  model_dics[2,] <- c('hierarchical', hpd(dic.samples(hier_mod$jags_model, 1000)$deviance, 0.9))
+  model_dics[2,] <- c('hierarchical', hpd(dic.samples(hier_mod$jags_model, 500)$deviance, 0.9))
   model_coverages[2,] <- c('hierarchical', sum(all_drps$In_90, na.rm = T) / length(which(!is.na(all_drps$Truth))))
   correlations <- lv_correlations(object = hier_mod, data_train = sim_data$data_train)
   model_correlations[2,] <- c('hierarchical', compare_correlations(sim_data$true_corrs,
@@ -143,7 +138,7 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
   mgcv_hier_mod <- gam(y ~ s(series, bs = 're') +
                          s(season, k = 12, m = 2, bs = 'cc') +
                          s(season, by = series, m = 1, k = 4) +
-                         s(year, by = series, k = 3, bs = 'gp', m = 1),
+                         s(year, by = series, k = 4, bs = 'gp', m = 1),
                        knots = list(season = c(0.5, 12.5)),
                        family = nb(), data = sim_data$data_train)
 
