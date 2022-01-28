@@ -1,5 +1,5 @@
 # A distributed lag example, using the Portal capture data
-# Load Portal rodents data
+# Load Portal rodents data (change to your wd if needed)
 library(mvgam)
 library(forecast)
 library(mgcv)
@@ -30,14 +30,15 @@ data_all <- list(lag=matrix(0:5,nrow(portal_dat_all),6,byrow=TRUE),
 data_all$precip <- lagard(portal_dat_all$precipitation)
 data_all$mintemp <- lagard(portal_dat_all$mintemp)
 
-# Create training and testing sets
-data_train <- list(lag = data_all$lag[1:174,],
-                   y = data_all$y[1:174],
-                   series = data_all$series[1:174],
-                   season = data_all$season[1:174],
-                   year = data_all$year[1:174],
-                   precip = data_all$precip[1:174,],
-                   mintemp = data_all$mintemp[1:174,])
+# Create training and testing sets; start at observation 7 so that the mean-imputed
+# lags are not included
+data_train <- list(lag = data_all$lag[7:174,],
+                   y = data_all$y[7:174],
+                   series = data_all$series[7:174],
+                   season = data_all$season[7:174],
+                   year = data_all$year[7:174],
+                   precip = data_all$precip[7:174,],
+                   mintemp = data_all$mintemp[7:174,])
 data_test <- list(lag = data_all$lag[175:length(data_all$y),],
                    y = data_all$y[175:length(data_all$y)],
                    series = data_all$series[175:length(data_all$y)],
@@ -49,7 +50,8 @@ data_test <- list(lag = data_all$lag[175:length(data_all$y),],
 # Fit a dynamic GAM with a distributed lag term for precipitation and
 # an AR1 process for the trend
 test <- mvjagam(formula =  y ~ s(season, bs = "cc", k = 12) +
-                   te(precip, lag, k = c(8, 3)),
+                   te(mintemp, lag, k = c(8, 3)) +
+                  te(precip, lag, k = c(8, 3)),
                  knots = list(season = c(0.5, 12.5)),
                  data_train = data_train,
                  data_test = data_test,
@@ -58,5 +60,36 @@ test <- mvjagam(formula =  y ~ s(season, bs = "cc", k = 12) +
                  trend_model = 'AR1',
                  auto_update = F)
 
-plot_mvgam_fc(test, series = 1, data_test = data_test)
+plot_mvgam_fc(test, series = 1, data_test = data_test, ylim = c(0, 100))
+plot_mvgam_trend(test, series = 1, data_test = data_test)
+plot_mvgam_uncertainty(test, series = 1, data_test = data_test)
+plot_mvgam_smooth(test, series = 1, smooth ='season')
+plot_mvgam_smooth(test, series = 1, smooth = 2)
+plot_mvgam_smooth(test, series = 1, smooth = 3)
+summary_mvgam(test)
 
+# Initiate particle filter
+pfilter_mvgam_init(test, data_assim = data_test)
+
+# Get next two observations for assimilation
+data_assim <- lapply(data_test, function(x){
+  if(is.matrix(x)){
+    matrix(x[1:3,], ncol = NCOL(x))
+  } else {
+    x[1:3]
+  }
+})
+names(data_assim) <- names(data_test)
+
+# Assimilate
+pfilter_mvgam_online(data_assim = data_assim,
+                     n_cores = 2,
+                     kernel_lambda = 1)
+
+# Forecast
+fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 2,
+                       data_test = data_test, ylim = c(0, 100))
+
+par(mfrow = c(1,2))
+plot_mvgam_fc(test, series = 1, data_test = data_test, ylim = c(0, 100))
+fc$series1()

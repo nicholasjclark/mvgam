@@ -13,14 +13,14 @@
 #'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
 #'(note that the number of knots is not always just k). Different terms can use different numbers of knots,
 #'unless they share a covariate.
-#'@param data_train A \code{dataframe} containing the model response variable and covariates
+#'@param data_train A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
 #''y' (the discrete outcomes; \code{NA}s allowed)
 #''series' (character or factor index of the series IDs)
 #''season' (numeric index of the seasonal time point for each observation)
 #' and 'year' the numeric index for year.
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
-#'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season', and 'year'
+#'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'season', and 'year'
 #'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
 #'observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
 #'simulations can be obtained

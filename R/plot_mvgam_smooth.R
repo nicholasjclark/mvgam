@@ -4,14 +4,16 @@
 #'
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param smooth \code{character} specifying the smooth term to be plotted
+#'@param smooth either a \code{character} or \code{integer} specifying which smooth term to be plotted
 #'@param newdata Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
-#'in addition to any other variables included in the linear predictor of the original model's \code{formula}
+#'in addition to any other variables included in the linear predictor of the original model's \code{formula}.
+#'Note that this currently is only supported for plotting univariate smooths
 #'@details Smooth functions are shown as empirical quantiles of posterior expectations from the GAM component of the linear
 #'predictor across a sequence of 500 values between the variable's \code{min} and \code{max},
 #'while holding all other variables either at their means (for numeric varibles) or at the first
-#'level (factor variables). At present, only univariate smooth plots
-#'are allowed (no smooth interactions can be plotted). For more nuanced visualisation, supply
+#'level (factor variables). At present, only univariate and bivariate smooth plots
+#'are allowed, though note that bivariate smooths rely on default behaviour from
+#'\code{\link[mgcv]{plot.gam}}. For more nuanced visualisation, supply
 #'\code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model
 #'@return A base \code{R} graphics plot
 #'@seealso \code{\link[mgcv]{plot.gam}}
@@ -26,6 +28,25 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
                                            paste(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
                                                  collapse = ',')))[[1]]))
 
+  if(is.character(smooth)){
+    if(!smooth %in% smooth_terms){
+      stop(smooth, ' not found in smooth terms of object')
+    }
+    smooth_int <- which(smooth_terms == smooth)
+  }
+
+  if(is.numeric(smooth)){
+    if(!smooth %in% seq_along(smooth_terms)){
+      stop(smooth, ' not found in smooth terms of object')
+    }
+    smooth_int <- smooth
+    smooth <- smooth_terms[smooth]
+  }
+
+  if(length(unlist(strsplit(smooth, ','))) > 2){
+    stop('Cannot plot smooths of more than 2 dimensions')
+  }
+
   # Be sure that parametric and by variables are included in newdata
   smooth_terms <- unique(c(smooth_terms, attr(object$mgcv_model$pterms, 'term.labels'),
                     trimws(strsplit(gsub('\\+', ',', as.character(object$mgcv_model$pred.formula)[2]), ',')[[1]])))
@@ -33,9 +54,6 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
   # Can't yet plot bivariate smooth effects
   smooth_terms[!grepl(',', smooth_terms)] -> smooth_terms
 
-  if(!smooth %in% smooth_terms){
-    stop(smooth, ' not found in smooth terms of object')
-  }
 
   # Filter training data to take means of all other smooth terms while providing a prediction
   # sequence for the smooth of interest
@@ -71,12 +89,38 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
   # Extract GAM coefficients
   betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
 
-  # Predictions
+  # Predictions and plots
+  if(length(unlist(strsplit(smooth, ','))) == 2){
+
+    # Use default mgcv plotting for bivariate smooths as it is quicker
+    # Extract median beta params for smooths and their covariances
+    # so that uncertainty from mgcv plots is reasonably accurate
+    V <- cov(MCMCvis::MCMCchains(object$jags_output, 'b'))
+    object$mgcv_model$Ve <- V
+    object$mgcv_model$Vp <- V
+    object$mgcv_model$Vc <- V
+    p <- MCMCvis::MCMCsummary(object$jags_output, 'b')[,c(4)]
+    coef_names <- names(object$mgcv_model$coefficients)
+    names(p) <- coef_names
+    object$mgcv_model$coefficients <- p
+
+    suppressWarnings(plot(object$mgcv_model, select = smooth_int,
+         scheme = 2,
+         main = '', too.far = 0,
+         contour.col = c("black"),
+         nlevels = 4,
+         lwd = 1, labcex = 1,
+         seWithMean = T ))
+
+
+  } else {
+
   if(class(pred_dat) == 'list'){
     pred_vals <- as.vector(as.matrix(pred_dat[[smooth]]))
   } else{
     pred_vals <- as.vector(as.matrix(pred_dat[,smooth]))
   }
+
   preds <- matrix(NA, nrow = NROW(betas), ncol = length(pred_vals))
   for(i in 1:NROW(betas)){
     if(class(pred_dat) == 'list'){
@@ -130,6 +174,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     rug((as.vector(as.matrix(data_train[,smooth])))[which(data_train$series ==
                                                             levels(data_train$series)[series])],
         lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)
+  }
   }
 
 }

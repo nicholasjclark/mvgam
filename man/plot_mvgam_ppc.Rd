@@ -9,7 +9,7 @@ plot_mvgam_ppc(object, data_test, series, type = "density", legend_position)
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
 
-\item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season' and 'year'
+\item{data_test}{Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'season' and 'year'
 for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
 included, the observed values in the test data are compared to the model's forecast distribution for exploring
 biases in model predictions.

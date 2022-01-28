@@ -11,10 +11,11 @@ plot_mvgam_smooth(object, series = 1, smooth, newdata)
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
-\item{smooth}{\code{character} specifying the smooth term to be plotted}
+\item{smooth}{either a \code{character} or \code{integer} specifying which smooth term to be plotted}
 
 \item{newdata}{Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
-in addition to any other variables included in the linear predictor of the original model's \code{formula}}
+in addition to any other variables included in the linear predictor of the original model's \code{formula}.
+Note that this currently is only supported for plotting univariate smooths}
 }
 \value{
 A base \code{R} graphics plot
@@ -26,8 +27,9 @@ This function plots credible intervals for a series-specific smooth term on the 
 Smooth functions are shown as empirical quantiles of posterior expectations from the GAM component of the linear
 predictor across a sequence of 500 values between the variable's \code{min} and \code{max},
 while holding all other variables either at their means (for numeric varibles) or at the first
-level (factor variables). At present, only univariate smooth plots
-are allowed (no smooth interactions can be plotted). For more nuanced visualisation, supply
+level (factor variables). At present, only univariate and bivariate smooth plots
+are allowed, though note that bivariate smooths rely on default behaviour from
+\code{\link[mgcv]{plot.gam}}. For more nuanced visualisation, supply
 \code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model
 }
 \seealso{

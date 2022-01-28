@@ -5,7 +5,7 @@
 #'In each iteration, the next observation is assimilated
 #'and particles are weighted by their proposal's multivariate composite likelihood
 #'
-#'@param data_assim A \code{dataframe} of test data containing at least one more observation per series
+#'@param data_assim A \code{dataframe} or \code{list} of test data containing at least one more observation per series
 #'(beyond the last observation seen by the model when initialising particles with
 #' \code{\link{pfilter_mvgam_init}} or in previous calls to \code{pfilter_mvgam_online}.
 #'Should at least contain 'series', 'season' and 'year' for the one-step ahead horizon,
@@ -39,13 +39,50 @@ pfilter_mvgam_online = function(data_assim,
   }
 
   # Get next observations in line to be assimilated
-  data_assim %>%
-    dplyr::arrange(year, season, series) -> data_assim
-  data_assim %>%
-    dplyr::mutate(assimilated = dplyr::case_when(
-      season <= last_assim[1] & year <= last_assim[2] ~ 'yes',
-      TRUE ~ 'no'
+  if(class(data_assim) == 'list'){
+    all_needed_names <- names(obs_data)
+    # Find indices of next observation
+    data_assim_orig <- data_assim
+    list_names <- names(data_assim_orig)
+    data_assim = data.frame(year = data_assim$year,
+                          season = data_assim$season,
+                          series = data_assim$series) %>%
+      dplyr::mutate(index = dplyr::row_number()) %>%
+      dplyr::arrange(year, season, series) %>%
+      dplyr::mutate(assimilated = dplyr::case_when(
+        season <= last_assim[1] & year <= last_assim[2] ~ 'yes',
+        TRUE ~ 'no'
+      ))
+
+    temp_dat = data.frame(year = data_assim$year,
+                          season = data_assim$season,
+                          series = data_assim$series) %>%
+      dplyr::mutate(index = dplyr::row_number()) %>%
+      dplyr::arrange(year, season, series)
+    indices_assim <- temp_dat[1:n_series,'index']
+
+    # Get list object into correct order in case it is not already
+    data_assim_orig <- lapply(data_assim_orig, function(x){
+      if(is.matrix(x)){
+        matrix(x[temp_dat$index,], ncol = NCOL(x))
+      } else {
+        x[temp_dat$index]
+      }
+
+    })
+    names(data_assim_orig) <- list_names
+    data_assim_orig$assimilated <- data_assim$assimilated
+
+  } else {
+    data_assim %>%
+      dplyr::arrange(year, season, series) -> data_assim
+    data_assim %>%
+      dplyr::mutate(assimilated = dplyr::case_when(
+        season <= last_assim[1] & year <= last_assim[2] ~ 'yes',
+        TRUE ~ 'no'
       )) -> data_assim
+  }
+
 
   # Stop if all observations already assimilated
   if(all(data_assim$assimilated == 'yes')){
@@ -70,9 +107,26 @@ pfilter_mvgam_online = function(data_assim,
                   dplyr::filter(assimilated == 'no')) / length(unique(data_assim$series)))){
 
         # Get next set of observations for assimilation (one observation per series)
-        next_assim <- (data_assim %>%
-          dplyr::arrange(year, season, series))[starts[i]:ends[i],]
+    if(class(obs_data) == 'list'){
 
+      indices_assim <- (data_assim %>%
+                          dplyr::arrange(year,
+                                         season, series))[starts[i]:ends[i],'index']
+
+      # Get list object into correct format for lpmatrix prediction
+      next_assim <- lapply(data_assim_orig, function(x){
+        if(is.matrix(x)){
+          matrix(x[indices_assim,], ncol = NCOL(x))
+        } else {
+          x[indices_assim]
+        }
+
+      })
+
+    } else {
+      next_assim <- (data_assim %>%
+                       dplyr::arrange(year, season, series))[starts[i]:ends[i],]
+    }
         # Run particle filter with kernel smoothing
         particles <- pfilter_mvgam_smooth(particles = particles,
                                           mgcv_model = mgcv_model,
@@ -83,9 +137,29 @@ pfilter_mvgam_online = function(data_assim,
                                           n_cores = n_cores)
 
         # Update observation history with last assimilations
-        data_assim$assimilated[starts[i]:ends[i]] <- 'yes'
-        obs_data %>%
-          dplyr::bind_rows(data_assim[starts[i]:ends[i],]) -> obs_data
+        if(class(obs_data) == 'list'){
+          data_assim_orig$assimilated[starts[i]:ends[i]] <- 'yes'
+          obs_data <- lapply(seq_along(obs_data), function(x){
+
+            if(is.matrix(obs_data[[x]])){
+              rbind(obs_data[[x]], data_assim_orig[[x]][starts[i]:ends[i],])
+            } else {
+              if(is.factor(obs_data[[x]])){
+                factor(unlist(list(obs_data[[x]], data_assim_orig[[x]][starts[i]:ends[i]])),
+                       levels = levels(obs_data[[x]]))
+              } else {
+              c(obs_data[[x]], data_assim_orig[[x]][starts[i]:ends[i]])
+              }
+            }
+          })
+
+          names(obs_data) <- all_needed_names
+        } else {
+          data_assim$assimilated[starts[i]:ends[i]] <- 'yes'
+          obs_data %>%
+            dplyr::bind_rows(data_assim[starts[i]:ends[i],]) -> obs_data
+        }
+
   }
   last_assim <- c(tail(obs_data$season, 1),
                 tail(obs_data$year, 1))

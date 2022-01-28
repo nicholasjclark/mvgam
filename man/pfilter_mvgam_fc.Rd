@@ -19,7 +19,7 @@ pfilter_mvgam_fc(
 
 \item{n_cores}{\code{integer} specifying number of cores for generating particle forecasts in parallel}
 
-\item{data_test}{A \code{dataframe} of test data containing at least 'series', 'season' and 'year',
+\item{data_test}{A \code{dataframe} or \code{list} of test data containing at least 'series', 'season' and 'year',
 in addition to any other variables included in the linear predictor of \code{formula}}
 
 \item{plot_legend}{\code{logical} stating whether to include a legend to highlight which observations

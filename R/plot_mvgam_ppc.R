@@ -1,6 +1,6 @@
 #'Plot mvjagam posterior predictive checks for a specified series
 #'@param object \code{list} object returned from \code{mvjagam}
-#'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season' and 'year'
+#'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'season' and 'year'
 #'for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
 #'included, the observed values in the test data are compared to the model's forecast distribution for exploring
 #'biases in model predictions.

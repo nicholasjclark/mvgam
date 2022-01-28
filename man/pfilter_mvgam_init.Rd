@@ -15,7 +15,7 @@ pfilter_mvgam_init(
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
 
-\item{data_assim}{A \code{dataframe} of test data containing at least one more observation per series
+\item{data_assim}{A \code{dataframe} or \code{list} of test data containing at least one more observation per series
 (beyond the last observation seen by the model in \code{object}) to be assimilated by the particle filter.
 Should at least contain 'series', 'season' and 'year' for the one-step ahead horizon,
 in addition to any other variables included in the linear predictor of \code{object}}

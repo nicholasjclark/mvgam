@@ -65,8 +65,9 @@ eval_mvgam = function(object,
 
     data_assim <- lapply(object$obs_data, function(x){
       if(is.matrix(x)){
-        x[which(times > (eval_timepoint) &
-                  times <= (eval_timepoint + fc_horizon)),]
+        matrix(x[which(times > (eval_timepoint) &
+                  times <= (eval_timepoint + fc_horizon)),],
+               ncol = NCOL(x))
       } else {
         x[which(times > (eval_timepoint) &
                   times <= (eval_timepoint + fc_horizon))]

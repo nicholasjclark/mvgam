@@ -18,8 +18,8 @@ mvjagam(
   drift = FALSE,
   n.chains = 2,
   n.burnin = 5000,
-  n.iter = 2000,
-  thin = 2,
+  n.iter = 1000,
+  thin = 1,
   auto_update = TRUE,
   phi_prior,
   ar_prior,
@@ -38,7 +38,7 @@ For most bases the user simply supplies the knots to be used, which must match u
 (note that the number of knots is not always just k). Different terms can use different numbers of knots,
 unless they share a covariate.}
 
-\item{data_train}{A \code{dataframe} containing the model response variable and covariates
+\item{data_train}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
 'y' (the discrete outcomes; \code{NA}s allowed)
 'series' (character or factor index of the series IDs)
@@ -46,7 +46,7 @@ required by the GAM \code{formula}. Should include columns:
 and 'year' the numeric index for year.
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
-\item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season', and 'year'
+\item{data_test}{Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'season', and 'year'
 in addition to any other variables included in the linear predictor of \code{formula}. If included, the
 observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
 simulations can be obtained}

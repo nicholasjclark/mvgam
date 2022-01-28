@@ -1,7 +1,7 @@
 #'Plot mvjagam forecast uncertainty contributions for a specified series
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param data_test A \code{dataframe} containing at least 'series', 'season' and 'year' for the forecast horizon, in
+#'@param data_test A \code{dataframe} or \code{list} containing at least 'series', 'season' and 'year' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
 #'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
@@ -19,8 +19,25 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
   ends <- ends[-1]
 
   # Generate linear predictor matrix for specified series
-  series_test <- data_test[which(data_test$series ==
-                                   levels(data_train$series)[series]),]
+  if(class(data_test) == 'list'){
+    list_names <- names(data_test)
+    indices_keep <- which(data_test$series ==
+                            levels(data_train$series)[series])
+    series_test <- lapply(data_test, function(x){
+        if(is.matrix(x)){
+          matrix(x[indices_keep,], ncol = NCOL(x))
+        } else {
+          x[indices_keep]
+        }
+
+      })
+    names(series_test) <- list_names
+
+  } else {
+    series_test <- data_test[which(data_test$series ==
+                                     levels(data_train$series)[series]),]
+  }
+
   Xp <- predict(object$mgcv_model, newdata = series_test,
                 type = 'lpmatrix')
 
@@ -33,14 +50,25 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
   if(length(unique(data_train$series)) == 1){
     trend <- matrix(trend[, NCOL(trend)])
   } else {
-    trend <- trend[,(NROW(data_train) / NCOL(object$ytimes)+1):NCOL(trend)]
+    if(class(data_test) == 'list'){
+      trend <- trend[,(length(data_train$series) / NCOL(object$ytimes)+1):NCOL(trend)]
+    } else {
+      trend <- trend[,(NROW(data_train) / NCOL(object$ytimes)+1):NCOL(trend)]
+
+    }
   }
 
   n_samples <- NROW(trend)
   size <- MCMCvis::MCMCsummary(object$jags_output, 'r')$mean
 
   # Full uncertainty interval for the mean
-  preds <- matrix(NA, nrow = n_samples, ncol = NROW(series_test))
+  if(class(data_test) == 'list'){
+    ncols <- length(series_test$series)
+  } else {
+    ncols <- NROW(series_test)
+  }
+
+  preds <- matrix(NA, nrow = n_samples, ncol = ncols)
   for(i in 1:n_samples){
     preds[i,] <- Xp %*% betas[i,] + trend[i,]
   }
@@ -49,7 +77,7 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
   full_int[full_int<0] <- 0
 
   # GAM only interval
-  preds <- matrix(NA, nrow = n_samples, ncol = NROW(series_test))
+  preds <- matrix(NA, nrow = n_samples, ncol = ncols)
   for(i in 1:n_samples){
     preds[i,] <- Xp %*% betas[i,]
   }

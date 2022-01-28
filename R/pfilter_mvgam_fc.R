@@ -6,7 +6,7 @@
 #'according to their state space dynamics. The forecast is a weighted ensemble, with weights determined by
 #'each particle's proposal likelihood prior to the most recent assimilation step
 #'
-#'@param data_test A \code{dataframe} of test data containing at least 'series', 'season' and 'year',
+#'@param data_test A \code{dataframe} or \code{list} of test data containing at least 'series', 'season' and 'year',
 #'in addition to any other variables included in the linear predictor of \code{formula}
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
 #'@param file_path \code{character} string specifying the file path where the particles have been saved
@@ -62,12 +62,48 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   }
 
   # Get all observations that have not yet been assimilated
-  data_test %>%
-    dplyr::arrange(year, season, series) -> data_test
-  last_row <- max(which(data_test$season == last_assim[1] & data_test$year == last_assim[2]))
-  series_test <- data_test[(last_row + 1):NROW(data_test),]
+  if(class(data_test) == 'list'){
+    data_test_orig <- data_test
+    list_names <- names(data_test_orig)
+    data_test = data.frame(year = data_test$year,
+                            season = data_test$season,
+                            series = data_test$series) %>%
+      dplyr::mutate(index = dplyr::row_number()) %>%
+      dplyr::arrange(year, season, series)
+
+    data_test_orig <- lapply(data_test_orig, function(x){
+      if(is.matrix(x)){
+        matrix(x[data_test$index,], ncol = NCOL(x))
+      } else {
+        x[data_test$index]
+      }
+
+    })
+    names(data_test_orig) <- list_names
+    last_row <- max(which(data_test$season == last_assim[1] & data_test$year == last_assim[2]))
+
+    series_test <- lapply(data_test_orig, function(x){
+      if(is.matrix(x)){
+        matrix(x[(last_row + 1):NROW(data_test),], ncol = NCOL(x))
+      } else {
+        x[(last_row + 1):NROW(data_test)]
+      }
+    })
+
+  } else {
+    data_test %>%
+      dplyr::arrange(year, season, series) -> data_test
+    last_row <- max(which(data_test$season == last_assim[1] & data_test$year == last_assim[2]))
+    series_test <- data_test[(last_row + 1):NROW(data_test),]
+  }
+
   n_series <- (length(levels(data_test$series)))
-  fc_horizon <- NROW(series_test) / n_series
+
+  if(class(series_test) == 'list'){
+    fc_horizon <- length(series_test$series) / n_series
+  } else {
+    fc_horizon <- NROW(series_test) / n_series
+  }
 
   # Generate linear predictor matrix
   Xp <- predict(mgcv_model,
@@ -145,8 +181,10 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   names(series_fcs) <- levels(data_test$series)
 
   # Generate plots of forecasts for each series
-  obs_data %>%
-    dplyr::arrange(year, season, series) -> obs_data
+  if(class(obs_data) != 'list'){
+    obs_data %>%
+      dplyr::arrange(year, season, series) -> obs_data
+  }
 
   plot_series_fc = function(series, preds, ylim, plot_legend = TRUE){
     all_obs <- obs_data$y[which(as.numeric(obs_data$series) == series)]

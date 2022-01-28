@@ -6,7 +6,7 @@
 #'forecast distribution
 #'
 #'@param object \code{list} object returned from \code{mvjagam}
-#'@param data_assim A \code{dataframe} of test data containing at least one more observation per series
+#'@param data_assim A \code{dataframe} or \code{list} of test data containing at least one more observation per series
 #'(beyond the last observation seen by the model in \code{object}) to be assimilated by the particle filter.
 #'Should at least contain 'series', 'season' and 'year' for the one-step ahead horizon,
 #'in addition to any other variables included in the linear predictor of \code{object}
@@ -29,10 +29,32 @@ pfilter_mvgam_init = function(object,
 data_train <- object$obs_data
 n_series <- NCOL(object$ytimes)
 
-# Next observation for assimilation when forming particles (ensure data_assim has been arranged correctly)
-data_assim %>%
-  dplyr::arrange(year, season, series) -> data_assim
-series_test <- data_assim[1:n_series,]
+# Next observation for assimilation (ensure data_assim is arranged correctly)
+if(class(object$obs_data) == 'list'){
+  # Find indices of next observation
+  temp_dat = data.frame(year = data_assim$year,
+                        season = data_assim$season,
+                        series = data_assim$series) %>%
+    dplyr::mutate(index = dplyr::row_number()) %>%
+    dplyr::arrange(year, season, series)
+  indices_assim <- temp_dat[1:n_series,'index']
+
+  # Get list object into correct format for lpmatrix prediction
+  series_test <- lapply(data_assim, function(x){
+    if(is.matrix(x)){
+      matrix(x[indices_assim,], ncol = NCOL(x))
+    } else {
+      x[indices_assim]
+    }
+
+  })
+
+} else {
+  data_assim %>%
+    dplyr::arrange(year, season, series) -> data_assim
+  series_test <- data_assim[1:n_series,]
+}
+
 
 if(length(unique(series_test$season)) > 1){
   stop('data_assim should have one observation per series for the next seasonal timepoint')
@@ -84,13 +106,7 @@ if(object$use_lv){
 }
 
 # Beta coefficients for GAM component
-betas_orig <- MCMCvis::MCMCchains(object$jags_output, 'b')
-betas <- matrix(NA, nrow = dim(betas_orig)[1],
-                ncol = NCOL(MCMCvis::MCMCchains(object$jags_output, 'b')))
-betas_hpd <- apply(betas_orig, 2, function(x) hpd(x)[2])
-for(i in 1:dim(betas_orig)[1]){
-  betas[i,] <- betas_hpd
-}
+betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
 
 # Phi estimates for latent trend drift terms
 phis <- MCMCvis::MCMCchains(object$jags_output, 'phi')
@@ -280,10 +296,33 @@ stopCluster(cl)
 
 # Calculate ESS and save outputs for later online filtering
 mgcv_model <- object$mgcv_model
-data_train$assimilated <- 'no'
 series_test$assimilated <- 'yes'
-data_train %>%
-  dplyr::bind_rows(series_test) -> obs_data
+
+if(class(data_train) == 'list'){
+
+  data_train$assimilated <- rep('no', length(data_train$y))
+  obs_data <- lapply(seq_along(data_train), function(x){
+
+    if(is.matrix(data_train[[x]])){
+      rbind(data_train[[x]], series_test[[x]])
+    } else {
+      if(is.factor(data_train[[x]])){
+        factor(unlist(list(data_train[[x]], series_test[[x]])),
+               levels = levels(data_train[[x]]))
+      } else {
+        c(data_train[[x]], series_test[[x]])
+      }
+    }
+  })
+
+  names(obs_data) <- names(series_test)
+
+} else {
+  data_train$assimilated <- 'no'
+  data_train %>%
+    dplyr::bind_rows(series_test) -> obs_data
+}
+
 weights <- (unlist(lapply(seq_along(particles), function(x){
   tail(particles[[x]]$weight, 1)})))
 weights <- weights / sum(weights)
