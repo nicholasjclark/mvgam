@@ -14,16 +14,16 @@ pdf('NEON_manuscript/Figures/Fig5_ixodes_example.pdf', width = 6.25, height = 5.
 par(mfrow = c(2, 2),
     mgp = c(2.5, 1, 0),
     mai = c(0.6, 0.6, 0.2, 0.2))
-plot_mvgam_smooth(fit_hyp1$out_gam_mod, series = 3, smooth = 'season')
-plot_mvgam_smooth(fit_hyp1$out_gam_mod, series = 3, smooth = 'cum_gdd')
-plot_mvgam_fc(fit_hyp1$out_gam_mod, series = 3,
+plot_mvgam_smooth(fit_hyp1$out_gam_mod, series = 4, smooth = 'season')
+plot_mvgam_smooth(fit_hyp1$out_gam_mod, series = 4, smooth = 'cum_gdd')
+plot_mvgam_fc(fit_hyp1$out_gam_mod, series = 4,
                   data_test = all_data$data_test,
               hide_xlabels = TRUE)
 axis(1, at = seq(0, dim(fit_hyp3$out_gam_mod$ytimes)[1],
                  b = 26), labels = seq(2015, 2020), cex.axis = 1)
 text(x=NROW(all_data$data_train) / NCOL(fit_hyp2$out_gam_mod$ytimes) + 6.5,
-     y=18, labels = 'Forecast horizon', srt = -90)
-plot_mvgam_trend(fit_hyp1$out_gam_mod, series = 3,
+     y=45, labels = 'Forecast horizon', srt = -90)
+plot_mvgam_trend(fit_hyp1$out_gam_mod, series = 4,
               data_test = all_data$data_test,
               hide_xlabels = TRUE)
 axis(1, at = seq(0, dim(fit_hyp3$out_gam_mod$ytimes)[1],

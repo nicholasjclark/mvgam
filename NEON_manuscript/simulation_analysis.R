@@ -252,7 +252,7 @@ ggplot(drps_plot_dat %>%
   facet_wrap(~prop_missing, labeller = as_labeller(prop_names), scales = 'free_x') +
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
   theme_bw() + coord_flip() + labs(x = '', y = 'Normalised DRPS calibration (lower is better)',
-                                   title = 'Moderate trend') -> plot1
+                                   title = 'Moderate dynamics') -> plot1
 
 ggplot(drps_plot_dat %>%
          dplyr::filter(trend_rel == 0.7),
@@ -261,7 +261,7 @@ ggplot(drps_plot_dat %>%
   facet_wrap(~prop_missing, labeller = as_labeller(prop_names), scales = 'free_x') +
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
   theme_bw() + coord_flip() + labs(x = '', y = 'Normalised DRPS calibration (lower is better)',
-                                   title = 'Strong trend') -> plot2
+                                   title = 'Strong dynamics') -> plot2
 pdf('NEON_manuscript/Figures/Fig2_simulation_drps_missing_plot.pdf')
 cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()
@@ -274,7 +274,7 @@ ggplot(drps_plot_dat %>%
   facet_wrap(~n_series, labeller = as_labeller(n_names), scales = 'free_x') +
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
   theme_bw() + coord_flip() + labs(x = '', y = 'Normalised DRPS calibration (lower is better)',
-                                   title = 'Moderate trend') -> plot1
+                                   title = 'Moderate dynamics') -> plot1
 
 ggplot(drps_plot_dat %>%
          dplyr::filter(trend_rel == 0.7),
@@ -283,7 +283,7 @@ ggplot(drps_plot_dat %>%
   facet_wrap(~n_series, labeller = as_labeller(n_names), scales = 'free_x') +
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
   theme_bw() + coord_flip() + labs(x = '', y = 'Normalised DRPS calibration (lower is better)',
-                                   title = 'Strong trend') -> plot2
+                                   title = 'Strong dynamics') -> plot2
 pdf('NEON_manuscript/Figures/FigS1_simulation_drps_nseries_plot.pdf')
 cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()
@@ -297,7 +297,7 @@ ggplot(coverage_plot_dat %>%
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
   ylim(0, 1) +
   theme_bw() + coord_flip() + labs(x = '', y = '90% interval coverage',
-                                   title = 'Moderate trend') -> plot1
+                                   title = 'Moderate dynamics') -> plot1
 
 ggplot(coverage_plot_dat %>%
          dplyr::filter(trend_rel == 0.7),
@@ -308,7 +308,7 @@ ggplot(coverage_plot_dat %>%
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
   ylim(0, 1) +
   theme_bw() + coord_flip() + labs(x = '', y = '90% interval coverage',
-                                   title = 'Strong trend') -> plot2
+                                   title = 'Strong dynamics') -> plot2
 pdf('NEON_manuscript/Figures/FigS2_simulation_coverage_missing_plot.pdf')
 cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()
@@ -323,7 +323,7 @@ ggplot(coverage_plot_dat %>%
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
   ylim(0, 1) +
   theme_bw() + coord_flip() + labs(x = '', y = '90% interval coverage',
-                                   title = 'Moderate trend') -> plot1
+                                   title = 'Moderate dynamics') -> plot1
 
 ggplot(coverage_plot_dat %>%
          dplyr::filter(trend_rel == 0.7),
@@ -334,7 +334,7 @@ ggplot(coverage_plot_dat %>%
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
   ylim(0, 1) +
   theme_bw() + coord_flip() + labs(x = '', y = '90% interval coverage',
-                                   title = 'Strong trend') -> plot2
+                                   title = 'Strong dynamics') -> plot2
 pdf('NEON_manuscript/Figures/Fig3_simulation_coverage_nseries_plot.pdf')
 cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()
