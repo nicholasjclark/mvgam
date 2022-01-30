@@ -46,8 +46,7 @@ mod1 <- mvjagam(data_train = dat$data_train,
                 n_lv = 2,
                 family = 'nb',
                 trend_model = 'RW',
-                n.burnin = 2000,
-                auto_update = F)
+                burnin = 2000)
 ```
 
 Look at a few plots. The estimated smooth function
@@ -76,8 +75,7 @@ mod2 <- mvjagam(data_train = dat$data_train,
                 n_lv = 8,
                 family = 'nb',
                 trend_model = 'RW',
-                n.burnin = 2000,
-                auto_update = F)
+                burnin = 2000)
 ```
 
 The same plots as model 1 to see if this model has also fit the data well
@@ -141,8 +139,7 @@ trends_mod1 <- mvjagam(data_train = trends_data$data_train,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
                       family = 'nb',
-                      n.burnin = 5000,
-                      auto_update = F)
+                      burnin = 5000)
 ```
 
 Given that these series could potentially be following a hierarchical seasonality, we will also trial a slghtly more complex model with an extra smoothing term per series that allows its seasonal curve to deviate from the global seasonal smooth. Ignore the warning about repeated smooths, as this is not an issue for estimation.
@@ -154,8 +151,7 @@ trends_mod2 <- mvjagam(data_train = trends_data$data_train,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
                       family = 'nb',
-                      n.burnin = 5000,
-                      auto_update = F)
+                      burnin = 5000)
 ```
 
 How can we compare these models to ensure we choose one that performs well and provides useful inferences? Beyond posterior retrodictive and predictive checks, we can take advantage of the fact that `mvgam` fits an `mgcv` model to provide all the necessary penalty matrices, as well as to identify good initial values for smoothing and beta parameters. Because we did not modify this model by adding a trend component we can still inspect the usual `mgcv` model comparison routines
@@ -179,11 +175,11 @@ summary(trends_mod2$mgcv_model)
 
 WE can also use `JAGS` routines for interrogating models. Which model minimises in-sample DIC?
 ```{r}
-dic.samples(trends_mod1$jags_model, 500)
+runjags::extract(trends_mod1$jags_model, 'dic')
 ```
 
 ```{r}
-dic.samples(trends_mod2$jags_model, 500)
+runjags::extract(trends_mod2$jags_model, 'dic')
 ```
 
 Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow an AR1 process, and we will rely on the exponential penalties to help regularise any un-needed factors by setting `n_lv = 4`
@@ -198,8 +194,7 @@ trends_mod3 <- mvjagam(data_train = trends_data$data_train,
                       n_lv = 4,
                       family = 'nb',
                       drift = T,
-                      n.burnin = 5000,
-                      auto_update = F)
+                      n.burnin = 5000)
 ```
 
 

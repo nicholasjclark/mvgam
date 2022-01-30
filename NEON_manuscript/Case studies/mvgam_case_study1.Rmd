@@ -58,7 +58,7 @@ head(fake_data$data_test)
 ```
 
 As a first pass at modelling this series, we will fit a GAM that includes a seasonal smooth and a yearly smooth, as well as their tensor product interaction. As the seasonality is cyclic, we will use a cyclic cubic regression spline for `season`. The knots are set so that the boundaries of the cyclic smooth match up between December 31 and January 1. We will stick with the default thin plate regression spline for `year`. This is similar to what we might do when fitting a model in `mgcv` to try and forecast ahead, except here we also have an explicit model for the residual component. `mvgam` uses the `jagam` function from the `mgcv` package to generate a skeleton `JAGS` file and updates that file to incorporate any dynamic trend components (so far limited to no trend, random walks or AR models up to order 3). This is advantageous as any GAM that is allowed in `mgcv` can in principle be used in `mvgam` to fit dynamic linear models with smooth functions for nonlinear covariate effects. For multivariate series, `mvgam` also includes an option for dimension reduction by inducing trend correlations via a dynamic factor process. Here we use the Negative Binomial family and a burnin length of `2000` iterations (in practice we would probably run these models for a bit longer, but they tend to converge rather quickly for univariate series thanks to the useful starting values supplied by `jagam`). Note that feeding the `data_test` object does not mean that these values are used in training of the model. Rather, they are included as `NA` so that we can automatically create a forecast from the posterior predictions for these observations. This is useful for plotting forecasts without needing to run new data through the model's equations later on
-```{r}
+```{r, message=FALSE, warning=FALSE}
 mod1 <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,
                formula = y ~ s(season, bs = c('cc'), k = 12) +
@@ -67,8 +67,7 @@ mod1 <- mvjagam(data_train = fake_data$data_train,
                knots = list(season = c(0.5, 12.5)),
                family = 'nb',
                trend_model = 'None',
-               n.burnin = 2000,
-               auto_update = F)
+               burnin = 2000)
 ```
 
 We can view the `JAGS` model file that has been generated to see the additions that have been made to the base `gam` model. If the user selects `return_jags_data = TRUE` when calling `mvjagam`, this file can be modified and the resulting `jags_data` object can also be modified to fit more complex Bayesian models. Note that here the AR and phi terms have been set to zero as this model does not include a dynamic trend component
@@ -158,7 +157,7 @@ plot_mvgam_ppc(mod1, series = 1, type = 'pit', data_test = fake_data$data_test)
 ```
 
 There are some very clear problems with the way this model is generating future predictions. Perhaps a different smooth function for `year` can help? Here we fit our original model again but use a different smooth term for `year` to try and capture the long-term trend (using `B` splines with multiple penalties, following the excellent example by Gavin Simpson about [extrapolating with smooth terms](https://fromthebottomoftheheap.net/2020/06/03/extrapolating-with-gams/)). This is similar to what we might do when trying to forecast ahead from a more wiggly function, as `B` splines have useful properties by allowing the penalty to be extended into the range of values we wish to predict (in this case, the years in `data_test`)
-```{r}
+```{r, message=FALSE, warning=FALSE}
 mod2 <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,
                formula = y ~ s(season, bs = c('cc'), k = 12) +
@@ -171,8 +170,7 @@ mod2 <- mvjagam(data_train = fake_data$data_train,
                                      max(fake_data$data_test$year))),
                family = 'nb',
                trend_model = 'None',
-               n.burnin = 2000,
-               auto_update = F)
+               burnin = 2000)
 ```
 
 Again as we haven't modified the base `gam` much, the summary from the `mgcv` model is fairly accurate
@@ -217,7 +215,7 @@ plot_mvgam_ppc(mod2, series = 1, type = 'pit', data_test = fake_data$data_test)
 ```
 
 Can we improve the forecasts by removing our reliance on extrapolation? Now we will fit a model in which the GAM component of the linear predictor captures the repeated seasonality (again with a cyclic smooth) and a dynamic latent trend captures the residual process using AR parameters (up to order 3). This model is a mildly modified version of the base `mgcv` model where the linear predictor is augmented with the latent trend component. Slightly longer burnin is used here due to the added complexity of the time series component, but the model still fits in ~ 30 seconds on most machines
-```{r message = F}
+```{r, message=FALSE, warning=FALSE}
 mod3 <- mvjagam(data_train = fake_data$data_train,
                 data_test = fake_data$data_test,
                 formula = y ~ s(season, bs = c('cc'), k = 12) + 
@@ -226,8 +224,7 @@ mod3 <- mvjagam(data_train = fake_data$data_train,
                 family = 'nb',
                 trend_model = 'AR3',
                 drift = TRUE,
-                n.burnin = 2000,
-                auto_update = F)
+                burnin = 2000)
 ```
                
 In this case the fitted model is more different to the base `mgcv` model that was used in `jagam` to produce the skeleton `JAGS` file, so the summary of that base model is less accurate. But we can still check the model summary for the `mvjagam` mdoel to examine convergence for key parameters
@@ -272,7 +269,7 @@ plot_mvgam_trend(mod3, series = 1, data_test = fake_data$data_test)
 ```
 
 Benchmarking against "null" models is a very important part of evaluating a proposed forecast model. After all, if our complex dynamic model can't generate better predictions then a random walk or mean forecast, is it really telling us anything new about the data-generating process? Here we examine the model comparison utilities in `mvgam`. Here we illustrate how this can be done in `mvgam` by fitting a simpler model by smoothing on a white noise covariate rather than on the seasonal variable. Because the white noise covariate is not informative and we are using a random walk for the trend process, this model essentially becomes a Poisson observation model over a dynamic random walk process.
-```{r message = F}
+```{r, message=FALSE, warning=FALSE}
 fake_data$data_train$fake_cov <- rnorm(NROW(fake_data$data_train))
 fake_data$data_test$fake_cov <- rnorm(NROW(fake_data$data_test))
 mod4 <- mvjagam(data_train = fake_data$data_train,
@@ -281,8 +278,7 @@ mod4 <- mvjagam(data_train = fake_data$data_train,
                family = 'poisson',
                trend_model = 'RW',
                drift = TRUE,
-               n.burnin = 3000,
-               auto_update = F)
+               burnin = 3000)
 ```
 
 Look at this model's proposed forecast
@@ -396,7 +392,7 @@ lynx_test = lynx_full[41:50, ]
 ```
 
 The best-forecasting model in the course was with nonlinear smooths of lags 1 and 2; we use those here is that we also include a cyclic smooth for the 19-year cycles as this seems like an important feature, as well as a yearly smooth for the long-term trend. Following the information about spline extrapolation above, we again fit a cubic `B` spline for the trend with a mix of penalties to try and reign in wacky extrapolation behaviours, and we extend the penalty to cover the years that we wish to predict. This will hopefully give us better uncertainty estimates for the forecast. In this example we assume the observations are Poisson distributed
-```{r}
+```{r, message=FALSE, warning=FALSE}
 lynx_mgcv = gam(population ~ 
                   s(season, bs = 'cc', k = 19) +
                   s(year, bs = 'bs', m = c(3, 2, 1, 0)) + 
@@ -572,15 +568,14 @@ lynx_mgcv2_drps <- drps_mcmc_object(truth = lynx_test$population[1:10],
 
                    
 This forecast is highly overconfident, with very unrealistic uncertainty intervals due to the interpolation behaviours of the lag smooths. You can certainly keep trying different formulations (our experience is that the B spline variant above produces the best forecasts from any tested `mgcv` model, but we did not test an exhaustive set), but hopefully it is clear that forecasting using splines is tricky business and it is likely that each time you do it you'll end up honing in on different combinations of penalties, knot selections etc.... Now we will fit an `mvgam` model for comparison. This model fits a similar model to the `mgcv` model directly above but with a full time series model for the errors (in this case an `AR1` process), rather than smoothing splines that do not incorporate a concept of the future. We do not use a `year` term to reduce any possible extrapolation and because the latent dynamic component should capture this temporal variation. We estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
-```{r}
+```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvjagam(data_train = lynx_train,
                data_test = lynx_test,
                formula = y ~ s(season, bs = 'cc', k = 19),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR1',
-               n.burnin = 5000,
-               auto_update = F)
+               burnin = 5000)
 ```
 
 Calculate the out of sample forecast from the fitted `mvgam` model and plot

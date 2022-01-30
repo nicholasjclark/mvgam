@@ -16,11 +16,11 @@ mvjagam(
   n_lv,
   trend_model = "RW",
   drift = FALSE,
-  n.chains = 2,
-  n.burnin = 5000,
-  n.iter = 1000,
-  thin = 1,
-  auto_update = TRUE,
+  chains = 2,
+  burnin = 5000,
+  n_samples = 2000,
+  thin = 4,
+  parallel = TRUE,
   phi_prior,
   ar_prior,
   r_prior,
@@ -78,16 +78,19 @@ trend is expected to broadly follow a non-zero slope. Note that if the latent tr
 the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
 predictor (which it is by default when calling \code{\link[mcgv]{jagam}}). Therefore this defaults to \code{FALSE}}
 
-\item{n.chains}{\code{integer} specifying the number of parallel chains for the model}
+\item{chains}{\code{integer} specifying the number of parallel chains for the model}
 
-\item{n.burnin}{\code{integer} specifying the number of iterations of the Markov chain to run during
+\item{burnin}{\code{integer} specifying the number of iterations of the Markov chain to run during
 adaptive mode to tune sampling algorithms}
 
-\item{n.iter}{\code{integer} specifying the number of iterations of the Markov chain to run for sampling the posterior distribution}
+\item{n_samples}{\code{integer} specifying the number of iterations of the Markov chain to run for
+sampling the posterior distribution}
 
-\item{auto_update}{\code{logical}. If \code{TRUE}, the model is run for up to \code{15,000} additional
-iterations, or until the lower 10th percentile of effective sample sizes for the GAM smoothing
-parameters and beta coefficients reaches \code{100}}
+\item{thin}{Thinning interval for monitors}
+
+\item{parallel}{\code{logical} specifying whether multiple cores should be used for
+for generating \code{JAGS} simulations in parallel. One core per chain will be used so be aware of
+how many chains you are calling when resources are finite}
 
 \item{phi_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the drift terms/intercepts
 in the latent trends}
@@ -123,9 +126,9 @@ A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modi
 state space trends. Prior distributions for most important model parameters can be altered by the user to inspect model
 sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 accordingly. The model parameters are esimated in a Bayesian framework using Gibbs sampling
-in \code{\link[rjags]{jags.model}}. When using a dynamic factor model for the trends, factor loadings are given
-regularized horseshoe priors to theoretically allow some factors to be dropped from the model by squeezing loadings for
-an entire factor to zero. This is done to help protect against selecting too many latent factors than are needed to
+in \code{\link[run.jags]{runjags}}. When using a dynamic factor model for the trends, factor precisions are given
+regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
+factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
 capture dependencies in the data, so it can often be advantageous to set n_lv to a slightly larger number. However
 larger numbers of factors do come with additional computational costs so these should be balanced as well.
 For the time being, all series are assumed to have the same overdispersion

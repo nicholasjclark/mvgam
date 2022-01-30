@@ -54,17 +54,14 @@ lynx_test = lynx_full[51:60, ]
 ```
 
 Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process with drift), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
-```{r}
+```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvjagam(data_train = lynx_train,
                data_test = lynx_test,
                formula = y ~ s(season, bs = 'cc', k = 19),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               n.burnin = 5000,
-               n.iter = 5000,
-               thin = 5,
-               auto_update = F)
+               burnin = 5000)
 ```
 
 Perform a series of posterior predictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine simulated kernel densities for posterior predictions (`yhat`) and compare to the density of the observations (`y`)
@@ -135,16 +132,13 @@ plot_mvgam_resids(lynx_mvgam)
 ```
 
 Another useful utility of `mvgam` is the ability to use rolling window forecasts to evaluate competing models that may represent different hypotheses about the series dynamics. Here we will fit a poorly specified model to showcase how this evaluation works. In this model, we ignore the cyclic pattern of seasonality and force it to be fairly non-wiggly. We also use a random walk process for the trend
-```{r}
+```{r, message=FALSE, warning=FALSE}
 lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
                data_test = lynx_test,
                formula = y ~ s(season, bs = 'gp', k = 3),
                family = 'poisson',
                trend_model = 'RW',
-               n.burnin = 5000,
-               n.iter = 5000,
-               thin = 5,
-               auto_update = F)
+               burnin = 5000)
 
 ```
 

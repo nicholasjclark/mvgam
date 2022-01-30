@@ -44,13 +44,15 @@
 #'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 #'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
 #'predictor (which it is by default when calling \code{\link[mcgv]{jagam}}). Therefore this defaults to \code{FALSE}
-#'@param n.chains \code{integer} specifying the number of parallel chains for the model
-#'@param n.burnin \code{integer} specifying the number of iterations of the Markov chain to run during
+#'@param chains \code{integer} specifying the number of parallel chains for the model
+#'@param burnin \code{integer} specifying the number of iterations of the Markov chain to run during
 #'adaptive mode to tune sampling algorithms
-#'@param n.iter \code{integer} specifying the number of iterations of the Markov chain to run for sampling the posterior distribution
-#'@param auto_update \code{logical}. If \code{TRUE}, the model is run for up to \code{15,000} additional
-#'iterations, or until the lower 10th percentile of effective sample sizes for the GAM smoothing
-#'parameters and beta coefficients reaches \code{100}
+#'@param n_samples \code{integer} specifying the number of iterations of the Markov chain to run for
+#'sampling the posterior distribution
+#'@param thin Thinning interval for monitors
+#'@param parallel \code{logical} specifying whether multiple cores should be used for
+#'for generating \code{JAGS} simulations in parallel. One core per chain will be used so be aware of
+#'how many chains you are calling when resources are finite
 #'@param phi_prior \code{character} specifying (in JAGS syntax) the prior distribution for the drift terms/intercepts
 #'in the latent trends
 #'@param ar_prior \code{character} specifying (in JAGS syntax) the prior distribution for the AR terms
@@ -67,9 +69,9 @@
 #'state space trends. Prior distributions for most important model parameters can be altered by the user to inspect model
 #'sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 #'accordingly. The model parameters are esimated in a Bayesian framework using Gibbs sampling
-#'in \code{\link[rjags]{jags.model}}. When using a dynamic factor model for the trends, factor loadings are given
-#'regularized horseshoe priors to theoretically allow some factors to be dropped from the model by squeezing loadings for
-#'an entire factor to zero. This is done to help protect against selecting too many latent factors than are needed to
+#'in \code{\link[run.jags]{runjags}}. When using a dynamic factor model for the trends, factor precisions are given
+#'regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
+#'factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
 #'capture dependencies in the data, so it can often be advantageous to set n_lv to a slightly larger number. However
 #'larger numbers of factors do come with additional computational costs so these should be balanced as well.
 #'For the time being, all series are assumed to have the same overdispersion
@@ -99,11 +101,11 @@ mvjagam = function(formula,
                    n_lv,
                    trend_model = 'RW',
                    drift = FALSE,
-                   n.chains = 2,
-                   n.burnin = 5000,
-                   n.iter = 1000,
-                   thin = 1,
-                   auto_update = TRUE,
+                   chains = 2,
+                   burnin = 5000,
+                   n_samples = 2000,
+                   thin = 4,
+                   parallel = TRUE,
                    phi_prior,
                    ar_prior,
                    r_prior,
@@ -704,16 +706,6 @@ for (i in 1:n) {
   # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS
   # will take a while to optimise the samplers, so long adaptation with little 'burnin'
   # is more crucial than little adaptation but long 'burnin' https://mmeredith.net/blog/2016/Adapt_or_burn.htm
-  load.module("glm")
-  gam_mod <- jags.model(model_file_jags,
-                        data = ss_jagam$jags.data,
-                        inits = ss_jagam$jags.ini,
-                        n.chains = n.chains,
-                        n.adapt = 0)
-  unlink('base_gam.txt')
-
-  # Update the model for the burnin period
-  adapt(gam_mod, n.iter = n.burnin, end.adaptation = TRUE)
 
   # Gather posterior samples for the specified parameters
   if(!use_lv){
@@ -725,34 +717,41 @@ for (i in 1:n) {
                'ar1', 'ar2', 'ar3')
   }
 
-  out_gam_mod <- coda.samples(gam_mod,
-                              variable.names = param,
-                              n.iter = n.iter,
-                              thin = thin)
-
-  if(auto_update){
-  # Update until reasonable convergence in the form of Rhat and ESS
-    if(!use_lv){
-      update_params <- c('rho', 'b', 'tau')
-    } else {
-      update_params <- c('rho', 'b')
-    }
-  mod_summary <- MCMCvis::MCMCsummary(out_gam_mod, update_params)
-  for(i in 1:3){
-    if(quantile(mod_summary$Rhat, 0.75, na.rm = T) <= 1.25 &
-       quantile(mod_summary$n.eff, 0.25) >= 90){
-      break;
-    }
-    cat('Convergence not reached. Extending burnin...\n')
-    update(gam_mod, min(5000, n.burnin))
-    out_gam_mod <- rjags::coda.samples(gam_mod,
-                                       variable.names = param,
-                                       n.iter = n.iter,
-                                       thin = thin)
-    mod_summary <- MCMCvis::MCMCsummary(out_gam_mod, update_params)
+  n.burn <- burnin
+  #cat(model_file, file = 'base_gam.txt', sep = '\n', append = T)
+  if(parallel){
+    cl <- parallel::makePSOCKcluster(min(c(chains, parallel::detectCores() - 1)))
+    setDefaultCluster(cl)
+    gam_mod <- runjags::run.jags(model = model_file,
+                                 data = ss_jagam$jags.data,
+                                 modules = 'glm',
+                                 inits = ss_jagam$jags.ini,
+                                 n.chains = chains,
+                                 # Rely on long adaptation to tune samplers appropriately
+                                 adapt = max(1000, n.burn - 1000),
+                                 burnin = 1000,
+                                 sample = n_samples,
+                                 thin = thin,
+                                 method = "rjparallel",
+                                 monitor = param,
+                                 cl = cl)
+  } else {
+    gam_mod <- runjags::run.jags(model = model_file,
+                                 data = ss_jagam$jags.data,
+                                 modules = 'glm',
+                                 inits = ss_jagam$jags.ini,
+                                 n.chains = chains,
+                                 # Rely on long adaptation to tune samplers appropriately
+                                 adapt = max(1000, n.burn - 1000),
+                                 burnin = 1000,
+                                 sample = n_samples,
+                                 thin = thin,
+                                 method = "rjags",
+                                 monitor = param)
   }
-  }
 
+  out_gam_mod <- coda::as.mcmc.list(gam_mod)
+  unlink('base_gam.txt')
   unlink(fil)
 
   if(missing(upper_bounds)){
@@ -822,8 +821,11 @@ for (i in 1:n) {
   names(series_resids) <- levels(data_train$series)
 
   # Get smooth penalty names in more interpretable format
-  sam <- jags.samples(gam_mod, c("b","rho"), n.iter=10, thin=1)
+  sam <- jags.samples(runjags::as.jags(gam_mod, adapt = 10, quiet = T),
+                      c("b","rho"), n.iter = 100, thin = 1)
   jam <- mgcv::sim2jam(sam, ss_jagam$pregam, edf.type = 1)
+  jam$sp <- exp(sam$rho)
+
   name_starts <- unlist(purrr:::map(jam$smooth, 'first.sp'))
   name_ends <- unlist(purrr:::map(jam$smooth, 'last.sp'))
 
@@ -849,6 +851,7 @@ for (i in 1:n) {
                    jags_data = ss_jagam$jags.data,
                    jags_inits = ss_jagam$jags.ini,
                    mgcv_model = ss_gam,
+                   jam_model = jam,
                    jags_model = gam_mod,
                    ytimes = ytimes,
                    resids = series_resids,
@@ -867,6 +870,7 @@ for (i in 1:n) {
                    sp_names = rho_names,
                    mgcv_model = ss_gam,
                    jags_model = gam_mod,
+                   jam_model = jam,
                    ytimes = ytimes,
                    resids = series_resids,
                    use_lv = use_lv,

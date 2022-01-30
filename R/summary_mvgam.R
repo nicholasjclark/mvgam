@@ -15,12 +15,9 @@
 #'@return A \code{list} is printed on-screen showing the summaries for the model
 #'@export
 summary_mvgam = function(object){
-# Convert samples for betas and rhos to mgcv format using sim2jam; this is necessary to
-# calculate effective degrees of freedom and approximate p-values for smooth terms
-  sam <- jags.samples(object$jags_model,c("b","rho"),n.iter=500,thin=1)
-  jam <- mgcv::sim2jam(sam, object$pregam, edf.type = 1)
-  jam$sp <- exp(sam$rho)
-  rm(sam)
+  # Grab the sim2jam object, which is needed to
+  # calculate effective degrees of freedom and approximate p-values for smooth terms
+  jam = object$jam_model
 
   #### Functions used directly from Simon Wood's mgcv summary functions R script:
   # https://github.com/cran/mgcv/blob/master/R/mgcv.r

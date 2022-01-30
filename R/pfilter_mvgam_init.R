@@ -118,7 +118,7 @@ ar3s <- MCMCvis::MCMCchains(object$jags_output, 'ar3')
 
 # Negative binomial size estimate
 sizes <- as.matrix(rep(hpd(MCMCvis::MCMCchains(object$jags_output, 'r'))[2],
-                       dim(betas_orig)[1]))
+                       dim(betas)[1]))
 
 # Generate sample sequence for n_particles
 if(n_particles < dim(phis)[1]){
