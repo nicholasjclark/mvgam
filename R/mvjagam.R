@@ -24,6 +24,9 @@
 #'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
 #'observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
 #'simulations can be obtained
+#'@param drop_intercept \code{logical}. If \code{TRUE}, the global intercept will be set to zero in the \code{JAGS} model,
+#'which may be necessary when estimating models for univariate series with latent trend components to preserve identifiability
+#'(otherwise the latent trend may compete with the intercept, especially if it is relatively stationary)
 #'@param prior_simulation \code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 #'simulations from prior distributions are returned
 #'@param return_jags_data \code{logical}. If \code{TRUE}, the list of data that is needed to fit the \code{JAGS}
@@ -37,8 +40,12 @@
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
 #'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(5, floor(n_series / 2))}
 #'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
-#''None' (modelled as a Gaussian static white noise process), 'RW' (random walk with possible drift),
-#''AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
+#''None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mcgv]{gam}}),
+#''Noise' (modelled as a Gaussian static white noise process),
+#''RW' (random walk with possible drift),
+#''AR1' (AR1 model with intercept),
+#''AR2' (AR2 model with intercept) or
 #''AR3' (AR3 model with intercept)
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 #'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
@@ -51,8 +58,8 @@
 #'sampling the posterior distribution
 #'@param thin Thinning interval for monitors
 #'@param parallel \code{logical} specifying whether multiple cores should be used for
-#'for generating \code{JAGS} simulations in parallel. One core per chain will be used so be aware of
-#'how many chains you are calling when resources are finite
+#'for generating \code{JAGS} simulations in parallel. If \code{TRUE}, the number of cores to use will be
+#'\code{min(c(chains, parallel::detectCores() - 1))}
 #'@param phi_prior \code{character} specifying (in JAGS syntax) the prior distribution for the drift terms/intercepts
 #'in the latent trends
 #'@param ar_prior \code{character} specifying (in JAGS syntax) the prior distribution for the AR terms
@@ -94,6 +101,7 @@ mvjagam = function(formula,
                    knots,
                    data_train,
                    data_test,
+                   drop_intercept = FALSE,
                    prior_simulation = FALSE,
                    return_jags_data = FALSE,
                    family = 'nb',
@@ -113,7 +121,7 @@ mvjagam = function(formula,
                    upper_bounds){
 
   # Check arguments
-  trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1", "AR2", "AR3"))
+  trend_model <- match.arg(arg = trend_model, choices = c("None", "Noise", "RW", "AR1", "AR2", "AR3"))
   family <- match.arg(arg = family, choices = c("nb", "poisson"))
 
   # If there are missing values in y, use predictions from an initial mgcv model to fill
@@ -189,7 +197,7 @@ mvjagam = function(formula,
                             diagonalize = F)
   }
 
-  # Update initial values of Betas and lambdas using the full estimates from the
+  # Update initial values of lambdas using the full estimates from the
   # fitted bam model to speed convergence
   ss_jagam$jags.ini$b <- coef(ss_gam)
 
@@ -221,12 +229,29 @@ mvjagam = function(formula,
                                                                base_model) + 1], perl = T))[[1]][1]
     n_terms <- as.numeric(sub(".*:", "", in_parenth))
 
-    base_model[grep('Parametric effect priors',
-                      base_model) + 1] <- paste0('for (i in 1:',
+    if(n_terms == 1 && drop_intercept){
+      base_model[grep('Parametric effect priors',
+                      base_model) + 1] <- paste0('  for (i in 1:',
                                                  n_terms,
-                                                 ') { b[i] ~ dnorm(0, 0.1) }')
+                                                 ') { b[i] ~ dunif(-0.0001, 0.0001) }')
+      ss_jagam$jags.ini$b[1] <- 0
+    } else if(n_terms > 1 && drop_intercept){
+
+      base_model[grep('Parametric effect priors',
+                      base_model) + 1] <- paste0('  b[i] ~ dunif(-0.0001, 0.0001)\n          for (i in 2:',
+                                                 n_terms,
+                                                 ') { b[i] ~ dnorm(0, tau_para[i])\n         tau_para[i] ~ dexp(0.05) }')
+
+      ss_jagam$jags.ini$b[1] <- 0
+    } else {
+      base_model[grep('Parametric effect priors',
+                      base_model) + 1] <- paste0('  for (i in 1:',
+                                                 n_terms,
+                                                 ') { b[i] ~ dnorm(0, tau_para[i])\n         tau_para[i] ~ dexp(0.05) }')
+    }
 
   }
+
 
   # Add replacement lines for trends and the linear predictor
   if(!use_lv){
@@ -336,6 +361,13 @@ for (i in 1:n) {
       model_file[grep('trend\\[1, s\\] ~', model_file)] <- ' trend[1, s] <- 0'
       model_file[grep('trend\\[2, s\\] ~', model_file)] <- ' trend[2, s] <- 0'
       model_file[grep('trend\\[3, s\\] ~', model_file)] <- ' trend[3, s] <- 0'
+      model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
+      model_file[grep('ar1\\[s\\] ~', model_file)] <- ' ar1[s] <- 0'
+      model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
+      model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
+    }
+
+    if(trend_model == 'Noise'){
       model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
       model_file[grep('ar1\\[s\\] ~', model_file)] <- ' ar1[s] <- 0'
       model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
@@ -549,6 +581,13 @@ for (i in 1:n) {
         model_file[grep('ar3\\[s\\] ~', model_file)] <- '        ar3[s] <- 0'
       }
 
+      if(trend_model == 'Noise'){
+        model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
+        model_file[grep('ar1\\[s\\] ~', model_file)] <- ' ar1[s] <- 0'
+        model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
+        model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
+      }
+
       if(trend_model == 'RW'){
         model_file[grep('ar1\\[s\\] ~', model_file)] <- '        ar1[s] <- 1'
         model_file[grep('ar2\\[s\\] ~', model_file)] <- '        ar2[s] <- 0'
@@ -718,11 +757,12 @@ for (i in 1:n) {
   }
 
   n.burn <- burnin
-  #cat(model_file, file = 'base_gam.txt', sep = '\n', append = T)
+  unlink('base_gam.txt')
+  cat(model_file, file = 'base_gam.txt', sep = '\n', append = T)
   if(parallel){
     cl <- parallel::makePSOCKcluster(min(c(chains, parallel::detectCores() - 1)))
     setDefaultCluster(cl)
-    gam_mod <- runjags::run.jags(model = model_file,
+    gam_mod <- runjags::run.jags(model = 'base_gam.txt',
                                  data = ss_jagam$jags.data,
                                  modules = 'glm',
                                  inits = ss_jagam$jags.ini,
@@ -735,8 +775,9 @@ for (i in 1:n) {
                                  method = "rjparallel",
                                  monitor = param,
                                  cl = cl)
+    stopCluster(cl)
   } else {
-    gam_mod <- runjags::run.jags(model = model_file,
+    gam_mod <- runjags::run.jags(model = 'base_gam.txt',
                                  data = ss_jagam$jags.data,
                                  modules = 'glm',
                                  inits = ss_jagam$jags.ini,
@@ -821,8 +862,8 @@ for (i in 1:n) {
   names(series_resids) <- levels(data_train$series)
 
   # Get smooth penalty names in more interpretable format
-  sam <- jags.samples(runjags::as.jags(gam_mod, adapt = 10, quiet = T),
-                      c("b","rho"), n.iter = 100, thin = 1)
+  sam <- suppressMessages(jags.samples(runjags::as.jags(gam_mod, adapt = 10, quiet = T),
+                      c("b","rho"), n.iter = 100, thin = 1))
   jam <- mgcv::sim2jam(sam, ss_jagam$pregam, edf.type = 1)
   jam$sp <- exp(sam$rho)
 

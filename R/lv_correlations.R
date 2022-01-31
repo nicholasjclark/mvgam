@@ -7,27 +7,37 @@
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@return A \code{list} object containing the mean posterior correlations and the full array of posterior correlations
 #'@export
-lv_correlations = function(object, data_train){
+lv_correlations = function(object){
   data_train <- object$obs_data
-  samps <- jags.samples(object$jags_model,
-                        variable.names = 'trend',
-                        n.iter = 1000, thin = 5)
-  trends <- samps$trend
-  n_series <- dim(trends)[2]
-  n_samples <- dim(trends)[3]
-  n_chains <- dim(trends)[4]
 
-  # Get list of trend correlation estimates
-  get_cors = function(trends, n_samples, chain){
-    trend_cors <- lapply(seq_len(n_samples), function(x){
-      cov2cor(cov(trends[, , x, chain]))
-    })
-    trend_cors
+  # Series start and end indices
+  ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
+              length.out = NCOL(object$ytimes) + 1)
+  starts <- ends + 1
+  starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
+  ends <- ends[-1]
+
+  # Total number of MCMC samples
+  n_preds <- dim(MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[1]:ends[1]])[1]
+
+  # Total number of observations per series
+  if(class(data_train) == 'list'){
+    n_obs <- length(data_train$y) / NCOL(object$ytimes)
+  } else {
+    n_obs <- NROW(data_train) / NCOL(object$ytimes)
   }
 
-  all_trend_cors <- do.call(c, lapply(seq_len(n_chains), function(chain){
-    get_cors(trends, n_samples, chain)
-  }))
+  # Extract series trends
+  series_trends <- lapply(seq_len(length(ends)), function(y){
+    MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[y]:ends[y]][,1:n_obs]
+  })
+
+  # Get list of trend correlation estimates
+  all_trend_cors <- lapply(seq_len(n_preds), function(x){
+    cov2cor(cov(do.call(cbind, lapply(series_trends, function(y){
+      y[x,]
+    }))))
+  })
 
   # Calculate posterior mean correlations
   mean_correlations <- Reduce(`+`, all_trend_cors) / length(all_trend_cors)

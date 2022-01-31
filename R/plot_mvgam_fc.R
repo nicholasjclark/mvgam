@@ -113,13 +113,13 @@ plot_mvgam_fc = function(object, series, data_test, hide_xlabels = FALSE, ylab, 
              dplyr::select(year, season, y) %>%
              dplyr::distinct() %>%
              dplyr::arrange(year, season) %>%
-             dplyr::pull(y),pch = 16, col = "white", cex = 0.6)
+             dplyr::pull(y),pch = 16, col = "white", cex = 0.65)
     points(data_train %>%
             dplyr::filter(series == s_name) %>%
             dplyr::select(year, season, y) %>%
             dplyr::distinct() %>%
             dplyr::arrange(year, season) %>%
-            dplyr::pull(y),pch = 16, col = "black", cex = 0.5)
+            dplyr::pull(y),pch = 16, col = "black", cex = 0.55 )
   }
 
 }

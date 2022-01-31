@@ -9,6 +9,7 @@ mvjagam(
   knots,
   data_train,
   data_test,
+  drop_intercept = FALSE,
   prior_simulation = FALSE,
   return_jags_data = FALSE,
   family = "nb",
@@ -51,6 +52,10 @@ in addition to any other variables included in the linear predictor of \code{for
 observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
 simulations can be obtained}
 
+\item{drop_intercept}{\code{logical}. If \code{TRUE}, the global intercept will be set to zero in the \code{JAGS} model,
+which may be necessary when estimating models for univariate series with latent trend components to preserve identifiability
+(otherwise the latent trend may compete with the intercept, especially if it is relatively stationary)}
+
 \item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 simulations from prior distributions are returned}
 
@@ -69,8 +74,12 @@ latent trends in a reduced dimension format. If \code{FALSE}, estimate independe
 Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(5, floor(n_series / 2))}}
 
 \item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
-'None' (modelled as a Gaussian static white noise process), 'RW' (random walk with possible drift),
-'AR1' (AR1 model with intercept), 'AR2' (AR2 model with intercept) or
+'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by \code{\link[mcgv]{gam}}),
+'Noise' (modelled as a Gaussian static white noise process),
+'RW' (random walk with possible drift),
+'AR1' (AR1 model with intercept),
+'AR2' (AR2 model with intercept) or
 'AR3' (AR3 model with intercept)}
 
 \item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
@@ -89,8 +98,8 @@ sampling the posterior distribution}
 \item{thin}{Thinning interval for monitors}
 
 \item{parallel}{\code{logical} specifying whether multiple cores should be used for
-for generating \code{JAGS} simulations in parallel. One core per chain will be used so be aware of
-how many chains you are calling when resources are finite}
+for generating \code{JAGS} simulations in parallel. If \code{TRUE}, the number of cores to use will be
+\code{min(c(chains, parallel::detectCores() - 1))}}
 
 \item{phi_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the drift terms/intercepts
 in the latent trends}

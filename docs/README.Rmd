@@ -53,7 +53,7 @@ lynx_train = lynx_full[1:50, ]
 lynx_test = lynx_full[51:60, ]
 ```
 
-Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process with drift), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
+Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvjagam(data_train = lynx_train,
                data_test = lynx_test,
@@ -61,7 +61,9 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               burnin = 5000)
+               drift = F,
+               burnin = 10000,
+               chains = 4)
 ```
 
 Perform a series of posterior predictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine simulated kernel densities for posterior predictions (`yhat`) and compare to the density of the observations (`y`)
@@ -138,7 +140,9 @@ lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
                formula = y ~ s(season, bs = 'gp', k = 3),
                family = 'poisson',
                trend_model = 'RW',
-               burnin = 5000)
+               drift = FALSE,
+               burnin = 10000,
+               chains = 4)
 
 ```
 

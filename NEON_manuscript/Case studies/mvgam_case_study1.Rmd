@@ -67,7 +67,8 @@ mod1 <- mvjagam(data_train = fake_data$data_train,
                knots = list(season = c(0.5, 12.5)),
                family = 'nb',
                trend_model = 'None',
-               burnin = 2000)
+               burnin = 2000,
+               chains = 4)
 ```
 
 We can view the `JAGS` model file that has been generated to see the additions that have been made to the base `gam` model. If the user selects `return_jags_data = TRUE` when calling `mvjagam`, this file can be modified and the resulting `jags_data` object can also be modified to fit more complex Bayesian models. Note that here the AR and phi terms have been set to zero as this model does not include a dynamic trend component
@@ -170,7 +171,8 @@ mod2 <- mvjagam(data_train = fake_data$data_train,
                                      max(fake_data$data_test$year))),
                family = 'nb',
                trend_model = 'None',
-               burnin = 2000)
+               burnin = 2000,
+               chains = 4)
 ```
 
 Again as we haven't modified the base `gam` much, the summary from the `mgcv` model is fairly accurate
@@ -224,7 +226,8 @@ mod3 <- mvjagam(data_train = fake_data$data_train,
                 family = 'nb',
                 trend_model = 'AR3',
                 drift = TRUE,
-                burnin = 2000)
+                burnin = 2000,
+               chains = 4)
 ```
                
 In this case the fitted model is more different to the base `mgcv` model that was used in `jagam` to produce the skeleton `JAGS` file, so the summary of that base model is less accurate. But we can still check the model summary for the `mvjagam` mdoel to examine convergence for key parameters
@@ -278,7 +281,8 @@ mod4 <- mvjagam(data_train = fake_data$data_train,
                family = 'poisson',
                trend_model = 'RW',
                drift = TRUE,
-               burnin = 3000)
+               burnin = 3000,
+               chains = 4)
 ```
 
 Look at this model's proposed forecast
@@ -567,7 +571,7 @@ lynx_mgcv2_drps <- drps_mcmc_object(truth = lynx_test$population[1:10],
 ```
 
                    
-This forecast is highly overconfident, with very unrealistic uncertainty intervals due to the interpolation behaviours of the lag smooths. You can certainly keep trying different formulations (our experience is that the B spline variant above produces the best forecasts from any tested `mgcv` model, but we did not test an exhaustive set), but hopefully it is clear that forecasting using splines is tricky business and it is likely that each time you do it you'll end up honing in on different combinations of penalties, knot selections etc.... Now we will fit an `mvgam` model for comparison. This model fits a similar model to the `mgcv` model directly above but with a full time series model for the errors (in this case an `AR1` process), rather than smoothing splines that do not incorporate a concept of the future. We do not use a `year` term to reduce any possible extrapolation and because the latent dynamic component should capture this temporal variation. We estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
+This forecast is highly overconfident, with very unrealistic uncertainty intervals due to the interpolation behaviours of the lag smooths. You can certainly keep trying different formulations (our experience is that the B spline variant above produces the best forecasts from any tested `mgcv` model, but we did not test an exhaustive set), but hopefully it is clear that forecasting using splines is tricky business and it is likely that each time you do it you'll end up honing in on different combinations of penalties, knot selections etc.... Now we will fit an `mvgam` model for comparison. This model fits a similar model to the `mgcv` model directly above but with a full time series model for the errors (in this case an `AR1` process), rather than smoothing splines that do not incorporate a concept of the future. We do not use a `year` term to reduce any possible extrapolation and because the latent dynamic component should capture this temporal variation. We estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)).
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvjagam(data_train = lynx_train,
                data_test = lynx_test,
@@ -575,7 +579,8 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR1',
-               burnin = 5000)
+               burnin = 5000,
+               chains = 4)
 ```
 
 Calculate the out of sample forecast from the fitted `mvgam` model and plot

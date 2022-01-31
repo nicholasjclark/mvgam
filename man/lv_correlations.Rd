@@ -4,7 +4,7 @@
 \alias{lv_correlations}
 \title{Calculate trend correlations based on mvjagam latent factor loadings}
 \usage{
-lv_correlations(object, data_train)
+lv_correlations(object)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}

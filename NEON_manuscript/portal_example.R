@@ -48,17 +48,20 @@ data_test <- list(lag = data_all$lag[175:length(data_all$y),],
                   mintemp = data_all$mintemp[175:length(data_all$y),])
 
 # Fit a dynamic GAM with a distributed lag term for precipitation and
-# an AR1 process for the trend
+# an AR1 process for the trend; note that we suppress the intercept here as sometimes
+# this can be difficult to estimate alongside the latent dynamic process, particularly if that
+# process is relatively stationary and if the global intercept is relatively small
 test <- mvjagam(formula =  y ~ s(season, bs = "cc", k = 12) +
                    te(mintemp, lag, k = c(8, 3)) +
                   te(precip, lag, k = c(8, 3)),
+                drop_intercept = T,
                  knots = list(season = c(0.5, 12.5)),
                  data_train = data_train,
                  data_test = data_test,
                  family = 'poisson',
-                 n.burnin = 5000,
-                 trend_model = 'AR1',
-                 auto_update = F)
+                chains = 3,
+                 burnin = 5000,
+                 trend_model = 'AR1')
 
 plot_mvgam_fc(test, series = 1, data_test = data_test, ylim = c(0, 100))
 plot_mvgam_trend(test, series = 1, data_test = data_test)
