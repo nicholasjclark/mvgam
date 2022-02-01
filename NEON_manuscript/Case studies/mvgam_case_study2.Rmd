@@ -46,6 +46,7 @@ mod1 <- mvjagam(data_train = dat$data_train,
                 n_lv = 2,
                 family = 'nb',
                 trend_model = 'RW',
+                chains = 4,
                 burnin = 2000)
 ```
 
@@ -75,6 +76,7 @@ mod2 <- mvjagam(data_train = dat$data_train,
                 n_lv = 8,
                 family = 'nb',
                 trend_model = 'RW',
+                chains = 4,
                 burnin = 2000)
 ```
 
@@ -130,7 +132,7 @@ Plot the series to see how similar their seasonal shapes are over time
 plot(series, legend.loc = 'topleft')
 ```
 
-Now we will fit an `mvgam` model with shared seasonality and random intercepts per series. Our first attempt will ignore any temporal component in the residuals so that we can identidy which GAM predictor combination gives us the best fit, prior to investigating how to deal with any remaining autocorrelation. We assume a Negative Binomial distrubution with shared overdispersion parameter for the response
+Now we will fit an `mvgam` model with shared seasonality and random intercepts per series. Our first attempt will ignore any temporal component in the residuals so that we can identidy which GAM predictor combination gives us the best fit, prior to investigating how to deal with any remaining autocorrelation. We assume a Negative Binomial distrubution with shared overdispersion parameter for the response. Also note that any smooths using the random effects basis (`s(series, bs = "re")` below) are automatically re-parameterised to use the [non-centred parameterisation that is necessary to help avoid common posterior degeneracies in hierarchical models](https://betanalpha.github.io/assets/case_studies/hierarchical_modeling.html)
 ```{r, message=FALSE, warning=FALSE}
 trends_mod1 <- mvjagam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
@@ -139,6 +141,7 @@ trends_mod1 <- mvjagam(data_train = trends_data$data_train,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
                       family = 'nb',
+                      chains = 4,
                       burnin = 5000)
 ```
 
@@ -151,6 +154,7 @@ trends_mod2 <- mvjagam(data_train = trends_data$data_train,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
                       family = 'nb',
+                      chains = 4,
                       burnin = 5000)
 ```
 
@@ -193,12 +197,13 @@ trends_mod3 <- mvjagam(data_train = trends_data$data_train,
                       use_lv = T,
                       n_lv = 4,
                       family = 'nb',
+                      chains = 4,
                       drift = T,
                       burnin = 5000)
 ```
 
 
-Have a look at the returned `JAGS` model file to see how the dynamic factors are incorporated. Notice that the precisions of factors, together with each factor's set of loadings, are penalised using a regularised horseshoe prior
+Have a look at the returned `JAGS` model file to see how the dynamic factors are incorporated. Notice that the precisions of factors, together with each factor's set of loadings, are penalised using a regularised horseshoe prior 
 ```{r}
 trends_mod3$model_file
 ```

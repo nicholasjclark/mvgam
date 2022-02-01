@@ -24,9 +24,6 @@
 #'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
 #'observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
 #'simulations can be obtained
-#'@param drop_intercept \code{logical}. If \code{TRUE}, the global intercept will be set to zero in the \code{JAGS} model,
-#'which may be necessary when estimating models for univariate series with latent trend components to preserve identifiability
-#'(otherwise the latent trend may compete with the intercept, especially if it is relatively stationary)
 #'@param prior_simulation \code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 #'simulations from prior distributions are returned
 #'@param return_jags_data \code{logical}. If \code{TRUE}, the list of data that is needed to fit the \code{JAGS}
@@ -76,7 +73,9 @@
 #'state space trends. Prior distributions for most important model parameters can be altered by the user to inspect model
 #'sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 #'accordingly. The model parameters are esimated in a Bayesian framework using Gibbs sampling
-#'in \code{\link[run.jags]{runjags}}. When using a dynamic factor model for the trends, factor precisions are given
+#'in \code{\link[run.jags]{runjags}}. For any smooth terms using the random effect basis (\code{\link[mcgv]{smooth.construct.re.smooth.spec}}),
+#'a non-centred parameterisation is employed to avoid degeneracies that are common in hierarchical models.
+#'When using a dynamic factor model for the trends, factor precisions are given
 #'regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 #'factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
 #'capture dependencies in the data, so it can often be advantageous to set n_lv to a slightly larger number. However
@@ -101,7 +100,6 @@ mvjagam = function(formula,
                    knots,
                    data_train,
                    data_test,
-                   drop_intercept = FALSE,
                    prior_simulation = FALSE,
                    return_jags_data = FALSE,
                    family = 'nb',
@@ -199,7 +197,8 @@ mvjagam = function(formula,
 
   # Update initial values of lambdas using the full estimates from the
   # fitted bam model to speed convergence
-  ss_jagam$jags.ini$b <- coef(ss_gam)
+  #ss_jagam$jags.ini$b <- coef(ss_gam)
+  ss_jagam$jags.ini$b <- NULL
 
   if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
     ss_jagam$jags.ini$lambda <- ss_gam$sp
@@ -220,7 +219,8 @@ mvjagam = function(formula,
   lines_remove <- c(1:grep('## response', base_model))
   base_model <- base_model[-lines_remove]
 
-  # Any parametric effects in the gam need to get more sensible priors
+  # Any parametric effects in the gam (particularly the intercept) need to get more sensible priors to ensure they
+  # do not directly compete with the latent trends
   if(any(grepl('Parametric effect priors', base_model))){
 
     in_parenth <- regmatches(base_model[grep('Parametric effect priors',
@@ -228,30 +228,57 @@ mvjagam = function(formula,
                gregexpr( "(?<=\\().+?(?=\\))", base_model[grep('Parametric effect priors',
                                                                base_model) + 1], perl = T))[[1]][1]
     n_terms <- as.numeric(sub(".*:", "", in_parenth))
+    ss_jagam$jags.data$p_coefs <- coef(ss_gam)[1:n_terms]
 
-    if(n_terms == 1 && drop_intercept){
-      base_model[grep('Parametric effect priors',
+    rmvn <- function(n,mu,sig) {
+      L <- mroot(sig);m <- ncol(L);
+      t(mu + L%*%matrix(rnorm(m*n),m,n))
+    }
+
+    beta_sims <- rmvn(1000, coef(ss_gam), ss_gam$Vp)
+    ss_jagam$jags.data$p_taus <- apply(as.matrix(beta_sims[,1:n_terms]),
+                                       2, function(x) 1 / sd(x))
+
+    base_model[grep('Parametric effect priors',
                       base_model) + 1] <- paste0('  for (i in 1:',
                                                  n_terms,
-                                                 ') { b[i] ~ dunif(-0.0001, 0.0001) }')
-      ss_jagam$jags.ini$b[1] <- 0
-    } else if(n_terms > 1 && drop_intercept){
+                                                 ') { b[i] ~ dnorm(p_coefs[i], p_taus[i]) }')
+    base_model[grep('Parametric effect priors',
+                    base_model)] <- c('  ## parametric effect priors (regularised for identifiability)')
+  }
 
-      base_model[grep('Parametric effect priors',
-                      base_model) + 1] <- paste0('  b[i] ~ dunif(-0.0001, 0.0001)\n          for (i in 2:',
-                                                 n_terms,
-                                                 ') { b[i] ~ dnorm(0, tau_para[i])\n         tau_para[i] ~ dexp(0.05) }')
+  # For any random effect smooths, use the non-centred parameterisation to avoid degeneracies
+  smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
+    data.frame(label = ss_gam$smooth[[x]]$label, class = class(ss_gam$smooth[[x]])[1])
+  }))
 
-      ss_jagam$jags.ini$b[1] <- 0
-    } else {
-      base_model[grep('Parametric effect priors',
-                      base_model) + 1] <- paste0('  for (i in 1:',
-                                                 n_terms,
-                                                 ') { b[i] ~ dnorm(0, tau_para[i])\n         tau_para[i] ~ dexp(0.05) }')
+  if(any(smooth_labs$class == 'random.effect')){
+    re_smooths <- smooth_labs %>%
+      dplyr::filter(class == 'random.effect') %>%
+      dplyr::pull(label)
+
+    for(i in 1:length(re_smooths)){
+      in_parenth <- regmatches(base_model[grep(re_smooths[i],
+                                               base_model, fixed = T) + 1],
+                               gregexpr( "(?<=\\().+?(?=\\))", base_model[grep(re_smooths[i],
+                                                                               base_model, fixed = T) + 1],
+                                         perl = T))[[1]][1]
+      n_terms <- as.numeric(sub(".*:", "", in_parenth))
+      n_start <- as.numeric(strsplit(sub(".*\\(", "", in_parenth), ':')[[1]][1])
+      base_model[grep(re_smooths[i],
+                      base_model, fixed = T) + 1] <- paste0('  for (i in ', n_start, ':',
+                                                            n_terms,
+                                                            ') { b_raw[i] ~ dnorm(0, 1)\n   b[i] <- b_raw[i] * ',
+                                                            paste0('sigma_raw', i), ' \n  }\n  ',
+                                                            paste0('sigma_raw', i), ' ~ dexp(1)')
+      base_model[grep(re_smooths[i],
+                      base_model, fixed = T)] <- paste0('  ## prior (non-centred) for ', re_smooths[i], '...')
     }
 
   }
 
+  base_model[grep('smoothing parameter priors',
+                  base_model)] <- c('   ## smoothing parameter priors...')
 
   # Add replacement lines for trends and the linear predictor
   if(!use_lv){
@@ -293,7 +320,8 @@ for (s in 1:n_series){
  ar1[s] ~ dnorm(0, 10)
  ar2[s] ~ dnorm(0, 10)
  ar3[s] ~ dnorm(0, 10)
- tau[s] ~ dgamma(0.01, 0.001)
+ tau[s] <- pow(sigma[s], -2)
+ sigma[s] ~ dexp(1)
 }
 
 ## Negative binomial likelihood functions
@@ -454,9 +482,7 @@ for (i in 1:n) {
         ## to allow loadings for entire factors to be 'dropped', reducing overfitting. Still
         ## need to impose identifiability constraints
 
-        ## Global shrinkage penalty (half cauchy, following Gelman et
-        ## al. 2008: A weakly informative default prior distribution for logistic and other
-        ## regression models)
+        ## Global shrinkage penalty (T distribution on the standard deviation)
         lv_tau ~ dscaled.gamma(0.5, 5)
 
         ## Shrinkage penalties for each factor squeeze the factor to a flat line and squeeze
@@ -663,7 +689,7 @@ for (i in 1:n) {
     X$series <- as.numeric(rbind(data_train, data_test)$series)
 
     # Add an outcome variable
-    X$outcome <- c(orig_y, rep(NA, NROW(data_test)))
+    X$outcome <- c(data_train$y, rep(NA, NROW(data_test)))
     }
 
   } else {
@@ -691,7 +717,7 @@ for (i in 1:n) {
         dplyr::pull(time)
     }
 
-    X$outcome <- c(orig_y)
+    X$outcome <- c(data_train$y)
     X$series <- as.numeric(data_train$series)
   }
 

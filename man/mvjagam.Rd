@@ -9,7 +9,6 @@ mvjagam(
   knots,
   data_train,
   data_test,
-  drop_intercept = FALSE,
   prior_simulation = FALSE,
   return_jags_data = FALSE,
   family = "nb",
@@ -51,10 +50,6 @@ Any other variables to be included in the linear predictor of \code{formula} mus
 in addition to any other variables included in the linear predictor of \code{formula}. If included, the
 observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
 simulations can be obtained}
-
-\item{drop_intercept}{\code{logical}. If \code{TRUE}, the global intercept will be set to zero in the \code{JAGS} model,
-which may be necessary when estimating models for univariate series with latent trend components to preserve identifiability
-(otherwise the latent trend may compete with the intercept, especially if it is relatively stationary)}
 
 \item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 simulations from prior distributions are returned}
@@ -135,7 +130,9 @@ A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modi
 state space trends. Prior distributions for most important model parameters can be altered by the user to inspect model
 sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 accordingly. The model parameters are esimated in a Bayesian framework using Gibbs sampling
-in \code{\link[run.jags]{runjags}}. When using a dynamic factor model for the trends, factor precisions are given
+in \code{\link[run.jags]{runjags}}. For any smooth terms using the random effect basis (\code{\link[mcgv]{smooth.construct.re.smooth.spec}}),
+a non-centred parameterisation is employed to avoid degeneracies that are common in hierarchical models.
+When using a dynamic factor model for the trends, factor precisions are given
 regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
 capture dependencies in the data, so it can often be advantageous to set n_lv to a slightly larger number. However

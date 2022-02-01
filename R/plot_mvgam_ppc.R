@@ -71,8 +71,12 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_po
   c_dark_highlight <- c("#7C0000")
 
   if(type == 'mean'){
-    # Plot observed and predicted location (means)
+    # Plot observed and predicted means
     pred_means <- apply(preds, 1, mean)
+    lower <- quantile(pred_means, probs = 0.01)
+    upper <- quantile(pred_means, probs = 0.99)
+    pred_means <- pred_means[-which(pred_means > upper)]
+    pred_means <- pred_means[-which(pred_means < lower)]
     obs_mean <- mean(truths)
     hist(pred_means,
          xlim = c(min(min(pred_means), min(obs_mean)),

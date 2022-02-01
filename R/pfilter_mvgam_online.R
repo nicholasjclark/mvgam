@@ -40,6 +40,7 @@ pfilter_mvgam_online = function(data_assim,
 
   # Get next observations in line to be assimilated
   if(class(data_assim) == 'list'){
+    n_series <- length(unique(obs_data$series))
     all_needed_names <- names(obs_data)
     # Find indices of next observation
     data_assim_orig <- data_assim
