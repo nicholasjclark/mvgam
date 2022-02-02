@@ -209,7 +209,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     if(is.na(truth[series])){
       weight <- 1
     } else {
-      weight <- dnbinom(truth[series], size = size,
+      weight <- dnbinom(truth[series], size = size[series],
                         mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
                                    (trends[series])))
     }
@@ -259,7 +259,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
       if(is.na(truth[series])){
         weight <- 1
       } else {
-        weight <- dnbinom(truth[series], size = size,
+        weight <- dnbinom(truth[series], size = size[series],
                           mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
                                      (trends[series])))
       }

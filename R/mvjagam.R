@@ -62,7 +62,9 @@
 #'@param ar_prior \code{character} specifying (in JAGS syntax) the prior distribution for the AR terms
 #'in the latent trends
 #'@param r_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
-#'overdispersion parameter. Ignored if \code{family = 'poisson'}
+#'overdispersion parameters. Note that this prior acts on the INVERSE of \code{r}, which is convenient
+#'for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
+#'as the sampled parameter approaches \code{0}. Ignored if \code{family = 'poisson'}
 #'@param tau_prior \code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
 #'precisions used for the latent trends (ignored if \code{use_lv == TRUE})
 #'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
@@ -80,9 +82,7 @@
 #'factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
 #'capture dependencies in the data, so it can often be advantageous to set n_lv to a slightly larger number. However
 #'larger numbers of factors do come with additional computational costs so these should be balanced as well.
-#'For the time being, all series are assumed to have the same overdispersion
-#'parameter when using a negative binomial distribution, though this will be relaxed in future versions. For each
-#'series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
+#' For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
 #'medians of posterior predictions. If the fitted model is appropriate then Dunn-Smyth residuals will be
 #'standard normal in distribution and no autocorrelation will be evident
 #'
@@ -327,17 +327,25 @@ for (s in 1:n_series){
 ## Negative binomial likelihood functions
 for (i in 1:n) {
  for (s in 1:n_series) {
-  y[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s]);
-  rate[i, s] <- ifelse((r / (r + mu[i, s])) < min_eps, min_eps,
-                      (r / (r + mu[i, s])))
+  y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
+  rate[i, s] <- ifelse((r[s] / (r[s] + mu[i, s])) < min_eps, min_eps,
+                      (r[s] / (r[s] + mu[i, s])))
  }
 }
-r ~ dexp(0.001)
+
+## Complexity penalising prior for the overdispersion parameter;
+## where the likelihood reduces to a 'base' model (Poisson) unless
+## the data support overdispersion
+for(s in 1:n_series){
+ r[s] <- 1 / r_raw[s]
+ r_raw[s] ~ dexp(0.5)
+}
+
 
 ## Posterior predictions
 for (i in 1:n) {
  for (s in 1:n_series) {
-   ypred[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s])
+   ypred[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s])
  }
 }
 ")
@@ -379,8 +387,8 @@ for (i in 1:n) {
 
     } else {
       if(missing(upper_bounds)){
-        model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dnegbin(rate[i, s], r)'
-        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dnegbin(rate[i, s], r)'
+        model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dnegbin(rate[i, s], r[s])'
+        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dnegbin(rate[i, s], r[s])'
       }
     }
 
@@ -478,13 +486,6 @@ for (i in 1:n) {
         ar3[s] ~ dnorm(0, 10)
         }
 
-        ## Latent factor loadings are penalized using a regularized horseshoe prior
-        ## to allow loadings for entire factors to be 'dropped', reducing overfitting. Still
-        ## need to impose identifiability constraints
-
-        ## Global shrinkage penalty (T distribution on the standard deviation)
-        lv_tau ~ dscaled.gamma(0.5, 5)
-
         ## Shrinkage penalties for each factor squeeze the factor to a flat line and squeeze
         ## the entire factor's set of coefficients toward zero if supported by
         ## the data. The prior for individual factor penalties allows each factor to possibly
@@ -510,6 +511,7 @@ for (i in 1:n) {
          penalty[t] <- theta.prime[t] * l.var[t]
         }
 
+        ## Latent factor loadings: standard normal with identifiability constraints
         ## Upper triangle of loading matrix set to zero
         for(j in 1:(n_lv - 1)){
           for(j2 in (j + 1):n_lv){
@@ -519,20 +521,20 @@ for (i in 1:n) {
 
         ## Positive constraints on loading diagonals
         for(j in 1:n_lv) {
-         lv_coefs[j, j] ~ dnorm(0, lv_tau * penalty[j])T(0, 1);
+         lv_coefs[j, j] ~ dnorm(0, 1)T(0, 1);
         }
 
         ## Lower diagonal free
         for(j in 2:n_lv){
          for(j2 in 1:(j - 1)){
-          lv_coefs[j, j2] ~ dnorm(0, lv_tau * penalty[j2])T(-1, 1);
+          lv_coefs[j, j2] ~ dnorm(0, 1)T(-1, 1);
          }
        }
 
         ## Other elements also free
         for(j in (n_lv + 1):n_series) {
          for(j2 in 1:n_lv){
-          lv_coefs[j, j2] ~ dnorm(0, lv_tau * penalty[j2])T(-1, 1);
+          lv_coefs[j, j2] ~ dnorm(0, 1)T(-1, 1);
          }
         }
 
@@ -546,12 +548,19 @@ for (i in 1:n) {
         ## Negative binomial likelihood functions
         for (i in 1:n) {
         for (s in 1:n_series) {
-        y[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s]);
-        rate[i, s] <- ifelse((r / (r + mu[i, s])) < min_eps, min_eps,
-                            (r / (r + mu[i, s])))
+        y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
+        rate[i, s] <- ifelse((r[s] / (r[s] + mu[i, s])) < min_eps, min_eps,
+                            (r[s] / (r[s] + mu[i, s])))
         }
         }
-        r ~ dexp(0.001)
+
+        ## Complexity penalising prior for the overdispersion parameter;
+        ## where the likelihood reduces to a 'base' model (Poisson) unless
+        ## the data support overdispersion
+        for(s in 1:n_series){
+         r[s] <- 1 / r_raw[s]
+         r_raw[s] ~ dexp(0.5)
+        }
 
         ## Posterior predictions
         for (i in 1:n) {
@@ -594,8 +603,8 @@ for (i in 1:n) {
 
       } else {
         if(missing(upper_bounds)){
-          model_file[grep('y\\[i, s\\] ~', model_file)] <- '       y[i, s] ~ dnegbin(rate[i, s], r)'
-          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '       ypred[i, s] ~ dnegbin(rate[i, s], r)'
+          model_file[grep('y\\[i, s\\] ~', model_file)] <- '       y[i, s] ~ dnegbin(rate[i, s], r[s])'
+          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '       ypred[i, s] ~ dnegbin(rate[i, s], r[s])'
         }
       }
 

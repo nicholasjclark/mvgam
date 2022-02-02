@@ -103,7 +103,9 @@ in the latent trends}
 in the latent trends}
 
 \item{r_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
-overdispersion parameter. Ignored if \code{family = 'poisson'}}
+overdispersion parameters. Note that this prior acts on the INVERSE of \code{r}, which is convenient
+for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
+as the sampled parameter approaches \code{0}. Ignored if \code{family = 'poisson'}}
 
 \item{tau_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
 precisions used for the latent trends (ignored if \code{use_lv == TRUE})}
@@ -137,9 +139,7 @@ regularized penalty priors to theoretically allow some factors to be dropped fro
 factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
 capture dependencies in the data, so it can often be advantageous to set n_lv to a slightly larger number. However
 larger numbers of factors do come with additional computational costs so these should be balanced as well.
-For the time being, all series are assumed to have the same overdispersion
-parameter when using a negative binomial distribution, though this will be relaxed in future versions. For each
-series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
+For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
 medians of posterior predictions. If the fitted model is appropriate then Dunn-Smyth residuals will be
 standard normal in distribution and no autocorrelation will be evident
 }

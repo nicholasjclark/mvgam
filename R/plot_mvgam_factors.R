@@ -10,9 +10,8 @@
 #'contributed to the estimated trends. This is due to the regularisation penalty that acts independently on each
 #'factor's Gaussian precision, which will squeeze un-needed factors to a white noise process (effectively dropping
 #'that factor from the model). In this function, each factor is tested against a null hypothesis of white noise by
-#'calculating the sum of the factor's 1st derivatives. A factor that has a larger contribution will have a larger
-#'sum, both because that factor's absolute magnitudes will be larger (due to the weaker penalty on the factor's
-#'precision) and because the factor will move around more. If
+#'calculating the sum of the factor's 2nd derivatives. A factor that has a larger contribution will have a larger
+#'sum due to the weaker penalty on the factor's precision. If
 #'\code{plot == TRUE}, the factors are also plotted.
 #'@return A \code{dataframe} of factor contributions and, optionally, a series of base \code{R} plots
 #'@export
@@ -57,13 +56,12 @@ plot_mvgam_factors = function(object, plot = TRUE){
     # Keep only the in-sample observations for testing against the null of white noise
     preds <- preds[,1:(NROW(object$obs_data) / NCOL(object$ytimes))]
 
+    cred <- sapply(1:NCOL(preds),
+                   function(n) quantile(preds[,n],
+                                        probs = probs))
     # If plot = TRUE, plot the LVs
     if(plot){
       preds_last <- preds[1,]
-      cred <- sapply(1:NCOL(preds),
-                     function(n) quantile(preds[,n],
-                                          probs = probs))
-
       ylim <- c(min(cred) - 1, max(cred) + 1)
       ylab <- paste0('Factor ', x)
       pred_vals <- seq(1:length(preds_last))
@@ -84,14 +82,15 @@ plot_mvgam_factors = function(object, plot = TRUE){
 
     }
 
-    uppers <- cred[9,]
-    cred_deriv = vector(length = length(uppers) + 1)
-    cred_deriv[1] <- 0
-    for(i in 2:length(uppers)){
-      cred_deriv[i] <- abs(uppers[i] - uppers[i - 1])
-    }
-
-    data.frame('Contribution' = sum(cred_deriv))
+    # Calculate second derivatives of empirical medians and upper / lower intervals;
+    # factors with small second derivatives are moving in roughly a straight line and not
+    # likely contributing much (or at all) to the latent trend estimates
+    meds <- cred[5,]
+    uppers <- cred[8,]
+    lowers <- cred[2,]
+    data.frame('Contribution' = sum(abs(diff(diff(meds)) +
+                                          diff(diff(uppers)) +
+                                          diff(diff(lowers)))))
   }))
 
   rownames(lv_estimates) <- paste0('Factor', 1:object$n_lv)

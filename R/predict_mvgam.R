@@ -56,7 +56,7 @@ predict_mvgam = function(object, series = 1, newdata, type = 'link'){
         as.vector(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
                            ( lv_preds %*% lv_coefs[[series]][x,]))
       } else {
-        rnbinom(n = NROW(newdata), size = sizes[x,],
+        rnbinom(n = NROW(newdata), size = sizes[x, series],
                 mu = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
                            ( lv_preds %*% lv_coefs[[series]][x,])))
       }
@@ -66,7 +66,7 @@ predict_mvgam = function(object, series = 1, newdata, type = 'link'){
         as.vector(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
                            (rnorm(NROW(newdata), 0, sqrt(1 / taus[x,series]))))
       } else {
-        rnbinom(n = NROW(newdata), size = sizes[x,],
+        rnbinom(n = NROW(newdata), size = sizes[x, series],
                 mu = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
                            (rnorm(NROW(newdata), 0, sqrt(1 / taus[x,series])))))
       }

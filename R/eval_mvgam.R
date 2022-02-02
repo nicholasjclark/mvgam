@@ -148,8 +148,7 @@ eval_mvgam = function(object,
   ar3s <- MCMCvis::MCMCchains(object$jags_output, 'ar3')
 
   # Negative binomial size estimate
-  sizes <- as.matrix(rep(hpd(MCMCvis::MCMCchains(object$jags_output, 'r'))[2],
-                         dim(betas)[1]))
+  sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
 
   # Generate sample sequence for n_samples
   if(n_samples < dim(phis)[1]){
@@ -249,7 +248,7 @@ eval_mvgam = function(object,
         trunc_preds <- rnbinom(fc_horizon,
                                mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
                                                        betas)) + (trend_preds)),
-                               size = size)
+                               size = size[series])
         trunc_preds
       })
 
@@ -289,7 +288,7 @@ eval_mvgam = function(object,
         fc <-  rnbinom(fc_horizon,
                        mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
                                                betas)) + (trend_preds)),
-                       size = size)
+                       size = size[series])
         fc
       })
     }
@@ -344,7 +343,7 @@ eval_mvgam = function(object,
           trunc_preds <- rnbinom(fc_horizon,
                                  mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
                                                        betas)) + (trend_preds)),
-                                 size = size)
+                                 size = size[series])
           trunc_preds
         })
 
@@ -384,7 +383,7 @@ eval_mvgam = function(object,
           fc <-  rnbinom(fc_horizon,
                          mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
                                                betas)) + (trend_preds)),
-                         size = size)
+                         size = size[series])
           fc
         })
       }

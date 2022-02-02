@@ -293,7 +293,7 @@ if(class(object$obs_data) == 'list'){
 message()
 
 if(object$family == 'Negative Binomial'){
-  message("Dispersion parameter estimate:")
+  message("Dispersion parameter estimates:")
   print(MCMCvis::MCMCsummary(object$jags_output, 'r')[,c(3:7)])
   message()
 }

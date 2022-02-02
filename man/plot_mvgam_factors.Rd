@@ -23,9 +23,8 @@ If the model in \code{object} was estimated using dynamic factors, it is possibl
 contributed to the estimated trends. This is due to the regularisation penalty that acts independently on each
 factor's Gaussian precision, which will squeeze un-needed factors to a white noise process (effectively dropping
 that factor from the model). In this function, each factor is tested against a null hypothesis of white noise by
-calculating the sum of the factor's 1st derivatives. A factor that has a larger contribution will have a larger
-sum, both because that factor's absolute magnitudes will be larger (due to the weaker penalty on the factor's
-precision) and because the factor will move around more. If
+calculating the sum of the factor's 2nd derivatives. A factor that has a larger contribution will have a larger
+sum due to the weaker penalty on the factor's precision. If
 \code{plot == TRUE}, the factors are also plotted.
 }
 \author{

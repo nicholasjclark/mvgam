@@ -113,7 +113,7 @@ pfilter_mvgam_smooth = function(particles,
       series_weight <- 1
     } else {
       series_weight <- dnbinom(next_assim$y[series],
-                        size = particles[[x]]$size,
+                        size = particles[[x]]$size[series],
                         mu = exp((
                                     (Xp[which(as.numeric(next_assim$series) == series),] %*%
                                        particles[[x]]$betas)) +

@@ -144,7 +144,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                                mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
                                                        particles[[x]]$betas)) +
                                           (trend_preds)),
-                               size = particles[[x]]$size)
+                               size = particles[[x]]$size[series])
         trunc_preds
       })
 
@@ -161,7 +161,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
             fc <-  rnbinom(fc_horizon,
                                mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
                                                        particles[[x]]$betas)) + (trend_preds)),
-                               size = particles[[x]]$size)
+                               size = particles[[x]]$size[series])
           fc
       })
     }

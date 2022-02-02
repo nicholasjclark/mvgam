@@ -132,17 +132,17 @@ Plot the series to see how similar their seasonal shapes are over time
 plot(series, legend.loc = 'topleft')
 ```
 
-Now we will fit an `mvgam` model with shared seasonality and random intercepts per series. Our first attempt will ignore any temporal component in the residuals so that we can identidy which GAM predictor combination gives us the best fit, prior to investigating how to deal with any remaining autocorrelation. We assume a Negative Binomial distrubution with shared overdispersion parameter for the response. Also note that any smooths using the random effects basis (`s(series, bs = "re")` below) are automatically re-parameterised to use the [non-centred parameterisation that is necessary to help avoid common posterior degeneracies in hierarchical models](https://betanalpha.github.io/assets/case_studies/hierarchical_modeling.html)
+Now we will fit an `mvgam` model with shared seasonality and random intercepts per series. Our first attempt will ignore any temporal component in the residuals so that we can identidy which GAM predictor combination gives us the best fit, prior to investigating how to deal with any remaining autocorrelation. We assume a Negative Binomial distrubution with series-specific overdispersion parameters for the response. We use a complexity-penalising prior for the overdispersion, which allows the model to reduce toward a more simple Poisson observation process unless the data provide adequate information to support overdispersion. Also note that any smooths using the random effects basis (`s(series, bs = "re")` below) are automatically re-parameterised to use the [non-centred parameterisation that is necessary to help avoid common posterior degeneracies in hierarchical models](https://betanalpha.github.io/assets/case_studies/hierarchical_modeling.html). We suppress the global intercept as it is not needed and will lead to identifiability issues when estimating the series-specific random intercepts
 ```{r, message=FALSE, warning=FALSE}
 trends_mod1 <- mvjagam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
                       formula = y ~ s(series, bs = 're') + 
-                        s(season, k = 12, m = 2, bs = 'cc'),
+                        s(season, k = 12, m = 2, bs = 'cc') - 1,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
                       family = 'nb',
                       chains = 4,
-                      burnin = 5000)
+                      burnin = 8000)
 ```
 
 Given that these series could potentially be following a hierarchical seasonality, we will also trial a slghtly more complex model with an extra smoothing term per series that allows its seasonal curve to deviate from the global seasonal smooth. Ignore the warning about repeated smooths, as this is not an issue for estimation.
@@ -155,10 +155,10 @@ trends_mod2 <- mvjagam(data_train = trends_data$data_train,
                       trend_model = 'None',
                       family = 'nb',
                       chains = 4,
-                      burnin = 5000)
+                      burnin = 8000)
 ```
 
-How can we compare these models to ensure we choose one that performs well and provides useful inferences? Beyond posterior retrodictive and predictive checks, we can take advantage of the fact that `mvgam` fits an `mgcv` model to provide all the necessary penalty matrices, as well as to identify good initial values for smoothing and beta parameters. Because we did not modify this model by adding a trend component we can still inspect the usual `mgcv` model comparison routines
+How can we compare these models to ensure we choose one that performs well and provides useful inferences? Beyond posterior retrodictive and predictive checks, we can take advantage of the fact that `mvgam` fits an `mgcv` model to provide all the necessary penalty matrices, as well as to identify good initial values for smoothing and beta parameters. Because we did not modify this model by adding a trend component (the only modification is that we estimated series-specific overdispersion parameters), we can still inspect the usual `mgcv` model comparison routines
 ```{r}
 anova(trends_mod1$mgcv_model,
       trends_mod2$mgcv_model, test = 'LRT')
@@ -186,20 +186,19 @@ runjags::extract(trends_mod1$jags_model, 'dic')
 runjags::extract(trends_mod2$jags_model, 'dic')
 ```
 
-Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow an AR1 process, and we will rely on the exponential penalties to help regularise any un-needed factors by setting `n_lv = 4`
+Model 1 seems to fit better so far, suggesting that hierarchical seasonality does not give better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 1 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow an AR1 process, and we will rely on the exponential penalties to help regularise any un-needed factors by setting `n_lv = 4`
 ```{r, message=FALSE, warning=FALSE}
 trends_mod3 <- mvjagam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
-                      formula = y ~ s(season, k = 12, m = 2, bs = 'cc') +
-                        s(season, series, k = 5, bs = 'fs', m = 1),
+                      formula = y ~ s(series, bs = 're') + 
+                        s(season, k = 12, m = 2, bs = 'cc') - 1,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'AR1',
                       use_lv = T,
                       n_lv = 4,
                       family = 'nb',
                       chains = 4,
-                      drift = T,
-                      burnin = 5000)
+                      burnin = 8000)
 ```
 
 
@@ -215,7 +214,7 @@ plot_mvgam_factors(trends_mod3)
 
 How do forecasts for this model compare to the previous one that did not include any trend component?
 ```{r,  fig.width = 6, fig.height = 5, fig.align='center'}
-compare_mvgams(trends_mod2, trends_mod3, fc_horizon = 6,
+compare_mvgams(trends_mod1, trends_mod3, fc_horizon = 6,
                n_cores = 3, n_evaluations = 20)
 ```
 
@@ -242,7 +241,7 @@ plot_mvgam_resids(trends_mod3, 3)
 plot_mvgam_resids(trends_mod3, 4)
 ```
 
-Perform posterior predictive checks to see if the model is able to simulate data that looks realistic and unbiased by examining simulated kernel densities for posterior predictions (`yhat`) compared to the density of the observations (`y`). This will be particularly useful for examining whether the shared overdispersion parameter is able to produce realistic looking simulations for each individual series.
+Perform posterior predictive checks to see if the model is able to simulate data that looks realistic and unbiased by examining simulated kernel densities for posterior predictions (`yhat`) compared to the density of the observations (`y`). This will be particularly useful for examining whether the Negative Binomial observation model is able to produce realistic looking simulations for each individual series.
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 plot_mvgam_ppc(trends_mod3, series = 1, type = 'density')
 ```
@@ -298,7 +297,7 @@ plot_mvgam_trend(object = trends_mod3, series = 3, data_test = trends_data$data_
 plot_mvgam_trend(object = trends_mod3, series = 4, data_test = trends_data$data_test)
 ```
 
-Given that we fit a model with hierarchical seasonality, the seasonal smooths are allowed to differ somewhat
+Given that we fit a model with sharedseasonality, the seasonal smooths will not differ
 ```{r, fig.width = 4, fig.height = 3, fig.align='center'}
 plot_mvgam_smooth(object = trends_mod3, series = 1, smooth = 'season')
 ```
@@ -345,7 +344,7 @@ plot(stl(ts(as.vector(series$`dog tick`), frequency = 12), 'periodic'))
 plot(stl(ts(as.vector(series$`tick bite`), frequency = 12), 'periodic'))
 ```
 
-A logical next step for this analysis would be to trial varying overdispersion parameters for each series. This may be necessary as the residual diagnostic plots and forecast period posterior predictive checks suggest that the estimated Negative Binomial overdispersion parameter is more suitable for some series than for others: 
+Forecast period posterior predictive checks suggest that the model still has room for improvement: 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 plot_mvgam_ppc(trends_mod3, series = 1, type = 'density', data_test = trends_data$data_test)
 ```
