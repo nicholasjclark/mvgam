@@ -62,7 +62,7 @@
 #'@param ar_prior \code{character} specifying (in JAGS syntax) the prior distribution for the AR terms
 #'in the latent trends
 #'@param r_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
-#'overdispersion parameters. Note that this prior acts on the INVERSE of \code{r}, which is convenient
+#'overdispersion parameters. Note that this prior acts on the SQUARE ROOT of \code{r}, which is convenient
 #'for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
 #'as the sampled parameter approaches \code{0}. Ignored if \code{family = 'poisson'}
 #'@param tau_prior \code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
@@ -337,8 +337,8 @@ for (i in 1:n) {
 ## where the likelihood reduces to a 'base' model (Poisson) unless
 ## the data support overdispersion
 for(s in 1:n_series){
- r[s] <- 1 / r_raw[s]
- r_raw[s] ~ dexp(0.5)
+ r[s] <- pow(r_raw[s], 2)
+ r_raw[s] ~ dexp(0.05)
 }
 
 
@@ -508,7 +508,7 @@ for (i in 1:n) {
          l.weight[t] <- exp(eta2[] * l.dist[t])
          l.var[t] <- exp(eta1[] * l.dist[t] / 2) * 1
          theta.prime[t] <- l.weight[t] * X1[t] + (1 - l.weight[t]) * X2[]
-         penalty[t] <- theta.prime[t] * l.var[t]
+         penalty[t] <- max(min_eps, theta.prime[t] * l.var[t])
         }
 
         ## Latent factor loadings: standard normal with identifiability constraints
@@ -558,8 +558,8 @@ for (i in 1:n) {
         ## where the likelihood reduces to a 'base' model (Poisson) unless
         ## the data support overdispersion
         for(s in 1:n_series){
-         r[s] <- 1 / r_raw[s]
-         r_raw[s] ~ dexp(0.5)
+         r[s] <- pow(r_raw[s], 2)
+         r_raw[s] ~ dexp(0.05)
         }
 
         ## Posterior predictions
@@ -770,6 +770,10 @@ for (i in 1:n) {
         ss_jagam$jags.data$n_lv <- min(2, floor(ss_jagam$jags.data$n_series / 2))
       } else {
         ss_jagam$jags.data$n_lv <- n_lv
+        ss_jagam$jags.ini$LV <- matrix(rep(0.1, n_lv), nrow = NROW(ytimes),
+                                       ncol = n_lv)
+        ss_jagam$jags.ini$X1 <- rep(1, n_lv)
+        ss_jagam$jags.ini$X2 <- 1
       }
       if(ss_jagam$jags.data$n_lv > ss_jagam$jags.data$n_series){
         stop('Number of latent variables cannot be greater than number of series')

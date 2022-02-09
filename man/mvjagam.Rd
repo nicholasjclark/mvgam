@@ -103,7 +103,7 @@ in the latent trends}
 in the latent trends}
 
 \item{r_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
-overdispersion parameters. Note that this prior acts on the INVERSE of \code{r}, which is convenient
+overdispersion parameters. Note that this prior acts on the SQUARE ROOT of \code{r}, which is convenient
 for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
 as the sampled parameter approaches \code{0}. Ignored if \code{family = 'poisson'}}
 

@@ -59,7 +59,7 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
   }
 
   n_samples <- NROW(trend)
-  size <- MCMCvis::MCMCsummary(object$jags_output, 'r')[,series]$mean
+  size <- MCMCvis::MCMCsummary(object$jags_output, 'r')[series,]$mean
 
   # Full uncertainty interval for the mean
   if(class(data_test) == 'list'){

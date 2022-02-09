@@ -57,7 +57,7 @@ test <- mvjagam(formula =  y ~ s(season, bs = "cc", k = 12) +
                 data_test = data_test,
                 family = 'poisson',
                 chains = 4,
-                burnin = 5000,
+                burnin = 2000,
                 trend_model = 'AR1')
 
 plot_mvgam_fc(test, series = 1, data_test = data_test, ylim = c(0, 100))
@@ -68,6 +68,58 @@ plot_mvgam_smooth(test, series = 1, smooth = 2)
 plot_mvgam_smooth(test, series = 1, smooth = 3)
 plot_mvgam_trace(test, 'trend')
 summary_mvgam(test)
+
+# For visualising how covariate functions change with different lags, use
+# the predict_mvgam function
+# Set up prediction data by zeroing out all covariates apart from the covariate of
+# interest
+newdata <- data_test
+newdata$year <- rep(0, length(newdata$year))
+newdata$season <- rep(0, length(newdata$season))
+newdata$precip <- matrix(0, ncol = ncol(newdata$precip),
+                         nrow = nrow(newdata$precip))
+
+# Set up plot colours and initiate plot window
+cols <- viridis::inferno(5)
+plot(1, type = "n",
+     xlab = 'Mintemp',
+     ylab = 'Predicted response function',
+     xlim = c(min(data_train$mintemp), max(data_train$mintemp)),
+     ylim = c(-0.6, 0.6))
+
+for(i in 1:5){
+  # Set up prediction matrix for mintemp with lag i as the prediction sequence
+  newdata$mintemp <- matrix(0, ncol = ncol(newdata$precip),
+                            nrow = nrow(newdata$precip))
+  newdata$mintemp[,i] <- seq(min(data_train$mintemp),
+                             max(data_train$mintemp),
+                             length.out = length(newdata$year))
+
+  # Predict on the link scale (intercept still included in prediction by default)
+  preds <- predict_mvgam(test, series = 1, newdata = newdata, type = 'link')
+
+  # Calculate prediction quantiles
+  probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+  cred <- sapply(1:NCOL(preds),
+                 function(n) quantile(preds[,n],
+                                      probs = probs))
+
+  # Plot expected function posterior median in varying colours per lag; subtract out the
+  # intercept so that the function is roughly centred on zero
+  pred_upper <- cred[4,] - test$mgcv_model$coefficients[1]
+  pred_lower <- cred[6,] - test$mgcv_model$coefficients[1]
+  pred_vals <- seq(min(data_train$mintemp),
+                   max(data_train$mintemp),
+                   length.out = length(newdata$year))
+  polygon(c(pred_vals, rev(pred_vals)), c(pred_upper, rev(pred_lower)),
+          col = scales::alpha(cols[i], 0.6), border = scales::alpha(cols[i], 0.7))
+  lines(pred_vals, cred[5,] - test$mgcv_model$coefficients[1],
+        col = scales::alpha(cols[i], 0.8), lwd = 2.5)
+}
+abline(h = 0, lty = 'dashed')
+legend('topleft',legend=paste0('lag', seq(0, 4)),
+       bg = 'white', bty = 'n',
+       col=cols,lty=1,lwd=6)
 
 
 # Initiate particle filter

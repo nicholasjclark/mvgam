@@ -49,14 +49,14 @@ predict_mvgam = function(object, series = 1, newdata, type = 'link'){
 
     if(object$use_lv){
       lv_preds <- do.call(cbind, lapply(seq_len(object$n_lv), function(lv){
-        rnorm(NROW(newdata), 0, sqrt(1 / taus[x,lv]))
+        rnorm(length(newdata$series), 0, sqrt(1 / taus[x,lv]))
       }))
 
       if(type == 'link'){
         as.vector(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
                            ( lv_preds %*% lv_coefs[[series]][x,]))
       } else {
-        rnbinom(n = NROW(newdata), size = sizes[x, series],
+        rnbinom(n = length(newdata$series), size = sizes[x, series],
                 mu = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
                            ( lv_preds %*% lv_coefs[[series]][x,])))
       }
@@ -64,11 +64,11 @@ predict_mvgam = function(object, series = 1, newdata, type = 'link'){
     } else {
       if(type == 'link'){
         as.vector(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
-                           (rnorm(NROW(newdata), 0, sqrt(1 / taus[x,series]))))
+                           (rnorm(length(newdata$series), 0, sqrt(1 / taus[x,series]))))
       } else {
-        rnbinom(n = NROW(newdata), size = sizes[x, series],
+        rnbinom(n = length(newdata$series), size = sizes[x, series],
                 mu = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
-                           (rnorm(NROW(newdata), 0, sqrt(1 / taus[x,series])))))
+                           (rnorm(length(newdata$series), 0, sqrt(1 / taus[x,series])))))
       }
 
     }
