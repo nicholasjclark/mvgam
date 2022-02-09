@@ -67,6 +67,9 @@ plot_mvgam_smooth(test, series = 1, smooth ='season')
 plot_mvgam_smooth(test, series = 1, smooth = 2)
 plot_mvgam_smooth(test, series = 1, smooth = 3)
 plot_mvgam_trace(test, 'trend')
+
+plot_mvgam_resids(test, series = 1)
+
 summary_mvgam(test)
 
 # For visualising how covariate functions change with different lags, use

@@ -23,6 +23,11 @@ predict_mvgam = function(object, series = 1, newdata, type = 'link'){
                 newdata = newdata,
                 type = 'lpmatrix')
 
+  if(drop_intercept){
+    if(colnames(Xp)[1] == "(Intercept)"){
+      Xp[,1] <- rep(0, NROW(Xp))
+    }
+  }
 
   # Beta coefficients for GAM component
   betas <- MCMCvis::MCMCchains(object$jags_output, 'b')

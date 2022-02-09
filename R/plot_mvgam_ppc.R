@@ -35,24 +35,46 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_po
   s_name <- levels(data_train$series)[series]
 
   if(!missing(data_test)){
+    if(class(object$obs_data) == 'list'){
+      truths <- data.frame(y = data_test$y,
+                           year = data_test$year,
+                           season = data_test$season,
+                           series = data_test$series) %>%
+        dplyr::arrange(year, season, series) %>%
+        dplyr::filter(series == s_name) %>%
+        dplyr::pull(y)
+
+    } else {
     truths <- data_test %>%
       dplyr::filter(series == s_name) %>%
       dplyr::select(year, season, y) %>%
       dplyr::distinct() %>%
       dplyr::arrange(year, season) %>%
       dplyr::pull(y)
+    }
 
     preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
     preds <- preds[,((NROW(data_train) / NCOL(object$ytimes))+1):
                      ((NROW(data_train) / NCOL(object$ytimes))+length(truths))]
 
   } else {
-    truths <- data_train %>%
-      dplyr::filter(series == s_name) %>%
-      dplyr::select(year, season, y) %>%
-      dplyr::distinct() %>%
-      dplyr::arrange(year, season) %>%
-      dplyr::pull(y)
+    if(class(object$obs_data) == 'list'){
+      truths <- data.frame(y = data_train$y,
+                           year = data_train$year,
+                           season = data_train$season,
+                           series = data_train$series) %>%
+        dplyr::arrange(year, season, series) %>%
+        dplyr::filter(series == s_name) %>%
+        dplyr::pull(y)
+
+    } else {
+      truths <- data_train %>%
+        dplyr::filter(series == s_name) %>%
+        dplyr::select(year, season, y) %>%
+        dplyr::distinct() %>%
+        dplyr::arrange(year, season) %>%
+        dplyr::pull(y)
+    }
 
     preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
     preds <- preds[,1:length(truths)]

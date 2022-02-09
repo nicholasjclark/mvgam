@@ -1,0 +1,240 @@
+---
+title: "mvgam case study 3: distributed lag models"
+author: Nicholas Clark (n.clark@uq.edu.au)
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    highlight: zenburn
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
+```
+
+Here we will work use the `mvgam` package, which fits dynamic GAMs using MCMC sampling via the `JAGS` software (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)), to estimate a distributed lag model
+
+Load the Portal rodents capture data, which are available from the `portalr` package
+```{r message=FALSE, warning = FALSE}
+#devtools::install_github("nicholasjclark/mvgam")
+library(mvgam)
+library(dplyr)
+portal_dat <- read.csv('https://raw.githubusercontent.com/nicholasjclark/mvgam/master/NEON_manuscript/rodents_data.csv', as.is = T)
+```
+
+We'll keep data from 2004 onwards to make the model quicker to estimate for this simple example
+```{r}
+portal_dat %>%
+  dplyr::filter(year >= 2004) %>%
+  dplyr::group_by(year, month) %>%
+  dplyr::slice_head(n = 1) -> portal_dat_all
+```
+
+Below is a slight modifiction of Simon Wood's lag matrix function (which he uses in his distributed lag example from the 2nd edition of his [GAMs in R book](https://www.taylorfrancis.com/books/mono/10.1201/9781315370279/generalized-additive-models-simon-wood))
+```{r}
+lagard <- function(x,n.lag=6) {
+  n <- length(x); X <- matrix(NA,n,n.lag)
+  for (i in 1:n.lag) X[i:n,i] <- x[i:n-i+1]
+  X[is.na(X)] <- mean(X, na.rm = T)
+  X
+}
+```
+
+Organise all data needed for modelling into a list. We will focus only on the species `PP`, which shows reasonable seasonality in its captures over time
+```{r}
+data_all <- list(lag=matrix(0:5,nrow(portal_dat_all),6,byrow=TRUE),
+            y = portal_dat_all$PP,
+            season = portal_dat_all$month,
+            year = portal_dat_all$year,
+            series = rep(as.factor('series1'), nrow(portal_dat_all)))
+data_all$precip <- lagard(portal_dat_all$precipitation)
+data_all$mintemp <- lagard(portal_dat_all$mintemp)
+```
+
+The matrix elements of the data list look as follows:
+```{r}
+head(data_all$lag, 5)
+head(data_all$precip, 5)
+head(data_all$mintemp, 5)
+```
+
+All other elements of the data list are in the usual vector format
+```{r}
+head(data_all$y, 5)
+head(data_all$series, 5)
+head(data_all$year, 5)
+```
+
+View the raw series. There is a clear seasonal pattern to the data, and there are missing values scattered throughout
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot(ts(data_all$y, frequency = 12), ylab = 'Captures for PP', xlab = '' )
+```
+
+Create training and testing sets; start at observation 7 so that the mean-imputed values at the beginning of the covariate lag matrices are not included. Currently there is no option for on-the-fly imputation of missing covariate values in `mvgam` models, though this can easily be done in `JAGS` by specifying prior distributions over these missing entries
+```{r}
+data_train <- list(lag = data_all$lag[7:174,],
+                   y = data_all$y[7:174],
+                   series = data_all$series[7:174],
+                   season = data_all$season[7:174],
+                   year = data_all$year[7:174],
+                   precip = data_all$precip[7:174,],
+                   mintemp = data_all$mintemp[7:174,])
+data_test <- list(lag = data_all$lag[175:length(data_all$y),],
+                   y = data_all$y[175:length(data_all$y)],
+                   series = data_all$series[175:length(data_all$y)],
+                   season = data_all$season[175:length(data_all$y)],
+                   year = data_all$year[175:length(data_all$y)],
+                   precip = data_all$precip[175:length(data_all$y),],
+                  mintemp = data_all$mintemp[175:length(data_all$y),])
+```
+
+Fit a dynamic GAM with distributed lag terms for precipitation and minimum temperature and an `AR1` process for the unobserved temporal trend. We assume a `Poisson` observation model for this example
+```{r, message=FALSE, warning=FALSE}
+test <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
+                  te(precip, lag, k = c(8, 4)),
+                data_train = data_train,
+                data_test = data_test,
+                family = 'poisson',
+                chains = 4,
+                burnin = 10000,
+                trend_model = 'AR1')
+```
+
+The summary of the model provides useful information on convergence for unobserved parameters
+```{r}
+summary_mvgam(test)
+```
+
+Plots of the estimated forecast distribution and latent trend process
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_fc(test, series = 1, data_test = data_test, ylim = c(0, 100))
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_trend(test, series = 1, data_test = data_test)
+```
+
+Plots of the estimated smooth tensor product interactions for the distributed lag terms, which basically follow `mgcv`'s two-dimensional plotting utility but uses the `mvgam`'s estimated coefficients
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_smooth(test, series = 1, smooth = 1)
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_smooth(test, series = 1, smooth = 2)
+```
+
+As these plots are rather difficult to interpret, we can use the `predict_mvgam` function to generate more interpretable plots. We will focus on the effect of `mintemp` and generate a series of predictions to visualise how the estimated function changes over different lags. Set up prediction data by zeroing out all covariates apart from the covariate of interest
+```{r}
+newdata <- data_test
+newdata$year <- rep(0, length(newdata$year))
+newdata$season <- rep(0, length(newdata$season))
+newdata$precip <- matrix(0, ncol = ncol(newdata$precip),
+                         nrow = nrow(newdata$precip))
+```
+
+Set up `viridis` plot colours and initiate the plot window to be centred around zero. We will then keep all `mintemp` values at zero apart from the particular lag being predicted so that we can visualise how the predicted function changes over lags of `mintemp`. Predictions are generated on the link scale. Note that we need to first generate predictions with all zeros to find the 'baseline' prediction so that we can shift by this baseline for generating a zero-centred plot, following the traditional `mgcv` partial effect plots
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+cols <- viridis::inferno(6)
+plot(1, type = "n",
+     xlab = 'Mintemp',
+     ylab = 'Predicted response function',
+     xlim = c(min(data_train$mintemp), max(data_train$mintemp)),
+     ylim = c(-1.6, 1.6))
+
+# Calculate predictions for when mintemp is all zeros to find the baseline
+# value for centring the plot
+newdata$mintemp <- matrix(0, ncol = ncol(newdata$mintemp),
+                         nrow = nrow(newdata$mintemp))
+preds <- predict_mvgam(test, series = 1, newdata = newdata, type = 'link')
+offset <- mean(preds)
+
+for(i in 1:6){
+  # Set up prediction matrix for mintemp with lag i as the prediction sequence
+  newdata$mintemp <- matrix(0, ncol = ncol(newdata$precip),
+                            nrow = nrow(newdata$precip))
+  newdata$mintemp[,i] <- seq(min(data_train$mintemp),
+                             max(data_train$mintemp),
+                             length.out = length(newdata$year))
+
+  # Predict on the link scale (intercept still included in prediction by default)
+  preds <- predict_mvgam(test, series = 1, newdata = newdata, type = 'link') - offset
+
+  # Calculate prediction quantiles
+  probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+  cred <- sapply(1:NCOL(preds),
+                 function(n) quantile(preds[,n],
+                                      probs = probs))
+
+  # Plot expected function posterior intervals (40-60%) in varying colours per lag
+  pred_upper <- cred[4,]
+  pred_lower <- cred[6,]
+  pred_vals <- seq(min(data_train$mintemp),
+                   max(data_train$mintemp),
+                   length.out = length(newdata$year))
+  polygon(c(pred_vals, rev(pred_vals)), c(pred_upper, rev(pred_lower)),
+          col = scales::alpha(cols[i], 0.6), border = scales::alpha(cols[i], 0.7))
+  lines(pred_vals, cred[5,],
+        col = scales::alpha(cols[i], 0.8), lwd = 2.5)
+}
+abline(h = 0, lty = 'dashed')
+legend('topleft',legend=paste0('lag', seq(0, 5)),
+       bg = 'white', bty = 'n',
+       col=cols,lty=1,lwd=6)
+```
+
+This plot demonstrates how the effect of `mintemp` changes over different lags, with the 3 - 4 month lags showing more of a cyclic seasonal pattern (catches increasing 3 - 5 months following cold winter temperatures) while the more recent lags (lags 0 and 1) demonstrating a more linear response function (catches increasing as minimum temperature increases). This is hopefully a useful example for developing a better understanding of what a distributed lag model is capturing. And here is the same plot for precipitation, which demonstrates how a u-shaped functional relationship diminishes toward a flat function at lags 3 - 5 (though this effect is clearly less important in the model than the mintem * lag effect above)
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+newdata <- data_test
+newdata$year <- rep(0, length(newdata$year))
+newdata$season <- rep(0, length(newdata$season))
+newdata$mintemp <- matrix(0, ncol = ncol(newdata$mintemp),
+                         nrow = nrow(newdata$mintemp))
+newdata$precip <- matrix(0, ncol = ncol(newdata$precip),
+                         nrow = nrow(newdata$precip))
+preds <- predict_mvgam(test, series = 1, newdata = newdata, type = 'link')
+offset <- mean(preds)
+plot(1, type = "n",
+     xlab = 'Precipitation',
+     ylab = 'Predicted response function',
+     xlim = c(min(data_train$precip), max(data_train$precip)),
+     ylim = c(-1.6, 1.6))
+
+for(i in 1:6){
+  newdata$precip <- matrix(0, ncol = ncol(newdata$precip),
+                            nrow = nrow(newdata$precip))
+  newdata$precip[,i] <- seq(min(data_train$precip),
+                             max(data_train$precip),
+                             length.out = length(newdata$year))
+  preds <- predict_mvgam(test, series = 1, newdata = newdata, type = 'link') - offset
+  probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+  cred <- sapply(1:NCOL(preds),
+                 function(n) quantile(preds[,n],
+                                      probs = probs))
+  pred_upper <- cred[4,]
+  pred_lower <- cred[6,]
+  pred_vals <- seq(min(data_train$precip),
+                   max(data_train$precip),
+                   length.out = length(newdata$year))
+  polygon(c(pred_vals, rev(pred_vals)), c(pred_upper, rev(pred_lower)),
+          col = scales::alpha(cols[i], 0.6), border = scales::alpha(cols[i], 0.7))
+  lines(pred_vals, cred[5,],
+        col = scales::alpha(cols[i], 0.8), lwd = 2.5)
+}
+abline(h = 0, lty = 'dashed')
+legend('bottomleft',legend=paste0('lag', seq(0, 5)),
+       bg = 'white', bty = 'n',
+       col=cols,lty=1,lwd=6)
+```
+
+All of the usual functions in `mvgam` can also be used for list data objects, so long as they contain the necessary fields `series`, `season` and `year`. For example, posterior retrodictive checks for the in-sample training period: 
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_ppc(test, series = 1, type = 'cdf')
+```
+
+and predictive checks for the out of sample forecast period (which demonstrates how the model overpredicts for the forecast period in this particular example):
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_ppc(test, data_test = data_test, series = 1, type = 'cdf')
+```

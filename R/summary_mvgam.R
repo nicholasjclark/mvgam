@@ -324,7 +324,7 @@ df <- edf1 <- edf <- s.pv <- chi.sq <- array(0, m)
   ii <- 0
 
   # Median beta params for smooths and their covariances
-  V <- cov(MCMCvis::MCMCchains(object$jags_output, 'b'))
+  V <- cov(MCMCvis::MCMCchains(object$jags_output, 'b')[1:1000,])
   object$mgcv_model$Ve <- V
   object$mgcv_model$Vp <- V
   object$mgcv_model$Vc <- V
@@ -339,19 +339,8 @@ df <- edf1 <- edf <- s.pv <- chi.sq <- array(0, m)
   for (i in 1:m) { ## loop through smooths
     start <- object$mgcv_model$smooth[[i]]$first.para;stop <- object$mgcv_model$smooth[[i]]$last.para
 
-    edf1i <- edfi <- sum(object$mgcv_model$edf[start:stop]) # edf for this smooth
-    ## extract alternative edf estimate for this smooth, if possible...
-    if (!is.null(object$mgcv_model$edf1)) edf1i <-  sum(object$mgcv_model$edf1[start:stop])
+    edf1i <- edfi <- sum(object$mgcv_model$edf[start:stop])# edf for this smooth
     Xt <- X[start:stop,start:stop,drop=FALSE]
-    fx <- if (inherits(object$mgcv_model$smooth[[i]],"tensor.smooth")&&
-              !is.null(object$mgcv_model$smooth[[i]]$fx)) all(object$mgcv_model$smooth[[i]]$fx) else object$mgcv_model$smooth[[i]]$fixed
-    # if (!fx&&object$mgcv_model$smooth[[i]]$null.space.dim==0&&!is.null(object$mgcv_model$R)) { ## random effect or fully penalized term
-    #   res <- reTest(object$mgcv_model,i)
-    # } else { ## Inverted Nychka interval statistics
-    #   rdf <- -1
-    #   res <- testStat(p[start:stop],Xt,V,min(ncol(Xt),edf1i),type=0,res.df = residual.df)
-    # }
-
     # Complicated to test the parametric hypothesis given by the null space of the component’s
     # smoothing penalty, which is the default in mgcv for fully penalized smooths when the
     # estimate of the frequentist covariance matrix is present. In our case, we do not have this
