@@ -30,7 +30,7 @@ data_train <- object$obs_data
 n_series <- NCOL(object$ytimes)
 
 # Next observation for assimilation (ensure data_assim is arranged correctly)
-if(class(object$obs_data) == 'list'){
+if(class(object$obs_data)[1] == 'list'){
   # Find indices of next observation
   temp_dat = data.frame(year = data_assim$year,
                         season = data_assim$season,
@@ -297,7 +297,7 @@ stopCluster(cl)
 mgcv_model <- object$mgcv_model
 series_test$assimilated <- 'yes'
 
-if(class(data_train) == 'list'){
+if(class(data_train)[1] == 'list'){
 
   data_train$assimilated <- rep('no', length(data_train$y))
   obs_data <- lapply(seq_along(data_train), function(x){

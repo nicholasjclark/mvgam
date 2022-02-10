@@ -57,7 +57,7 @@ head(fake_data$data_train)
 head(fake_data$data_test)
 ```
 
-As a first pass at modelling this series, we will fit a GAM that includes a seasonal smooth and a yearly smooth, as well as their tensor product interaction. As the seasonality is cyclic, we will use a cyclic cubic regression spline for `season`. The knots are set so that the boundaries of the cyclic smooth match up between December 31 and January 1. We will stick with the default thin plate regression spline for `year`. This is similar to what we might do when fitting a model in `mgcv` to try and forecast ahead, except here we also have an explicit model for the residual component. `mvgam` uses the `jagam` function from the `mgcv` package to generate a skeleton `JAGS` file and updates that file to incorporate any dynamic trend components (so far limited to no trend, random walks or AR models up to order 3). This is advantageous as any GAM that is allowed in `mgcv` can in principle be used in `mvgam` to fit dynamic linear models with smooth functions for nonlinear covariate effects. For multivariate series, `mvgam` also includes an option for dimension reduction by inducing trend correlations via a dynamic factor process. Here we use the Negative Binomial family and a burnin length of `2000` iterations (in practice we would probably run these models for a bit longer, but they tend to converge rather quickly for univariate series thanks to the useful starting values supplied by `jagam`). Note that feeding the `data_test` object does not mean that these values are used in training of the model. Rather, they are included as `NA` so that we can automatically create a forecast from the posterior predictions for these observations. This is useful for plotting forecasts without needing to run new data through the model's equations later on
+As a first pass at modelling this series, we will fit a GAM that includes a seasonal smooth and a yearly smooth, as well as their tensor product interaction. As the seasonality is cyclic, we will use a cyclic cubic regression spline for `season`. The knots are set so that the boundaries of the cyclic smooth match up between December 31 and January 1. We will stick with the default thin plate regression spline for `year`. This is similar to what we might do when fitting a model in `mgcv` to try and forecast ahead, except here we also have an explicit model for the residual component. `mvgam` uses the `jagam` function from the `mgcv` package to generate a skeleton `JAGS` file and updates that file to incorporate any dynamic trend components (so far limited to no trend, random walks or AR models up to order 3). This is advantageous as any GAM that is allowed in `mgcv` can in principle be used in `mvgam` to fit dynamic linear models with smooth functions for nonlinear covariate effects. For multivariate series, `mvgam` also includes an option for dimension reduction by inducing trend correlations via a dynamic factor process. Here we use the Negative Binomial family and a burnin length of `5000` iterations (in practice we would probably run these models for a bit longer, but they tend to converge rather quickly for univariate series thanks to the useful starting values supplied by `jagam`). Note that feeding the `data_test` object does not mean that these values are used in training of the model. Rather, they are included as `NA` so that we can automatically create a forecast from the posterior predictions for these observations. This is useful for plotting forecasts without needing to run new data through the model's equations later on
 ```{r, message=FALSE, warning=FALSE}
 mod1 <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,
@@ -67,7 +67,7 @@ mod1 <- mvjagam(data_train = fake_data$data_train,
                knots = list(season = c(0.5, 12.5)),
                family = 'nb',
                trend_model = 'None',
-               burnin = 2000,
+               burnin = 5000,
                chains = 4)
 ```
 
@@ -171,7 +171,7 @@ mod2 <- mvjagam(data_train = fake_data$data_train,
                                      max(fake_data$data_test$year))),
                family = 'nb',
                trend_model = 'None',
-               burnin = 2000,
+               burnin = 5000,
                chains = 4)
 ```
 
@@ -226,7 +226,7 @@ mod3 <- mvjagam(data_train = fake_data$data_train,
                 family = 'nb',
                 trend_model = 'AR3',
                 drift = TRUE,
-                burnin = 2000,
+                burnin = 5000,
                chains = 4)
 ```
                
@@ -281,7 +281,7 @@ mod4 <- mvjagam(data_train = fake_data$data_train,
                family = 'poisson',
                trend_model = 'RW',
                drift = TRUE,
-               burnin = 3000,
+               burnin = 5000,
                chains = 4)
 ```
 

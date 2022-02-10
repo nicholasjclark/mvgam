@@ -39,7 +39,7 @@ pfilter_mvgam_online = function(data_assim,
   }
 
   # Get next observations in line to be assimilated
-  if(class(data_assim) == 'list'){
+  if(class(data_assim)[1] == 'list'){
     n_series <- length(unique(obs_data$series))
     all_needed_names <- names(obs_data)
     # Find indices of next observation
@@ -108,7 +108,7 @@ pfilter_mvgam_online = function(data_assim,
                   dplyr::filter(assimilated == 'no')) / length(unique(data_assim$series)))){
 
         # Get next set of observations for assimilation (one observation per series)
-    if(class(obs_data) == 'list'){
+    if(class(obs_data)[1] == 'list'){
 
       indices_assim <- (data_assim %>%
                           dplyr::arrange(year,
@@ -138,7 +138,7 @@ pfilter_mvgam_online = function(data_assim,
                                           n_cores = n_cores)
 
         # Update observation history with last assimilations
-        if(class(obs_data) == 'list'){
+        if(class(obs_data)[1] == 'list'){
           data_assim_orig$assimilated[starts[i]:ends[i]] <- 'yes'
           obs_data <- lapply(seq_along(obs_data), function(x){
 

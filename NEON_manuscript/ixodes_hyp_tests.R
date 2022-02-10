@@ -61,7 +61,6 @@ fit_null <- fit_mvgam(data_train = all_data$data_train,
                   n.burnin = n.burnin,
                   n.iter = n.iter,
                   thin = thin,
-                  auto_update = FALSE,
                   interval_width = 0.9)
 
 fit_hyp1 <- fit_mvgam(data_train = all_data$data_train,
@@ -75,7 +74,6 @@ fit_hyp1 <- fit_mvgam(data_train = all_data$data_train,
                       n.burnin = n.burnin,
                       n.iter = n.iter,
                       thin = thin,
-                      auto_update = F,
                       interval_width = 0.9)
 
 fit_hyp2 <- fit_mvgam(data_train = all_data$data_train,

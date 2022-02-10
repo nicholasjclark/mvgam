@@ -64,7 +64,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
       x <- mean(x, na.rm = T)
     }
   }
-  if(missing(newdata) && class(object$obs_data) != 'list'){
+  if(missing(newdata) && class(object$obs_data)[1] != 'list'){
     data_train %>%
       dplyr::select(c(series, year, smooth_terms)) %>%
       dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
@@ -77,7 +77,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
                                         length.out = 500)) -> pred_dat
      colnames(pred_dat) <- gsub('smooth.var', smooth, colnames(pred_dat))
 
-  } else if(missing(newdata) && class(object$obs_data) == 'list'){
+  } else if(missing(newdata) && class(object$obs_data)[1] == 'list'){
     pred_dat <- object$obs_data
   } else {
     pred_dat <- newdata

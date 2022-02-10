@@ -35,7 +35,7 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_po
   s_name <- levels(data_train$series)[series]
 
   if(!missing(data_test)){
-    if(class(object$obs_data) == 'list'){
+    if(class(object$obs_data)[1] == 'list'){
       truths <- data.frame(y = data_test$y,
                            year = data_test$year,
                            season = data_test$season,
@@ -58,7 +58,7 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_po
                      ((NROW(data_train) / NCOL(object$ytimes))+length(truths))]
 
   } else {
-    if(class(object$obs_data) == 'list'){
+    if(class(object$obs_data)[1] == 'list'){
       truths <- data.frame(y = data_train$y,
                            year = data_train$year,
                            season = data_train$season,

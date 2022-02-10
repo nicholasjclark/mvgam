@@ -40,7 +40,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     tail(particles[[x]]$weight, 1)})))
   weights <- weights / max(weights)
   index <- sample.int(length(weights), length(weights), replace = TRUE,
-                      prob = weights + 0.0001)
+                      prob = exp(weights))
   fc_samples <- sample(index, min(10000, length(weights)), T)
 
   # Function to simulate trends / latent factors ahead using ar3 model
@@ -62,7 +62,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   }
 
   # Get all observations that have not yet been assimilated
-  if(class(data_test) == 'list'){
+  if(class(data_test)[1] == 'list'){
     data_test_orig <- data_test
     list_names <- names(data_test_orig)
     data_test = data.frame(year = data_test$year,
@@ -99,7 +99,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
 
   n_series <- (length(levels(data_test$series)))
 
-  if(class(series_test) == 'list'){
+  if(class(series_test)[1] == 'list'){
     fc_horizon <- length(series_test$series) / n_series
   } else {
     fc_horizon <- NROW(series_test) / n_series
@@ -181,7 +181,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   names(series_fcs) <- levels(data_test$series)
 
   # Generate plots of forecasts for each series
-  if(class(obs_data) != 'list'){
+  if(class(obs_data)[1] != 'list'){
     obs_data %>%
       dplyr::arrange(year, season, series) -> obs_data
   }

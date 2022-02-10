@@ -76,7 +76,7 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
   s_name <- levels(data_train$series)[series]
   if(!missing(data_test)){
 
-    if(class(data_train) == 'list'){
+    if(class(data_train)[1] == 'list'){
       data_train <- data.frame(series = data_train$series,
                           y = data_train$y,
                           season = data_train$season,
@@ -101,7 +101,7 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
              dplyr::pull(y), pch = 16, col = "black", cex = 0.55)
     abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
   } else {
-    if(class(data_train) == 'list'){
+    if(class(data_train)[1] == 'list'){
       data_train <- data.frame(series = data_train$series,
                                y = data_train$y,
                                season = data_train$season,

@@ -316,15 +316,15 @@ pfilter_mvgam_smooth = function(particles,
       # any dependencies in states
       weight <- norm_weights[x]
       if(weight < weight_thres.1){
-        evolve <- 0.9 * kernel_lambda
+        evolve <- 0.95 * kernel_lambda
 
       } else if(weight < weight_thres.4 &
                 weight > weight_thres.1){
-        evolve <- 0.6 * kernel_lambda
+        evolve <- 0.7 * kernel_lambda
 
       } else if(weight < weight_thres.85 &
                 weight > weight_thres.4){
-        evolve <- 0.3 * kernel_lambda
+        evolve <- 0.45 * kernel_lambda
 
       } else {
         evolve <- 0.25 * kernel_lambda
@@ -340,7 +340,7 @@ pfilter_mvgam_smooth = function(particles,
             (lv_draws[x,] * sqrt(1 - evolve^2))
 
           # Put latent variable states back in list format
-          lv_begins <- seq(1, length(lv_evolve), by = length(particles[[x]]$lv_states))
+          lv_begins <- seq(1, length(lv_evolve), by = 3)
           lv_ends <- lv_begins + 2
 
           lv_evolve <- lapply(seq_along(particles[[x]]$lv_states), function(lv){
@@ -365,7 +365,7 @@ pfilter_mvgam_smooth = function(particles,
             (trend_draws[x,] * sqrt(1 - evolve^2))
 
           # Put trend states back in list format
-          trend_begins <- seq(1, length(trend_evolve), by = length(particles[[x]]$trend_states))
+          trend_begins <- seq(1, length(trend_evolve), by = 3)
           trend_ends <- trend_begins + 2
 
           trend_evolve <- lapply(seq_along(particles[[x]]$trend_states), function(trend){

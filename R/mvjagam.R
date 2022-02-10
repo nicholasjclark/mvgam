@@ -487,9 +487,9 @@ for (i in 1:n) {
         }
 
         ## Shrinkage penalties for each factor squeeze the factor to a flat line and squeeze
-        ## the entire factor's set of coefficients toward zero if supported by
+        ## the entire factor toward a flat white noise process if supported by
         ## the data. The prior for individual factor penalties allows each factor to possibly
-        ## have a relatively large penalty, which shrinks the prior for that factor's loadings
+        ## have a relatively large penalty, which shrinks the prior for that factor's variance
         ## substantially. Penalties increase exponentially with the number of factors following
         ## Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate
         ## matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291.
@@ -660,7 +660,7 @@ for (i in 1:n) {
                           predict(ss_gam, newdata = data_test, type = 'lpmatrix')))
 
     # Add a time variable
-    if(class(data_train) == 'list'){
+    if(class(data_train)[1] == 'list'){
       temp_dat_train <- data.frame(year = data_train$year,
                                    series = data_train$series,
                                    season = data_train$season)
@@ -704,7 +704,7 @@ for (i in 1:n) {
   } else {
     X <- data.frame(ss_jagam$jags.data$X)
 
-    if(class(data_train) == 'list'){
+    if(class(data_train)[1] == 'list'){
       temp_dat <- data.frame(year = data_train$year,
                              season = data_train$season)
       X$time <- temp_dat %>%
@@ -770,8 +770,8 @@ for (i in 1:n) {
         ss_jagam$jags.data$n_lv <- min(2, floor(ss_jagam$jags.data$n_series / 2))
       } else {
         ss_jagam$jags.data$n_lv <- n_lv
-        ss_jagam$jags.ini$LV <- matrix(rep(0.1, n_lv), nrow = NROW(ytimes),
-                                       ncol = n_lv)
+        # ss_jagam$jags.ini$LV <- matrix(rep(0.1, n_lv), nrow = NROW(ytimes),
+        #                                ncol = n_lv)
         ss_jagam$jags.ini$X1 <- rep(1, n_lv)
         ss_jagam$jags.ini$X2 <- 1
       }
@@ -880,7 +880,7 @@ for (i in 1:n) {
   size <- MCMCvis::MCMCsummary(out_gam_mod, 'r')$mean
 
   series_resids <- lapply(seq_len(NCOL(ytimes)), function(series){
-    if(class(data_train) == 'list'){
+    if(class(data_train)[1] == 'list'){
       n_obs <- data.frame(series = data_train$series) %>%
         dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
         nrow()
