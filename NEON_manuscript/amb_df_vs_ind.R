@@ -43,7 +43,7 @@ all_data <- prep_neon_data(species = 'Ambloyomma_americanum', split_prop = 0.8)
 # Hypothesis 1 was the best fitting model
 hyp1 = y ~
   s(siteID, bs = 're') +
-  s(cum_gdd, by = siteID, k = 3) +
+  s(cum_gdd, siteID, k = 3, bs = 'fs') +
   # Global cyclic seasonality term (smooth)
   s(season, k = 26, m = 2, bs = 'cc')
 
@@ -58,70 +58,89 @@ mod_ind <- mvjagam(data_train = all_data$data_train,
                    use_lv = F,
                    burnin = 10000)
 
-# Initiate particle filter
-pfilter_mvgam_init(object = mod_ind, n_particles = 5000, n_cores = 4,
-                   data_assim = all_data$data_test)
+# Total (summed) out of sample DRPS from the fitted independent trend model,
+# excluding the next 8 observations (which will be assimilated)
+object <- mod_ind
+length_train <- object$obs_data %>%
+  dplyr::select(season, year) %>%
+  dplyr::distinct() %>% nrow()
+ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
+            length.out = NCOL(object$ytimes) + 1)
+starts <- ends + 1
+starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
+ends <- ends[-1]
 
-# Assimilate next 7 observations per series
-data_assim <- all_data$data_test[1:(length(unique(all_data$data_train$series))*8),]
-pfilter_mvgam_online(data_assim = data_assim,
-                     n_cores = 4,
-                     kernel_lambda = 1)
-# Forecast remaining observations
-fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 4,
-                       data_test = all_data$data_test, return_forecasts = T)
-
-length(fc$forecasts)
-
-# Total (summed) out of sample DRPS from the particle filtered independent trend model
 ind_drps <- unlist(lapply(seq_len(length(unique(all_data$data_train$series))), function(i){
+  preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[i]:ends[i]][,-c(1:length_train)]
   sum(drps_mcmc_object(truth = all_data$data_test[-c(1:(length(unique(all_data$data_train$series))*8)),] %>%
                          dplyr::filter(series == levels(all_data$data_train$series)[i]) %>%
                          dplyr::pull(y),
-                       fc = fc$forecasts[[i]])[,1], na.rm = T)
+                       fc = preds[,-c(1:8)])[,1], na.rm = T)
 }))
 names(ind_drps) <- levels(all_data$data_test$series)
 
-# Repeat for dynamic factor trends model
-mod_df <- mvjagam(data_train = all_data$data_train,
-                   data_test = all_data$data_test,
-                   formula = hyp1,
-                   knots = list(season = c(0.5, 26.5)),
-                   family = 'nb',
-                  trend_model = 'AR1',
-                   chains = 4,
-                   use_lv = T,
-                   n_lv = 6,
-                   burnin = 10000)
-
 # Initiate particle filter
-pfilter_mvgam_init(object = mod_df, n_particles = 5000, n_cores = 4,
+pfilter_mvgam_init(object = mod_ind, n_particles = 5000, n_cores = 5,
                    data_assim = all_data$data_test)
+
 # Assimilate next 7 observations per series
 data_assim <- all_data$data_test[1:(length(unique(all_data$data_train$series))*8),]
 pfilter_mvgam_online(data_assim = data_assim,
-                     n_cores = 4,
+                     n_cores = 5,
                      kernel_lambda = 1)
 # Forecast remaining observations
-fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 4,
+fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 5,
                        data_test = all_data$data_test, return_forecasts = T)
 
-# Total (summed) out of sample DRPS from the particle filtered df trend model
-df_drps <- unlist(lapply(seq_len(length(unique(all_data$data_train$series))), function(i){
+
+# Total (summed) out of sample DRPS from the particle filtered independent trend model
+ind_drps_pf <- unlist(lapply(seq_len(length(unique(all_data$data_train$series))), function(i){
   sum(drps_mcmc_object(truth = all_data$data_test[-c(1:(length(unique(all_data$data_train$series))*8)),] %>%
                          dplyr::filter(series == levels(all_data$data_train$series)[i]) %>%
                          dplyr::pull(y),
                        fc = fc$forecasts[[i]])[,1], na.rm = T)
 }))
-names(df_drps) <- levels(all_data$data_test$series)
-ind_drps
-df_drps
+names(ind_drps_pf) <- levels(all_data$data_test$series)
+
+# How would a model that is trained on these next 8 observations, rather than assimilating them
+# via a particle filter, perform?
+new_data_train <- rbind(all_data$data_train,
+                        all_data$data_test[c(1:(length(unique(all_data$data_train$series))*8)),])
+new_data_test <- all_data$data_test[-c(1:(length(unique(all_data$data_train$series))*8)),]
+mod_ind_updated <- mvjagam(data_train = new_data_train,
+                   data_test = new_data_test,
+                   formula = hyp1,
+                   knots = list(season = c(0.5, 26.5)),
+                   family = 'nb',
+                   trend_model = 'AR1',
+                   chains = 4,
+                   use_lv = F,
+                   burnin = 10000)
+
+object <- mod_ind_updated
+length_train <- object$obs_data %>%
+  dplyr::select(season, year) %>%
+  dplyr::distinct() %>% nrow()
+ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
+            length.out = NCOL(object$ytimes) + 1)
+starts <- ends + 1
+starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
+ends <- ends[-1]
+
+ind_drps_updated <- unlist(lapply(seq_len(length(unique(all_data$data_train$series))), function(i){
+  preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[i]:ends[i]][,-c(1:length_train)]
+  sum(drps_mcmc_object(truth = new_data_test %>%
+                         dplyr::filter(series == levels(all_data$data_train$series)[i]) %>%
+                         dplyr::pull(y),
+                       fc = preds)[,1], na.rm = T)
+}))
+names(ind_drps_updated) <- levels(all_data$data_test$series)
 
 sum(ind_drps)
-sum(df_drps)
+sum(ind_drps_pf)
+sum(ind_drps_updated)
 
-plot_mvgam_fc(mod_ind, series = 1)
-plot_mvgam_fc(mod_df, series = 1)
-fc$fc_plots$ORNL_002()
-plot_mvgam_trend(mod_ind, series = 6)
-plot_mvgam_trend(mod_df, series = 6)
+
+plot_mvgam_fc(mod_ind, series = 4, data_test = all_data$data_test)
+fc$fc_plots$ORNL_008()
+plot_mvgam_fc(mod_ind_updated, series = 2, data_test = new_data_test)

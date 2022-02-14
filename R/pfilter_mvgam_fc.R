@@ -40,7 +40,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     tail(particles[[x]]$weight, 1)})))
   weights <- weights / max(weights)
   index <- sample.int(length(weights), length(weights), replace = TRUE,
-                      prob = exp(weights))
+                      prob = weights)
   fc_samples <- sample(index, min(10000, length(weights)), T)
 
   # Function to simulate trends / latent factors ahead using ar3 model

@@ -112,12 +112,11 @@ pfilter_mvgam_smooth = function(particles,
     if(is.na(next_assim$y[series])){
       series_weight <- 1
     } else {
-      series_weight <- dnbinom(next_assim$y[series],
+      series_weight <- 1 + (dnbinom(next_assim$y[series],
                         size = particles[[x]]$size[series],
-                        mu = exp((
-                                    (Xp[which(as.numeric(next_assim$series) == series),] %*%
+                        mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
                                        particles[[x]]$betas)) +
-                                   (trend_states[series])))
+                                   (trend_states[series]))))
     }
     series_weight
   })), na.rm = T)
@@ -148,9 +147,137 @@ pfilter_mvgam_smooth = function(particles,
 
   weights <- (unlist(lapply(seq_along(particles), function(x){
     tail(particles[[x]]$weight, 1)})))
-  index <- sample.int(length(weights), length(weights),
+
+  # Initial thresholding, keeping only top 50% of weights
+  weights_keep <- sample(sort.int(weights, decreasing = TRUE,
+                             index.return = TRUE)$ix[1:floor(length(weights) / 2)],
+                  length(weights),
+                  replace = T)
+
+  # Functions for Pareto smoothing of remaining importance weights
+  # (from loo package: https://github.com/stan-dev/loo/tree/master/R)
+  nlist <- function(...) {
+    m <- match.call()
+    out <- list(...)
+    no_names <- is.null(names(out))
+    has_name <- if (no_names) FALSE else nzchar(names(out))
+    if (all(has_name))
+      return(out)
+    nms <- as.character(m)[-1L]
+    if (no_names) {
+      names(out) <- nms
+    } else {
+      names(out)[!has_name] <- nms[!has_name]
+    }
+
+    return(out)
+  }
+
+  adjust_k_wip <- function(k, n) {
+    a <- 10
+    n_plus_a <- n + a
+    k * n / n_plus_a + a * 0.5 / n_plus_a
+  }
+
+  qgpd <- function(p, k, sigma) {
+    if (is.nan(sigma) || sigma <= 0) {
+      return(rep(NaN, length(p)))
+    }
+
+    sigma * expm1(-k * log1p(-p)) / k
+  }
+
+  gpdfit <- function(x, wip = TRUE, min_grid_pts = 30, sort_x = TRUE) {
+    # See section 4 of Zhang and Stephens (2009)
+    if (sort_x) {
+      x <- sort.int(x)
+    }
+    N <- length(x)
+    prior <- 3
+    M <- min_grid_pts + floor(sqrt(N))
+    jj <- seq_len(M)
+    xstar <- x[floor(N / 4 + 0.5)] # first quartile of sample
+    theta <- 1 / x[N] + (1 - sqrt(M / (jj - 0.5))) / prior / xstar
+    l_theta <- N * lx(theta, x) # profile log-lik
+    w_theta <- exp(l_theta - matrixStats::logSumExp(l_theta)) # normalize
+    theta_hat <- sum(theta * w_theta)
+    k <- mean.default(log1p(-theta_hat * x))
+    sigma <- -k / theta_hat
+
+    if (wip) {
+      k <- adjust_k_wip(k, n = N)
+    }
+
+    if (is.nan(k)) {
+      k <- Inf
+    }
+
+    nlist(k, sigma)
+  }
+
+
+  # internal ----------------------------------------------------------------
+
+  lx <- function(a,x) {
+    a <- -a
+    k <- vapply(a, FUN = function(a_i) mean(log1p(a_i * x)), FUN.VALUE = numeric(1))
+    log(a / k) - k - 1
+  }
+  enough_tail_samples <- function(tail_len, min_len = 5) {
+    tail_len >= min_len
+  }
+
+  psis_smooth_tail <- function(x, cutoff) {
+    len <- length(x)
+    exp_cutoff <- exp(cutoff)
+
+    # save time not sorting since x already sorted
+    fit <- gpdfit(exp(x) - exp_cutoff, sort_x = FALSE)
+    k <- fit$k
+    sigma <- fit$sigma
+    if (is.finite(k)) {
+      p <- (seq_len(len) - 0.5) / len
+      qq <- qgpd(p, k, sigma) + exp_cutoff
+      tail <- log(qq)
+    } else {
+      tail <- x
+    }
+    list(tail = tail, k = k)
+  }
+
+  do_psis_i <- function(log_ratios_i, tail_len_i, ...) {
+    S <- length(log_ratios_i)
+    # shift log ratios for safer exponentation
+    lw_i <- log_ratios_i - max(log_ratios_i)
+    khat <- Inf
+
+    if (enough_tail_samples(tail_len_i)) {
+      ord <- sort.int(lw_i, index.return = TRUE)
+      tail_ids <- seq(S - tail_len_i + 1, S)
+      lw_tail <- ord$x[tail_ids]
+      if (abs(max(lw_tail) - min(lw_tail)) < .Machine$double.eps/100) {
+        # Won't fit when we have just resampled or when weights were just reset
+      } else {
+        cutoff <- ord$x[min(tail_ids) - 1] # largest value smaller than tail values
+        smoothed <- psis_smooth_tail(lw_tail, cutoff)
+        khat <- smoothed$k
+        lw_i[ord$ix[tail_ids]] <- smoothed$tail
+      }
+    }
+
+    # truncate at max of raw wts (i.e., 0 since max has been subtracted)
+    lw_i[lw_i > 0] <- 0
+    # shift log weights back so that the smallest log weights remain unchanged
+    lw_i <- lw_i + max(log_ratios_i)
+
+    list(log_weights = lw_i, pareto_k = khat)
+  }
+
+  pareto_weights <- do_psis_i(log_ratios_i = weights[weights_keep],
+                                  tail_len_i = length(weights) / 5)$log_weights
+  index <- sample(weights_keep, length(weights_keep),
                       replace = TRUE,
-                      prob = weights + 0.0001)
+                      prob = pareto_weights)
 
   # Use effective sample size of weights to decide whether to resample particles
   # i.e. when there is too much disparity in weights
@@ -184,6 +311,7 @@ pfilter_mvgam_smooth = function(particles,
     orig_betas <- NULL
   } else {
     # If resampling, must preserve the original diversity of GAM beta coefficients
+    next_update_seq <- index
     orig_betas <- do.call(rbind, purrr::map(particles, 'betas'))
   }
 
@@ -225,7 +353,8 @@ pfilter_mvgam_smooth = function(particles,
       best_trend_cov <- cov(as.matrix(best_trend))
       best_trend_means <- apply(best_trend, 2, mean)
 
-      trend_draws <- MASS::mvrnorm(n = length(next_update_seq), mu = rep(0, length(best_trend_means)),
+      trend_draws <- MASS::mvrnorm(n = length(next_update_seq),
+                                   mu = rep(0, length(best_trend_means)),
                                    Sigma = best_trend_cov)
 
       lv_draws <- NULL
@@ -316,18 +445,18 @@ pfilter_mvgam_smooth = function(particles,
       # any dependencies in states
       weight <- norm_weights[x]
       if(weight < weight_thres.1){
-        evolve <- 0.95 * kernel_lambda
+        evolve <- kernel_lambda
 
       } else if(weight < weight_thres.4 &
                 weight > weight_thres.1){
-        evolve <- 0.7 * kernel_lambda
+        evolve <- 0.75 * kernel_lambda
 
       } else if(weight < weight_thres.85 &
                 weight > weight_thres.4){
-        evolve <- 0.45 * kernel_lambda
+        evolve <- 0.5 * kernel_lambda
 
       } else {
-        evolve <- 0.25 * kernel_lambda
+        evolve <- 0.35 * kernel_lambda
       }
       if(weight < weight_thres.85){
 
@@ -337,7 +466,7 @@ pfilter_mvgam_smooth = function(particles,
           # Smooth latent variable states
           lv_evolve <- unlist(particles[[x]]$lv_states) +
             evolve*(best_lv_means - unlist(particles[[x]]$lv_states)) +
-            (lv_draws[x,] * sqrt(1 - evolve^2))
+            (lv_draws[x,] * (1 - evolve))
 
           # Put latent variable states back in list format
           lv_begins <- seq(1, length(lv_evolve), by = 3)
@@ -350,7 +479,7 @@ pfilter_mvgam_smooth = function(particles,
           # Smooth latent variable loadings
           lv_coefs_evolve <- as.vector(particles[[x]]$lv_coefs) +
             evolve*(best_lv_coefs_means - particles[[x]]$lv_coefs) +
-            (lv_coef_draws[x,] * sqrt(1 - evolve^2))
+            (lv_coef_draws[x,] * (1 - evolve))
 
           trend_evolve <- NULL
           phi_evolve <- particles[[x]]$phi
@@ -362,7 +491,7 @@ pfilter_mvgam_smooth = function(particles,
           # Smooth trend states
           trend_evolve <- unlist(particles[[x]]$trend_states) +
             evolve*(best_trend_means - unlist(particles[[x]]$trend_states)) +
-            (trend_draws[x,] * sqrt(1 - evolve^2))
+            (trend_draws[x,] * (1 - evolve))
 
           # Put trend states back in list format
           trend_begins <- seq(1, length(trend_evolve), by = 3)

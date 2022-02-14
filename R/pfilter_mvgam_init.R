@@ -75,6 +75,12 @@ if(object$use_lv){
   ends <- ends[-1]
   lvs <- lapply(seq_len(n_lv), function(lv){
     lv_estimates <- MCMCvis::MCMCchains(object$jags_output, 'LV')[,starts[lv]:ends[lv]]
+
+    # Need to only use estimates from the training period
+    end_train <- object$obs_data %>%
+      dplyr::filter(series == levels(object$obs_data$series)[series]) %>%
+      NROW()
+    lv_estimates <- lv_estimates[,1:end_train]
     lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
   })
 
@@ -88,6 +94,12 @@ if(object$use_lv){
   ends <- ends[-1]
   trends <- lapply(seq_len(n_series), function(series){
     trend_estimates <- MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[series]:ends[series]]
+
+    # Need to only use estimates from the training period
+    end_train <- object$obs_data %>%
+      dplyr::filter(series == levels(object$obs_data$series)[series]) %>%
+      NROW()
+    trend_estimates <- trend_estimates[,1:end_train]
     trend_estimates[,(NCOL(trend_estimates)-2):(NCOL(trend_estimates))]
   })
 
@@ -209,9 +221,9 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     if(is.na(truth[series])){
       weight <- 1
     } else {
-      weight <- dnbinom(truth[series], size = size[series],
+      weight <- 1 + (dnbinom(truth[series], size = size[series],
                         mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                   (trends[series])))
+                                   (trends[series]))))
     }
     weight
   })), na.rm = T)
@@ -259,9 +271,9 @@ particles <- pbapply::pblapply(sample_seq, function(x){
       if(is.na(truth[series])){
         weight <- 1
       } else {
-        weight <- dnbinom(truth[series], size = size[series],
+        weight <- 1 + (dnbinom(truth[series], size = size[series],
                           mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                     (trends[series])))
+                                     (trends[series]))))
       }
       weight
     })), na.rm = T)
