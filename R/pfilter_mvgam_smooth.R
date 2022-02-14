@@ -107,7 +107,7 @@ pfilter_mvgam_smooth = function(particles,
 
     }
 
-   particle_weight <- prod(unlist(lapply(seq_len(n_series), function(series){
+   particle_liks <- unlist(lapply(seq_len(n_series), function(series){
 
     if(is.na(next_assim$y[series])){
       series_weight <- 1
@@ -119,7 +119,8 @@ pfilter_mvgam_smooth = function(particles,
                                    (trend_states[series]))))
     }
     series_weight
-  })), na.rm = T)
+  }))
+   particle_weight <- prod(particle_liks, na.rm = T)
 
    if(use_lv){
      trend_states <- NULL
@@ -140,17 +141,40 @@ pfilter_mvgam_smooth = function(particles,
         ar3 = particles[[x]]$ar3,
         trend_states = next_trends,
         weight = particle_weight,
+        liks = particle_liks,
         upper_bounds = particles[[x]]$upper_bounds,
         last_assim = c(unique(next_assim$season), unique(next_assim$year)))
   }, cl = cl)
   stopCluster(cl)
 
+  n_series <- length(particles[[1]]$phi)
+  if(n_series > 1){
+  lik_weights <- do.call(rbind, lapply(seq_along(particles), function(x){
+    particles[[x]]$liks
+  }))
+
+  series_sds <- apply(lik_weights, 2, function(x) sd(x))
+  if(all(series_sds == 0)){
+    # Do nothing if all series have equal weights due to resampling or all NAs in
+    # last observation
+  } else {
+    # Else update weights using ranking information
+    lik_weights <- apply(apply(lik_weights[, !series_sds  == 0 ], 2, rank), 1, prod)
+    lik_weights <- lik_weights / max(lik_weights)
+
+    particles <- lapply(seq_along(particles), function(x){
+      particles[[x]]$weight <- lik_weights[x] * particles[[x]]$weight
+      particles[[x]]
+    })
+  }
+  }
+
   weights <- (unlist(lapply(seq_along(particles), function(x){
     tail(particles[[x]]$weight, 1)})))
 
-  # Initial thresholding, keeping only top 50% of weights
+  # Initial thresholding, keeping only top 90% of weights
   weights_keep <- sample(sort.int(weights, decreasing = TRUE,
-                             index.return = TRUE)$ix[1:floor(length(weights) / 2)],
+                             index.return = TRUE)$ix[1:floor(length(weights) / 1.1)],
                   length(weights),
                   replace = T)
 
@@ -274,7 +298,7 @@ pfilter_mvgam_smooth = function(particles,
   }
 
   pareto_weights <- do_psis_i(log_ratios_i = weights[weights_keep],
-                                  tail_len_i = length(weights) / 5)$log_weights
+                                  tail_len_i = length(weights) / 4)$log_weights
   index <- sample(weights_keep, length(weights_keep),
                       replace = TRUE,
                       prob = pareto_weights)
@@ -466,7 +490,7 @@ pfilter_mvgam_smooth = function(particles,
           # Smooth latent variable states
           lv_evolve <- unlist(particles[[x]]$lv_states) +
             evolve*(best_lv_means - unlist(particles[[x]]$lv_states)) +
-            (lv_draws[x,] * (1 - evolve))
+            (lv_draws[x,] * max(0.5, 1 - evolve))
 
           # Put latent variable states back in list format
           lv_begins <- seq(1, length(lv_evolve), by = 3)
@@ -479,7 +503,7 @@ pfilter_mvgam_smooth = function(particles,
           # Smooth latent variable loadings
           lv_coefs_evolve <- as.vector(particles[[x]]$lv_coefs) +
             evolve*(best_lv_coefs_means - particles[[x]]$lv_coefs) +
-            (lv_coef_draws[x,] * (1 - evolve))
+            (lv_coef_draws[x,] * max(0.5, 1 - evolve))
 
           trend_evolve <- NULL
           phi_evolve <- particles[[x]]$phi
@@ -491,7 +515,7 @@ pfilter_mvgam_smooth = function(particles,
           # Smooth trend states
           trend_evolve <- unlist(particles[[x]]$trend_states) +
             evolve*(best_trend_means - unlist(particles[[x]]$trend_states)) +
-            (trend_draws[x,] * (1 - evolve))
+            (trend_draws[x,] * max(0.5, 1 - evolve))
 
           # Put trend states back in list format
           trend_begins <- seq(1, length(trend_evolve), by = 3)

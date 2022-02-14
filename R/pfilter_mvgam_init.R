@@ -78,7 +78,7 @@ if(object$use_lv){
 
     # Need to only use estimates from the training period
     end_train <- object$obs_data %>%
-      dplyr::filter(series == levels(object$obs_data$series)[series]) %>%
+      dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
       NROW()
     lv_estimates <- lv_estimates[,1:end_train]
     lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
@@ -97,7 +97,7 @@ if(object$use_lv){
 
     # Need to only use estimates from the training period
     end_train <- object$obs_data %>%
-      dplyr::filter(series == levels(object$obs_data$series)[series]) %>%
+      dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
       NROW()
     trend_estimates <- trend_estimates[,1:end_train]
     trend_estimates[,(NCOL(trend_estimates)-2):(NCOL(trend_estimates))]
@@ -266,7 +266,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     }))
 
     # Calculate weight for the particle in the form of a composite likelihood
-    weight <- prod(unlist(lapply(seq_len(n_series), function(series){
+    liks <- unlist(lapply(seq_len(n_series), function(series){
 
       if(is.na(truth[series])){
         weight <- 1
@@ -276,7 +276,9 @@ particles <- pbapply::pblapply(sample_seq, function(x){
                                      (trends[series]))))
       }
       weight
-    })), na.rm = T)
+    }))
+
+    weight <- prod(liks, na.rm = T)
 
     # Include previous two states for each trend
     trends <- lapply(seq_len(n_series), function(trend){
@@ -299,6 +301,7 @@ list(use_lv = use_lv,
      ar3 = as.numeric(ar3),
      trend_states = trends,
      weight = weight,
+     liks = liks,
      upper_bounds = upper_bounds,
      last_assim = last_assim)
 
@@ -332,6 +335,31 @@ if(class(data_train)[1] == 'list'){
   data_train$assimilated <- 'no'
   data_train %>%
     dplyr::bind_rows(series_test) -> obs_data
+}
+
+# For multivariate models, gather information on each particle's ranked proposal
+# to update weights so that we can target particles that perform well across the
+# full set of series, rather than performing extremely well for one at the expense
+# of the others
+if(NCOL(object$ytimes) > 1){
+lik_weights <- do.call(rbind, lapply(seq_along(particles), function(x){
+  particles[[x]]$liks
+}))
+
+series_sds <- apply(lik_weights, 2, function(x) sd(x))
+if(all(series_sds == 0)){
+  # Do nothing if all series have equal weights due to resampling or all NAs in
+  # last observation
+} else {
+  # Else update weights using ranking information
+  lik_weights <- apply(apply(lik_weights[, !series_sds  == 0 ], 2, rank), 1, prod)
+  lik_weights <- lik_weights / max(lik_weights)
+
+  particles <- lapply(seq_along(particles), function(x){
+    particles[[x]]$weight <- lik_weights[x] * particles[[x]]$weight
+    particles[[x]]
+  })
+}
 }
 
 weights <- (unlist(lapply(seq_along(particles), function(x){

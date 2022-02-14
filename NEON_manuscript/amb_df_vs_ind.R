@@ -72,30 +72,30 @@ ends <- ends[-1]
 
 ind_drps <- unlist(lapply(seq_len(length(unique(all_data$data_train$series))), function(i){
   preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[i]:ends[i]][,-c(1:length_train)]
-  sum(drps_mcmc_object(truth = all_data$data_test[-c(1:(length(unique(all_data$data_train$series))*8)),] %>%
+  sum(drps_mcmc_object(truth = all_data$data_test[-c(1:(length(unique(all_data$data_train$series))*10)),] %>%
                          dplyr::filter(series == levels(all_data$data_train$series)[i]) %>%
                          dplyr::pull(y),
-                       fc = preds[,-c(1:8)])[,1], na.rm = T)
+                       fc = preds[,-c(1:10)])[,1], na.rm = T)
 }))
 names(ind_drps) <- levels(all_data$data_test$series)
 
 # Initiate particle filter
-pfilter_mvgam_init(object = mod_ind, n_particles = 5000, n_cores = 5,
+pfilter_mvgam_init(object = mod_ind, n_particles = 10000, n_cores = 4,
                    data_assim = all_data$data_test)
 
-# Assimilate next 7 observations per series
-data_assim <- all_data$data_test[1:(length(unique(all_data$data_train$series))*8),]
+# Assimilate next 9 observations per series
+data_assim <- all_data$data_test[1:(length(unique(all_data$data_train$series))*10),]
 pfilter_mvgam_online(data_assim = data_assim,
-                     n_cores = 5,
+                     n_cores = 4,
                      kernel_lambda = 1)
 # Forecast remaining observations
-fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 5,
+fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 4,
                        data_test = all_data$data_test, return_forecasts = T)
 
 
 # Total (summed) out of sample DRPS from the particle filtered independent trend model
 ind_drps_pf <- unlist(lapply(seq_len(length(unique(all_data$data_train$series))), function(i){
-  sum(drps_mcmc_object(truth = all_data$data_test[-c(1:(length(unique(all_data$data_train$series))*8)),] %>%
+  sum(drps_mcmc_object(truth = all_data$data_test[-c(1:(length(unique(all_data$data_train$series))*10)),] %>%
                          dplyr::filter(series == levels(all_data$data_train$series)[i]) %>%
                          dplyr::pull(y),
                        fc = fc$forecasts[[i]])[,1], na.rm = T)
@@ -105,8 +105,8 @@ names(ind_drps_pf) <- levels(all_data$data_test$series)
 # How would a model that is trained on these next 8 observations, rather than assimilating them
 # via a particle filter, perform?
 new_data_train <- rbind(all_data$data_train,
-                        all_data$data_test[c(1:(length(unique(all_data$data_train$series))*8)),])
-new_data_test <- all_data$data_test[-c(1:(length(unique(all_data$data_train$series))*8)),]
+                        all_data$data_test[c(1:(length(unique(all_data$data_train$series))*10)),])
+new_data_test <- all_data$data_test[-c(1:(length(unique(all_data$data_train$series))*10)),]
 mod_ind_updated <- mvjagam(data_train = new_data_train,
                    data_test = new_data_test,
                    formula = hyp1,
@@ -138,9 +138,10 @@ names(ind_drps_updated) <- levels(all_data$data_test$series)
 
 sum(ind_drps)
 sum(ind_drps_pf)
+(ind_drps - ind_drps_pf) / ind_drps
+plot_mvgam_fc(mod_ind, series = 8, data_test = all_data$data_test)
+fc$fc_plots$SERC_002()
+
 sum(ind_drps_updated)
 
 
-plot_mvgam_fc(mod_ind, series = 4, data_test = all_data$data_test)
-fc$fc_plots$ORNL_008()
-plot_mvgam_fc(mod_ind_updated, series = 2, data_test = new_data_test)
