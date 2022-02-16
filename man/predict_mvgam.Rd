@@ -4,13 +4,7 @@
 \alias{predict_mvgam}
 \title{Plot mvjagam posterior predictions for a specified series}
 \usage{
-predict_mvgam(
-  object,
-  series = 1,
-  newdata,
-  type = "link",
-  drop_intercept = TRUE
-)
+predict_mvgam(object, series = 1, newdata, type = "link")
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
@@ -20,12 +14,7 @@ predict_mvgam(
 \item{newdata}{A \code{dataframe} or \code{list} of test data containing at least 'series', 'season' and 'year'
 for prediction, in addition to any other variables included in the linear predictor of \code{formula}}
 
-\item{type}{When this has the value \code{link} (default) the linear predictor is calculated on the log link scale.}
-
-\item{drop_intercept}{\code{logical}. If \code{TRUE} and the first coefficient in the GAM linear predictor is a
-global intercept, this intercept will be set to zero for prediction. This is useful for visualising predicted
-smooth functions on a zero-centred y-axis (provided that all other covariates have also been set to zero in
-\code{newdata})
+\item{type}{When this has the value \code{link} (default) the linear predictor is calculated on the log link scale.
 When \code{response} is used, the predictions take uncertainty in the obsevation process into account to return
 predictions on the outcome (discrete) scale. Note that for both sets of predictions, the temporal
 dynamics of any fitted latent trends will be ignored but the precisions of latent trends / factors will

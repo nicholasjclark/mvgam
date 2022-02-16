@@ -3,7 +3,7 @@
 #'This function operates on a new observation in \code{next_assim} to update the
 #'posterior forecast distribution. The next observation is assimilated
 #'and particle weights are updated in light of their most recent their multivariate composite likelihood.
-#'Low weight particles are smoothed towards the high weight state space using kernel smoothing, and options are
+#'Low weight particles are smoothed towards the high weight state space using importance sampling, and options are
 #'given for using resampling of high weight particles when Effective Sample Size falls below a
 #'user-specified threshold
 #'
@@ -25,7 +25,7 @@
 #'beta coefficients from the original model's distribution to each particle. This does not however guarantee that there
 #'will be no loss of diversity, especially if successive resamples take place. Default for this option is therefore
 #'\code{FALSE}
-#'@param kernel_lambda \code{proportional numeric} specifying the strength of kernel smoothing to use when
+#'@param kernel_lambda \code{proportional numeric} specifying the strength of smoothing to use when
 #'pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}
 #'@param file_path \code{character} string specifying the file path for locating the particles
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
@@ -172,9 +172,10 @@ pfilter_mvgam_smooth = function(particles,
   weights <- (unlist(lapply(seq_along(particles), function(x){
     tail(particles[[x]]$weight, 1)})))
 
-  # Initial thresholding, keeping only top 90% of weights
+  # Initial thresholding, keeping only top 80% of weights, often leads to minor
+  # improvements in particle filter tracking
   weights_keep <- sample(sort.int(weights, decreasing = TRUE,
-                             index.return = TRUE)$ix[1:floor(length(weights) / 1.1)],
+                             index.return = TRUE)$ix[1:floor(length(weights) / 1.2)],
                   length(weights),
                   replace = T)
 
@@ -330,7 +331,7 @@ pfilter_mvgam_smooth = function(particles,
   # If resampling is not specified by user, keep the current full set of particles and only
   # use kernel smoothing
   if(!use_resampling){
-    re_weight <- F
+    re_weight <- T
     next_update_seq <- seq(1:length(weights))
     orig_betas <- NULL
   } else {
@@ -339,12 +340,29 @@ pfilter_mvgam_smooth = function(particles,
     orig_betas <- do.call(rbind, purrr::map(particles, 'betas'))
   }
 
+  # Function to use importance sampling to generate draws from each trend state's
+  # highest likelihood distribution
+  imp_samp = function(x, N = 500){
+    # Draw from proposal distribution which is normal(mu, sd = 1)
+    mean_x <- mean(x)
+    sam <- rnorm(N, mean_x, 1)
+
+    # Weight the sample using ratio of target and proposal densities
+    bw <- density(x)$bw
+    w <- sapply(sam, function(input) sum(dnorm(input, mean = x, sd = bw)) /
+                  dnorm(input, mean_x, 1))
+
+    # Resample according to the weights to obtain an un-weighted sample
+    sample(sam, length(particles), replace = TRUE, prob = w)
+
+  }
+
   if(length(unique(index)) > 100){
     use_smoothing <- TRUE
     cat('Smoothing particles ...\n\n')
 
     if(use_lv){
-      # Extract weighted means and covariances of lv states and lv loadings for kernel smoothing
+      # Extract draws from high-likelihood state spaces for kernel smoothing
       best_lv <- do.call(rbind, lapply(index, function(j){
         unlist(particles[[j]]$lv_states)
         }))
@@ -356,17 +374,9 @@ pfilter_mvgam_smooth = function(particles,
         as.vector(best_lv_coefs[[x]])
       }))
 
-      best_lv_cov <- cov(as.matrix(best_lv))
-      best_lv_means <- apply(best_lv, 2, mean)
-      lv_draws <- MASS::mvrnorm(n = length(next_update_seq), mu = rep(0, length(best_lv_means)),
-                                Sigma = best_lv_cov)
+      lv_draws <- apply(best_lv, 2, imp_samp)
+      lv_coef_draws <- apply(best_lv_coefs, 2, imp_samp)
 
-      best_lv_coefs_cov <- cov(as.matrix(best_lv_coefs))
-      best_lv_coefs_means <- apply(best_lv_coefs, 2, mean)
-      lv_coef_draws <- MASS::mvrnorm(n = length(next_update_seq), mu = rep(0, length(best_lv_coefs_means)),
-                                     Sigma = best_lv_coefs_cov)
-
-      best_trend_means <- NULL
       trend_draws <- NULL
       rm(best_lv, best_lv_coefs)
 
@@ -374,17 +384,11 @@ pfilter_mvgam_smooth = function(particles,
       best_trend <- do.call(rbind, lapply(index, function(j){
         unlist(particles[[j]]$trend_states)
       }))
-      best_trend_cov <- cov(as.matrix(best_trend))
-      best_trend_means <- apply(best_trend, 2, mean)
 
-      trend_draws <- MASS::mvrnorm(n = length(next_update_seq),
-                                   mu = rep(0, length(best_trend_means)),
-                                   Sigma = best_trend_cov)
+      trend_draws <- apply(best_trend, 2, imp_samp)
 
       lv_draws <- NULL
       lv_coef_draws <- NULL
-      best_lv_means <- NULL
-      best_lv_coefs_means <- NULL
       rm(best_trend)
     }
 
@@ -399,10 +403,6 @@ pfilter_mvgam_smooth = function(particles,
     re_weight <- FALSE
   }
 
-  weight_thres.1 <- quantile(norm_weights, prob = 0.1, na.rm = T)
-  weight_thres.4 <- quantile(norm_weights, prob = 0.4, na.rm = T)
-  weight_thres.85 <- quantile(norm_weights, prob = 0.85, na.rm = T)
-
   library(parallel)
   cl <- makePSOCKcluster(n_cores)
   setDefaultCluster(cl)
@@ -410,20 +410,15 @@ pfilter_mvgam_smooth = function(particles,
                         'use_resampling',
                         'orig_betas',
                         'lv_draws',
-                        'best_lv_means',
                         'lv_coef_draws',
-                        'best_lv_coefs_means',
                         'trend_draws',
-                        'best_trend_means',
                         'use_lv',
                         'ess',
                         'norm_weights',
                         'particles',
                         'kernel_lambda',
                         're_weight',
-                        'weight_thres.1',
-                        'weight_thres.4',
-                        'weight_thres.85'),
+                        'norm_weights'),
                 envir = environment())
 
   clusterEvalQ(cl, library(MASS))
@@ -464,33 +459,17 @@ pfilter_mvgam_smooth = function(particles,
       # space is determined  by its last fitness estimate (weight)
       # Particles with low weight (less than 10th percentile) are pulled more strongly towards the
       # state space of the high weight particles. Particles with moderate weights are only moderatly
-      # shifted, while high weight particles are not moved by much. A Gaussian kernel is appropriate in
-      # this case as trends / latent variables are Gaussian random walks, and so this form of kernel captures
-      # any dependencies in states
+      # shifted, while high weight particles are not moved by much
       weight <- norm_weights[x]
-      if(weight < weight_thres.1){
-        evolve <- kernel_lambda
-
-      } else if(weight < weight_thres.4 &
-                weight > weight_thres.1){
-        evolve <- 0.75 * kernel_lambda
-
-      } else if(weight < weight_thres.85 &
-                weight > weight_thres.4){
-        evolve <- 0.5 * kernel_lambda
-
-      } else {
-        evolve <- 0.35 * kernel_lambda
-      }
-      if(weight < weight_thres.85){
+      evolve <- kernel_lambda *
+        (1 - (length(which(norm_weights < weight)) / length(norm_weights)))
 
         if(use_lv){
           particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
 
           # Smooth latent variable states
           lv_evolve <- unlist(particles[[x]]$lv_states) +
-            evolve*(best_lv_means - unlist(particles[[x]]$lv_states)) +
-            (lv_draws[x,] * max(0.5, 1 - evolve))
+            evolve*(lv_draws[x,] - unlist(particles[[x]]$lv_states))
 
           # Put latent variable states back in list format
           lv_begins <- seq(1, length(lv_evolve), by = 3)
@@ -502,8 +481,7 @@ pfilter_mvgam_smooth = function(particles,
 
           # Smooth latent variable loadings
           lv_coefs_evolve <- as.vector(particles[[x]]$lv_coefs) +
-            evolve*(best_lv_coefs_means - particles[[x]]$lv_coefs) +
-            (lv_coef_draws[x,] * max(0.5, 1 - evolve))
+            evolve*(lv_coef_draws[x,] - particles[[x]]$lv_coefs)
 
           trend_evolve <- NULL
           phi_evolve <- particles[[x]]$phi
@@ -514,8 +492,7 @@ pfilter_mvgam_smooth = function(particles,
         } else {
           # Smooth trend states
           trend_evolve <- unlist(particles[[x]]$trend_states) +
-            evolve*(best_trend_means - unlist(particles[[x]]$trend_states)) +
-            (trend_draws[x,] * max(0.5, 1 - evolve))
+            evolve*(trend_draws[x,] - unlist(particles[[x]]$trend_states))
 
           # Put trend states back in list format
           trend_begins <- seq(1, length(trend_evolve), by = 3)
@@ -533,26 +510,6 @@ pfilter_mvgam_smooth = function(particles,
           ar2_evolve <- particles[[x]]$ar2
           ar3_evolve <- particles[[x]]$ar3
         }
-
-        # If this is a high weight particle leave it where it is
-      } else {
-
-        if(use_lv){
-          lv_evolve <- particles[[x]]$lv_states
-          lv_coefs_evolve <- particles[[x]]$lv_coefs
-          trend_evolve <- NULL
-        } else {
-          lv_evolve <- NULL
-          lv_coefs_evolve <- NULL
-          trend_evolve <- particles[[x]]$trend_states
-
-        }
-        particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
-        phi_evolve <- particles[[x]]$phi
-        ar1_evolve <- particles[[x]]$ar1
-        ar2_evolve <- particles[[x]]$ar2
-        ar3_evolve <- particles[[x]]$ar3
-      }
     }
 
     # Return the updated particle, preserving original betas

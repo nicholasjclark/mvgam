@@ -40,7 +40,7 @@ beta coefficients from the original model's distribution to each particle. This 
 will be no loss of diversity, especially if successive resamples take place. Default for this option is therefore
 \code{FALSE}}
 
-\item{kernel_lambda}{\code{proportional numeric} specifying the strength of kernel smoothing to use when
+\item{kernel_lambda}{\code{proportional numeric} specifying the strength of smoothing to use when
 pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}}
 
 \item{file_path}{\code{character} string specifying the file path for locating the particles}
@@ -53,7 +53,7 @@ current state estimates for each particle
 This function operates on a new observation in \code{next_assim} to update the
 posterior forecast distribution. The next observation is assimilated
 and particle weights are updated in light of their most recent their multivariate composite likelihood.
-Low weight particles are smoothed towards the high weight state space using kernel smoothing, and options are
+Low weight particles are smoothed towards the high weight state space using importance sampling, and options are
 given for using resampling of high weight particles when Effective Sample Size falls below a
 user-specified threshold
 }

@@ -56,10 +56,10 @@ mod_ind <- mvjagam(data_train = all_data$data_train,
                    trend_model = 'AR1',
                    chains = 4,
                    use_lv = F,
-                   burnin = 10000)
+                   burnin = 1000)
 
 # Total (summed) out of sample DRPS from the fitted independent trend model,
-# excluding the next 8 observations (which will be assimilated)
+# excluding the next 10 observations (which will be assimilated)
 object <- mod_ind
 length_train <- object$obs_data %>%
   dplyr::select(season, year) %>%
@@ -80,7 +80,7 @@ ind_drps <- unlist(lapply(seq_len(length(unique(all_data$data_train$series))), f
 names(ind_drps) <- levels(all_data$data_test$series)
 
 # Initiate particle filter
-pfilter_mvgam_init(object = mod_ind, n_particles = 10000, n_cores = 4,
+pfilter_mvgam_init(object = mod_ind, n_particles = 25000, n_cores = 4,
                    data_assim = all_data$data_test)
 
 # Assimilate next 9 observations per series
@@ -138,10 +138,12 @@ names(ind_drps_updated) <- levels(all_data$data_test$series)
 
 sum(ind_drps)
 sum(ind_drps_pf)
+sum(ind_drps_updated)
 (ind_drps - ind_drps_pf) / ind_drps
 plot_mvgam_fc(mod_ind, series = 8, data_test = all_data$data_test)
+plot_mvgam_fc(mod_ind_updated, series = 8, data_test = all_data$data_test)
 fc$fc_plots$SERC_002()
 
-sum(ind_drps_updated)
+
 
 
