@@ -98,7 +98,9 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_po
     lower <- quantile(pred_means, probs = 0.01)
     upper <- quantile(pred_means, probs = 0.99)
     pred_means <- pred_means[-which(pred_means > upper)]
-    pred_means <- pred_means[-which(pred_means < lower)]
+    if(lower!=0){
+      pred_means <- pred_means[-which(pred_means < lower)]
+    }
     obs_mean <- mean(truths)
     hist(pred_means,
          xlim = c(min(min(pred_means), min(obs_mean)),

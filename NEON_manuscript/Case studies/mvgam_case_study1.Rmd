@@ -57,7 +57,7 @@ head(fake_data$data_train)
 head(fake_data$data_test)
 ```
 
-As a first pass at modelling this series, we will fit a GAM that includes a seasonal smooth and a yearly smooth, as well as their tensor product interaction. As the seasonality is cyclic, we will use a cyclic cubic regression spline for `season`. The knots are set so that the boundaries of the cyclic smooth match up between December 31 and January 1. We will stick with the default thin plate regression spline for `year`. This is similar to what we might do when fitting a model in `mgcv` to try and forecast ahead, except here we also have an explicit model for the residual component. `mvgam` uses the `jagam` function from the `mgcv` package to generate a skeleton `JAGS` file and updates that file to incorporate any dynamic trend components (so far limited to no trend, random walks or AR models up to order 3). This is advantageous as any GAM that is allowed in `mgcv` can in principle be used in `mvgam` to fit dynamic linear models with smooth functions for nonlinear covariate effects. For multivariate series, `mvgam` also includes an option for dimension reduction by inducing trend correlations via a dynamic factor process. Here we use the Negative Binomial family and a burnin length of `5000` iterations (in practice we would probably run these models for a bit longer, but they tend to converge rather quickly for univariate series thanks to the useful starting values supplied by `jagam`). Note that feeding the `data_test` object does not mean that these values are used in training of the model. Rather, they are included as `NA` so that we can automatically create a forecast from the posterior predictions for these observations. This is useful for plotting forecasts without needing to run new data through the model's equations later on
+As a first pass at modelling this series, we will fit a GAM that includes a seasonal smooth and a yearly smooth, as well as their tensor product interaction. As the seasonality is cyclic, we will use a cyclic cubic regression spline for `season`. The knots are set so that the boundaries of the cyclic smooth match up between December 31 and January 1. We will stick with the default thin plate regression spline for `year`. This is similar to what we might do when fitting a model in `mgcv` to try and forecast ahead, except here we also have an explicit model for the residual component. `mvgam` uses the `jagam` function from the `mgcv` package to generate a skeleton `JAGS` file and updates that file to incorporate any dynamic trend components (so far limited to no trend, random walks or AR models up to order 3). This is advantageous as any GAM that is allowed in `mgcv` can in principle be used in `mvgam` to fit dynamic linear models with smooth functions for nonlinear covariate effects. For multivariate series, `mvgam` also includes an option for dimension reduction by inducing trend correlations via a dynamic factor process. Here we use the Negative Binomial family and a burnin length of `10000` iterations (in practice we would probably run these models for a bit longer, but they tend to converge rather quickly for univariate series thanks to the useful starting values supplied by `jagam`). Note that feeding the `data_test` object does not mean that these values are used in training of the model. Rather, they are included as `NA` so that we can automatically create a forecast from the posterior predictions for these observations. This is useful for plotting forecasts without needing to run new data through the model's equations later on
 ```{r, message=FALSE, warning=FALSE}
 mod1 <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,
@@ -67,7 +67,7 @@ mod1 <- mvjagam(data_train = fake_data$data_train,
                knots = list(season = c(0.5, 12.5)),
                family = 'nb',
                trend_model = 'None',
-               burnin = 5000,
+               burnin = 10000,
                chains = 4)
 ```
 
@@ -162,8 +162,7 @@ There are some very clear problems with the way this model is generating future 
 mod2 <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,
                formula = y ~ s(season, bs = c('cc'), k = 12) +
-                 s(year, bs = "bs", m = c(3, 2, 1, 0)) +
-                  ti(season, year, bs = c('cc', 'tp'), k = c(12, 3), m = c(2, 1)),
+                 s(year, bs = "bs", m = c(2, 1)),
                knots = list(season = c(0.5, 12.5),
                             year = c(min(fake_data$data_train$year) - 1,
                                      min(fake_data$data_train$year),
@@ -171,7 +170,7 @@ mod2 <- mvjagam(data_train = fake_data$data_train,
                                      max(fake_data$data_test$year))),
                family = 'nb',
                trend_model = 'None',
-               burnin = 5000,
+               burnin = 10000,
                chains = 4)
 ```
 
@@ -220,13 +219,12 @@ Can we improve the forecasts by removing our reliance on extrapolation? Now we w
 ```{r, message=FALSE, warning=FALSE}
 mod3 <- mvjagam(data_train = fake_data$data_train,
                 data_test = fake_data$data_test,
-                formula = y ~ s(season, bs = c('cc'), k = 12) + 
-                  ti(season, year, bs = c('cc', 'tp'), k = c(12, 3), m = c(2, 1)),
+                formula = y ~ s(season, bs = c('cc'), k = 12),
                 knots = list(season = c(0.5, 12.5)),
                 family = 'nb',
                 trend_model = 'AR3',
                 drift = TRUE,
-                burnin = 5000,
+                burnin = 10000,
                chains = 4)
 ```
                
@@ -281,7 +279,7 @@ mod4 <- mvjagam(data_train = fake_data$data_train,
                family = 'poisson',
                trend_model = 'RW',
                drift = TRUE,
-               burnin = 5000,
+               burnin = 10000,
                chains = 4)
 ```
 
@@ -308,22 +306,22 @@ compare_mvgams(model1 = mod2, model2 = mod3, fc_horizon = 6,
                n_evaluations = 30, n_cores = 3)
 ```
 
-Now we proceed by exploring how forecast distributions from an `mvgam` object can be automatically updated in light of new incoming observations. This works by generating a set of "particles" that each captures a unique proposal about the current state of the system (in this case, the current estimate of the latent trend component). The next observation in `data_assim` is assimilated and particles are weighted by how well their proposal (i.e. their proposed forecast, prior to seeing the new data) matched the new observations. For univariate models such as the ones we've fitted so far, this weight is represented by the proposal's Negative Binomial log-likelihood. For multivariate models, a multivariate composite likelihood is used for weights. Once weights are calculated, we use importance sampling to update the model's forecast distribution for the remaining forecast horizon. Begin by initiating a set of `5000` particles by assimilating the next observation in `data_test` and storing the particles in the default location (in a directory called `particles` within the working directory)
+Now we proceed by exploring how forecast distributions from an `mvgam` object can be automatically updated in light of new incoming observations. This works by generating a set of "particles" that each captures a unique proposal about the current state of the system (in this case, the current estimate of the latent trend component). The next observation in `data_assim` is assimilated and particles are weighted by how well their proposal (i.e. their proposed forecast, prior to seeing the new data) matched the new observations. For univariate models such as the ones we've fitted so far, this weight is represented by the proposal's Negative Binomial log-likelihood. For multivariate models, a multivariate composite likelihood is used for weights. Once weights are calculated, we use importance sampling to update the model's forecast distribution for the remaining forecast horizon. Begin by initiating a set of `15000` particles by assimilating the next observation in `data_test` and storing the particles in the default location (in a directory called `particles` within the working directory)
 ```{r}
-pfilter_mvgam_init(object = mod3, n_particles = 5000, n_cores = 2,
+pfilter_mvgam_init(object = mod3, n_particles = 15000, n_cores = 3,
                    data_assim = fake_data$data_test)
 ```
 
 Now we are ready to run the particle filter. This function will assimilate the next six out of sample observations in `data_test` and update the forecast after each assimilation step. This works in an iterative fashion by calculating each particle's weight, then using a kernel smoothing algorithm to "pull" low weight particles toward the high-likelihood space before assimilating the next observation. The strength of the kernel smoother is controlled by `kernel_lambda`, which in our experience works well when left to the default of `1`. If the Effective Sample Size of particles drops too low, suggesting we are putting most of our belief in a very small set of particles, an automatic resampling step is triggered to increase particle diversity and reduce the chance that our forecast intervals become too narrow and incapable of adapting to changing conditions
 ```{r}
 pfilter_mvgam_online(data_assim = fake_data$data_test[1:7,], 
-                     n_cores = 2,
+                     n_cores = 3,
                      kernel_lambda = 1)
 ```
 
 Once assimilation is complete, generate the updated forecast from the particles using the covariate information in remaining `data_test` observations. This function is designed to hopefully make it simpler to assimilate observations, as all that needs to be provided once the particles are initiated as a dataframe of test data in exactly the same format as the data that were used to train the initial model. If no new observations are found (observations are arranged by `year` and then by `season` so the consistent indexing of these two variables is very important!) then the function returns a `NULL` and the particles remain where they are in state space.
 ```{r}
-fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 2,
+fc <- pfilter_mvgam_fc(file_path = 'pfilter', n_cores = 3,
                        data_test = fake_data$data_test,
                        ylim = c(min(fake_data$data_train$y, na.rm = T),
                                 max(fake_data$data_test$y, na.rm = T)*1.25))

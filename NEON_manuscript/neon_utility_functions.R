@@ -327,10 +327,9 @@ fit_mvgam = function(data_train,
                      phi_prior,
                      tau_prior,
                      knots,
-                     n.burnin = 1000,
-                     n.iter = 1000,
+                     burnin = 1000,
+                     n_samples = 1000,
                      thin = 2,
-                     auto_update = FALSE,
                      interval_width = 0.9){
 
   # Condition the model on the observed data
@@ -338,12 +337,12 @@ fit_mvgam = function(data_train,
     out_gam_mod <- mvjagam(formula = formula,
                            data_train = data_train,
                            data_test = data_test,
-                           n.burnin = n.burnin,
-                           n.iter = n.iter,
+                           burnin = burnin,
+                           n_samples = n_samples,
                            thin = thin,
-                           auto_update = auto_update,
                            use_lv = use_lv,
                            n_lv = n_lv,
+                           chains = 4,
                            family = family,
                            phi_prior = phi_prior,
                            tau_prior = tau_prior)
@@ -351,13 +350,13 @@ fit_mvgam = function(data_train,
     out_gam_mod <- mvjagam(formula = formula,
                            data_train = data_train,
                            data_test = data_test,
-                           n.burnin = n.burnin,
-                           n.iter = n.iter,
+                           burnin = burnin,
+                           n_samples = n_samples,
                            knots = knots,
                            thin = thin,
-                           auto_update = auto_update,
                            use_lv = use_lv,
                            n_lv = n_lv,
+                           chains = 4,
                            family = family,
                            phi_prior = phi_prior,
                            tau_prior = tau_prior)
@@ -372,7 +371,7 @@ fit_mvgam = function(data_train,
 
   # 2. Stronger residual correlations, suggesting we are missing some site-level structure
   # Calculate the correlation matrix from the latent trends
-    correlations <- lv_correlations(object = out_gam_mod, data_train = data_train)
+    correlations <- lv_correlations(object = out_gam_mod)
 
     # Plot trend correlations
     library(ggplot2)

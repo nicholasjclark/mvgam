@@ -22,7 +22,7 @@ Load the Portal rodents capture data, which are available from the `portalr` pac
 #devtools::install_github("nicholasjclark/mvgam")
 library(mvgam)
 library(dplyr)
-portal_dat <- read.csv('https://raw.githubusercontent.com/nicholasjclark/mvgam/master/NEON_manuscript/rodents_data.csv', as.is = T)
+portal_dat <- read.csv('https://raw.githubusercontent.com/nicholasjclark/mvgam/master/NEON_manuscript/Case studies/rodents_data.csv', as.is = T)
 ```
 
 We'll keep data from the year 2004 onwards to make the model quicker to estimate for this simple example
