@@ -35,7 +35,11 @@ for(i in 1:8){
 par(mfrow = c(1,1))
 ```
 
-Clearly there are some correlations in the trends for these series. Now let's fit a well-specified model in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
+Clearly there are some correlations in the trends for these series. But how does a dynamic factor process allow us to potentially capture these dependencies? The below example demonstrates how. Essentially, a dynamic factor is an *unmeasured* (latent) random process that induces correlations between time series via a set of factor loadings ($\beta$) while exercising dimension reduction. The loadings represent constant associations between the observed time series and the dynamic factor, but each series can still deviate from the factor through its error process and its associations with other factors (if we estimate `>1` latent factor in our model).
+
+![](df.gif)
+
+ A challenge with any factor model is the need to determine the number of factors `K`. Setting `K` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `K` too large leads to unnecessary computation. `mvgam` approaches this problem by formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines. Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
 ```{r, message=FALSE, warning=FALSE}
 mod1 <- mvjagam(data_train = dat$data_train,
                 data_test = dat$data_test,
@@ -186,12 +190,12 @@ runjags::extract(trends_mod1$jags_model, 'dic')
 runjags::extract(trends_mod2$jags_model, 'dic')
 ```
 
-Model 1 seems to fit better so far, suggesting that hierarchical seasonality does not give better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 1 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow an AR1 process, and we will rely on the exponential penalties to help regularise any un-needed factors by setting `n_lv = 4`
+Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow an AR1 process, and we will rely on the exponential penalties to help regularise any un-needed factors by setting `n_lv = 4`
 ```{r, message=FALSE, warning=FALSE}
 trends_mod3 <- mvjagam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
-                      formula = y ~ s(series, bs = 're') + 
-                        s(season, k = 12, m = 2, bs = 'cc') - 1,
+                      formula = y ~ s(season, k = 12, m = 2, bs = 'cc') +
+                        s(season, series, k = 5, bs = 'fs', m = 1),
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'AR1',
                       use_lv = T,
@@ -214,7 +218,7 @@ plot_mvgam_factors(trends_mod3)
 
 How do forecasts for this model compare to the previous one that did not include any trend component?
 ```{r,  fig.width = 6, fig.height = 5, fig.align='center'}
-compare_mvgams(trends_mod1, trends_mod3, fc_horizon = 6,
+compare_mvgams(trends_mod2, trends_mod3, fc_horizon = 6,
                n_cores = 3, n_evaluations = 20)
 ```
 
@@ -297,7 +301,7 @@ plot_mvgam_trend(object = trends_mod3, series = 3, data_test = trends_data$data_
 plot_mvgam_trend(object = trends_mod3, series = 4, data_test = trends_data$data_test)
 ```
 
-Given that we fit a model with sharedseasonality, the seasonal smooths will not differ
+Given that we fit a model with hierarchical seasonality, the seasonal smooths are able to deviate from one another (though they share the same wiggliness and all deviate from a common 'global' seasonal function)
 ```{r, fig.width = 4, fig.height = 3, fig.align='center'}
 plot_mvgam_smooth(object = trends_mod3, series = 1, smooth = 'season')
 ```
