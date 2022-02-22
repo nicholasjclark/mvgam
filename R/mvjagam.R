@@ -122,6 +122,37 @@ mvjagam = function(formula,
   trend_model <- match.arg(arg = trend_model, choices = c("None", "Noise", "RW", "AR1", "AR2", "AR3"))
   family <- match.arg(arg = family, choices = c("nb", "poisson"))
 
+  # Add series factor variable if missing
+  if(class(data_train)[1] != 'list'){
+  if(!'series' %in% colnames(data_train)){
+    data_train$series <- factor('series1')
+    if(!missing(data_test)){
+      data_test$series <- factor('series1')
+    }
+  }
+
+  # Add season variable if missing
+  if(!'season' %in% colnames(data_train)){
+    data_train$season <- 1
+    if(!missing(data_test)){
+      data_test$season <- 1
+    }
+  }
+
+  # Add year variable if missing
+  if(!'year' %in% colnames(data_train)){
+    data_train$year <- seq(1:NROW(data_train))
+    if(!missing(data_test)){
+      data_test$year <- seq(1:NROW(data_test))
+    }
+  }
+}
+  # Ensure outcome is labelled 'y'
+  form_terms <- terms(formula(formula))
+  if(dimnames(attr(form_terms, 'factors'))[[1]][1] != 'y'){
+    stop('Outcome variable must be named "y"')
+  }
+
   # If there are missing values in y, use predictions from an initial mgcv model to fill
   # these in so that initial values can be more accurate and we maintain the true
   # size of the training dataset

@@ -1,11 +1,12 @@
 ---
-title: "mvgam case study 1: model comparison and data assimilation"
-author: Nicholas Clark (n.clark@uq.edu.au)
+title: 'mvgam case study 1: model comparison and data assimilation'
+author: "Nicholas Clark (n.clark@uq.edu.au)"
 output:
   html_document:
     df_print: paged
   pdf_document:
     highlight: zenburn
+  word_document: default
 urlcolor: blue
 ---
 
@@ -17,7 +18,7 @@ opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
 
 Generalised Additive Models (GAMs) are incredibly flexible tools that have found particular application in the analysis of time series. In ecology, a host of recent papers and workshops (i.e. the [2018 Ecological Society of America workshop on GAMs](https://noamross.github.io/mgcv-esa-2018/) that was hosted by Eric Pedersen, David L. Miller, Gavin Simpson, and Noam Ross) have drawn special attention to the wide range of applications that GAMs have for addressing complex ecological problems. Given the many ways that GAMs can model temporal data, it is tempting to use the smooth functions estimated by a GAM to produce out of sample forecasts. Here we will inspect the behaviours of smoothing splines when extrapolating to data outside the range of the training data to examine whether this can be useful in practice. 
 
-Here we will work in the `mvgam` package, which fits dynamic GAMs using MCMC sampling via the `JAGS` software (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)). Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a discrete response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Asssuming $\boldsymbol{y}$ is drawn from an exponential distribution (such as Poisson or Negative Binomial) with a log link function, the linear predictor for a dynamic GAM is written as:
+We will work in the `mvgam` package, which fits dynamic GAMs (DGAMs) using MCMC sampling via the `JAGS` software (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)). Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a discrete response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Asssuming $\boldsymbol{y}$ is drawn from an exponential distribution (such as Poisson or Negative Binomial) with a log link function, the linear predictor for a dynamic GAM is written as:
 
 $$log(\tilde{\boldsymbol{y}}_{t})={\boldsymbol{B}}_0+\sum\limits_{i=1}^I\boldsymbol{s}_{i,t}\boldsymbol{x}_{i,t}+\boldsymbol{z}_{t}\,,$$
 Here $\boldsymbol{B}_{0}$ is the unknown intercept, the $\boldsymbol{s}$'s are unknown smooth functions of the covariates ($\boldsymbol{x}$'s) and $\boldsymbol{z}$ is a dynamic latent trend component. Each smooth function $\boldsymbol{s}_{i}$ is composed of spline like basis expansions whose coefficients, which must be estimated, control the shape of the functional relationship between $\boldsymbol{x}_{i}$ and $log(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity, with a larger set of basis functions allowing greater flexibility. Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson or Negative Binomial) that accommodate ecological features such as zero-inflation, and that they can be formulated to include hierarchical smoothing for multivariate responses. For the dynamic component, in its most basic form we assume a random walk with drift:
@@ -25,8 +26,41 @@ Here $\boldsymbol{B}_{0}$ is the unknown intercept, the $\boldsymbol{s}$'s are u
 $$\boldsymbol{z}_{t}=\phi+\boldsymbol{z}_{t-1}+\boldsymbol{e}_{t}\,,$$
 where $\phi$ is an optional drift parameter (if the latent trend is assumed to not be stationary) and $\boldsymbol{e}$ is drawn from a zero-centred Gaussian distribution. This model is easily modified to include autoregressive terms, which `mvgam` accomodates up to `order = 3`.
 
+#Why DGAMs?
+Dynamic GAMs are useful when we wish to predict future values from time series that show temporal dependence and we want to avoid extrapolating from a smooth (which, as you’ll see below, can sometimes lead to unpredictable and unrealistic behaviours). In addition, smooths can often try to wiggle excessively to capture any autocorrelation that is present in a time series, which exacerbates the problem of forecasting ahead. Here we use an exaggerated example to show how a smooth tries to wiggle excessively, leading to overfitting by lessening the smoothing penalty $\lambda$. Notice how wiggly the function becomes in the last plot when $\lambda$ is very small, which is what `mgcv`’s `gam.check` function will often tell you to do if you are trying to model an autocorrelated time series with a smooth function
+```{r, fig.width = 6, fig.height = 5.5, fig.align='center'}
+# Fit a model to the mcycle dataset in the MASS package, fixing the smoothing parameter at an abnormally large value
+par(mfrow = c(2, 2),
+    mgp = c(2.5, 1, 0),
+    mai = c(0.6, 0.6, 0.2, 0.2))
+library(mgcv)
+data(mcycle, package = 'MASS')
+
+m1 <- gam(accel ~ s(times, k = 50), data = mcycle, method = 'REML', sp = 5)
+
+plot(m1, scheme = 1, residuals = TRUE, pch= 16,
+     ylab = expression(lambda == 5), xlab = '',
+     shade.col = scales::alpha("#B97C7C", 0.6))
+
+# Fit models with increasingly relaxed smooths (lambdas approaching zero)
+m2 <- gam(accel ~ s(times, k = 50), data = mcycle, method = 'REML', sp = 1)
+plot(m2, scheme = 1, residuals = TRUE, pch= 16,
+     ylab = expression(lambda == 1), xlab = '',
+     shade.col = scales::alpha("#B97C7C", 0.6))
+
+m3 <- gam(accel ~ s(times, k = 50), data = mcycle, method = 'REML', sp = 0.01)
+plot(m3, scheme = 1, residuals = TRUE, pch= 16,
+     ylab = expression(lambda == 0.01), xlab = '',
+     shade.col = scales::alpha("#B97C7C", 0.6))
+
+m4 <- gam(accel ~ s(times, k = 50), data = mcycle, method = 'REML', sp = 0.0000001)
+plot(m4, scheme = 1, residuals = TRUE, pch= 16,
+     ylab = expression(lambda == 0.0000001), xlab = '',
+     shade.col = scales::alpha("#B97C7C", 0.6))
+```
+
 #AirPassengers example
-First we load the `AirPassengers` data from the `forecast` package and convert to an `xts` object. This series is a good starting point as it should be highly forecastable given its stable seasonal pattern and nearly linear trend
+Now onto an empirical example. First we load the `AirPassengers` data from the `forecast` package and convert to an `xts` object. This series is a good starting point as it should be highly forecastable given its stable seasonal pattern and nearly linear trend
 ```{r message=FALSE, warning = FALSE}
 #devtools::install_github("nicholasjclark/mvgam")
 library(mvgam)
@@ -86,7 +120,7 @@ summary_mvgam(mod1)
 summary(mod1$mgcv_model)
 ```
 
-Ordinarily we would be quite pleased with this result, as we have explained most of the variation in the series with a fairly simple model. We can plot the estimated smooth functions and with their associated credible intervals, which are interpreted similarly to `mgcv` plots except they are not centred at zero (`mvgam` predicts the smooth with all other covariates at their means, rather than at zero). So the plot below, for the `season` smooth, shows the estimated values for the linear predictor (on the log scale in this case) if `year` was set to its mean 
+Ordinarily we would be quite pleased with this result, as we have explained most of the variation in the series with a fairly simple model. We can plot the estimated smooth functions and with their associated credible intervals, which are interpreted similarly to `mgcv` plots except that `mvgam` uses Dunn-Smyth residuals that are drawn from a standard normal distribution 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 plot_mvgam_smooth(mod1, series = 1, smooth = 'season')
 ```
@@ -157,7 +191,7 @@ plot_mvgam_ppc(mod1, series = 1, type = 'cdf', data_test = fake_data$data_test)
 plot_mvgam_ppc(mod1, series = 1, type = 'pit', data_test = fake_data$data_test)
 ```
 
-There are some very clear problems with the way this model is generating future predictions. Perhaps a different smooth function for `year` can help? Here we fit our original model again but use a different smooth term for `year` to try and capture the long-term trend (using `B` splines with multiple penalties, following the excellent example by Gavin Simpson about [extrapolating with smooth terms](https://fromthebottomoftheheap.net/2020/06/03/extrapolating-with-gams/)). This is similar to what we might do when trying to forecast ahead from a more wiggly function, as `B` splines have useful properties by allowing the penalty to be extended into the range of values we wish to predict (in this case, the years in `data_test`)
+There are some problems with the way this model is generating future predictions. Perhaps a different smooth function for `year` can help? Here we fit our original model again but use a different smooth term for `year` to try and capture the long-term trend (using `B` splines with multiple penalties, following the excellent example by Gavin Simpson about [extrapolating with smooth terms](https://fromthebottomoftheheap.net/2020/06/03/extrapolating-with-gams/)). This is similar to what we might do when trying to forecast ahead from a more wiggly function, as `B` splines have useful properties by allowing the penalty to be extended into the range of values we wish to predict (in this case, the years in `data_test`). Note that we drop the `year*season` tensor product interaction to help emphasize the extrapolation behaviour of the `B` spline
 ```{r, message=FALSE, warning=FALSE}
 mod2 <- mvjagam(data_train = fake_data$data_train,
                data_test = fake_data$data_test,

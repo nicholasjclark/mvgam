@@ -1,11 +1,12 @@
 ---
-title: "mvgam case study 3: distributed lag models"
-author: Nicholas Clark (n.clark@uq.edu.au)
+title: 'mvgam case study 3: distributed lag models'
+author: "Nicholas Clark (n.clark@uq.edu.au)"
 output:
-  html_document:
-    df_print: paged
+  word_document: default
   pdf_document:
     highlight: zenburn
+  html_document:
+    df_print: paged
 urlcolor: blue
 ---
 

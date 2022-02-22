@@ -4,7 +4,13 @@
 \alias{plot_mvgam_trend}
 \title{Plot mvjagam latent trend for a specified series}
 \usage{
-plot_mvgam_trend(object, series, data_test, hide_xlabels = FALSE)
+plot_mvgam_trend(
+  object,
+  series,
+  data_test,
+  derivatives = FALSE,
+  hide_xlabels = FALSE
+)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
@@ -14,8 +20,11 @@ plot_mvgam_trend(object, series, data_test, hide_xlabels = FALSE)
 \item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season' and 'year'
 forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}}
 
+\item{derivatives}{\code{logical}. If \code{TRUE}, an additional plot will be returned to show the
+estimated 1st derivative for the estimated trend}
+
 \item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
-\code{axis} from base \code{R}}
+\code{axis} from base \code{R}. Ignored if \code{derivatives = TRUE}}
 }
 \description{
 Plot mvjagam latent trend for a specified series

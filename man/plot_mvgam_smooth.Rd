@@ -4,7 +4,14 @@
 \alias{plot_mvgam_smooth}
 \title{Plot mvjagam smooth terms}
 \usage{
-plot_mvgam_smooth(object, series = 1, smooth, newdata)
+plot_mvgam_smooth(
+  object,
+  series = 1,
+  smooth,
+  residuals = FALSE,
+  derivatives = FALSE,
+  newdata
+)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
@@ -12,6 +19,18 @@ plot_mvgam_smooth(object, series = 1, smooth, newdata)
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
 \item{smooth}{either a \code{character} or \code{integer} specifying which smooth term to be plotted}
+
+\item{residuals}{\code{logical}. If \code{TRUE} then partial residuals are added to plots of 1-D smooths.
+Partial residuals for a smooth term are the median Dunn-Smyth residuals that would be obtained by dropping the term
+concerned from the model, while leaving all other estimates fixed (i.e. the
+estimates for the term plus the original median Dunn-Smyth residuals). Note that because \code{mvgam} works with
+Dunn-Smyth residuals and not working residuals, which are used by \code{mgcv}, the magnitudes of
+partial residuals will be different to what you would expect from \code{\link[mgcv]{plot.gam}}. Interpretation
+is similar though, as these partial residuals should be evenly scattered
+around the smooth function if the function is well estimated}
+
+\item{derivatives}{\code{logical}. If \code{TRUE}, an additional plot will be returned to show the
+estimated 1st derivative for the specified smooth (Note, this only works for univariate smooths)}
 
 \item{newdata}{Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
 in addition to any other variables included in the linear predictor of the original model's \code{formula}.
@@ -24,10 +43,9 @@ A base \code{R} graphics plot
 This function plots credible intervals for a series-specific smooth term on the scale of the linear predictor
 }
 \details{
-Smooth functions are shown as empirical quantiles of posterior expectations from the GAM component of the linear
-predictor across a sequence of 500 values between the variable's \code{min} and \code{max},
-while holding all other variables either at their means (for numeric varibles) or at the first
-level (factor variables). At present, only univariate and bivariate smooth plots
+Smooth functions are shown as empirical quantiles of posterior partial expectations
+across a sequence of 500 values between the variable's \code{min} and \code{max},
+while zeroing out effects of all other variables. At present, only univariate and bivariate smooth plots
 are allowed, though note that bivariate smooths rely on default behaviour from
 \code{\link[mgcv]{plot.gam}}. For more nuanced visualisation, supply
 \code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model

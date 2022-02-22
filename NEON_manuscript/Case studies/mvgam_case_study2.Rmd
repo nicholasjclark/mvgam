@@ -1,11 +1,12 @@
 ---
-title: "mvgam case study 2: multivariate models"
-author: Nicholas Clark (n.clark@uq.edu.au)
+title: 'mvgam case study 2: multivariate models'
+author: "Nicholas Clark (n.clark@uq.edu.au)"
 output:
   html_document:
     df_print: paged
   pdf_document:
     highlight: zenburn
+  word_document: default
 urlcolor: blue
 ---
 
@@ -39,7 +40,7 @@ Clearly there are some correlations in the trends for these series. But how does
 
 ![](df.gif)
 
- A challenge with any factor model is the need to determine the number of factors `K`. Setting `K` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `K` too large leads to unnecessary computation. `mvgam` approaches this problem by formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines. Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
+A challenge with any factor model is the need to determine the number of factors `K`. Setting `K` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `K` too large leads to unnecessary computation. `mvgam` approaches this problem by formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines. Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
 ```{r, message=FALSE, warning=FALSE}
 mod1 <- mvjagam(data_train = dat$data_train,
                 data_test = dat$data_test,
