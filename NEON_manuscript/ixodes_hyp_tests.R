@@ -15,7 +15,7 @@ all_data <- prep_neon_data(species = 'Ixodes_scapularis', split_prop = 0.8)
 # factors and site-level effects of growing days influence the series dynamics
 null_hyp = y ~ s(siteID, bs = 're') +
   s(cum_gdd, k = 3) +
-  s(cum_gdd, siteID, k = 3, m = 1, bs = 'fs') +
+  s(cum_gdd, siteID, k = 3, m = 1, bs = 'fs')
 
 # 1. Do all series share same seasonal pattern, with any remaining variation due to
 # non-seasonal local variation captured by the trends?
@@ -341,3 +341,9 @@ fit_null$rho_summary
 fit_hyp1$rho_summary
 fit_hyp2$rho_summary
 fit_hyp3$rho_summary
+
+compare_mvgams(fit_hyp1$out_gam_mod, fit_null$out_gam_mod)
+
+
+
+

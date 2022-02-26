@@ -65,7 +65,7 @@ lynx_train = lynx_full[1:50, ]
 lynx_test = lynx_full[51:60, ]
 ```
 
-Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `JAGS` using MCMC sampling (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
+Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR2` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `JAGS` using MCMC sampling (installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
 
 ``` r
 lynx_mvgam <- mvjagam(data_train = lynx_train,
@@ -73,9 +73,9 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
                formula = y ~ s(season, bs = 'cc', k = 19),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
-               trend_model = 'AR3',
+               trend_model = 'AR2',
                drift = F,
-               burnin = 10000,
+               burnin = 15000,
                chains = 4)
 #> Compiling rjags model...
 #> Starting 4 rjags simulations using a PSOCK cluster with 4 nodes on host
@@ -138,45 +138,45 @@ summary_mvgam(lynx_mvgam)
 #> 
 #> GAM smooth term approximate significances:
 #>             edf Ref.df Chi.sq p-value    
-#> s(season) 16.19  17.00  159.7  <2e-16 ***
+#> s(season) 16.19  17.00  696.8  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> GAM coefficient (beta) estimates:
-#>                    2.5%         50%       97.5% Rhat n.eff
-#> (Intercept)   6.2770901  6.68528234  6.89327788 1.43    28
-#> s(season).1  -1.1564530 -0.64458777 -0.11872920 1.27   132
-#> s(season).2  -0.2683529  0.25073954  0.94169775 1.14    70
-#> s(season).3   0.3308783  1.09336242  1.79402756 1.07    28
-#> s(season).4   0.8341058  1.67841585  2.18185213 1.34    47
-#> s(season).5   1.0001588  1.80584298  2.44659910 2.01    59
-#> s(season).6   0.1578135  1.00852951  1.69310142 1.55    50
-#> s(season).7  -0.8748761 -0.21508874  0.54066675 1.12    77
-#> s(season).8  -1.3830175 -0.69447020  0.05220082 1.11    97
-#> s(season).9  -1.5430305 -0.81352062  0.06923342 1.29   150
-#> s(season).10 -1.1355176 -0.43732912  0.37036136 1.19   110
-#> s(season).11 -0.4439438  0.30838553  0.97091844 1.26    78
-#> s(season).12  0.3253495  1.18666706  1.95251673 1.75    45
-#> s(season).13  0.3082855  1.36908045  2.13585080 2.87    55
-#> s(season).14  0.2477303  1.12496685  1.82336145 2.17    56
-#> s(season).15 -0.4690048  0.02562886  0.55971985 1.13   139
-#> s(season).16 -1.2397070 -0.68863456 -0.14501644 1.02   166
-#> s(season).17 -1.4897623 -1.00618670 -0.42730783 1.18   140
+#>                    2.5%        50%       97.5% Rhat n.eff
+#> (Intercept)   6.6468611  6.7748372  6.94525261 1.03    71
+#> s(season).1  -1.1298871 -0.6555494 -0.05659360 1.23    98
+#> s(season).2  -0.1751489  0.3879878  1.16675768 1.52    82
+#> s(season).3   0.8095397  1.2870103  2.17354256 1.41    40
+#> s(season).4   1.3664280  1.8762071  2.45952191 1.10    49
+#> s(season).5   1.3139700  1.9771184  2.40722417 1.38    47
+#> s(season).6  -0.0174942  1.0377501  1.56343910 1.69    61
+#> s(season).7  -1.0711102 -0.2709102  0.35867670 1.45   114
+#> s(season).8  -1.3320074 -0.7685839 -0.17333382 1.07   140
+#> s(season).9  -1.4856547 -0.8679460 -0.09709773 1.05   165
+#> s(season).10 -1.2420556 -0.5499060  0.31194961 1.09    82
+#> s(season).11 -0.7396990  0.1676010  0.99184259 1.19    42
+#> s(season).12  0.2700804  1.1519587  1.95430888 1.36    29
+#> s(season).13  0.5045643  1.3696671  2.08590815 1.43    32
+#> s(season).14  0.2708631  1.1044233  2.00906276 1.19    39
+#> s(season).15 -0.6285226 -0.0336396  0.54954624 1.05   105
+#> s(season).16 -1.3001986 -0.8152208 -0.28756815 1.02   155
+#> s(season).17 -1.6003273 -1.0759127 -0.58132177 1.05   135
 #> 
 #> GAM smoothing parameter (rho) estimates:
 #>               2.5%      50%    97.5% Rhat n.eff
-#> s(season) 3.092496 3.911626 4.617757 1.01  1668
+#> s(season) 3.050288 3.889149 4.565194 1.01  1527
 #> 
 #> Latent trend drift (phi) and AR parameter estimates:
-#>           2.5%         50%     97.5% Rhat n.eff
-#> phi  0.0000000  0.00000000 0.0000000  NaN     0
-#> ar1  0.4241680  0.74162051 1.0587950 1.16  1333
-#> ar2 -0.4899124 -0.14435058 0.2108217 1.02  2999
-#> ar3 -0.3483214  0.04447393 0.3626631 1.32   646
+#>           2.5%        50%     97.5% Rhat n.eff
+#> phi  0.0000000  0.0000000 0.0000000  NaN     0
+#> ar1  0.4181641  0.7400922 1.0888287 1.12   624
+#> ar2 -0.4847299 -0.1195360 0.2008643 1.14   768
+#> ar3  0.0000000  0.0000000 0.0000000  NaN     0
 #> 
 ```
 
-Inspect the model's estimated smooth for the 19-year cyclic pattern. Note that the `mvgam` smooth plot is on a different scale compared to `mgcv` plots, but interpretation is similar
+Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles
 
 ``` r
 plot_mvgam_smooth(lynx_mvgam, 1, 'season')
@@ -234,7 +234,7 @@ plot_mvgam_uncertainty(lynx_mvgam, data_test = lynx_test)
 
 <img src="README-unnamed-chunk-19-1.png" style="display: block; margin: auto;" />
 
-Both components contribute to forecast uncertainty, suggesting we would still need some more work to learn about factors driving the dynamics of the system. But we will leave the model as-is for this example. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's residuals, which are posterior medians of Dunn-Smyth randomised quantile residuals so should follow approximate normality. We are primarily looking for a lack of autocorrelation, which would suggest our AR3 model is appropriate for the latent trend
+Both components contribute to forecast uncertainty, suggesting we would still need some more work to learn about factors driving the dynamics of the system. But we will leave the model as-is for this example. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's residuals, which are posterior medians of Dunn-Smyth randomised quantile residuals so should follow approximate normality. We are primarily looking for a lack of autocorrelation, which would suggest our AR2 model is appropriate for the latent trend
 
 ``` r
 plot_mvgam_resids(lynx_mvgam)
@@ -251,7 +251,7 @@ lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
                family = 'poisson',
                trend_model = 'RW',
                drift = FALSE,
-               burnin = 10000,
+               burnin = 15000,
                chains = 4)
 #> Compiling rjags model...
 #> Starting 4 rjags simulations using a PSOCK cluster with 4 nodes on host
@@ -276,10 +276,10 @@ Summary statistics of the two models' out of sample Discrete Rank Probability Sc
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   5.537  20.306  87.331  83.300 119.164 212.100
+#>   5.874  26.094  86.247  80.180 112.312 206.018
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   56.86   76.82  298.87  301.55  433.57  720.72
+#>   64.08   81.24  287.87  290.83  414.15  683.66
 ```
 
 Nominal coverages for both models' 90% prediction intervals
