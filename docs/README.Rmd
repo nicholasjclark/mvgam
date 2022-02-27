@@ -62,7 +62,7 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
                family = 'poisson',
                trend_model = 'AR2',
                drift = F,
-               burnin = 15000,
+               burnin = 20000,
                chains = 4)
 ```
 
@@ -101,7 +101,7 @@ and for the latent trend component parameters
 plot_mvgam_trace(lynx_mvgam, 'trend')
 ```
 
-Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior draws of partial residuals (`100` draws by default), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
+Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior draws of partial residuals (`25` draws by default), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
 ```{r, fig.width=5, fig.height=4, fig.align='center'}
 plot_mvgam_smooth(lynx_mvgam, 1, 'season', residuals = T)
 ```
@@ -156,7 +156,7 @@ lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
                family = 'poisson',
                trend_model = 'RW',
                drift = FALSE,
-               burnin = 15000,
+               burnin = 20000,
                chains = 4)
 ```
 

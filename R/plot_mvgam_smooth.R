@@ -5,7 +5,7 @@
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param smooth either a \code{character} or \code{integer} specifying which smooth term to be plotted
-#'@param residuals \code{logical}. If \code{TRUE} then 100 posterior draws of partial residuals are added
+#'@param residuals \code{logical}. If \code{TRUE} then 25 posterior draws of partial residuals are added
 #'to plots of 1-D smooths.
 #'Partial residuals for a smooth term are the median Dunn-Smyth residuals that would be obtained by dropping the term
 #'concerned from the model, while leaving all other estimates fixed (i.e. the
@@ -271,42 +271,42 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
            ylim = c(min(min(partial_resids, min(cred) - sd(preds), na.rm = T)),
                     max(max(partial_resids, max(cred) + sd(preds), na.rm = T))))
 
-      # Just plot 100 residual draws at each observation to reduce overplotting
-      if(dim(partial_resids)[1] > 100){
-        indices <- sample(1:NROW(partial_resids), 100, F)
-        for(i in 1:100){
+      # Just plot 25residual draws at each observation to reduce overplotting
+      if(dim(partial_resids)[1] > 25){
+        indices <- sample(1:NROW(partial_resids), 25, F)
+        for(i in 1:25){
           points(x = jitter(object$obs_data[,smooth],
-                            amount = diff(range(object$obs_data[,smooth]))*0.005),
-                 y = jitter(partial_resids[i,], amount = 0.1),
+                            amount = diff(range(object$obs_data[,smooth]))*0.01),
+                 y = jitter(partial_resids[i,], amount = 0.2),
                  col = rgb(red = 50, green = 10, blue = 10, alpha = 15, maxColorValue = 200),
                  bg = rgb(red = 50, green = 10, blue = 10, alpha = 10, maxColorValue = 200),
-                 pch = 21, cex = 0.85)
+                 pch = 21, cex = 0.7)
         }
       } else {
         for(i in 1:(dim(partial_resids)[1])){
           points(x = jitter(object$obs_data[,smooth],
-                            amount = diff(range(object$obs_data[,smooth]))*0.005),
-                 y = jitter(partial_resids[i,], amount = 0.1),
+                            amount = diff(range(object$obs_data[,smooth]))*0.01),
+                 y = jitter(partial_resids[i,], amount = 0.2),
                  col = rgb(red = 50, green = 10, blue = 10, alpha = 15, maxColorValue = 200),
                  bg = rgb(red = 50, green = 10, blue = 10, alpha = 10, maxColorValue = 200),
-                 pch = 21, cex = 0.85)
+                 pch = 21, cex = 0.7)
         }
       }
 
       polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
-              col = rgb(red = 172, green = 146, blue = 146, alpha = 55, maxColorValue = 200),
+              col = rgb(red = 172, green = 146, blue = 146, alpha = 80, maxColorValue = 200),
               border = NA)
       polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
-              col = rgb(red = 156, green = 120, blue = 120, alpha = 60, maxColorValue = 200),
+              col = rgb(red = 156, green = 120, blue = 120, alpha = 80, maxColorValue = 200),
               border = NA)
       polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
-              col = rgb(red = 144, green = 96, blue = 96, alpha = 65, maxColorValue = 200),
+              col = rgb(red = 144, green = 96, blue = 96, alpha = 85, maxColorValue = 200),
               border = NA)
       polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
-              col = rgb(red = 126, green = 62, blue = 62, alpha = 70, maxColorValue = 200),
+              col = rgb(red = 126, green = 62, blue = 62, alpha = 90, maxColorValue = 200),
               border = NA)
       lines(pred_vals, cred[5,],
-            col = rgb(red = 112, green = 30, blue = 30, alpha = 75, maxColorValue = 200),
+            col = rgb(red = 112, green = 30, blue = 30, alpha = 90, maxColorValue = 200),
             lwd = 2.5)
 
     } else {

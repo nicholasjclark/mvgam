@@ -75,7 +75,7 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
                family = 'poisson',
                trend_model = 'AR2',
                drift = F,
-               burnin = 15000,
+               burnin = 20000,
                chains = 4)
 #> Compiling rjags model...
 #> Starting 4 rjags simulations using a PSOCK cluster with 4 nodes on host
@@ -138,40 +138,40 @@ summary_mvgam(lynx_mvgam)
 #> 
 #> GAM smooth term approximate significances:
 #>             edf Ref.df Chi.sq p-value    
-#> s(season) 16.18  17.00  526.1  <2e-16 ***
+#> s(season) 16.35  17.00  709.6  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> GAM coefficient (beta) estimates:
-#>                    2.5%          50%      97.5% Rhat n.eff
-#> (Intercept)   6.6414448  6.775121690  6.9297701 1.19    94
-#> s(season).1  -1.2391641 -0.722866805 -0.1175322 1.65   138
-#> s(season).2  -0.3250230  0.270766307  1.0470525 1.43    79
-#> s(season).3   0.6833317  1.142679916  1.7875855 1.10    50
-#> s(season).4   1.3108174  1.801679379  2.3325312 1.66    80
-#> s(season).5   1.2832314  2.053140032  2.6751229 1.93    43
-#> s(season).6   0.3835507  1.088626133  1.7225956 1.52    51
-#> s(season).7  -0.8951958 -0.270823653  0.4450779 1.21    84
-#> s(season).8  -1.5088206 -0.763916354 -0.1064782 1.13   105
-#> s(season).9  -1.6080323 -0.831370259 -0.1214984 1.06   162
-#> s(season).10 -1.1476397 -0.404949020  0.3360080 1.04   113
-#> s(season).11 -0.2829743  0.376828470  1.2482557 1.16    80
-#> s(season).12  0.6874380  1.342716530  2.5035233 1.44    45
-#> s(season).13  0.6703287  1.505870070  2.9014473 1.72    40
-#> s(season).14  0.3241477  1.250549232  1.9369987 1.77    48
-#> s(season).15 -0.6019052 -0.001262083  0.5299313 1.20    88
-#> s(season).16 -1.4168892 -0.823010470 -0.2709757 1.06   159
-#> s(season).17 -1.6965983 -1.127683599 -0.6109694 1.26   141
+#>                    2.5%        50%       97.5% Rhat n.eff
+#> (Intercept)   6.6523017  6.7881247  6.91125298 1.11   110
+#> s(season).1  -1.1667908 -0.7063249 -0.25685022 1.22   165
+#> s(season).2  -0.2795035  0.2371427  0.83636393 1.30    92
+#> s(season).3   0.4700631  1.0970060  1.75797377 1.35    49
+#> s(season).4   1.1209831  1.7780309  2.30311485 1.41    52
+#> s(season).5   1.4744329  1.9905888  2.53515040 1.55    58
+#> s(season).6   0.5600792  1.0858070  1.60929375 1.25    76
+#> s(season).7  -0.7981071 -0.2126467  0.43002728 1.16    76
+#> s(season).8  -1.4706102 -0.7284284 -0.06974140 1.16    92
+#> s(season).9  -1.6271197 -0.8397939  0.02061668 1.12   124
+#> s(season).10 -1.1902213 -0.4489668  0.56042966 1.15    87
+#> s(season).11 -0.4145627  0.3585913  1.25112425 1.27    53
+#> s(season).12  0.6728200  1.4477185  2.16625354 1.30    39
+#> s(season).13  1.0413930  1.5792379  2.10901203 1.05    50
+#> s(season).14  0.5761981  1.1741613  1.75470918 1.02    48
+#> s(season).15 -0.6934321 -0.0480723  0.47073223 1.05    94
+#> s(season).16 -1.3313636 -0.8396221 -0.32060469 1.02   186
+#> s(season).17 -1.5329366 -1.1052163 -0.66845472 1.05   207
 #> 
 #> GAM smoothing parameter (rho) estimates:
 #>               2.5%      50%    97.5% Rhat n.eff
-#> s(season) 3.066625 3.872132 4.556741 1.02  1595
+#> s(season) 3.050854 3.881583 4.550006 1.01  1810
 #> 
 #> Latent trend drift (phi) and AR parameter estimates:
 #>           2.5%        50%     97.5% Rhat n.eff
 #> phi  0.0000000  0.0000000 0.0000000  NaN     0
-#> ar1  0.4225540  0.7371280 1.0443655 1.10   664
-#> ar2 -0.4240642 -0.1147406 0.1951969 1.13   686
+#> ar1  0.4183701  0.7279794 1.0245716 1.01   801
+#> ar2 -0.3894034 -0.1037656 0.1921478 1.01   717
 #> ar3  0.0000000  0.0000000 0.0000000  NaN     0
 #> 
 ```
@@ -192,7 +192,7 @@ plot_mvgam_trace(lynx_mvgam, 'trend')
 
 <img src="README-unnamed-chunk-13-1.png" style="display: block; margin: auto;" /><img src="README-unnamed-chunk-13-2.png" style="display: block; margin: auto;" />
 
-Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior draws of partial residuals (`100` draws by default), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
+Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior draws of partial residuals (`25` draws by default), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
 
 ``` r
 plot_mvgam_smooth(lynx_mvgam, 1, 'season', residuals = T)
@@ -275,7 +275,7 @@ lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
                family = 'poisson',
                trend_model = 'RW',
                drift = FALSE,
-               burnin = 15000,
+               burnin = 20000,
                chains = 4)
 #> Compiling rjags model...
 #> Starting 4 rjags simulations using a PSOCK cluster with 4 nodes on host
@@ -300,10 +300,10 @@ Summary statistics of the two models' out of sample Discrete Rank Probability Sc
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>    3.31   16.75   87.79   83.48  107.81  195.82
+#>   1.996  14.293  89.110  86.620 115.231 205.505
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   63.20   79.16  289.47  288.80  410.85  677.14
+#>   71.93   94.75  274.03  286.05  394.59  671.00
 ```
 
 Nominal coverages for both models' 90% prediction intervals
