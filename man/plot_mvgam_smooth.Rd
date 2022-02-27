@@ -20,7 +20,8 @@ plot_mvgam_smooth(
 
 \item{smooth}{either a \code{character} or \code{integer} specifying which smooth term to be plotted}
 
-\item{residuals}{\code{logical}. If \code{TRUE} then partial residuals are added to plots of 1-D smooths.
+\item{residuals}{\code{logical}. If \code{TRUE} then 100 posterior draws of partial residuals are added
+to plots of 1-D smooths.
 Partial residuals for a smooth term are the median Dunn-Smyth residuals that would be obtained by dropping the term
 concerned from the model, while leaving all other estimates fixed (i.e. the
 estimates for the term plus the original median Dunn-Smyth residuals). Note that because \code{mvgam} works with

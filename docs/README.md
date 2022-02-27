@@ -2,7 +2,7 @@
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 # *mvgam*
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalised Additive Models for discrete time series with dynamic trend components.
+The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalised Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells](https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1)
 
 ## Installation
 
@@ -138,41 +138,41 @@ summary_mvgam(lynx_mvgam)
 #> 
 #> GAM smooth term approximate significances:
 #>             edf Ref.df Chi.sq p-value    
-#> s(season) 16.37  17.00    411  <2e-16 ***
+#> s(season) 16.18  17.00  526.1  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> GAM coefficient (beta) estimates:
-#>                    2.5%        50%       97.5% Rhat n.eff
-#> (Intercept)   6.6408616  6.7783881  6.92535584 1.10    93
-#> s(season).1  -1.3737387 -0.7733917 -0.29113318 1.28   103
-#> s(season).2  -0.3599721  0.1975292  0.85941372 1.30    69
-#> s(season).3   0.5024614  1.0689934  1.70168043 1.14    47
-#> s(season).4   0.9024232  1.7275534  2.43417476 1.81    33
-#> s(season).5   1.2704571  2.0589865  2.80074783 1.94    36
-#> s(season).6   0.5723797  1.2895668  1.86199915 1.31    57
-#> s(season).7  -0.6579933 -0.1124040  0.63075020 1.04    87
-#> s(season).8  -1.3355679 -0.6839564  0.11281987 1.07    91
-#> s(season).9  -1.5875042 -0.8049383  0.04089095 1.14   104
-#> s(season).10 -1.1541136 -0.3993683  0.45495619 1.23    85
-#> s(season).11 -0.3293195  0.3435211  1.12911815 1.33    79
-#> s(season).12  0.6540556  1.3620047  2.08894780 1.18    41
-#> s(season).13  0.8692815  1.6794895  2.40976795 1.13    26
-#> s(season).14  0.7033897  1.2910336  1.96047372 1.10    44
-#> s(season).15 -0.4674973  0.0465720  0.54388383 1.03   137
-#> s(season).16 -1.3219706 -0.8132277 -0.32609778 1.01   189
-#> s(season).17 -1.6593615 -1.1614013 -0.67796637 1.08   149
+#>                    2.5%          50%      97.5% Rhat n.eff
+#> (Intercept)   6.6414448  6.775121690  6.9297701 1.19    94
+#> s(season).1  -1.2391641 -0.722866805 -0.1175322 1.65   138
+#> s(season).2  -0.3250230  0.270766307  1.0470525 1.43    79
+#> s(season).3   0.6833317  1.142679916  1.7875855 1.10    50
+#> s(season).4   1.3108174  1.801679379  2.3325312 1.66    80
+#> s(season).5   1.2832314  2.053140032  2.6751229 1.93    43
+#> s(season).6   0.3835507  1.088626133  1.7225956 1.52    51
+#> s(season).7  -0.8951958 -0.270823653  0.4450779 1.21    84
+#> s(season).8  -1.5088206 -0.763916354 -0.1064782 1.13   105
+#> s(season).9  -1.6080323 -0.831370259 -0.1214984 1.06   162
+#> s(season).10 -1.1476397 -0.404949020  0.3360080 1.04   113
+#> s(season).11 -0.2829743  0.376828470  1.2482557 1.16    80
+#> s(season).12  0.6874380  1.342716530  2.5035233 1.44    45
+#> s(season).13  0.6703287  1.505870070  2.9014473 1.72    40
+#> s(season).14  0.3241477  1.250549232  1.9369987 1.77    48
+#> s(season).15 -0.6019052 -0.001262083  0.5299313 1.20    88
+#> s(season).16 -1.4168892 -0.823010470 -0.2709757 1.06   159
+#> s(season).17 -1.6965983 -1.127683599 -0.6109694 1.26   141
 #> 
 #> GAM smoothing parameter (rho) estimates:
-#>               2.5%      50%   97.5% Rhat n.eff
-#> s(season) 3.056304 3.860081 4.53871 1.01  2028
+#>               2.5%      50%    97.5% Rhat n.eff
+#> s(season) 3.066625 3.872132 4.556741 1.02  1595
 #> 
 #> Latent trend drift (phi) and AR parameter estimates:
-#>          2.5%        50%     97.5% Rhat n.eff
-#> phi  0.000000  0.0000000 0.0000000  NaN     0
-#> ar1  0.427258  0.7323852 1.0160221 1.02  1205
-#> ar2 -0.407528 -0.1093697 0.1855636 1.04   904
-#> ar3  0.000000  0.0000000 0.0000000  NaN     0
+#>           2.5%        50%     97.5% Rhat n.eff
+#> phi  0.0000000  0.0000000 0.0000000  NaN     0
+#> ar1  0.4225540  0.7371280 1.0443655 1.10   664
+#> ar2 -0.4240642 -0.1147406 0.1951969 1.13   686
+#> ar3  0.0000000  0.0000000 0.0000000  NaN     0
 #> 
 ```
 
@@ -192,7 +192,7 @@ plot_mvgam_trace(lynx_mvgam, 'trend')
 
 <img src="README-unnamed-chunk-13-1.png" style="display: block; margin: auto;" /><img src="README-unnamed-chunk-13-2.png" style="display: block; margin: auto;" />
 
-Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay partial residuals, which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
+Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior draws of partial residuals (`100` draws by default), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
 
 ``` r
 plot_mvgam_smooth(lynx_mvgam, 1, 'season', residuals = T)
@@ -300,10 +300,10 @@ Summary statistics of the two models' out of sample Discrete Rank Probability Sc
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   2.394  14.380  89.798  81.761 109.706 195.382
+#>    3.31   16.75   87.79   83.48  107.81  195.82
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   66.46   81.15  285.84  286.26  403.66  664.64
+#>   63.20   79.16  289.47  288.80  410.85  677.14
 ```
 
 Nominal coverages for both models' 90% prediction intervals

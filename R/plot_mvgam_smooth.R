@@ -5,7 +5,8 @@
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param smooth either a \code{character} or \code{integer} specifying which smooth term to be plotted
-#'@param residuals \code{logical}. If \code{TRUE} then partial residuals are added to plots of 1-D smooths.
+#'@param residuals \code{logical}. If \code{TRUE} then 100 posterior draws of partial residuals are added
+#'to plots of 1-D smooths.
 #'Partial residuals for a smooth term are the median Dunn-Smyth residuals that would be obtained by dropping the term
 #'concerned from the model, while leaving all other estimates fixed (i.e. the
 #'estimates for the term plus the original median Dunn-Smyth residuals). Note that because \code{mvgam} works with
@@ -128,7 +129,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
 
   } else {
 
-  if(class(pred_dat) == 'list'){
+  if(class(pred_dat)[1] == 'list'){
     pred_vals <- as.vector(as.matrix(pred_dat[[smooth]]))
   } else{
     pred_vals <- as.vector(as.matrix(pred_dat[,smooth]))
@@ -145,7 +146,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
 
   }
 
-  if(class(pred_dat) == 'list'){
+  if(class(pred_dat)[1] == 'list'){
     pred_vals <- pred_vals[order(pred_vals)]
   }
 
@@ -164,7 +165,11 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
 
     # Calculate residuals from full prediction set
     all_resids <- object$resids[[series]][1:end_train]
-    partial_resids <- (Xp2 %*% betas[1, ]) + all_resids
+
+    partial_resids <- matrix(NA, nrow = nrow(betas), ncol = length(all_resids))
+    for(i in 1:NROW(betas)){
+      partial_resids[i,] <- (Xp2 %*% betas[i, ]) + all_resids
+    }
   }
 
   # Plot quantiles of the smooth function, along with observed values
@@ -265,23 +270,62 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
            xlim = c(min(pred_vals), max(pred_vals)),
            ylim = c(min(min(partial_resids, min(cred) - sd(preds), na.rm = T)),
                     max(max(partial_resids, max(cred) + sd(preds), na.rm = T))))
+
+      # Just plot 100 residual draws at each observation to reduce overplotting
+      if(dim(partial_resids)[1] > 100){
+        indices <- sample(1:NROW(partial_resids), 100, F)
+        for(i in 1:100){
+          points(x = jitter(object$obs_data[,smooth],
+                            amount = diff(range(object$obs_data[,smooth]))*0.005),
+                 y = jitter(partial_resids[i,], amount = 0.1),
+                 col = rgb(red = 50, green = 10, blue = 10, alpha = 15, maxColorValue = 200),
+                 bg = rgb(red = 50, green = 10, blue = 10, alpha = 10, maxColorValue = 200),
+                 pch = 21, cex = 0.85)
+        }
+      } else {
+        for(i in 1:(dim(partial_resids)[1])){
+          points(x = jitter(object$obs_data[,smooth],
+                            amount = diff(range(object$obs_data[,smooth]))*0.005),
+                 y = jitter(partial_resids[i,], amount = 0.1),
+                 col = rgb(red = 50, green = 10, blue = 10, alpha = 15, maxColorValue = 200),
+                 bg = rgb(red = 50, green = 10, blue = 10, alpha = 10, maxColorValue = 200),
+                 pch = 21, cex = 0.85)
+        }
+      }
+
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+              col = rgb(red = 172, green = 146, blue = 146, alpha = 55, maxColorValue = 200),
+              border = NA)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+              col = rgb(red = 156, green = 120, blue = 120, alpha = 60, maxColorValue = 200),
+              border = NA)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+              col = rgb(red = 144, green = 96, blue = 96, alpha = 65, maxColorValue = 200),
+              border = NA)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+              col = rgb(red = 126, green = 62, blue = 62, alpha = 70, maxColorValue = 200),
+              border = NA)
+      lines(pred_vals, cred[5,],
+            col = rgb(red = 112, green = 30, blue = 30, alpha = 75, maxColorValue = 200),
+            lwd = 2.5)
+
     } else {
       plot(1, type = "n",
            xlab = smooth,
            ylab = paste0('s(', smooth, ') for ', unique(pred_dat$series)),
            xlim = c(min(pred_vals), max(pred_vals)),
            ylim = c(min(cred) - sd(preds), max(cred) + sd(preds)))
-    }
 
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
-            col = c_light, border = NA)
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
-            col = c_light_highlight, border = NA)
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
-            col = c_mid, border = NA)
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
-            col = c_mid_highlight, border = NA)
-    lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+              col = c_light, border = NA)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+              col = c_light_highlight, border = NA)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+              col = c_mid, border = NA)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+              col = c_mid_highlight, border = NA)
+      lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+    }
 
     # Show observed values of the smooth as a rug
     if(class(object$obs_data) == 'list'){
@@ -292,14 +336,6 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
       rug((as.vector(as.matrix(data_train[,smooth])))[which(data_train$series ==
                                                               levels(data_train$series)[series])],
           lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)
-    }
-
-    if(residuals){
-      points(x = object$obs_data[,smooth],
-             y = partial_resids,
-             col = rgb(red = 0, green = 0, blue = 0, alpha = 80, maxColorValue = 200),
-             bg = rgb(red = 0, green = 0, blue = 0, alpha = 40, maxColorValue = 200),
-             pch = 21)
     }
 
   }
