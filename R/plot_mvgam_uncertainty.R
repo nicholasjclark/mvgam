@@ -4,8 +4,8 @@
 #'@param data_test A \code{dataframe} or \code{list} containing at least 'series', 'season' and 'year' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
-#'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
-#'This places the legend on the inside of the plot frame at the given location.
+#'list: "none", "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
+#'This places the legend on the inside of the plot frame at the given location (if it is not "none").
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
 #'@export
@@ -110,10 +110,11 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
   polygon(c(seq(1:(NCOL(gam_int))), rev(seq(1:NCOL(gam_int)))),
           c(gam_cont, rep(1, NCOL(gam_int))),
           col = '#DCBCBC', border = NA)
-  legend(legend_position,legend=c("Trend","GAM"),
-         bg = 'white',
-         col=c('#DCBCBC',
-               "#7C0000"),lty=1,lwd=6)
-
+  if(legend_position != 'none'){
+    legend(legend_position,legend=c("Trend","GAM"),
+           bg = 'white',
+           col=c('#DCBCBC',
+                 "#7C0000"),lty=1,lwd=6)
+  }
 
 }

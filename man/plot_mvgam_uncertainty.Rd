@@ -21,8 +21,8 @@ plot_mvgam_uncertainty(
 addition to any other variables included in the linear predictor of \code{formula}}
 
 \item{legend_position}{The location may also be specified by setting x to a single keyword from the
-list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
-This places the legend on the inside of the plot frame at the given location.}
+list: "none", "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
+This places the legend on the inside of the plot frame at the given location (if it is not "none").}
 
 \item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 \code{axis} from base \code{R}}

@@ -2,11 +2,11 @@
 title: 'mvgam case study 3: distributed lag models'
 author: "Nicholas Clark (n.clark@uq.edu.au)"
 output:
-  word_document: default
-  pdf_document:
-    highlight: zenburn
   html_document:
     df_print: paged
+  pdf_document:
+    highlight: zenburn
+  word_document: default
 urlcolor: blue
 ---
 
@@ -70,7 +70,8 @@ head(data_all$year, 5)
 
 View the raw series. There is a clear seasonal pattern to the data, and there are missing values scattered throughout
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot(ts(data_all$y, frequency = 12), ylab = 'Captures for PP', xlab = '' )
+plot(ts(data_all$y, frequency = 12), ylab = 'Captures for PP', xlab = '',
+     lwd = 2.5, col = "#8F2727")
 ```
 
 Create training and testing sets; start at observation 7 so that the `NA` values at the beginning of the covariate lag matrices are not included. Currently there is no option for on-the-fly imputation of missing covariate values in `mvgam` models, though this can easily be done in `JAGS` by specifying prior distributions over these missing entries
@@ -91,7 +92,7 @@ data_test <- list(lag = data_all$lag[175:length(data_all$y),],
                   mintemp = data_all$mintemp[175:length(data_all$y),])
 ```
 
-Now we can fit a dynamic GAM with distributed lag terms for precipitation and minimum temperature and an `AR1` process for the unobserved temporal trend. The distributed lags are set up as tensor product smooth functions (see `help(te)` for an explanation of tensor product smooths) between `lag` and each covariate. We assume a `Poisson` observation model for this example
+Now we can fit a dynamic GAM with distributed lag terms for precipitation and minimum temperature and an `AR1` process for the unobserved temporal trend. The distributed lags are set up as tensor product smooth functions (see `help(te)` for an explanation of tensor product smooth constructions in the `mgcv` package) between `lag` and each covariate. We assume a `Poisson` observation model for this example
 ```{r, message=FALSE, warning=FALSE}
 test <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                   te(precip, lag, k = c(8, 4)),
@@ -99,7 +100,7 @@ test <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                 data_test = data_test,
                 family = 'poisson',
                 chains = 4,
-                burnin = 12000,
+                burnin = 15000,
                 trend_model = 'AR1')
 ```
 
@@ -108,16 +109,16 @@ The summary of the model provides useful information on convergence for unobserv
 summary_mvgam(test)
 ```
 
-As with all other `mvgam` objects, we can create plots of the estimated forecast distribution and the dynamic latent trend process
+As with all other `mvgam` objects, we can create plots of the estimated forecast distribution and the dynamic latent trend process (with 1st derivatives shown to inspect time periods of substantial upward or downward change in the latent trend)
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 plot_mvgam_fc(test, series = 1, data_test = data_test, ylim = c(0, 100))
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_trend(test, series = 1, data_test = data_test)
+plot_mvgam_trend(test, series = 1, data_test = data_test, derivatives = T)
 ```
 
-Traceplots of smooth penalties and latent trend parameters indicate good mixing and convergence of the four MCMC chains
+Traceplots of smooth penalties and latent trend parameters indicate good mixing and convergence of the four MCMC chains, as well as providing evidence that the data have informed posterior estimates that have shifted away from the prior distributions for many of these parameters
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 plot_mvgam_trace(test, 'rho')
 plot_mvgam_trace(test, 'trend')

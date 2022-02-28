@@ -14,6 +14,9 @@
 #'partial residuals will be different to what you would expect from \code{\link[mgcv]{plot.gam}}. Interpretation
 #'is similar though, as these partial residuals should be evenly scattered
 #'around the smooth function if the function is well estimated
+#'@param n_resid_bins \code{integer} specifying the number of bins group the covariate into when plotting partial residuals.
+#'Setting this argument too high can make for messy plots that are difficult to interpret, while setting it too
+#'low will likely mask some potentially useful patterns in the partial residuals. Default is \code{25}
 #'@param derivatives \code{logical}. If \code{TRUE}, an additional plot will be returned to show the
 #'estimated 1st derivative for the specified smooth (Note, this only works for univariate smooths)
 #'@param newdata Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
@@ -30,6 +33,7 @@
 #'@export
 plot_mvgam_smooth = function(object, series = 1, smooth,
                              residuals = FALSE,
+                             n_resid_bins = 25,
                              derivatives = FALSE,
                              newdata){
 
@@ -229,14 +233,6 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
           lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)
     }
 
-    if(residuals){
-      points(x = object$obs_data[,smooth],
-             y = partial_resids,
-             col = rgb(red = 0, green = 0, blue = 0, alpha = 80, maxColorValue = 200),
-             bg = rgb(red = 0, green = 0, blue = 0, alpha = 40, maxColorValue = 200),
-             pch = 21)
-    }
-
     # Compute 1st derivatives
     first_derivs <- cbind(rep(NA, NROW(preds)), t(apply(preds, 1, diff)))
     cred <- sapply(1:NCOL(first_derivs),
@@ -274,9 +270,9 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
       # Get x-axis values and bin if necessary to prevent overplotting
       sorted_x <- sort(unique(round(object$obs_data[,smooth], 6)))
 
-      if(length(sorted_x) > 40){
-        sorted_x <- seq(min(sorted_x), max(sorted_x), length.out = 40)
-        resid_probs <- do.call(rbind, lapply(2:40, function(i){
+      if(length(sorted_x) > n_resid_bins){
+        sorted_x <- seq(min(sorted_x), max(sorted_x), length.out = n_resid_bins)
+        resid_probs <- do.call(rbind, lapply(2:n_resid_bins, function(i){
           quantile(as.vector(partial_resids[,which(round(object$obs_data[,smooth], 6) <= sorted_x[i] &
                                                      round(object$obs_data[,smooth], 6) > sorted_x[i-1])]),
                    probs = probs)
@@ -293,13 +289,15 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
       }
 
 
-      # Get polygon indices and plot
+      # Get polygon coordinates and plot
       N <- length(sorted_x)
       idx <- rep(1:N, each = 2)
       repped_x <- rep(sorted_x, each = 2)
 
       x <- sapply(1:length(idx),
-                  function(k) if(k %% 2 == 0) repped_x[k] + min(diff(sorted_x))/2 else repped_x[k] - min(diff(sorted_x))/2)
+                  function(k) if(k %% 2 == 0)
+                    repped_x[k] + min(diff(sorted_x))/2 else
+                      repped_x[k] - min(diff(sorted_x))/2)
 
       rect(xleft = x[seq(1, N*2, by = 2)],
            xright = x[seq(2, N*2, by = 2)],
@@ -326,37 +324,19 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
            col = c_mid_highlight,
            border = 'transparent')
 
-      # polygon(c(x, rev(x)), c(pad_cred[1,], rev(pad_cred[9,])),
-      #         col = c_light, border = NA)
-      # polygon(c(x, rev(x)), c(pad_cred[2,], rev(pad_cred[8,])),
-      #         col = c_light_highlight, border = NA)
-      # polygon(c(x, rev(x)), c(pad_cred[3,], rev(pad_cred[7,])),
-      #         col = c_mid, border = NA)
-      # polygon(c(x, rev(x)), c(pad_cred[4,], rev(pad_cred[6,])),
-      #         col = c_mid_highlight, border = NA)
-
       for (k in 1:N) {
         lines(x = c(x[seq(1, N*2, by = 2)][k],x[seq(2, N*2, by = 2)][k]),
               y = c(resid_probs[k,5], resid_probs[k,5]),
               col = c_dark, lwd = 2)
       }
 
-      # Overlay smooth function
+      # Overlay a minimalist version of the estimated smooth function
       polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
               col = rgb(red = 0, green = 0, blue = 0, alpha = 30, maxColorValue = 200),
               border = NA)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
-              col = rgb(red = 0, green = 0, blue = 0, alpha = 35, maxColorValue = 200),
-              border = NA)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
-              col = rgb(red = 0, green = 0, blue = 0, alpha = 40, maxColorValue = 200),
-              border = NA)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
-              col = rgb(red = 0, green = 0, blue = 0, alpha = 45, maxColorValue = 200),
-              border = NA)
       lines(pred_vals, cred[5,],
-            col = rgb(red = 0, green = 0, blue = 0, alpha = 55, maxColorValue = 200),
-            lwd = 2.5)
+            col = rgb(red = 0, green = 0, blue = 0, alpha = 45, maxColorValue = 200),
+            lwd = 3)
 
     } else {
       plot(1, type = "n",

@@ -9,6 +9,7 @@ plot_mvgam_smooth(
   series = 1,
   smooth,
   residuals = FALSE,
+  n_resid_bins = 25,
   derivatives = FALSE,
   newdata
 )
@@ -29,6 +30,10 @@ Dunn-Smyth residuals and not working residuals, which are used by \code{mgcv}, t
 partial residuals will be different to what you would expect from \code{\link[mgcv]{plot.gam}}. Interpretation
 is similar though, as these partial residuals should be evenly scattered
 around the smooth function if the function is well estimated}
+
+\item{n_resid_bins}{\code{integer} specifying the number of bins group the covariate into when plotting partial residuals.
+Setting this argument too high can make for messy plots that are difficult to interpret, while setting it too
+low will likely mask some potentially useful patterns in the partial residuals. Default is \code{25}}
 
 \item{derivatives}{\code{logical}. If \code{TRUE}, an additional plot will be returned to show the
 estimated 1st derivative for the specified smooth (Note, this only works for univariate smooths)}

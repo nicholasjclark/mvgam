@@ -138,41 +138,41 @@ summary_mvgam(lynx_mvgam)
 #> 
 #> GAM smooth term approximate significances:
 #>             edf Ref.df Chi.sq p-value    
-#> s(season) 16.38  17.00  605.8  <2e-16 ***
+#> s(season) 16.26  17.00  895.9  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> GAM coefficient (beta) estimates:
 #>                    2.5%         50%      97.5% Rhat n.eff
-#> (Intercept)   6.6417128  6.78989144  6.9224246 1.05    94
-#> s(season).1  -1.1630618 -0.72904932 -0.2485156 1.02   124
-#> s(season).2  -0.2461746  0.26284167  0.8544801 1.13    94
-#> s(season).3   0.5847942  1.16133906  1.8554431 1.29    55
-#> s(season).4   1.3226671  1.82624849  2.3337827 1.19    53
-#> s(season).5   1.3346312  2.10146758  2.9005929 1.34    43
-#> s(season).6   0.5700281  1.27091657  1.9722049 1.69    64
-#> s(season).7  -0.7209603 -0.11340609  0.5044168 1.24    94
-#> s(season).8  -1.3790046 -0.74246375 -0.0480999 1.09   105
-#> s(season).9  -1.5826360 -0.90948346 -0.2012926 1.05   113
-#> s(season).10 -1.2860833 -0.60522122  0.1031649 1.03   105
-#> s(season).11 -0.5236805  0.08556451  0.7250084 1.02    83
-#> s(season).12  0.4375686  1.10392626  1.8477848 1.26    44
-#> s(season).13  0.6547936  1.35080153  2.3010604 1.82    42
-#> s(season).14  0.5817974  1.19427821  2.0354374 1.91    74
-#> s(season).15 -0.5801651  0.01918446  0.7038850 1.29   102
-#> s(season).16 -1.3457949 -0.79084284 -0.2220896 1.16   165
-#> s(season).17 -1.6117935 -1.09264584 -0.6469876 1.08   164
+#> (Intercept)   6.6576074  6.77853485  6.9212594 1.05    88
+#> s(season).1  -1.2290241 -0.68734717 -0.1875609 1.39   133
+#> s(season).2  -0.3578916  0.25965317  0.8365117 1.23    76
+#> s(season).3   0.5779850  1.09406507  1.6499922 1.18    57
+#> s(season).4   1.2898583  1.81650320  2.2637867 1.40    53
+#> s(season).5   1.4563061  2.20871777  2.7775186 1.83    45
+#> s(season).6   0.5633056  1.31944290  1.8870897 1.50    70
+#> s(season).7  -0.6637729 -0.02632234  0.6960057 1.24    89
+#> s(season).8  -1.2093072 -0.57996535  0.2733595 1.19   109
+#> s(season).9  -1.3993486 -0.64497557  0.2077909 1.07   105
+#> s(season).10 -1.0333690 -0.32309001  0.5706681 1.02    68
+#> s(season).11 -0.4317056  0.36807347  1.0853681 1.11    53
+#> s(season).12  0.2529551  1.18527258  1.7785658 1.55    42
+#> s(season).13  0.1137979  1.21577858  1.8107595 2.52    63
+#> s(season).14 -0.1179462  0.91735159  1.6277047 2.11    48
+#> s(season).15 -0.9110310 -0.18626860  0.4264597 1.25    89
+#> s(season).16 -1.4964100 -0.89794283 -0.3213307 1.03   128
+#> s(season).17 -1.6772655 -1.12662302 -0.6607839 1.12   136
 #> 
 #> GAM smoothing parameter (rho) estimates:
 #>               2.5%      50%    97.5% Rhat n.eff
-#> s(season) 3.010019 3.843971 4.509707 1.01  1713
+#> s(season) 3.042201 3.885326 4.583159 1.03  1432
 #> 
 #> Latent trend drift (phi) and AR parameter estimates:
-#>           2.5%         50%     97.5% Rhat n.eff
-#> phi  0.0000000  0.00000000 0.0000000  NaN     0
-#> ar1  0.4207896  0.71458780 1.0031113 1.02  1760
-#> ar2 -0.3928795 -0.09456729 0.2017822 1.04  1243
-#> ar3  0.0000000  0.00000000 0.0000000  NaN     0
+#>           2.5%        50%     97.5% Rhat n.eff
+#> phi  0.0000000  0.0000000 0.0000000  NaN     0
+#> ar1  0.4589342  0.7780231 1.1002675 1.16   924
+#> ar2 -0.4366027 -0.1381638 0.1771885 1.11  1346
+#> ar3  0.0000000  0.0000000 0.0000000  NaN     0
 #> 
 ```
 
@@ -253,7 +253,11 @@ plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'pit', data_test = lynx_test)
 A key aspect of ecological forecasting is to understand [how different components of a model contribute to forecast uncertainty](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589). We can estimate relative contributions to forecast uncertainty for the GAM component and the latent trend component using `mvgam`
 
 ``` r
-plot_mvgam_uncertainty(lynx_mvgam, data_test = lynx_test)
+plot_mvgam_uncertainty(lynx_mvgam, data_test = lynx_test, legend_position = 'none')
+text(1, 0.2, cex = 1.5, label="GAM component", 
+     pos = 4, col="white", family = 'serif')
+text(1, 0.8, cex = 1.5, label="Trend component", 
+     pos = 4, col="#7C0000", family = 'serif')
 ```
 
 <img src="README-unnamed-chunk-22-1.png" style="display: block; margin: auto;" />
@@ -300,10 +304,10 @@ Summary statistics of the two models' out of sample Discrete Rank Probability Sc
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   4.377  25.558  73.638  72.186 103.495 183.398
+#>   11.48   34.52   98.61   99.68  133.44  230.84
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   63.62   83.63  291.03  291.71  414.11  688.00
+#>   64.56   84.92  283.51  289.99  409.86  688.65
 ```
 
 Nominal coverages for both models' 90% prediction intervals
