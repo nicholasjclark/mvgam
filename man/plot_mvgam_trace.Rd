@@ -4,7 +4,7 @@
 \alias{plot_mvgam_trace}
 \title{Plot mvjagam trace plots}
 \usage{
-plot_mvgam_trace(object, param = "rho")
+plot_mvgam_trace(object, param = "rho", overlay_prior = TRUE)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
@@ -12,11 +12,16 @@ plot_mvgam_trace(object, param = "rho")
 \item{param}{\code{character} vector specifying which parameter(s) are to be plotted. Valid options are:
 'rho' (smoothing penalties), 'trend' (which returns traces for all latent trend parameters,
 including drift and autoregressive terms), 'b' (traces for all smooth beta coefficients) and
-'r' (the Negative Binomial overdispersion parameter)
+'r' (the Negative Binomial overdispersion parameter)}
+
+\item{overlay_prior}{\code{logical}. If \code{TRUE} and \code{param} is 'rho' or 'trend', the default prior densities
+are also shown to evaluate how informative the data were for shaping the posterior estimates. Note that these
+densities assume that the priors for 'rho', 'ar' and 'tau' were not changed from their default values when the
+model was originaly fitted
 \code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model}
 }
 \value{
-A \code{\link[MCMCvis]{MCMCtrace}} traceplot
+A \code{\link[MCMCvis]{MCMCtrace}} traceplot.
 }
 \description{
 This function returns MCMC trace plots for the specified parameter(s)

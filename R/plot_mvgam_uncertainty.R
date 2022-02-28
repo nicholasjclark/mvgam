@@ -106,14 +106,14 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
 
   polygon(c(seq(1:(NCOL(gam_int))), rev(seq(1:NCOL(gam_int)))),
           c(gam_cont, rep(0, NCOL(gam_int))),
-          col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
+          col = "#7C0000", border = NA)
   polygon(c(seq(1:(NCOL(gam_int))), rev(seq(1:NCOL(gam_int)))),
           c(gam_cont, rep(1, NCOL(gam_int))),
-          col = 'gray70', border = NA)
+          col = '#DCBCBC', border = NA)
   legend(legend_position,legend=c("Trend","GAM"),
          bg = 'white',
-         col=c('gray70',
-               rgb(150, 0, 0, max = 255, alpha = 180)),lty=1,lwd=6)
+         col=c('#DCBCBC',
+               "#7C0000"),lty=1,lwd=6)
 
 
 }

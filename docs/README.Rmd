@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
 *mvgam*
 ================
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalised Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells](https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1)
+The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalised Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others.
   
 ## Installation
 Install the development version from `GitHub` using:
@@ -92,7 +92,7 @@ summary_mvgam(lynx_mvgam)
 ```
 
 Of course we should always inpsect traceplots when sampling from a posterior with `MCMC` methods. Here for the `GAM` component (smoothing parameters)
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r, fig.width = 7, fig.height = 4.1, fig.align='center'}
 plot_mvgam_trace(lynx_mvgam, 'rho')
 ```
 
@@ -101,7 +101,7 @@ and for the latent trend component parameters
 plot_mvgam_trace(lynx_mvgam, 'trend')
 ```
 
-Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior draws of partial residuals (`25` draws by default), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
+Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior quantiles of partial residuals (shown as ribbon rectangles in red), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
 ```{r, fig.width=5, fig.height=4, fig.align='center'}
 plot_mvgam_smooth(lynx_mvgam, 1, 'season', residuals = T)
 ```

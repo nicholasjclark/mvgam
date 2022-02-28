@@ -2,7 +2,7 @@
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 # *mvgam*
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalised Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells](https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1)
+The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalised Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others.
 
 ## Installation
 
@@ -138,41 +138,41 @@ summary_mvgam(lynx_mvgam)
 #> 
 #> GAM smooth term approximate significances:
 #>             edf Ref.df Chi.sq p-value    
-#> s(season) 16.35  17.00  709.6  <2e-16 ***
+#> s(season) 16.38  17.00  605.8  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> GAM coefficient (beta) estimates:
-#>                    2.5%        50%       97.5% Rhat n.eff
-#> (Intercept)   6.6523017  6.7881247  6.91125298 1.11   110
-#> s(season).1  -1.1667908 -0.7063249 -0.25685022 1.22   165
-#> s(season).2  -0.2795035  0.2371427  0.83636393 1.30    92
-#> s(season).3   0.4700631  1.0970060  1.75797377 1.35    49
-#> s(season).4   1.1209831  1.7780309  2.30311485 1.41    52
-#> s(season).5   1.4744329  1.9905888  2.53515040 1.55    58
-#> s(season).6   0.5600792  1.0858070  1.60929375 1.25    76
-#> s(season).7  -0.7981071 -0.2126467  0.43002728 1.16    76
-#> s(season).8  -1.4706102 -0.7284284 -0.06974140 1.16    92
-#> s(season).9  -1.6271197 -0.8397939  0.02061668 1.12   124
-#> s(season).10 -1.1902213 -0.4489668  0.56042966 1.15    87
-#> s(season).11 -0.4145627  0.3585913  1.25112425 1.27    53
-#> s(season).12  0.6728200  1.4477185  2.16625354 1.30    39
-#> s(season).13  1.0413930  1.5792379  2.10901203 1.05    50
-#> s(season).14  0.5761981  1.1741613  1.75470918 1.02    48
-#> s(season).15 -0.6934321 -0.0480723  0.47073223 1.05    94
-#> s(season).16 -1.3313636 -0.8396221 -0.32060469 1.02   186
-#> s(season).17 -1.5329366 -1.1052163 -0.66845472 1.05   207
+#>                    2.5%         50%      97.5% Rhat n.eff
+#> (Intercept)   6.6417128  6.78989144  6.9224246 1.05    94
+#> s(season).1  -1.1630618 -0.72904932 -0.2485156 1.02   124
+#> s(season).2  -0.2461746  0.26284167  0.8544801 1.13    94
+#> s(season).3   0.5847942  1.16133906  1.8554431 1.29    55
+#> s(season).4   1.3226671  1.82624849  2.3337827 1.19    53
+#> s(season).5   1.3346312  2.10146758  2.9005929 1.34    43
+#> s(season).6   0.5700281  1.27091657  1.9722049 1.69    64
+#> s(season).7  -0.7209603 -0.11340609  0.5044168 1.24    94
+#> s(season).8  -1.3790046 -0.74246375 -0.0480999 1.09   105
+#> s(season).9  -1.5826360 -0.90948346 -0.2012926 1.05   113
+#> s(season).10 -1.2860833 -0.60522122  0.1031649 1.03   105
+#> s(season).11 -0.5236805  0.08556451  0.7250084 1.02    83
+#> s(season).12  0.4375686  1.10392626  1.8477848 1.26    44
+#> s(season).13  0.6547936  1.35080153  2.3010604 1.82    42
+#> s(season).14  0.5817974  1.19427821  2.0354374 1.91    74
+#> s(season).15 -0.5801651  0.01918446  0.7038850 1.29   102
+#> s(season).16 -1.3457949 -0.79084284 -0.2220896 1.16   165
+#> s(season).17 -1.6117935 -1.09264584 -0.6469876 1.08   164
 #> 
 #> GAM smoothing parameter (rho) estimates:
 #>               2.5%      50%    97.5% Rhat n.eff
-#> s(season) 3.050854 3.881583 4.550006 1.01  1810
+#> s(season) 3.010019 3.843971 4.509707 1.01  1713
 #> 
 #> Latent trend drift (phi) and AR parameter estimates:
-#>           2.5%        50%     97.5% Rhat n.eff
-#> phi  0.0000000  0.0000000 0.0000000  NaN     0
-#> ar1  0.4183701  0.7279794 1.0245716 1.01   801
-#> ar2 -0.3894034 -0.1037656 0.1921478 1.01   717
-#> ar3  0.0000000  0.0000000 0.0000000  NaN     0
+#>           2.5%         50%     97.5% Rhat n.eff
+#> phi  0.0000000  0.00000000 0.0000000  NaN     0
+#> ar1  0.4207896  0.71458780 1.0031113 1.02  1760
+#> ar2 -0.3928795 -0.09456729 0.2017822 1.04  1243
+#> ar3  0.0000000  0.00000000 0.0000000  NaN     0
 #> 
 ```
 
@@ -192,7 +192,7 @@ plot_mvgam_trace(lynx_mvgam, 'trend')
 
 <img src="README-unnamed-chunk-13-1.png" style="display: block; margin: auto;" /><img src="README-unnamed-chunk-13-2.png" style="display: block; margin: auto;" />
 
-Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior draws of partial residuals (`25` draws by default), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
+Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior quantiles of partial residuals (shown as ribbon rectangles in red), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
 
 ``` r
 plot_mvgam_smooth(lynx_mvgam, 1, 'season', residuals = T)
@@ -300,10 +300,10 @@ Summary statistics of the two models' out of sample Discrete Rank Probability Sc
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   1.996  14.293  89.110  86.620 115.231 205.505
+#>   4.377  25.558  73.638  72.186 103.495 183.398
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   71.93   94.75  274.03  286.05  394.59  671.00
+#>   63.62   83.63  291.03  291.71  414.11  688.00
 ```
 
 Nominal coverages for both models' 90% prediction intervals

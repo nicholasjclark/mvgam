@@ -819,7 +819,7 @@ for (i in 1:n) {
   # Gather posterior samples for the specified parameters
   if(!use_lv){
     param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
-               'tau', 'trend', 'ar1', 'ar2', 'ar3')
+               'tau', 'trend', 'ar1', 'ar2', 'ar3', 'sigma')
   } else {
     param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi', 'LV',
                'trend', 'lv_coefs', 'penalty',

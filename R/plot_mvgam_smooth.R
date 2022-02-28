@@ -5,8 +5,8 @@
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param smooth either a \code{character} or \code{integer} specifying which smooth term to be plotted
-#'@param residuals \code{logical}. If \code{TRUE} then 25 posterior draws of partial residuals are added
-#'to plots of 1-D smooths.
+#'@param residuals \code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added
+#'to plots of 1-D smooths as a series of ribbon rectangles.
 #'Partial residuals for a smooth term are the median Dunn-Smyth residuals that would be obtained by dropping the term
 #'concerned from the model, while leaving all other estimates fixed (i.e. the
 #'estimates for the term plus the original median Dunn-Smyth residuals). Note that because \code{mvgam} works with
@@ -271,42 +271,91 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
            ylim = c(min(min(partial_resids, min(cred) - sd(preds), na.rm = T)),
                     max(max(partial_resids, max(cred) + sd(preds), na.rm = T))))
 
-      # Just plot 25residual draws at each observation to reduce overplotting
-      if(dim(partial_resids)[1] > 25){
-        indices <- sample(1:NROW(partial_resids), 25, F)
-        for(i in 1:25){
-          points(x = jitter(object$obs_data[,smooth],
-                            amount = diff(range(object$obs_data[,smooth]))*0.01),
-                 y = jitter(partial_resids[i,], amount = 0.2),
-                 col = rgb(red = 50, green = 10, blue = 10, alpha = 15, maxColorValue = 200),
-                 bg = rgb(red = 50, green = 10, blue = 10, alpha = 10, maxColorValue = 200),
-                 pch = 21, cex = 0.7)
-        }
+      # Get x-axis values and bin if necessary to prevent overplotting
+      sorted_x <- sort(unique(round(object$obs_data[,smooth], 6)))
+
+      if(length(sorted_x) > 40){
+        sorted_x <- seq(min(sorted_x), max(sorted_x), length.out = 40)
+        resid_probs <- do.call(rbind, lapply(2:40, function(i){
+          quantile(as.vector(partial_resids[,which(round(object$obs_data[,smooth], 6) <= sorted_x[i] &
+                                                     round(object$obs_data[,smooth], 6) > sorted_x[i-1])]),
+                   probs = probs)
+        }))
+        resid_probs <- rbind(quantile(as.vector(partial_resids[,which(round(object$obs_data[,smooth], 6) == sorted_x[1])]),
+                                                probs = probs),
+                             resid_probs)
+
       } else {
-        for(i in 1:(dim(partial_resids)[1])){
-          points(x = jitter(object$obs_data[,smooth],
-                            amount = diff(range(object$obs_data[,smooth]))*0.01),
-                 y = jitter(partial_resids[i,], amount = 0.2),
-                 col = rgb(red = 50, green = 10, blue = 10, alpha = 15, maxColorValue = 200),
-                 bg = rgb(red = 50, green = 10, blue = 10, alpha = 10, maxColorValue = 200),
-                 pch = 21, cex = 0.7)
-        }
+        resid_probs <- do.call(rbind, lapply(sorted_x, function(i){
+          quantile(as.vector(partial_resids[,which(round(object$obs_data[,smooth], 6) == i)]),
+                   probs = probs)
+        }))
       }
 
+
+      # Get polygon indices and plot
+      N <- length(sorted_x)
+      idx <- rep(1:N, each = 2)
+      repped_x <- rep(sorted_x, each = 2)
+
+      x <- sapply(1:length(idx),
+                  function(k) if(k %% 2 == 0) repped_x[k] + min(diff(sorted_x))/2 else repped_x[k] - min(diff(sorted_x))/2)
+
+      rect(xleft = x[seq(1, N*2, by = 2)],
+           xright = x[seq(2, N*2, by = 2)],
+           ytop =  resid_probs[,9],
+           ybottom =  resid_probs[,1],
+           col = c_light,
+           border = 'transparent')
+      rect(xleft = x[seq(1, N*2, by = 2)],
+           xright = x[seq(2, N*2, by = 2)],
+           ytop =  resid_probs[,8],
+           ybottom =  resid_probs[,2],
+           col = c_light_highlight,
+           border = 'transparent')
+      rect(xleft = x[seq(1, N*2, by = 2)],
+           xright = x[seq(2, N*2, by = 2)],
+           ytop =  resid_probs[,7],
+           ybottom =  resid_probs[,3],
+           col = c_mid,
+           border = 'transparent')
+      rect(xleft = x[seq(1, N*2, by = 2)],
+           xright = x[seq(2, N*2, by = 2)],
+           ytop =  resid_probs[,6],
+           ybottom =  resid_probs[,4],
+           col = c_mid_highlight,
+           border = 'transparent')
+
+      # polygon(c(x, rev(x)), c(pad_cred[1,], rev(pad_cred[9,])),
+      #         col = c_light, border = NA)
+      # polygon(c(x, rev(x)), c(pad_cred[2,], rev(pad_cred[8,])),
+      #         col = c_light_highlight, border = NA)
+      # polygon(c(x, rev(x)), c(pad_cred[3,], rev(pad_cred[7,])),
+      #         col = c_mid, border = NA)
+      # polygon(c(x, rev(x)), c(pad_cred[4,], rev(pad_cred[6,])),
+      #         col = c_mid_highlight, border = NA)
+
+      for (k in 1:N) {
+        lines(x = c(x[seq(1, N*2, by = 2)][k],x[seq(2, N*2, by = 2)][k]),
+              y = c(resid_probs[k,5], resid_probs[k,5]),
+              col = c_dark, lwd = 2)
+      }
+
+      # Overlay smooth function
       polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
-              col = rgb(red = 172, green = 146, blue = 146, alpha = 80, maxColorValue = 200),
+              col = rgb(red = 0, green = 0, blue = 0, alpha = 30, maxColorValue = 200),
               border = NA)
       polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
-              col = rgb(red = 156, green = 120, blue = 120, alpha = 80, maxColorValue = 200),
+              col = rgb(red = 0, green = 0, blue = 0, alpha = 35, maxColorValue = 200),
               border = NA)
       polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
-              col = rgb(red = 144, green = 96, blue = 96, alpha = 85, maxColorValue = 200),
+              col = rgb(red = 0, green = 0, blue = 0, alpha = 40, maxColorValue = 200),
               border = NA)
       polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
-              col = rgb(red = 126, green = 62, blue = 62, alpha = 90, maxColorValue = 200),
+              col = rgb(red = 0, green = 0, blue = 0, alpha = 45, maxColorValue = 200),
               border = NA)
       lines(pred_vals, cred[5,],
-            col = rgb(red = 112, green = 30, blue = 30, alpha = 90, maxColorValue = 200),
+            col = rgb(red = 0, green = 0, blue = 0, alpha = 55, maxColorValue = 200),
             lwd = 2.5)
 
     } else {
