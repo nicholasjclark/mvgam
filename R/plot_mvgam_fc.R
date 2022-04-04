@@ -1,10 +1,10 @@
 #'Plot mvjagam posterior predictions for a specified series
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'season' and 'year'
-#'for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
-#'included, the test values are shown as points on the plot to help visualise the accuracy of the model's forecast.
-#'Note this is only useful if the same \code{data_test} was also included when fitting the original model.
+#'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+#'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
+#'observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
+#'simulations can be obtained
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
 #'@param ylab Optional \code{character} string specifying the y-axis label
@@ -25,6 +25,18 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
 
   preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
   preds_last <- preds[1,]
+
+  # Add variables to data_test if missing
+  if(!missing(data_test)){
+
+    if(!'time' %in% colnames(data_test)){
+      stop('data_train does not contain a "time" column')
+    }
+
+    if(!'series' %in% colnames(data_test)){
+      data_test$series <- factor('series1')
+      }
+  }
 
   # Plot quantiles of the forecast distribution
   probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
@@ -89,36 +101,35 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
 
     points(dplyr::bind_rows(data_train, data_test) %>%
              dplyr::filter(series == s_name) %>%
-             dplyr::select(year, season, y) %>%
+             dplyr::select(time, y) %>%
              dplyr::distinct() %>%
-             dplyr::arrange(year, season) %>%
+             dplyr::arrange(time) %>%
              dplyr::pull(y), pch = 16, col = "white", cex = 0.65)
     points(dplyr::bind_rows(data_train, data_test) %>%
              dplyr::filter(series == s_name) %>%
-             dplyr::select(year, season, y) %>%
+             dplyr::select(time, y) %>%
              dplyr::distinct() %>%
-             dplyr::arrange(year, season) %>%
+             dplyr::arrange(time) %>%
              dplyr::pull(y), pch = 16, col = "black", cex = 0.55)
     abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
   } else {
     if(class(data_train)[1] == 'list'){
       data_train <- data.frame(series = data_train$series,
                                y = data_train$y,
-                               season = data_train$season,
-                               year = data_train$year)
+                               time = data_train$time)
     }
 
     points(data_train %>%
              dplyr::filter(series == s_name) %>%
-             dplyr::select(year, season, y) %>%
+             dplyr::select(time, y) %>%
              dplyr::distinct() %>%
-             dplyr::arrange(year, season) %>%
+             dplyr::arrange(time) %>%
              dplyr::pull(y),pch = 16, col = "white", cex = 0.65)
     points(data_train %>%
             dplyr::filter(series == s_name) %>%
-            dplyr::select(year, season, y) %>%
+            dplyr::select(time, y) %>%
             dplyr::distinct() %>%
-            dplyr::arrange(year, season) %>%
+            dplyr::arrange(time) %>%
             dplyr::pull(y),pch = 16, col = "black", cex = 0.55 )
   }
 

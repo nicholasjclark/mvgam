@@ -298,6 +298,16 @@ if(object$family == 'Negative Binomial'){
   message()
 }
 
+if(object$family == 'Tweedie'){
+  message("Dispersion parameter estimates:")
+  print(MCMCvis::MCMCsummary(object$jags_output, 'twdis')[,c(3:7)])
+  message()
+
+  message("Power parameter estimates:")
+  print(MCMCvis::MCMCsummary(object$jags_output, 'p')[,c(3:7)])
+  message()
+}
+
 #### Summary table and approximate tests for non-flat smooth functions ####
 coef_names <- names(object$mgcv_model$coefficients)
 m <- length(object$mgcv_model$smooth)

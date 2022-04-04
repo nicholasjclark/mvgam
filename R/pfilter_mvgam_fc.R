@@ -6,7 +6,7 @@
 #'according to their state space dynamics. The forecast is a weighted ensemble, with weights determined by
 #'each particle's proposal likelihood prior to the most recent assimilation step
 #'
-#'@param data_test A \code{dataframe} or \code{list} of test data containing at least 'series', 'season' and 'year',
+#'@param data_test A \code{dataframe} or \code{list} of test data containing at least 'series' and time',
 #'in addition to any other variables included in the linear predictor of \code{formula}
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
 #'@param file_path \code{character} string specifying the file path where the particles have been saved
@@ -63,13 +63,21 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
 
   # Get all observations that have not yet been assimilated
   if(class(data_test)[1] == 'list'){
+
+    if(!'series' %in% names(data_test)){
+      data_test$series <- factor('series1')
+    }
+
+    if(!'time' %in% names(data_test)){
+      stop('data_test does not contain a "time" column')
+    }
+
     data_test_orig <- data_test
     list_names <- names(data_test_orig)
-    data_test = data.frame(year = data_test$year,
-                            season = data_test$season,
+    data_test = data.frame(time = data_test$time,
                             series = data_test$series) %>%
       dplyr::mutate(index = dplyr::row_number()) %>%
-      dplyr::arrange(year, season, series)
+      dplyr::arrange(time, series)
 
     data_test_orig <- lapply(data_test_orig, function(x){
       if(is.matrix(x)){
@@ -80,7 +88,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
 
     })
     names(data_test_orig) <- list_names
-    last_row <- max(which(data_test$season == last_assim[1] & data_test$year == last_assim[2]))
+    last_row <- max(which(data_test$time == last_assim))
 
     series_test <- lapply(data_test_orig, function(x){
       if(is.matrix(x)){
@@ -91,9 +99,17 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     })
 
   } else {
+    if(!'series' %in% colnames(data_test)){
+      data_test$series <- factor('series1')
+    }
+
+    if(!'time' %in% colnames(data_test)){
+      stop('data_test does not contain a "time" column')
+    }
+
     data_test %>%
-      dplyr::arrange(year, season, series) -> data_test
-    last_row <- max(which(data_test$season == last_assim[1] & data_test$year == last_assim[2]))
+      dplyr::arrange(time, series) -> data_test
+    last_row <- max(which(data_test$time == last_assim))
     series_test <- data_test[(last_row + 1):NROW(data_test),]
   }
 
@@ -140,12 +156,32 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
       }))
       series_fcs <- lapply(seq_len(n_series), function(series){
         trend_preds <- as.numeric(t(lv_preds) %*% particles[[x]]$lv_coefs[series,])
-        trunc_preds <- rnbinom(fc_horizon,
-                               mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
-                                                       particles[[x]]$betas)) +
-                                          (trend_preds)),
-                               size = particles[[x]]$size[series])
-        trunc_preds
+
+        if(particles[[x]]$family == 'Negative binomial'){
+          fc <- rnbinom(fc_horizon,
+                        mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                                              particles[[x]]$betas)) +
+                                   (trend_preds)),
+                        size = particles[[x]]$size[series])
+        }
+
+        if(particles[[x]]$family == 'Poisson'){
+          fc <- rpois(fc_horizon,
+                        lambda = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                                              particles[[x]]$betas)) +
+                                   (trend_preds)))
+        }
+
+        if(particles[[x]]$family == 'Tweedie'){
+          fc <- rpois(fc_horizon,
+                        lambda = mgcv::rTweedie(
+                          mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                                                  particles[[x]]$betas)) +
+                                       (trend_preds)),
+                          p = particles[[x]]$p,
+                          phi = particles[[x]]$twdis))
+        }
+        fc
       })
 
     } else {
@@ -158,10 +194,28 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                                  tau = particles[[x]]$tau[series],
                                  state = particles[[x]]$trend_states[[series]],
                                  h = fc_horizon)
+
+          if(particles[[x]]$family == 'Negative binomial'){
             fc <-  rnbinom(fc_horizon,
-                               mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
-                                                       particles[[x]]$betas)) + (trend_preds)),
-                               size = particles[[x]]$size[series])
+                           mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                                                 particles[[x]]$betas)) + (trend_preds)),
+                           size = particles[[x]]$size[series])
+          }
+
+          if(particles[[x]]$family == 'Poisson'){
+            fc <-  rpois(fc_horizon,
+                           lambda = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                                                 particles[[x]]$betas)) + (trend_preds)))
+          }
+
+          if(particles[[x]]$family == 'Tweedie'){
+            fc <-  rpois(fc_horizon,
+                         lambda = mgcv::rTweedie(mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                                                                       particles[[x]]$betas)) + (trend_preds)),
+                                                 p = particles[[x]]$p,
+                                                 phi = particles[[x]]$twdis))
+          }
+
           fc
       })
     }
@@ -183,7 +237,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   # Generate plots of forecasts for each series
   if(class(obs_data)[1] != 'list'){
     obs_data %>%
-      dplyr::arrange(year, season, series) -> obs_data
+      dplyr::arrange(time, series) -> obs_data
   }
 
   plot_series_fc = function(series, preds, ylim, plot_legend = TRUE){

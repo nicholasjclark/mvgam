@@ -29,14 +29,34 @@ pfilter_mvgam_init = function(object,
 data_train <- object$obs_data
 n_series <- NCOL(object$ytimes)
 
+# Variable name checks
+if(class(object$obs_data)[1] == 'list'){
+  if(!'time' %in% names(data_assim)){
+    stop('data_assim does not contain a "time" column')
+  }
+
+  if(!'series' %in% names(data_assim)){
+    data_assim$series <- factor('series1')
+  }
+
+} else {
+  if(!'time' %in% colnames(data_assim)){
+    stop('data_assim does not contain a "time" column')
+  }
+
+  if(!'series' %in% colnames(data_assim)){
+    data_assim$series <- factor('series1')
+  }
+}
+
 # Next observation for assimilation (ensure data_assim is arranged correctly)
 if(class(object$obs_data)[1] == 'list'){
+
   # Find indices of next observation
-  temp_dat = data.frame(year = data_assim$year,
-                        season = data_assim$season,
+  temp_dat = data.frame(time = data_assim$time,
                         series = data_assim$series) %>%
     dplyr::mutate(index = dplyr::row_number()) %>%
-    dplyr::arrange(year, season, series)
+    dplyr::arrange(time, series)
   indices_assim <- temp_dat[1:n_series,'index']
 
   # Get list object into correct format for lpmatrix prediction
@@ -51,13 +71,13 @@ if(class(object$obs_data)[1] == 'list'){
 
 } else {
   data_assim %>%
-    dplyr::arrange(year, season, series) -> data_assim
+    dplyr::arrange(time, series) -> data_assim
   series_test <- data_assim[1:n_series,]
 }
 
 
-if(length(unique(series_test$season)) > 1){
-  stop('data_assim should have one observation per series for the next seasonal timepoint')
+if(length(unique(series_test$time)) > 1){
+  stop('data_assim should have one observation per series for the next timepoint')
 }
 
 # Linear predictor matrix for the next observation
@@ -128,8 +148,21 @@ ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
 ar2s <- MCMCvis::MCMCchains(object$jags_output, 'ar2')
 ar3s <- MCMCvis::MCMCchains(object$jags_output, 'ar3')
 
-# Negative binomial size estimate
-sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
+# Family-specific parameters
+if(object$family == 'Negative binomial'){
+  sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
+} else {
+  sizes <- NULL
+}
+
+if(object$family == 'Tweedie'){
+  twdis <- MCMCvis::MCMCchains(object$jags_output, 'twdis')
+  p <- MCMCvis::MCMCchains(object$jags_output, 'p')
+} else {
+  twdis <- p <- NULL
+}
+
+family <- object$family
 
 # Generate sample sequence for n_particles
 if(n_particles < dim(phis)[1]){
@@ -141,7 +174,7 @@ if(n_particles < dim(phis)[1]){
 #### 2. Generate particles and calculate their proposal weights ####
 use_lv <- object$use_lv
 truth <- series_test$y
-last_assim <- c(unique(series_test$season), unique(series_test$year))
+last_assim <- unique(series_test$time)
 upper_bounds <- object$upper_bounds
 
 cl <- parallel::makePSOCKcluster(n_cores)
@@ -160,7 +193,10 @@ clusterExport(NULL, c('use_lv',
                       'lvs',
                       'lv_coefs',
                       'trends',
+                      'family',
                       'sizes',
+                      'twdis',
+                      'p',
                       'n_series',
                       'n_particles',
                       'upper_bounds'),
@@ -169,7 +205,7 @@ clusterExport(NULL, c('use_lv',
 pbapply::pboptions(type = "none")
 
 particles <- pbapply::pblapply(sample_seq, function(x){
-  cat('running',x,'\n')
+
   if(use_lv){
   # Sample a last state estimate for the latent variables
   samp_index <- x
@@ -194,8 +230,15 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   # Sample beta coefs
   betas <- betas[samp_index, ]
 
-  # Sample a negative binomial size parameter
-  size <- sizes[samp_index, ]
+  # Family-specific parameters
+  if(family == 'Negative binomial'){
+    size <- sizes[samp_index, ]
+  }
+
+  if(family == 'Tweedie'){
+    twdis <- twdis[samp_index, ]
+    p <- p[samp_index]
+  }
 
   # Run the latent variables forward one timestep
   next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
@@ -221,9 +264,27 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     if(is.na(truth[series])){
       weight <- 1
     } else {
-      weight <- 1 + (dnbinom(truth[series], size = size[series],
-                        mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                   (trends[series]))))
+      if(family == 'Negative binomial'){
+        weight <- 1 + (dnbinom(truth[series], size = size[series],
+                               mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
+                                          (trends[series]))))
+      }
+
+      if(family == 'Poisson'){
+        weight <- 1 + (dpois(truth[series],
+                               lambda = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
+                                          (trends[series]))))
+      }
+
+      if(family == 'Tweedie'){
+        weight <- 1 + exp(mgcv::ldTweedie(y = truth[series],
+                                       mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
+                                            (trends[series])),
+                                       p = p,
+                                       phi = twdis[series],
+                                       all.derivs = F)[,1])
+      }
+
     }
     weight
   })), na.rm = T)
@@ -255,8 +316,15 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     # Sample trend precisions
     tau <- taus[samp_index,]
 
-    # Sample a negative binomial size parameter
-    size <- sizes[samp_index, ]
+    # Family-specific parameters
+    if(family == 'Negative binomial'){
+      size <- sizes[samp_index, ]
+    }
+
+    if(family == 'Tweedie'){
+      twdis <- twdis[samp_index, ]
+      p <- p[samp_index]
+    }
 
     # Run the trends forward one timestep
     trends <- do.call(cbind, lapply(seq_along(trends), function(trend){
@@ -271,9 +339,27 @@ particles <- pbapply::pblapply(sample_seq, function(x){
       if(is.na(truth[series])){
         weight <- 1
       } else {
-        weight <- 1 + (dnbinom(truth[series], size = size[series],
-                          mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                     (trends[series]))))
+        if(family == 'Negative binomial'){
+          weight <- 1 + (dnbinom(truth[series], size = size[series],
+                                 mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
+                                            (trends[series]))))
+        }
+
+        if(family == 'Poisson'){
+          weight <- 1 + (dpois(truth[series],
+                               lambda = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
+                                              (trends[series]))))
+        }
+
+        if(family == 'Tweedie'){
+          weight <- 1 + exp(mgcv::ldTweedie(y = truth[series],
+                                            mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
+                                                       (trends[series])),
+                                            p = p,
+                                            phi = twdis[series],
+                                            all.derivs = F)[,1])
+        }
+
       }
       weight
     }))
@@ -288,22 +374,67 @@ particles <- pbapply::pblapply(sample_seq, function(x){
 }
 
   # Store important particle-specific information for later filtering
-list(use_lv = use_lv,
-     n_lv = n_lv,
-     lv_states = next_lvs,
-     lv_coefs = lv_coefs,
-     betas = as.numeric(betas),
-     size = as.numeric(size),
-     tau = as.numeric(tau),
-     phi = as.numeric(phi),
-     ar1 = as.numeric(ar1),
-     ar2 = as.numeric(ar2),
-     ar3 = as.numeric(ar3),
-     trend_states = trends,
-     weight = weight,
-     liks = liks,
-     upper_bounds = upper_bounds,
-     last_assim = last_assim)
+  if(family == 'Poisson'){
+    output <- list(use_lv = use_lv,
+                   n_lv = n_lv,
+                   family = family,
+                   lv_states = next_lvs,
+                   lv_coefs = lv_coefs,
+                   betas = as.numeric(betas),
+                   tau = as.numeric(tau),
+                   phi = as.numeric(phi),
+                   ar1 = as.numeric(ar1),
+                   ar2 = as.numeric(ar2),
+                   ar3 = as.numeric(ar3),
+                   trend_states = trends,
+                   weight = weight,
+                   liks = liks,
+                   upper_bounds = upper_bounds,
+                   last_assim = last_assim)
+  }
+
+  if(family == 'Negative binomial'){
+    output <- list(use_lv = use_lv,
+                   n_lv = n_lv,
+                   family = family,
+                   lv_states = next_lvs,
+                   lv_coefs = lv_coefs,
+                   betas = as.numeric(betas),
+                   size = as.numeric(size),
+                   tau = as.numeric(tau),
+                   phi = as.numeric(phi),
+                   ar1 = as.numeric(ar1),
+                   ar2 = as.numeric(ar2),
+                   ar3 = as.numeric(ar3),
+                   trend_states = trends,
+                   weight = weight,
+                   liks = liks,
+                   upper_bounds = upper_bounds,
+                   last_assim = last_assim)
+  }
+
+  if(family == 'Tweedie'){
+    output <- list(use_lv = use_lv,
+                   n_lv = n_lv,
+                   family = family,
+                   lv_states = next_lvs,
+                   lv_coefs = lv_coefs,
+                   betas = as.numeric(betas),
+                   p = as.numeric(p),
+                   twdis = as.numeric(twdis),
+                   tau = as.numeric(tau),
+                   phi = as.numeric(phi),
+                   ar1 = as.numeric(ar1),
+                   ar2 = as.numeric(ar2),
+                   ar3 = as.numeric(ar3),
+                   trend_states = trends,
+                   weight = weight,
+                   liks = liks,
+                   upper_bounds = upper_bounds,
+                   last_assim = last_assim)
+  }
+
+  output
 
 }, cl = cl)
 stopCluster(cl)

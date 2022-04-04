@@ -9,9 +9,10 @@ mvjagam(
   knots,
   data_train,
   data_test,
+  run_model = TRUE,
   prior_simulation = FALSE,
   return_jags_data = FALSE,
-  family = "nb",
+  family = "poisson",
   use_lv = FALSE,
   n_lv,
   trend_model = "RW",
@@ -24,6 +25,7 @@ mvjagam(
   phi_prior,
   ar_prior,
   r_prior,
+  twdis_prior,
   tau_prior,
   upper_bounds
 )
@@ -42,14 +44,16 @@ unless they share a covariate.}
 required by the GAM \code{formula}. Should include columns:
 'y' (the discrete outcomes; \code{NA}s allowed)
 'series' (character or factor index of the series IDs)
-'season' (numeric index of the seasonal time point for each observation)
-and 'year' the numeric index for year.
+'time' (numeric index of the time point for each observation).
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
-\item{data_test}{Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'season', and 'year'
+\item{data_test}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 in addition to any other variables included in the linear predictor of \code{formula}. If included, the
 observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
 simulations can be obtained}
+
+\item{run_model}{\code{logical}. If \code{FALSE}, the model is not fitted but instead the function will
+return the model file and the data / initial values that are needed to fit the \code{JAGS} model}
 
 \item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 simulations from prior distributions are returned}
@@ -58,9 +62,9 @@ simulations from prior distributions are returned}
 model is returned, along with the initial values for smooth and AR parameters, once the model is fitted.
 This will be helpful if users wish to modify the model file to add
 other stochastic elements that are not currently avaiable in \code{mvgam}. Default is \code{FALSE} to reduce
-the size of the returned object}
+the size of the returned object, unless \code{run_model == FALSE}}
 
-\item{family}{\code{character}. Must be either 'nb' (for Negative Binomial) or 'poisson'}
+\item{family}{\code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series}
@@ -105,7 +109,11 @@ in the latent trends}
 \item{r_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
 overdispersion parameters. Note that this prior acts on the SQUARE ROOT of \code{r}, which is convenient
 for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
-as the sampled parameter approaches \code{0}. Ignored if \code{family = 'poisson'}}
+as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tweedie}
+
+\item{twdis_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Tweedie
+overdispersion parameters. The observation process reduces to a Poisson
+as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Negative Binomial}
 
 \item{tau_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
 precisions used for the latent trends (ignored if \code{use_lv == TRUE})}

@@ -28,19 +28,18 @@ roll_eval_mvgam = function(object,
 
   # Generate time variable from training data
   if(class(object$obs_data) == 'list'){
-    all_timepoints <- (data.frame(year = object$obs_data$year,
-                                  season = object$obs_data$season)  %>%
-                         dplyr::select(year, season) %>%
+    all_timepoints <- (data.frame(time = object$obs_data$time)  %>%
+                         dplyr::select(time) %>%
                          dplyr::distinct() %>%
-                         dplyr::arrange(year, season) %>%
+                         dplyr::arrange(time) %>%
                          dplyr::mutate(time = dplyr::row_number())) %>%
       dplyr::pull(time)
 
   } else {
     all_timepoints <- (object$obs_data %>%
-                         dplyr::select(year, season) %>%
+                         dplyr::select(time) %>%
                          dplyr::distinct() %>%
-                         dplyr::arrange(year, season) %>%
+                         dplyr::arrange(time) %>%
                          dplyr::mutate(time = dplyr::row_number())) %>%
       dplyr::pull(time)
   }
@@ -95,7 +94,7 @@ roll_eval_mvgam = function(object,
   }
 
   evals_df <- do.call(rbind, do.call(rbind, evals)) %>%
-    dplyr::group_by(eval_season, eval_year, eval_horizon) %>%
+    dplyr::group_by(eval_horizon) %>%
     dplyr::summarise(drps = sum_or_na(drps),
                      in_interval = mean(in_interval, na.rm = T))
 

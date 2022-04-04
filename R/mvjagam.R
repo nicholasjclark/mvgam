@@ -17,21 +17,22 @@
 #'required by the GAM \code{formula}. Should include columns:
 #''y' (the discrete outcomes; \code{NA}s allowed)
 #''series' (character or factor index of the series IDs)
-#''season' (numeric index of the seasonal time point for each observation)
-#' and 'year' the numeric index for year.
+#''time' (numeric index of the time point for each observation).
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
-#'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'season', and 'year'
+#'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 #'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
 #'observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
 #'simulations can be obtained
+#'@param run_model \code{logical}. If \code{FALSE}, the model is not fitted but instead the function will
+#'return the model file and the data / initial values that are needed to fit the \code{JAGS} model
 #'@param prior_simulation \code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 #'simulations from prior distributions are returned
 #'@param return_jags_data \code{logical}. If \code{TRUE}, the list of data that is needed to fit the \code{JAGS}
 #'model is returned, along with the initial values for smooth and AR parameters, once the model is fitted.
 #'This will be helpful if users wish to modify the model file to add
 #'other stochastic elements that are not currently avaiable in \code{mvgam}. Default is \code{FALSE} to reduce
-#'the size of the returned object
-#'@param family \code{character}. Must be either 'nb' (for Negative Binomial) or 'poisson'
+#'the size of the returned object, unless \code{run_model == FALSE}
+#'@param family \code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
@@ -64,7 +65,10 @@
 #'@param r_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
 #'overdispersion parameters. Note that this prior acts on the SQUARE ROOT of \code{r}, which is convenient
 #'for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
-#'as the sampled parameter approaches \code{0}. Ignored if \code{family = 'poisson'}
+#'as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tweedie
+#'@param twdis_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Tweedie
+#'overdispersion parameters. The observation process reduces to a Poisson
+#'as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Negative Binomial
 #'@param tau_prior \code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
 #'precisions used for the latent trends (ignored if \code{use_lv == TRUE})
 #'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
@@ -100,9 +104,10 @@ mvjagam = function(formula,
                    knots,
                    data_train,
                    data_test,
+                   run_model = TRUE,
                    prior_simulation = FALSE,
                    return_jags_data = FALSE,
-                   family = 'nb',
+                   family = 'poisson',
                    use_lv = FALSE,
                    n_lv,
                    trend_model = 'RW',
@@ -115,12 +120,13 @@ mvjagam = function(formula,
                    phi_prior,
                    ar_prior,
                    r_prior,
+                   twdis_prior,
                    tau_prior,
                    upper_bounds){
 
   # Check arguments
   trend_model <- match.arg(arg = trend_model, choices = c("None", "Noise", "RW", "AR1", "AR2", "AR3"))
-  family <- match.arg(arg = family, choices = c("nb", "poisson"))
+  family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
 
   # Add series factor variable if missing
   if(class(data_train)[1] != 'list'){
@@ -131,22 +137,20 @@ mvjagam = function(formula,
     }
   }
 
-  # Add season variable if missing
-  if(!'season' %in% colnames(data_train)){
-    data_train$season <- 1
-    if(!missing(data_test)){
-      data_test$season <- 1
+  # Must be able to index by time; it is too dangerous to 'guess' as this could make a huge
+    # impact on resulting estimates / inferences
+  if(!'time' %in% colnames(data_train)){
+    stop('data_train does not contain a "time" column')
+  }
+
+  }
+
+  if(class(data_train)[1] == 'list'){
+    if(!'time' %in% names(data_train)){
+      stop('data_train does not contain a "time" column')
     }
   }
 
-  # Add year variable if missing
-  if(!'year' %in% colnames(data_train)){
-    data_train$year <- seq(1:NROW(data_train))
-    if(!missing(data_test)){
-      data_test$year <- seq(1:NROW(data_test))
-    }
-  }
-}
   # Ensure outcome is labelled 'y'
   form_terms <- terms(formula(formula))
   if(dimnames(attr(form_terms, 'factors'))[[1]][1] != 'y'){
@@ -169,15 +173,26 @@ mvjagam = function(formula,
                             family = nb(),
                             drop.unused.levels = FALSE,
                             knots = knots,
-                            nthreads = parallel::detectCores()-1)
-      } else {
+                            nthreads = parallel::detectCores()-1,
+                            discrete = TRUE)
+      } else if(family == 'poisson'){
         ss_gam <- mgcv::bam(formula(formula),
                             data = data_train,
                             method = "fREML",
                             family = poisson(),
                             drop.unused.levels = FALSE,
                             knots = knots,
-                            nthreads = parallel::detectCores()-1)
+                            nthreads = parallel::detectCores()-1,
+                            discrete = TRUE)
+      } else {
+        ss_gam <- mgcv::bam(formula(formula),
+                            data = data_train,
+                            method = "fREML",
+                            family = tw(),
+                            drop.unused.levels = FALSE,
+                            knots = knots,
+                            nthreads = parallel::detectCores()-1,
+                            discrete = TRUE)
       }
 
     } else {
@@ -187,14 +202,24 @@ mvjagam = function(formula,
                             method = "fREML",
                             family = nb(),
                             drop.unused.levels = FALSE,
-                            nthreads = parallel::detectCores()-1)
-      } else {
+                            nthreads = parallel::detectCores()-1,
+                            discrete = TRUE)
+      } else if(family == 'poisson'){
         ss_gam <- mgcv::bam(formula(formula),
                             data = data_train,
                             method = "fREML",
                             family = poisson(),
                             drop.unused.levels = FALSE,
-                            nthreads = parallel::detectCores()-1)
+                            nthreads = parallel::detectCores()-1,
+                            discrete = TRUE)
+      } else {
+        ss_gam <- mgcv::bam(formula(formula),
+                            data = data_train,
+                            method = "fREML",
+                            family = tw(),
+                            drop.unused.levels = FALSE,
+                            nthreads = parallel::detectCores()-1,
+                            discrete = TRUE)
       }
 
     }
@@ -206,7 +231,8 @@ mvjagam = function(formula,
                                                               type = 'response'), 0)[which(is.na(data_train$y))]
 
 
-  # Make jags file and appropriate data structures
+  # Make jags file and appropriate data structures; note this has to use Poisson but the
+  # resulting JAGS file will be modified to accomodate the specified response distribution accordingly
   if(!missing(knots)){
     ss_jagam <- mgcv::jagam(formula,
                             data = data_train,
@@ -227,8 +253,8 @@ mvjagam = function(formula,
   }
 
   # Update initial values of lambdas using the full estimates from the
-  # fitted bam model to speed convergence
-  #ss_jagam$jags.ini$b <- coef(ss_gam)
+  # fitted bam model to speed convergence; remove initial betas so that the
+  # chains can start in very different regions of the parameter space
   ss_jagam$jags.ini$b <- NULL
 
   if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
@@ -236,11 +262,17 @@ mvjagam = function(formula,
     ss_jagam$jags.ini$lambda[log(ss_jagam$jags.ini$lambda) > 10] <- exp(10)
   }
 
-  # Fill with NAs if this is a simulation from the priors
+  # Fill y with NAs if this is a simulation from the priors
   if(prior_simulation){
     data_train$y <- rep(NA, length(data_train$y))
   } else {
-    data_train$y <- orig_y
+    if(family == 'tw'){
+      # Add small offset for Tweedie so that any initial zeros won't give failures based on
+      # initial values
+      data_train$y <- orig_y + 0.00001
+    } else {
+      data_train$y <- orig_y
+    }
   }
 
   # Read in the base (unmodified) jags model file
@@ -403,10 +435,74 @@ for (i in 1:n) {
     }
 
     if(!missing(r_prior)){
-      model_file[grep('r1 ~', model_file)] <- paste0('r1 ~ ', r_prior)
+      model_file[grep('r_raw\\[s\\] ~', model_file)] <- paste0('r_raw[s] ~ ', r_prior)
     }
 
-    if(family == 'poisson'){
+    if(family == 'tw'){
+      model_file[grep('## Negative binomial likelihood functions', model_file)] <- '## Tweedie likelihood functions'
+
+      rate_begin <- grep('rate\\[i, s\\] <- ', model_file)
+      rate_end <- rate_begin + 1
+      model_file <- model_file[-c(rate_begin:rate_end)]
+
+      odis_begin <- grep('r\\[s\\] <- ', model_file) - 4
+      odis_end <- odis_begin + 7
+      model_file <- model_file[-c(odis_begin:odis_end)]
+
+      if(missing(upper_bounds)){
+        model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(linpred[i, s])\n  linpred[i, s] ~'
+        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(linpred[i, s])'
+
+      } else {
+        model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(linpred[i, s])T(, upper_bound[s])\n  linpred[i, s] ~'
+        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(linpred[i, s])T(, upper_bound[s])'
+      }
+
+      model_file <- readLines(textConnection(model_file), n = -1)
+      model_file[grep('linpred\\[i, s\\] ~', model_file)] <- '  linpred[i, s] ~ dgamma(shape[i, s, y_ind[i, s]], rate[i, s, y_ind[i, s]])\n  twlambda[i, s] <-'
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      model_file[grep('twlambda\\[i, s\\] <-', model_file)] <- '  twlambda[i, s] <- pow(mu[i, s], 2 - p) / (twdis[s] * (2 - p))\n  N_pois[i, s] ~'
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      model_file[grep('N_pois\\[i, s\\] ~', model_file)] <- '  N_pois[i, s] ~ dpois(twlambda[i, s])T(1,)\n  shape[i, s, 1] <-'
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      model_file[grep('shape\\[i, s, 1\\] <-', model_file)] <- '  shape[i, s, 1] <- N_pois[i, s] * ((2 - p) / (p - 1))\n  shape[i, s, 2] <-'
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      model_file[grep('shape\\[i, s, 2\\] <-', model_file)] <- '  shape[i, s, 2] <- 1\n  rate[i, s, 1] <-'
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      model_file[grep('rate\\[i, s, 1\\] <-', model_file)] <- '  rate[i, s, 1] <- 1 / (twdis[s] * (p - 1) * pow(mu[i, s], p - 1))\n  rate[i, s, 2] <-'
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      model_file[grep('rate\\[i, s, 2\\] <-', model_file)] <- '  rate[i, s, 2] <- exp(-twlambda[i, s])\n  pois_draw[i, s] ~'
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      model_file[grep('pois_draw\\[i, s\\] ~', model_file)] <- '  pois_draw[i, s] ~ dpois(mu[i, s])\n  is_zero[i, s] <-'
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      model_file[grep('is_zero\\[i, s\\] <-', model_file)] <- '  is_zero[i, s] <- equals(pois_draw[i, s], 1)\n  y_ind[i, s] <-'
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      model_file[grep('y_ind\\[i, s\\] <-', model_file)] <- '  y_ind[i, s] <- is_zero[i, s] + 1'
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      yind_begin <- grep('y_ind\\[i, s\\] <-', model_file)
+      prior_line <- yind_begin + 2
+      model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np_raw ~ dbeta(4, 4)T(0.05, 0.95)\np <- p_raw + 1\nfor (s in 1:n_series) {\n twdis[s] ~ dexp(1)\n}'
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+    } else if(family == 'poisson'){
+      model_file[grep('## Negative binomial likelihood functions', model_file)] <- '## Poisson likelihood functions'
+      odis_begin <- grep('r\\[s\\] <- ', model_file) - 4
+      odis_end <- odis_begin + 7
+      model_file <- model_file[-c(odis_begin:odis_end)]
+
+      rate_begin <- grep('rate\\[i, s\\] <- ', model_file)
+      rate_end <- rate_begin + 1
+      model_file <- model_file[-c(rate_begin:rate_end)]
       if(missing(upper_bounds)){
         model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mu[i, s])'
         model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mu[i, s])'
@@ -414,7 +510,6 @@ for (i in 1:n) {
         model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
         model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
       }
-      model_file[grep('r ~', model_file)] <- 'r <- 10000'
 
     } else {
       if(missing(upper_bounds)){
@@ -619,23 +714,86 @@ for (i in 1:n) {
       }
 
       if(!missing(r_prior)){
-       model_file[grep('r1 ~', model_file)] <- paste0('   r1 ~ ', r_prior)
+        model_file[grep('r_raw\\[s\\] ~', model_file)] <- paste0('r_raw[s] ~ ', r_prior)
       }
 
-      if(family == 'poisson'){
+      if(family == 'tw'){
+        model_file[grep('## Negative binomial likelihood functions', model_file)] <- '## Tweedie likelihood functions'
+
+        rate_begin <- grep('rate\\[i, s\\] <- ', model_file)
+        rate_end <- rate_begin + 1
+        model_file <- model_file[-c(rate_begin:rate_end)]
+
+        odis_begin <- grep('r\\[s\\] <- ', model_file) - 4
+        odis_end <- odis_begin + 7
+        model_file <- model_file[-c(odis_begin:odis_end)]
+
         if(missing(upper_bounds)){
-          model_file[grep('y\\[i, s\\] ~', model_file)] <- '       y[i, s] ~ dpois(mu[i, s])'
-          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '       ypred[i, s] ~ dpois(mu[i, s])'
+          model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(linpred[i, s])\n  linpred[i, s] ~'
+          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(linpred[i, s])'
+
         } else {
-          model_file[grep('y\\[i, s\\] ~', model_file)] <- '       y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
-          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '       ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+          model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(linpred[i, s])T(, upper_bound[s])\n  linpred[i, s] ~'
+          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(linpred[i, s])T(, upper_bound[s])'
         }
-        model_file[grep('r ~', model_file)] <- '      r <- 10000'
+
+        model_file <- readLines(textConnection(model_file), n = -1)
+        model_file[grep('linpred\\[i, s\\] ~', model_file)] <- '  linpred[i, s] ~ dgamma(shape[i, s, y_ind[i, s]], rate[i, s, y_ind[i, s]])\n  twlambda[i, s] <-'
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        model_file[grep('twlambda\\[i, s\\] <-', model_file)] <- '  twlambda[i, s] <- pow(mu[i, s], 2 - p) / (twdis[s] * (2 - p))\n  N_pois[i, s] ~'
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        model_file[grep('N_pois\\[i, s\\] ~', model_file)] <- '  N_pois[i, s] ~ dpois(twlambda[i, s])T(1,)\n  shape[i, s, 1] <-'
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        model_file[grep('shape\\[i, s, 1\\] <-', model_file)] <- '  shape[i, s, 1] <- N_pois[i, s] * ((2 - p) / (p - 1))\n  shape[i, s, 2] <-'
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        model_file[grep('shape\\[i, s, 2\\] <-', model_file)] <- '  shape[i, s, 2] <- 1\n  rate[i, s, 1] <-'
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        model_file[grep('rate\\[i, s, 1\\] <-', model_file)] <- '  rate[i, s, 1] <- 1 / (twdis[s] * (p - 1) * pow(mu[i, s], p - 1))\n  rate[i, s, 2] <-'
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        model_file[grep('rate\\[i, s, 2\\] <-', model_file)] <- '  rate[i, s, 2] <- exp(-twlambda[i, s])\n  pois_draw[i, s] ~'
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        model_file[grep('pois_draw\\[i, s\\] ~', model_file)] <- '  pois_draw[i, s] ~ dpois(mu[i, s])\n  is_zero[i, s] <-'
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        model_file[grep('is_zero\\[i, s\\] <-', model_file)] <- '  is_zero[i, s] <- equals(pois_draw[i, s], 1)\n  y_ind[i, s] <-'
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        model_file[grep('y_ind\\[i, s\\] <-', model_file)] <- '  y_ind[i, s] <- is_zero[i, s] + 1'
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        yind_begin <- grep('y_ind\\[i, s\\] <-', model_file)
+        prior_line <- yind_begin + 2
+        model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np_raw ~ dbeta(4, 4)T(0.05, 0.95)\np <- p_raw + 1\nfor (s in 1:n_series) {\n twdis[s] ~ dexp(1)\n}'
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+      } else if(family == 'poisson'){
+        model_file[grep('## Negative binomial likelihood functions', model_file)] <- '## Poisson likelihood functions'
+        odis_begin <- grep('r\\[s\\] <- ', model_file) - 4
+        odis_end <- odis_begin + 7
+        model_file <- model_file[-c(odis_begin:odis_end)]
+
+        rate_begin <- grep('rate\\[i, s\\] <- ', model_file)
+        rate_end <- rate_begin + 1
+        model_file <- model_file[-c(rate_begin:rate_end)]
+        if(missing(upper_bounds)){
+          model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mu[i, s])'
+          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mu[i, s])'
+        } else {
+          model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+        }
 
       } else {
         if(missing(upper_bounds)){
-          model_file[grep('y\\[i, s\\] ~', model_file)] <- '       y[i, s] ~ dnegbin(rate[i, s], r[s])'
-          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '       ypred[i, s] ~ dnegbin(rate[i, s], r[s])'
+          model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dnegbin(rate[i, s], r[s])'
+          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dnegbin(rate[i, s], r[s])'
         }
       }
 
@@ -692,20 +850,18 @@ for (i in 1:n) {
 
     # Add a time variable
     if(class(data_train)[1] == 'list'){
-      temp_dat_train <- data.frame(year = data_train$year,
-                                   series = data_train$series,
-                                   season = data_train$season)
-      temp_dat_test <- data.frame(year = data_test$year,
-                                  series = data_test$series,
-                                  season = data_test$season)
+      temp_dat_train <- data.frame(time = data_train$time,
+                                   series = data_train$series)
+      temp_dat_test <- data.frame(time = data_test$time,
+                                  series = data_test$series)
 
       X$time <- rbind(temp_dat_train, temp_dat_test) %>%
         dplyr::left_join(rbind(temp_dat_train, temp_dat_test) %>%
-                           dplyr::select(year, season) %>%
+                           dplyr::select(time) %>%
                            dplyr::distinct() %>%
-                           dplyr::arrange(year, season) %>%
+                           dplyr::arrange(time) %>%
                            dplyr::mutate(time = dplyr::row_number()),
-                         by = c('season', 'year')) %>%
+                         by = c('time')) %>%
         dplyr::pull(time)
 
       # Add a series identifier variable
@@ -718,11 +874,11 @@ for (i in 1:n) {
 
     X$time <- rbind(data_train, data_test[,1:ncol(data_train)]) %>%
       dplyr::left_join(rbind(data_train, data_test[,1:ncol(data_train)]) %>%
-                         dplyr::select(year, season) %>%
+                         dplyr::select(time) %>%
                          dplyr::distinct() %>%
-                         dplyr::arrange(year, season) %>%
+                         dplyr::arrange(time) %>%
                          dplyr::mutate(time = dplyr::row_number()),
-                       by = c('season', 'year')) %>%
+                       by = c('time')) %>%
       dplyr::pull(time)
 
     # Add a series identifier variable
@@ -736,24 +892,23 @@ for (i in 1:n) {
     X <- data.frame(ss_jagam$jags.data$X)
 
     if(class(data_train)[1] == 'list'){
-      temp_dat <- data.frame(year = data_train$year,
-                             season = data_train$season)
+      temp_dat <- data.frame(time = data_train$time)
       X$time <- temp_dat %>%
         dplyr::left_join(temp_dat %>%
-                           dplyr::select(year, season) %>%
+                           dplyr::select(time) %>%
                            dplyr::distinct() %>%
-                           dplyr::arrange(year, season) %>%
+                           dplyr::arrange(time) %>%
                            dplyr::mutate(time = dplyr::row_number()),
-                         by = c('season', 'year')) %>%
+                         by = c('r')) %>%
         dplyr::pull(time)
     } else {
       X$time <- data_train %>%
         dplyr::left_join(data_train %>%
-                           dplyr::select(year, season) %>%
+                           dplyr::select(time) %>%
                            dplyr::distinct() %>%
-                           dplyr::arrange(year, season) %>%
+                           dplyr::arrange(time) %>%
                            dplyr::mutate(time = dplyr::row_number()),
-                         by = c('season', 'year')) %>%
+                         by = c('time')) %>%
         dplyr::pull(time)
     }
 
@@ -801,8 +956,6 @@ for (i in 1:n) {
         ss_jagam$jags.data$n_lv <- min(2, floor(ss_jagam$jags.data$n_series / 2))
       } else {
         ss_jagam$jags.data$n_lv <- n_lv
-        # ss_jagam$jags.ini$LV <- matrix(rep(0.1, n_lv), nrow = NROW(ytimes),
-        #                                ncol = n_lv)
         ss_jagam$jags.ini$X1 <- rep(1, n_lv)
         ss_jagam$jags.ini$X2 <- 1
       }
@@ -818,14 +971,64 @@ for (i in 1:n) {
 
   # Gather posterior samples for the specified parameters
   if(!use_lv){
-    param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
-               'tau', 'trend', 'ar1', 'ar2', 'ar3', 'sigma')
+    if(family == 'nb'){
+      param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
+                 'tau', 'trend', 'ar1', 'ar2', 'ar3', 'sigma')
+    } else if(family == 'poisson'){
+      param <- c('rho', 'b', 'mu', 'ypred',  'phi',
+                 'tau', 'trend', 'ar1', 'ar2', 'ar3', 'sigma')
+    } else {
+      param <- c('rho', 'b', 'mu', 'ypred',  'phi', 'p', 'twdis',
+                 'tau', 'trend', 'ar1', 'ar2', 'ar3', 'sigma')
+    }
+
   } else {
+    if(family == 'nb'){
     param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi', 'LV',
                'trend', 'lv_coefs', 'penalty',
                'ar1', 'ar2', 'ar3')
+    } else if(family == 'poisson'){
+      param <- c('rho', 'b', 'mu', 'ypred', 'phi', 'LV',
+                 'trend', 'lv_coefs', 'penalty',
+                 'ar1', 'ar2', 'ar3')
+    } else {
+      param <- c('rho', 'b', 'mu', 'ypred', 'phi',
+                 'p', 'twdis', 'LV',
+                 'trend', 'lv_coefs', 'penalty',
+                 'ar1', 'ar2', 'ar3')
+    }
   }
 
+  if(missing(upper_bounds)){
+    upper_bounds <- NULL
+  }
+
+  if(use_lv){
+    n_lv <- ss_jagam$jags.data$n_lv
+  } else {
+    n_lv <- NULL
+  }
+
+  if(!run_model){
+    # Return only the model file and all data / inits needed to run the model
+    # outside of mvgam
+    output <- list(call = formula,
+                   family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
+                                             family == 'poisson' ~ 'Poisson',
+                                             TRUE ~ 'Negative Binomial'),
+                   pregam = ss_jagam$pregam,
+                   model_file = model_file,
+                   jags_data = ss_jagam$jags.data,
+                   jags_inits = ss_jagam$jags.ini,
+                   mgcv_model = ss_gam,
+                   sp_names = names(ss_jagam$pregam$lsp0),
+                   ytimes = ytimes,
+                   use_lv = use_lv,
+                   n_lv = n_lv,
+                   upper_bounds = upper_bounds,
+                   obs_data = data_train)
+
+  } else {
   n.burn <- burnin
   unlink('base_gam.txt')
   cat(model_file, file = 'base_gam.txt', sep = '\n', append = T)
@@ -865,75 +1068,24 @@ for (i in 1:n) {
   unlink('base_gam.txt')
   unlink(fil)
 
-  if(missing(upper_bounds)){
-    upper_bounds <- NULL
+  # Remove the small offset for Tweedie
+  if(family == 'tw'){
+    data_train$y <- orig_y
   }
 
-  if(use_lv){
-    n_lv <- ss_jagam$jags.data$n_lv
-  } else {
-    n_lv <- NULL
-  }
-
-  # Get Dunn-Smyth Residuals based on median predictions from the model;
-  # if the truth is NA at a certain point, we use a random draw from the model's
-  # posterior
-  ds_resids = function(truth, fitted, draw, size){
-    dsres_out <- matrix(NA, length(truth), 1)
-    for(i in 1:length(truth)){
-      if(is.na(truth[i])){
-        a <- pnbinom(as.vector(draw[i]) - 1, mu = fitted[i], size = size)
-        b <- pnbinom(as.vector(draw[i]), mu = fitted[i], size = size)
-      } else {
-        a <- pnbinom(as.vector(truth[i]) - 1, mu = fitted[i], size = size)
-        b <- pnbinom(as.vector(truth[i]), mu = fitted[i], size = size)
-      }
-
-      u <- runif(n = 1, min = a, max = b)
-      if(u <= 0){
-        u <- 0.0001
-      }
-      if(u >=1){
-        u <- 0.9999
-      }
-      dsres_out[i, ] <- qnorm(u)
-    }
-    resids <- dsres_out[,1]
-    resids[is.infinite(resids)] <- NaN
-    resids
-  }
-
-  ends <- seq(0, dim(MCMCvis::MCMCchains(out_gam_mod, 'ypred'))[2],
-              length.out = NCOL(ytimes) + 1)
-  starts <- ends + 1
-  starts <- c(1, starts[-c(1, (NCOL(ytimes)+1))])
-  ends <- ends[-1]
-  size <- MCMCvis::MCMCsummary(out_gam_mod, 'r')$mean
-
-  series_resids <- lapply(seq_len(NCOL(ytimes)), function(series){
-    if(class(data_train)[1] == 'list'){
-      n_obs <- data.frame(series = data_train$series) %>%
-        dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-        nrow()
-    } else {
-      n_obs <- data_train %>%
-        dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-        nrow()
-    }
-    preds <- MCMCvis::MCMCchains(out_gam_mod, 'ypred')[,starts[series]:ends[series]]
-    draw <- preds[sample(seq(1, NROW(preds)), 1), ]
-    preds <- apply(preds,
-                   2, function(x) hpd(x)[2])
-    suppressWarnings(ds_resids(truth = as.vector(ys_mat[1:n_obs,series]),
-                               fitted = preds[1:n_obs],
-                               draw = draw,
-                               size = size))
-  })
-  names(series_resids) <- levels(data_train$series)
+  # Get Dunn-Smyth Residual distributions for each series
+  series_resids <- get_mvgam_resids(object = list(
+    jags_output = out_gam_mod,
+    family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
+                              family == 'poisson' ~ 'Poisson',
+                              TRUE ~ 'Negative Binomial'),
+    obs_data = data_train,
+    ytimes = ytimes),
+    n_cores = min(c(parallel::detectCores() - 1, NCOL(ytimes))))
 
   # Get smooth penalty names in more interpretable format
   sam <- suppressMessages(jags.samples(runjags::as.jags(gam_mod, adapt = 10, quiet = T),
-                      c("b","rho"), n.iter = 100, thin = 1))
+                                       c("b","rho"), n.iter = 100, thin = 1))
   jam <- mgcv::sim2jam(sam, ss_jagam$pregam, edf.type = 1)
   jam$sp <- exp(sam$rho)
 
@@ -950,11 +1102,12 @@ for (i in 1:n) {
            number_seq)
   }))
 
+
   if(return_jags_data){
     output <- list(call = formula,
-                   family = ifelse(family == 'nb',
-                                   'Negative Binomial',
-                                   'Poisson'),
+                   family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
+                                             family == 'poisson' ~ 'Poisson',
+                                             TRUE ~ 'Negative Binomial'),
                    pregam = ss_jagam$pregam,
                    jags_output = out_gam_mod,
                    model_file = model_file,
@@ -972,9 +1125,9 @@ for (i in 1:n) {
                    obs_data = data_train)
   } else {
     output <- list(call = formula,
-                   family = ifelse(family == 'nb',
-                                   'Negative Binomial',
-                                   'Poisson'),
+                   family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
+                                             family == 'poisson' ~ 'Poisson',
+                                             TRUE ~ 'Negative Binomial'),
                    pregam = ss_jagam$pregam,
                    jags_output = out_gam_mod,
                    model_file = model_file,
@@ -988,6 +1141,7 @@ for (i in 1:n) {
                    n_lv = n_lv,
                    upper_bounds = upper_bounds,
                    obs_data = data_train)
+  }
   }
 
   return(output)

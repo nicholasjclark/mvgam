@@ -101,7 +101,7 @@ mod1 <- mvjagam(data_train = fake_data$data_train,
                knots = list(season = c(0.5, 12.5)),
                family = 'nb',
                trend_model = 'None',
-               burnin = 10000,
+               burnin = 1000,
                chains = 4)
 ```
 

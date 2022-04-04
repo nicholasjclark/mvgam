@@ -27,7 +27,11 @@ predict_mvgam = function(object, series = 1, newdata, type = 'link'){
   betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
 
   # Negative binomial size estimate
-  sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
+  if(family == 'nb'){
+    sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
+  } else {
+    sizes <- matrix(10000, ncol = ncol(object$ytimes), nrow = NROW(betas))
+  }
 
   # Latent trend precisions and loadings
   if(object$use_lv){

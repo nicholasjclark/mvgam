@@ -17,7 +17,7 @@ pfilter_mvgam_online(
 \item{data_assim}{A \code{dataframe} or \code{list} of test data containing at least one more observation per series
 (beyond the last observation seen by the model when initialising particles with
 \code{\link{pfilter_mvgam_init}} or in previous calls to \code{pfilter_mvgam_online}.
-Should at least contain 'series', 'season' and 'year' for the one-step ahead horizon,
+Should at least contain 'series' and 'time' for the one-step ahead horizon,
 in addition to any other variables included in the linear predictor of \code{object}}
 
 \item{file_path}{\code{character} string specifying the file path for locating the particles}

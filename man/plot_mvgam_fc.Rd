@@ -11,10 +11,10 @@ plot_mvgam_fc(object, series = 1, data_test, hide_xlabels = FALSE, ylab, ylim)
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
-\item{data_test}{Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'season' and 'year'
-for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
-included, the test values are shown as points on the plot to help visualise the accuracy of the model's forecast.
-Note this is only useful if the same \code{data_test} was also included when fitting the original model.}
+\item{data_test}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+in addition to any other variables included in the linear predictor of \code{formula}. If included, the
+observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
+simulations can be obtained}
 
 \item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 \code{axis} from base \code{R}}

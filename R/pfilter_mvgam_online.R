@@ -8,7 +8,7 @@
 #'@param data_assim A \code{dataframe} or \code{list} of test data containing at least one more observation per series
 #'(beyond the last observation seen by the model when initialising particles with
 #' \code{\link{pfilter_mvgam_init}} or in previous calls to \code{pfilter_mvgam_online}.
-#'Should at least contain 'series', 'season' and 'year' for the one-step ahead horizon,
+#'Should at least contain 'series' and 'time' for the one-step ahead horizon,
 #'in addition to any other variables included in the linear predictor of \code{object}
 #'@param threshold \code{proportional numeric} specifying the Effective Sample Size limit under which
 #'resampling of particles will be triggered (calculated as \code{ESS / n_particles}) if \code{use_resampling == TRUE}.
@@ -40,26 +40,29 @@ pfilter_mvgam_online = function(data_assim,
 
   # Get next observations in line to be assimilated
   if(class(data_assim)[1] == 'list'){
+
+    if(!'series' %in% names(data_assim)){
+      data_assim$series <- factor('series1')
+    }
+
     n_series <- length(unique(obs_data$series))
     all_needed_names <- names(obs_data)
     # Find indices of next observation
     data_assim_orig <- data_assim
     list_names <- names(data_assim_orig)
-    data_assim = data.frame(year = data_assim$year,
-                          season = data_assim$season,
-                          series = data_assim$series) %>%
+    data_assim = data.frame(time = data_assim$time,
+                            series = data_assim$series) %>%
       dplyr::mutate(index = dplyr::row_number()) %>%
-      dplyr::arrange(year, season, series) %>%
+      dplyr::arrange(time, series) %>%
       dplyr::mutate(assimilated = dplyr::case_when(
-        season <= last_assim[1] & year <= last_assim[2] ~ 'yes',
+        time <= last_assim ~ 'yes',
         TRUE ~ 'no'
       ))
 
-    temp_dat = data.frame(year = data_assim$year,
-                          season = data_assim$season,
+    temp_dat = data.frame(time = data_assim$time,
                           series = data_assim$series) %>%
       dplyr::mutate(index = dplyr::row_number()) %>%
-      dplyr::arrange(year, season, series)
+      dplyr::arrange(time, series)
     indices_assim <- temp_dat[1:n_series,'index']
 
     # Get list object into correct order in case it is not already
@@ -75,11 +78,19 @@ pfilter_mvgam_online = function(data_assim,
     data_assim_orig$assimilated <- data_assim$assimilated
 
   } else {
+
+    if(!'time' %in% colnames(data_assim)){
+      stop('data_assim does not contain a "time" column')
+    }
+
+    if(!'series' %in% colnames(data_assim)){
+      data_assim$series <- factor('series1')
+    }
     data_assim %>%
-      dplyr::arrange(year, season, series) -> data_assim
+      dplyr::arrange(time, series) -> data_assim
     data_assim %>%
       dplyr::mutate(assimilated = dplyr::case_when(
-        season <= last_assim[1] & year <= last_assim[2] ~ 'yes',
+        time <= last_assim ~ 'yes',
         TRUE ~ 'no'
       )) -> data_assim
   }
@@ -111,8 +122,7 @@ pfilter_mvgam_online = function(data_assim,
     if(class(obs_data)[1] == 'list'){
 
       indices_assim <- (data_assim %>%
-                          dplyr::arrange(year,
-                                         season, series))[starts[i]:ends[i],'index']
+                          dplyr::arrange(time, series))[starts[i]:ends[i],'index']
 
       # Get list object into correct format for lpmatrix prediction
       next_assim <- lapply(data_assim_orig, function(x){
@@ -126,7 +136,7 @@ pfilter_mvgam_online = function(data_assim,
 
     } else {
       next_assim <- (data_assim %>%
-                       dplyr::arrange(year, season, series))[starts[i]:ends[i],]
+                       dplyr::arrange(time, series))[starts[i]:ends[i],]
     }
         # Run particle filter with kernel smoothing
         particles <- pfilter_mvgam_smooth(particles = particles,
@@ -162,8 +172,7 @@ pfilter_mvgam_online = function(data_assim,
         }
 
   }
-  last_assim <- c(tail(obs_data$season, 1),
-                tail(obs_data$year, 1))
+  last_assim <- tail(obs_data$time, 1)
       cat('Last assimilation time was', last_assim, '\n\n')
 
       # Keep track of effective sample size

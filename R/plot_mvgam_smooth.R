@@ -72,7 +72,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
 
   if(missing(newdata) && class(object$obs_data)[1] != 'list'){
     data_train %>%
-      dplyr::select(c(series, year, smooth_terms)) %>%
+      dplyr::select(c(series, smooth_terms)) %>%
       dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
       dplyr::mutate(series = !!(levels(data_train$series)[series])) -> pred_dat
 
@@ -105,6 +105,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
   Xp[,!grepl(paste0('(', smooth, ')'), colnames(Xp), fixed = T)] <- 0
 
   # Extract GAM coefficients
+  #betas <- t(matrix(coef(object$mgcv_model)))
   betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
 
   # Predictions and plots
@@ -253,7 +254,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
             col = c_mid_highlight, border = NA)
     lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
-    abline(h = 0, lty = 'dashed')
+    abline(h = 0, lty = 'dashed', col = 'grey70', lwd = 2)
 
     invisible()
     par(.pardefault)

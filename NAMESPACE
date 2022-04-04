@@ -3,6 +3,7 @@
 export("%>%")
 export(compare_mvgams)
 export(eval_mvgam)
+export(get_mvgam_resids)
 export(hpd)
 export(lv_correlations)
 export(mvjagam)

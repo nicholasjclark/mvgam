@@ -31,19 +31,18 @@ eval_mvgam = function(object,
 
   # Check evaluation timepoint
   if(class(object$obs_data) == 'list'){
-    all_times <- (data.frame(year = object$obs_data$year,
-                                  season = object$obs_data$season)  %>%
-                         dplyr::select(year, season) %>%
+    all_times <- (data.frame(time = object$obs_data$time)  %>%
+                         dplyr::select(time) %>%
                          dplyr::distinct() %>%
-                         dplyr::arrange(year, season) %>%
+                         dplyr::arrange(time) %>%
                          dplyr::mutate(time = dplyr::row_number())) %>%
       dplyr::pull(time)
 
   } else {
     all_times <- (object$obs_data %>%
-                         dplyr::select(year, season) %>%
+                         dplyr::select(time) %>%
                          dplyr::distinct() %>%
-                         dplyr::arrange(year, season) %>%
+                         dplyr::arrange(time) %>%
                          dplyr::mutate(time = dplyr::row_number())) %>%
       dplyr::pull(time)
   }
@@ -55,11 +54,10 @@ eval_mvgam = function(object,
   # Filter training data to correct point (just following evaluation timepoint)
   if(class(object$obs_data) == 'list'){
 
-    times <- (data.frame(year = object$obs_data$year,
-                season = object$obs_data$season) %>%
-        dplyr::select(year, season) %>%
+    times <- (data.frame(year = object$obs_data$time) %>%
+        dplyr::select(time) %>%
         dplyr::distinct() %>%
-        dplyr::arrange(year, season) %>%
+        dplyr::arrange(time) %>%
         dplyr::mutate(time = dplyr::row_number())) %>%
       dplyr::pull(time)
 
@@ -78,13 +76,13 @@ eval_mvgam = function(object,
 
   } else {
     (object$obs_data %>%
-       dplyr::select(year, season) %>%
+       dplyr::select(time) %>%
        dplyr::distinct() %>%
-       dplyr::arrange(year, season) %>%
+       dplyr::arrange(time) %>%
        dplyr::mutate(time = dplyr::row_number())) %>%
       dplyr::left_join(object$obs_data,
-                       by = c('season', 'year')) %>%
-      dplyr::arrange(year, season, series) %>%
+                       by = c('time')) %>%
+      dplyr::arrange(time, series) %>%
       dplyr::filter(time > (eval_timepoint ) &
                       time <= (eval_timepoint + fc_horizon)) -> data_assim
   }
@@ -147,8 +145,21 @@ eval_mvgam = function(object,
   ar2s <- MCMCvis::MCMCchains(object$jags_output, 'ar2')
   ar3s <- MCMCvis::MCMCchains(object$jags_output, 'ar3')
 
-  # Negative binomial size estimate
-  sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
+  # Family-specific parameters
+  if(object$family == 'Negative binomial'){
+    sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
+  } else {
+    sizes <- NULL
+  }
+
+  if(object$family == 'Tweedie'){
+    twdis <- MCMCvis::MCMCchains(object$jags_output, 'twdis')
+    p <- MCMCvis::MCMCchains(object$jags_output, 'p')
+  } else {
+    twdis <- p <- NULL
+  }
+
+  family <- object$family
 
   # Generate sample sequence for n_samples
   if(n_samples < dim(phis)[1]){
@@ -182,6 +193,7 @@ eval_mvgam = function(object,
   cl <- parallel::makePSOCKcluster(n_cores)
   setDefaultCluster(cl)
   clusterExport(NULL, c('use_lv',
+                        'family',
                         'n_lv',
                         'fc_horizon',
                         'data_assim',
@@ -196,6 +208,8 @@ eval_mvgam = function(object,
                         'lv_coefs',
                         'trends',
                         'sizes',
+                        'p',
+                        'twdis',
                         'n_series',
                         'upper_bounds',
                         'sim_ar3',
@@ -229,8 +243,15 @@ eval_mvgam = function(object,
       # Sample beta coefs
       betas <- betas[samp_index, ]
 
-      # Sample a negative binomial size parameter
-      size <- sizes[samp_index, ]
+      # Family-specific parameters
+      if(family == 'Negative binomial'){
+        size <- sizes[samp_index, ]
+      }
+
+      if(family == 'Tweedie'){
+        twdis <- twdis[samp_index, ]
+        p <- p[samp_index]
+      }
 
       # Run the latent variables forward fc_horizon timesteps
       lv_preds <- do.call(rbind, lapply(seq_len(n_lv), function(lv){
@@ -245,11 +266,30 @@ eval_mvgam = function(object,
 
       series_fcs <- lapply(seq_len(n_series), function(series){
         trend_preds <- as.numeric(t(lv_preds) %*% lv_coefs[series,])
-        trunc_preds <- rnbinom(fc_horizon,
-                               mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+
+        if(family == 'Negative binomial'){
+          fc <- rnbinom(fc_horizon,
+                                 mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
                                                        betas)) + (trend_preds)),
-                               size = size[series])
-        trunc_preds
+                                 size = size[series])
+        }
+
+        if(family == 'Poisson'){
+          fc <- rpois(fc_horizon,
+                        lambda = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                              betas)) + (trend_preds)))
+        }
+
+        if(family == 'Tweedie'){
+          fc <- rpois(fc_horizon,
+                      lambda = mgcv::rTweedie(
+                        mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                              betas)) + (trend_preds)),
+                        p = p,
+                        phi = twdis[series]))
+        }
+
+        fc
       })
 
     } else {
@@ -274,8 +314,15 @@ eval_mvgam = function(object,
       # Sample trend precisions
       tau <- taus[samp_index,]
 
-      # Sample a negative binomial size parameter
-      size <- sizes[samp_index, ]
+      # Family-specific parameters
+      if(family == 'Negative binomial'){
+        size <- sizes[samp_index, ]
+      }
+
+      if(family == 'Tweedie'){
+        twdis <- twdis[samp_index, ]
+        p <- p[samp_index]
+      }
 
       series_fcs <- lapply(seq_len(n_series), function(series){
         trend_preds <- sim_ar3(phi = phi[series],
@@ -285,10 +332,28 @@ eval_mvgam = function(object,
                                tau = tau[series],
                                state = last_trends[[series]],
                                h = fc_horizon)
-        fc <-  rnbinom(fc_horizon,
-                       mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+        if(family == 'Negative binomial'){
+          fc <-  rnbinom(fc_horizon,
+                         mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
                                                betas)) + (trend_preds)),
-                       size = size[series])
+                         size = size[series])
+        }
+
+        if(family == 'Poisson'){
+          fc <-  rpois(fc_horizon,
+                         lambda = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                               betas)) + (trend_preds)))
+        }
+
+        if(family == 'Tweedie'){
+          fc <-  rpois(fc_horizon,
+                       lambda = mgcv::rTweedie(
+                         mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                               betas)) + (trend_preds)),
+                         p = p,
+                         phi = twdis[series]))
+        }
+
         fc
       })
     }
@@ -324,8 +389,15 @@ eval_mvgam = function(object,
         # Sample beta coefs
         betas <- betas[samp_index, ]
 
-        # Sample a negative binomial size parameter
-        size <- sizes[samp_index, ]
+        # Family-specific parameters
+        if(family == 'Negative binomial'){
+          size <- sizes[samp_index, ]
+        }
+
+        if(family == 'Tweedie'){
+          twdis <- twdis[samp_index, ]
+          p <- p[samp_index]
+        }
 
         # Run the latent variables forward fc_horizon timesteps
         lv_preds <- do.call(rbind, lapply(seq_len(n_lv), function(lv){
@@ -340,11 +412,30 @@ eval_mvgam = function(object,
 
         series_fcs <- lapply(seq_len(n_series), function(series){
           trend_preds <- as.numeric(t(lv_preds) %*% lv_coefs[series,])
-          trunc_preds <- rnbinom(fc_horizon,
-                                 mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
-                                                       betas)) + (trend_preds)),
-                                 size = size[series])
-          trunc_preds
+
+          if(family == 'Negative binomial'){
+            fc <- rnbinom(fc_horizon,
+                          mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                                betas)) + (trend_preds)),
+                          size = size[series])
+          }
+
+          if(family == 'Poisson'){
+            fc <- rpois(fc_horizon,
+                        lambda = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                                  betas)) + (trend_preds)))
+          }
+
+          if(family == 'Tweedie'){
+            fc <- rpois(fc_horizon,
+                        lambda = mgcv::rTweedie(
+                          mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                                betas)) + (trend_preds)),
+                          p = p,
+                          phi = twdis[series]))
+          }
+
+          fc
         })
 
       } else {
@@ -369,8 +460,15 @@ eval_mvgam = function(object,
         # Sample trend precisions
         tau <- taus[samp_index,]
 
-        # Sample a negative binomial size parameter
-        size <- sizes[samp_index, ]
+        # Family-specific parameters
+        if(family == 'Negative binomial'){
+          size <- sizes[samp_index, ]
+        }
+
+        if(family == 'Tweedie'){
+          twdis <- twdis[samp_index, ]
+          p <- p[samp_index]
+        }
 
         series_fcs <- lapply(seq_len(n_series), function(series){
           trend_preds <- sim_ar3(phi = phi[series],
@@ -380,10 +478,28 @@ eval_mvgam = function(object,
                                  tau = tau[series],
                                  state = last_trends[[series]],
                                  h = fc_horizon)
-          fc <-  rnbinom(fc_horizon,
-                         mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
-                                               betas)) + (trend_preds)),
-                         size = size[series])
+          if(family == 'Negative binomial'){
+            fc <-  rnbinom(fc_horizon,
+                           mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                                 betas)) + (trend_preds)),
+                           size = size[series])
+          }
+
+          if(family == 'Poisson'){
+            fc <-  rpois(fc_horizon,
+                         lambda = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                                   betas)) + (trend_preds)))
+          }
+
+          if(family == 'Tweedie'){
+            fc <-  rpois(fc_horizon,
+                         lambda = mgcv::rTweedie(
+                           mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                                 betas)) + (trend_preds)),
+                           p = p,
+                           phi = twdis[series]))
+          }
+
           fc
         })
       }
@@ -448,14 +564,6 @@ eval_mvgam = function(object,
                                         series_fcs[[series]]))
     colnames(DRPS) <- c('drps','in_interval')
     DRPS$eval_horizon <- seq(1, fc_horizon)
-    if(class(object$obs_data) == 'list'){
-      DRPS$eval_season <- data_assim[['season']][which(as.numeric(data_assim$series) == series)]
-      DRPS$eval_year <- data_assim[['year']][which(as.numeric(data_assim$series) == series)]
-    } else {
-      DRPS$eval_season <- data_assim[which(as.numeric(data_assim$series) == series),]$season
-      DRPS$eval_year <- data_assim[which(as.numeric(data_assim$series) == series),]$year
-    }
-
     DRPS
   })
   names(series_drps) <- levels(data_assim$series)
