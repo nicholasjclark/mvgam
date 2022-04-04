@@ -41,9 +41,10 @@ plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'))
 lynx_full$season <- (lynx_full$year %%19) + 1
 ```
 
-For `mvgam` models, the response needs to be labelled `y` and we also need an indicator of the series name as a `factor` variable (if the column `series` is missing, this will be added automatically by assuming that all observations are from a single time series)
+For `mvgam` models, the response needs to be labelled `y` and we also need an indicator of the series name as a `factor` variable (if the column `series` is missing, this will be added automatically by assuming that all observations are from a single time series). Finally, a `time` column is needed to index time
 ```{r}
 lynx_full$y <- lynx_full$population
+lynx_full$time <- 1:NROW(lynx_full)
 lynx_full$series <- factor('series1')
 ```
 

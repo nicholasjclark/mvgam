@@ -51,10 +51,11 @@ plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'))
 lynx_full$season <- (lynx_full$year %%19) + 1
 ```
 
-For `mvgam` models, the response needs to be labelled `y` and we also need an indicator of the series name as a `factor` variable (if the column `series` is missing, this will be added automatically by assuming that all observations are from a single time series)
+For `mvgam` models, the response needs to be labelled `y` and we also need an indicator of the series name as a `factor` variable (if the column `series` is missing, this will be added automatically by assuming that all observations are from a single time series). Finally, a `time` column is needed to index time
 
 ``` r
 lynx_full$y <- lynx_full$population
+lynx_full$time <- 1:NROW(lynx_full)
 lynx_full$series <- factor('series1')
 ```
 
@@ -138,40 +139,40 @@ summary_mvgam(lynx_mvgam)
 #> 
 #> GAM smooth term approximate significances:
 #>             edf Ref.df Chi.sq p-value    
-#> s(season) 16.26  17.00  895.9  <2e-16 ***
+#> s(season) 16.28  17.00  721.1  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> GAM coefficient (beta) estimates:
-#>                    2.5%         50%      97.5% Rhat n.eff
-#> (Intercept)   6.6576074  6.77853485  6.9212594 1.05    88
-#> s(season).1  -1.2290241 -0.68734717 -0.1875609 1.39   133
-#> s(season).2  -0.3578916  0.25965317  0.8365117 1.23    76
-#> s(season).3   0.5779850  1.09406507  1.6499922 1.18    57
-#> s(season).4   1.2898583  1.81650320  2.2637867 1.40    53
-#> s(season).5   1.4563061  2.20871777  2.7775186 1.83    45
-#> s(season).6   0.5633056  1.31944290  1.8870897 1.50    70
-#> s(season).7  -0.6637729 -0.02632234  0.6960057 1.24    89
-#> s(season).8  -1.2093072 -0.57996535  0.2733595 1.19   109
-#> s(season).9  -1.3993486 -0.64497557  0.2077909 1.07   105
-#> s(season).10 -1.0333690 -0.32309001  0.5706681 1.02    68
-#> s(season).11 -0.4317056  0.36807347  1.0853681 1.11    53
-#> s(season).12  0.2529551  1.18527258  1.7785658 1.55    42
-#> s(season).13  0.1137979  1.21577858  1.8107595 2.52    63
-#> s(season).14 -0.1179462  0.91735159  1.6277047 2.11    48
-#> s(season).15 -0.9110310 -0.18626860  0.4264597 1.25    89
-#> s(season).16 -1.4964100 -0.89794283 -0.3213307 1.03   128
-#> s(season).17 -1.6772655 -1.12662302 -0.6607839 1.12   136
+#>                    2.5%         50%       97.5% Rhat n.eff
+#> (Intercept)   6.7402986  6.87207587  7.03499145 1.09    79
+#> s(season).1  -1.1406926 -0.64944481 -0.07620630 1.25   121
+#> s(season).2  -0.2012878  0.30993748  0.88298882 1.33    94
+#> s(season).3   0.6006420  1.15648719  1.66587704 1.29    69
+#> s(season).4   1.2185839  1.70602681  2.10432010 1.21    64
+#> s(season).5   1.4447802  1.91430122  2.75104854 1.92    51
+#> s(season).6   0.3083207  1.01506546  2.01735499 2.25    53
+#> s(season).7  -1.0286500 -0.31477764  0.59560210 1.53    74
+#> s(season).8  -1.5943929 -0.84593620 -0.05917633 1.20    94
+#> s(season).9  -1.5590621 -0.89877688 -0.11168855 1.08   160
+#> s(season).10 -1.2115215 -0.43846233  0.42091257 1.04    88
+#> s(season).11 -0.4511884  0.38852845  1.09390622 1.11    76
+#> s(season).12  0.3517240  1.36688464  2.19087026 1.54    35
+#> s(season).13  0.5319749  1.33913938  2.63695317 2.01    30
+#> s(season).14  0.1667318  1.07374496  2.18012223 1.94    36
+#> s(season).15 -0.7673543 -0.02726729  0.55289598 1.35    82
+#> s(season).16 -1.5149409 -0.80481756 -0.23932188 1.07   128
+#> s(season).17 -1.6198656 -1.04398655 -0.54188889 1.08   152
 #> 
 #> GAM smoothing parameter (rho) estimates:
-#>               2.5%      50%    97.5% Rhat n.eff
-#> s(season) 3.042201 3.885326 4.583159 1.03  1432
+#>               2.5%     50%    97.5% Rhat n.eff
+#> s(season) 3.023061 3.85911 4.549625 1.01  1379
 #> 
 #> Latent trend drift (phi) and AR parameter estimates:
 #>           2.5%        50%     97.5% Rhat n.eff
 #> phi  0.0000000  0.0000000 0.0000000  NaN     0
-#> ar1  0.4589342  0.7780231 1.1002675 1.16   924
-#> ar2 -0.4366027 -0.1381638 0.1771885 1.11  1346
+#> ar1  0.4446479  0.7585432 1.0595875 1.06   870
+#> ar2 -0.4075347 -0.1001537 0.2089212 1.07   768
 #> ar3  0.0000000  0.0000000 0.0000000  NaN     0
 #> 
 ```
@@ -304,10 +305,10 @@ Summary statistics of the two models' out of sample Discrete Rank Probability Sc
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   11.48   34.52   98.61   99.68  133.44  230.84
+#>   2.234   6.460  86.014 110.300 169.251 326.005
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   64.56   84.92  283.51  289.99  409.86  688.65
+#>   61.35   81.06  292.86  297.28  427.07  700.39
 ```
 
 Nominal coverages for both models' 90% prediction intervals
