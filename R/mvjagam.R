@@ -67,20 +67,25 @@
 #'for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
 #'as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tweedie
 #'@param twdis_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Tweedie
-#'overdispersion parameters. The observation process reduces to a Poisson
-#'as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Negative Binomial
+#'overdispersion parameters. Ignored if family is Poisson or Negative Binomial
 #'@param tau_prior \code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
 #'precisions used for the latent trends (ignored if \code{use_lv == TRUE})
 #'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 #'this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 #'truncation entirely (i.e. there is no upper bound for each series)
+#'@param jags_path Optional character vector specifying the path to the location of the `JAGS` executable (.exe) to use
+#'for modelling. If missing, the path will be recovered from a call to \code{\link[runjags]{findjags}}
+#'
 #'@details A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent
 #'state space trends. Prior distributions for most important model parameters can be altered by the user to inspect model
 #'sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
-#'accordingly. The model parameters are esimated in a Bayesian framework using Gibbs sampling
+#'accordingly. Model parameters are esimated in a Bayesian framework using Gibbs sampling
 #'in \code{\link[run.jags]{runjags}}. For any smooth terms using the random effect basis (\code{\link[mcgv]{smooth.construct.re.smooth.spec}}),
-#'a non-centred parameterisation is employed to avoid degeneracies that are common in hierarchical models.
+#'a non-centred parameterisation is employed to avoid degeneracies that are common in hierarchical models. Note that for Tweedie
+#'models, estimating the power parameter `p` alongside the overdispersion parameter
+#'`twdis` and the smooth coefficients is very challenging for noisy data, introducing some difficult posterior geometries.
+#'By default, the `p` parameter is fixed at `1.5` (i.e. a so-called Geometric Poisson model).
 #'When using a dynamic factor model for the trends, factor precisions are given
 #'regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 #'factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
@@ -122,11 +127,35 @@ mvjagam = function(formula,
                    r_prior,
                    twdis_prior,
                    tau_prior,
-                   upper_bounds){
+                   upper_bounds,
+                   jags_path){
 
   # Check arguments
   trend_model <- match.arg(arg = trend_model, choices = c("None", "Noise", "RW", "AR1", "AR2", "AR3"))
   family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
+
+  # If the model is to be run, make sure JAGS can be located
+  if(run_model){
+    if(missing(jags_path)){
+      jags_path <- runjags::findjags()
+    }
+
+    # Code borrowed from the runjags package
+    jags_status <- runjags::testjags(jags_path, silent = TRUE)
+    if(!jags_status$JAGS.available){
+      if(jags_status$os=="windows"){
+        # Try it again - sometimes this helps
+        Sys.sleep(0.2)
+        jags_status <- runjags::testjags(jags_path, silent = TRUE)
+      }
+
+      if(!jags_status$JAGS.available){
+        cat("Unable to call JAGS using '", jags_path, "'\nTry specifying the path to the JAGS binary as the jags_path argument, or installing the rjags package.\nUse the runjags::testjags() function for more detailed diagnostics.\n", sep="")
+        stop("Unable to call JAGS", call. = FALSE)
+      }
+    }
+  }
+
 
   # Add series factor variable if missing
   if(class(data_train)[1] != 'list'){
@@ -267,7 +296,7 @@ mvjagam = function(formula,
     data_train$y <- rep(NA, length(data_train$y))
   } else {
     if(family == 'tw'){
-      # Add small offset for Tweedie so that any initial zeros won't give failures based on
+      # Add small offset for Tweedie so that any zeros won't cause failures based on
       # initial values
       data_train$y <- orig_y + 0.00001
     } else {
@@ -491,8 +520,14 @@ for (i in 1:n) {
 
       yind_begin <- grep('y_ind\\[i, s\\] <-', model_file)
       prior_line <- yind_begin + 2
-      model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np_raw ~ dbeta(4, 4)T(0.05, 0.95)\np <- p_raw + 1\nfor (s in 1:n_series) {\n twdis[s] ~ dexp(1)\n}'
+      model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis_raw[s] ~ dbeta(4, 4);\n twdis[s] <- twdis_raw[s] + 0.5\n}'
       model_file <- readLines(textConnection(model_file), n = -1)
+
+      if(!missing(twdis_prior)){
+        twdis_begin <- grep('twdis_raw\\[s\\] ~', model_file)
+        model_file <- model_file[-twdis_begin]
+        model_file[twdis_begin] <- paste0(' twdis[s] ~ ', twdis_prior)
+      }
 
     } else if(family == 'poisson'){
       model_file[grep('## Negative binomial likelihood functions', model_file)] <- '## Poisson likelihood functions'
@@ -770,8 +805,14 @@ for (i in 1:n) {
 
         yind_begin <- grep('y_ind\\[i, s\\] <-', model_file)
         prior_line <- yind_begin + 2
-        model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np_raw ~ dbeta(4, 4)T(0.05, 0.95)\np <- p_raw + 1\nfor (s in 1:n_series) {\n twdis[s] ~ dexp(1)\n}'
+        model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis_raw[s] ~ dbeta(4, 4);\n twdis[s] <- twdis_raw[s] + 0.5\n}'
         model_file <- readLines(textConnection(model_file), n = -1)
+
+        if(!missing(twdis_prior)){
+          twdis_begin <- grep('twdis_raw\\[s\\] ~', model_file)
+          model_file <- model_file[-twdis_begin]
+          model_file[twdis_begin] <- paste0(' twdis[s] ~ ', twdis_prior)
+        }
 
       } else if(family == 'poisson'){
         model_file[grep('## Negative binomial likelihood functions', model_file)] <- '## Poisson likelihood functions'
@@ -948,7 +989,9 @@ for (i in 1:n) {
   }
 
   # Machine epsilon for minimum allowable non-zero rate
-  ss_jagam$jags.data$min_eps <- .Machine$double.eps
+  if(family == 'nb'){
+    ss_jagam$jags.data$min_eps <- .Machine$double.eps
+  }
 
   # Number of latent variables to use
   if(use_lv){
@@ -1029,6 +1072,9 @@ for (i in 1:n) {
                    obs_data = data_train)
 
   } else {
+  initlist <- replicate(chains, ss_jagam$jags.ini,
+                          simplify = FALSE)
+  runjags::runjags.options(silent.jags=TRUE, silent.runjags=TRUE)
   n.burn <- burnin
   unlink('base_gam.txt')
   cat(model_file, file = 'base_gam.txt', sep = '\n', append = T)
@@ -1038,30 +1084,34 @@ for (i in 1:n) {
     gam_mod <- runjags::run.jags(model = 'base_gam.txt',
                                  data = ss_jagam$jags.data,
                                  modules = 'glm',
-                                 inits = ss_jagam$jags.ini,
+                                 inits = initlist,
                                  n.chains = chains,
                                  # Rely on long adaptation to tune samplers appropriately
                                  adapt = max(1000, n.burn - 1000),
                                  burnin = 1000,
                                  sample = n_samples,
+                                 jags = jags_path,
                                  thin = thin,
                                  method = "rjparallel",
                                  monitor = param,
+                                 silent.jags = TRUE,
                                  cl = cl)
     stopCluster(cl)
   } else {
     gam_mod <- runjags::run.jags(model = 'base_gam.txt',
                                  data = ss_jagam$jags.data,
                                  modules = 'glm',
-                                 inits = ss_jagam$jags.ini,
+                                 inits = initlist,
                                  n.chains = chains,
                                  # Rely on long adaptation to tune samplers appropriately
                                  adapt = max(1000, n.burn - 1000),
                                  burnin = 1000,
                                  sample = n_samples,
+                                 jags = jags_path,
                                  thin = thin,
                                  method = "rjags",
-                                 monitor = param)
+                                 monitor = param,
+                                 silent.jags = TRUE)
   }
 
   out_gam_mod <- coda::as.mcmc.list(gam_mod)

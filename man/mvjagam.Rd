@@ -27,7 +27,8 @@ mvjagam(
   r_prior,
   twdis_prior,
   tau_prior,
-  upper_bounds
+  upper_bounds,
+  jags_path
 )
 }
 \arguments{
@@ -112,8 +113,7 @@ for inducing a complexity-penalising prior model whereby the observation process
 as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tweedie}
 
 \item{twdis_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Tweedie
-overdispersion parameters. The observation process reduces to a Poisson
-as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Negative Binomial}
+overdispersion parameters. Ignored if family is Poisson or Negative Binomial}
 
 \item{tau_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
 precisions used for the latent trends (ignored if \code{use_lv == TRUE})}
@@ -122,6 +122,9 @@ precisions used for the latent trends (ignored if \code{use_lv == TRUE})}
 this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 truncation entirely (i.e. there is no upper bound for each series)}
+
+\item{jags_path}{Optional character vector specifying the path to the location of the \code{JAGS} executable (.exe) to use
+for modelling. If missing, the path will be recovered from a call to \code{\link[runjags]{findjags}}}
 }
 \value{
 A \code{list} object containing JAGS model output, the text representation of the model file,
@@ -139,9 +142,12 @@ dynamic factors to capture trend dependencies in a reduced dimension format, or 
 A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent
 state space trends. Prior distributions for most important model parameters can be altered by the user to inspect model
 sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
-accordingly. The model parameters are esimated in a Bayesian framework using Gibbs sampling
+accordingly. Model parameters are esimated in a Bayesian framework using Gibbs sampling
 in \code{\link[run.jags]{runjags}}. For any smooth terms using the random effect basis (\code{\link[mcgv]{smooth.construct.re.smooth.spec}}),
-a non-centred parameterisation is employed to avoid degeneracies that are common in hierarchical models.
+a non-centred parameterisation is employed to avoid degeneracies that are common in hierarchical models. Note that for Tweedie
+models, estimating the power parameter \code{p} alongside the overdispersion parameter
+\code{twdis} and the smooth coefficients is very challenging for noisy data, introducing some difficult posterior geometries.
+By default, the \code{p} parameter is fixed at \code{1.5} (i.e. a so-called Geometric Poisson model).
 When using a dynamic factor model for the trends, factor precisions are given
 regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to

@@ -99,7 +99,8 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
   }
 
   # Generate linear predictor matrix from fitted mgcv model
-  Xp <- predict(object$mgcv_model, newdata = pred_dat, type = 'lpmatrix')
+  Xp <- predict(object$mgcv_model, newdata = pred_dat, type = 'lpmatrix',
+                discrete = FALSE, newdata.guaranteed = TRUE)
 
   # Zero out all other columns in Xp
   Xp[,!grepl(paste0('(', smooth, ')'), colnames(Xp), fixed = T)] <- 0
@@ -158,7 +159,8 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
   if(residuals){
     # Need to predict from a reduced set that zeroes out all terms apart from the
     # smooth of interest
-    Xp2 <- predict(object$mgcv_model, newdata = object$obs_data, type = 'lpmatrix')
+    Xp2 <- predict(object$mgcv_model, newdata = object$obs_data, type = 'lpmatrix',
+                   discrete = FALSE, newdata.guaranteed = TRUE)
 
     # Zero out all other columns in Xp2
     Xp2[,!grepl(paste0('(', smooth, ')'), colnames(Xp2), fixed = T)] <- 0

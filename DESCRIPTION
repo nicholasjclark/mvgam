@@ -10,7 +10,7 @@ Description: This package is for fitting Bayesian Generalised Additive Models to
              The primary purpose of the package is to build a version of dynamic factor models that incorporates 
              the flexibility of GAMs in the linear predictor and latent dynamic trend components that are useful 
              for time series analysis and forecasting. Estimation is performed using Markov Chain Monte Carlo (MCMC) by
-             the Gibbs sampling software JAGS (requires version 4.3.0 or higher). The package also includes 
+             the Gibbs sampling software JAGS. The package also includes 
              utilities for online updating of  forecast distributions with a recursive particle filter that 
              uses sequential importance sampling to assimilate new observations as they become available.
 Maintainer: Nicholas J Clark <nicholas.j.clark1214@gmail.com>
