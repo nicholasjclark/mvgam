@@ -4,6 +4,7 @@
 #'
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
+#'@param n_bins \code{integer} specifying the number of bins to use for binning fitted values
 #'@author Nicholas J Clark
 #'@details A total of four base \code{R} plots are generated to examine Dunn-Smyth residuals for
 #'the specified series. Plots include a residuals vs fitted values plot,
@@ -11,7 +12,7 @@
 #'Note, all plots use posterior medians of fitted values / residuals, so uncertainty is not represented.
 #'@return A series of base \code{R} plots
 #'@export
-plot_mvgam_resids = function(object, series = 1){
+plot_mvgam_resids = function(object, series = 1, n_bins = 25){
 
 probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
 c_light <- c("#DCBCBC")
@@ -47,7 +48,7 @@ par(.pardefault)
 par(mfrow = c(2, 2))
 
 # Fitted vs redisuals plot
-n_fitted_bins = 40
+n_fitted_bins = n_bins
 
 # Get x-axis values and bin if necessary to prevent overplotting
 sorted_x <- sort(unique(round(median_preds, 6)))

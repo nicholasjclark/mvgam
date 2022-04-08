@@ -14,23 +14,39 @@ plot(y, type = 'l')
 data_train <-
   data.frame(y = y[1:125],
              season = season[1:125],
-             time = 1:125)
+             time = 1:125,
+             ran1 = rnorm(125),
+             ran2 = rnorm(125))
 data_test <-
   data.frame(y = y[126:length(season)],
              season = season[126:length(season)],
-             time = 126:length(season))
+             time = 126:length(season),
+             ran1 = rnorm(length(season)-125),
+             ran2 = rnorm(length(season)-125))
 
 # Fit dynamic GAMs
 # Poisson model
 mod1 <- mvjagam(data_train = data_train,
                 data_test = data_test,
                 formula = y ~ s(season, k = 15, bs = 'cc') +
-                  s(time, k = 8, bs = 'gp'),
+                  s(time, k = 8, bs = 'gp') +
+                  s(ran1) + s(ran2) + ti(ran1, ran2),
                 knots = list(season = c(0.5, 24.5)),
                 family = 'poisson',
                 trend_model = 'AR1',
                 chains = 4,
-                burnin = 6000)
+                burnin = 1000)
+mod1
+summary(mod1)
+predict(mod1)
+plot(mod1, type = 'smooths', smooth_residuals = T)
+plot(mod1, type = 'residuals')
+plot(mod1, type = 'forecast')
+plot(mod1, type = 'uncertainty', data_test = data_test)
+
+dic(mod1)
+
+
 
 # Negative binomial model
 mod2 <- mvjagam(data_train = data_train,

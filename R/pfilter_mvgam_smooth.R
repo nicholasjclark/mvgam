@@ -112,7 +112,7 @@ pfilter_mvgam_smooth = function(particles,
     if(is.na(next_assim$y[series])){
       series_weight <- 1
     } else {
-      if(particles[[x]]$family == 'Negative binomial'){
+      if(particles[[x]]$family == 'Negative Binomial'){
         series_weight <- 1 + (dnbinom(next_assim$y[series],
                                       size = particles[[x]]$size[series],
                                       mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
@@ -148,7 +148,7 @@ pfilter_mvgam_smooth = function(particles,
    # Update particle weight using a condensation algorithm
    weight <- particle_weight * particles[[x]]$weight
 
-   if(particles[[x]]$family == 'Negative binomial'){
+   if(particles[[x]]$family == 'Negative Binomial'){
      output <- list(use_lv = use_lv,
                     n_lv = particles[[x]]$n_lv,
                     family = particles[[x]]$family,
@@ -581,10 +581,10 @@ pfilter_mvgam_smooth = function(particles,
     # Return the updated particle, preserving original betas
     betas <- particles[[x]]$betas
 
-    if(particles[[x]]$family == 'Negative binomial'){
+    if(particles[[x]]$family == 'Negative Binomial'){
       output <-     list(use_lv = use_lv,
                          n_lv = particles[[x]]$n_lv,
-                         family = 'Negative binomial',
+                         family = 'Negative Binomial',
                          lv_states = lv_evolve,
                          lv_coefs = lv_coefs_evolve,
                          betas = betas,

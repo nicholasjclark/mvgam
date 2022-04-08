@@ -70,46 +70,8 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
   # Remove comma separated names as these won't match the column names in data
   smooth_terms[!grepl(',', smooth_terms)] -> smooth_terms
 
-  if(missing(newdata) && class(object$obs_data)[1] != 'list'){
-    data_train %>%
-      dplyr::select(c(series, smooth_terms)) %>%
-      dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-      dplyr::mutate(series = !!(levels(data_train$series)[series])) -> pred_dat
 
-    # Use a larger sample size when estimating derivatives so they can be better approximated
-    if(derivatives){
-      pred_dat %>% dplyr::select(-smooth) %>% dplyr::distinct() %>%
-        dplyr::slice_head(n = 1) %>%
-        dplyr::bind_cols(smooth.var = seq(min(pred_dat[,smooth]),
-                                          max(pred_dat[,smooth]),
-                                          length.out = 1000)) -> pred_dat
-    } else {
-      pred_dat %>% dplyr::select(-smooth) %>% dplyr::distinct() %>%
-        dplyr::slice_head(n = 1) %>%
-        dplyr::bind_cols(smooth.var = seq(min(pred_dat[,smooth]),
-                                          max(pred_dat[,smooth]),
-                                          length.out = 500)) -> pred_dat
-    }
-     colnames(pred_dat) <- gsub('smooth.var', smooth, colnames(pred_dat))
-
-  } else if(missing(newdata) && class(object$obs_data)[1] == 'list'){
-    pred_dat <- object$obs_data
-  } else {
-    pred_dat <- newdata
-  }
-
-  # Generate linear predictor matrix from fitted mgcv model
-  Xp <- predict(object$mgcv_model, newdata = pred_dat, type = 'lpmatrix',
-                discrete = FALSE, newdata.guaranteed = TRUE)
-
-  # Zero out all other columns in Xp
-  Xp[,!grepl(paste0('(', smooth, ')'), colnames(Xp), fixed = T)] <- 0
-
-  # Extract GAM coefficients
-  #betas <- t(matrix(coef(object$mgcv_model)))
-  betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
-
-  # Predictions and plots
+  # Predictions and plots for 2-dimensional smooths
   if(length(unlist(strsplit(smooth, ','))) == 2){
 
     # Use default mgcv plotting for bivariate smooths as it is quicker
@@ -125,15 +87,53 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     object$mgcv_model$coefficients <- p
 
     suppressWarnings(plot(object$mgcv_model, select = smooth_int,
-         scheme = 2,
-         main = '', too.far = 0,
-         contour.col = c("black"),
-         nlevels = 4,
-         lwd = 1, labcex = 1,
-         seWithMean = T ))
-
+                          residuals = residuals,
+                          scheme = 2,
+                          main = '', too.far = 0,
+                          contour.col = c("black"),
+                          lwd = 1,
+                          seWithMean = T ))
 
   } else {
+
+    # Use posterior predictions to generate univariate smooth plots
+    if(missing(newdata) && class(object$obs_data)[1] != 'list'){
+      data_train %>%
+        dplyr::select(c(series, smooth_terms)) %>%
+        dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
+        dplyr::mutate(series = !!(levels(data_train$series)[series])) -> pred_dat
+
+      # Use a larger sample size when estimating derivatives so they can be better approximated
+      if(derivatives){
+        pred_dat %>% dplyr::select(-smooth) %>% dplyr::distinct() %>%
+          dplyr::slice_head(n = 1) %>%
+          dplyr::bind_cols(smooth.var = seq(min(pred_dat[,smooth]),
+                                            max(pred_dat[,smooth]),
+                                            length.out = 1000)) -> pred_dat
+      } else {
+        pred_dat %>% dplyr::select(-smooth) %>% dplyr::distinct() %>%
+          dplyr::slice_head(n = 1) %>%
+          dplyr::bind_cols(smooth.var = seq(min(pred_dat[,smooth]),
+                                            max(pred_dat[,smooth]),
+                                            length.out = 500)) -> pred_dat
+      }
+      colnames(pred_dat) <- gsub('smooth.var', smooth, colnames(pred_dat))
+
+    } else if(missing(newdata) && class(object$obs_data)[1] == 'list'){
+      pred_dat <- object$obs_data
+    } else {
+      pred_dat <- newdata
+    }
+
+    # Generate linear predictor matrix from fitted mgcv model
+    Xp <- predict(object$mgcv_model, newdata = pred_dat, type = 'lpmatrix')
+
+    # Zero out all other columns in Xp
+    Xp[,!grepl(paste0('(', smooth, ')'), colnames(Xp), fixed = T)] <- 0
+
+    # Extract GAM coefficients
+    #betas <- t(matrix(coef(object$mgcv_model)))
+    betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
 
   if(class(pred_dat)[1] == 'list'){
     pred_vals <- as.vector(as.matrix(pred_dat[[smooth]]))
@@ -143,7 +143,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
 
   preds <- matrix(NA, nrow = NROW(betas), ncol = length(pred_vals))
   for(i in 1:NROW(betas)){
-    if(class(pred_dat) == 'list'){
+    if(class(pred_dat)[1] == 'list'){
       preds[i,] <- (Xp[order(pred_vals),grepl(smooth, names(object$mgcv_model$coefficients))] %*%
                       betas[i,  grepl(smooth, names(object$mgcv_model$coefficients))])
     } else {
@@ -159,8 +159,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
   if(residuals){
     # Need to predict from a reduced set that zeroes out all terms apart from the
     # smooth of interest
-    Xp2 <- predict(object$mgcv_model, newdata = object$obs_data, type = 'lpmatrix',
-                   discrete = FALSE, newdata.guaranteed = TRUE)
+    Xp2 <- predict(object$mgcv_model, newdata = object$obs_data, type = 'lpmatrix')
 
     # Zero out all other columns in Xp2
     Xp2[,!grepl(paste0('(', smooth, ')'), colnames(Xp2), fixed = T)] <- 0
@@ -226,7 +225,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
 
     # Show observed values of the smooth as a rug
-    if(class(object$obs_data) == 'list'){
+    if(class(object$obs_data)[1] == 'list'){
       rug((as.vector(as.matrix(pred_dat[[smooth]])))[which(pred_dat[['series']] ==
                                                              levels(pred_dat[['series']])[series])],
           lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)
@@ -360,7 +359,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     }
 
     # Show observed values of the smooth as a rug
-    if(class(object$obs_data) == 'list'){
+    if(class(object$obs_data)[1] == 'list'){
       rug((as.vector(as.matrix(pred_dat[[smooth]])))[which(pred_dat[['series']] ==
                                                              levels(pred_dat[['series']])[series])],
           lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)

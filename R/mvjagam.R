@@ -1,9 +1,9 @@
 #'Fit a Bayesian multivariate dynamic GAM to a set of discrete time series
 #'
-#'This function estimates the posterior distribution for a multivariate GAM that includes
-#'smooth functions, specified in the GAM formula, and state-space latent trends, specified by trend_model.
+#'This function estimates the posterior distribution for Generalised Additive Models (GAMs) that can include
+#'smooth functions, specified in the GAM formula, as well as latent temporal processes, specified by trend_model.
 #'There are currently two options for specifying the structures of the trends (either as latent
-#'dynamic factors to capture trend dependencies in a reduced dimension format, or as independent trends)
+#'dynamic factors to capture trend dependencies among series in a reduced dimension format, or as independent trends)
 #'
 #'
 #'@param formula A \code{character} string specifying the GAM formula. These are exactly like the formula
@@ -77,30 +77,55 @@
 #'@param jags_path Optional character vector specifying the path to the location of the `JAGS` executable (.exe) to use
 #'for modelling. If missing, the path will be recovered from a call to \code{\link[runjags]{findjags}}
 #'
-#'@details A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent
-#'state space trends. Prior distributions for most important model parameters can be altered by the user to inspect model
+#'@details Dynamic GAMs are useful when we wish to predict future values from time series that show temporal dependence
+#'but we do not want to rely on extrapolating from a smooth term (which can sometimes lead to unpredictable and unrealistic behaviours).
+#'In addition, smooths can often try to wiggle excessively to capture any autocorrelation that is present in a time series,
+#'which exacerbates the problem of forecasting ahead. As GAMs are very naturally viewed through a Bayesian lens, and we often
+#'must model time series that show complex distributional features and missing data, parameters for `mvjagam` models are esimated
+#'in a Bayesian framework using Gibbs sampling in \code{\link[run.jags]{runjags}}.
+#'\cr
+#'\cr
+#'*Priors*: A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include any latent
+#'temporal processes. Prior distributions for most important model parameters can be altered by the user to inspect model
 #'sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
-#'accordingly. Model parameters are esimated in a Bayesian framework using Gibbs sampling
-#'in \code{\link[run.jags]{runjags}}. For any smooth terms using the random effect basis (\code{\link[mcgv]{smooth.construct.re.smooth.spec}}),
-#'a non-centred parameterisation is employed to avoid degeneracies that are common in hierarchical models. Note that for Tweedie
+#'accordingly. However more control over the model specification can be accomplished by first using `mvjagam` as a
+#'baseline, then editing the returned model accordingly. The `JAGS` model file can be edited and run outside
+#'of `mvgam` by setting \code{run_model = TRUE} and this is encouraged for complex modelling tasks
+#'\cr
+#'\cr
+#'*Random effects*: For any smooth terms using the random effect basis (\code{\link[mcgv]{smooth.construct.re.smooth.spec}}),
+#'a non-centred parameterisation is automatically employed to avoid degeneracies that are common in hierarchical models.
+#'Note however that centred versions may perform better for series that are particularly informative, so as with any
+#'foray into Bayesian modelling, it is worth building an understanding of the model's assumptions and limitations by following a
+#'principled workflow.
+#'\cr
+#'\cr
+#'*Overdispersion parameters*: When more than one series is included in \code{data_train} and an overdispersed
+#'exponential family is used, by default the overdispersion parameters (`r` for Poisson, `twdis` for Tweedie) are
+#'estimated independently for each series. Note that for Tweedie
 #'models, estimating the power parameter `p` alongside the overdispersion parameter
 #'`twdis` and the smooth coefficients is very challenging for noisy data, introducing some difficult posterior geometries.
-#'By default, the `p` parameter is fixed at `1.5` (i.e. a so-called Geometric Poisson model).
-#'When using a dynamic factor model for the trends, factor precisions are given
+#'The `p` parameter is therefore fixed at `1.5` (i.e. a so-called Geometric Poisson model).
+#'\cr
+#'\cr
+#'*Factor regularisation*: When using a dynamic factor model for the trends, factor precisions are given
 #'regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 #'factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
-#'capture dependencies in the data, so it can often be advantageous to set n_lv to a slightly larger number. However
+#'capture dependencies in the data, so it can often be advantageous to set `n_lv`` to a slightly larger number. However
 #'larger numbers of factors do come with additional computational costs so these should be balanced as well.
-#' For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
-#'medians of posterior predictions. If the fitted model is appropriate then Dunn-Smyth residuals will be
-#'standard normal in distribution and no autocorrelation will be evident
+#'\cr
+#'\cr
+#'*Residuals*: For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics
+#'If the fitted model is appropriate then Dunn-Smyth residuals will be standard normal in distribution and no
+#'autocorrelation will be evident. When a particular observation is missing, the residual is calculated by comparing independent
+#'draws from the model's posterior distribution
 #'
 #'@author Nicholas J Clark
 #'
 #'@seealso \code{\link[rjags]{jags.model}}, \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
 #'@return A \code{list} object containing JAGS model output, the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
-#'unsampled covariate values), Dunn-Smyth residuals for each series and other key information needed
+#'unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
 #'for other functions in the package
 #'
 #'@export
@@ -133,6 +158,10 @@ mvjagam = function(formula,
   # Check arguments
   trend_model <- match.arg(arg = trend_model, choices = c("None", "Noise", "RW", "AR1", "AR2", "AR3"))
   family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
+
+  if(chains == 1){
+    stop('number of chains must be >1')
+  }
 
   # If the model is to be run, make sure JAGS can be located
   if(run_model){
@@ -196,59 +225,53 @@ mvjagam = function(formula,
       # Estimate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
       # when simulating from the JAGS model later on
       if(family == 'nb'){
-        ss_gam <- mgcv::bam(formula(formula),
+        ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
-                            method = "fREML",
+                            method = "REML",
                             family = nb(),
                             drop.unused.levels = FALSE,
                             knots = knots,
-                            nthreads = parallel::detectCores()-1,
-                            discrete = TRUE)
+                            control = list(nthreads = parallel::detectCores()-1))
       } else if(family == 'poisson'){
-        ss_gam <- mgcv::bam(formula(formula),
+        ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
-                            method = "fREML",
+                            method = "REML",
                             family = poisson(),
                             drop.unused.levels = FALSE,
                             knots = knots,
-                            nthreads = parallel::detectCores()-1,
-                            discrete = TRUE)
+                            control = list(nthreads = parallel::detectCores()-1))
       } else {
-        ss_gam <- mgcv::bam(formula(formula),
+        ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
-                            method = "fREML",
+                            method = "REML",
                             family = tw(),
                             drop.unused.levels = FALSE,
                             knots = knots,
-                            nthreads = parallel::detectCores()-1,
-                            discrete = TRUE)
+                            control = list(nthreads = parallel::detectCores()-1))
       }
 
     } else {
       if(family == 'nb'){
-        ss_gam <- mgcv::bam(formula(formula),
+        ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
-                            method = "fREML",
+                            method = "REML",
                             family = nb(),
                             drop.unused.levels = FALSE,
-                            nthreads = parallel::detectCores()-1,
-                            discrete = TRUE)
+                            control = list(nthreads = parallel::detectCores()-1))
       } else if(family == 'poisson'){
-        ss_gam <- mgcv::bam(formula(formula),
+        ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
-                            method = "fREML",
+                            method = "REML",
                             family = poisson(),
                             drop.unused.levels = FALSE,
-                            nthreads = parallel::detectCores()-1,
-                            discrete = TRUE)
+                            control = list(nthreads = parallel::detectCores()-1))
       } else {
-        ss_gam <- mgcv::bam(formula(formula),
+        ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
-                            method = "fREML",
+                            method = "REML",
                             family = tw(),
                             drop.unused.levels = FALSE,
-                            nthreads = parallel::detectCores()-1,
-                            discrete = TRUE)
+                            control = list(nthreads = parallel::detectCores()-1))
       }
 
     }
@@ -962,7 +985,7 @@ for (i in 1:n) {
     dplyr::arrange(time, series) -> X
 
   # Matrix of indices in X that correspond to timepoints for each series
-  ytimes <- matrix(NA, nrow = max(X$time), ncol = length(unique(X$series)))
+  ytimes <- matrix(NA, nrow = length(unique(X$time)), ncol = length(unique(X$series)))
   for(i in 1:length(unique(X$series))){
     ytimes[,i] <- which(X$series == i)
   }
@@ -1055,21 +1078,23 @@ for (i in 1:n) {
   if(!run_model){
     # Return only the model file and all data / inits needed to run the model
     # outside of mvgam
-    output <- list(call = formula,
-                   family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
-                                             family == 'poisson' ~ 'Poisson',
-                                             TRUE ~ 'Negative Binomial'),
-                   pregam = ss_jagam$pregam,
-                   model_file = model_file,
-                   jags_data = ss_jagam$jags.data,
-                   jags_inits = ss_jagam$jags.ini,
-                   mgcv_model = ss_gam,
-                   sp_names = names(ss_jagam$pregam$lsp0),
-                   ytimes = ytimes,
-                   use_lv = use_lv,
-                   n_lv = n_lv,
-                   upper_bounds = upper_bounds,
-                   obs_data = data_train)
+    output <- structure(list(call = formula,
+                             family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
+                                                       family == 'poisson' ~ 'Poisson',
+                                                       TRUE ~ 'Negative Binomial'),
+                             trend_model = trend_model,
+                             pregam = ss_jagam$pregam,
+                             model_file = model_file,
+                             jags_data = ss_jagam$jags.data,
+                             jags_inits = ss_jagam$jags.ini,
+                             mgcv_model = ss_gam,
+                             sp_names = names(ss_jagam$pregam$lsp0),
+                             ytimes = ytimes,
+                             use_lv = use_lv,
+                             n_lv = n_lv,
+                             upper_bounds = upper_bounds,
+                             obs_data = data_train),
+                        class = 'mvgam_prefit')
 
   } else {
   initlist <- replicate(chains, ss_jagam$jags.ini,
@@ -1093,7 +1118,7 @@ for (i in 1:n) {
                                  jags = jags_path,
                                  thin = thin,
                                  method = "rjparallel",
-                                 monitor = param,
+                                 monitor = c(param, 'deviance'),
                                  silent.jags = TRUE,
                                  cl = cl)
     stopCluster(cl)
@@ -1110,7 +1135,7 @@ for (i in 1:n) {
                                  jags = jags_path,
                                  thin = thin,
                                  method = "rjags",
-                                 monitor = param,
+                                 monitor = c(param, 'deviance'),
                                  silent.jags = TRUE)
   }
 
@@ -1154,43 +1179,47 @@ for (i in 1:n) {
 
 
   if(return_jags_data){
-    output <- list(call = formula,
-                   family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
-                                             family == 'poisson' ~ 'Poisson',
-                                             TRUE ~ 'Negative Binomial'),
-                   pregam = ss_jagam$pregam,
-                   jags_output = out_gam_mod,
-                   model_file = model_file,
-                   sp_names = rho_names,
-                   jags_data = ss_jagam$jags.data,
-                   jags_inits = ss_jagam$jags.ini,
-                   mgcv_model = ss_gam,
-                   jam_model = jam,
-                   jags_model = gam_mod,
-                   ytimes = ytimes,
-                   resids = series_resids,
-                   use_lv = use_lv,
-                   n_lv = n_lv,
-                   upper_bounds = upper_bounds,
-                   obs_data = data_train)
+    output <- structure(list(call = formula,
+                             family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
+                                                       family == 'poisson' ~ 'Poisson',
+                                                       TRUE ~ 'Negative Binomial'),
+                             trend_model = trend_model,
+                             pregam = ss_jagam$pregam,
+                             jags_output = out_gam_mod,
+                             model_file = model_file,
+                             sp_names = rho_names,
+                             jags_data = ss_jagam$jags.data,
+                             jags_inits = ss_jagam$jags.ini,
+                             mgcv_model = ss_gam,
+                             jam_model = jam,
+                             jags_model = gam_mod,
+                             ytimes = ytimes,
+                             resids = series_resids,
+                             use_lv = use_lv,
+                             n_lv = n_lv,
+                             upper_bounds = upper_bounds,
+                             obs_data = data_train),
+                        class = 'mvgam')
   } else {
-    output <- list(call = formula,
-                   family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
-                                             family == 'poisson' ~ 'Poisson',
-                                             TRUE ~ 'Negative Binomial'),
-                   pregam = ss_jagam$pregam,
-                   jags_output = out_gam_mod,
-                   model_file = model_file,
-                   sp_names = rho_names,
-                   mgcv_model = ss_gam,
-                   jags_model = gam_mod,
-                   jam_model = jam,
-                   ytimes = ytimes,
-                   resids = series_resids,
-                   use_lv = use_lv,
-                   n_lv = n_lv,
-                   upper_bounds = upper_bounds,
-                   obs_data = data_train)
+    output <- structure(list(call = formula,
+                             family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
+                                                       family == 'poisson' ~ 'Poisson',
+                                                       TRUE ~ 'Negative Binomial'),
+                             trend_model = trend_model,
+                             pregam = ss_jagam$pregam,
+                             jags_output = out_gam_mod,
+                             model_file = model_file,
+                             sp_names = rho_names,
+                             mgcv_model = ss_gam,
+                             jags_model = gam_mod,
+                             jam_model = jam,
+                             ytimes = ytimes,
+                             resids = series_resids,
+                             use_lv = use_lv,
+                             n_lv = n_lv,
+                             upper_bounds = upper_bounds,
+                             obs_data = data_train),
+                        class = 'mvgam')
   }
   }
 

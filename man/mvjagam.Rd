@@ -129,33 +129,58 @@ for modelling. If missing, the path will be recovered from a call to \code{\link
 \value{
 A \code{list} object containing JAGS model output, the text representation of the model file,
 the mgcv model output (for easily generating simulations at
-unsampled covariate values), Dunn-Smyth residuals for each series and other key information needed
+unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
 for other functions in the package
 }
 \description{
-This function estimates the posterior distribution for a multivariate GAM that includes
-smooth functions, specified in the GAM formula, and state-space latent trends, specified by trend_model.
+This function estimates the posterior distribution for Generalised Additive Models (GAMs) that can include
+smooth functions, specified in the GAM formula, as well as latent temporal processes, specified by trend_model.
 There are currently two options for specifying the structures of the trends (either as latent
-dynamic factors to capture trend dependencies in a reduced dimension format, or as independent trends)
+dynamic factors to capture trend dependencies among series in a reduced dimension format, or as independent trends)
 }
 \details{
-A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include the latent
-state space trends. Prior distributions for most important model parameters can be altered by the user to inspect model
+Dynamic GAMs are useful when we wish to predict future values from time series that show temporal dependence
+but we do not want to rely on extrapolating from a smooth term (which can sometimes lead to unpredictable and unrealistic behaviours).
+In addition, smooths can often try to wiggle excessively to capture any autocorrelation that is present in a time series,
+which exacerbates the problem of forecasting ahead. As GAMs are very naturally viewed through a Bayesian lens, and we often
+must model time series that show complex distributional features and missing data, parameters for \code{mvjagam} models are esimated
+in a Bayesian framework using Gibbs sampling in \code{\link[run.jags]{runjags}}.
+\cr
+\cr
+\emph{Priors}: A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include any latent
+temporal processes. Prior distributions for most important model parameters can be altered by the user to inspect model
 sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
-accordingly. Model parameters are esimated in a Bayesian framework using Gibbs sampling
-in \code{\link[run.jags]{runjags}}. For any smooth terms using the random effect basis (\code{\link[mcgv]{smooth.construct.re.smooth.spec}}),
-a non-centred parameterisation is employed to avoid degeneracies that are common in hierarchical models. Note that for Tweedie
+accordingly. However more control over the model specification can be accomplished by first using \code{mvjagam} as a
+baseline, then editing the returned model accordingly. The \code{JAGS} model file can be edited and run outside
+of \code{mvgam} by setting \code{run_model = TRUE} and this is encouraged for complex modelling tasks
+\cr
+\cr
+\emph{Random effects}: For any smooth terms using the random effect basis (\code{\link[mcgv]{smooth.construct.re.smooth.spec}}),
+a non-centred parameterisation is automatically employed to avoid degeneracies that are common in hierarchical models.
+Note however that centred versions may perform better for series that are particularly informative, so as with any
+foray into Bayesian modelling, it is worth building an understanding of the model's assumptions and limitations by following a
+principled workflow.
+\cr
+\cr
+\emph{Overdispersion parameters}: When more than one series is included in \code{data_train} and an overdispersed
+exponential family is used, by default the overdispersion parameters (\code{r} for Poisson, \code{twdis} for Tweedie) are
+estimated independently for each series. Note that for Tweedie
 models, estimating the power parameter \code{p} alongside the overdispersion parameter
 \code{twdis} and the smooth coefficients is very challenging for noisy data, introducing some difficult posterior geometries.
-By default, the \code{p} parameter is fixed at \code{1.5} (i.e. a so-called Geometric Poisson model).
-When using a dynamic factor model for the trends, factor precisions are given
+The \code{p} parameter is therefore fixed at \code{1.5} (i.e. a so-called Geometric Poisson model).
+\cr
+\cr
+\emph{Factor regularisation}: When using a dynamic factor model for the trends, factor precisions are given
 regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
-capture dependencies in the data, so it can often be advantageous to set n_lv to a slightly larger number. However
+capture dependencies in the data, so it can often be advantageous to set `n_lv`` to a slightly larger number. However
 larger numbers of factors do come with additional computational costs so these should be balanced as well.
-For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics using
-medians of posterior predictions. If the fitted model is appropriate then Dunn-Smyth residuals will be
-standard normal in distribution and no autocorrelation will be evident
+\cr
+\cr
+\emph{Residuals}: For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics
+If the fitted model is appropriate then Dunn-Smyth residuals will be standard normal in distribution and no
+autocorrelation will be evident. When a particular observation is missing, the residual is calculated by comparing independent
+draws from the model's posterior distribution
 }
 \seealso{
 \code{\link[rjags]{jags.model}}, \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}

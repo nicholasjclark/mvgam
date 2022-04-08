@@ -149,7 +149,7 @@ ar2s <- MCMCvis::MCMCchains(object$jags_output, 'ar2')
 ar3s <- MCMCvis::MCMCchains(object$jags_output, 'ar3')
 
 # Family-specific parameters
-if(object$family == 'Negative binomial'){
+if(object$family == 'Negative Binomial'){
   sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
 } else {
   sizes <- NULL
@@ -231,7 +231,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   betas <- betas[samp_index, ]
 
   # Family-specific parameters
-  if(family == 'Negative binomial'){
+  if(family == 'Negative Binomial'){
     size <- sizes[samp_index, ]
   }
 
@@ -264,7 +264,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     if(is.na(truth[series])){
       weight <- 1
     } else {
-      if(family == 'Negative binomial'){
+      if(family == 'Negative Binomial'){
         weight <- 1 + (dnbinom(truth[series], size = size[series],
                                mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
                                           (trends[series]))))
@@ -317,7 +317,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     tau <- taus[samp_index,]
 
     # Family-specific parameters
-    if(family == 'Negative binomial'){
+    if(family == 'Negative Binomial'){
       size <- sizes[samp_index, ]
     }
 
@@ -339,7 +339,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
       if(is.na(truth[series])){
         weight <- 1
       } else {
-        if(family == 'Negative binomial'){
+        if(family == 'Negative Binomial'){
           weight <- 1 + (dnbinom(truth[series], size = size[series],
                                  mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
                                             (trends[series]))))
@@ -393,7 +393,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
                    last_assim = last_assim)
   }
 
-  if(family == 'Negative binomial'){
+  if(family == 'Negative Binomial'){
     output <- list(use_lv = use_lv,
                    n_lv = n_lv,
                    family = family,

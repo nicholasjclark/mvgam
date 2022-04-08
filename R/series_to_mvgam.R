@@ -97,9 +97,7 @@ series_to_mvgam <- function(series, freq, train_prop = 0.85){
  last_time <- floor(max(mvgam_data$time) * train_prop)
 
   return(list(data_train = mvgam_data %>%
-                dplyr::filter(time <= last_time) %>%
-                dplyr::select(-time),
+                dplyr::filter(time <= last_time),
               data_test = mvgam_data %>%
-                dplyr::filter(time > last_time) %>%
-                dplyr::select(-time)))
+                dplyr::filter(time > last_time)))
 }

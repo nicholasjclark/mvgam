@@ -91,7 +91,8 @@ eval_mvgam = function(object,
   # Linear predictor matrix for the evaluation observations
   Xp <- predict(object$mgcv_model,
                 newdata = data_assim,
-                type = 'lpmatrix')
+                type = 'lpmatrix',
+                newdata.guaranteed = TRUE)
 
   # Extract trend / latent variable estimates at the correct timepoint
   if(object$use_lv){
@@ -146,7 +147,7 @@ eval_mvgam = function(object,
   ar3s <- MCMCvis::MCMCchains(object$jags_output, 'ar3')
 
   # Family-specific parameters
-  if(object$family == 'Negative binomial'){
+  if(object$family == 'Negative Binomial'){
     sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
   } else {
     sizes <- NULL
@@ -244,7 +245,7 @@ eval_mvgam = function(object,
       betas <- betas[samp_index, ]
 
       # Family-specific parameters
-      if(family == 'Negative binomial'){
+      if(family == 'Negative Binomial'){
         size <- sizes[samp_index, ]
       }
 
@@ -267,7 +268,7 @@ eval_mvgam = function(object,
       series_fcs <- lapply(seq_len(n_series), function(series){
         trend_preds <- as.numeric(t(lv_preds) %*% lv_coefs[series,])
 
-        if(family == 'Negative binomial'){
+        if(family == 'Negative Binomial'){
           fc <- rnbinom(fc_horizon,
                                  mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
                                                        betas)) + (trend_preds)),
@@ -315,7 +316,7 @@ eval_mvgam = function(object,
       tau <- taus[samp_index,]
 
       # Family-specific parameters
-      if(family == 'Negative binomial'){
+      if(family == 'Negative Binomial'){
         size <- sizes[samp_index, ]
       }
 
@@ -332,7 +333,7 @@ eval_mvgam = function(object,
                                tau = tau[series],
                                state = last_trends[[series]],
                                h = fc_horizon)
-        if(family == 'Negative binomial'){
+        if(family == 'Negative Binomial'){
           fc <-  rnbinom(fc_horizon,
                          mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
                                                betas)) + (trend_preds)),
@@ -390,7 +391,7 @@ eval_mvgam = function(object,
         betas <- betas[samp_index, ]
 
         # Family-specific parameters
-        if(family == 'Negative binomial'){
+        if(family == 'Negative Binomial'){
           size <- sizes[samp_index, ]
         }
 
@@ -413,7 +414,7 @@ eval_mvgam = function(object,
         series_fcs <- lapply(seq_len(n_series), function(series){
           trend_preds <- as.numeric(t(lv_preds) %*% lv_coefs[series,])
 
-          if(family == 'Negative binomial'){
+          if(family == 'Negative Binomial'){
             fc <- rnbinom(fc_horizon,
                           mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
                                                 betas)) + (trend_preds)),
@@ -461,7 +462,7 @@ eval_mvgam = function(object,
         tau <- taus[samp_index,]
 
         # Family-specific parameters
-        if(family == 'Negative binomial'){
+        if(family == 'Negative Binomial'){
           size <- sizes[samp_index, ]
         }
 
@@ -478,7 +479,7 @@ eval_mvgam = function(object,
                                  tau = tau[series],
                                  state = last_trends[[series]],
                                  h = fc_horizon)
-          if(family == 'Negative binomial'){
+          if(family == 'Negative Binomial'){
             fc <-  rnbinom(fc_horizon,
                            mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
                                                  betas)) + (trend_preds)),

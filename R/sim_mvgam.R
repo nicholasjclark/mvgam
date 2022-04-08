@@ -127,7 +127,10 @@ sim_mvgam = function(T = 100,
                         season = rep(rep(seq(1, freq), ceiling(T/freq))[1:T], n_series),
                         year = rep(sort(rep(seq(1, ceiling(T/freq)), freq))[1:T], n_series),
                         series = as.factor(paste0('series_', sort(rep(seq(1, n_series), T))))) %>%
-    dplyr::arrange(year, season, series)
+    dplyr::group_by(series) %>%
+    dplyr::arrange(year, season) %>%
+    dplyr::mutate(time = 1:dplyr::n()) %>%
+    dplyr::ungroup()
 
   list(data_train = sim_data[1:(floor(nrow(sim_data) * train_prop)),],
        data_test = sim_data[((floor(nrow(sim_data) * train_prop)) + 1):nrow(sim_data),],

@@ -119,9 +119,20 @@ series_resids <- pbapply::pblapply(seq_len(NCOL(object$ytimes)), function(series
       nrow()
   }
   preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
-  truth <- as.vector(object$obs_data %>%
-                       dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
-                       dplyr::pull(y))
+
+  if(class(object$obs_data)[1] == 'list'){
+    obj_dat <- data.frame(y = object$obs_data$y,
+                          series = factor(object$obs_data$series,
+                                          levels = levels(object$obs_data$series)))
+    truth <- as.vector(obj_dat %>%
+                         dplyr::filter(series == !!(levels(obj_dat$series)[series])) %>%
+                         dplyr::pull(y))
+  } else {
+    truth <- as.vector(object$obs_data %>%
+                         dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
+                         dplyr::pull(y))
+  }
+
 
   if(NROW(preds) > 2000){
     sample_seq <- sample(1:NROW(preds), 2000, F)

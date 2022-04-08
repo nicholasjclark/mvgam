@@ -1,7 +1,7 @@
 #'Plot mvjagam forecast uncertainty contributions for a specified series
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param data_test A \code{dataframe} or \code{list} containing at least 'series', 'season' and 'year' for the forecast horizon, in
+#'@param data_test A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
 #'list: "none", "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
@@ -18,8 +18,21 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
   ends <- ends[-1]
 
+  # Add series factor variable if missing
+  if(class(data_train)[1] != 'list'){
+    if(!'series' %in% colnames(data_test)){
+      data_test$series <- factor('series1')
+    }
+  }
+
+  if(class(data_train)[1] == 'list'){
+    if(!'series' %in% names(data_test)){
+      data_test$series <- factor('series1')
+    }
+  }
+
   # Generate linear predictor matrix for specified series
-  if(class(data_test) == 'list'){
+  if(class(data_test)[1] == 'list'){
     list_names <- names(data_test)
     indices_keep <- which(data_test$series ==
                             levels(data_train$series)[series])

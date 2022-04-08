@@ -4,12 +4,14 @@
 \alias{plot_mvgam_resids}
 \title{Residual diagnostics for a fitted mvjagam object}
 \usage{
-plot_mvgam_resids(object, series = 1)
+plot_mvgam_resids(object, series = 1, n_bins = 25)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
+
+\item{n_bins}{\code{integer} specifying the number of bins to use for binning fitted values}
 }
 \value{
 A series of base \code{R} plots

@@ -16,7 +16,7 @@ library(knitr)
 opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
 ```
 
-Here we will use the `mvgam` package, which fits dynamic GAMs using MCMC sampling via the `JAGS` software (Note that `JAGS` 4.3.0 is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)), to estimate paramaters of a Bayesian distributed lag model.  These models are used to describe simultaneously non-linear and delayed functional relationships between a covariate and a response, and are sometimes referred to as exposure-lag-response models.
+Here we will use the `mvgam` package, which fits dynamic GAMs using MCMC sampling via the `JAGS` software (Note that `JAGS` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)), to estimate paramaters of a Bayesian distributed lag model.  These models are used to describe simultaneously non-linear and delayed functional relationships between a covariate and a response, and are sometimes referred to as exposure-lag-response models.
 
 Load the Portal rodents capture data, which are available from the `portalr` package
 ```{r message=FALSE, warning = FALSE}
@@ -49,7 +49,8 @@ data_all <- list(lag=matrix(0:5,nrow(portal_dat_all),6,byrow=TRUE),
             y = portal_dat_all$PP,
             season = portal_dat_all$month,
             year = portal_dat_all$year,
-            series = rep(as.factor('series1'), nrow(portal_dat_all)))
+            series = rep(as.factor('series1'), NROW(portal_dat_all)),
+            time = 1:NROW(portal_dat_all))
 data_all$precip <- lagard(portal_dat_all$precipitation)
 data_all$mintemp <- lagard(portal_dat_all$mintemp)
 ```
@@ -66,6 +67,7 @@ All other elements of the data list are in the usual vector format
 head(data_all$y, 5)
 head(data_all$series, 5)
 head(data_all$year, 5)
+head(data_all$time, 5)
 ```
 
 View the raw series. There is a clear seasonal pattern to the data, and there are missing values scattered throughout
@@ -81,6 +83,7 @@ data_train <- list(lag = data_all$lag[7:174,],
                    series = data_all$series[7:174],
                    season = data_all$season[7:174],
                    year = data_all$year[7:174],
+                   time = 7:174,
                    precip = data_all$precip[7:174,],
                    mintemp = data_all$mintemp[7:174,])
 data_test <- list(lag = data_all$lag[175:length(data_all$y),],
@@ -88,20 +91,21 @@ data_test <- list(lag = data_all$lag[175:length(data_all$y),],
                    series = data_all$series[175:length(data_all$y)],
                    season = data_all$season[175:length(data_all$y)],
                    year = data_all$year[175:length(data_all$y)],
+                   time = 175:length(data_all$y),
                    precip = data_all$precip[175:length(data_all$y),],
                   mintemp = data_all$mintemp[175:length(data_all$y),])
 ```
 
-Now we can fit a dynamic GAM with distributed lag terms for precipitation and minimum temperature and an `AR1` process for the unobserved temporal trend. The distributed lags are set up as tensor product smooth functions (see `help(te)` for an explanation of tensor product smooth constructions in the `mgcv` package) between `lag` and each covariate. We assume a `Poisson` observation model for this example
+Now we can fit a dynamic GAM with distributed lag terms for precipitation and minimum temperature and an `AR3` process for the unobserved temporal trend. The distributed lags are set up as tensor product smooth functions (see `help(te)` for an explanation of tensor product smooth constructions in the `mgcv` package) between `lag` and each covariate. Given the overdispersion in the data, we will assume a [`Geometric-Poisson`](https://en.wikipedia.org/wiki/Geometric_Poisson_distribution) observation model, which can be [more flexible than the `Negative binomial` for modelling overdispersed count data](https://www.jstor.org/stable/2533492?origin=crossref&seq=1). In `mvgam` the `Geometric-Poisson` is estimated as a `Tweedie-Poisson` model with the power parameter `p` fixed at `1.5`
 ```{r, message=FALSE, warning=FALSE}
 test <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                   te(precip, lag, k = c(8, 4)),
                 data_train = data_train,
                 data_test = data_test,
-                family = 'poisson',
+                family = 'tw',
                 chains = 4,
                 burnin = 15000,
-                trend_model = 'AR1')
+                trend_model = 'AR3')
 ```
 
 The summary of the model provides useful information on convergence for unobserved parameters
@@ -232,7 +236,7 @@ for(i in 1:6){
         col = scales::alpha(cols[i], 0.8), lwd = 2.5)
 }
 abline(h = 0, lty = 'dashed')
-legend('bottomleft', legend = paste0('lag', seq(0, 5)),
+legend('topleft', legend = paste0('lag', seq(0, 5)),
        bg = 'white', bty = 'n',
        col = cols, lty = 1, lwd = 6)
 ```
@@ -242,9 +246,9 @@ All of the usual functions in `mvgam` can also be used for list data objects, so
 plot_mvgam_ppc(test, series = 1, type = 'cdf')
 ```
 
-and predictive checks for the out of sample forecast period (which demonstrates how the model overpredicts for the forecast period in this particular example):
+and predictive checks for the out of sample forecast period (which demonstrates how the model tends to overpredict for the forecast period in this particular example):
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 plot_mvgam_ppc(test, data_test = data_test, series = 1, type = 'cdf')
 ```
 
-Logical next steps for interrogating this model would be to trial different trend types (random walk, AR2, AR3), replace the distributed lag function for `precip` with a standard smooth function (that does not include lag interactions, as clearly the model above indicates that these are not supported) and inspect whether different covariates (such as `ndvi` or `maxtemp`) might play a role in modulating catches of `PP`. Finally, once we are satisfied that we have a well-performing model that we can understand and interrogate, we could expand up to a multivariate model by including other species as response variables. This would allow us to capture any possible unobserved dependencies in the catches of multiple co-occurring species in a single unified modelling framework
+Logical next steps for interrogating this model would be to trial different trend types (i.e. random walk), replace the distributed lag function for `precip` with a standard smooth function (that does not include lag interactions, as clearly the model above indicates that these are not supported) and inspect whether different covariates (such as `ndvi` or `maxtemp`) might play a role in modulating catches of `PP`. Finally, once we are satisfied that we have a well-performing model that we can understand and interrogate, we could expand up to a multivariate model by including other species as response variables. This would allow us to capture any possible unobserved dependencies in the catches of multiple co-occurring species in a single unified modelling framework

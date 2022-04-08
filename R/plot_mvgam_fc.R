@@ -29,13 +29,25 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
   # Add variables to data_test if missing
   if(!missing(data_test)){
 
-    if(!'time' %in% colnames(data_test)){
-      stop('data_train does not contain a "time" column')
+    if(class(data_test)[1] == 'list'){
+      if(!'time' %in% names(data_test)){
+        stop('data_train does not contain a "time" column')
+      }
+
+      if(!'series' %in% names(data_test)){
+        data_test$series <- factor('series1')
+      }
+
+    } else {
+      if(!'time' %in% colnames(data_test)){
+        stop('data_train does not contain a "time" column')
+      }
+
+      if(!'series' %in% colnames(data_test)){
+        data_test$series <- factor('series1')
+      }
     }
 
-    if(!'series' %in% colnames(data_test)){
-      data_test$series <- factor('series1')
-      }
   }
 
   # Plot quantiles of the forecast distribution
@@ -91,12 +103,10 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
     if(class(data_train)[1] == 'list'){
       data_train <- data.frame(series = data_train$series,
                           y = data_train$y,
-                          season = data_train$season,
-                          year = data_train$year)
+                          time = data_train$time)
       data_test <- data.frame(series = data_test$series,
                                y = data_test$y,
-                               season = data_test$season,
-                               year = data_test$year)
+                               time = data_test$time)
     }
 
     points(dplyr::bind_rows(data_train, data_test) %>%

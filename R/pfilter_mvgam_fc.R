@@ -157,7 +157,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
       series_fcs <- lapply(seq_len(n_series), function(series){
         trend_preds <- as.numeric(t(lv_preds) %*% particles[[x]]$lv_coefs[series,])
 
-        if(particles[[x]]$family == 'Negative binomial'){
+        if(particles[[x]]$family == 'Negative Binomial'){
           fc <- rnbinom(fc_horizon,
                         mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
                                               particles[[x]]$betas)) +
@@ -195,7 +195,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                                  state = particles[[x]]$trend_states[[series]],
                                  h = fc_horizon)
 
-          if(particles[[x]]$family == 'Negative binomial'){
+          if(particles[[x]]$family == 'Negative Binomial'){
             fc <-  rnbinom(fc_horizon,
                            mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
                                                  particles[[x]]$betas)) + (trend_preds)),
