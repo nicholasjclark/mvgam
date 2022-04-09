@@ -12,7 +12,7 @@
 #'uncertainty,
 #'factors
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param smooth_residuals \code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added
+#'@param residuals \code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added
 #'to plots of 1-D smooths as a series of ribbon rectangles.
 #'@param data_test A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}. This argument is optional when
@@ -25,9 +25,11 @@
 #'@author Nicholas J Clark
 #'@return A base R plot or set of plots
 #'@export
-plot.mvgam = function(object, type = 'smooths', series = 1, smooth_residuals = FALSE,
+plot.mvgam = function(object, type = 'smooths',
+                      series = 1, residuals = FALSE,
                       data_test){
-  type <- match.arg(arg = type, choices = c("residuals", "smooths", "forecast", "trend", "uncertainty",
+  type <- match.arg(arg = type, choices = c("residuals", "smooths",
+                                            "forecast", "trend", "uncertainty",
                                             "factors"))
 
   if(type == 'residuals'){
@@ -68,20 +70,21 @@ plot.mvgam = function(object, type = 'smooths', series = 1, smooth_residuals = F
 
   if(type == 'smooths'){
 
+    # Get labels of all included smooths from the object
     smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
       data.frame(label = object$mgcv_model$smooth[[x]]$label, class = class(object$mgcv_model$smooth[[x]])[1])
     }))
     n_smooths <- NROW(smooth_labs)
     if(n_smooths == 0) stop("No terms to plot - nothing for plot.mvgam() to do.")
 
-    # Check which ones plot_mvgam_smooth can handle (no ore than 2 dimensions)
+    # Check which ones plot_mvgam_smooth can handle (no more than 2 dimensions)
     plottable = function(x){
       length(unlist(strsplit(x, ','))) <= 2
     }
     which_to_plot <- (1:n_smooths)[sapply(smooth_labs$label, plottable)]
     n_smooths <- length(which_to_plot)
 
-
+    # For remaining plots, get the needed page numbers
     n_plots <- n_smooths
     if (n_plots==0) stop("No suitable terms to plot - plot.mvgam() only handles smooths of 2 or fewer dimensions.")
     pages <- 1
@@ -99,7 +102,7 @@ plot.mvgam = function(object, type = 'smooths', series = 1, smooth_residuals = F
         while (ppp*(pages-1)>=n_plots) pages<-pages-1
         }
 
-    # now figure out number of rows and columns
+    # Configure layout matrix
     c <- r <- trunc(sqrt(ppp))
     if (c<1) r <- c <- 1
     if (c*r < ppp) c <- c + 1
@@ -108,9 +111,10 @@ plot.mvgam = function(object, type = 'smooths', series = 1, smooth_residuals = F
 
     } else { ppp<-1;oldpar<-par()}
 
+    # Plot the smooths
     for(i in 1:n_smooths){
       plot_mvgam_smooth(object = object, smooth = i, series = series,
-                        residuals = smooth_residuals)
+                        residuals = residuals)
     }
 
     invisible()

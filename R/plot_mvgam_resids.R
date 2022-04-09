@@ -308,6 +308,6 @@ abline(h = -clim, lty = 'dashed', col = 'white', lwd = 2.85)
 abline(h = -clim, lty = 'dashed', col = 'black', lwd = 2.5)
 
 invisible()
-par(.pardefault)
+par(mfrow = c(1,1))
 
 }

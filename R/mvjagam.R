@@ -321,7 +321,7 @@ mvjagam = function(formula,
     if(family == 'tw'){
       # Add small offset for Tweedie so that any zeros won't cause failures based on
       # initial values
-      data_train$y <- orig_y + 0.00001
+      #data_train$y <- orig_y + 0.00001
     } else {
       data_train$y <- orig_y
     }
@@ -543,12 +543,11 @@ for (i in 1:n) {
 
       yind_begin <- grep('y_ind\\[i, s\\] <-', model_file)
       prior_line <- yind_begin + 2
-      model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis_raw[s] ~ dbeta(4, 4);\n twdis[s] <- twdis_raw[s] + 0.5\n}'
+      model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis[s] ~ dgamma(3, 2)\n}'
       model_file <- readLines(textConnection(model_file), n = -1)
 
       if(!missing(twdis_prior)){
-        twdis_begin <- grep('twdis_raw\\[s\\] ~', model_file)
-        model_file <- model_file[-twdis_begin]
+        twdis_begin <- grep('twdis\\[s\\] ~', model_file)
         model_file[twdis_begin] <- paste0(' twdis[s] ~ ', twdis_prior)
       }
 
@@ -828,12 +827,11 @@ for (i in 1:n) {
 
         yind_begin <- grep('y_ind\\[i, s\\] <-', model_file)
         prior_line <- yind_begin + 2
-        model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis_raw[s] ~ dbeta(4, 4);\n twdis[s] <- twdis_raw[s] + 0.5\n}'
+        model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis[s] ~ dgamma(3, 2)\n}'
         model_file <- readLines(textConnection(model_file), n = -1)
 
         if(!missing(twdis_prior)){
-          twdis_begin <- grep('twdis_raw\\[s\\] ~', model_file)
-          model_file <- model_file[-twdis_begin]
+          twdis_begin <- grep('twdis\\[s\\] ~', model_file)
           model_file[twdis_begin] <- paste0(' twdis[s] ~ ', twdis_prior)
         }
 

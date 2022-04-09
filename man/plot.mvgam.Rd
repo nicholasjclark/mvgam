@@ -4,7 +4,7 @@
 \alias{plot.mvgam}
 \title{Default mvgam plots}
 \usage{
-\method{plot}{mvgam}(object, type = "smooths", series = 1, smooth_residuals = FALSE, data_test)
+\method{plot}{mvgam}(object, type = "smooths", series = 1, residuals = FALSE, data_test)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
@@ -19,7 +19,7 @@ factors}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
-\item{smooth_residuals}{\code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added
+\item{residuals}{\code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added
 to plots of 1-D smooths as a series of ribbon rectangles.}
 
 \item{data_test}{A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in

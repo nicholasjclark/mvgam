@@ -14,38 +14,32 @@ plot(y, type = 'l')
 data_train <-
   data.frame(y = y[1:125],
              season = season[1:125],
-             time = 1:125,
-             ran1 = rnorm(125),
-             ran2 = rnorm(125))
+             time = 1:125)
 data_test <-
   data.frame(y = y[126:length(season)],
              season = season[126:length(season)],
-             time = 126:length(season),
-             ran1 = rnorm(length(season)-125),
-             ran2 = rnorm(length(season)-125))
+             time = 126:length(season))
 
 # Fit dynamic GAMs
 # Poisson model
 mod1 <- mvjagam(data_train = data_train,
                 data_test = data_test,
                 formula = y ~ s(season, k = 15, bs = 'cc') +
-                  s(time, k = 8, bs = 'gp') +
-                  s(ran1) + s(ran2) + ti(ran1, ran2),
+                  s(time, k = 8, bs = 'gp'),
                 knots = list(season = c(0.5, 24.5)),
                 family = 'poisson',
                 trend_model = 'AR1',
                 chains = 4,
-                burnin = 1000)
+                burnin = 6000)
 mod1
 summary(mod1)
 predict(mod1)
-plot(mod1, type = 'smooths', smooth_residuals = T)
+plot(mod1, type = 'smooths', residuals = T)
 plot(mod1, type = 'residuals')
 plot(mod1, type = 'forecast')
 plot(mod1, type = 'uncertainty', data_test = data_test)
-
+ppc(mod1, type = 'rootogram')
 dic(mod1)
-
 
 
 # Negative binomial model
@@ -71,29 +65,30 @@ mod3 <- mvjagam(data_train = data_train,
                 burnin = 12000)
 
 # Examine DS residual distributions
-plot_mvgam_resids(mod1)
-plot_mvgam_resids(mod2)
-plot_mvgam_resids(mod3)
+plot(mod1, type = 'residuals')
+plot(mod2, type = 'residuals')
+plot(mod3, type = 'residuals')
 
 # Examine out of sample forecast distributions
-plot_mvgam_fc(mod1, data_test = data_test)
-plot_mvgam_fc(mod2, data_test = data_test)
-plot_mvgam_fc(mod3, data_test = data_test)
+plot(mod1, type = 'forecast', data_test = data_test)
+plot(mod2, type = 'forecast', data_test = data_test)
+plot(mod3, type = 'forecast', data_test = data_test)
 
 # Examine estimated temporal processes
 # Examine out of sample forecast distributions
-plot_mvgam_trend(mod1, data_test = data_test)
-plot_mvgam_trend(mod2, data_test = data_test)
-plot_mvgam_trend(mod3, data_test = data_test)
+plot(mod1, type = 'trend', data_test = data_test)
+plot(mod2, type = 'trend', data_test = data_test)
+plot(mod3, type = 'trend', data_test = data_test)
 
 # Examine estimated smooth functions
-plot_mvgam_smooth(object = mod1, series = 1,
-                  smooth = 'season', residuals = T)
-plot_mvgam_smooth(object = mod2, series = 1,
-                  smooth = 'season', residuals = T)
-plot_mvgam_smooth(object = mod3, series = 1,
-                  smooth = 'season', residuals = T)
+plot(mod1, type = 'smooth', residuals = T)
+plot(mod2, type = 'smooth', residuals = T)
+plot(mod3, type = 'smooth', residuals = T)
 
+# In-sample DICs
+dic(mod1)
+dic(mod2)
+dic(mod3)
 
 # Testing the particle filtering and compare_mvgam functions
 pfilter_mvgam_init(object = mod3, n_particles = 5000,

@@ -1,28 +1,41 @@
-#'Plot mvjagam posterior predictive checks for a specified series
+#'@title Plot mvjagam posterior predictive checks for a specified series
+#'@name ppc.mvgam
 #'@param object \code{list} object returned from \code{mvjagam}
-#'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'season' and 'year'
+#'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 #'for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
 #'included, the observed values in the test data are compared to the model's forecast distribution for exploring
 #'biases in model predictions.
 #'Note this is only useful if the same \code{data_test} was also included when fitting the original model.
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param type \code{character} specifying the type of posterior predictive check to calculate and plot.
-#'Valid options are: 'mean', 'density', 'pit' and 'cdf'
+#'Valid options are: 'rootogram', 'mean', 'density', 'pit' and 'cdf'
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
 #'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
 #'This places the legend on the inside of the plot frame at the given location.
 #'@details Posterior predictions are drawn from the fitted \code{mvjagam} and compared against
 #'the empirical distribution of the observed data for a specified series to help evaluate the model's
-#'ability to generate unbiased predictions.
-#'@return A base \code{R} graphics plot showing either the predicted vs observed mean for the
+#'ability to generate unbiased predictions. For all plots apart from the 'rootogram', posterior predictions
+#'can also be compared to out of sample observations as long as these observations were included as
+#''data_test' in the original model fit and supplied here
+#'@return A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram}),
+#'the predicted vs observed mean for the
 #'series (for \code{type == 'mean'}), kernel density or empirical CDF estimates for
 #'posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
 #'Integral Transform histogram (for \code{type == 'pit'})
+#'
+NULL
 #'@export
-plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_position){
+ppc <- function(x, what, ...){
+  UseMethod("ppc")
+}
+
+#'@rdname ppc.mvgam
+#'@method ppc mvgam
+#'@export
+ppc.mvgam = function(object, data_test, series, type = 'density', legend_position){
 
   # Check arguments
-  type <- match.arg(arg = type, choices = c("mean","density", "pit", "cdf"))
+  type <- match.arg(arg = type, choices = c("rootogram", "mean", "density", "pit", "cdf"))
 
   # Pull out observations and posterior predictions for the specified series
   data_train <- object$obs_data
@@ -37,20 +50,19 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_po
   if(!missing(data_test)){
     if(class(object$obs_data)[1] == 'list'){
       truths <- data.frame(y = data_test$y,
-                           year = data_test$year,
-                           season = data_test$season,
+                           time = data_test$time,
                            series = data_test$series) %>%
-        dplyr::arrange(year, season, series) %>%
+        dplyr::arrange(time, series) %>%
         dplyr::filter(series == s_name) %>%
         dplyr::pull(y)
 
     } else {
-    truths <- data_test %>%
-      dplyr::filter(series == s_name) %>%
-      dplyr::select(year, season, y) %>%
-      dplyr::distinct() %>%
-      dplyr::arrange(year, season) %>%
-      dplyr::pull(y)
+      truths <- data_test %>%
+        dplyr::filter(series == s_name) %>%
+        dplyr::select(time, y) %>%
+        dplyr::distinct() %>%
+        dplyr::arrange(time) %>%
+        dplyr::pull(y)
     }
 
     preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
@@ -60,19 +72,18 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_po
   } else {
     if(class(object$obs_data)[1] == 'list'){
       truths <- data.frame(y = data_train$y,
-                           year = data_train$year,
-                           season = data_train$season,
+                           time = data_train$time,
                            series = data_train$series) %>%
-        dplyr::arrange(year, season, series) %>%
+        dplyr::arrange(time, series) %>%
         dplyr::filter(series == s_name) %>%
         dplyr::pull(y)
 
     } else {
       truths <- data_train %>%
         dplyr::filter(series == s_name) %>%
-        dplyr::select(year, season, y) %>%
+        dplyr::select(time, y) %>%
         dplyr::distinct() %>%
-        dplyr::arrange(year, season) %>%
+        dplyr::arrange(time) %>%
         dplyr::pull(y)
     }
 
@@ -91,6 +102,81 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_po
   c_mid_highlight <- c("#A25050")
   c_dark <- c("#8F2727")
   c_dark_highlight <- c("#7C0000")
+
+  if(type == 'rootogram'){
+    ymax <- max(max(truths), quantile(preds, prob = 0.99))
+    xpos <- 0L:ymax
+    tpreds <- as.list(rep(NA, nrow(preds)))
+    for (i in seq_along(tpreds)) {
+      tpreds[[i]] <- table(preds[i,])
+      matches <- match(xpos, rownames(tpreds[[i]]))
+      tpreds[[i]] <- as.numeric(tpreds[[i]][matches])
+    }
+    tpreds <- do.call(rbind, tpreds)
+    tpreds[is.na(tpreds)] <- 0
+    tyquantile <- sqrt(t(apply(tpreds, 2, quantile, probs = probs)))
+    tyexp <- tyquantile[,5]
+    ty <- table(truths)
+    ty <- sqrt(as.numeric(ty[match(xpos, rownames(ty))]))
+    ty[is.na(ty)] <- 0
+    ypos <- ty / 2
+    ypos <- tyexp - ypos
+    data <- data.frame(xpos, ypos, ty, tyexp, tyquantile)
+    N <- length(xpos)
+    idx <- rep(1:N, each = 2)
+    repped_x <- rep(xpos, each = 2)
+    x <- sapply(1:length(idx),
+                function(k) if(k %% 2 == 0)
+                  repped_x[k] + min(diff(xpos))/2 else
+                    repped_x[k] - min(diff(xpos))/2)
+
+    # Plot the rootogram
+    plot(1, type = "n",
+         xlab = expression(y),
+         ylab = expression(sqrt(Count)),
+         xlim = range(xpos),
+         ylim = range(c(data$tyexp, data[,13],
+                        data[,5],
+                        data$tyexp - data$ty)))
+    rect(xleft = x[seq(1, N*2, by = 2)],
+         xright = x[seq(2, N*2, by = 2)],
+         ytop =  data$tyexp,
+         ybottom =  data$tyexp - data$ty,
+         col = 'grey80',
+         border = 'grey10',
+         lwd = 2)
+    rect(xleft = x[seq(1, N*2, by = 2)],
+         xright = x[seq(2, N*2, by = 2)],
+         ytop =  data[,13],
+         ybottom =  data[,5],
+         col = "#DCBCBC85",
+         border = 'transparent')
+    rect(xleft = x[seq(1, N*2, by = 2)],
+         xright = x[seq(2, N*2, by = 2)],
+         ytop =  data[,12],
+         ybottom =  data[,6],
+         col = "#C7999985",
+         border = 'transparent')
+    rect(xleft = x[seq(1, N*2, by = 2)],
+         xright = x[seq(2, N*2, by = 2)],
+         ytop =  data[,11],
+         ybottom =  data[,7],
+         col = "#B97C7C85",
+         border = 'transparent')
+    rect(xleft = x[seq(1, N*2, by = 2)],
+         xright = x[seq(2, N*2, by = 2)],
+         ytop =  data[,10],
+         ybottom =  data[,8],
+         col = "#A2505085",
+         border = 'transparent')
+    abline(h = 0, col = 'white', lwd = 3)
+    abline(h = 0, col = 'black', lwd = 2.5)
+    for (k in 1:N) {
+      lines(x = c(x[seq(1, N*2, by = 2)][k],x[seq(2, N*2, by = 2)][k]),
+            y = c(data[k,9], data[k,9]),
+            col = "#8F2727", lwd = 3)
+    }
+  }
 
   if(type == 'mean'){
     # Plot observed and predicted means
@@ -129,6 +215,7 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_po
            bty = 'n')
   }
 
+
   # Generate a sample sequence and plot
   if(type == 'density'){
 
@@ -148,7 +235,7 @@ plot_mvgam_ppc = function(object, data_test, series, type = 'density', legend_po
     true_dens <- density(truths, from = min_x,
                          to = max_x)
     ymax <- max(c(max(cred),
-                max(true_dens$y)))
+                  max(true_dens$y)))
 
     plot(1, type = "n",
          xlab = '',
