@@ -4,7 +4,7 @@
 \alias{ppc.mvgam}
 \title{Plot mvjagam posterior predictive checks for a specified series}
 \usage{
-\method{ppc}{mvgam}(object, data_test, series, type = "density", legend_position)
+\method{ppc}{mvgam}(object, data_test, series, type = "density", n_bins = 50, legend_position)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
@@ -19,6 +19,10 @@ Note this is only useful if the same \code{data_test} was also included when fit
 
 \item{type}{\code{character} specifying the type of posterior predictive check to calculate and plot.
 Valid options are: 'rootogram', 'mean', 'density', 'pit' and 'cdf'}
+
+\item{n_bins}{\code{integer} specifying the number of bins to use for binning observed values when plotting
+a rootogram. Default is to use \code{50} bins, which means that if there are \verb{>50} unique observed values, bins will
+be used to prevent overplotting and facilitate interpretation}
 
 \item{legend_position}{The location may also be specified by setting x to a single keyword from the
 list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
@@ -39,5 +43,6 @@ Posterior predictions are drawn from the fitted \code{mvjagam} and compared agai
 the empirical distribution of the observed data for a specified series to help evaluate the model's
 ability to generate unbiased predictions. For all plots apart from the 'rootogram', posterior predictions
 can also be compared to out of sample observations as long as these observations were included as
-'data_test' in the original model fit and supplied here
+'data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
+'hanging' style
 }

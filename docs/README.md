@@ -78,21 +78,13 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
                drift = F,
                burnin = 20000,
                chains = 4)
-#> Compiling rjags model...
-#> Starting 4 rjags simulations using a PSOCK cluster with 4 nodes on host
-#> 'localhost'
-#> Simulation complete
-#> Note: Summary statistics were not produced as there are >50 monitored
-#> variables
-#> [To override this behaviour see ?add.summary and ?runjags.options]
-#> FALSEFinished running the simulation
 #> NOTE: Stopping adaptation
 ```
 
 Perform a series of posterior predictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine simulated kernel densities for posterior predictions (`yhat`) and compare to the density of the observations (`y`)
 
 ``` r
-plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'density')
+ppc(lynx_mvgam, series = 1, type = 'density')
 ```
 
 <img src="README-unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
@@ -100,7 +92,7 @@ plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'density')
 Now plot the distribution of predicted means compared to the observed mean
 
 ``` r
-plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'mean')
+ppc(lynx_mvgam, series = 1, type = 'mean')
 ```
 
 <img src="README-unnamed-chunk-8-1.png" style="display: block; margin: auto;" />
@@ -108,28 +100,42 @@ plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'mean')
 Next examine simulated empirical Cumulative Distribution Functions (CDF) for posterior predictions (`yhat`) and compare to the CDF of the observations (`y`)
 
 ``` r
-plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'cdf')
+ppc(lynx_mvgam, series = 1, type = 'cdf')
 ```
 
 <img src="README-unnamed-chunk-9-1.png" style="display: block; margin: auto;" />
 
-Finally look for any biases in predictions by examining a Probability Integral Transform (PIT) histogram. If our predictions are not biased one way or another (i.e. not consistently under- or over-predicting), this histogram should look roughly uniform
+Rootograms are becoming [popular graphical tools for checking a discrete model's ability to capture dispersion properties of the response variable](https://arxiv.org/pdf/1605.01311.pdf). Posterior predictive hanging rootograms can be displayed using the `ppc()` function in `mvgam`. In the plot below, we bin the unique observed values into `25` bins to prevent overplotting and help with interpretation. This plot compares the frequencies of observed vs predicted values for each bin, which can help to identify aspects of poor model fit. For example, if the gray bars (representing observed frequencies) tend to stretch below zero, this suggests the model's simulations predict the values in that particular bin less frequently than they are observed in the data. A well-fitting model that can generate realistic simulated data will provide a rootogram in which the lower boundaries of the grey bars are generally near zero
 
 ``` r
-plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'pit')
+ppc(lynx_mvgam, series = 1, type = 'rootogram', n_bins = 25)
 ```
 
 <img src="README-unnamed-chunk-10-1.png" style="display: block; margin: auto;" />
 
+Finally look for any biases in predictions by examining a Probability Integral Transform (PIT) histogram. If our predictions are not biased one way or another (i.e. not consistently under- or over-predicting), this histogram should look roughly uniform
+
+``` r
+ppc(lynx_mvgam, series = 1, type = 'pit')
+```
+
+<img src="README-unnamed-chunk-11-1.png" style="display: block; margin: auto;" />
+
 All of these plots indicate the model is well calibrated against the training data, with no apparent pathological behaviors exhibited. Have a look at this model's summary to see what is being estimated (note that longer MCMC runs would probably be needed to increase effective sample sizes)
 
 ``` r
-summary_mvgam(lynx_mvgam)
+summary(lynx_mvgam)
 #> GAM formula:
 #> y ~ s(season, bs = "cc", k = 19)
 #> 
 #> Family:
 #> Poisson
+#> 
+#> Link function:
+#> log
+#> 
+#> Trend model:
+#> AR2
 #> 
 #> N series:
 #> 1
@@ -137,53 +143,56 @@ summary_mvgam(lynx_mvgam)
 #> N observations per series:
 #> 50
 #> 
+#> Status:
+#> Fitted using runjags::run.jags()
+#> 
 #> GAM smooth term approximate significances:
 #>             edf Ref.df Chi.sq p-value    
-#> s(season) 16.28  17.00  721.1  <2e-16 ***
+#> s(season) 16.35  17.00  433.4  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> GAM coefficient (beta) estimates:
 #>                    2.5%         50%       97.5% Rhat n.eff
-#> (Intercept)   6.7402986  6.87207587  7.03499145 1.09    79
-#> s(season).1  -1.1406926 -0.64944481 -0.07620630 1.25   121
-#> s(season).2  -0.2012878  0.30993748  0.88298882 1.33    94
-#> s(season).3   0.6006420  1.15648719  1.66587704 1.29    69
-#> s(season).4   1.2185839  1.70602681  2.10432010 1.21    64
-#> s(season).5   1.4447802  1.91430122  2.75104854 1.92    51
-#> s(season).6   0.3083207  1.01506546  2.01735499 2.25    53
-#> s(season).7  -1.0286500 -0.31477764  0.59560210 1.53    74
-#> s(season).8  -1.5943929 -0.84593620 -0.05917633 1.20    94
-#> s(season).9  -1.5590621 -0.89877688 -0.11168855 1.08   160
-#> s(season).10 -1.2115215 -0.43846233  0.42091257 1.04    88
-#> s(season).11 -0.4511884  0.38852845  1.09390622 1.11    76
-#> s(season).12  0.3517240  1.36688464  2.19087026 1.54    35
-#> s(season).13  0.5319749  1.33913938  2.63695317 2.01    30
-#> s(season).14  0.1667318  1.07374496  2.18012223 1.94    36
-#> s(season).15 -0.7673543 -0.02726729  0.55289598 1.35    82
-#> s(season).16 -1.5149409 -0.80481756 -0.23932188 1.07   128
-#> s(season).17 -1.6198656 -1.04398655 -0.54188889 1.08   152
+#> (Intercept)   6.6499895  6.77282057  6.90965261 1.08   110
+#> s(season).1  -1.1945043 -0.70316805 -0.19353191 1.02    96
+#> s(season).2  -0.3763193  0.23635487  0.77710126 1.04    75
+#> s(season).3   0.4134563  1.07370823  1.77251522 1.09    28
+#> s(season).4   1.0802667  1.71896480  2.35842720 1.26    35
+#> s(season).5   1.2126016  1.95225696  2.61451653 1.42    36
+#> s(season).6   0.3503449  1.03612011  1.76100663 1.12    34
+#> s(season).7  -0.8934572 -0.25798609  0.53776811 1.02    57
+#> s(season).8  -1.4306093 -0.76108780  0.01181555 1.02    71
+#> s(season).9  -1.6207012 -0.90227747 -0.14843757 1.03   117
+#> s(season).10 -1.1686178 -0.51409174  0.18910762 1.05   114
+#> s(season).11 -0.3763644  0.31820721  1.06359377 1.18    78
+#> s(season).12  0.6732042  1.39332811  2.13882995 1.41    43
+#> s(season).13  0.8827504  1.63372452  2.31486153 1.38    28
+#> s(season).14  0.6215632  1.24724055  1.99972057 1.07    28
+#> s(season).15 -0.5936375  0.04815016  0.65978588 1.05    95
+#> s(season).16 -1.3435105 -0.75309726 -0.13946592 1.12   143
+#> s(season).17 -1.6023979 -1.06368932 -0.52991254 1.11   150
 #> 
 #> GAM smoothing parameter (rho) estimates:
-#>               2.5%     50%    97.5% Rhat n.eff
-#> s(season) 3.023061 3.85911 4.549625 1.01  1379
+#>               2.5%      50%   97.5% Rhat n.eff
+#> s(season) 3.096734 3.871571 4.53649 1.01  2063
 #> 
 #> Latent trend drift (phi) and AR parameter estimates:
-#>           2.5%        50%     97.5% Rhat n.eff
-#> phi  0.0000000  0.0000000 0.0000000  NaN     0
-#> ar1  0.4446479  0.7585432 1.0595875 1.06   870
-#> ar2 -0.4075347 -0.1001537 0.2089212 1.07   768
-#> ar3  0.0000000  0.0000000 0.0000000  NaN     0
+#>           2.5%         50%     97.5% Rhat n.eff
+#> phi  0.0000000  0.00000000 0.0000000  NaN     0
+#> ar1  0.4092519  0.72030248 1.0068403    1   906
+#> ar2 -0.3893921 -0.09838423 0.2094005    1   785
+#> ar3  0.0000000  0.00000000 0.0000000  NaN     0
 #> 
 ```
 
-Of course we should always inpsect traceplots when sampling from a posterior with `MCMC` methods. Here for the `GAM` component (smoothing parameters)
+The `plot_mvgam_...()` functions offer more flexibility than the generic `S3 plot.mvgam()` functions. For example, we can inpsect traceplots when sampling from a posterior with `MCMC` methods. Here for the `GAM` component (smoothing parameters).
 
 ``` r
 plot_mvgam_trace(lynx_mvgam, 'rho')
 ```
 
-<img src="README-unnamed-chunk-12-1.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-13-1.png" style="display: block; margin: auto;" />
 
 and for the latent trend component parameters
 
@@ -191,65 +200,65 @@ and for the latent trend component parameters
 plot_mvgam_trace(lynx_mvgam, 'trend')
 ```
 
-<img src="README-unnamed-chunk-13-1.png" style="display: block; margin: auto;" /><img src="README-unnamed-chunk-13-2.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-14-1.png" style="display: block; margin: auto;" /><img src="README-unnamed-chunk-14-2.png" style="display: block; margin: auto;" />
 
 Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior quantiles of partial residuals (shown as ribbon rectangles in red), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
 
 ``` r
-plot_mvgam_smooth(lynx_mvgam, 1, 'season', residuals = T)
+plot(lynx_mvgam, type = 'smooths', residuals = T)
 ```
 
-<img src="README-unnamed-chunk-14-1.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-15-1.png" style="display: block; margin: auto;" />
 
-First derivatives of smooth functions can also be plotted to inspect how the slope of the function changes across its length
+First derivatives of smooth functions can also be plotted to inspect how the slope of the function changes across its length. To plot these we use the more flexible `plot_mvgam_smooth()` function
 
 ``` r
 plot_mvgam_smooth(lynx_mvgam, 1, 'season', derivatives = T)
 ```
 
-<img src="README-unnamed-chunk-15-1.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-16-1.png" style="display: block; margin: auto;" />
 
 We can also view the mvgam's posterior retrodictions and predictions for the entire series (testing and training)
 
 ``` r
-plot_mvgam_fc(lynx_mvgam, data_test = lynx_test)
+plot(lynx_mvgam, type = 'forecast', data_test = lynx_test)
 ```
 
-<img src="README-unnamed-chunk-16-1.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-17-1.png" style="display: block; margin: auto;" />
 
-And the estimated latent trend component, again with the option to show first derivatives
+And the estimated latent trend component, again using the more flexible `plot_mvgam_...()` option to show first derivatives of the estimated trend
 
 ``` r
 plot_mvgam_trend(lynx_mvgam, data_test = lynx_test, derivatives = T)
 ```
 
-<img src="README-unnamed-chunk-17-1.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-18-1.png" style="display: block; margin: auto;" />
 
 We can also re-do the posterior predictive checks, but this time focusing only on the out of sample period. This will give us better insight into how the model is performing and whether it is able to simulate realistic and unbiased future values
 
 ``` r
-plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'density', data_test = lynx_test)
-```
-
-<img src="README-unnamed-chunk-18-1.png" style="display: block; margin: auto;" />
-
-``` r
-plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'mean', data_test = lynx_test)
+ppc(lynx_mvgam, series = 1, type = 'density', data_test = lynx_test)
 ```
 
 <img src="README-unnamed-chunk-19-1.png" style="display: block; margin: auto;" />
 
 ``` r
-plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'cdf', data_test = lynx_test)
+ppc(lynx_mvgam, series = 1, type = 'mean', data_test = lynx_test)
 ```
 
 <img src="README-unnamed-chunk-20-1.png" style="display: block; margin: auto;" />
 
 ``` r
-plot_mvgam_ppc(lynx_mvgam, series = 1, type = 'pit', data_test = lynx_test)
+ppc(lynx_mvgam, series = 1, type = 'cdf', data_test = lynx_test)
 ```
 
 <img src="README-unnamed-chunk-21-1.png" style="display: block; margin: auto;" />
+
+``` r
+ppc(lynx_mvgam, series = 1, type = 'pit', data_test = lynx_test)
+```
+
+<img src="README-unnamed-chunk-22-1.png" style="display: block; margin: auto;" />
 
 A key aspect of ecological forecasting is to understand [how different components of a model contribute to forecast uncertainty](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589). We can estimate relative contributions to forecast uncertainty for the GAM component and the latent trend component using `mvgam`
 
@@ -261,15 +270,15 @@ text(1, 0.8, cex = 1.5, label="Trend component",
      pos = 4, col="#7C0000", family = 'serif')
 ```
 
-<img src="README-unnamed-chunk-22-1.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-23-1.png" style="display: block; margin: auto;" />
 
 Both components contribute to forecast uncertainty, suggesting we would still need some more work to learn about factors driving the dynamics of the system. But we will leave the model as-is for this example. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's residuals, which are posterior medians of Dunn-Smyth randomised quantile residuals so should follow approximate normality. We are primarily looking for a lack of autocorrelation, which would suggest our AR2 model is appropriate for the latent trend
 
 ``` r
-plot_mvgam_resids(lynx_mvgam)
+plot(lynx_mvgam, type = 'residuals')
 ```
 
-<img src="README-unnamed-chunk-23-1.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-24-1.png" style="display: block; margin: auto;" />
 
 Another useful utility of `mvgam` is the ability to use rolling window forecasts to evaluate competing models that may represent different hypotheses about the series dynamics. Here we will fit a poorly specified model to showcase how this evaluation works. In this model, we ignore the cyclic pattern of seasonality and force it to be fairly non-wiggly. We also use a random walk process for the trend
 
@@ -282,14 +291,6 @@ lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
                drift = FALSE,
                burnin = 20000,
                chains = 4)
-#> Compiling rjags model...
-#> Starting 4 rjags simulations using a PSOCK cluster with 4 nodes on host
-#> 'localhost'
-#> Simulation complete
-#> Note: Summary statistics were not produced as there are >50 monitored
-#> variables
-#> [To override this behaviour see ?add.summary and ?runjags.options]
-#> FALSEFinished running the simulation
 #> NOTE: Stopping adaptation
 ```
 
@@ -304,11 +305,11 @@ Summary statistics of the two models' out of sample Discrete Rank Probability Sc
 
 ``` r
 summary(mod1_eval$series1$drps)
-#>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   2.234   6.460  86.014 110.300 169.251 326.005
+#>     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+#>   0.3049   5.3115  98.2153  89.0318 115.8889 226.8302
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   61.35   81.06  292.86  297.28  427.07  700.39
+#>   59.16   81.11  292.59  299.99  430.72  717.14
 ```
 
 Nominal coverages for both models' 90% prediction intervals
@@ -321,3 +322,7 @@ mean(mod2_eval$series1$in_interval)
 ```
 
 The `compare_mvgams` function automates this process by rolling along a set of timepoints for each model, ensuring a more in-depth evaluation of each competing model at the same set of timepoints. There are many more extended uses for `mvgam` models, including the ability to fit dynamic factor processes for analysing and forecasting sets of multivariate discrete time series
+
+# License
+
+This project is licensed under an `MIT` open source license

@@ -9,6 +9,9 @@
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param type \code{character} specifying the type of posterior predictive check to calculate and plot.
 #'Valid options are: 'rootogram', 'mean', 'density', 'pit' and 'cdf'
+#'@param n_bins \code{integer} specifying the number of bins to use for binning observed values when plotting
+#'a rootogram. Default is to use `50` bins, which means that if there are `>50` unique observed values, bins will
+#'be used to prevent overplotting and facilitate interpretation
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
 #'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
 #'This places the legend on the inside of the plot frame at the given location.
@@ -16,7 +19,8 @@
 #'the empirical distribution of the observed data for a specified series to help evaluate the model's
 #'ability to generate unbiased predictions. For all plots apart from the 'rootogram', posterior predictions
 #'can also be compared to out of sample observations as long as these observations were included as
-#''data_test' in the original model fit and supplied here
+#''data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
+#''hanging' style
 #'@return A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram}),
 #'the predicted vs observed mean for the
 #'series (for \code{type == 'mean'}), kernel density or empirical CDF estimates for
@@ -32,7 +36,8 @@ ppc <- function(x, what, ...){
 #'@rdname ppc.mvgam
 #'@method ppc mvgam
 #'@export
-ppc.mvgam = function(object, data_test, series, type = 'density', legend_position){
+ppc.mvgam = function(object, data_test, series, type = 'density',
+                     n_bins = 50, legend_position){
 
   # Check arguments
   type <- match.arg(arg = type, choices = c("rootogram", "mean", "density", "pit", "cdf"))
@@ -45,6 +50,13 @@ ppc.mvgam = function(object, data_test, series, type = 'density', legend_positio
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
   ends <- ends[-1]
 
+  # Colours needed for plotting quantiles
+  c_light <- c("#DCBCBC")
+  c_light_highlight <- c("#C79999")
+  c_mid <- c("#B97C7C")
+  c_mid_highlight <- c("#A25050")
+  c_dark <- c("#8F2727")
+  c_dark_highlight <- c("#7C0000")
   s_name <- levels(data_train$series)[series]
 
   if(!missing(data_test)){
@@ -69,6 +81,10 @@ ppc.mvgam = function(object, data_test, series, type = 'density', legend_positio
     preds <- preds[,((NROW(data_train) / NCOL(object$ytimes))+1):
                      ((NROW(data_train) / NCOL(object$ytimes))+length(truths))]
 
+    if(NROW(preds) > 4000){
+      preds <- preds[sample(1:NROW(preds), 4000, F), ]
+    }
+
   } else {
     if(class(object$obs_data)[1] == 'list'){
       truths <- data.frame(y = data_train$y,
@@ -89,35 +105,59 @@ ppc.mvgam = function(object, data_test, series, type = 'density', legend_positio
 
     preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
     preds <- preds[,1:length(truths)]
+
+    if(NROW(preds) > 4000){
+      preds <- preds[sample(1:NROW(preds), 4000, F), ]
+    }
   }
 
   # Can't deal with missing values in these diagnostic plots
   preds <- preds[, !is.na(truths)]
   truths <- truths[!is.na(truths)]
-
-  # Colours needed for plotting quantiles
-  c_light <- c("#DCBCBC")
-  c_light_highlight <- c("#C79999")
-  c_mid <- c("#B97C7C")
-  c_mid_highlight <- c("#A25050")
-  c_dark <- c("#8F2727")
-  c_dark_highlight <- c("#7C0000")
+  probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
 
   if(type == 'rootogram'){
-    ymax <- max(max(truths), quantile(preds, prob = 0.99))
-    xpos <- 0L:ymax
-    tpreds <- as.list(rep(NA, nrow(preds)))
-    for (i in seq_along(tpreds)) {
-      tpreds[[i]] <- table(preds[i,])
-      matches <- match(xpos, rownames(tpreds[[i]]))
-      tpreds[[i]] <- as.numeric(tpreds[[i]][matches])
+    ymax <- floor(max(max(truths), quantile(preds, prob = 0.99)))
+    ymin <- 0L
+    xpos <- ymin:ymax
+
+    # Bin if necessary to prevent overplotting
+    if(length(xpos) > n_bins){
+      cutpoints <- seq(ymin, ymax, length.out = n_bins)
+      xpos <- floor(cutpoints)
+
+      # Find the cutpoint interval that each prediction falls in
+      tpreds <- as.list(rep(NA, NROW(preds)))
+      for (i in seq_along(tpreds)) {
+        tpreds[[i]] <- table(xpos[findInterval(preds[i, ], cutpoints)])
+        matches <- match(xpos, rownames(tpreds[[i]]))
+        tpreds[[i]] <- as.numeric(tpreds[[i]][matches])
+      }
+      tpreds <- do.call(rbind, tpreds)
+      tpreds[is.na(tpreds)] <- 0
+      tyquantile <- sqrt(t(apply(tpreds, 2, quantile, probs = probs)))
+      tyexp <- tyquantile[,5]
+
+      # Repeat for truths
+      ty <- table(xpos[findInterval(truths, cutpoints)])
+      ty <- sqrt(as.numeric(ty[match(xpos, rownames(ty))]))
+
+    } else {
+
+      tpreds <- as.list(rep(NA, NROW(preds)))
+      for (i in seq_along(tpreds)) {
+        tpreds[[i]] <- table(as.vector(preds[i,]))
+        matches <- match(xpos, rownames(tpreds[[i]]))
+        tpreds[[i]] <- as.numeric(tpreds[[i]][matches])
+      }
+      tpreds <- do.call(rbind, tpreds)
+      tpreds[is.na(tpreds)] <- 0
+      tyquantile <- sqrt(t(apply(tpreds, 2, quantile, probs = probs)))
+      tyexp <- tyquantile[,5]
+      ty <- table(truths)
+      ty <- sqrt(as.numeric(ty[match(xpos, rownames(ty))]))
     }
-    tpreds <- do.call(rbind, tpreds)
-    tpreds[is.na(tpreds)] <- 0
-    tyquantile <- sqrt(t(apply(tpreds, 2, quantile, probs = probs)))
-    tyexp <- tyquantile[,5]
-    ty <- table(truths)
-    ty <- sqrt(as.numeric(ty[match(xpos, rownames(ty))]))
+
     ty[is.na(ty)] <- 0
     ypos <- ty / 2
     ypos <- tyexp - ypos
@@ -133,7 +173,7 @@ ppc.mvgam = function(object, data_test, series, type = 'density', legend_positio
     # Plot the rootogram
     plot(1, type = "n",
          xlab = expression(y),
-         ylab = expression(sqrt(Count)),
+         ylab = expression(sqrt(frequency)),
          xlim = range(xpos),
          ylim = range(c(data$tyexp, data[,13],
                         data[,5],
@@ -220,7 +260,6 @@ ppc.mvgam = function(object, data_test, series, type = 'density', legend_positio
   if(type == 'density'){
 
     probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
-
     max_x <- max(density(preds[1,])$x)
     min_x <- min(density(preds[1,])$x)
     pred_densities <- do.call(rbind, (lapply(1:NROW(preds), function(x){

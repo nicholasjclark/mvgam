@@ -87,7 +87,7 @@ plot_mvgam_trend = function(object, series, data_test,
     polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
             col = c_mid_highlight, border = NA)
     lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
-    abline(h = 0, lty = 'dashed')
+    abline(h = 0, lty = 'dashed', col = 'grey70', lwd = 2)
 
     invisible()
     par(.pardefault)
