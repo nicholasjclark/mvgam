@@ -225,41 +225,41 @@ compare_mvgams(trends_mod2, trends_mod3, fc_horizon = 6,
 
 Model 3 (with the dynamic trend) provides far superior forecasts than relying only on the estimated smooths. Inspect the model summary (note again that p-value approximations are a work in progress here and so may not be totally reliable).
 ```{r}
-summary_mvgam(trends_mod3)
+summary(trends_mod3)
 ```
 
 Look at Dunn-Smyth residuals for some series from this preferred model to ensure that our dynamic factor process has captured most of the temporal dependencies in the observations
 ```{r, fig.width = 7, fig.height = 7, fig.align='center'}
-plot_mvgam_resids(trends_mod3, 1)
+plot_mvgam_resids(trends_mod3, series = 1)
 ```
 
 ```{r, fig.width = 7, fig.height = 7, fig.align='center'}
-plot_mvgam_resids(trends_mod3, 2)
+plot_mvgam_resids(trends_mod3, series = 2)
 ```
 
 ```{r, fig.width = 7, fig.height = 7, fig.align='center'}
-plot_mvgam_resids(trends_mod3, 3)
+plot_mvgam_resids(trends_mod3, series = 3)
 ```
 
 ```{r, fig.width = 7, fig.height = 7, fig.align='center'}
-plot_mvgam_resids(trends_mod3, 4)
+plot_mvgam_resids(trends_mod3, series = 4)
 ```
 
 Perform posterior predictive checks to see if the model is able to simulate data that looks realistic and unbiased by examining simulated kernel densities for posterior predictions (`yhat`) compared to the density of the observations (`y`). This will be particularly useful for examining whether the Negative Binomial observation model is able to produce realistic looking simulations for each individual series.
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod3, series = 1, type = 'density')
+ppc(trends_mod3, series = 1, type = 'density')
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod3, series = 2, type = 'density')
+ppc(trends_mod3, series = 2, type = 'density')
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod3, series = 3, type = 'density')
+ppc(trends_mod3, series = 3, type = 'density')
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod3, series = 4, type = 'density')
+ppc(trends_mod3, series = 4, type = 'density')
 ```
 
 Look at traceplots for the smoothing parameters (`rho`)
@@ -350,38 +350,38 @@ plot(stl(ts(as.vector(series$`tick bite`), frequency = 12), 'periodic'))
 
 Forecast period posterior predictive checks suggest that the model still has room for improvement: 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod3, series = 1, type = 'density', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 1, type = 'density', data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod3, series = 1, type = 'mean', data_test = trends_data$data_test)
-```
-
-
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod3, series = 2, type = 'density', data_test = trends_data$data_test)
-```
-
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod3, series = 2, type = 'mean', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 1, type = 'mean', data_test = trends_data$data_test)
 ```
 
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod3, series = 3, type = 'density', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 2, type = 'density', data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod3, series = 3, type = 'mean', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 2, type = 'mean', data_test = trends_data$data_test)
 ```
 
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod3, series = 4, type = 'density', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 3, type = 'density', data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_ppc(trends_mod3, series = 4, type = 'mean', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 3, type = 'mean', data_test = trends_data$data_test)
+```
+
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(trends_mod3, series = 4, type = 'density', data_test = trends_data$data_test)
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(trends_mod3, series = 4, type = 'mean', data_test = trends_data$data_test)
 ```
 
 Other next steps could involve devising a more goal-specific set of posterior predictive checks (see [this paper by Gelman et al](https://www.jstor.org/stable/2680852?seq=1#metadata_info_tab_contents) and [relevant works by Betancourt](https://betanalpha.github.io/assets/case_studies/principled_bayesian_workflow.html) for examples) and compare out of sample Discrete Rank Probability Scores for this model and other versions for the latent trends (i.e. AR2, AR3, Random Walk)

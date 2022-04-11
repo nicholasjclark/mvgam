@@ -7,7 +7,7 @@ set.seed(15)
 y = rpois(length(season),
           lambda = mgcv::rTweedie(mu = exp(-0.9 + mean_func(season) +
                                              cumsum(rnorm(length(season), sd = 0.075))),
-                                  p = 1.5, phi = 1.1))
+                                  p = 1.5, phi = 1.25))
 plot(y, type = 'l')
 
 # Split data into training and testing
@@ -31,16 +31,6 @@ mod1 <- mvjagam(data_train = data_train,
                 trend_model = 'AR1',
                 chains = 4,
                 burnin = 6000)
-mod1
-summary(mod1)
-predict(mod1)
-plot(mod1, type = 'smooths', residuals = T)
-plot(mod1, type = 'residuals')
-plot(mod1, type = 'forecast')
-plot(mod1, type = 'uncertainty', data_test = data_test)
-ppc(mod1, type = 'rootogram')
-dic(mod1)
-
 
 # Negative binomial model
 mod2 <- mvjagam(data_train = data_train,
@@ -104,4 +94,3 @@ unlink('pfilter', recursive = T, force = T)
 
 compare_mvgams(model1 = mod1, model2 = mod3,
                fc_horizon = 6, n_evaluations = 25, n_cores = 4)
-
