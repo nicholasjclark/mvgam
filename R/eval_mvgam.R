@@ -213,8 +213,7 @@ eval_mvgam = function(object,
                         'twdis',
                         'n_series',
                         'upper_bounds',
-                        'sim_ar3',
-                        'hpd'),
+                        'sim_ar3'),
                 envir = environment())
 
   pbapply::pboptions(type = "none")
@@ -537,9 +536,9 @@ eval_mvgam = function(object,
     indicator <- ifelse(ysum - truth >= 0, 1, 0)
     score <- sum((indicator - Fy(ysum))^2)
 
-    # Is value within 90% HPD?
-    interval <- hpd(fc, interval_width)
-    in_interval <- ifelse(truth <= interval[3] & truth >= interval[1], 1, 0)
+    # Is value within empirical interval?
+    interval <- quantile(fc, probs = c((1-interval_width)/2, (interval_width + (1-interval_width)/2)))
+    in_interval <- ifelse(truth <= interval[2] & truth >= interval[1], 1, 0)
     return(c(score, in_interval))
   }
 

@@ -140,49 +140,49 @@ summary(lynx_mvgam)
 #> N series:
 #> 1
 #> 
-#> N observations per series:
+#> N observations:
 #> 50
 #> 
 #> Status:
 #> Fitted using runjags::run.jags()
 #> 
 #> GAM smooth term approximate significances:
-#>             edf Ref.df Chi.sq p-value    
-#> s(season) 16.35  17.00  433.4  <2e-16 ***
+#>            edf Ref.df Chi.sq p-value    
+#> s(season) 16.3   17.0    825  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> GAM coefficient (beta) estimates:
 #>                    2.5%         50%       97.5% Rhat n.eff
-#> (Intercept)   6.6499895  6.77282057  6.90965261 1.08   110
-#> s(season).1  -1.1945043 -0.70316805 -0.19353191 1.02    96
-#> s(season).2  -0.3763193  0.23635487  0.77710126 1.04    75
-#> s(season).3   0.4134563  1.07370823  1.77251522 1.09    28
-#> s(season).4   1.0802667  1.71896480  2.35842720 1.26    35
-#> s(season).5   1.2126016  1.95225696  2.61451653 1.42    36
-#> s(season).6   0.3503449  1.03612011  1.76100663 1.12    34
-#> s(season).7  -0.8934572 -0.25798609  0.53776811 1.02    57
-#> s(season).8  -1.4306093 -0.76108780  0.01181555 1.02    71
-#> s(season).9  -1.6207012 -0.90227747 -0.14843757 1.03   117
-#> s(season).10 -1.1686178 -0.51409174  0.18910762 1.05   114
-#> s(season).11 -0.3763644  0.31820721  1.06359377 1.18    78
-#> s(season).12  0.6732042  1.39332811  2.13882995 1.41    43
-#> s(season).13  0.8827504  1.63372452  2.31486153 1.38    28
-#> s(season).14  0.6215632  1.24724055  1.99972057 1.07    28
-#> s(season).15 -0.5936375  0.04815016  0.65978588 1.05    95
-#> s(season).16 -1.3435105 -0.75309726 -0.13946592 1.12   143
-#> s(season).17 -1.6023979 -1.06368932 -0.52991254 1.11   150
+#> (Intercept)   6.6226899  6.76517708  6.91602969 1.30   102
+#> s(season).1  -1.2011624 -0.71575657 -0.20716899 1.38   141
+#> s(season).2  -0.2149871  0.22098919  0.74451158 1.17   128
+#> s(season).3   0.7635618  1.14861404  1.66890382 1.10    81
+#> s(season).4   1.2333767  1.82473253  2.32995571 1.45    59
+#> s(season).5   1.3467498  2.16947376  2.92528563 2.39    32
+#> s(season).6   0.5172846  1.32348598  1.90167622 1.74    64
+#> s(season).7  -0.6702727 -0.04995845  0.51518574 1.10   106
+#> s(season).8  -1.2621008 -0.63402916  0.04373479 1.01    92
+#> s(season).9  -1.5237466 -0.80435629 -0.02498228 1.09   110
+#> s(season).10 -1.2562719 -0.51265123  0.29132620 1.07    75
+#> s(season).11 -0.5950199  0.14359652  0.87042270 1.12    74
+#> s(season).12  0.2329999  0.98013820  1.69249843 1.61    48
+#> s(season).13 -0.1322053  1.14822888  2.06678446 1.88    41
+#> s(season).14  0.1335092  0.96192174  1.78650831 1.65    49
+#> s(season).15 -0.5537063 -0.05260065  0.53451329 1.04    99
+#> s(season).16 -1.3172003 -0.80145360 -0.16722824 1.19   196
+#> s(season).17 -1.5848958 -1.06874781 -0.51136140 1.46   152
 #> 
 #> GAM smoothing parameter (rho) estimates:
-#>               2.5%      50%   97.5% Rhat n.eff
-#> s(season) 3.096734 3.871571 4.53649 1.01  2063
+#>               2.5%      50%    97.5% Rhat n.eff
+#> s(season) 3.043383 3.887432 4.566178 1.05  1462
 #> 
 #> Latent trend drift (phi) and AR parameter estimates:
-#>           2.5%         50%     97.5% Rhat n.eff
-#> phi  0.0000000  0.00000000 0.0000000  NaN     0
-#> ar1  0.4092519  0.72030248 1.0068403    1   906
-#> ar2 -0.3893921 -0.09838423 0.2094005    1   785
-#> ar3  0.0000000  0.00000000 0.0000000  NaN     0
+#>           2.5%        50%     97.5% Rhat n.eff
+#> phi  0.0000000  0.0000000 0.0000000  NaN     0
+#> ar1  0.4420593  0.7492687 1.0579282 1.08   852
+#> ar2 -0.4394162 -0.1249333 0.1819528 1.15   836
+#> ar3  0.0000000  0.0000000 0.0000000  NaN     0
 #> 
 ```
 
@@ -305,20 +305,20 @@ Summary statistics of the two models' out of sample Discrete Rank Probability Sc
 
 ``` r
 summary(mod1_eval$series1$drps)
-#>     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-#>   0.3049   5.3115  98.2153  89.0318 115.8889 226.8302
+#>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#>   6.576  20.299  93.281  87.763 122.664 221.325
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   59.16   81.11  292.59  299.99  430.72  717.14
+#>   50.39   64.34  311.39  304.36  447.75  729.65
 ```
 
 Nominal coverages for both models' 90% prediction intervals
 
 ``` r
 mean(mod1_eval$series1$in_interval)
-#> [1] 1
+#> [1] 0.9
 mean(mod2_eval$series1$in_interval)
-#> [1] 1
+#> [1] 0.7
 ```
 
 The `compare_mvgams` function automates this process by rolling along a set of timepoints for each model, ensuring a more in-depth evaluation of each competing model at the same set of timepoints. There are many more extended uses for `mvgam` models, including the ability to fit dynamic factor processes for analysing and forecasting sets of multivariate discrete time series

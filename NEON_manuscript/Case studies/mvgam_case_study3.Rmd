@@ -16,9 +16,12 @@ library(knitr)
 opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
 ```
 
-Here we will use the `mvgam` package, which fits dynamic GAMs using MCMC sampling via the `JAGS` software (Note that `JAGS` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)), to estimate paramaters of a Bayesian distributed lag model.  These models are used to describe simultaneously non-linear and delayed functional relationships between a covariate and a response, and are sometimes referred to as exposure-lag-response models.
+Here we will use the `mvgam` package, which fits dynamic GAMs using MCMC sampling via the `JAGS` software (Note that `JAGS` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)), to estimate paramaters of a Bayesian distributed lag model.  These models are used to describe simultaneously non-linear and delayed functional relationships between a covariate and a response, and are sometimes referred to as exposure-lag-response models. If we assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a discrete response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$, the linear predictor for a dynamic distributed lag GAM with one lagged covariate is written as:
 
-Load the Portal rodents capture data, which are available from the `portalr` package
+$$log(\tilde{\boldsymbol{y}}_{t})={\boldsymbol{B}}_0+\sum\limits_{k=1}^K{f}(\boldsymbol{b}_{k,t}\boldsymbol{x}_{k,t})+\boldsymbol{z}_{t}\,,$$
+where $\boldsymbol{B}_{0}$ is the unknown intercept, the $\boldsymbol{b}$'s are unknown spline coefficients estimating how the functional effect of covariate ($\boldsymbol{x}$) on $log(\tilde{\boldsymbol{y}}_{t})$ changes over increasing lags (up to a maximum lag of ($\boldsymbol{K}$)) and $\boldsymbol{z}$ is a dynamic latent trend component. 
+
+To demonstrate how these models are estimated in `mvgam`, first we load the Portal rodents capture data, which are available from the `portalr` package
 ```{r message=FALSE, warning = FALSE}
 #devtools::install_github("nicholasjclark/mvgam")
 library(mvgam)
