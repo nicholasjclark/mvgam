@@ -183,11 +183,11 @@ summary(trends_mod2$mgcv_model)
 
 WE can also use `JAGS` routines for interrogating models. Which model minimises in-sample DIC?
 ```{r}
-runjags::extract(trends_mod1$jags_model, 'dic')
+dic(trends_mod1)
 ```
 
 ```{r}
-runjags::extract(trends_mod2$jags_model, 'dic')
+dic(trends_mod2)
 ```
 
 Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow an AR1 process, and we will rely on the exponential penalties to help regularise any un-needed factors by setting `n_lv = 4`

@@ -9,12 +9,13 @@ sim_mvgam(
   n_series = 3,
   seasonality = "shared",
   n_trends = 5,
-  trend_rel,
+  trend_rel = 0.2,
   freq = 12,
-  size_obs,
-  mu_obs,
+  family = "poisson",
+  phi_obs,
+  mu_obs = 4,
   prop_missing = 0,
-  train_prop
+  train_prop = 8.85
 )
 }
 \arguments{
@@ -31,9 +32,16 @@ or \code{hierarchical}, meaning that there is a global seasonality but each seri
 
 \item{freq}{\code{integer}. The seasonal frequency of the series}
 
-\item{size_obs}{\code{vector} of negative binomial size parameters for the series}
+\item{family}{\code{character} specifying the exponential observation family for the series. Must be either
+'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'}
 
-\item{mu_obs}{\code{vector} of negative binomial mu parameters for the series}
+\item{phi_obs}{\code{vector} of dispersion parameters for the series (i.e. \code{size} for Negative Binomial or
+\code{phi} for Tweedie; ignored for Poisson). If \code{length(phi_obs) < n_series}, the first element of \code{phi_obs} will
+be replicated \code{n_series} times}
+
+\item{mu_obs}{\code{vector} of location parameters for the series (i.e. \code{mu} for Negative Binomial or Tweedie,
+or \code{lambda} for Poisson). If \code{length(mu_obs) < n_series}, the first element of \code{mu_obs} will
+be replicated \code{n_series} times}
 
 \item{prop_missing}{\code{numeric} stating proportion of observations that are missing}
 

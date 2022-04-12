@@ -40,7 +40,7 @@ plot.mvgam = function(object, type = 'smooths',
     if(!object$use_lv){
       stop('no latent variables were fitted in the model')
     } else {
-      plot_mvgam_resids(object, series = series)
+      plot_mvgam_factors(object)
     }
   }
 
@@ -75,13 +75,19 @@ plot.mvgam = function(object, type = 'smooths',
       data.frame(label = object$mgcv_model$smooth[[x]]$label, class = class(object$mgcv_model$smooth[[x]])[1])
     }))
     n_smooths <- NROW(smooth_labs)
+    smooth_labs$smooth_index <- 1:NROW(smooth_labs)
     if(n_smooths == 0) stop("No terms to plot - nothing for plot.mvgam() to do.")
+
+    # Cannot yet make sensible plots of random effects
+    smooth_labs %>%
+      dplyr::filter(class != 'random.effect') -> smooth_labs
 
     # Check which ones plot_mvgam_smooth can handle (no more than 2 dimensions)
     plottable = function(x){
-      length(unlist(strsplit(x, ','))) <= 2
+      length(unlist(strsplit(x, ','))) <= 2 &
+        length(unlist(strsplit(x, ':'))) < 2
     }
-    which_to_plot <- (1:n_smooths)[sapply(smooth_labs$label, plottable)]
+    which_to_plot <- (smooth_labs$smooth_index)[sapply(smooth_labs$label, plottable)]
     n_smooths <- length(which_to_plot)
 
     # For remaining plots, get the needed page numbers
@@ -112,7 +118,7 @@ plot.mvgam = function(object, type = 'smooths',
     } else { ppp<-1;oldpar<-par()}
 
     # Plot the smooths
-    for(i in 1:n_smooths){
+    for(i in which_to_plot){
       plot_mvgam_smooth(object = object, smooth = i, series = series,
                         residuals = residuals)
     }

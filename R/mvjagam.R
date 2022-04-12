@@ -688,7 +688,7 @@ for (i in 1:n) {
          l.weight[t] <- exp(eta2[] * l.dist[t])
          l.var[t] <- exp(eta1[] * l.dist[t] / 2) * 1
          theta.prime[t] <- l.weight[t] * X1[t] + (1 - l.weight[t]) * X2[]
-         penalty[t] <- max(min_eps, theta.prime[t] * l.var[t])
+         penalty[t] <- max(0.0001, theta.prime[t] * l.var[t])
         }
 
         ## Latent factor loadings: standard normal with identifiability constraints

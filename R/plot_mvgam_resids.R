@@ -41,7 +41,7 @@ obs_length <- length(data_train %>%
 series_residuals <- series_residuals[, 1:obs_length]
 
 preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]][, 1:obs_length]
-median_preds <- apply(preds, 2, function(x) hpd(x)[2])
+median_preds <- apply(preds, 2, function(x) quantile(x, 0.5))
 
 .pardefault <- par(no.readonly=T)
 par(.pardefault)

@@ -94,3 +94,34 @@ unlink('pfilter', recursive = T, force = T)
 
 compare_mvgams(model1 = mod1, model2 = mod3,
                fc_horizon = 6, n_evaluations = 25, n_cores = 4)
+
+
+# Simulating data via sim_mvgam
+sim_data <- sim_mvgam(T = 120,
+                      n_series = 2,
+                      prop_missing = 0.1,
+                      n_trends = 1,
+                      train_prop = 0.833,
+                      trend_rel = 0.4,
+                      seasonality = 'shared',
+                      phi_obs = c(0.4, 1.5),
+                      mu_obs = c(4,6),
+                      family = 'tw')
+
+hier_mod <- mvjagam(data_train = sim_data$data_train,
+                    data_test = sim_data$data_test,
+                    formula = y ~ series +
+                      s(season, k = 12, m = 2, bs = 'cc'),
+                    knots = list(season = c(0.5, 12.5)),
+                    trend_model = 'AR1',
+                    family = 'tw',
+                    burnin = 5000)
+summary(hier_mod)
+plot(hier_mod, series = 1, type = 'smooths')
+plot(hier_mod, series = 1, type = 'forecast')
+plot(hier_mod, series = 2, type = 'forecast')
+plot(hier_mod, series = 1, type = 'residuals')
+plot(hier_mod, series = 2, type = 'residuals')
+ppc(hier_mod, series = 1, type = 'rootogram')
+ppc(hier_mod, series = 2, type = 'rootogram')
+

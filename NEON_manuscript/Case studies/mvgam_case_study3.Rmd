@@ -113,7 +113,7 @@ The summary of the model provides useful information on convergence for unobserv
 summary(mod1)
 ```
 
-The overdispersion parameter of the `Tweedie-Poisson` distribution is not converging, most likely because it is taking on very small values and any change in this region does not have a major impact on the resulting predictions. This is evidence that overdispersion is not fully supported. We can therefore simplify the model and estimate a `Poisson` observation process instead
+The overdispersion parameter of the `Tweedie-Poisson` distribution is not converging, most likely because it is taking on very small values and any change in this region does not have a major impact on the resulting predictions. This is evidence that overdispersion is not fully supported. We may therefore be inclined to simplify the model and estimate a `Poisson` observation process instead. A posterior summary of this model indicates better performance of the samplers
 ```{r, message=FALSE, warning=FALSE}
 mod2 <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                  te(precip, lag, k = c(8, 4)),
@@ -123,6 +123,12 @@ mod2 <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                 chains = 4,
                 burnin = 20000,
                 trend_model = 'AR1')
+summary(mod2)
+```
+
+To further ensure our model is capable of representing the dispersion of the observed time series, a posterior predictive rootogram can be visualised. This plot compares the frequencies of observed vs predicted values for each bin, which can help to identify aspects of poor model fit. For example, if the gray bars (representing observed frequencies) tend to stretch below zero, this suggests the model's simulations predict the values in that particular bin less frequently than they are observed in the data. A well-fitting model that can generate realistic simulated data will provide a rootogram in which the lower boundaries of the grey bars are generally near zero
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(mod2, type = 'rootogram')
 ```
 
 As with all other `mvgam` objects, we can create plots of the estimated forecast distribution and the dynamic latent trend process (with 1st derivatives shown to inspect time periods of substantial upward or downward change in the latent trend)

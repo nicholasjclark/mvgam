@@ -96,11 +96,11 @@ print.mvgam_prefit = function(object){
   cat(NCOL(object$ytimes), '\n')
   message()
 
-  message('N observations per series:')
-  if(class(object$obs_data) == 'list'){
-    cat(length(object$obs_data$y) / NCOL(object$ytimes), '\n')
+  message('N observations:')
+  if(class(object$obs_data)[1] == 'list'){
+    cat(length(object$obs_data$y), '\n')
   } else {
-    cat(NROW(object$obs_data) / NCOL(object$ytimes), '\n')
+    cat(NROW(object$obs_data), '\n')
   }
   message()
 

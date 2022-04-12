@@ -12,8 +12,14 @@
 #'@param n_trends \code{integer}. Number of latent dynamic factors (as random walks with drift) for generating the series' trends
 #'@param trend_rel \code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}
 #'@param freq \code{integer}. The seasonal frequency of the series
-#'@param size_obs \code{vector} of negative binomial size parameters for the series
-#'@param mu_obs \code{vector} of negative binomial mu parameters for the series
+#'@param family \code{character} specifying the exponential observation family for the series. Must be either
+#''nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'
+#'@param phi_obs \code{vector} of dispersion parameters for the series (i.e. `size` for Negative Binomial or
+#'`phi` for Tweedie; ignored for Poisson). If \code{length(phi_obs) < n_series}, the first element of `phi_obs` will
+#'be replicated `n_series` times
+#'@param mu_obs \code{vector} of location parameters for the series (i.e. `mu` for Negative Binomial or Tweedie,
+#'or `lambda` for Poisson). If \code{length(mu_obs) < n_series}, the first element of `mu_obs` will
+#'be replicated `n_series` times
 #'@param prop_missing \code{numeric} stating proportion of observations that are missing
 #'@param train_prop \code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}
 #'@return A \code{list} object containing outputs needed for \code{\link{mvjagam}}, including 'data_train' and 'data_test',
@@ -24,12 +30,16 @@ sim_mvgam = function(T = 100,
                      n_series = 3,
                      seasonality = 'shared',
                      n_trends = 5,
-                     trend_rel,
+                     trend_rel = 0.2,
                      freq = 12,
-                     size_obs,
-                     mu_obs,
+                     family = 'poisson',
+                     phi_obs,
+                     mu_obs = 4,
                      prop_missing = 0,
-                     train_prop){
+                     train_prop = 8.85){
+
+  # Check arguments
+  family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
 
   # Sample trend drift terms so they are (hopefully) not too correlated
   trend_alphas <- rnorm(n_trends, sd = 0.15)
@@ -42,8 +52,8 @@ sim_mvgam = function(T = 100,
     stop('seasonality must be either shared or hierarchical')
   }
 
-  if(missing(size_obs)){
-    size_obs <- rep(1, n_series)
+  if(missing(phi_obs)){
+    phi_obs <- rep(1, n_series)
   }
 
   if(missing(mu_obs)){
@@ -52,6 +62,14 @@ sim_mvgam = function(T = 100,
 
   if(missing(train_prop)){
     train_prop <- 0.75
+  }
+
+  if(length(phi_obs) < n_series){
+    phi_obs <- rep(phi_obs[1], n_series)
+  }
+
+  if(length(mu_obs) < n_series){
+    mu_obs <- rep(mu_obs[1], n_series)
   }
 
   # Simulate the long-term trends, which evolve as random walks + drift
@@ -80,15 +98,16 @@ sim_mvgam = function(T = 100,
   diag(corMat) <- 1
   stddev <- rep(1, n_series)
   Sigma <- stddev %*% t(stddev) * corMat
-  loadings <- MASS::mvrnorm(n = n_trends, mu = rep(0, n_series),
-                            Sigma = as.matrix(Matrix::nearPD(Sigma)$mat))
+  loadings <- matrix(MASS::mvrnorm(n = n_trends, mu = rep(0, n_series),
+                                      Sigma = as.matrix(Matrix::nearPD(Sigma)$mat)),
+                     ncol = n_series)
 
   # Simulate the shared seasonal pattern
-  stl_season <- stl(smooth::sim.es(model="ANA",frequency=freq,obs = T + 5,
-                               randomizer="rnorm")$data, 'periodic')$time.series[,1]
+  stl_season <- stl(smooth::sim.es(model = "ANA",frequency = freq, obs = T + 5,
+                               randomizer = "rnorm")$data, 'periodic')$time.series[,1]
   glob_season <- as.vector(scale(zoo::rollmean(stl_season, k = 6, na.pad = F)))
 
-  # Simulate observed series as negative binomial draws dependent on seasonality and trend
+  # Simulate observed series as discrete draws dependent on seasonality and trend
   invlogit = function(x){
     exp(x)/(1+exp(x))
   }
@@ -114,7 +133,22 @@ sim_mvgam = function(T = 100,
       obs <- scale01(invlogit(as.vector(scale(as.vector(loadings[,x] %*%  t(trends))) * trend_rel) +
                                  yseason * (1 - trend_rel)))
     }
-    out <- qnbinom(obs, size = size_obs[x], mu = mu_obs[x])
+
+    if(family == 'nb'){
+      out <- qnbinom(obs, size = phi_obs[x],
+                     mu = mu_obs[x])
+    }
+
+    if(family == 'poisson'){
+      out <- qpois(obs, lambda = mu_obs[x])
+    }
+
+    if(family == 'tw'){
+      out <- rpois(n = length(obs),
+                   lambda = tweedie::qtweedie(obs, mu = mu_obs[x],
+                                              power = 1.5, phi = phi_obs[x]))
+    }
+
     out[is.infinite(out)] <- NA
     if(prop_missing > 0){
       out[sample(seq(1, length(out)), floor(length(out) * prop_missing))] <- NA

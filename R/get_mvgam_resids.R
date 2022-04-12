@@ -7,7 +7,6 @@
 #'@author Nicholas J Clark
 #'@details Dunn-Smyth residual distributions are calculated for each series in the fitted object
 #'@return A \code{list} of residual distributions
-#'@export
 get_mvgam_resids = function(object, n_cores = 1){
 
 # Functions for calculating randomised quantile (Dunn-Smyth) residuals
