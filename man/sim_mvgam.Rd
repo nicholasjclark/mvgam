@@ -39,8 +39,7 @@ or \code{hierarchical}, meaning that there is a global seasonality but each seri
 \code{phi} for Tweedie; ignored for Poisson). If \code{length(phi_obs) < n_series}, the first element of \code{phi_obs} will
 be replicated \code{n_series} times}
 
-\item{mu_obs}{\code{vector} of location parameters for the series (i.e. \code{mu} for Negative Binomial or Tweedie,
-or \code{lambda} for Poisson). If \code{length(mu_obs) < n_series}, the first element of \code{mu_obs} will
+\item{mu_obs}{\code{vector} of location parameters for the series. If \code{length(mu_obs) < n_series}, the first element of \code{mu_obs} will
 be replicated \code{n_series} times}
 
 \item{prop_missing}{\code{numeric} stating proportion of observations that are missing}

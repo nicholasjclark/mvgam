@@ -26,7 +26,7 @@ mvjagam(
   ar_prior,
   r_prior,
   twdis_prior,
-  tau_prior,
+  sigma_prior,
   upper_bounds,
   jags_path
 )
@@ -115,8 +115,8 @@ as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tw
 \item{twdis_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Tweedie
 overdispersion parameters. Ignored if family is Poisson or Negative Binomial}
 
-\item{tau_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
-precisions used for the latent trends (ignored if \code{use_lv == TRUE})}
+\item{sigma_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
+variances used for the latent trends (ignored if \code{use_lv == TRUE})}
 
 \item{upper_bounds}{Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification

@@ -68,8 +68,8 @@
 #'as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tweedie
 #'@param twdis_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Tweedie
 #'overdispersion parameters. Ignored if family is Poisson or Negative Binomial
-#'@param tau_prior \code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
-#'precisions used for the latent trends (ignored if \code{use_lv == TRUE})
+#'@param sigma_prior \code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
+#'variances used for the latent trends (ignored if \code{use_lv == TRUE})
 #'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 #'this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
@@ -151,7 +151,7 @@ mvjagam = function(formula,
                    ar_prior,
                    r_prior,
                    twdis_prior,
-                   tau_prior,
+                   sigma_prior,
                    upper_bounds,
                    jags_path){
 
@@ -436,7 +436,7 @@ for (s in 1:n_series){
  ar2[s] ~ dnorm(0, 10)
  ar3[s] ~ dnorm(0, 10)
  tau[s] <- pow(sigma[s], -2)
- sigma[s] ~ dexp(1)
+ sigma[s] ~ dexp(4)T(0, 5)
 }
 
 ## Negative binomial likelihood functions
@@ -482,8 +482,8 @@ for (i in 1:n) {
       model_file[grep('ar3\\[s\\] ~', model_file)] <- paste0(' ar3[s] ~ ', ar_prior)
     }
 
-    if(!missing(tau_prior)){
-      model_file[grep('tau\\[s\\] ~', model_file)] <- paste0(' tau[s] ~ ', tau_prior)
+    if(!missing(sigma_prior)){
+      model_file[grep('sigma\\[s\\] ~', model_file)] <- paste0(' sigma[s] ~ ', sigma_prior)
     }
 
     if(!missing(r_prior)){
@@ -540,7 +540,7 @@ for (i in 1:n) {
 
       yind_begin <- grep('y_ind\\[i, s\\] <-', model_file)
       prior_line <- yind_begin + 2
-      model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis[s] ~ dexp(1)T(0, 20)\n}'
+      model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis_raw[s] ~ dnorm(0, 2)T(-3.5, 3.5);\n twdis[s] <- exp(twdis_raw[s])\n}'
       model_file <- readLines(textConnection(model_file), n = -1)
 
       if(!missing(twdis_prior)){
@@ -821,7 +821,7 @@ for (i in 1:n) {
 
         yind_begin <- grep('y_ind\\[i, s\\] <-', model_file)
         prior_line <- yind_begin + 2
-        model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis[s] ~ dexp(1)T(0, 20)\n}'
+        model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis_raw[s] ~ dnorm(0, 2)T(-3.5, 3.5);\n twdis[s] <- exp(twdis_raw[s])\n}'
         model_file <- readLines(textConnection(model_file), n = -1)
 
         if(!missing(twdis_prior)){

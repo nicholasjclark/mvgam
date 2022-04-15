@@ -17,8 +17,7 @@
 #'@param phi_obs \code{vector} of dispersion parameters for the series (i.e. `size` for Negative Binomial or
 #'`phi` for Tweedie; ignored for Poisson). If \code{length(phi_obs) < n_series}, the first element of `phi_obs` will
 #'be replicated `n_series` times
-#'@param mu_obs \code{vector} of location parameters for the series (i.e. `mu` for Negative Binomial or Tweedie,
-#'or `lambda` for Poisson). If \code{length(mu_obs) < n_series}, the first element of `mu_obs` will
+#'@param mu_obs \code{vector} of location parameters for the series. If \code{length(mu_obs) < n_series}, the first element of `mu_obs` will
 #'be replicated `n_series` times
 #'@param prop_missing \code{numeric} stating proportion of observations that are missing
 #'@param train_prop \code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}
@@ -57,7 +56,7 @@ sim_mvgam = function(T = 100,
   }
 
   if(missing(mu_obs)){
-    mu_obs <- sample(seq(3, 7), n_series, T)
+    mu_obs <- sample(seq(2, 6), n_series, T)
   }
 
   if(missing(train_prop)){
@@ -135,17 +134,17 @@ sim_mvgam = function(T = 100,
     }
 
     if(family == 'nb'){
-      out <- qnbinom(obs, size = phi_obs[x],
-                     mu = mu_obs[x])
+      out <- rnbinom(length(obs), size = phi_obs[x],
+                     mu = mu_obs[x]*obs)
     }
 
     if(family == 'poisson'){
-      out <- qpois(obs, lambda = mu_obs[x])
+      out <- rpois(length(obs), lambda = mu_obs[x]*obs)
     }
 
     if(family == 'tw'){
       out <- rpois(n = length(obs),
-                   lambda = tweedie::qtweedie(obs, mu = mu_obs[x],
+                   lambda = tweedie::rtweedie(length(obs), mu = mu_obs[x]*obs,
                                               power = 1.5, phi = phi_obs[x]))
     }
 

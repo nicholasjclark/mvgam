@@ -60,6 +60,26 @@ ppc.mvgam = function(object, data_test, series, type = 'density',
   s_name <- levels(data_train$series)[series]
 
   if(!missing(data_test)){
+
+    if(class(data_test)[1] == 'list'){
+      if(!'time' %in% names(data_test)){
+        stop('data_test does not contain a "time" column')
+      }
+
+      if(!'series' %in% names(data_test)){
+        data_test$series <- factor('series1')
+      }
+
+    } else {
+      if(!'time' %in% colnames(data_test)){
+        stop('data_test does not contain a "time" column')
+      }
+
+      if(!'series' %in% colnames(data_test)){
+        data_test$series <- factor('series1')
+      }
+    }
+
     if(class(object$obs_data)[1] == 'list'){
       truths <- data.frame(y = data_test$y,
                            time = data_test$time,
