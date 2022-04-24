@@ -46,7 +46,7 @@ Note that this currently is only supported for plotting univariate smooths}
 A base \code{R} graphics plot
 }
 \description{
-This function plots credible intervals for a series-specific smooth term on the scale of the linear predictor
+This function plots posterior empirical quantiles for a series-specific smooth term
 }
 \details{
 Smooth functions are shown as empirical quantiles of posterior partial expectations

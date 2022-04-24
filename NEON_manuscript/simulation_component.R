@@ -31,29 +31,13 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                         seasonality = 'hierarchical')
 
   # Fit a multivariate gam with no seasonality (null model)
-  t <- Sys.time()
   nullmod <- mvjagam(data_train = sim_data$data_train,
                   data_test = sim_data$data_test,
                   formula = y ~ s(series, bs = 're'),
                   family = 'nb',
+                  trend_model = 'RW',
                   use_lv = T,
-                  n.burnin = 1000,
-                  auto_update = F)
-  difftime(Sys.time(), t, units = "mins")[[1]] -> comp_time
-
-  # Record model computational times and summary of key effective sample sizes
-  model_efficiency <- data.frame(model = c('null', 'hierarchical'),
-                                 comp_time = NA,
-                                 beta_eff_lower = NA,
-                                 beta_eff_med = NA,
-                                 beta_eff_upper = NA,
-                                 ypred_eff_lower = NA,
-                                 ypred_eff_med = NA,
-                                 ypred_eff_upper = NA)
-
-  model_efficiency[1,] <- c('null', comp_time,
-                            hpd(MCMCvis::MCMCsummary(nullmod$jags_output, 'b')$n.eff, 0.9),
-                            hpd(MCMCvis::MCMCsummary(nullmod$jags_output, 'ypred')$n.eff, 0.9))
+                  burnin = 1000)
 
   # Calculate model out of sample DRPS and 90% interval coverage
   model_drps <- data.frame(model = c('null', 'hierarchical', 'mgcv_hierarchical'),
@@ -72,18 +56,11 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                            coverage = NA)
   model_coverages[1,] <- c('null', sum(all_drps$In_90, na.rm = T) / length(which(!is.na(all_drps$Truth))))
 
-  # Calculate model in-sample deviance
-  model_dics <- data.frame(model = c('null', 'hierarchical'),
-                           dic_lower = NA,
-                           dic_med = NA,
-                           dic_upper = NA)
-  model_dics[1,] <- c('null', hpd(dic.samples(nullmod$jags_model, 500)$deviance, 0.9))
-
   # Calculate trend correlations
   model_correlations <- data.frame(model = c('null', 'hierarchical'),
                                   correlations_wrong = NA,
                                   total_correlations = NA)
-  correlations <- lv_correlations(object = nullmod, data_train = sim_data$data_train)
+  correlations <- lv_correlations(object = nullmod)
 
   # Compare to truth by calculating proportion of true associations (>0.2) that were correctly detected
   compare_correlations = function(truth, estimated){
@@ -103,7 +80,6 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                                                            correlations$mean_correlations))
 
   # Fit a multivariate gam with hierarchical seasonality
-  t <- Sys.time()
   hier_mod <- mvjagam(data_train = sim_data$data_train,
                       data_test = sim_data$data_test,
                       formula = y ~ s(series, bs = 're') +
@@ -111,15 +87,11 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                         s(season, by = series, m = 1, k = 4),
                       knots = list(season = c(0.5, 12.5)),
                       family = 'nb',
+                      trend_model = 'RW',
                       use_lv = T,
-                      n.burnin = 2000,
-                      auto_update = F)
-  difftime(Sys.time(), t, units = "mins")[[1]] -> comp_time
+                      burnin = 4000)
 
   # Extract all performance information
-  model_efficiency[2,] <- c('hierarchical', comp_time,
-                            hpd(MCMCvis::MCMCsummary(hier_mod$jags_output, 'b')$n.eff, 0.9),
-                            hpd(MCMCvis::MCMCsummary(hier_mod$jags_output, 'ypred')$n.eff, 0.9))
   all_drps <- do.call(rbind, lapply(seq_len(run_parameters$n_series[x]), function(series){
     calculate_drps(out_gam_mod = hier_mod, data_test = sim_data$data_test,
                    data_train = sim_data$data_train, series = series, interval_width = 0.9)
@@ -127,9 +99,8 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
     dplyr::mutate(norm_drps = DRPS * (1 / Horizon))
 
   model_drps[2,] <- c('hierarchical', quantile(all_drps$norm_drps, probs = c(0.1, 0.5, 0.9), na.rm = T))
-  model_dics[2,] <- c('hierarchical', hpd(dic.samples(hier_mod$jags_model, 500)$deviance, 0.9))
   model_coverages[2,] <- c('hierarchical', sum(all_drps$In_90, na.rm = T) / length(which(!is.na(all_drps$Truth))))
-  correlations <- lv_correlations(object = hier_mod, data_train = sim_data$data_train)
+  correlations <- lv_correlations(object = hier_mod)
   model_correlations[2,] <- c('hierarchical', compare_correlations(sim_data$true_corrs,
                                                              correlations$mean_correlations))
 
@@ -159,21 +130,16 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
   })) %>%
     dplyr::mutate(norm_drps = DRPS * (1 / Horizon))
   model_drps[3,] <- c('mgcv_hierarchical', quantile(all_drps$norm_drps, probs = c(0.1, 0.5, 0.9), na.rm = T))
-  model_coverages[3,] <- c('mgcv_hierarchical', sum(all_drps$In_90, na.rm = T) / length(which(!is.na(all_drps$Truth))))
+  model_coverages[3,] <- c('mgcv_hierarchical',
+                           sum(all_drps$In_90, na.rm = T) / length(which(!is.na(all_drps$Truth))))
 
   rm(hier_mod, mgcv_hier_mod, nullmod)
   gc()
 
   # Return performance information
-  model_efficiency$T= run_parameters$T[x]
-  model_efficiency$n_series = run_parameters$n_series[x]
-  model_efficiency$size_obs = run_parameters$size_obs[x]
-  model_efficiency$prop_missing = run_parameters$prop_missing[x]
   list(model_correlations = model_correlations,
-       model_dics = model_dics,
        model_drps = model_drps,
-       model_coverages = model_coverages,
-       model_efficiencies = model_efficiency)
+       model_coverages = model_coverages)
 
 })
 dir.create('Results')

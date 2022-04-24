@@ -47,6 +47,7 @@ pfilter_mvgam_online = function(data_assim,
 
     n_series <- length(unique(obs_data$series))
     all_needed_names <- names(obs_data)
+
     # Find indices of next observation
     data_assim_orig <- data_assim
     list_names <- names(data_assim_orig)
@@ -94,7 +95,6 @@ pfilter_mvgam_online = function(data_assim,
         TRUE ~ 'no'
       )) -> data_assim
   }
-
 
   # Stop if all observations already assimilated
   if(all(data_assim$assimilated == 'yes')){

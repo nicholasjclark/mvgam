@@ -7,30 +7,50 @@
 #'@param type \code{character} specifying which type of plot to return. Options are:
 #'residuals,
 #'smooths,
+#'re (random effect smooths),
+#'pterms (parametric effects),
 #'forecast,
 #'trend,
 #'uncertainty,
 #'factors
-#'@param series \code{integer} specifying which series in the set is to be plotted
+#'@param series \code{integer} specifying which series in the set is to be plotted. This is ignored
+#'if \code{type == 're'}
 #'@param residuals \code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added
 #'to plots of 1-D smooths as a series of ribbon rectangles.
 #'@param data_test A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}. This argument is optional when
 #'plotting out of sample forecast period observations (when \code{type = forecast}) and required when plotting
 #'uncertainty components (\code{type = uncertainty}).
-#'@details These plots are useful for getting an overview of the fitted model and its estimated smooth functions,
-#'but the individual plotting functions offer more customisation.
+#'@details These plots are useful for getting an overview of the fitted model and its estimated
+#'random effects or smooth functions,
+#'but the individual plotting functions generally offer more customisation.
 #'@seealso \code{\link{plot_mvgam_resids}}, \code{\link{plot_mvgam_smooth}}, \code{\link{plot_mvgam_fc}},
-#'\code{\link{plot_mvgam_trend}}, \code{\link{plot_mvgam_uncertainty}}, \code{\link{plot_mvgam_factors}}
+#'\code{\link{plot_mvgam_trend}}, \code{\link{plot_mvgam_uncertainty}}, \code{\link{plot_mvgam_factors}},
+#'\code{\link{plot_mvgam_randomeffects}}
 #'@author Nicholas J Clark
 #'@return A base R plot or set of plots
 #'@export
 plot.mvgam = function(object, type = 'smooths',
                       series = 1, residuals = FALSE,
                       data_test){
-  type <- match.arg(arg = type, choices = c("residuals", "smooths",
-                                            "forecast", "trend", "uncertainty",
-                                            "factors"))
+
+  # Argument checks
+  type <- match.arg(arg = type, choices = c("residuals", "smooths", "re",
+                                            "pterms", "forecast", "trend",
+                                            "uncertainty", "factors"))
+
+  if(class(object) != 'mvgam'){
+    stop('argument "object" must be of class "mvgam"')
+  }
+
+  # Other errors and warnings will propagate from individual functions below
+  if(type == 're'){
+    plot_mvgam_randomeffects(object)
+  }
+
+  if(type == 'pterms'){
+    plot_mvgam_pterms(object)
+  }
 
   if(type == 'residuals'){
     plot_mvgam_resids(object, series = series)
@@ -87,7 +107,7 @@ plot.mvgam = function(object, type = 'smooths',
       length(unlist(strsplit(x, ','))) <= 2 &
         length(unlist(strsplit(x, ':'))) < 2
     }
-    which_to_plot <- (smooth_labs$smooth_index)[sapply(smooth_labs$label, plottable)]
+    which_to_plot <- (smooth_labs$smooth_index)[sapply(as.character(smooth_labs$label), plottable)]
     n_smooths <- length(which_to_plot)
 
     # For remaining plots, get the needed page numbers

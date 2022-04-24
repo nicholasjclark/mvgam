@@ -66,7 +66,9 @@ calculate_drps = function(out_gam_mod, pred_matrix = NULL, series, data_test, da
     score <- sum((indicator - Fy(ysum))^2)
 
     # Is value within 90% HPD?
-    interval <- hpd(fc, interval_width)
+    interval <- quantile(fc, probs = c((1 - interval_width) / 2,
+                                       0.5,
+                                       interval_width - (1 - interval_width) / 2))
     in_interval <- ifelse(truth <= interval[3] & truth >= interval[1], 1, 0)
     return(c(score, in_interval))
   }
@@ -90,16 +92,16 @@ calculate_drps = function(out_gam_mod, pred_matrix = NULL, series, data_test, da
   site_name <- levels(data_train$series)[series]
   last_obs <- max(data_train %>%
                     dplyr::left_join(data_train %>%
-                                       dplyr::select(year, season) %>%
+                                       dplyr::select(time) %>%
                                        dplyr::distinct() %>%
-                                       dplyr::arrange(year, season) %>%
+                                       dplyr::arrange(time) %>%
                                        dplyr::mutate(time = dplyr::row_number()),
-                                     by = c('season', 'year')) %>%
+                                     by = c('time')) %>%
                     dplyr::filter(series == site_name) %>%
                     dplyr::pull(time))
   truth <- data_test %>%
     dplyr::filter(series == site_name) %>%
-    dplyr::arrange(year, season) %>%
+    dplyr::arrange(time) %>%
     dplyr::pull(y)
 
   if(is.null(pred_matrix)){

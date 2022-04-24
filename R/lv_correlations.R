@@ -21,7 +21,7 @@ lv_correlations = function(object){
   n_preds <- dim(MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[1]:ends[1]])[1]
 
   # Total number of observations per series
-  if(class(data_train) == 'list'){
+  if(class(data_train)[1] == 'list'){
     n_obs <- length(data_train$y) / NCOL(object$ytimes)
   } else {
     n_obs <- NROW(data_train) / NCOL(object$ytimes)

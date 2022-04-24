@@ -99,63 +99,116 @@ data_test <- list(lag = data_all$lag[175:length(data_all$y),],
                   mintemp = data_all$mintemp[175:length(data_all$y),])
 ```
 
-Now we can fit a dynamic GAM with distributed lag terms for precipitation and minimum temperature and an `AR1` process for the unobserved temporal trend. The distributed lags are set up as tensor product smooth functions (see `help(te)` for an explanation of tensor product smooth constructions in the `mgcv` package) between `lag` and each covariate. Given the overdispersion in the data, we will assume a [`Geometric-Poisson`](https://en.wikipedia.org/wiki/Geometric_Poisson_distribution) observation model, which can be [more flexible than the `Negative binomial` for modelling overdispersed count data](https://www.jstor.org/stable/2533492?origin=crossref&seq=1). In `mvgam` the `Geometric-Poisson` is estimated as a `Tweedie-Poisson` model with the power parameter `p` fixed at `1.5`
+Now we can fit a Bayesian GAM with distributed lag terms for precipitation and minimum temperature. The distributed lags are set up as tensor product smooth functions (see `help(te)` for an explanation of tensor product smooth constructions in the `mgcv` package) between `lag` and each covariate. We will start simply by assuming our data follow a `Poisson` observation process
 ```{r, message=FALSE, warning=FALSE}
 mod1 <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                  te(precip, lag, k = c(8, 4)),
                 data_train = data_train,
                 data_test = data_test,
-                family = 'tw',
+                family = 'poisson',
                 chains = 4,
-                burnin = 20000,
-                trend_model = 'AR1')
+                burnin = 25000,
+                trend_model = 'None')
 ```
 
-The summary of the model provides useful information on convergence for unobserved parameters
-```{r}
-summary(mod1)
+Posterior predictive rootograms are a useful way to explore whether a discrete model is able to capture relevant dispersion in the observed data. This plot compares the frequencies of observed vs predicted values for each bin, which can help to identify aspects of poor model fit. For example, if the gray bars (representing observed frequencies) tend to stretch below zero, this suggests the model's simulations predict the values in that particular bin less frequently than they are observed in the data. A well-fitting model that can generate realistic simulated data will provide a rootogram in which the lower boundaries of the grey bars are generally near zero
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(mod1, type = 'rootogram')
 ```
 
-The overdispersion parameter of the `Tweedie-Poisson` distribution is not converging, most likely because it is taking on very small values and any change in this region does not have a major impact on the resulting predictions. This is evidence that overdispersion is not fully supported. We may therefore be inclined to simplify the model and estimate a `Poisson` observation process instead. A posterior summary of this model indicates better performance of the samplers
+The `Poisson` model is not doing a great job of capturing dispersion, underpredicting the zeros in the data and overpredicting some of the medium-range values (counts of `~5-30`). The residual `Q-Q` plot confirms that the `Poisson` is not an appropriate distribution for these data
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot(mod1, type = 'residuals')
+```
+
+
+Given the overdispersion present in the data, we will now assume a [`Geometric-Poisson`](https://en.wikipedia.org/wiki/Geometric_Poisson_distribution) observation model, which can be [more flexible than the `Negative binomial` for modelling overdispersed count data](https://www.jstor.org/stable/2533492?origin=crossref&seq=1). In `mvgam` the `Geometric-Poisson` is estimated as a `Tweedie-Poisson` model with the power parameter `p` fixed at `1.5`
 ```{r, message=FALSE, warning=FALSE}
 mod2 <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                  te(precip, lag, k = c(8, 4)),
                 data_train = data_train,
                 data_test = data_test,
-                family = 'poisson',
+                family = 'tw',
                 chains = 4,
-                burnin = 20000,
-                trend_model = 'AR1')
-summary(mod2)
+                burnin = 25000,
+                trend_model = 'None')
 ```
 
-To further ensure our model is capable of representing the dispersion of the observed time series, a posterior predictive rootogram can be visualised. This plot compares the frequencies of observed vs predicted values for each bin, which can help to identify aspects of poor model fit. For example, if the gray bars (representing observed frequencies) tend to stretch below zero, this suggests the model's simulations predict the values in that particular bin less frequently than they are observed in the data. A well-fitting model that can generate realistic simulated data will provide a rootogram in which the lower boundaries of the grey bars are generally near zero
+The rootogram for this model looks better, though of course there is still some overprediction of medium-range values
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 ppc(mod2, type = 'rootogram')
 ```
 
-As with all other `mvgam` objects, we can create plots of the estimated forecast distribution and the dynamic latent trend process (with 1st derivatives shown to inspect time periods of substantial upward or downward change in the latent trend)
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_fc(mod2, series = 1, data_test = data_test, ylim = c(0, 100))
+However, the residual plot looks much better for this model
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot(mod2, type = 'residuals')
 ```
 
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_trend(mod2, series = 1, data_test = data_test, derivatives = T)
+The summary of the model provides useful information on convergence for unobserved parameters. Notice how strongly positive the overdispersion parameter is estimated to be, providing further evidence that this overdispersion is important to capture for these data
+```{r}
+summary(mod2)
 ```
 
-Traceplots of smooth penalties and latent trend parameters indicate good mixing and convergence of the four MCMC chains, as well as providing evidence that the data have informed posterior estimates that have shifted away from the prior distributions for many of these parameters
+As this is a timeseries and the residual plot hints at some autocorrelation remaining in the short-term lags, lets check if an `AR` latent trend process improves forecasts compared to the no-trend model. An important note here is the choice of prior for the overdispersion parameter `twdis`. This parameter and the latent trend variance can interact strongly, particularly when overdispersion is in the data high. This is because at high values of the dispersion parameter, there is less need for a latent trend to be able to capture any outliers and so the latent trend precision can go up toward infinity, approaching a space of very diffuse likelihood that forces the Gibbs samplers to take on frustratingly small step sizes. Likewise when there is not much need for overdispersion, the dispersion parameter can approach zero and move around in an equally uninformative parameter space. The latent trend operates on the log scale, so really we should not expect autocorrelated jumps in trappings of more than `6-8` from timepoint to timepoint (any larger and the trend will compete strongly with the overdispersion parameter, making it difficult for us to model the inherent overdispersion process and instead assuming it is all autocorrelation). A containment prior on the latent trend `sigma` will help achieve this
+```{r, message=FALSE, warning=FALSE}
+mod3 <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
+                 te(precip, lag, k = c(8, 4)),
+                data_train = data_train,
+                data_test = data_test,
+                family = 'tw',
+                sigma_prior = 'dexp(2.5)T(0,2)',
+                chains = 4,
+                burnin = 25000,
+                trend_model = 'AR3')
+summary(mod3)
+```
+
+A pairs plot of the logged versions of the latent trend precision and the overdispersion parameter suggest there is no strange behaviour in the joint posterior
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_trace(mod2, 'rho')
-plot_mvgam_trace(mod2, 'trend')
+plot(log(MCMCvis::MCMCchains(mod3$jags_output, 'twdis')),
+     log(MCMCvis::MCMCchains(mod3$jags_output, 'tau')),
+     ylab = 'log(tau)', xlab = 'log(twdis)', pch = 16, col = "#8F272740")
+```
+
+Our rootogram has not improved much with the addition of the latent trend
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(mod3, type = 'rootogram')
+```
+
+But there is no more evidence of autocorrelation in the residuals
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot(mod3, type = 'residuals')
+```
+
+The version with the latent trend does reduce in-sample DIC...
+```{r}
+dic(mod2)
+dic(mod3)
+```
+
+...and comparing models based on their forecasting abilities also suggests the latent trend model is superior. We will therefore stick with `mod3`, which is the distributed lag `Tweedie-Poisson` model with an `AR3` dynamic process
+```{r}
+compare_mvgams(model1 = mod2, model2 = mod3,
+               fc_horizon = 6, n_evaluations = 30, n_cores = 5)
+```
+               
+As with all other `mvgam` objects, we can create plots of the estimated forecast distribution
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_fc(mod3, series = 1, data_test = data_test, ylim = c(0, 100))
+```
+
+Traceplots of smooth penalties indicate good mixing and convergence of the four MCMC chains
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_trace(mod3, 'rho')
 ```
 
 We can also create quick plots of the estimated smooth tensor product interactions for the distributed lag terms, which basically follow `mgcv`'s two-dimensional plotting utility but uses the `mvgam`'s estimated coefficients
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_smooth(mod2, series = 1, smooth = 1)
+plot_mvgam_smooth(mod3, series = 1, smooth = 1)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_smooth(mod2, series = 1, smooth = 2)
+plot_mvgam_smooth(mod3, series = 1, smooth = 2)
 ```
 
 If you are like me then you'll find these plots rather difficult to interpret! The more intense yellow/white colours indicate higher predicted values, with the deeper red colours representing lower predicted values, but actually making sense of how the functional response is expected to change over different lags is not easy from these plots. HOwever, we can use the `predict_mvgam` function to generate much more interpretable plots. First we will focus on the effect of `mintemp` and generate a series of predictions to visualise how the estimated function changes over different lags. Set up prediction data by zeroing out all covariates apart from the covariate of interest
@@ -180,7 +233,7 @@ plot(1, type = "n",
 # value for centring the plot
 newdata$mintemp <- matrix(0, ncol = ncol(newdata$mintemp),
                          nrow = nrow(newdata$mintemp))
-preds <- predict(mod2, series = 1, newdata = newdata, type = 'link')
+preds <- predict(mod3, series = 1, newdata = newdata, type = 'link')
 offset <- mean(preds)
 
 for(i in 1:6){
@@ -193,7 +246,7 @@ for(i in 1:6){
                              length.out = length(newdata$year))
 
   # Predict on the link scale and shift by the offset so that values are roughly centred at zero
-  preds <- predict(mod2, series = 1, newdata = newdata, type = 'link') - offset
+  preds <- predict(mod3, series = 1, newdata = newdata, type = 'link') - offset
 
   # Calculate empirical prediction quantiles
   probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
@@ -227,7 +280,7 @@ newdata$mintemp <- matrix(0, ncol = ncol(newdata$mintemp),
                          nrow = nrow(newdata$mintemp))
 newdata$precip <- matrix(0, ncol = ncol(newdata$precip),
                          nrow = nrow(newdata$precip))
-preds <- predict(mod2, series = 1, newdata = newdata, type = 'link')
+preds <- predict(mod3, series = 1, newdata = newdata, type = 'link')
 offset <- mean(preds)
 plot(1, type = "n",
      xlab = 'Precipitation',
@@ -241,7 +294,7 @@ for(i in 1:6){
   newdata$precip[,i] <- seq(min(data_train$precip),
                              max(data_train$precip),
                              length.out = length(newdata$year))
-  preds <- predict(mod2, series = 1, newdata = newdata, type = 'link') - offset
+  preds <- predict(mod3, series = 1, newdata = newdata, type = 'link') - offset
   probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
   cred <- sapply(1:NCOL(preds),
                  function(n) quantile(preds[,n],
@@ -264,12 +317,12 @@ legend('topleft', legend = paste0('lag', seq(0, 5)),
 
 All of the usual functions in `mvgam` can also be used for list data objects, so long as they contain the necessary fields `series`, `season` and `year`. For example, posterior retrodictive checks for the in-sample training period: 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(mod2, series = 1, type = 'cdf')
+ppc(mod3, series = 1, type = 'cdf')
 ```
 
 and predictive checks for the out of sample forecast period (which demonstrates how the model tends to overpredict for the forecast period in this particular example):
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(mod2, data_test = data_test, series = 1, type = 'cdf')
+ppc(mod3, data_test = data_test, series = 1, type = 'cdf')
 ```
 
 Logical next steps for interrogating this model would be to trial different trend types (i.e. random walk), replace the distributed lag function for `precip` with a standard smooth function (that does not include lag interactions, as clearly the model above indicates that these are not supported) and inspect whether different covariates (such as `ndvi` or `maxtemp`) might play a role in modulating catches of `PP`. Finally, once we are satisfied that we have a well-performing model that we can understand and interrogate, we could expand up to a multivariate model by including other species as response variables. This would allow us to capture any possible unobserved dependencies in the catches of multiple co-occurring species in a single unified modelling framework

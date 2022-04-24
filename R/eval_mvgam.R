@@ -25,12 +25,37 @@ eval_mvgam = function(object,
                       fc_horizon = 3,
                       n_cores = 2){
 
+  # Check arguments
+  if(class(object) != 'mvgam'){
+    stop('argument "object" must be of class "mvgam"')
+  }
+
+  if(sign(fc_horizon) != 1){
+    stop('argument "fc_horizon" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(fc_horizon%%1 != 0){
+      stop('argument "fc_horizon" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+  if(sign(eval_timepoint) != 1){
+    stop('argument "eval_timepoint" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(eval_timepoint%%1 != 0){
+      stop('argument "eval_timepoint" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
   #### 1. Generate linear predictor matrix for covariates and extract trend estimates at timepoint
   data_train <- object$obs_data
   n_series <- NCOL(object$ytimes)
 
   # Check evaluation timepoint
-  if(class(object$obs_data) == 'list'){
+  if(class(object$obs_data)[1] == 'list'){
     all_times <- (data.frame(time = object$obs_data$time)  %>%
                          dplyr::select(time) %>%
                          dplyr::distinct() %>%
@@ -52,9 +77,9 @@ eval_mvgam = function(object,
   }
 
   # Filter training data to correct point (just following evaluation timepoint)
-  if(class(object$obs_data) == 'list'){
+  if(class(object$obs_data)[1] == 'list'){
 
-    times <- (data.frame(year = object$obs_data$time) %>%
+    times <- (data.frame(time = object$obs_data$time) %>%
         dplyr::select(time) %>%
         dplyr::distinct() %>%
         dplyr::arrange(time) %>%
@@ -91,8 +116,7 @@ eval_mvgam = function(object,
   # Linear predictor matrix for the evaluation observations
   Xp <- predict(object$mgcv_model,
                 newdata = data_assim,
-                type = 'lpmatrix',
-                newdata.guaranteed = TRUE)
+                type = 'lpmatrix')
 
   # Extract trend / latent variable estimates at the correct timepoint
   if(object$use_lv){

@@ -17,6 +17,21 @@
 #'@export
 predict.mvgam = function(object, series = 1, newdata, type = 'link'){
 
+  # Argument checks
+  if(class(object) != 'mvgam'){
+    stop('argument "object" must be of class "mvgam"')
+  }
+
+  if(sign(series) != 1){
+    stop('argument "series" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(series%%1 != 0){
+      stop('argument "series" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
   type <- match.arg(arg = type, choices = c("link", "response"))
 
   # Generate linear predictor matrix from the mgcv component
@@ -110,16 +125,16 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
         }
 
         if(family == 'Tweedie'){
-          out <- rpois(n = length(newdata$series), size = sizes[x, series],
+          out <- rpois(n = length(newdata$series),
                 lambda = mgcv::rTweedie(
                   mu = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
-                             (rnorm(length(newdata$series), 0, sqrt(1 / taus[x,series]))))),
+                             (rnorm(length(newdata$series), 0, sqrt(1 / taus[x,series])))),
                 p = ps[x],
-                phi = twdiss[x, series])
+                phi = twdiss[x, series]))
         }
 
         if(family == 'Poisson'){
-          out <- rpois(n = length(newdata$series), size = sizes[x, series],
+          out <- rpois(n = length(newdata$series),
                 lambda = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
                              (rnorm(length(newdata$series), 0, sqrt(1 / taus[x,series])))))
         }

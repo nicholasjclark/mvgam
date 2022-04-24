@@ -10,6 +10,23 @@
 #'@export
 plot_mvgam_trend = function(object, series, data_test,
                             derivatives = FALSE, hide_xlabels = FALSE){
+
+  # Check arguments
+  if(class(object) != 'mvgam'){
+    stop('argument "object" must be of class "mvgam"')
+  }
+
+  if(sign(series) != 1){
+    stop('argument "series" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(series%%1 != 0){
+      stop('argument "series" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+  # Prediction indices for the particular series
   data_train <- object$obs_data
   ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
               length.out = NCOL(object$ytimes) + 1)

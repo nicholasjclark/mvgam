@@ -12,12 +12,15 @@
 \item{type}{\code{character} specifying which type of plot to return. Options are:
 residuals,
 smooths,
+re (random effect smooths),
+pterms (parametric effects),
 forecast,
 trend,
 uncertainty,
 factors}
 
-\item{series}{\code{integer} specifying which series in the set is to be plotted}
+\item{series}{\code{integer} specifying which series in the set is to be plotted. This is ignored
+if \code{type == 're'}}
 
 \item{residuals}{\code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added
 to plots of 1-D smooths as a series of ribbon rectangles.}
@@ -35,12 +38,14 @@ This function takes a fitted \code{mvjagam} object and produces plots of smooth 
 uncertainty components
 }
 \details{
-These plots are useful for getting an overview of the fitted model and its estimated smooth functions,
-but the individual plotting functions offer more customisation.
+These plots are useful for getting an overview of the fitted model and its estimated
+random effects or smooth functions,
+but the individual plotting functions generally offer more customisation.
 }
 \seealso{
 \code{\link{plot_mvgam_resids}}, \code{\link{plot_mvgam_smooth}}, \code{\link{plot_mvgam_fc}},
-\code{\link{plot_mvgam_trend}}, \code{\link{plot_mvgam_uncertainty}}, \code{\link{plot_mvgam_factors}}
+\code{\link{plot_mvgam_trend}}, \code{\link{plot_mvgam_uncertainty}}, \code{\link{plot_mvgam_factors}},
+\code{\link{plot_mvgam_randomeffects}}
 }
 \author{
 Nicholas J Clark

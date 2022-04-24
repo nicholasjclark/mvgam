@@ -26,8 +26,13 @@ roll_eval_mvgam = function(object,
                            fc_horizon = 3,
                            n_cores = 2){
 
+  # Check arguments
+  if(class(object) != 'mvgam'){
+    stop('argument "object" must be of class "mvgam"')
+  }
+
   # Generate time variable from training data
-  if(class(object$obs_data) == 'list'){
+  if(class(object$obs_data)[1] == 'list'){
     all_timepoints <- (data.frame(time = object$obs_data$time)  %>%
                          dplyr::select(time) %>%
                          dplyr::distinct() %>%

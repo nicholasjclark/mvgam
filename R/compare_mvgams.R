@@ -33,6 +33,35 @@ compare_mvgams = function(model1,
                              n_evaluations = 10,
                              n_cores = 2){
 
+  # Check arguments
+  if(class(model1) != 'mvgam'){
+    stop('argument "model1" must be of class "mvgam"')
+  }
+
+  if(class(model2) != 'mvgam'){
+    stop('argument "model2" must be of class "mvgam"')
+  }
+
+  if(sign(fc_horizon) != 1){
+    stop('argument "fc_horizon" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(fc_horizon%%1 != 0){
+      stop('argument "fc_horizon" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+  if(sign(n_evaluations) != 1){
+    stop('argument "n_evaluations" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_evaluations%%1 != 0){
+      stop('argument "n_evaluations" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
 # Evaluate the two models
 mod1_eval <- roll_eval_mvgam(model1,
                              n_samples = n_samples,

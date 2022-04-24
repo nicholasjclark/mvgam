@@ -1,6 +1,6 @@
 #'Plot mvjagam smooth terms
 #'
-#'This function plots credible intervals for a series-specific smooth term on the scale of the linear predictor
+#'This function plots posterior empirical quantiles for a series-specific smooth term
 #'
 #'@param object \code{list} object returned from \code{mvjagam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
@@ -37,6 +37,32 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
                              derivatives = FALSE,
                              newdata){
 
+  # Check arguments
+  if(class(object) != 'mvgam'){
+    stop('argument "object" must be of class "mvgam"')
+  }
+
+  if(sign(series) != 1){
+    stop('argument "series" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(series%%1 != 0){
+      stop('argument "series" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+  if(sign(n_resid_bins) != 1){
+    stop('argument "n_resid_bins" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_resid_bins%%1 != 0){
+      stop('argument "n_resid_bins" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+  # Get smooth term names
   data_train <- object$obs_data
   smooth_terms <- unique(gsub("[\\(\\)]", "", regmatches(paste(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
                                         collapse = ','),

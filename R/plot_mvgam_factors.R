@@ -17,6 +17,11 @@
 #'@export
 plot_mvgam_factors = function(object, plot = TRUE){
 
+  # Check arguments
+  if(class(object) != 'mvgam'){
+    stop('argument "object" must be of class "mvgam"')
+  }
+
   # Check object has latent dynamic factors
   if(!object$use_lv){
     stop('No latent factors used in object')

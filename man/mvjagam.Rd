@@ -127,7 +127,7 @@ truncation entirely (i.e. there is no upper bound for each series)}
 for modelling. If missing, the path will be recovered from a call to \code{\link[runjags]{findjags}}}
 }
 \value{
-A \code{list} object containing JAGS model output, the text representation of the model file,
+A \code{list} object of class \code{mvgam} containing JAGS model output, the text representation of the model file,
 the mgcv model output (for easily generating simulations at
 unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
 for other functions in the package

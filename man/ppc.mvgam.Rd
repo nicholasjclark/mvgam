@@ -4,7 +4,14 @@
 \alias{ppc.mvgam}
 \title{Plot mvjagam posterior predictive checks for a specified series}
 \usage{
-\method{ppc}{mvgam}(object, data_test, series, type = "density", n_bins = 50, legend_position)
+\method{ppc}{mvgam}(
+  object,
+  data_test,
+  series = 1,
+  type = "density",
+  n_bins = 50,
+  legend_position
+)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
@@ -29,11 +36,11 @@ list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright"
 This places the legend on the inside of the plot frame at the given location.}
 }
 \value{
-A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram}),
+A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram'}),
 the predicted vs observed mean for the
 series (for \code{type == 'mean'}), kernel density or empirical CDF estimates for
 posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
-Integral Transform histogram (for \code{type == 'pit'})
+Integral Transform histogram (for \code{type == 'pit'}).
 }
 \description{
 Plot mvjagam posterior predictive checks for a specified series

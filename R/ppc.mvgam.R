@@ -21,11 +21,11 @@
 #'can also be compared to out of sample observations as long as these observations were included as
 #''data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
 #''hanging' style
-#'@return A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram}),
+#'@return A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram'}),
 #'the predicted vs observed mean for the
 #'series (for \code{type == 'mean'}), kernel density or empirical CDF estimates for
 #'posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
-#'Integral Transform histogram (for \code{type == 'pit'})
+#'Integral Transform histogram (for \code{type == 'pit'}).
 #'
 NULL
 #'@export
@@ -36,11 +36,35 @@ ppc <- function(x, what, ...){
 #'@rdname ppc.mvgam
 #'@method ppc mvgam
 #'@export
-ppc.mvgam = function(object, data_test, series, type = 'density',
+ppc.mvgam = function(object, data_test, series = 1, type = 'density',
                      n_bins = 50, legend_position){
 
   # Check arguments
   type <- match.arg(arg = type, choices = c("rootogram", "mean", "density", "pit", "cdf"))
+
+  if(class(object) != 'mvgam'){
+    stop('argument "object" must be of class "mvgam"')
+  }
+
+  if(sign(series) != 1){
+    stop('argument "series" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(series%%1 != 0){
+      stop('argument "series" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+  if(sign(n_bins) != 1){
+    stop('argument "n_bins" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_bins%%1 != 0){
+      stop('argument "n_bins" must be a positive integer',
+           call. = FALSE)
+    }
+  }
 
   # Pull out observations and posterior predictions for the specified series
   data_train <- object$obs_data

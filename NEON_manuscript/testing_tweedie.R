@@ -31,9 +31,21 @@ mod1 <- mvjagam(data_train = data_train,
                 trend_model = 'None',
                 chains = 4,
                 burnin = 6000)
+predict(mod1)
+print(mod1)
+plot(mod1, type = 'smooths', residuals = T)
+
+plot(mod1$resids$series1[1,] ~ data_train$season,
+     pch = 16, col = "#8F272710", cex = 0.8,
+     ylim = c(-5, 5))
+for(i in 2:300){
+  points(mod1$resids$series1[i,] ~ data_train$season,
+       pch = 16, col = "#8F272710", cex = 0.8)
+}
 
 # Check if overdispersion correctly captured
 ppc(mod1, type = 'rootogram', data_test = data_test, n_bins = 25)
+ppc(mod1, type = 'pit', data_test = data_test)
 plot(mod1, type = 'residuals')
 
 # Not captured; try Negative binomial model
@@ -47,9 +59,12 @@ mod2 <- mvjagam(data_train = data_train,
                 chains = 4,
                 burnin = 8000)
 ppc(mod2, type = 'rootogram', data_test = data_test, n_bins = 25)
+ppc(mod2, type = 'pit', data_test = data_test)
 plot(mod2, type = 'residuals')
+summary(mod2)
 
-# Better but Q-Q plot shows some problems remain; try Tweedie model
+# Dispersion parameter clearly playing a role; but
+# Q-Q plot still shows some problems remain; try Tweedie model
 mod3 <- mvjagam(data_train = data_train,
                 data_test = data_test,
                 formula = y ~ s(season, k = 15, bs = 'cc') +
@@ -60,6 +75,7 @@ mod3 <- mvjagam(data_train = data_train,
                 chains = 4,
                 burnin = 8000)
 ppc(mod3, type = 'rootogram', data_test = data_test, n_bins = 25)
+ppc(mod3, type = 'pit', data_test = data_test)
 plot(mod3, type = 'residuals')
 
 # Tweedie shows best fit in terms of capturing dispersion, with no autocorrelation left
@@ -72,6 +88,7 @@ plot(mod3, type = 'smooth', residuals = T)
 dic(mod1)
 dic(mod2)
 dic(mod3)
+
 
 # Check if AR process improves forecasts; better to estimate AR3 even if it is not as likely;
 # this is because we don't want the trend to compete with the overdispersion parameter too much;
@@ -109,6 +126,10 @@ ppc(mod3b, type = 'cdf', data_test = data_test)
 plot(mod3b, type = 'trend', data_test = data_test)
 plot(mod3b, type = 'smooth', residuals = T)
 
+
+
+
+
 # The dispersion and latent trend variance parameters can interact strongly
 # particularly when dispersion is high (less need for a latent trend so the trend precision
 # can go up to bloody infinity!; carefully selected priors are required to ensure the trend
@@ -119,26 +140,34 @@ plot(log(MCMCvis::MCMCchains(mod3b$jags_output, 'twdis')),
 
 
 # Simulating data via sim_mvgam for a further Tweedie comparison
-sim_data <- sim_mvgam(T = 120,
-                      n_series = 2,
+sim_data <- sim_mvgam(T = 60,
+                      n_series = 4,
                       prop_missing = 0.1,
                       n_trends = 2,
                       train_prop = 0.833,
                       trend_rel = 0.6,
                       seasonality = 'shared',
-                      phi_obs = c(0.4, 1.1),
-                      mu_obs = c(6, 9),
+                      phi_obs = c(0.4, 1.1, 0.4, 1.1),
+                      mu_obs = c(6, 9, 3, 12),
                       family = 'tw')
+sim_data$data_train$fake_cov <- rnorm(NROW(sim_data$data_train))
+sim_data$data_test$fake_cov <- rnorm(NROW(sim_data$data_test))
+
+sim_data$data_train$fake_cov2 <- rnorm(NROW(sim_data$data_train))
+sim_data$data_test$fake_cov2 <- rnorm(NROW(sim_data$data_test))
 
 hier_mod <- mvjagam(data_train = sim_data$data_train,
                     data_test = sim_data$data_test,
-                    formula = y ~ series +
+                    formula = y ~ fake_cov + fake_cov2 +
                       s(season, k = 12, m = 2, bs = 'cc'),
                     knots = list(season = c(0.5, 12.5)),
                     trend_model = 'AR3',
                     family = 'tw',
-                    burnin = 20000)
+                    burnin = 1000)
 summary(hier_mod)
+plot(hier_mod$mgcv_model, all.terms = T, residuals = T)
+plot(hier_mod, type = 're')
+plot(hier_mod, type = 'pterms')
 plot(hier_mod, series = 1, type = 'smooths')
 plot(hier_mod, series = 1, type = 'forecast')
 plot(hier_mod, series = 2, type = 'forecast')

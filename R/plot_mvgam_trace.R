@@ -17,7 +17,12 @@
 #'@export
 plot_mvgam_trace = function(object, param = 'rho', overlay_prior = TRUE){
 
+  # Check arguments
   param <- match.arg(arg = param, choices = c("rho", "trend", "b", "r"))
+
+  if(class(object) != 'mvgam'){
+    stop('argument "object" must be of class "mvgam"')
+  }
 
   if(param == 'rho'){
     param_names <- object$sp_names

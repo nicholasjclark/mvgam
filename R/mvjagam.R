@@ -123,7 +123,7 @@
 #'@author Nicholas J Clark
 #'
 #'@seealso \code{\link[rjags]{jags.model}}, \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
-#'@return A \code{list} object containing JAGS model output, the text representation of the model file,
+#'@return A \code{list} object of class \code{mvgam} containing JAGS model output, the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
 #'unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
 #'for other functions in the package
@@ -162,6 +162,25 @@ mvjagam = function(formula,
   if(chains == 1){
     stop('number of chains must be >1')
   }
+  if(sign(chains) != 1){
+    stop('argument "chains" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(chains%%1 != 0){
+      stop('argument "chains" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+  if(sign(burnin) != 1){
+    stop('argument "burnin" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(burnin%%1 != 0){
+      stop('argument "burnin" must be a positive integer',
+           call. = FALSE)
+    }
+  }
 
   # If the model is to be run, make sure JAGS can be located
   if(run_model){
@@ -185,7 +204,6 @@ mvjagam = function(formula,
     }
   }
 
-
   # Add series factor variable if missing
   if(class(data_train)[1] != 'list'){
   if(!'series' %in% colnames(data_train)){
@@ -200,12 +218,28 @@ mvjagam = function(formula,
   if(!'time' %in% colnames(data_train)){
     stop('data_train does not contain a "time" column')
   }
-
-  }
+    }
 
   if(class(data_train)[1] == 'list'){
+    if(!'series' %in% names(data_train)){
+      data_train$series <- factor('series1')
+      if(!missing(data_test)){
+        data_test$series <- factor('series1')
+      }
+    }
+
     if(!'time' %in% names(data_train)){
       stop('data_train does not contain a "time" column')
+    }
+  }
+
+  # Number of latent variables cannot be greater than number of series
+  if(use_lv){
+    if(missing(n_lv)){
+      n_lv <- min(2, floor(length(unique(data_train$series)) / 2))
+    }
+    if(n_lv > length(unique(data_train$series))){
+      stop('number of latent variables cannot be greater than number of series')
     }
   }
 
@@ -231,7 +265,8 @@ mvjagam = function(formula,
                             family = nb(),
                             drop.unused.levels = FALSE,
                             knots = knots,
-                            control = list(nthreads = parallel::detectCores()-1))
+                            control = list(nthreads = parallel::detectCores()-1,
+                                           maxit = 100))
       } else if(family == 'poisson'){
         ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
@@ -239,7 +274,8 @@ mvjagam = function(formula,
                             family = poisson(),
                             drop.unused.levels = FALSE,
                             knots = knots,
-                            control = list(nthreads = parallel::detectCores()-1))
+                            control = list(nthreads = parallel::detectCores()-1,
+                                           maxit = 100))
       } else {
         ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
@@ -247,7 +283,8 @@ mvjagam = function(formula,
                             family = tw(),
                             drop.unused.levels = FALSE,
                             knots = knots,
-                            control = list(nthreads = parallel::detectCores()-1))
+                            control = list(nthreads = parallel::detectCores()-1,
+                                           maxit = 100))
       }
 
     } else {

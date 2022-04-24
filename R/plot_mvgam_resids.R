@@ -14,6 +14,32 @@
 #'@export
 plot_mvgam_resids = function(object, series = 1, n_bins = 25){
 
+  # Check arguments
+  if(class(object) != 'mvgam'){
+    stop('argument "object" must be of class "mvgam"')
+  }
+
+  if(sign(series) != 1){
+    stop('argument "series" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(series%%1 != 0){
+      stop('argument "series" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+  if(sign(n_bins) != 1){
+    stop('argument "n_bins" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_bins%%1 != 0){
+      stop('argument "n_bins" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+# Plotting colours
 probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
 c_light <- c("#DCBCBC")
 c_light_highlight <- c("#C79999")
@@ -22,6 +48,7 @@ c_mid_highlight <- c("#A25050")
 c_dark <- c("#8F2727")
 c_dark_highlight <- c("#7C0000")
 
+# Prediction indices for the particular series
 data_train <- object$obs_data
 ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
             length.out = NCOL(object$ytimes) + 1)
@@ -29,20 +56,35 @@ starts <- ends + 1
 starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
 ends <- ends[-1]
 
+# Pull out series' residuals
 series_residuals <- object$resids[[series]]
 
-obs_length <- length(data_train %>%
-                       dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-                       dplyr::select(time, y) %>%
-                       dplyr::distinct() %>%
-                       dplyr::arrange(time) %>%
-                       dplyr::pull(y))
+# Get indices of training horizon
+if(class(data_train)[1] == 'list'){
+  data_train_df <- data.frame(time = data_train$time,
+                              y = data_train$y,
+                              series = data_train$series)
+  obs_length <- length(data_train_df %>%
+                         dplyr::filter(series == !!(levels(data_train_df$series)[series])) %>%
+                         dplyr::select(time, y) %>%
+                         dplyr::distinct() %>%
+                         dplyr::arrange(time) %>%
+                         dplyr::pull(y))
+} else {
+  obs_length <- length(data_train %>%
+                         dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
+                         dplyr::select(time, y) %>%
+                         dplyr::distinct() %>%
+                         dplyr::arrange(time) %>%
+                         dplyr::pull(y))
+}
 
+# Resids and predictions for only the training period
 series_residuals <- series_residuals[, 1:obs_length]
-
 preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]][, 1:obs_length]
 median_preds <- apply(preds, 2, function(x) quantile(x, 0.5))
 
+# Graphical parameters
 .pardefault <- par(no.readonly=T)
 par(.pardefault)
 par(mfrow = c(2, 2))
