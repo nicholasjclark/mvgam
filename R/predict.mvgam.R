@@ -114,7 +114,8 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
     } else {
       if(type == 'link'){
         out <- as.vector(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
-                           (rnorm(length(newdata$series), 0, sqrt(1 / taus[x,series]))))
+                           (rnorm(length(newdata$series),
+                                  0, sqrt(1 / taus[x,series]))))
       }
 
       if(type == 'response'){
@@ -128,7 +129,8 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
           out <- rpois(n = length(newdata$series),
                 lambda = mgcv::rTweedie(
                   mu = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
-                             (rnorm(length(newdata$series), 0, sqrt(1 / taus[x,series])))),
+                             (rnorm(length(newdata$series),
+                                    0, sqrt(1 / taus[x,series])))),
                 p = ps[x],
                 phi = twdiss[x, series]))
         }
@@ -136,7 +138,8 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
         if(family == 'Poisson'){
           out <- rpois(n = length(newdata$series),
                 lambda = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
-                             (rnorm(length(newdata$series), 0, sqrt(1 / taus[x,series])))))
+                             (rnorm(length(newdata$series),
+                                    0, sqrt(1 / taus[x,series])))))
         }
       }
 

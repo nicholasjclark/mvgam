@@ -12,16 +12,16 @@ calculate_pit = function(out_gam_mod, series, data_test, data_train){
   site_name <- levels(data_train$series)[series]
   last_obs <- max(data_train %>%
                     dplyr::left_join(data_train %>%
-                                       dplyr::select(year, season) %>%
+                                       dplyr::select(time) %>%
                                        dplyr::distinct() %>%
-                                       dplyr::arrange(year, season) %>%
+                                       dplyr::arrange(time) %>%
                                        dplyr::mutate(time = dplyr::row_number()),
-                                     by = c('season', 'year')) %>%
+                                     by = c('time')) %>%
                     dplyr::filter(series == site_name) %>%
                     dplyr::pull(time))
   truth <- data_test %>%
     dplyr::filter(series == site_name) %>%
-    dplyr::arrange(year, season) %>%
+    dplyr::arrange(time) %>%
     dplyr::pull(y)
 
   preds <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'ypred')[,starts[series]:ends[series]]
@@ -310,6 +310,14 @@ prep_neon_data = function(species = 'Ambloyomma_americanum', split_prop = 0.9){
   mean_gdd <- mean(model_dat$cum_gdd)
   model_dat$cum_gdd <- (model_dat$cum_gdd - mean_gdd) / sd_gdd
 
+  # Add time column
+  model_dat %>%
+    dplyr::ungroup() %>%
+    dplyr::group_by(series) %>%
+    dplyr::arrange(Year_orig, season) %>%
+    dplyr::mutate(time = seq(1, dplyr::n())) %>%
+    dplyr::ungroup() -> model_dat
+
   # Split into training and testing
   data_train = model_dat[1:(floor(nrow(model_dat) * split_prop)),]
   data_test = model_dat[((floor(nrow(model_dat) * split_prop)) + 1):nrow(model_dat),]
@@ -327,7 +335,6 @@ fit_mvgam = function(data_train,
                      use_lv = TRUE,
                      n_lv = 5,
                      phi_prior,
-                     tau_prior,
                      knots,
                      burnin = 1000,
                      n_samples = 1000,
@@ -346,8 +353,7 @@ fit_mvgam = function(data_train,
                            n_lv = n_lv,
                            chains = 4,
                            family = family,
-                           phi_prior = phi_prior,
-                           tau_prior = tau_prior)
+                           phi_prior = phi_prior)
   } else {
     out_gam_mod <- mvjagam(formula = formula,
                            data_train = data_train,
@@ -360,8 +366,7 @@ fit_mvgam = function(data_train,
                            n_lv = n_lv,
                            chains = 4,
                            family = family,
-                           phi_prior = phi_prior,
-                           tau_prior = tau_prior)
+                           phi_prior = phi_prior)
   }
 
 

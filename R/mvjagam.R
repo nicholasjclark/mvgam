@@ -250,8 +250,7 @@ mvjagam = function(formula,
   }
 
   # If there are missing values in y, use predictions from an initial mgcv model to fill
-  # these in so that initial values can be more accurate and we maintain the true
-  # size of the training dataset
+  # these in so that initial values to maintain the true size of the training dataset
   orig_y <- data_train$y
 
     if(!missing(knots)){
@@ -355,13 +354,7 @@ mvjagam = function(formula,
   if(prior_simulation){
     data_train$y <- rep(NA, length(data_train$y))
   } else {
-    if(family == 'tw'){
-      # Add small offset for Tweedie so that any zeros won't cause failures based on
-      # initial values
-      #data_train$y <- orig_y + 0.00001
-    } else {
-      data_train$y <- orig_y
-    }
+    data_train$y <- orig_y
   }
 
   # Read in the base (unmodified) jags model file
@@ -420,9 +413,12 @@ mvjagam = function(formula,
       base_model[grep(re_smooths[i],
                       base_model, fixed = T) + 1] <- paste0('  for (i in ', n_start, ':',
                                                             n_terms,
-                                                            ') { b_raw[i] ~ dnorm(0, 1)\n   b[i] <- b_raw[i] * ',
-                                                            paste0('sigma_raw', i), ' \n  }\n  ',
-                                                            paste0('sigma_raw', i), ' ~ dexp(1)')
+                                                            ') {\n   b_raw[i] ~ dnorm(0, 1)\n',
+                                                            'b[i] <- ',
+                                                            paste0('mu_raw', i), ' + b_raw[i] * ',
+                                                            paste0('sigma_raw', i), '\n  }\n  ',
+                                                            paste0('sigma_raw', i), ' ~ dexp(1)\n',
+                                                            paste0('mu_raw', i), ' ~ dnorm(0, 1)')
       base_model[grep(re_smooths[i],
                       base_model, fixed = T)] <- paste0('  ## prior (non-centred) for ', re_smooths[i], '...')
     }
@@ -434,33 +430,34 @@ mvjagam = function(formula,
 
   # Add replacement lines for trends and the linear predictor
   if(!use_lv){
-    modification <- c("model {
+    modification <- c("
+#### Begin model ####
+model {
 
 ## GAM linear predictor
 eta <- X %*% b
 
-## Mean expectations
+## mean expectations
 for (i in 1:n) {
  for (s in 1:n_series) {
   mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
  }
 }
 
-
-## State space trend estimates
-for(s in 1:n_series) {
+## trend estimates
+for (s in 1:n_series) {
  trend[1, s] ~ dnorm(0, tau[s])
 }
 
-for(s in 1:n_series) {
+for (s in 1:n_series) {
  trend[2, s] ~ dnorm(phi[s] + ar1[s]*trend[1, s], tau[s])
 }
 
-for(s in 1:n_series) {
+for (s in 1:n_series) {
  trend[3, s] ~ dnorm(phi[s] + ar1[s]*trend[2, s] + ar2[s]*trend[1, s], tau[s])
 }
 
-for (i in 4:n){
+for (i in 4:n) {
  for (s in 1:n_series){
   trend[i, s] ~ dnorm(phi[s] + ar1[s]*trend[i - 1, s] + ar2[s]*trend[i - 2, s] + ar3[s]*trend[i - 3, s], tau[s])
  }
@@ -473,10 +470,10 @@ for (s in 1:n_series){
  ar2[s] ~ dnorm(0, 10)
  ar3[s] ~ dnorm(0, 10)
  tau[s] <- pow(sigma[s], -2)
- sigma[s] ~ dexp(4)T(0, 5)
+ sigma[s] ~ dexp(1)T(0.15, 5)
 }
 
-## Negative binomial likelihood functions
+## likelihood functions
 for (i in 1:n) {
  for (s in 1:n_series) {
   y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
@@ -485,22 +482,22 @@ for (i in 1:n) {
  }
 }
 
-## Complexity penalising prior for the overdispersion parameter;
+## complexity penalising prior for the overdispersion parameter;
 ## where the likelihood reduces to a 'base' model (Poisson) unless
 ## the data support overdispersion
-for(s in 1:n_series){
+for (s in 1:n_series) {
  r[s] <- pow(r_raw[s], 2)
  r_raw[s] ~ dexp(0.05)
 }
 
-
-## Posterior predictions
+## posterior predictions
 for (i in 1:n) {
  for (s in 1:n_series) {
    ypred[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s])
  }
 }
-")
+
+## GAM-specific priors")
 
     # Create the joined model file
     fil <- tempfile(fileext = ".xt")
@@ -528,8 +525,6 @@ for (i in 1:n) {
     }
 
     if(family == 'tw'){
-      model_file[grep('## Negative binomial likelihood functions', model_file)] <- '## Tweedie likelihood functions'
-
       rate_begin <- grep('rate\\[i, s\\] <- ', model_file)
       rate_end <- rate_begin + 1
       model_file <- model_file[-c(rate_begin:rate_end)]
@@ -586,7 +581,6 @@ for (i in 1:n) {
       }
 
     } else if(family == 'poisson'){
-      model_file[grep('## Negative binomial likelihood functions', model_file)] <- '## Poisson likelihood functions'
       odis_begin <- grep('r\\[s\\] <- ', model_file) - 4
       odis_end <- odis_begin + 7
       model_file <- model_file[-c(odis_begin:odis_end)]
@@ -661,49 +655,50 @@ for (i in 1:n) {
 
       #### Use the latent variable approach to estimate dependent trends
       cat('Fitting a multivariate GAM with latent dynamic factors for the trends...\n')
-      modification <- c(
-        "model {
+      modification <- c("
+#### Begin model ####
+model {
 
         ## GAM linear predictor
         eta <- X %*% b
 
-        ## Mean expectations
+        ## mean expectations
         for (i in 1:n) {
         for (s in 1:n_series) {
         mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
         }
         }
 
-        ## Latent factors evolve as time series with penalised precisions;
+        ## latent factors evolve as time series with penalised precisions;
         ## the penalty terms force any un-needed factors to evolve as flat lines
-        for(j in 1:n_lv){
+        for (j in 1:n_lv) {
          LV[1, j] ~ dnorm(0, penalty[j])
         }
 
-        for(j in 1:n_lv){
+        for (j in 1:n_lv) {
          LV[2, j] ~ dnorm(phi[j] + ar1[j]*LV[1, j], penalty[j])
         }
 
-        for(j in 1:n_lv){
+        for (j in 1:n_lv) {
          LV[3, j] ~ dnorm(phi[j] + ar1[j]*LV[2, j] + ar2[j]*LV[1, j], penalty[j])
         }
 
-        for(i in 4:n){
-         for(j in 1:n_lv){
+        for (i in 4:n) {
+         for (j in 1:n_lv) {
           LV[i, j] ~ dnorm(phi[j] + ar1[j]*LV[i - 1, j] +
                           ar2[j]*LV[i - 2, j] + ar3[j]*LV[i - 3, j], penalty[j])
          }
         }
 
         ## AR components
-        for (s in 1:n_lv){
+        for (s in 1:n_lv) {
         phi[s] ~ dnorm(0, 10)
         ar1[s] ~ dnorm(0, 10)
         ar2[s] ~ dnorm(0, 10)
         ar3[s] ~ dnorm(0, 10)
         }
 
-        ## Shrinkage penalties for each factor squeeze the factor to a flat line and squeeze
+        ## shrinkage penalties for each factor squeeze the factor to a flat line and squeeze
         ## the entire factor toward a flat white noise process if supported by
         ## the data. The prior for individual factor penalties allows each factor to possibly
         ## have a relatively large penalty, which shrinks the prior for that factor's variance
@@ -719,7 +714,7 @@ for (i in 1:n) {
         # eta2 controls how quickly the penalties exponentially increase
         eta2 ~ dunif(-1, 1)
 
-        for(t in 1:n_lv){
+        for (t in 1:n_lv) {
          X1[t] ~ dnorm(0, 1)T(0, )
          l.dist[t] <- max(t, pi[])
          l.weight[t] <- exp(eta2[] * l.dist[t])
@@ -728,41 +723,41 @@ for (i in 1:n) {
          penalty[t] <- max(0.0001, theta.prime[t] * l.var[t])
         }
 
-        ## Latent factor loadings: standard normal with identifiability constraints
-        ## Upper triangle of loading matrix set to zero
-        for(j in 1:(n_lv - 1)){
-          for(j2 in (j + 1):n_lv){
+        ## latent factor loadings: standard normal with identifiability constraints
+        ## upper triangle of loading matrix set to zero
+        for (j in 1:(n_lv - 1)) {
+          for (j2 in (j + 1):n_lv) {
            lv_coefs[j, j2] <- 0
           }
          }
 
-        ## Positive constraints on loading diagonals
-        for(j in 1:n_lv) {
+        ## positive constraints on loading diagonals
+        for (j in 1:n_lv) {
          lv_coefs[j, j] ~ dnorm(0, 1)T(0, 1);
         }
 
-        ## Lower diagonal free
-        for(j in 2:n_lv){
-         for(j2 in 1:(j - 1)){
+        ## lower diagonal free
+        for (j in 2:n_lv) {
+         for (j2 in 1:(j - 1)) {
           lv_coefs[j, j2] ~ dnorm(0, 1)T(-1, 1);
          }
        }
 
-        ## Other elements also free
-        for(j in (n_lv + 1):n_series) {
-         for(j2 in 1:n_lv){
+        ## other elements also free
+        for (j in (n_lv + 1):n_series) {
+         for (j2 in 1:n_lv) {
           lv_coefs[j, j2] ~ dnorm(0, 1)T(-1, 1);
          }
         }
 
-        ## Trend evolution for the series depends on latent factors
-        for (i in 1:n){
-        for (s in 1:n_series){
+        ## trend evolution depends on latent factors
+        for (i in 1:n) {
+        for (s in 1:n_series) {
          trend[i, s] <- inprod(lv_coefs[s,], LV[i,])
         }
         }
 
-        ## Negative binomial likelihood functions
+        ## likelihood functions
         for (i in 1:n) {
         for (s in 1:n_series) {
         y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
@@ -771,21 +766,22 @@ for (i in 1:n) {
         }
         }
 
-        ## Complexity penalising prior for the overdispersion parameter;
+        ## complexity penalising prior for the overdispersion parameter;
         ## where the likelihood reduces to a 'base' model (Poisson) unless
         ## the data support overdispersion
-        for(s in 1:n_series){
+        for (s in 1:n_series) {
          r[s] <- pow(r_raw[s], 2)
          r_raw[s] ~ dexp(0.05)
         }
 
-        ## Posterior predictions
+        ## posterior predictions
         for (i in 1:n) {
         for (s in 1:n_series) {
         ypred[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s])
         }
         }
-        ")
+
+        ## GAM-specific priors")
 
       # Create the joined model file
       fil <- tempfile(fileext = ".xt")
@@ -809,8 +805,6 @@ for (i in 1:n) {
       }
 
       if(family == 'tw'){
-        model_file[grep('## Negative binomial likelihood functions', model_file)] <- '## Tweedie likelihood functions'
-
         rate_begin <- grep('rate\\[i, s\\] <- ', model_file)
         rate_end <- rate_begin + 1
         model_file <- model_file[-c(rate_begin:rate_end)]
@@ -867,7 +861,6 @@ for (i in 1:n) {
         }
 
       } else if(family == 'poisson'){
-        model_file[grep('## Negative binomial likelihood functions', model_file)] <- '## Poisson likelihood functions'
         odis_begin <- grep('r\\[s\\] <- ', model_file) - 4
         odis_end <- odis_begin + 7
         model_file <- model_file[-c(odis_begin:odis_end)]
@@ -931,9 +924,7 @@ for (i in 1:n) {
       } else {
         model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)'
       }
-
       model_file_jags <- textConnection(model_file)
-
   }
 
   # Covariate dataframe including training and testing observations
@@ -1104,16 +1095,84 @@ for (i in 1:n) {
     n_lv <- NULL
   }
 
+  # Get dimensions and numbers of smooth terms
+  snames <- names(ss_jagam$jags.data)[grep('S.*', names(ss_jagam$jags.data))]
+  smooth_dims <- matrix(NA, ncol = 2, nrow = length(snames))
+  for(i in 1:length(snames)){
+    smooth_dims[i,] <- dim(ss_jagam$jags.data[[snames[i]]])
+  }
+  smooth_penalty_data <- vector()
+  for(i in 1:length(snames)){
+    smooth_penalty_data[i] <- paste0('matrix ',
+                                     snames[i],
+                                     ';  mgcv smooth penalty matrix ', snames[i])
+  }
+
+  if('sp' %in% names(ss_jagam$jags.data)){
+    if(length(ss_jagam$jags.data$sp) == 1){
+      sp_data <- c(paste0('real sp;  inverse exponential location prior for smoothing parameter ',
+                        paste0(names(ss_jagam$jags.data$sp))),
+                   '___________values ranging 5 - 50 are a good start')
+    } else {
+      sp_data <- c(paste0('vector sp;  inverse exponential location priors for smoothing parameters: ',
+                        paste0(names(ss_jagam$jags.data$sp), collapse = '; ')),
+                   '___________values ranging 5 - 50 are a good start')
+    }
+
+  } else {
+    sp_data <- NULL
+  }
+
+  if('p_coefs' %in% names(ss_jagam$jags.data)){
+    parametric_ldata <- paste0('vector p_coefs;  vector (length = ',
+                               length(ss_jagam$jags.data$p_coefs),
+                               ') of prior Gaussian means for parametric effects')
+  } else {
+    parametric_ldata <- NULL
+  }
+
+  if('p_taus' %in% names(ss_jagam$jags.data)){
+    parametric_tdata <- paste0('vector p_taus;  vector (length = ',
+                               length(ss_jagam$jags.data$p_coefs),
+                               ') of prior Gaussian precisions for parametric effects')
+  } else {
+    parametric_tdata <- NULL
+  }
+
+  # Add information about the call and necessary data structures to model file
+  model_file <- c('JAGS code generated by package mvgam',
+                       '\n',
+                       'GAM formula:',
+                  gsub('\"', '', paste(formula[2],formula[3],sep=' ~ ')),
+                       '\n',
+                  'Trend model:',
+                  trend_model,
+                  '\n',
+                  'Required data:',
+                  'integer n;  number of timepoints per series\n',
+                  'integer n_series;  number of series\n',
+                  'matrix y;  time-ordered observations of dimension n x n_series (missing values allowed)\n',
+                  'matrix ytimes;  time-ordered n x n_series matrix (which row in X belongs to each [time, series] observation?)\n',
+                  'matrix X;  mgcv GAM design matrix of dimension (n x n_series) x basis dimension\n',
+                  paste0(smooth_penalty_data),
+                  'vector zero; prior basis coefficient locations vector of length ncol(X)\n',
+                  paste0(parametric_ldata),
+                  paste0(parametric_tdata),
+                  sp_data,
+                  '\n',
+                  model_file)
+
   if(!run_model){
     # Return only the model file and all data / inits needed to run the model
     # outside of mvgam
+    unlink('base_gam.txt')
     output <- structure(list(call = formula,
                              family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
                                                        family == 'poisson' ~ 'Poisson',
                                                        TRUE ~ 'Negative Binomial'),
                              trend_model = trend_model,
                              pregam = ss_jagam$pregam,
-                             model_file = model_file,
+                             model_file = trimws(model_file),
                              jags_data = ss_jagam$jags.data,
                              jags_inits = ss_jagam$jags.ini,
                              mgcv_model = ss_gam,
@@ -1172,11 +1231,6 @@ for (i in 1:n) {
   unlink('base_gam.txt')
   unlink(fil)
 
-  # Remove the small offset for Tweedie
-  if(family == 'tw'){
-    data_train$y <- orig_y
-  }
-
   # Get Dunn-Smyth Residual distributions for each series
   series_resids <- get_mvgam_resids(object = list(
     jags_output = out_gam_mod,
@@ -1215,7 +1269,7 @@ for (i in 1:n) {
                              trend_model = trend_model,
                              pregam = ss_jagam$pregam,
                              jags_output = out_gam_mod,
-                             model_file = model_file,
+                             model_file = trimws(model_file),
                              sp_names = rho_names,
                              jags_data = ss_jagam$jags.data,
                              jags_inits = ss_jagam$jags.ini,
@@ -1237,7 +1291,7 @@ for (i in 1:n) {
                              trend_model = trend_model,
                              pregam = ss_jagam$pregam,
                              jags_output = out_gam_mod,
-                             model_file = model_file,
+                             model_file = trimws(model_file),
                              sp_names = rho_names,
                              mgcv_model = ss_gam,
                              jags_model = gam_mod,

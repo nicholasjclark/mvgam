@@ -47,9 +47,8 @@ hyp3 = y ~
   s(season, by = series, m = 2, k = 4)
 
 # Fit each hypothesis
-n.burnin = 10000
-n.iter = 2000
-thin = 2
+burnin = 10000
+n_samples = 2000
 
 # Use default priors for latent drift terms and for smooth penalties
 fit_null <- fit_mvgam(data_train = all_data$data_train,
@@ -59,10 +58,8 @@ fit_null <- fit_mvgam(data_train = all_data$data_train,
                   family = 'nb',
                   use_lv = T,
                   n_lv = 10,
-                  n.burnin = n.burnin,
-                  n.iter = n.iter,
-                  thin = thin,
-                  auto_update = FALSE,
+                  burnin = burnin,
+                  n_samples = n_samples,
                   interval_width = 0.9)
 
 fit_hyp1 <- fit_mvgam(data_train = all_data$data_train,
@@ -73,10 +70,8 @@ fit_hyp1 <- fit_mvgam(data_train = all_data$data_train,
                       family = 'nb',
                       use_lv = T,
                       n_lv = 10,
-                      n.burnin = n.burnin,
-                      n.iter = n.iter,
-                      thin = thin,
-                      auto_update = FALSE,
+                      burnin = burnin,
+                      n_samples = n_samples,
                       interval_width = 0.9)
 
 fit_hyp2 <- fit_mvgam(data_train = all_data$data_train,
@@ -87,10 +82,8 @@ fit_hyp2 <- fit_mvgam(data_train = all_data$data_train,
                       family = 'nb',
                       use_lv = T,
                       n_lv = 10,
-                      n.burnin = n.burnin,
-                      n.iter = n.iter,
-                      thin = thin,
-                      auto_update = FALSE,
+                      burnin = burnin,
+                      n_samples = n_samples,
                       interval_width = 0.9)
 
 fit_hyp3 <- fit_mvgam(data_train = all_data$data_train,
@@ -101,10 +94,8 @@ fit_hyp3 <- fit_mvgam(data_train = all_data$data_train,
                       knots = list(season = c(0.5, 26.5)),
                       use_lv = T,
                       n_lv = 10,
-                      n.burnin = n.burnin,
-                      n.iter = n.iter,
-                      thin = thin,
-                      auto_update = FALSE,
+                      burnin = burnin,
+                      n_samples = n_samples,
                       interval_width = 0.9)
 
 # Save models
@@ -340,8 +331,3 @@ for(i in seq_along(levels(all_data$data_train$series))){
   invisible()
   dev.off()
 }
-
-fit_null$rho_summary
-fit_hyp1$rho_summary
-fit_hyp2$rho_summary
-fit_hyp3$rho_summary

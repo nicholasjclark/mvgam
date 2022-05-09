@@ -8,9 +8,9 @@
 #'Note this is only useful if the same \code{data_test} was also included when fitting the original model.
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param type \code{character} specifying the type of posterior predictive check to calculate and plot.
-#'Valid options are: 'rootogram', 'mean', 'density', 'pit' and 'cdf'
+#'Valid options are: 'rootogram', 'mean', 'hist', 'density', 'prop_zero', 'pit' and 'cdf'
 #'@param n_bins \code{integer} specifying the number of bins to use for binning observed values when plotting
-#'a rootogram. Default is to use `50` bins, which means that if there are `>50` unique observed values, bins will
+#'a rootogram or histogram. Default is `50` bins, which means that if there are `>50` unique observed values, bins will
 #'be used to prevent overplotting and facilitate interpretation
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
 #'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
@@ -23,7 +23,9 @@
 #''hanging' style
 #'@return A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram'}),
 #'the predicted vs observed mean for the
-#'series (for \code{type == 'mean'}), kernel density or empirical CDF estimates for
+#'series (for \code{type == 'mean'}), predicted vs observed proportion of zeroes for the
+#'series (for \code{type == 'prop_zero'}),predicted vs observed histogram for the
+#'series (for \code{type == 'hist'}), kernel density or empirical CDF estimates for
 #'posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
 #'Integral Transform histogram (for \code{type == 'pit'}).
 #'
@@ -37,10 +39,12 @@ ppc <- function(x, what, ...){
 #'@method ppc mvgam
 #'@export
 ppc.mvgam = function(object, data_test, series = 1, type = 'density',
-                     n_bins = 50, legend_position){
+                     n_bins, legend_position){
 
   # Check arguments
-  type <- match.arg(arg = type, choices = c("rootogram", "mean", "density", "pit", "cdf"))
+  type <- match.arg(arg = type, choices = c("rootogram", "mean", "hist",
+                                            "density", "pit", "cdf",
+                                            "prop_zero"))
 
   if(class(object) != 'mvgam'){
     stop('argument "object" must be of class "mvgam"')
@@ -56,13 +60,31 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
     }
   }
 
-  if(sign(n_bins) != 1){
-    stop('argument "n_bins" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(n_bins%%1 != 0){
+  if(type == 'roogrogram' & missing(n_bins)){
+    n_bins <- 50
+
+    if(sign(n_bins) != 1){
       stop('argument "n_bins" must be a positive integer',
            call. = FALSE)
+    } else {
+      if(n_bins%%1 != 0){
+        stop('argument "n_bins" must be a positive integer',
+             call. = FALSE)
+      }
+    }
+  }
+
+  if(type == 'hist' & missing(n_bins)){
+    n_bins <- 50
+
+    if(sign(n_bins) != 1){
+      stop('argument "n_bins" must be a positive integer',
+           call. = FALSE)
+    } else {
+      if(n_bins%%1 != 0){
+        stop('argument "n_bins" must be a positive integer',
+             call. = FALSE)
+      }
     }
   }
 
@@ -112,6 +134,10 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
         dplyr::filter(series == s_name) %>%
         dplyr::pull(y)
 
+      preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
+      preds <- preds[,((length(data_train$y) / NCOL(object$ytimes))+1):
+                       ((length(data_train$y) / NCOL(object$ytimes))+length(truths))]
+
     } else {
       truths <- data_test %>%
         dplyr::filter(series == s_name) %>%
@@ -119,11 +145,11 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
         dplyr::distinct() %>%
         dplyr::arrange(time) %>%
         dplyr::pull(y)
-    }
 
-    preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
-    preds <- preds[,((NROW(data_train) / NCOL(object$ytimes))+1):
-                     ((NROW(data_train) / NCOL(object$ytimes))+length(truths))]
+      preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
+      preds <- preds[,((NROW(data_train) / NCOL(object$ytimes))+1):
+                       ((NROW(data_train) / NCOL(object$ytimes))+length(truths))]
+    }
 
     if(NROW(preds) > 4000){
       preds <- preds[sample(1:NROW(preds), 4000, F), ]
@@ -159,6 +185,43 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
   preds <- preds[, !is.na(truths)]
   truths <- truths[!is.na(truths)]
   probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+
+  if(type == 'prop_zero'){
+    pred_props <- apply(preds, 1, function(x) length(which(x == 0)) / length(x))
+    lower <- quantile(pred_props, probs = 0.01)
+    upper <- quantile(pred_props, probs = 0.99)
+    pred_props <- pred_props[-which(pred_props > upper)]
+    if(lower!=0){
+      pred_props <- pred_props[-which(pred_props < lower)]
+    }
+    obs_prop <- length(which(truths == 0)) / length(truths)
+    hist(pred_props,
+         xlim = c(min(min(pred_props), min(obs_prop)),
+                  max(max(pred_props), max(obs_prop))),
+         main = '',
+         breaks = seq(min(pred_props), max(pred_props),
+                      length.out = 15),
+         border = "#B97C7C",
+         col = "#C79999",
+         ylab = 'Density',
+         xlab = paste0('Predicted proportion of zeroes for ', levels(data_train$series)[series]))
+    abline(v = obs_prop, lwd = 3, col = 'white')
+    abline(v = obs_prop, lwd = 2.5, col = 'black')
+    box()
+
+    if(missing(legend_position)){
+      legend_position = 'topright'
+    }
+
+    legend(legend_position,
+           legend = c(expression(hat(y)[propzero]),
+                      expression(y[propzero])),
+           bg = 'white',
+           col = c(c_mid,
+                   'black'),
+           lty = 1, lwd = 2,
+           bty = 'n')
+  }
 
   if(type == 'rootogram'){
     ymax <- floor(max(max(truths), quantile(preds, prob = 0.99)))
@@ -302,10 +365,10 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
 
   # Generate a sample sequence and plot
   if(type == 'density'){
-
-    probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
-    max_x <- max(density(preds[1,])$x)
-    min_x <- min(density(preds[1,])$x)
+    max_x <- max(max(density(preds[1,])$x),
+                 max(density(truths)$x))
+    #min_x <- min(density(preds[1,])$x)
+    min_x <- 0
     pred_densities <- do.call(rbind, (lapply(1:NROW(preds), function(x){
       dens <- density(preds[x,], from = min_x,
                       to = max_x)
@@ -353,6 +416,50 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
            lwd = 2,
            bty = 'n')
   }
+
+  if(type == 'hist'){
+    posterior_values <- preds
+    bin_lims <- range(posterior_values)
+    delta <- diff(range(posterior_values)) / n_bins
+    breaks <- seq(bin_lims[1], bin_lims[2] + delta, delta)
+    xlim <- c(0,
+              max(max(density(preds[1,])$x),
+                  max(density(truths)$x)))
+    ylim <- c(0, max(c(max(hist(truths, breaks = breaks, plot = F)$density),
+                       max(hist(posterior_values, breaks = breaks, plot = F)$density))))
+    hist(posterior_values, breaks=breaks,
+         main='',
+         xlab = paste0('Predictive histogram for ', levels(data_train$series)[series]),
+         ylim=ylim,
+         xlim=xlim,
+         border = "#B97C7C",
+         col = "#C79999",
+         freq = F)
+
+    hist(truths, breaks=breaks,
+         main='', xlab='',
+         ylim=ylim,
+         xlim=xlim,
+         ylab='', yaxt='n',
+         col=rgb(red = 0, green = 0, blue = 0, alpha = 0.1),
+         border=rgb(red = 0, green = 0, blue = 0, alpha = 0.7),
+         add=T, freq = F)
+    box()
+
+    if(missing(legend_position)){
+      legend_position = 'topright'
+    }
+    legend(legend_position,
+           legend = c(expression(hat(y)),
+                      'y'),
+           bg = 'white',
+           col = c(c_mid,
+                   "black"),
+           lty = 1,
+           lwd = 2,
+           bty = 'n')
+  }
+
 
   if(type == 'cdf'){
     ecdf_plotdat = function(vals, x){

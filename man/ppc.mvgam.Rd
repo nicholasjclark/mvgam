@@ -4,14 +4,7 @@
 \alias{ppc.mvgam}
 \title{Plot mvjagam posterior predictive checks for a specified series}
 \usage{
-\method{ppc}{mvgam}(
-  object,
-  data_test,
-  series = 1,
-  type = "density",
-  n_bins = 50,
-  legend_position
-)
+\method{ppc}{mvgam}(object, data_test, series = 1, type = "density", n_bins, legend_position)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvjagam}}
@@ -25,10 +18,10 @@ Note this is only useful if the same \code{data_test} was also included when fit
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
 \item{type}{\code{character} specifying the type of posterior predictive check to calculate and plot.
-Valid options are: 'rootogram', 'mean', 'density', 'pit' and 'cdf'}
+Valid options are: 'rootogram', 'mean', 'hist', 'density', 'prop_zero', 'pit' and 'cdf'}
 
 \item{n_bins}{\code{integer} specifying the number of bins to use for binning observed values when plotting
-a rootogram. Default is to use \code{50} bins, which means that if there are \verb{>50} unique observed values, bins will
+a rootogram or histogram. Default is \code{50} bins, which means that if there are \verb{>50} unique observed values, bins will
 be used to prevent overplotting and facilitate interpretation}
 
 \item{legend_position}{The location may also be specified by setting x to a single keyword from the
@@ -38,7 +31,9 @@ This places the legend on the inside of the plot frame at the given location.}
 \value{
 A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram'}),
 the predicted vs observed mean for the
-series (for \code{type == 'mean'}), kernel density or empirical CDF estimates for
+series (for \code{type == 'mean'}), predicted vs observed proportion of zeroes for the
+series (for \code{type == 'prop_zero'}),predicted vs observed histogram for the
+series (for \code{type == 'hist'}), kernel density or empirical CDF estimates for
 posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
 Integral Transform histogram (for \code{type == 'pit'}).
 }

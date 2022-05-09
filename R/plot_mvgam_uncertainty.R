@@ -80,7 +80,7 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
   if(length(unique(data_train$series)) == 1){
     trend <- matrix(trend[, NCOL(trend)])
   } else {
-    if(class(data_test) == 'list'){
+    if(class(data_test)[1] == 'list'){
       trend <- trend[,(length(data_train$series) / NCOL(object$ytimes)+1):NCOL(trend)]
     } else {
       trend <- trend[,(NROW(data_train) / NCOL(object$ytimes)+1):NCOL(trend)]
@@ -91,8 +91,10 @@ plot_mvgam_uncertainty = function(object, series, data_test, legend_position = '
 
   # Function to calculate intersection of two uncertainty distributions
   intersect_hist = function(fullpreds, gampreds){
-    from <- min(fullpreds, na.rm = T)
-    to <- max(fullpreds, na.rm = T)
+    from <- min(min(fullpreds, na.rm = T),
+                min(gampreds, na.rm = T))
+    to <- max(max(fullpreds, na.rm = T),
+              max(gampreds, na.rm = T))
 
     fullhist <- hist(fullpreds, breaks = seq(from, to, length.out = 100),
          plot = F)

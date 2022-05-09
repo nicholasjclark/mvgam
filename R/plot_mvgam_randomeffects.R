@@ -107,16 +107,19 @@ if(any(smooth_labs$class == 'random.effect')){
             col = c_dark, lwd = 2)
     }
 
-    abline(h=0, col="white", lty=1, lwd=3, xpd = F)
-    abline(h=0, col="black", lty=1, lwd=2, xpd = F)
-
     # Label x-axis with the factor variable levels
     factor_var_name <- tail(strsplit(gsub('\\)', '',
                                           gsub('s\\(', '',
                                                re_smooths[i])), ',')[[1]], 1)
-    axis(side = 1, at = 1:N,
-         labels = levels(object$obs_data %>%
-                           dplyr::pull(factor_var_name)))
+    if(class(object$obs_data)[1] == 'list'){
+      axis(side = 1, at = 1:N,
+           labels = levels(object$obs_data[[factor_var_name]]))
+    } else {
+      axis(side = 1, at = 1:N,
+           labels = levels(object$obs_data %>%
+                             dplyr::pull(factor_var_name)))
+    }
+
   }
 
   invisible()

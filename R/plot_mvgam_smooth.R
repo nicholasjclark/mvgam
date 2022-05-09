@@ -147,6 +147,22 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
 
     } else if(missing(newdata) && class(object$obs_data)[1] == 'list'){
       pred_dat <- object$obs_data
+      indices_series <- which(pred_dat$series == (levels(data_train$series)[series]))
+
+      pred_dat <- lapply(pred_dat, function(x){
+        if(is.matrix(x)){
+          matrix(x[indices_series,], ncol = NCOL(x))
+        } else {
+          x[indices_series]
+        }
+      })
+
+      if(is.matrix(pred_dat[[smooth]])){
+        pred_dat[[smooth]] <- pred_dat[[smooth]][order(pred_dat[[smooth]][,1]), ]
+      } else {
+        pred_dat[[smooth]] <- pred_dat[[smooth]][order(pred_dat[[smooth]])]
+      }
+
     } else {
       pred_dat <- newdata
     }
@@ -162,24 +178,18 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
 
   if(class(pred_dat)[1] == 'list'){
-    pred_vals <- as.vector(as.matrix(pred_dat[[smooth]]))
+    if(is.matrix(pred_dat[[smooth]])){
+      pred_vals <- as.vector(as.matrix(pred_dat[[smooth]][,1]))
+    } else {
+      pred_vals <- as.vector(as.matrix(pred_dat[[smooth]]))
+    }
   } else{
     pred_vals <- as.vector(as.matrix(pred_dat[,smooth]))
   }
 
-  preds <- matrix(NA, nrow = NROW(betas), ncol = length(pred_vals))
+  preds <- matrix(NA, nrow = NROW(betas), ncol = NROW(Xp))
   for(i in 1:NROW(betas)){
-    if(class(pred_dat)[1] == 'list'){
-      preds[i,] <- (Xp[order(pred_vals),grepl(smooth, names(object$mgcv_model$coefficients))] %*%
-                      betas[i,  grepl(smooth, names(object$mgcv_model$coefficients))])
-    } else {
-      preds[i,] <- (Xp %*% betas[i, ])
-    }
-
-  }
-
-  if(class(pred_dat)[1] == 'list'){
-    pred_vals <- pred_vals[order(pred_vals)]
+    preds[i,] <- (Xp %*% betas[i, ])
   }
 
   if(residuals){
@@ -190,10 +200,17 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     # Zero out all other columns in Xp2
     Xp2[,!grepl(paste0('(', smooth, ')'), colnames(Xp2), fixed = T)] <- 0
 
-    # Find index for the end of training for this series
-    end_train <- object$obs_data %>%
-      dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-      NROW()
+    # Find index for the end of training for this series and keep only those training
+    # observations for the particular series
+    if(class(pred_dat)[1] == 'list'){
+      end_train <- length(which(object$obs_data[['series']] == (levels(data_train$series)[series])))
+    } else {
+      end_train <- object$obs_data %>%
+        dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
+        NROW()
+    }
+
+    Xp2 <- Xp2[object$ytimes[,series][1:end_train], ]
 
     # Calculate residuals from full prediction set
     all_resids <- object$resids[[series]][1:end_train]
@@ -296,22 +313,28 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
                     max(max(partial_resids, max(cred) + sd(preds), na.rm = T))))
 
       # Get x-axis values and bin if necessary to prevent overplotting
-      sorted_x <- sort(unique(round(object$obs_data[,smooth], 6)))
+      sorted_x <- sort(unique(round(object$obs_data %>%
+                                      dplyr::pull(smooth), 6)))
+
+      s_name <- levels(object$obs_data$series)[series]
+      obs_x <- round(object$obs_data %>%
+                       dplyr::filter(series == s_name) %>%
+                       dplyr::pull(smooth), 6)
 
       if(length(sorted_x) > n_resid_bins){
         sorted_x <- seq(min(sorted_x), max(sorted_x), length.out = n_resid_bins)
         resid_probs <- do.call(rbind, lapply(2:n_resid_bins, function(i){
-          quantile(as.vector(partial_resids[,which(round(object$obs_data[,smooth], 6) <= sorted_x[i] &
-                                                     round(object$obs_data[,smooth], 6) > sorted_x[i-1])]),
+          quantile(as.vector(partial_resids[,which(obs_x <= sorted_x[i] &
+                                                     obs_x > sorted_x[i-1])]),
                    probs = probs)
         }))
-        resid_probs <- rbind(quantile(as.vector(partial_resids[,which(round(object$obs_data[,smooth], 6) == sorted_x[1])]),
+        resid_probs <- rbind(quantile(as.vector(partial_resids[,which(obs_x == sorted_x[1])]),
                                                 probs = probs),
                              resid_probs)
 
       } else {
         resid_probs <- do.call(rbind, lapply(sorted_x, function(i){
-          quantile(as.vector(partial_resids[,which(round(object$obs_data[,smooth], 6) == i)]),
+          quantile(as.vector(partial_resids[,which(obs_x == i)]),
                    probs = probs)
         }))
       }

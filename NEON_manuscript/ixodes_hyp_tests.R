@@ -337,12 +337,6 @@ for(i in seq_along(levels(all_data$data_train$series))){
   dev.off()
 }
 
-fit_null$rho_summary
-fit_hyp1$rho_summary
-fit_hyp2$rho_summary
-fit_hyp3$rho_summary
-
-compare_mvgams(fit_hyp1$out_gam_mod, fit_null$out_gam_mod)
 
 
 

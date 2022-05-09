@@ -57,8 +57,13 @@ if(length(pterms) > 0){
     Xp[,!betas_keep] <- 0
 
     # X-axis values
-    pred_vals_orig <- sort(object$obs_data %>%
-      dplyr::pull(pterms[i]))
+    if(class(pred_dat)[1] == 'list'){
+      pred_vals_orig <- sort(object$obs_data[[pterms[i]]])
+    } else {
+      pred_vals_orig <- sort(object$obs_data %>%
+                               dplyr::pull(pterms[i]))
+    }
+
     pred_vals <- seq(min(pred_vals_orig), max(pred_vals_orig), length.out = 500)
     cred <- as.matrix(beta_creds) %*% pred_vals
 
