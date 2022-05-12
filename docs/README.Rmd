@@ -63,13 +63,13 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
                family = 'poisson',
                trend_model = 'AR2',
                drift = F,
-               burnin = 20000,
+               burnin = 10000,
                chains = 4)
 ```
 
-Perform a series of posterior predictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine simulated kernel densities for posterior predictions (`yhat`) and compare to the density of the observations (`y`)
+Perform a series of posterior predictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine histograms for posterior predictions (`yhat`) and compare to the histogram of the observations (`y`)
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(lynx_mvgam, series = 1, type = 'density')
+ppc(lynx_mvgam, series = 1, type = 'hist')
 ```
 
 Now plot the distribution of predicted means compared to the observed mean
@@ -104,7 +104,7 @@ plot_mvgam_trace(lynx_mvgam, 'rho')
 
 and for the latent trend component parameters
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_trace(lynx_mvgam, 'trend')
+MCMCvis::MCMCtrace(lynx_mvgam$jags_output, c('ar1', 'ar2', 'sigma'), pdf = F, n.eff = T, Rhat = T)
 ```
 
 Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior quantiles of partial residuals (shown as ribbon rectangles in red), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
@@ -129,7 +129,7 @@ plot_mvgam_trend(lynx_mvgam, data_test = lynx_test, derivatives = T)
 
 We can also re-do the posterior predictive checks, but this time focusing only on the out of sample period. This will give us better insight into how the model is performing and whether it is able to simulate realistic and unbiased future values
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(lynx_mvgam, series = 1, type = 'density', data_test = lynx_test)
+ppc(lynx_mvgam, series = 1, type = 'hist', data_test = lynx_test, n_bins = 150)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
@@ -166,7 +166,7 @@ lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
                family = 'poisson',
                trend_model = 'RW',
                drift = FALSE,
-               burnin = 20000,
+               burnin = 10000,
                chains = 4)
 ```
 

@@ -60,7 +60,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
     }
   }
 
-  if(type == 'roogrogram' & missing(n_bins)){
+  if(type == 'rootogram' & missing(n_bins)){
     n_bins <- 50
 
     if(sign(n_bins) != 1){

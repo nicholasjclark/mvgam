@@ -8,7 +8,7 @@
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}. Ignored if \code{derivatives = TRUE}
 #'@export
-plot_mvgam_trend = function(object, series, data_test,
+plot_mvgam_trend = function(object, series = 1, data_test,
                             derivatives = FALSE, hide_xlabels = FALSE){
 
   # Check arguments

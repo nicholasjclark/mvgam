@@ -31,6 +31,11 @@ roll_eval_mvgam = function(object,
     stop('argument "object" must be of class "mvgam"')
   }
 
+  if(object$trend_model == 'None'){
+    stop('cannot compute rolling forecasts for mvgams that have no trend model',
+         call. = FALSE)
+  }
+
   # Generate time variable from training data
   if(class(object$obs_data)[1] == 'list'){
     all_timepoints <- (data.frame(time = object$obs_data$time)  %>%

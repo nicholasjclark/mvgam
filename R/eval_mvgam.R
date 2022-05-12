@@ -30,6 +30,11 @@ eval_mvgam = function(object,
     stop('argument "object" must be of class "mvgam"')
   }
 
+  if(object$trend_model == 'None'){
+    stop('cannot compute rolling forecasts for mvgams that have no trend model',
+         call. = FALSE)
+  }
+
   if(sign(fc_horizon) != 1){
     stop('argument "fc_horizon" must be a positive integer',
          call. = FALSE)
@@ -132,8 +137,19 @@ eval_mvgam = function(object,
     })
 
     taus <- MCMCvis::MCMCchains(object$jags_output, 'penalty')
+
     trends <- NULL
   } else {
+    if(object$trend_model == 'None'){
+      trends <- lapply(seq_len(n_series), function(series){
+        trend_estimates <- matrix(0, ncol = NROW(object$ytimes),
+                                  nrow = dim(MCMCvis::MCMCchains(object$jags_output, 'b'))[1])
+        as.matrix(trend_estimates[,(eval_timepoint - 2):eval_timepoint])
+      })
+
+      taus <- matrix(0, nrow = dim(MCMCvis::MCMCchains(object$jags_output, 'b'))[1],
+                     ncol = NCOL(object$ytimes))
+    } else {
     ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'trend'))[2],
                 length.out = n_series + 1)
     starts <- ends + 1
@@ -145,6 +161,8 @@ eval_mvgam = function(object,
     })
 
     taus <- MCMCvis::MCMCchains(object$jags_output, 'tau')
+    }
+
     lvs <- NULL
     n_lv <- NULL
   }
@@ -163,12 +181,57 @@ eval_mvgam = function(object,
   betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
 
   # Phi estimates for latent trend drift terms
-  phis <- MCMCvis::MCMCchains(object$jags_output, 'phi')
+  if(object$drift){
+    phis <- MCMCvis::MCMCchains(object$jags_output, 'phi')
+  } else {
+    if(object$use_lv){
+      phis <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+    } else {
+      phis <- matrix(0, nrow = NROW(betas), ncol = n_series)
+    }
+  }
 
   # AR term estimates
-  ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
-  ar2s <- MCMCvis::MCMCchains(object$jags_output, 'ar2')
-  ar3s <- MCMCvis::MCMCchains(object$jags_output, 'ar3')
+  if(object$trend_model %in% c('RW', 'None')){
+    if(object$use_lv){
+      ar1s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+      ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+      ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+    } else {
+      ar1s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+      ar2s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+      ar3s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+    }
+  }
+
+  if(object$trend_model == 'AR1'){
+    ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
+
+    if(object$use_lv){
+      ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+      ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+    } else {
+      ar2s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+      ar3s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+    }
+  }
+
+  if(object$trend_model == 'AR2'){
+    ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
+    ar2s <- MCMCvis::MCMCchains(object$jags_output, 'ar2')
+
+    if(object$use_lv){
+      ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+    } else {
+      ar3s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+    }
+  }
+
+  if(object$trend_model == 'AR3'){
+    ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
+    ar2s <- MCMCvis::MCMCchains(object$jags_output, 'ar2')
+    ar3s <- MCMCvis::MCMCchains(object$jags_output, 'ar3')
+  }
 
   # Family-specific parameters
   if(object$family == 'Negative Binomial'){
@@ -179,7 +242,7 @@ eval_mvgam = function(object,
 
   if(object$family == 'Tweedie'){
     twdis <- MCMCvis::MCMCchains(object$jags_output, 'twdis')
-    p <- MCMCvis::MCMCchains(object$jags_output, 'p')
+    p <- matrix(1.5, nrow = NROW(betas), ncol = n_series)
   } else {
     twdis <- p <- NULL
   }

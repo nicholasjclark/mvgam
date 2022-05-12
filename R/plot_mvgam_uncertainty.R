@@ -9,7 +9,7 @@
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
 #'@export
-plot_mvgam_uncertainty = function(object, series, data_test, legend_position = 'topleft',
+plot_mvgam_uncertainty = function(object, series = 1, data_test, legend_position = 'topleft',
                                   hide_xlabels = FALSE){
 
   # Check arguments

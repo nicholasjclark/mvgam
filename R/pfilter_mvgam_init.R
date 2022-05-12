@@ -147,12 +147,57 @@ if(object$use_lv){
 betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
 
 # Phi estimates for latent trend drift terms
-phis <- MCMCvis::MCMCchains(object$jags_output, 'phi')
+if(object$drift){
+  phis <- MCMCvis::MCMCchains(object$jags_output, 'phi')
+} else {
+  if(object$use_lv){
+    phis <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+  } else {
+    phis <- matrix(0, nrow = NROW(betas), ncol = n_series)
+  }
+}
 
 # AR term estimates
-ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
-ar2s <- MCMCvis::MCMCchains(object$jags_output, 'ar2')
-ar3s <- MCMCvis::MCMCchains(object$jags_output, 'ar3')
+if(object$trend_model == 'RW'){
+  if(object$use_lv){
+    ar1s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+    ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+    ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+  } else {
+    ar1s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+    ar2s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+    ar3s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+  }
+}
+
+if(object$trend_model == 'AR1'){
+  ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
+  if(object$use_lv){
+    ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+    ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+  } else {
+    ar2s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+    ar3s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+  }
+}
+
+if(object$trend_model == 'AR2'){
+  ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
+  ar2s <- MCMCvis::MCMCchains(object$jags_output, 'ar2')
+
+  if(object$use_lv){
+    ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+  } else {
+    ar3s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+  }
+}
+
+if(object$trend_model == 'AR3'){
+  ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
+  ar2s <- MCMCvis::MCMCchains(object$jags_output, 'ar2')
+  ar3s <- MCMCvis::MCMCchains(object$jags_output, 'ar3')
+}
+
 
 # Family-specific parameters
 if(object$family == 'Negative Binomial'){
@@ -163,7 +208,7 @@ if(object$family == 'Negative Binomial'){
 
 if(object$family == 'Tweedie'){
   twdis <- MCMCvis::MCMCchains(object$jags_output, 'twdis')
-  p <- MCMCvis::MCMCchains(object$jags_output, 'p')
+  p <- matrix(1.5, nrow = NROW(betas), ncol = n_series)
 } else {
   twdis <- p <- NULL
 }

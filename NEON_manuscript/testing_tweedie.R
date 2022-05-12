@@ -22,17 +22,20 @@ data_test <-
 
 # Fit non-dynamic GAMs
 # Poisson model
+library(mvgam)
 mod1 <- mvjagam(data_train = data_train,
                 data_test = data_test,
                 formula = y ~ s(season, k = 15, bs = 'cc') +
-                  s(time, k = 8, bs = 'gp'),
+                  s(time, k = 12, bs = 'gp'),
                 knots = list(season = c(0.5, 24.5)),
                 family = 'poisson',
                 trend_model = 'None',
                 chains = 4,
-                burnin = 6000)
-predict(mod1)
-print(mod1)
+                burnin = 1000)
+summary(mod1)
+plot_mvgam_trace(mod1)
+mod1$model_file
+
 plot(mod1, type = 'smooths', residuals = T)
 
 plot(mod1$resids$series1[1,] ~ data_train$season,
@@ -52,12 +55,13 @@ plot(mod1, type = 'residuals')
 mod2 <- mvjagam(data_train = data_train,
                 data_test = data_test,
                 formula = y ~ s(season, k = 15, bs = 'cc') +
-                  s(time, k = 8, bs = 'gp'),
+                  s(time, k = 12, bs = 'gp'),
                 knots = list(season = c(0.5, 24.5)),
                 family = 'nb',
                 trend_model = 'None',
                 chains = 4,
-                burnin = 8000)
+                burnin = 2000)
+plot_mvgam_trace(mod2)
 ppc(mod2, type = 'rootogram', data_test = data_test, n_bins = 25)
 ppc(mod2, type = 'pit', data_test = data_test)
 plot(mod2, type = 'residuals')
@@ -68,12 +72,14 @@ summary(mod2)
 mod3 <- mvjagam(data_train = data_train,
                 data_test = data_test,
                 formula = y ~ s(season, k = 15, bs = 'cc') +
-                  s(time, k = 8, bs = 'gp'),
+                  s(time, k = 12, bs = 'gp'),
                 knots = list(season = c(0.5, 24.5)),
                 family = 'tw',
                 trend_model = 'None',
                 chains = 4,
-                burnin = 8000)
+                burnin = 2000)
+mod3$model_file
+plot_mvgam_trace(mod3)
 ppc(mod3, type = 'rootogram', data_test = data_test, n_bins = 25)
 ppc(mod3, type = 'pit', data_test = data_test)
 plot(mod3, type = 'residuals')
@@ -99,7 +105,7 @@ dic(mod3)
 mod3b <- mvjagam(data_train = data_train,
                 data_test = data_test,
                 formula = y ~ s(season, k = 15, bs = 'cc') +
-                  s(time, k = 8, bs = 'gp'),
+                  s(time, k = 12, bs = 'gp'),
                 knots = list(season = c(0.5, 24.5)),
                 family = 'tw',
                 trend_model = 'AR3',
@@ -107,12 +113,10 @@ mod3b <- mvjagam(data_train = data_train,
                 # or very large (which goes against our prior belief about trend evolution)
                 sigma_prior = 'dunif(0.01, 0.5)',
                 chains = 4,
-                burnin = 12000)
-compare_mvgams(model1 = mod3, model2 = mod3b,
-               fc_horizon = 6, n_evaluations = 30, n_cores = 5)
+                burnin = 5000)
 
-# AR process improves forecasts in rolling comparisons (provides better uncertainty quantification);
-# does DIC reflect this also?
+
+# Does DIC reflect this also?
 dic(mod3b)
 
 # Yes!; Overdispserion parameter is now smaller but still contributing
@@ -161,9 +165,12 @@ hier_mod <- mvjagam(data_train = sim_data$data_train,
                     formula = y ~ fake_cov + fake_cov2 +
                       s(season, k = 12, m = 2, bs = 'cc'),
                     knots = list(season = c(0.5, 12.5)),
-                    trend_model = 'AR3',
+                    trend_model = 'RW',
+                    use_lv = TRUE,
                     family = 'tw',
                     burnin = 1000)
+hier_mod$model_file
+
 summary(hier_mod)
 plot(hier_mod$mgcv_model, all.terms = T, residuals = T)
 plot(hier_mod, type = 're')

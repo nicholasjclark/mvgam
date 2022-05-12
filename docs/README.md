@@ -76,15 +76,15 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
                family = 'poisson',
                trend_model = 'AR2',
                drift = F,
-               burnin = 20000,
+               burnin = 10000,
                chains = 4)
 #> NOTE: Stopping adaptation
 ```
 
-Perform a series of posterior predictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine simulated kernel densities for posterior predictions (`yhat`) and compare to the density of the observations (`y`)
+Perform a series of posterior predictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine histograms for posterior predictions (`yhat`) and compare to the histogram of the observations (`y`)
 
 ``` r
-ppc(lynx_mvgam, series = 1, type = 'density')
+ppc(lynx_mvgam, series = 1, type = 'hist')
 ```
 
 <img src="README-unnamed-chunk-7-1.png" style="display: block; margin: auto;" />
@@ -146,43 +146,40 @@ summary(lynx_mvgam)
 #> Status:
 #> Fitted using runjags::run.jags()
 #> 
-#> GAM smooth term approximate significances:
-#>            edf Ref.df Chi.sq p-value    
-#> s(season) 16.3   17.0    825  <2e-16 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+#> GAM smooth term estimated degrees of freedom:
+#>             edf Ref.df
+#> s(season) 16.23     17
 #> 
 #> GAM coefficient (beta) estimates:
 #>                    2.5%         50%       97.5% Rhat n.eff
-#> (Intercept)   6.6226899  6.76517708  6.91602969 1.30   102
-#> s(season).1  -1.2011624 -0.71575657 -0.20716899 1.38   141
-#> s(season).2  -0.2149871  0.22098919  0.74451158 1.17   128
-#> s(season).3   0.7635618  1.14861404  1.66890382 1.10    81
-#> s(season).4   1.2333767  1.82473253  2.32995571 1.45    59
-#> s(season).5   1.3467498  2.16947376  2.92528563 2.39    32
-#> s(season).6   0.5172846  1.32348598  1.90167622 1.74    64
-#> s(season).7  -0.6702727 -0.04995845  0.51518574 1.10   106
-#> s(season).8  -1.2621008 -0.63402916  0.04373479 1.01    92
-#> s(season).9  -1.5237466 -0.80435629 -0.02498228 1.09   110
-#> s(season).10 -1.2562719 -0.51265123  0.29132620 1.07    75
-#> s(season).11 -0.5950199  0.14359652  0.87042270 1.12    74
-#> s(season).12  0.2329999  0.98013820  1.69249843 1.61    48
-#> s(season).13 -0.1322053  1.14822888  2.06678446 1.88    41
-#> s(season).14  0.1335092  0.96192174  1.78650831 1.65    49
-#> s(season).15 -0.5537063 -0.05260065  0.53451329 1.04    99
-#> s(season).16 -1.3172003 -0.80145360 -0.16722824 1.19   196
-#> s(season).17 -1.5848958 -1.06874781 -0.51136140 1.46   152
+#> (Intercept)   6.6105156  6.75145688  6.90631540 1.06    79
+#> s(season).1  -1.1167398 -0.66686831 -0.19909938 1.15   159
+#> s(season).2  -0.2597191  0.21243370  0.68457904 1.02   104
+#> s(season).3   0.4239870  0.98865331  1.51423294 1.24    62
+#> s(season).4   0.9719459  1.50128572  2.26302065 1.67    53
+#> s(season).5   1.3134227  1.77645942  2.56716736 1.53    41
+#> s(season).6   0.3180004  1.11004045  1.69276564 1.41    54
+#> s(season).7  -0.7186014 -0.11561379  0.62534135 1.23    83
+#> s(season).8  -1.2432651 -0.63007374 -0.01391211 1.19   144
+#> s(season).9  -1.4660521 -0.78077613 -0.07082851 1.21   138
+#> s(season).10 -1.1560260 -0.45833882  0.32669776 1.30   124
+#> s(season).11 -0.5575703  0.22134251  0.92264390 1.26    80
+#> s(season).12  0.4218646  1.11598797  1.87469199 1.06    42
+#> s(season).13  0.5435899  1.28854011  2.17037640 1.07    19
+#> s(season).14  0.2201595  1.08458247  1.96196902 1.13    36
+#> s(season).15 -0.5518826  0.03652332  0.63087028 1.03    81
+#> s(season).16 -1.1719668 -0.68437234 -0.12718952 1.02   192
+#> s(season).17 -1.4382975 -0.98883130 -0.52488760 1.07   167
 #> 
 #> GAM smoothing parameter (rho) estimates:
 #>               2.5%      50%    97.5% Rhat n.eff
-#> s(season) 3.043383 3.887432 4.566178 1.05  1462
+#> s(season) 3.116442 3.924688 4.610654 1.01  1801
 #> 
-#> Latent trend drift (phi) and AR parameter estimates:
-#>           2.5%        50%     97.5% Rhat n.eff
-#> phi  0.0000000  0.0000000 0.0000000  NaN     0
-#> ar1  0.4420593  0.7492687 1.0579282 1.08   852
-#> ar2 -0.4394162 -0.1249333 0.1819528 1.15   836
-#> ar3  0.0000000  0.0000000 0.0000000  NaN     0
+#> Latent trend parameter estimates:
+#>             2.5%        50%     97.5% Rhat n.eff
+#> ar1    0.4343678  0.7345141 1.0307479 1.03   768
+#> ar2   -0.4349903 -0.1238582 0.1844518 1.05   368
+#> sigma  0.3715101  0.4689521 0.6015719 1.01   715
 #> 
 ```
 
@@ -197,10 +194,10 @@ plot_mvgam_trace(lynx_mvgam, 'rho')
 and for the latent trend component parameters
 
 ``` r
-plot_mvgam_trace(lynx_mvgam, 'trend')
+MCMCvis::MCMCtrace(lynx_mvgam$jags_output, c('ar1', 'ar2', 'sigma'), pdf = F, n.eff = T, Rhat = T)
 ```
 
-<img src="README-unnamed-chunk-14-1.png" style="display: block; margin: auto;" /><img src="README-unnamed-chunk-14-2.png" style="display: block; margin: auto;" />
+<img src="README-unnamed-chunk-14-1.png" style="display: block; margin: auto;" />
 
 Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior quantiles of partial residuals (shown as ribbon rectangles in red), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
 
@@ -237,7 +234,7 @@ plot_mvgam_trend(lynx_mvgam, data_test = lynx_test, derivatives = T)
 We can also re-do the posterior predictive checks, but this time focusing only on the out of sample period. This will give us better insight into how the model is performing and whether it is able to simulate realistic and unbiased future values
 
 ``` r
-ppc(lynx_mvgam, series = 1, type = 'density', data_test = lynx_test)
+ppc(lynx_mvgam, series = 1, type = 'hist', data_test = lynx_test, n_bins = 150)
 ```
 
 <img src="README-unnamed-chunk-19-1.png" style="display: block; margin: auto;" />
@@ -289,7 +286,7 @@ lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
                family = 'poisson',
                trend_model = 'RW',
                drift = FALSE,
-               burnin = 20000,
+               burnin = 10000,
                chains = 4)
 #> NOTE: Stopping adaptation
 ```
@@ -306,10 +303,10 @@ Summary statistics of the two models' out of sample Discrete Rank Probability Sc
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   6.576  20.299  93.281  87.763 122.664 221.325
+#>   1.478  11.706 107.337  92.395 125.152 231.358
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   50.39   64.34  311.39  304.36  447.75  729.65
+#>   42.17   49.49  296.16  283.49  438.72  658.31
 ```
 
 Nominal coverages for both models' 90% prediction intervals

@@ -57,7 +57,7 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
   # Tweedie parameters
   if(family == 'Tweedie'){
     twdiss <- MCMCvis::MCMCchains(object$jags_output, 'twdis')
-    ps <- MCMCvis::MCMCchains(object$jags_output, 'p')
+    ps <- matrix(1.5, nrow = NROW(betas), ncol = NCOL(object$ytimes))
   }
 
   # Latent trend precisions and loadings

@@ -76,7 +76,6 @@ Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(5, floor(n_series 
 \item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
 'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 and the observation process is the only source of error; similarly to what is estimated by \code{\link[mcgv]{gam}}),
-'Noise' (modelled as a Gaussian static white noise process),
 'RW' (random walk with possible drift),
 'AR1' (AR1 model with intercept),
 'AR2' (AR2 model with intercept) or

@@ -16,27 +16,27 @@ library(knitr)
 opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
 ```
 
-In this example we will examine multivariate forecasting models using `mvgam`, which fits GAMs using MCMC sampling via the `JAGS` software (Note that `JAGS` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `K` can be difficult. The approach used by `mvgam` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated in an exponentially increasing manner (following Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291), we hope that we can guard against specying too large a `K`. But we should test this property to see how it behaves in different scenarios. Begin by simulating `8` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `100` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Negative Binomial distributions
+In this example we will examine multivariate forecasting models using `mvgam`, which fits GAMs using MCMC sampling via the `JAGS` software (Note that `JAGS` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `K` can be difficult. The approach used by `mvgam` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated in an exponentially increasing manner (following Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291), we hope that we can guard against specying too large a `K`. But we should test this property to see how it behaves in different scenarios. Begin by simulating `6` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `80` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Poisson distributions
 ```{r}
-set.seed(100)
+set.seed(500)
 library(mvgam)
-dat <- sim_mvgam(T = 100, n_series = 8, n_trends = 2,
-                 mu_obs = runif(8, 2, 6),
-                 size_obs = runif(8, 0.5, 2),
+dat <- sim_mvgam(T = 80, n_series = 6, n_trends = 2,
+                 family = 'poisson',
+                 mu_obs = runif(8, 4, 6),
                  trend_rel = 0.6, train_prop = 0.8)
 ```
 
 Have a look at the series
 ```{r, fig.width = 6, fig.height = 7, fig.align='center'}
-par(mfrow = c(4,2))
-for(i in 1:8){
+par(mfrow = c(3,2))
+for(i in 1:6){
   plot(dat$data_train$y[which(as.numeric(dat$data_train$series) == i)], type = 'l',
        ylab = paste('Series', i), xlab = 'Time')
 }
 par(mfrow = c(1,1))
 ```
 
-Clearly there are some correlations in the trends for these series. But how does a dynamic factor process allow us to potentially capture these dependencies? The below example demonstrates how. Essentially, a dynamic factor is an *unmeasured* (latent) random process that induces correlations between time series via a set of factor loadings ($\beta$) while exercising dimension reduction. The loadings represent constant associations between the observed time series and the dynamic factor, but each series can still deviate from the factor through its error process and its associations with other factors (if we estimate `>1` latent factor in our model).
+Clearly there are some correlations in the trends for these series. But how does a dynamic factor process allow us to potentially capture these dependencies? The below example demonstrates how. Essentially, a dynamic factor is an *unobserved* (latent) random process that induces correlations between time series via a set of factor loadings ($\beta$) while exercising dimension reduction. The loadings represent constant associations between the observed time series and the dynamic factor, but each series can still deviate from the factor through its error process and its associations with other factors (if we estimate `>1` latent factor in our model).
 
 ![](df.gif)
 
@@ -49,10 +49,10 @@ mod1 <- mvjagam(data_train = dat$data_train,
                 knots = list(season = c(0.5, 12.5)),
                 use_lv = T,
                 n_lv = 2,
-                family = 'nb',
+                family = 'poisson',
                 trend_model = 'RW',
                 chains = 4,
-                burnin = 2000)
+                burnin = 4000)
 ```
 
 Look at a few plots. The estimated smooth function
@@ -78,11 +78,11 @@ mod2 <- mvjagam(data_train = dat$data_train,
                   s(season, bs = c('cc'), k = 12),
                 knots = list(season = c(0.5, 12.5)),
                 use_lv = T,
-                n_lv = 8,
-                family = 'nb',
+                n_lv = 6,
+                family = 'poisson',
                 trend_model = 'RW',
                 chains = 4,
-                burnin = 2000)
+                burnin = 4000)
 ```
 
 The same plots as model 1 to see if this model has also fit the data well
@@ -216,14 +216,7 @@ Inspection of the dynamic factors and their relative contributions indicates tha
 plot_mvgam_factors(trends_mod3)
 ```
 
-How do forecasts for this model compare to the previous one that did not include any trend component?
-```{r,  fig.width = 6, fig.height = 5, fig.align='center'}
-compare_mvgams(trends_mod2, trends_mod3, fc_horizon = 6,
-               n_cores = 3, n_evaluations = 20)
-```
-
-
-Model 3 (with the dynamic trend) provides far superior forecasts than relying only on the estimated smooths. Inspect the model summary (note again that p-value approximations are a work in progress here and so may not be totally reliable).
+Model 3 (with the dynamic trend) should provide far superior forecasts than relying only on the estimated smooths. Inspect the model summary (note again that p-value approximations are a work in progress here and so may not be totally reliable).
 ```{r}
 summary(trends_mod3)
 ```
@@ -247,19 +240,19 @@ plot_mvgam_resids(trends_mod3, series = 4)
 
 Perform posterior predictive checks to see if the model is able to simulate data that looks realistic and unbiased by examining simulated kernel densities for posterior predictions (`yhat`) compared to the density of the observations (`y`). This will be particularly useful for examining whether the Negative Binomial observation model is able to produce realistic looking simulations for each individual series.
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 1, type = 'density')
+ppc(trends_mod3, series = 1, type = 'hist')
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 2, type = 'density')
+ppc(trends_mod3, series = 2, type = 'hist')
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 3, type = 'density')
+ppc(trends_mod3, series = 3, type = 'hist')
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 4, type = 'density')
+ppc(trends_mod3, series = 4, type = 'hist')
 ```
 
 Look at traceplots for the smoothing parameters (`rho`)
@@ -350,7 +343,7 @@ plot(stl(ts(as.vector(series$`tick bite`), frequency = 12), 'periodic'))
 
 Forecast period posterior predictive checks suggest that the model still has room for improvement: 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 1, type = 'density', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 1, type = 'hist', data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
@@ -359,7 +352,7 @@ ppc(trends_mod3, series = 1, type = 'mean', data_test = trends_data$data_test)
 
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 2, type = 'density', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 2, type = 'hist', data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
@@ -368,7 +361,7 @@ ppc(trends_mod3, series = 2, type = 'mean', data_test = trends_data$data_test)
 
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 3, type = 'density', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 3, type = 'hist', data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
@@ -377,7 +370,7 @@ ppc(trends_mod3, series = 3, type = 'mean', data_test = trends_data$data_test)
 
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 4, type = 'density', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 4, type = 'hist', data_test = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}

@@ -107,7 +107,7 @@ mod1 <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                 data_test = data_test,
                 family = 'poisson',
                 chains = 4,
-                burnin = 25000,
+                burnin = 10000,
                 trend_model = 'None')
 ```
 
@@ -130,7 +130,7 @@ mod2 <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                 data_test = data_test,
                 family = 'tw',
                 chains = 4,
-                burnin = 25000,
+                burnin = 10000,
                 trend_model = 'None')
 ```
 
@@ -156,9 +156,9 @@ mod3 <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                 data_train = data_train,
                 data_test = data_test,
                 family = 'tw',
-                sigma_prior = 'dexp(2.5)T(0,2)',
+                sigma_prior = 'dexp(2.5)T(0.15, 2)',
                 chains = 4,
-                burnin = 25000,
+                burnin = 10000,
                 trend_model = 'AR3')
 summary(mod3)
 ```
@@ -180,16 +180,10 @@ But there is no more evidence of autocorrelation in the residuals
 plot(mod3, type = 'residuals')
 ```
 
-The version with the latent trend does reduce in-sample DIC...
+The version with the latent trend reduces in-sample DIC and will provide more realistic forecasts
 ```{r}
 dic(mod2)
 dic(mod3)
-```
-
-...and comparing models based on their forecasting abilities also suggests the latent trend model is superior. We will therefore stick with `mod3`, which is the distributed lag `Tweedie-Poisson` model with an `AR3` dynamic process
-```{r}
-compare_mvgams(model1 = mod2, model2 = mod3,
-               fc_horizon = 6, n_evaluations = 30, n_cores = 5)
 ```
                
 As with all other `mvgam` objects, we can create plots of the estimated forecast distribution

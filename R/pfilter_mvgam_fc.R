@@ -134,8 +134,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                         'sim_ar3',
                         'series_test',
                         'fc_horizon',
-                        'n_series',
-                        'hpd'),
+                        'n_series'),
                 envir = environment())
 
   pbapply::pboptions(type = "none")
@@ -245,7 +244,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     assimilated <- obs_data$assimilated[which(as.numeric(obs_data$series) == series)]
     preds_last <- c(all_obs, preds[1,])
     int <- apply(preds,
-                  2, hpd, 0.95)
+                  2, function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
     if(!is.null(particles[[1]]$upper_bounds)){
       upper_lim <- min(c(particles[[1]]$upper_bounds[series],
                          (max(c(all_obs, int[3,]), na.rm = T) + 4)))

@@ -40,7 +40,6 @@
 #'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
 #''None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 #'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mcgv]{gam}}),
-#''Noise' (modelled as a Gaussian static white noise process),
 #''RW' (random walk with possible drift),
 #''AR1' (AR1 model with intercept),
 #''AR2' (AR2 model with intercept) or
@@ -156,7 +155,7 @@ mvjagam = function(formula,
                    jags_path){
 
   # Check arguments
-  trend_model <- match.arg(arg = trend_model, choices = c("None", "Noise", "RW", "AR1", "AR2", "AR3"))
+  trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1", "AR2", "AR3"))
   family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
 
   if(chains == 1){
@@ -241,6 +240,12 @@ mvjagam = function(formula,
     if(n_lv > length(unique(data_train$series))){
       stop('number of latent variables cannot be greater than number of series')
     }
+  }
+
+  # No point in latent variables if trend model is None
+  if(trend_model == 'None' & use_lv){
+    use_lv <- FALSE
+    warning('No point in latent variables if trend model is None; changing use_lv to FALSE')
   }
 
   # Ensure outcome is labelled 'y'
@@ -428,504 +433,67 @@ mvjagam = function(formula,
   base_model[grep('smoothing parameter priors',
                   base_model)] <- c('   ## smoothing parameter priors...')
 
-  # Add replacement lines for trends and the linear predictor
-  if(!use_lv){
-    modification <- c("
-#### Begin model ####
-model {
+  # Add replacement lines for priors, trends and the linear predictor
+  fil <- tempfile(fileext = ".xt")
+  modification <- add_base_dgam_lines(use_lv)
+  cat(c(readLines(textConnection(modification)), base_model), file = fil,
+      sep = "\n")
+  model_file <- trimws(readLines(fil, n = -1))
 
-## GAM linear predictor
-eta <- X %*% b
+  # Update prior distributions
+  if(!missing(phi_prior)){
+    model_file[grep('phi\\[s\\] ~', model_file)] <- paste0(' phi[s] ~ ', phi_prior)
+  }
 
-## mean expectations
-for (i in 1:n) {
- for (s in 1:n_series) {
-  mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
- }
-}
+  if(!missing(ar_prior)){
+    model_file[grep('ar1\\[s\\] ~', model_file)] <- paste0(' ar1[s] ~ ', ar_prior)
+    model_file[grep('ar2\\[s\\] ~', model_file)] <- paste0(' ar2[s] ~ ', ar_prior)
+    model_file[grep('ar3\\[s\\] ~', model_file)] <- paste0(' ar3[s] ~ ', ar_prior)
+  }
 
-## trend estimates
-for (s in 1:n_series) {
- trend[1, s] ~ dnorm(0, tau[s])
-}
+  if(!missing(sigma_prior)){
+    model_file[grep('sigma\\[s\\] ~', model_file)] <- paste0(' sigma[s] ~ ', sigma_prior)
+  }
 
-for (s in 1:n_series) {
- trend[2, s] ~ dnorm(phi[s] + ar1[s]*trend[1, s], tau[s])
-}
+  # Modify observation distribution lines
+  if(family == 'tw'){
+    model_file <- add_tweedie_lines(model_file, upper_bounds = upper_bounds,
+                                    twdis_prior = twdis_prior)
 
-for (s in 1:n_series) {
- trend[3, s] ~ dnorm(phi[s] + ar1[s]*trend[2, s] + ar2[s]*trend[1, s], tau[s])
-}
+  } else if(family == 'poisson'){
+    model_file <- add_poisson_lines(model_file, upper_bounds = upper_bounds)
 
-for (i in 4:n) {
- for (s in 1:n_series){
-  trend[i, s] ~ dnorm(phi[s] + ar1[s]*trend[i - 1, s] + ar2[s]*trend[i - 2, s] + ar3[s]*trend[i - 3, s], tau[s])
- }
-}
-
-## AR components
-for (s in 1:n_series){
- phi[s] ~ dnorm(0, 10)
- ar1[s] ~ dnorm(0, 10)
- ar2[s] ~ dnorm(0, 10)
- ar3[s] ~ dnorm(0, 10)
- tau[s] <- pow(sigma[s], -2)
- sigma[s] ~ dexp(1)T(0.15, 5)
-}
-
-## likelihood functions
-for (i in 1:n) {
- for (s in 1:n_series) {
-  y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
-  rate[i, s] <- ifelse((r[s] / (r[s] + mu[i, s])) < min_eps, min_eps,
-                      (r[s] / (r[s] + mu[i, s])))
- }
-}
-
-## complexity penalising prior for the overdispersion parameter;
-## where the likelihood reduces to a 'base' model (Poisson) unless
-## the data support overdispersion
-for (s in 1:n_series) {
- r[s] <- pow(r_raw[s], 2)
- r_raw[s] ~ dexp(0.05)
-}
-
-## posterior predictions
-for (i in 1:n) {
- for (s in 1:n_series) {
-   ypred[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s])
- }
-}
-
-## GAM-specific priors")
-
-    # Create the joined model file
-    fil <- tempfile(fileext = ".xt")
-    cat(c(readLines(textConnection(modification)), base_model), file = fil,
-        sep = "\n")
-    model_file <- readLines(fil, n = -1)
-
-    # Update further prior distributions
-    if(!missing(phi_prior)){
-      model_file[grep('phi\\[s\\] ~', model_file)] <- paste0(' phi[s] ~ ', phi_prior)
-    }
-
-    if(!missing(ar_prior)){
-      model_file[grep('ar1\\[s\\] ~', model_file)] <- paste0(' ar1[s] ~ ', ar_prior)
-      model_file[grep('ar2\\[s\\] ~', model_file)] <- paste0(' ar2[s] ~ ', ar_prior)
-      model_file[grep('ar3\\[s\\] ~', model_file)] <- paste0(' ar3[s] ~ ', ar_prior)
-    }
-
-    if(!missing(sigma_prior)){
-      model_file[grep('sigma\\[s\\] ~', model_file)] <- paste0(' sigma[s] ~ ', sigma_prior)
+  } else {
+    if(missing(upper_bounds)){
+      model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dnegbin(rate[i, s], r[s])'
+      model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dnegbin(rate[i, s], r[s])'
     }
 
     if(!missing(r_prior)){
       model_file[grep('r_raw\\[s\\] ~', model_file)] <- paste0('r_raw[s] ~ ', r_prior)
     }
-
-    if(family == 'tw'){
-      rate_begin <- grep('rate\\[i, s\\] <- ', model_file)
-      rate_end <- rate_begin + 1
-      model_file <- model_file[-c(rate_begin:rate_end)]
-
-      odis_begin <- grep('r\\[s\\] <- ', model_file) - 4
-      odis_end <- odis_begin + 7
-      model_file <- model_file[-c(odis_begin:odis_end)]
-
-      if(missing(upper_bounds)){
-        model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(linpred[i, s])\n  linpred[i, s] ~'
-        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(linpred[i, s])'
-
-      } else {
-        model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(linpred[i, s])T(, upper_bound[s])\n  linpred[i, s] ~'
-        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(linpred[i, s])T(, upper_bound[s])'
-      }
-
-      model_file <- readLines(textConnection(model_file), n = -1)
-      model_file[grep('linpred\\[i, s\\] ~', model_file)] <- '  linpred[i, s] ~ dgamma(shape[i, s, y_ind[i, s]], rate[i, s])\n  twlambda[i, s] <-'
-      model_file <- readLines(textConnection(model_file), n = -1)
-
-      model_file[grep('twlambda\\[i, s\\] <-', model_file)] <- '  twlambda[i, s] <- pow(mu[i, s], 2 - p) / (twdis[s] * (2 - p))\n  N_pois[i, s] ~'
-      model_file <- readLines(textConnection(model_file), n = -1)
-
-      model_file[grep('N_pois\\[i, s\\] ~', model_file)] <- '  N_pois[i, s] ~ dpois(twlambda[i, s])T(1,)\n  shape[i, s, 1] <-'
-      model_file <- readLines(textConnection(model_file), n = -1)
-
-      model_file[grep('shape\\[i, s, 1\\] <-', model_file)] <- '  shape[i, s, 1] <- N_pois[i, s] * ((2 - p) / (p - 1))\n  shape[i, s, 2] <-'
-      model_file <- readLines(textConnection(model_file), n = -1)
-
-      model_file[grep('shape\\[i, s, 2\\] <-', model_file)] <- '  shape[i, s, 2] <- 1\n  rate[i, s] <-'
-      model_file <- readLines(textConnection(model_file), n = -1)
-
-      model_file[grep('rate\\[i, s\\] <-', model_file)] <- '  rate[i, s] <- 1 / (twdis[s] * (p - 1) * pow(mu[i, s], p - 1))\n  pois_draw[i, s] ~'
-      model_file <- readLines(textConnection(model_file), n = -1)
-
-      model_file[grep('pois_draw\\[i, s\\] ~', model_file)] <- '  pois_draw[i, s] ~ dpois(mu[i, s])\n  is_zero[i, s] <-'
-      model_file <- readLines(textConnection(model_file), n = -1)
-
-      model_file[grep('is_zero\\[i, s\\] <-', model_file)] <- '  is_zero[i, s] <- equals(pois_draw[i, s], 0)\n  y_ind[i, s] <-'
-      model_file <- readLines(textConnection(model_file), n = -1)
-
-      model_file[grep('y_ind\\[i, s\\] <-', model_file)] <- '  y_ind[i, s] <- is_zero[i, s] + 1'
-      model_file <- readLines(textConnection(model_file), n = -1)
-
-      yind_begin <- grep('y_ind\\[i, s\\] <-', model_file)
-      prior_line <- yind_begin + 2
-      model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis_raw[s] ~ dnorm(0, 2)T(-3.5, 3.5);\n twdis[s] <- exp(twdis_raw[s])\n}'
-      model_file <- readLines(textConnection(model_file), n = -1)
-
-      if(!missing(twdis_prior)){
-        twdis_begin <- grep('twdis\\[s\\] ~', model_file)
-        model_file[twdis_begin] <- paste0(' twdis[s] ~ ', twdis_prior)
-      }
-
-    } else if(family == 'poisson'){
-      odis_begin <- grep('r\\[s\\] <- ', model_file) - 4
-      odis_end <- odis_begin + 7
-      model_file <- model_file[-c(odis_begin:odis_end)]
-
-      rate_begin <- grep('rate\\[i, s\\] <- ', model_file)
-      rate_end <- rate_begin + 1
-      model_file <- model_file[-c(rate_begin:rate_end)]
-      if(missing(upper_bounds)){
-        model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mu[i, s])'
-        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mu[i, s])'
-      } else {
-        model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
-        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
-      }
-
-    } else {
-      if(missing(upper_bounds)){
-        model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dnegbin(rate[i, s], r[s])'
-        model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dnegbin(rate[i, s], r[s])'
-      }
-    }
-
-    if(trend_model == 'None'){
-      model_file[grep('trend\\[i, s\\] ~', model_file)] <- ' trend[i, s] <- 0'
-      model_file[grep('trend\\[1, s\\] ~', model_file)] <- ' trend[1, s] <- 0'
-      model_file[grep('trend\\[2, s\\] ~', model_file)] <- ' trend[2, s] <- 0'
-      model_file[grep('trend\\[3, s\\] ~', model_file)] <- ' trend[3, s] <- 0'
-      model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
-      model_file[grep('ar1\\[s\\] ~', model_file)] <- ' ar1[s] <- 0'
-      model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
-      model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
-    }
-
-    if(trend_model == 'Noise'){
-      model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
-      model_file[grep('ar1\\[s\\] ~', model_file)] <- ' ar1[s] <- 0'
-      model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
-      model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
-    }
-
-    if(trend_model == 'RW'){
-      model_file[grep('ar1\\[s\\] ~', model_file)] <- ' ar1[s] <- 1'
-      model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
-      model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
-    }
-
-    if(trend_model == 'AR1'){
-      model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
-      model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
-    }
-
-    if(trend_model == 'AR2'){
-      model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
-    }
-
-    if(!drift){
-      model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
-    }
-
-    # Use informative priors based on the fitted mgcv model to speed convergence
-    # and eliminate searching over strange parameter spaces
-    if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
-       model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(1/sp[i])'
-    } else {
-      model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)'
-    }
-
-    model_file_jags <- textConnection(model_file)
   }
 
-  if(use_lv){
+  # Modify lines needed for the specified trend model
+  model_file <- add_trend_lines(model_file, use_lv, trend_model, drift)
 
-      #### Use the latent variable approach to estimate dependent trends
-      cat('Fitting a multivariate GAM with latent dynamic factors for the trends...\n')
-      modification <- c("
-#### Begin model ####
-model {
-
-        ## GAM linear predictor
-        eta <- X %*% b
-
-        ## mean expectations
-        for (i in 1:n) {
-        for (s in 1:n_series) {
-        mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
-        }
-        }
-
-        ## latent factors evolve as time series with penalised precisions;
-        ## the penalty terms force any un-needed factors to evolve as flat lines
-        for (j in 1:n_lv) {
-         LV[1, j] ~ dnorm(0, penalty[j])
-        }
-
-        for (j in 1:n_lv) {
-         LV[2, j] ~ dnorm(phi[j] + ar1[j]*LV[1, j], penalty[j])
-        }
-
-        for (j in 1:n_lv) {
-         LV[3, j] ~ dnorm(phi[j] + ar1[j]*LV[2, j] + ar2[j]*LV[1, j], penalty[j])
-        }
-
-        for (i in 4:n) {
-         for (j in 1:n_lv) {
-          LV[i, j] ~ dnorm(phi[j] + ar1[j]*LV[i - 1, j] +
-                          ar2[j]*LV[i - 2, j] + ar3[j]*LV[i - 3, j], penalty[j])
-         }
-        }
-
-        ## AR components
-        for (s in 1:n_lv) {
-        phi[s] ~ dnorm(0, 10)
-        ar1[s] ~ dnorm(0, 10)
-        ar2[s] ~ dnorm(0, 10)
-        ar3[s] ~ dnorm(0, 10)
-        }
-
-        ## shrinkage penalties for each factor squeeze the factor to a flat line and squeeze
-        ## the entire factor toward a flat white noise process if supported by
-        ## the data. The prior for individual factor penalties allows each factor to possibly
-        ## have a relatively large penalty, which shrinks the prior for that factor's variance
-        ## substantially. Penalties increase exponentially with the number of factors following
-        ## Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate
-        ## matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291.
-        pi ~ dunif(0, n_lv)
-        X2 ~ dnorm(0, 1)T(0, )
-
-        # eta1 controls the baseline penalty
-        eta1 ~ dunif(-1, 1)
-
-        # eta2 controls how quickly the penalties exponentially increase
-        eta2 ~ dunif(-1, 1)
-
-        for (t in 1:n_lv) {
-         X1[t] ~ dnorm(0, 1)T(0, )
-         l.dist[t] <- max(t, pi[])
-         l.weight[t] <- exp(eta2[] * l.dist[t])
-         l.var[t] <- exp(eta1[] * l.dist[t] / 2) * 1
-         theta.prime[t] <- l.weight[t] * X1[t] + (1 - l.weight[t]) * X2[]
-         penalty[t] <- max(0.0001, theta.prime[t] * l.var[t])
-        }
-
-        ## latent factor loadings: standard normal with identifiability constraints
-        ## upper triangle of loading matrix set to zero
-        for (j in 1:(n_lv - 1)) {
-          for (j2 in (j + 1):n_lv) {
-           lv_coefs[j, j2] <- 0
-          }
-         }
-
-        ## positive constraints on loading diagonals
-        for (j in 1:n_lv) {
-         lv_coefs[j, j] ~ dnorm(0, 1)T(0, 1);
-        }
-
-        ## lower diagonal free
-        for (j in 2:n_lv) {
-         for (j2 in 1:(j - 1)) {
-          lv_coefs[j, j2] ~ dnorm(0, 1)T(-1, 1);
-         }
-       }
-
-        ## other elements also free
-        for (j in (n_lv + 1):n_series) {
-         for (j2 in 1:n_lv) {
-          lv_coefs[j, j2] ~ dnorm(0, 1)T(-1, 1);
-         }
-        }
-
-        ## trend evolution depends on latent factors
-        for (i in 1:n) {
-        for (s in 1:n_series) {
-         trend[i, s] <- inprod(lv_coefs[s,], LV[i,])
-        }
-        }
-
-        ## likelihood functions
-        for (i in 1:n) {
-        for (s in 1:n_series) {
-        y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
-        rate[i, s] <- ifelse((r[s] / (r[s] + mu[i, s])) < min_eps, min_eps,
-                            (r[s] / (r[s] + mu[i, s])))
-        }
-        }
-
-        ## complexity penalising prior for the overdispersion parameter;
-        ## where the likelihood reduces to a 'base' model (Poisson) unless
-        ## the data support overdispersion
-        for (s in 1:n_series) {
-         r[s] <- pow(r_raw[s], 2)
-         r_raw[s] ~ dexp(0.05)
-        }
-
-        ## posterior predictions
-        for (i in 1:n) {
-        for (s in 1:n_series) {
-        ypred[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s])
-        }
-        }
-
-        ## GAM-specific priors")
-
-      # Create the joined model file
-      fil <- tempfile(fileext = ".xt")
-      cat(c(readLines(textConnection(modification)), base_model), file = fil,
-          sep = "\n")
-      model_file <- readLines(fil, n = -1)
-
-      # Update further prior distributions
-      if(!missing(phi_prior)){
-        model_file[grep('phi\\[s\\] ~', model_file)] <- paste0('        phi[s] ~ ', phi_prior)
-      }
-
-      if(!missing(ar_prior)){
-        model_file[grep('ar1\\[s\\] ~', model_file)] <- paste0('        ar1[s] ~ ', ar_prior)
-        model_file[grep('ar2\\[s\\] ~', model_file)] <- paste0('        ar2[s] ~ ', ar_prior)
-        model_file[grep('ar3\\[s\\] ~', model_file)] <- paste0('        ar3[s] ~ ', ar_prior)
-      }
-
-      if(!missing(r_prior)){
-        model_file[grep('r_raw\\[s\\] ~', model_file)] <- paste0('r_raw[s] ~ ', r_prior)
-      }
-
-      if(family == 'tw'){
-        rate_begin <- grep('rate\\[i, s\\] <- ', model_file)
-        rate_end <- rate_begin + 1
-        model_file <- model_file[-c(rate_begin:rate_end)]
-
-        odis_begin <- grep('r\\[s\\] <- ', model_file) - 4
-        odis_end <- odis_begin + 7
-        model_file <- model_file[-c(odis_begin:odis_end)]
-
-        if(missing(upper_bounds)){
-          model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(linpred[i, s])\n  linpred[i, s] ~'
-          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(linpred[i, s])'
-
-        } else {
-          model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(linpred[i, s])T(, upper_bound[s])\n  linpred[i, s] ~'
-          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(linpred[i, s])T(, upper_bound[s])'
-        }
-
-        model_file <- readLines(textConnection(model_file), n = -1)
-        model_file[grep('linpred\\[i, s\\] ~', model_file)] <- '  linpred[i, s] ~ dgamma(shape[i, s, y_ind[i, s]], rate[i, s])\n  twlambda[i, s] <-'
-        model_file <- readLines(textConnection(model_file), n = -1)
-
-        model_file[grep('twlambda\\[i, s\\] <-', model_file)] <- '  twlambda[i, s] <- pow(mu[i, s], 2 - p) / (twdis[s] * (2 - p))\n  N_pois[i, s] ~'
-        model_file <- readLines(textConnection(model_file), n = -1)
-
-        model_file[grep('N_pois\\[i, s\\] ~', model_file)] <- '  N_pois[i, s] ~ dpois(twlambda[i, s])T(1,)\n  shape[i, s, 1] <-'
-        model_file <- readLines(textConnection(model_file), n = -1)
-
-        model_file[grep('shape\\[i, s, 1\\] <-', model_file)] <- '  shape[i, s, 1] <- N_pois[i, s] * ((2 - p) / (p - 1))\n  shape[i, s, 2] <-'
-        model_file <- readLines(textConnection(model_file), n = -1)
-
-        model_file[grep('shape\\[i, s, 2\\] <-', model_file)] <- '  shape[i, s, 2] <- 1\n  rate[i, s] <-'
-        model_file <- readLines(textConnection(model_file), n = -1)
-
-        model_file[grep('rate\\[i, s\\] <-', model_file)] <- '  rate[i, s] <- 1 / (twdis[s] * (p - 1) * pow(mu[i, s], p - 1))\n  pois_draw[i, s] ~'
-        model_file <- readLines(textConnection(model_file), n = -1)
-
-        model_file[grep('pois_draw\\[i, s\\] ~', model_file)] <- '  pois_draw[i, s] ~ dpois(mu[i, s])\n  is_zero[i, s] <-'
-        model_file <- readLines(textConnection(model_file), n = -1)
-
-        model_file[grep('is_zero\\[i, s\\] <-', model_file)] <- '  is_zero[i, s] <- equals(pois_draw[i, s], 0)\n  y_ind[i, s] <-'
-        model_file <- readLines(textConnection(model_file), n = -1)
-
-        model_file[grep('y_ind\\[i, s\\] <-', model_file)] <- '  y_ind[i, s] <- is_zero[i, s] + 1'
-        model_file <- readLines(textConnection(model_file), n = -1)
-
-        yind_begin <- grep('y_ind\\[i, s\\] <-', model_file)
-        prior_line <- yind_begin + 2
-        model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis_raw[s] ~ dnorm(0, 2)T(-3.5, 3.5);\n twdis[s] <- exp(twdis_raw[s])\n}'
-        model_file <- readLines(textConnection(model_file), n = -1)
-
-        if(!missing(twdis_prior)){
-          twdis_begin <- grep('twdis\\[s\\] ~', model_file)
-          model_file[twdis_begin] <- paste0(' twdis[s] ~ ', twdis_prior)
-        }
-
-      } else if(family == 'poisson'){
-        odis_begin <- grep('r\\[s\\] <- ', model_file) - 4
-        odis_end <- odis_begin + 7
-        model_file <- model_file[-c(odis_begin:odis_end)]
-
-        rate_begin <- grep('rate\\[i, s\\] <- ', model_file)
-        rate_end <- rate_begin + 1
-        model_file <- model_file[-c(rate_begin:rate_end)]
-        if(missing(upper_bounds)){
-          model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mu[i, s])'
-          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mu[i, s])'
-        } else {
-          model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
-          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
-        }
-
-      } else {
-        if(missing(upper_bounds)){
-          model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dnegbin(rate[i, s], r[s])'
-          model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dnegbin(rate[i, s], r[s])'
-        }
-      }
-
-      if(trend_model == 'None'){
-        model_file[grep('trend\\[i, s\\] ~', model_file)] <- '      trend[i, s] <- 0'
-        model_file[grep('phi\\[s\\] ~', model_file)] <- '         phi[s] <- 0'
-        model_file[grep('ar1\\[s\\] ~', model_file)] <- '        ar1[s] <- 0'
-        model_file[grep('ar2\\[s\\] ~', model_file)] <- '        ar2[s] <- 0'
-        model_file[grep('ar3\\[s\\] ~', model_file)] <- '        ar3[s] <- 0'
-      }
-
-      if(trend_model == 'Noise'){
-        model_file[grep('phi\\[s\\] ~', model_file)] <- ' phi[s] <- 0'
-        model_file[grep('ar1\\[s\\] ~', model_file)] <- ' ar1[s] <- 0'
-        model_file[grep('ar2\\[s\\] ~', model_file)] <- ' ar2[s] <- 0'
-        model_file[grep('ar3\\[s\\] ~', model_file)] <- ' ar3[s] <- 0'
-      }
-
-      if(trend_model == 'RW'){
-        model_file[grep('ar1\\[s\\] ~', model_file)] <- '        ar1[s] <- 1'
-        model_file[grep('ar2\\[s\\] ~', model_file)] <- '        ar2[s] <- 0'
-        model_file[grep('ar3\\[s\\] ~', model_file)] <- '        ar3[s] <- 0'
-      }
-
-      if(trend_model == 'AR1'){
-        model_file[grep('ar2\\[s\\] ~', model_file)] <- '        ar2[s] <- 0'
-        model_file[grep('ar3\\[s\\] ~', model_file)] <- '        ar3[s] <- 0'
-      }
-
-      if(trend_model == 'AR2'){
-        model_file[grep('ar3\\[s\\] ~', model_file)] <- '        ar3[s] <- 0'
-      }
-
-      if(!drift){
-        model_file[grep('phi\\[s\\] ~', model_file)] <- '        phi[s] <- 0'
-      }
-
-      # Use informative priors based on the fitted mgcv model to speed convergence
-      # and eliminate searching over strange parameter spaces
-      if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
-        model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(1/sp[i])'
-      } else {
-        model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)'
-      }
-      model_file_jags <- textConnection(model_file)
+  # Use informative priors based on the fitted mgcv model to speed convergence
+  # and eliminate searching over strange parameter spaces
+  if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
+    model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(1/sp[i])T(0.0001, )'
+  } else {
+    model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)T(0.0001, )'
   }
+
+  # Final tidying of the JAGS model for readability
+  clean_up <- vector()
+  for(x in 1:length(model_file)){
+    clean_up[x] <- model_file[x-1] == "" & model_file[x] == ""
+  }
+  clean_up[is.na(clean_up)] <- FALSE
+  model_file <- model_file[!clean_up]
+
+  model_file_jags <- textConnection(model_file)
 
   # Covariate dataframe including training and testing observations
   if(!missing(data_test)){
@@ -1048,41 +616,6 @@ model {
       if(ss_jagam$jags.data$n_lv > ss_jagam$jags.data$n_series){
         stop('Number of latent variables cannot be greater than number of series')
       }
-
-  }
-
-  # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS
-  # will take a while to optimise the samplers, so long adaptation with little 'burnin'
-  # is more crucial than little adaptation but long 'burnin' https://mmeredith.net/blog/2016/Adapt_or_burn.htm
-
-  # Gather posterior samples for the specified parameters
-  if(!use_lv){
-    if(family == 'nb'){
-      param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi',
-                 'tau', 'trend', 'ar1', 'ar2', 'ar3', 'sigma')
-    } else if(family == 'poisson'){
-      param <- c('rho', 'b', 'mu', 'ypred',  'phi',
-                 'tau', 'trend', 'ar1', 'ar2', 'ar3', 'sigma')
-    } else {
-      param <- c('rho', 'b', 'mu', 'ypred',  'phi', 'p', 'twdis',
-                 'tau', 'trend', 'ar1', 'ar2', 'ar3', 'sigma')
-    }
-
-  } else {
-    if(family == 'nb'){
-    param <- c('rho', 'b', 'mu', 'ypred',  'r', 'phi', 'LV',
-               'trend', 'lv_coefs', 'penalty',
-               'ar1', 'ar2', 'ar3')
-    } else if(family == 'poisson'){
-      param <- c('rho', 'b', 'mu', 'ypred', 'phi', 'LV',
-                 'trend', 'lv_coefs', 'penalty',
-                 'ar1', 'ar2', 'ar3')
-    } else {
-      param <- c('rho', 'b', 'mu', 'ypred', 'phi',
-                 'p', 'twdis', 'LV',
-                 'trend', 'lv_coefs', 'penalty',
-                 'ar1', 'ar2', 'ar3')
-    }
   }
 
   if(missing(upper_bounds)){
@@ -1095,6 +628,7 @@ model {
     n_lv <- NULL
   }
 
+  # Add information about the call and necessary data structures to the model file
   # Get dimensions and numbers of smooth terms
   snames <- names(ss_jagam$jags.data)[grep('S.*', names(ss_jagam$jags.data))]
   smooth_dims <- matrix(NA, ncol = 2, nrow = length(snames))
@@ -1139,7 +673,6 @@ model {
     parametric_tdata <- NULL
   }
 
-  # Add information about the call and necessary data structures to model file
   model_file <- c('JAGS code generated by package mvgam',
                        '\n',
                        'GAM formula:',
@@ -1171,6 +704,7 @@ model {
                                                        family == 'poisson' ~ 'Poisson',
                                                        TRUE ~ 'Negative Binomial'),
                              trend_model = trend_model,
+                             drift = drift,
                              pregam = ss_jagam$pregam,
                              model_file = trimws(model_file),
                              jags_data = ss_jagam$jags.data,
@@ -1185,10 +719,18 @@ model {
                         class = 'mvgam_prefit')
 
   } else {
+
+  # Set monitor parameters and initial values
+  param <- get_monitor_pars(family, use_lv, trend_model, drift)
+
   initlist <- replicate(chains, ss_jagam$jags.ini,
                           simplify = FALSE)
   runjags::runjags.options(silent.jags = TRUE, silent.runjags = TRUE)
   n.burn <- burnin
+
+  # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS
+  # will take a while to optimise the samplers, so long adaptation with little 'burnin'
+  # is more crucial than little adaptation but long 'burnin' https://mmeredith.net/blog/2016/Adapt_or_burn.htm
   unlink('base_gam.txt')
   cat(model_file, file = 'base_gam.txt', sep = '\n', append = T)
   if(parallel){
@@ -1267,6 +809,7 @@ model {
                                                        family == 'poisson' ~ 'Poisson',
                                                        TRUE ~ 'Negative Binomial'),
                              trend_model = trend_model,
+                             drift = drift,
                              pregam = ss_jagam$pregam,
                              jags_output = out_gam_mod,
                              model_file = trimws(model_file),
@@ -1289,6 +832,7 @@ model {
                                                        family == 'poisson' ~ 'Poisson',
                                                        TRUE ~ 'Negative Binomial'),
                              trend_model = trend_model,
+                             drift = drift,
                              pregam = ss_jagam$pregam,
                              jags_output = out_gam_mod,
                              model_file = trimws(model_file),

@@ -42,6 +42,16 @@ compare_mvgams = function(model1,
     stop('argument "model2" must be of class "mvgam"')
   }
 
+  if(model2$trend_model == 'None'){
+    stop('cannot compare rolling forecasts for mvgams that have no trend model',
+         call. = FALSE)
+  }
+
+  if(model1$trend_model == 'None'){
+    stop('cannot compare rolling forecasts for mvgams that have no trend model',
+         call. = FALSE)
+  }
+
   if(sign(fc_horizon) != 1){
     stop('argument "fc_horizon" must be a positive integer',
          call. = FALSE)
