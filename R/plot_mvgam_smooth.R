@@ -103,11 +103,11 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     # Use default mgcv plotting for bivariate smooths as it is quicker
     # Extract median beta params for smooths and their covariances
     # so that uncertainty from mgcv plots is reasonably accurate
-    V <- cov(MCMCvis::MCMCchains(object$jags_output, 'b'))
+    V <- cov(MCMCvis::MCMCchains(object$model_output, 'b'))
     object$mgcv_model$Ve <- V
     object$mgcv_model$Vp <- V
     object$mgcv_model$Vc <- V
-    p <- MCMCvis::MCMCsummary(object$jags_output, 'b')[,c(4)]
+    p <- MCMCvis::MCMCsummary(object$model_output, 'b')[,c(4)]
     coef_names <- names(object$mgcv_model$coefficients)
     names(p) <- coef_names
     object$mgcv_model$coefficients <- p
@@ -175,7 +175,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
 
     # Extract GAM coefficients
     #betas <- t(matrix(coef(object$mgcv_model)))
-    betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
+    betas <- MCMCvis::MCMCchains(object$model_output, 'b')
 
   if(class(pred_dat)[1] == 'list'){
     if(is.matrix(pred_dat[[smooth]])){

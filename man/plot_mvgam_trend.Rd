@@ -6,7 +6,7 @@
 \usage{
 plot_mvgam_trend(
   object,
-  series,
+  series = 1,
   data_test,
   derivatives = FALSE,
   hide_xlabels = FALSE

@@ -6,7 +6,7 @@
 \usage{
 plot_mvgam_uncertainty(
   object,
-  series,
+  series = 1,
   data_test,
   legend_position = "topleft",
   hide_xlabels = FALSE

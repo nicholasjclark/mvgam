@@ -47,7 +47,7 @@ if(length(pterms) > 0){
     betas_keep <- grepl(paste0(pterms[i]),
                         colnames(predict(object$mgcv_model, type = 'lpmatrix')),
                         fixed = T)
-    betas <- MCMCvis::MCMCchains(object$jags_output, 'b')[ ,betas_keep]
+    betas <- MCMCvis::MCMCchains(object$model_output, 'b')[ ,betas_keep]
     beta_creds <- quantile(betas, probs = probs)
 
     # Generate linear predictor matrix from fitted mgcv model

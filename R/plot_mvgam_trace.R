@@ -24,14 +24,14 @@ plot_mvgam_trace = function(object, param = 'rho', overlay_prior = TRUE){
 
   if(param == 'rho'){
     param_names <- object$sp_names
-    prior_mat <- matrix(NA, nrow = dim(MCMCvis::MCMCchains(object$jags_output, 'rho'))[1],
+    prior_mat <- matrix(NA, nrow = dim(MCMCvis::MCMCchains(object$model_output, 'rho'))[1],
                         ncol = length(param_names))
     for(i in 1:(length(param_names))){
-      prior_mat[,i] <- log(rexp(dim(MCMCvis::MCMCchains(object$jags_output, 'rho'))[1], 0.05))
+      prior_mat[,i] <- log(rexp(dim(MCMCvis::MCMCchains(object$model_output, 'rho'))[1], 0.05))
     }
 
     if(overlay_prior){
-      MCMCvis::MCMCtrace(object$jags_output, param,
+      MCMCvis::MCMCtrace(object$model_output, param,
                          priors = prior_mat,
                          col_pr = 'grey60',
                          post_zm = F,
@@ -46,7 +46,7 @@ plot_mvgam_trace = function(object, param = 'rho', overlay_prior = TRUE){
                          col_txt = 'black',
                          xlab_den = 'Prior (grey) vs posterior (red)')
     } else {
-      MCMCvis::MCMCtrace(object$jags_output, param,
+      MCMCvis::MCMCtrace(object$model_output, param,
                          post_zm = F,
                          pdf = FALSE,
                          n.eff = TRUE,
@@ -65,7 +65,7 @@ plot_mvgam_trace = function(object, param = 'rho', overlay_prior = TRUE){
   if(param == 'b'){
     param_names <- names(object$mgcv_model$coefficients)
 
-    MCMCvis::MCMCtrace(object$jags_output, param,
+    MCMCvis::MCMCtrace(object$model_output, param,
                        pdf = FALSE,
                        n.eff = TRUE,
                        Rhat = TRUE,

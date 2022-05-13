@@ -50,13 +50,13 @@ message()
 
 if(object$family == 'Negative Binomial'){
   message("Dispersion parameter estimates:")
-  print(MCMCvis::MCMCsummary(object$jags_output, 'r')[,c(3:7)])
+  print(MCMCvis::MCMCsummary(object$model_output, 'r')[,c(3:7)])
   message()
 }
 
 if(object$family == 'Tweedie'){
   message("Dispersion parameter estimates:")
-  print(MCMCvis::MCMCsummary(object$jags_output, 'twdis')[,c(3:7)])
+  print(MCMCvis::MCMCsummary(object$model_output, 'twdis')[,c(3:7)])
   message()
 }
 

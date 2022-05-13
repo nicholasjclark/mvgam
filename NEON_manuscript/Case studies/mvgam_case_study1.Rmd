@@ -107,7 +107,7 @@ mod1 <- mvjagam(data_train = fake_data$data_train,
                chains = 4)
 ```
 
-We can view the `JAGS` model file that has been generated to see the additions that have been made to the base `gam` model. If the user selects `return_jags_data = TRUE` when calling `mvjagam`, this file can be modified and the resulting `jags_data` object can also be modified to fit more complex Bayesian models. Note that here the AR and phi terms have been set to zero as this model does not include a dynamic trend component
+We can view the `JAGS` model file that has been generated to see the additions that have been made to the base `gam` model. If the user selects `return_model_data = TRUE` when calling `mvjagam`, this file can be modified and the resulting `model_data` object can also be modified to fit more complex Bayesian models. Note that here the AR and phi terms have been set to zero as this model does not include a dynamic trend component
 ```{r}
 mod1$model_file
 ```
@@ -619,7 +619,7 @@ lynx_mvgam <- mvjagam(data_train = lynx_train,
 
 Calculate the out of sample forecast from the fitted `mvgam` model and plot
 ```{r, fig.width=5, fig.height=4, fig.align='center'}
-fits <- MCMCvis::MCMCchains(lynx_mvgam$jags_output, 'ypred')
+fits <- MCMCvis::MCMCchains(lynx_mvgam$model_output, 'ypred')
 fits <- fits[,(NROW(lynx_mvgam$obs_data)+1):(NROW(lynx_mvgam$obs_data)+10)]
 cred_ints <- apply(fits, 2, function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
 yupper <- max(cred_ints) * 1.25

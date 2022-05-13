@@ -165,8 +165,8 @@ summary(mod3)
 
 A pairs plot of the logged versions of the latent trend precision and the overdispersion parameter suggest there is no strange behaviour in the joint posterior
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot(log(MCMCvis::MCMCchains(mod3$jags_output, 'twdis')),
-     log(MCMCvis::MCMCchains(mod3$jags_output, 'tau')),
+plot(log(MCMCvis::MCMCchains(mod3$model_output, 'twdis')),
+     log(MCMCvis::MCMCchains(mod3$model_output, 'tau')),
      ylab = 'log(tau)', xlab = 'log(twdis)', pch = 16, col = "#8F272740")
 ```
 

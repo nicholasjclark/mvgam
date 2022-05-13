@@ -44,34 +44,34 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
                 type = 'lpmatrix')
 
   # Beta coefficients for GAM component
-  betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
+  betas <- MCMCvis::MCMCchains(object$model_output, 'b')
 
   # Family of model
   family <- object$family
 
   # Negative binomial size estimate
   if(family == 'Negative Binomial'){
-    sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
+    sizes <- MCMCvis::MCMCchains(object$model_output, 'r')
   }
 
   # Tweedie parameters
   if(family == 'Tweedie'){
-    twdiss <- MCMCvis::MCMCchains(object$jags_output, 'twdis')
+    twdiss <- MCMCvis::MCMCchains(object$model_output, 'twdis')
     ps <- matrix(1.5, nrow = NROW(betas), ncol = NCOL(object$ytimes))
   }
 
   # Latent trend precisions and loadings
   if(object$use_lv){
-    taus <- MCMCvis::MCMCchains(object$jags_output, 'penalty')
+    taus <- MCMCvis::MCMCchains(object$model_output, 'penalty')
 
     n_series <- NCOL(object$ytimes)
     n_lv <- object$n_lv
     lv_coefs <- lapply(seq_len(n_series), function(series){
       lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
-      as.matrix(MCMCvis::MCMCchains(object$jags_output, 'lv_coefs')[,lv_indices])
+      as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
     })
   } else {
-    taus <- MCMCvis::MCMCchains(object$jags_output, 'tau')
+    taus <- MCMCvis::MCMCchains(object$model_output, 'tau')
   }
 
   # Loop across all posterior samples and calculate predictions on the outcome scale

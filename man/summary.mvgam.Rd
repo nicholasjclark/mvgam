@@ -19,11 +19,7 @@ This function takes a fitted \code{mvjagam} object and prints various useful sum
 A brief summary of the model's call is printed, along with posterior intervals for
 some of the key parameters in the model. Note that some smooths have extra penalties on the null space,
 so summaries for the \code{rho} parameters may include more penalty terms than the number of smooths in
-the original model formula. The function also returns an approximate smooth term
-significance table, but note that this signficance comes with the usual caveats associated with calculations
-of p-values for smooth terms in \code{\link[mcgv]{summary.gam}} (i.e. all p-values are computed without
-considering uncertainty in the smoothing parameter estimates). The significances are calculated following
-Wood (2013) Biometrika 100(1), 221-228
+the original model formula.
 }
 \author{
 Nicholas J Clark

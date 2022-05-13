@@ -28,13 +28,13 @@ plot_mvgam_trend = function(object, series = 1, data_test,
 
   # Prediction indices for the particular series
   data_train <- object$obs_data
-  ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
+  ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
               length.out = NCOL(object$ytimes) + 1)
   starts <- ends + 1
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
   ends <- ends[-1]
 
-  preds <- MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[series]:ends[series]]
+  preds <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
   preds_last <- preds[1,]
   pred_vals <- seq(1:length(preds_last))
 

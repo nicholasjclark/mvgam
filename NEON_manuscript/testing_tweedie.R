@@ -26,30 +26,37 @@ library(mvgam)
 mod1 <- mvjagam(data_train = data_train,
                 data_test = data_test,
                 formula = y ~ s(season, k = 15, bs = 'cc') +
-                  s(time, k = 12, bs = 'gp'),
+                  s(time, k = 4, bs = 'gp'),
                 knots = list(season = c(0.5, 24.5)),
-                family = 'poisson',
-                trend_model = 'None',
+                family = 'nb',
+                trend_model = 'AR1',
                 chains = 4,
                 burnin = 1000)
 summary(mod1)
-plot_mvgam_trace(mod1)
-mod1$model_file
 
-plot(mod1, type = 'smooths', residuals = T)
 
-plot(mod1$resids$series1[1,] ~ data_train$season,
-     pch = 16, col = "#8F272710", cex = 0.8,
-     ylim = c(-5, 5))
-for(i in 2:300){
-  points(mod1$resids$series1[i,] ~ data_train$season,
-       pch = 16, col = "#8F272710", cex = 0.8)
-}
+mod1stan <- mvjagam(data_train = data_train,
+                data_test = data_test,
+                formula = y ~ s(season, k = 15, bs = 'cc') +
+                  s(time, k = 4, bs = 'gp'),
+                knots = list(season = c(0.5, 24.5)),
+                family = 'nb',
+                trend_model = 'AR1',
+                chains = 4,
+                burnin = 1000,
+                use_stan = T)
+mod1stan$model_file
+summary(mod1stan)
+
+
+compare_mvgams(mod1, mod1stan, fc_horizon = 4,
+               n_evaluations = 20, n_cores = 5)
 
 # Check if overdispersion correctly captured
-ppc(mod1, type = 'rootogram', data_test = data_test, n_bins = 25)
-ppc(mod1, type = 'pit', data_test = data_test)
-plot(mod1, type = 'residuals')
+ppc(mod1stan, type = 'hist', n_bins = 100)
+ppc(mod1stan, type = 'rootogram', data_test = data_test, n_bins = 25)
+ppc(mod1stan, type = 'pit', data_test = data_test)
+plot(mod1stan, type = 'residuals')
 
 # Not captured; try Negative binomial model
 mod2 <- mvjagam(data_train = data_train,
@@ -138,9 +145,9 @@ plot(mod3b, type = 'smooth', residuals = T)
 # particularly when dispersion is high (less need for a latent trend so the trend precision
 # can go up to bloody infinity!; carefully selected priors are required to ensure the trend
 # variance doesn't sample in outrageous spaces
-MCMCvis::MCMCtrace(mod3b$jags_output, c('twdis','tau'), pdf = F, n.eff = T)
-plot(log(MCMCvis::MCMCchains(mod3b$jags_output, 'twdis')),
-     log(MCMCvis::MCMCchains(mod3b$jags_output, 'tau')))
+MCMCvis::MCMCtrace(mod3b$model_output, c('twdis','tau'), pdf = F, n.eff = T)
+plot(log(MCMCvis::MCMCchains(mod3b$model_output, 'twdis')),
+     log(MCMCvis::MCMCchains(mod3b$model_output, 'tau')))
 
 
 # Simulating data via sim_mvgam for a further Tweedie comparison
@@ -185,4 +192,4 @@ plot(hier_mod, series = 2, type = 'residuals')
 ppc(hier_mod, series = 1, type = 'rootogram')
 ppc(hier_mod, series = 2, type = 'rootogram')
 
-MCMCvis::MCMCtrace(hier_mod$jags_output, c('twdis','phi'), pdf = F, n.eff = T)
+MCMCvis::MCMCtrace(hier_mod$model_output, c('twdis','phi'), pdf = F, n.eff = T)

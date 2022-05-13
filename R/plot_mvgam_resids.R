@@ -50,7 +50,7 @@ c_dark_highlight <- c("#7C0000")
 
 # Prediction indices for the particular series
 data_train <- object$obs_data
-ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
+ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
             length.out = NCOL(object$ytimes) + 1)
 starts <- ends + 1
 starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
@@ -81,7 +81,7 @@ if(class(data_train)[1] == 'list'){
 
 # Resids and predictions for only the training period
 series_residuals <- series_residuals[, 1:obs_length]
-preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]][, 1:obs_length]
+preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]][, 1:obs_length]
 median_preds <- apply(preds, 2, function(x) quantile(x, 0.5))
 
 # Graphical parameters

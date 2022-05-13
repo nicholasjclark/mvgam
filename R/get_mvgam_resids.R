@@ -86,7 +86,7 @@ ds_resids_tw = function(truth, fitted, draw){
 }
 
 # Pull out starting and ending indices for each series in the object
-ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
+ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
             length.out = NCOL(object$ytimes) + 1)
 starts <- ends + 1
 starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
@@ -117,7 +117,7 @@ series_resids <- pbapply::pblapply(seq_len(NCOL(object$ytimes)), function(series
       dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
       nrow()
   }
-  preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
+  preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
 
   if(class(object$obs_data)[1] == 'list'){
     obj_dat <- data.frame(y = object$obs_data$y,
@@ -148,7 +148,7 @@ series_resids <- pbapply::pblapply(seq_len(NCOL(object$ytimes)), function(series
   }
 
   if(object$family == 'Negative Binomial'){
-    size <- MCMCvis::MCMCchains(object$jags_output, 'r')[,series]
+    size <- MCMCvis::MCMCchains(object$model_output, 'r')[,series]
     resids <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_nb(truth = truth,
                                     fitted = preds[x, ],

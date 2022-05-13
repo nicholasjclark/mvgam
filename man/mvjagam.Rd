@@ -11,7 +11,7 @@ mvjagam(
   data_test,
   run_model = TRUE,
   prior_simulation = FALSE,
-  return_jags_data = FALSE,
+  return_model_data = FALSE,
   family = "poisson",
   use_lv = FALSE,
   n_lv,
@@ -28,6 +28,7 @@ mvjagam(
   twdis_prior,
   sigma_prior,
   upper_bounds,
+  use_stan = FALSE,
   jags_path
 )
 }
@@ -59,7 +60,7 @@ return the model file and the data / initial values that are needed to fit the \
 \item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 simulations from prior distributions are returned}
 
-\item{return_jags_data}{\code{logical}. If \code{TRUE}, the list of data that is needed to fit the \code{JAGS}
+\item{return_model_data}{\code{logical}. If \code{TRUE}, the list of data that is needed to fit the
 model is returned, along with the initial values for smooth and AR parameters, once the model is fitted.
 This will be helpful if users wish to modify the model file to add
 other stochastic elements that are not currently avaiable in \code{mvgam}. Default is \code{FALSE} to reduce
@@ -121,6 +122,11 @@ variances used for the latent trends (ignored if \code{use_lv == TRUE})}
 this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 truncation entirely (i.e. there is no upper bound for each series)}
+
+\item{use_stan}{Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
+the \code{stan} language with a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
+not all options that are available in \code{JAGS} can be used, including: no option for a Tweedie family, no option for
+latent variable trends}
 
 \item{jags_path}{Optional character vector specifying the path to the location of the \code{JAGS} executable (.exe) to use
 for modelling. If missing, the path will be recovered from a call to \code{\link[runjags]{findjags}}}

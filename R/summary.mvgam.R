@@ -50,19 +50,27 @@ if(class(object$obs_data)[1] == 'list'){
 }
 message()
 
-message('Status:')
-cat('Fitted using runjags::run.jags()', '\n')
-message()
+if(object$fit_engine == 'jags'){
+  message('Status:')
+  cat('Fitted using runjags::run.jags()', '\n')
+  message()
+}
+
+if(object$fit_engine == 'stan'){
+  message('Status:')
+  cat('Fitted using rstan::stan()', '\n')
+  message()
+}
 
 if(object$family == 'Negative Binomial'){
   message("Dispersion parameter estimates:")
-  print(MCMCvis::MCMCsummary(object$jags_output, 'r')[,c(3:7)])
+  print(MCMCvis::MCMCsummary(object$model_output, 'r')[,c(3:7)])
   message()
 }
 
 if(object$family == 'Tweedie'){
   message("Dispersion parameter estimates:")
-  print(MCMCvis::MCMCsummary(object$jags_output, 'twdis')[,c(3:7)])
+  print(MCMCvis::MCMCsummary(object$model_output, 'twdis')[,c(3:7)])
   message()
 }
 
@@ -85,13 +93,13 @@ printCoefmat(edf_table, digits = 4, signif.stars = T)
 message()
 
 message("GAM coefficient (beta) estimates:")
-mvgam_coefs <- MCMCvis::MCMCsummary(object$jags_output, 'b')[,c(3:7)]
+mvgam_coefs <- MCMCvis::MCMCsummary(object$model_output, 'b')[,c(3:7)]
 rownames(mvgam_coefs) <- coef_names
 print(mvgam_coefs)
 message()
 
 message("GAM smoothing parameter (rho) estimates:")
-rho_coefs <- MCMCvis::MCMCsummary(object$jags_output, 'rho')[,c(3:7)]
+rho_coefs <- MCMCvis::MCMCsummary(object$model_output, 'rho')[,c(3:7)]
 
 name_starts <- unlist(purrr:::map(jam$smooth, 'first.sp'))
 name_ends <- unlist(purrr:::map(jam$smooth, 'last.sp'))
@@ -114,7 +122,7 @@ if(object$use_lv){
     if(object$trend_model == 'RW'){
       if(object$drift){
         message("Latent trend drift (phi) estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('phi'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('phi'))[,c(3:7)])
         message()
       } else {
       }
@@ -123,11 +131,11 @@ if(object$use_lv){
     if(object$trend_model == 'AR1'){
       if(object$drift){
         message("Latent trend drift (phi) and parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('phi', 'ar1'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('phi', 'ar1'))[,c(3:7)])
         message()
       } else {
         message("Latent trend parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('ar1'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('ar1'))[,c(3:7)])
         message()
       }
     }
@@ -135,11 +143,11 @@ if(object$use_lv){
     if(object$trend_model == 'AR2'){
       if(object$drift){
         message("Latent trend drift (phi) and parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('phi', 'ar1', 'ar2'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('phi', 'ar1', 'ar2'))[,c(3:7)])
         message()
       } else {
         message("Latent trend parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('ar1', 'ar2'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('ar1', 'ar2'))[,c(3:7)])
         message()
       }
     }
@@ -147,11 +155,11 @@ if(object$use_lv){
     if(object$trend_model == 'AR3'){
       if(object$drift){
         message("Latent trend drift (phi) and parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('phi', 'ar1', 'ar2', 'ar3'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('phi', 'ar1', 'ar2', 'ar3'))[,c(3:7)])
         message()
       } else {
         message("Latent trend parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('ar1', 'ar2', 'ar3'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('ar1', 'ar2', 'ar3'))[,c(3:7)])
         message()
       }
     }
@@ -163,11 +171,11 @@ if(!object$use_lv){
     if(object$trend_model == 'RW'){
       if(object$drift){
         message("Latent trend drift (phi) and sigma estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('phi', 'sigma'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('phi', 'sigma'))[,c(3:7)])
         message()
       } else {
         message("Latent trend variance estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('sigma'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('sigma'))[,c(3:7)])
         message()
       }
     }
@@ -175,11 +183,11 @@ if(!object$use_lv){
     if(object$trend_model == 'AR1'){
       if(object$drift){
         message("Latent trend drift (phi) and parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('phi', 'ar1', 'sigma'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('phi', 'ar1', 'sigma'))[,c(3:7)])
         message()
       } else {
         message("Latent trend parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('ar1', 'sigma'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('ar1', 'sigma'))[,c(3:7)])
         message()
       }
     }
@@ -187,11 +195,11 @@ if(!object$use_lv){
     if(object$trend_model == 'AR2'){
       if(object$drift){
         message("Latent trend drift (phi) and parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('phi', 'ar1', 'ar2', 'sigma'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('phi', 'ar1', 'ar2', 'sigma'))[,c(3:7)])
         message()
       } else {
         message("Latent trend parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('ar1', 'ar2', 'sigma'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('ar1', 'ar2', 'sigma'))[,c(3:7)])
         message()
       }
     }
@@ -199,11 +207,11 @@ if(!object$use_lv){
     if(object$trend_model == 'AR3'){
       if(object$drift){
         message("Latent trend drift (phi) and parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('phi', 'ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('phi', 'ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
         message()
       } else {
         message("Latent trend parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$jags_output, c('ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
+        print(MCMCvis::MCMCsummary(object$model_output, c('ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
         message()
       }
     }

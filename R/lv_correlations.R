@@ -11,14 +11,14 @@ lv_correlations = function(object){
   data_train <- object$obs_data
 
   # Series start and end indices
-  ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
+  ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
               length.out = NCOL(object$ytimes) + 1)
   starts <- ends + 1
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
   ends <- ends[-1]
 
   # Total number of MCMC samples
-  n_preds <- dim(MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[1]:ends[1]])[1]
+  n_preds <- dim(MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[1]:ends[1]])[1]
 
   # Total number of observations per series
   if(class(data_train)[1] == 'list'){
@@ -29,7 +29,7 @@ lv_correlations = function(object){
 
   # Extract series trends
   series_trends <- lapply(seq_len(length(ends)), function(y){
-    MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[y]:ends[y]][,1:n_obs]
+    MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[y]:ends[y]][,1:n_obs]
   })
 
   # Get list of trend correlation estimates

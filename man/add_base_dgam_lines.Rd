@@ -2,16 +2,18 @@
 % Please edit documentation in R/add_base_dgam_lines.R
 \name{add_base_dgam_lines}
 \alias{add_base_dgam_lines}
-\title{Dynamic GAM model file modifications}
+\title{Dynamic GAM model file adds}
 \usage{
-add_base_dgam_lines(use_lv)
+add_base_dgam_lines(use_lv, stan = FALSE)
 }
 \arguments{
 \item{use_lv}{Logical (use latent variables or not?)}
+
+\item{stan}{Logical (convert existing model to a Stan model?)}
 }
 \value{
 A character string to add to the mgcv jagam model file
 }
 \description{
-Dynamic GAM model file modifications
+Dynamic GAM model file adds
 }

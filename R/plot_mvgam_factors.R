@@ -28,7 +28,7 @@ plot_mvgam_factors = function(object, plot = TRUE){
   }
 
   # Get indices of LV estimates
-  ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'LV'))[2],
+  ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2],
               length.out = object$n_lv + 1)
   starts <- ends + 1
   starts <- c(1, starts[-c(1, object$n_lv + 1)])
@@ -56,7 +56,7 @@ plot_mvgam_factors = function(object, plot = TRUE){
 
   # Loop across each lv and calculate probability that the lv was dropped
   lv_estimates <- do.call(rbind, lapply(1:object$n_lv, function(x){
-    preds <- MCMCvis::MCMCchains(object$jags_output, 'LV')[,starts[x]:ends[x]]
+    preds <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[x]:ends[x]]
 
     # Keep only the in-sample observations for testing against the null of white noise
     preds <- preds[,1:(NROW(object$obs_data) / NCOL(object$ytimes))]

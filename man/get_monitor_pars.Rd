@@ -16,7 +16,7 @@ get_monitor_pars(family, use_lv, trend_model, drift)
 \item{drift}{Logical (was a drift term estimated or not)}
 }
 \value{
-A modified \code{JAGS} model file
+A string of parameters to monitor
 }
 \description{
 Return parameters to monitor during modelling

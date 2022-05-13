@@ -1,210 +1,282 @@
-#' Dynamic GAM model file modifications
+#' Dynamic GAM model file adds
 #'
 #'
 #' @export
 #' @param use_lv Logical (use latent variables or not?)
+#' @param stan Logical (convert existing model to a Stan model?)
 #' @return A character string to add to the mgcv jagam model file
-add_base_dgam_lines = function(use_lv){
+add_base_dgam_lines = function(use_lv, stan = FALSE){
 
-  if(use_lv){
-    modification <- c("
-#### Begin model ####
-                      model {
+  if(stan){
+    add <- "
+    ##insert data
+    parameters {
+    // raw basis coefficients
+    row_vector[num_basis] b_raw;
 
-                      ## GAM linear predictor
-                      eta <- X %*% b
+    // latent trend variance parameters
+    vector<lower=0.05,upper=5>[n_series] sigma;
 
-                      ## mean expectations
-                      for (i in 1:n) {
-                      for (s in 1:n_series) {
-                      mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
-                      }
-                      }
+    // latent trends
+    matrix[n, n_series] trend;
 
-                      ## latent factors evolve as time series with penalised precisions;
-                      ## the penalty terms force any un-needed factors to evolve as flat lines
-                      for (j in 1:n_lv) {
-                      LV[1, j] ~ dnorm(0, penalty[j])
-                      }
+    // smoothing parameters
+    vector<lower=0.0001>[n_sp] lambda;
+    }
 
-                      for (j in 1:n_lv) {
-                      LV[2, j] ~ dnorm(phi[j] + ar1[j]*LV[1, j], penalty[j])
-                      }
+    transformed parameters {
+    // basis coefficients
+    row_vector[num_basis] b;
 
-                      for (j in 1:n_lv) {
-                      LV[3, j] ~ dnorm(phi[j] + ar1[j]*LV[2, j] + ar2[j]*LV[1, j], penalty[j])
-                      }
+    // GAM contribution to expectations (log scale)
+    vector[total_obs] eta;
+    eta = to_vector(b * X);
+    }
 
-                      for (i in 4:n) {
-                      for (j in 1:n_lv) {
-                      LV[i, j] ~ dnorm(phi[j] + ar1[j]*LV[i - 1, j] +
-                      ar2[j]*LV[i - 2, j] + ar3[j]*LV[i - 3, j], penalty[j])
-                      }
-                      }
+    model {
+    ##insert smooths
 
-                      ## AR components
-                      for (s in 1:n_lv) {
-                      phi[s] ~ dnorm(0, 10)
-                      ar1[s] ~ dnorm(0, 10)
-                      ar2[s] ~ dnorm(0, 10)
-                      ar3[s] ~ dnorm(0, 10)
-                      }
+    // priors for smoothing parameters
+    lambda ~ exponential(0.1);
 
-                      ## shrinkage penalties for each factor squeeze the factor to a flat line and squeeze
-                      ## the entire factor toward a flat white noise process if supported by
-                      ## the data. The prior for individual factor penalties allows each factor to possibly
-                      ## have a relatively large penalty, which shrinks the prior for that factor's variance
-                      ## substantially. Penalties increase exponentially with the number of factors following
-                      ## Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate
-                      ## matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291.
-                      pi ~ dunif(0, n_lv)
-                      X2 ~ dnorm(0, 1)T(0, )
+    // priors for latent trend variance parameters
+    sigma ~ exponential(1);
 
-                      # eta1 controls the baseline penalty
-                      eta1 ~ dunif(-1, 1)
+    // trend estimates
+    for (s in 1:n_series) {
+    trend[1, s] ~ normal(0, sigma[s]);
+    }
 
-                      # eta2 controls how quickly the penalties exponentially increase
-                      eta2 ~ dunif(-1, 1)
+    for (s in 1:n_series) {
+    trend[2:n, s] ~ normal(trend[1:(n - 1), s], sigma[s]);
+    }
 
-                      for (t in 1:n_lv) {
-                      X1[t] ~ dnorm(0, 1)T(0, )
-                      l.dist[t] <- max(t, pi[])
-                      l.weight[t] <- exp(eta2[] * l.dist[t])
-                      l.var[t] <- exp(eta1[] * l.dist[t] / 2) * 1
-                      theta.prime[t] <- l.weight[t] * X1[t] + (1 - l.weight[t]) * X2[]
-                      penalty[t] <- max(0.0001, theta.prime[t] * l.var[t])
-                      }
+    // likelihood functions
+    for (i in 1:n) {
+    for (s in 1:n_series) {
+    if (y_observed[i, s])
+    y[i, s] ~ poisson_log(eta[ytimes[i, s]] + trend[i, s]);
+    }
+    }
+    }
 
-                      ## latent factor loadings: standard normal with identifiability constraints
-                      ## upper triangle of loading matrix set to zero
-                      for (j in 1:(n_lv - 1)) {
-                      for (j2 in (j + 1):n_lv) {
-                      lv_coefs[j, j2] <- 0
-                      }
-                      }
+    generated quantities {
+    vector[n_sp] rho;
+    rho = log(lambda);
+    vector[n_series] tau;
+    tau = sigma ^ -2;
 
-                      ## positive constraints on loading diagonals
-                      for (j in 1:n_lv) {
-                      lv_coefs[j, j] ~ dnorm(0, 1)T(0, 1);
-                      }
+    // posterior predictions
+    int<lower=0> ypred[n, n_series];
+    for (i in 1:n) {
+    for (s in 1:n_series) {
+    ypred[i, s] = poisson_log_rng(eta[ytimes[i, s]] + trend[i, s]);
+    }
+    }
+    }
+    "
 
-                      ## lower diagonal free
-                      for (j in 2:n_lv) {
-                      for (j2 in 1:(j - 1)) {
-                      lv_coefs[j, j2] ~ dnorm(0, 1)T(-1, 1);
-                      }
-                      }
-
-                      ## other elements also free
-                      for (j in (n_lv + 1):n_series) {
-                      for (j2 in 1:n_lv) {
-                      lv_coefs[j, j2] ~ dnorm(0, 1)T(-1, 1);
-                      }
-                      }
-
-                      ## trend evolution depends on latent factors
-                      for (i in 1:n) {
-                      for (s in 1:n_series) {
-                      trend[i, s] <- inprod(lv_coefs[s,], LV[i,])
-                      }
-                      }
-
-                      ## likelihood functions
-                      for (i in 1:n) {
-                      for (s in 1:n_series) {
-                      y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
-                      rate[i, s] <- ifelse((r[s] / (r[s] + mu[i, s])) < min_eps, min_eps,
-                      (r[s] / (r[s] + mu[i, s])))
-                      }
-                      }
-
-                      ## complexity penalising prior for the overdispersion parameter;
-                      ## where the likelihood reduces to a 'base' model (Poisson) unless
-                      ## the data support overdispersion
-                      for (s in 1:n_series) {
-                      r[s] <- pow(r_raw[s], 2)
-                      r_raw[s] ~ dexp(0.05)
-                      }
-
-                      ## posterior predictions
-                      for (i in 1:n) {
-                      for (s in 1:n_series) {
-                      ypred[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s])
-                      }
-                      }
-
-                      ## GAM-specific priors")
   } else {
-    modification <- c("
-#### Begin model ####
-                      model {
+    if(use_lv){
+      add <- c("
+               #### Begin model ####
+               model {
 
-                      ## GAM linear predictor
-                      eta <- X %*% b
+               ## GAM linear predictor
+               eta <- X %*% b
 
-                      ## mean expectations
-                      for (i in 1:n) {
-                      for (s in 1:n_series) {
-                      mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
-                      }
-                      }
+               ## mean expectations
+               for (i in 1:n) {
+               for (s in 1:n_series) {
+               mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
+               }
+               }
 
-                      ## trend estimates
-                      for (s in 1:n_series) {
-                      trend[1, s] ~ dnorm(0, tau[s])
-                      }
+               ## latent factors evolve as time series with penalised precisions;
+               ## the penalty terms force any un-needed factors to evolve as flat lines
+               for (j in 1:n_lv) {
+               LV[1, j] ~ dnorm(0, penalty[j])
+               }
 
-                      for (s in 1:n_series) {
-                      trend[2, s] ~ dnorm(phi[s] + ar1[s]*trend[1, s], tau[s])
-                      }
+               for (j in 1:n_lv) {
+               LV[2, j] ~ dnorm(phi[j] + ar1[j]*LV[1, j], penalty[j])
+               }
 
-                      for (s in 1:n_series) {
-                      trend[3, s] ~ dnorm(phi[s] + ar1[s]*trend[2, s] + ar2[s]*trend[1, s], tau[s])
-                      }
+               for (j in 1:n_lv) {
+               LV[3, j] ~ dnorm(phi[j] + ar1[j]*LV[2, j] + ar2[j]*LV[1, j], penalty[j])
+               }
 
-                      for (i in 4:n) {
-                      for (s in 1:n_series){
-                      trend[i, s] ~ dnorm(phi[s] + ar1[s]*trend[i - 1, s] + ar2[s]*trend[i - 2, s] + ar3[s]*trend[i - 3, s], tau[s])
-                      }
-                      }
+               for (i in 4:n) {
+               for (j in 1:n_lv) {
+               LV[i, j] ~ dnorm(phi[j] + ar1[j]*LV[i - 1, j] +
+               ar2[j]*LV[i - 2, j] + ar3[j]*LV[i - 3, j], penalty[j])
+               }
+               }
 
-                      ## AR components
-                      for (s in 1:n_series){
-                      phi[s] ~ dnorm(0, 10)
-                      ar1[s] ~ dnorm(0, 10)
-                      ar2[s] ~ dnorm(0, 10)
-                      ar3[s] ~ dnorm(0, 10)
-                      tau[s] <- pow(sigma[s], -2)
-                      sigma[s] ~ dexp(1)T(0.075, 5)
-                      }
+               ## AR components
+               for (s in 1:n_lv) {
+               phi[s] ~ dnorm(0, 10)
+               ar1[s] ~ dnorm(0, 10)
+               ar2[s] ~ dnorm(0, 10)
+               ar3[s] ~ dnorm(0, 10)
+               }
 
-                      ## likelihood functions
-                      for (i in 1:n) {
-                      for (s in 1:n_series) {
-                      y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
-                      rate[i, s] <- ifelse((r[s] / (r[s] + mu[i, s])) < min_eps, min_eps,
-                      (r[s] / (r[s] + mu[i, s])))
-                      }
-                      }
+               ## shrinkage penalties for each factor squeeze the factor to a flat line and squeeze
+               ## the entire factor toward a flat white noise process if supported by
+               ## the data. The prior for individual factor penalties allows each factor to possibly
+               ## have a relatively large penalty, which shrinks the prior for that factor's variance
+               ## substantially. Penalties increase exponentially with the number of factors following
+               ## Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate
+               ## matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291.
+               pi ~ dunif(0, n_lv)
+               X2 ~ dnorm(0, 1)T(0, )
 
-                      ## complexity penalising prior for the overdispersion parameter;
-                      ## where the likelihood reduces to a 'base' model (Poisson) unless
-                      ## the data support overdispersion
-                      for (s in 1:n_series) {
-                      r[s] <- pow(r_raw[s], 2)
-                      r_raw[s] ~ dexp(0.05)
-                      }
+               # eta1 controls the baseline penalty
+               eta1 ~ dunif(-1, 1)
 
-                      ## posterior predictions
-                      for (i in 1:n) {
-                      for (s in 1:n_series) {
-                      ypred[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s])
-                      }
-                      }
+               # eta2 controls how quickly the penalties exponentially increase
+               eta2 ~ dunif(-1, 1)
 
-                      ## GAM-specific priors")
+               for (t in 1:n_lv) {
+               X1[t] ~ dnorm(0, 1)T(0, )
+               l.dist[t] <- max(t, pi[])
+               l.weight[t] <- exp(eta2[] * l.dist[t])
+               l.var[t] <- exp(eta1[] * l.dist[t] / 2) * 1
+               theta.prime[t] <- l.weight[t] * X1[t] + (1 - l.weight[t]) * X2[]
+               penalty[t] <- max(0.0001, theta.prime[t] * l.var[t])
+               }
 
-  }
+               ## latent factor loadings: standard normal with identifiability constraints
+               ## upper triangle of loading matrix set to zero
+               for (j in 1:(n_lv - 1)) {
+               for (j2 in (j + 1):n_lv) {
+               lv_coefs[j, j2] <- 0
+               }
+               }
 
-  modification
-}
+               ## positive constraints on loading diagonals
+               for (j in 1:n_lv) {
+               lv_coefs[j, j] ~ dnorm(0, 1)T(0, 1);
+               }
+
+               ## lower diagonal free
+               for (j in 2:n_lv) {
+               for (j2 in 1:(j - 1)) {
+               lv_coefs[j, j2] ~ dnorm(0, 1)T(-1, 1);
+               }
+               }
+
+               ## other elements also free
+               for (j in (n_lv + 1):n_series) {
+               for (j2 in 1:n_lv) {
+               lv_coefs[j, j2] ~ dnorm(0, 1)T(-1, 1);
+               }
+               }
+
+               ## trend evolution depends on latent factors
+               for (i in 1:n) {
+               for (s in 1:n_series) {
+               trend[i, s] <- inprod(lv_coefs[s,], LV[i,])
+               }
+               }
+
+               ## likelihood functions
+               for (i in 1:n) {
+               for (s in 1:n_series) {
+               y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
+               rate[i, s] <- ifelse((r[s] / (r[s] + mu[i, s])) < min_eps, min_eps,
+               (r[s] / (r[s] + mu[i, s])))
+               }
+               }
+
+               ## complexity penalising prior for the overdispersion parameter;
+               ## where the likelihood reduces to a 'base' model (Poisson) unless
+               ## the data support overdispersion
+               for (s in 1:n_series) {
+               r[s] <- 1 / r_raw[s]
+               r_raw[s] ~ dnorm(0, 0.1)T(0, )
+               }
+
+               ## posterior predictions
+               for (i in 1:n) {
+               for (s in 1:n_series) {
+               ypred[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s])
+               }
+               }
+
+               ## GAM-specific priors")
+               } else {
+                 add <- c("
+                          #### Begin model ####
+                          model {
+
+                          ## GAM linear predictor
+                          eta <- X %*% b
+
+                          ## mean expectations
+                          for (i in 1:n) {
+                          for (s in 1:n_series) {
+                          mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
+                          }
+                          }
+
+                          ## trend estimates
+                          for (s in 1:n_series) {
+                          trend[1, s] ~ dnorm(0, tau[s])
+                          }
+
+                          for (s in 1:n_series) {
+                          trend[2, s] ~ dnorm(phi[s] + ar1[s]*trend[1, s], tau[s])
+                          }
+
+                          for (s in 1:n_series) {
+                          trend[3, s] ~ dnorm(phi[s] + ar1[s]*trend[2, s] + ar2[s]*trend[1, s], tau[s])
+                          }
+
+                          for (i in 4:n) {
+                          for (s in 1:n_series){
+                          trend[i, s] ~ dnorm(phi[s] + ar1[s]*trend[i - 1, s] + ar2[s]*trend[i - 2, s] + ar3[s]*trend[i - 3, s], tau[s])
+                          }
+                          }
+
+                          ## AR components
+                          for (s in 1:n_series){
+                          phi[s] ~ dnorm(0, 10)
+                          ar1[s] ~ dnorm(0, 10)
+                          ar2[s] ~ dnorm(0, 10)
+                          ar3[s] ~ dnorm(0, 10)
+                          tau[s] <- pow(sigma[s], -2)
+                          sigma[s] ~ dexp(1)T(0.075, 5)
+                          }
+
+                          ## likelihood functions
+                          for (i in 1:n) {
+                          for (s in 1:n_series) {
+                          y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
+                          rate[i, s] <- ifelse((r[s] / (r[s] + mu[i, s])) < min_eps, min_eps,
+                          (r[s] / (r[s] + mu[i, s])))
+                          }
+                          }
+
+                          ## complexity penalising prior for the overdispersion parameter;
+                          ## where the likelihood reduces to a 'base' model (Poisson) unless
+                          ## the data support overdispersion
+                          for (s in 1:n_series) {
+                          r[s] <- 1 / r_raw[s]
+                          r_raw[s] ~ dnorm(0, 0.1)T(0, )
+                          }
+
+                          ## posterior predictions
+                          for (i in 1:n) {
+                          for (s in 1:n_series) {
+                          ypred[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s])
+                          }
+                          }
+
+                          ## GAM-specific priors")
+
+                          }
+               }
+
+  return(add)
+    }

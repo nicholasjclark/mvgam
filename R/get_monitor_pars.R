@@ -6,7 +6,7 @@
 #' @param use_lv Logical (use latent variable trends or not)
 #' @param trend_model The type of trend model used
 #' @param drift Logical (was a drift term estimated or not)
-#' @return A modified `JAGS` model file
+#' @return A string of parameters to monitor
 get_monitor_pars = function(family, use_lv, trend_model, drift){
 
   param <- c('rho', 'b', 'ypred')

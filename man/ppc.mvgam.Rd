@@ -21,8 +21,10 @@ Note this is only useful if the same \code{data_test} was also included when fit
 Valid options are: 'rootogram', 'mean', 'hist', 'density', 'prop_zero', 'pit' and 'cdf'}
 
 \item{n_bins}{\code{integer} specifying the number of bins to use for binning observed values when plotting
-a rootogram or histogram. Default is \code{50} bins, which means that if there are \verb{>50} unique observed values, bins will
-be used to prevent overplotting and facilitate interpretation}
+a rootogram or histogram. Default is \code{50} bins for a rootogram, which means that if
+there are \verb{>50} unique observed values, bins will
+be used to prevent overplotting and facilitate interpretation. Default for a histogram is to use the
+number of bins returned by a call to \code{hist} in base \code{R}}
 
 \item{legend_position}{The location may also be specified by setting x to a single keyword from the
 list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".

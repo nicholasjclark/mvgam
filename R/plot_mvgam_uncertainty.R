@@ -29,7 +29,7 @@ plot_mvgam_uncertainty = function(object, series = 1, data_test, legend_position
 
   # Prediction indices for the particular series
   data_train <- object$obs_data
-  ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
+  ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
               length.out = NCOL(object$ytimes) + 1)
   starts <- ends + 1
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
@@ -72,10 +72,10 @@ plot_mvgam_uncertainty = function(object, series = 1, data_test, legend_position
                 type = 'lpmatrix')
 
   # Extract beta coefs
-  betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
+  betas <- MCMCvis::MCMCchains(object$model_output, 'b')
 
   # Extract current trend estimates
-  trend <- MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[series]:ends[series]]
+  trend <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
 
   if(length(unique(data_train$series)) == 1){
     trend <- matrix(trend[, NCOL(trend)])

@@ -126,41 +126,41 @@ eval_mvgam = function(object,
   # Extract trend / latent variable estimates at the correct timepoint
   if(object$use_lv){
     n_lv <- object$n_lv
-    ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'LV'))[2],
+    ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2],
                 length.out = n_lv + 1)
     starts <- ends + 1
     starts <- c(1, starts[-c(1, (n_lv + 1))])
     ends <- ends[-1]
     lvs <- lapply(seq_len(n_lv), function(lv){
-      lv_estimates <- MCMCvis::MCMCchains(object$jags_output, 'LV')[,starts[lv]:ends[lv]]
+      lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[lv]:ends[lv]]
       lv_estimates[,(eval_timepoint - 2):eval_timepoint]
     })
 
-    taus <- MCMCvis::MCMCchains(object$jags_output, 'penalty')
+    taus <- MCMCvis::MCMCchains(object$model_output, 'penalty')
 
     trends <- NULL
   } else {
     if(object$trend_model == 'None'){
       trends <- lapply(seq_len(n_series), function(series){
         trend_estimates <- matrix(0, ncol = NROW(object$ytimes),
-                                  nrow = dim(MCMCvis::MCMCchains(object$jags_output, 'b'))[1])
+                                  nrow = dim(MCMCvis::MCMCchains(object$model_output, 'b'))[1])
         as.matrix(trend_estimates[,(eval_timepoint - 2):eval_timepoint])
       })
 
-      taus <- matrix(0, nrow = dim(MCMCvis::MCMCchains(object$jags_output, 'b'))[1],
+      taus <- matrix(0, nrow = dim(MCMCvis::MCMCchains(object$model_output, 'b'))[1],
                      ncol = NCOL(object$ytimes))
     } else {
-    ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'trend'))[2],
+    ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'trend'))[2],
                 length.out = n_series + 1)
     starts <- ends + 1
     starts <- c(1, starts[-c(1, (n_series + 1))])
     ends <- ends[-1]
     trends <- lapply(seq_len(n_series), function(series){
-      trend_estimates <- MCMCvis::MCMCchains(object$jags_output, 'trend')[,starts[series]:ends[series]]
+      trend_estimates <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
       as.matrix(trend_estimates[,(eval_timepoint - 2):eval_timepoint])
     })
 
-    taus <- MCMCvis::MCMCchains(object$jags_output, 'tau')
+    taus <- MCMCvis::MCMCchains(object$model_output, 'tau')
     }
 
     lvs <- NULL
@@ -171,18 +171,18 @@ eval_mvgam = function(object,
   if(object$use_lv){
     lv_coefs <- lapply(seq_len(n_series), function(series){
       lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
-      as.matrix(MCMCvis::MCMCchains(object$jags_output, 'lv_coefs')[,lv_indices])
+      as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
     })
   } else {
     lv_coefs <- NULL
   }
 
   # Beta coefficients for GAM component
-  betas <- MCMCvis::MCMCchains(object$jags_output, 'b')
+  betas <- MCMCvis::MCMCchains(object$model_output, 'b')
 
   # Phi estimates for latent trend drift terms
   if(object$drift){
-    phis <- MCMCvis::MCMCchains(object$jags_output, 'phi')
+    phis <- MCMCvis::MCMCchains(object$model_output, 'phi')
   } else {
     if(object$use_lv){
       phis <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
@@ -205,7 +205,7 @@ eval_mvgam = function(object,
   }
 
   if(object$trend_model == 'AR1'){
-    ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
+    ar1s <- MCMCvis::MCMCchains(object$model_output, 'ar1')
 
     if(object$use_lv){
       ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
@@ -217,8 +217,8 @@ eval_mvgam = function(object,
   }
 
   if(object$trend_model == 'AR2'){
-    ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
-    ar2s <- MCMCvis::MCMCchains(object$jags_output, 'ar2')
+    ar1s <- MCMCvis::MCMCchains(object$model_output, 'ar1')
+    ar2s <- MCMCvis::MCMCchains(object$model_output, 'ar2')
 
     if(object$use_lv){
       ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
@@ -228,20 +228,20 @@ eval_mvgam = function(object,
   }
 
   if(object$trend_model == 'AR3'){
-    ar1s <- MCMCvis::MCMCchains(object$jags_output, 'ar1')
-    ar2s <- MCMCvis::MCMCchains(object$jags_output, 'ar2')
-    ar3s <- MCMCvis::MCMCchains(object$jags_output, 'ar3')
+    ar1s <- MCMCvis::MCMCchains(object$model_output, 'ar1')
+    ar2s <- MCMCvis::MCMCchains(object$model_output, 'ar2')
+    ar3s <- MCMCvis::MCMCchains(object$model_output, 'ar3')
   }
 
   # Family-specific parameters
   if(object$family == 'Negative Binomial'){
-    sizes <- MCMCvis::MCMCchains(object$jags_output, 'r')
+    sizes <- MCMCvis::MCMCchains(object$model_output, 'r')
   } else {
     sizes <- NULL
   }
 
   if(object$family == 'Tweedie'){
-    twdis <- MCMCvis::MCMCchains(object$jags_output, 'twdis')
+    twdis <- MCMCvis::MCMCchains(object$model_output, 'twdis')
     p <- matrix(1.5, nrow = NROW(betas), ncol = n_series)
   } else {
     twdis <- p <- NULL

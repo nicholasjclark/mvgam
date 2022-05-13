@@ -4,10 +4,12 @@
 \alias{add_trend_lines}
 \title{Latent trend model file modifications}
 \usage{
-add_trend_lines(model_file, use_lv, trend_model, drift)
+add_trend_lines(model_file, stan = FALSE, use_lv, trend_model, drift)
 }
 \arguments{
 \item{model_file}{A template \code{JAGS} model file to be modified}
+
+\item{stan}{Logical (convert existing model to a Stan model?)}
 
 \item{use_lv}{Logical (use latent variable trends or not)}
 

@@ -27,7 +27,7 @@
 #'return the model file and the data / initial values that are needed to fit the \code{JAGS} model
 #'@param prior_simulation \code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 #'simulations from prior distributions are returned
-#'@param return_jags_data \code{logical}. If \code{TRUE}, the list of data that is needed to fit the \code{JAGS}
+#'@param return_model_data \code{logical}. If \code{TRUE}, the list of data that is needed to fit the
 #'model is returned, along with the initial values for smooth and AR parameters, once the model is fitted.
 #'This will be helpful if users wish to modify the model file to add
 #'other stochastic elements that are not currently avaiable in \code{mvgam}. Default is \code{FALSE} to reduce
@@ -73,6 +73,10 @@
 #'this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 #'truncation entirely (i.e. there is no upper bound for each series)
+#'@param use_stan Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
+#'the `stan` language with a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
+#'not all options that are available in \code{JAGS} can be used, including: no option for a Tweedie family, no option for
+#'latent variable trends
 #'@param jags_path Optional character vector specifying the path to the location of the `JAGS` executable (.exe) to use
 #'for modelling. If missing, the path will be recovered from a call to \code{\link[runjags]{findjags}}
 #'
@@ -135,7 +139,7 @@ mvjagam = function(formula,
                    data_test,
                    run_model = TRUE,
                    prior_simulation = FALSE,
-                   return_jags_data = FALSE,
+                   return_model_data = FALSE,
                    family = 'poisson',
                    use_lv = FALSE,
                    n_lv,
@@ -152,6 +156,7 @@ mvjagam = function(formula,
                    twdis_prior,
                    sigma_prior,
                    upper_bounds,
+                   use_stan = FALSE,
                    jags_path){
 
   # Check arguments
@@ -181,24 +186,46 @@ mvjagam = function(formula,
     }
   }
 
-  # If the model is to be run, make sure JAGS can be located
-  if(run_model){
-    if(missing(jags_path)){
-      jags_path <- runjags::findjags()
+  # If Stan is to be used, make sure it is installed
+  if(use_stan){
+    if(!require(rstan)){
+      warning('rstan library not installed; reverting to JAGS')
+      use_stan <- FALSE
     }
+  }
 
-    # Code borrowed from the runjags package
-    jags_status <- runjags::testjags(jags_path, silent = TRUE)
-    if(!jags_status$JAGS.available){
-      if(jags_status$os=="windows"){
-        # Try it again - sometimes this helps
-        Sys.sleep(0.2)
-        jags_status <- runjags::testjags(jags_path, silent = TRUE)
+  # Stan can only handle certain options in the development phase
+  if(use_stan & use_lv){
+    warning('dynamic factor trends not yet supported for stan; reverting to JAGS')
+    use_stan <- FALSE
+  }
+
+  if(use_stan & family == 'tw'){
+    warning('Tweedie family not yet supported for stan; reverting to JAGS')
+    use_stan <- FALSE
+  }
+
+  # If the model is to be run in JAGS, make sure the JAGS software can be located
+  if(!use_stan){
+    if(run_model){
+      if(missing(jags_path)){
+        jags_path <- runjags::findjags()
       }
 
+      # Code borrowed from the runjags package
+      jags_status <- runjags::testjags(jags_path, silent = TRUE)
       if(!jags_status$JAGS.available){
-        cat("Unable to call JAGS using '", jags_path, "'\nTry specifying the path to the JAGS binary as the jags_path argument, or installing the rjags package.\nUse the runjags::testjags() function for more detailed diagnostics.\n", sep="")
-        stop("Unable to call JAGS", call. = FALSE)
+        if(jags_status$os=="windows"){
+          # Try it again - sometimes this helps
+          Sys.sleep(0.2)
+          jags_status <- runjags::testjags(jags_path, silent = TRUE)
+        }
+
+        if(!jags_status$JAGS.available){
+          cat("Unable to call JAGS using '", jags_path,
+              "'\nTry specifying the path to the JAGS binary as the jags_path argument, or installing the rjags package.\nUse the runjags::testjags() function for more detailed diagnostics.\n", sep="")
+          stop("Unable to call JAGS", call. = FALSE)
+        }
       }
     }
   }
@@ -475,7 +502,10 @@ mvjagam = function(formula,
   }
 
   # Modify lines needed for the specified trend model
-  model_file <- add_trend_lines(model_file, use_lv, trend_model, drift)
+  model_file <- add_trend_lines(model_file, stan = F,
+                                use_lv = use_lv,
+                                trend_model = trend_model,
+                                drift = drift)
 
   # Use informative priors based on the fitted mgcv model to speed convergence
   # and eliminate searching over strange parameter spaces
@@ -699,83 +729,194 @@ mvjagam = function(formula,
     # Return only the model file and all data / inits needed to run the model
     # outside of mvgam
     unlink('base_gam.txt')
-    output <- structure(list(call = formula,
-                             family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
-                                                       family == 'poisson' ~ 'Poisson',
-                                                       TRUE ~ 'Negative Binomial'),
-                             trend_model = trend_model,
-                             drift = drift,
-                             pregam = ss_jagam$pregam,
-                             model_file = trimws(model_file),
-                             jags_data = ss_jagam$jags.data,
-                             jags_inits = ss_jagam$jags.ini,
-                             mgcv_model = ss_gam,
-                             sp_names = names(ss_jagam$pregam$lsp0),
-                             ytimes = ytimes,
-                             use_lv = use_lv,
-                             n_lv = n_lv,
-                             upper_bounds = upper_bounds,
-                             obs_data = data_train),
-                        class = 'mvgam_prefit')
+    if(use_stan){
+      # Import the base Stan model file
+      modification <- add_base_dgam_lines(stan = TRUE)
+      unlink('base_gam_stan.txt')
+      cat(modification, file = 'base_gam_stan.txt', sep = '\n', append = T)
+      base_stan_model <- trimws(suppressWarnings(readLines('base_gam_stan.txt')))
+      unlink('base_gam_stan.txt')
+
+      # Add necessary trend structure
+      base_stan_model <- add_trend_lines(model_file = base_stan_model,
+                                         stan = T,
+                                         trend_model = trend_model,
+                                         drift = drift)
+
+      # Add remaining data, model and parameters blocks to the Stan model file;
+      # gather Stan data structure
+      stan_objects <- add_stan_data(jags_file = trimws(model_file),
+                                    stan_file = base_stan_model,
+                                    jags_data = ss_jagam$jags.data,
+                                    family = family)
+
+      output <- structure(list(call = formula,
+                               family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
+                                                         family == 'poisson' ~ 'Poisson',
+                                                         TRUE ~ 'Negative Binomial'),
+                               trend_model = trend_model,
+                               drift = drift,
+                               pregam = ss_jagam$pregam,
+                               model_file = stan_objects$stan_file,
+                               model_data = stan_objects$model_data,
+                               mgcv_model = ss_gam,
+                               sp_names = names(ss_jagam$pregam$lsp0),
+                               ytimes = ytimes,
+                               use_lv = use_lv,
+                               n_lv = n_lv,
+                               upper_bounds = upper_bounds,
+                               obs_data = data_train,
+                               fit_engine = 'stan'),
+                          class = 'mvgam_prefit')
+    } else {
+      output <- structure(list(call = formula,
+                               family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
+                                                         family == 'poisson' ~ 'Poisson',
+                                                         TRUE ~ 'Negative Binomial'),
+                               trend_model = trend_model,
+                               drift = drift,
+                               pregam = ss_jagam$pregam,
+                               model_file = trimws(model_file),
+                               model_data = ss_jagam$jags.data,
+                               mgcv_model = ss_gam,
+                               sp_names = names(ss_jagam$pregam$lsp0),
+                               ytimes = ytimes,
+                               use_lv = use_lv,
+                               n_lv = n_lv,
+                               upper_bounds = upper_bounds,
+                               obs_data = data_train,
+                               fit_engine = 'jags'),
+                          class = 'mvgam_prefit')
+    }
 
   } else {
 
-  # Set monitor parameters and initial values
-  param <- get_monitor_pars(family, use_lv, trend_model, drift)
+    if(use_stan){
+      fit_engine <- 'stan'
+      # Import the base Stan model file
+      modification <- add_base_dgam_lines(stan = TRUE)
+      unlink('base_gam_stan.txt')
+      cat(modification, file = 'base_gam_stan.txt', sep = '\n', append = T)
+      base_stan_model <- trimws(suppressWarnings(readLines('base_gam_stan.txt')))
+      unlink('base_gam_stan.txt')
 
-  initlist <- replicate(chains, ss_jagam$jags.ini,
-                          simplify = FALSE)
-  runjags::runjags.options(silent.jags = TRUE, silent.runjags = TRUE)
-  n.burn <- burnin
+      # Add necessary trend structure
+      base_stan_model <- add_trend_lines(model_file = base_stan_model,
+                                         stan = T,
+                                         trend_model = trend_model,
+                                         drift = drift)
 
-  # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS
-  # will take a while to optimise the samplers, so long adaptation with little 'burnin'
-  # is more crucial than little adaptation but long 'burnin' https://mmeredith.net/blog/2016/Adapt_or_burn.htm
-  unlink('base_gam.txt')
-  cat(model_file, file = 'base_gam.txt', sep = '\n', append = T)
-  if(parallel){
-    cl <- parallel::makePSOCKcluster(min(c(chains, parallel::detectCores() - 1)))
-    setDefaultCluster(cl)
-    gam_mod <- runjags::run.jags(model = 'base_gam.txt',
-                                 data = ss_jagam$jags.data,
-                                 modules = 'glm',
-                                 inits = initlist,
-                                 n.chains = chains,
-                                 # Rely on long adaptation to tune samplers appropriately
-                                 adapt = max(1000, n.burn - 1000),
-                                 burnin = 1000,
-                                 sample = n_samples,
-                                 jags = jags_path,
-                                 thin = thin,
-                                 method = "rjparallel",
-                                 monitor = c(param, 'deviance'),
-                                 silent.jags = TRUE,
-                                 cl = cl)
-    stopCluster(cl)
-  } else {
-    gam_mod <- runjags::run.jags(model = 'base_gam.txt',
-                                 data = ss_jagam$jags.data,
-                                 modules = 'glm',
-                                 inits = initlist,
-                                 n.chains = chains,
-                                 # Rely on long adaptation to tune samplers appropriately
-                                 adapt = max(1000, n.burn - 1000),
-                                 burnin = 1000,
-                                 sample = n_samples,
-                                 jags = jags_path,
-                                 thin = thin,
-                                 method = "rjags",
-                                 monitor = c(param, 'deviance'),
-                                 silent.jags = TRUE)
-  }
+      # Add remaining data, model and parameters blocks to the Stan model file;
+      # gather Stan data structure
+      stan_objects <- add_stan_data(jags_file = trimws(model_file),
+                                    stan_file = base_stan_model,
+                                    jags_data = ss_jagam$jags.data,
+                                    family = family)
+      model_data <- stan_objects$model_data
 
-  out_gam_mod <- coda::as.mcmc.list(gam_mod)
+      # Should never call library in a function, but just doing this for now while
+      # developing stan functionality!!
+      library(rstan)
+      options(mc.cores = parallel::detectCores())
+
+      # Sensible inits needed for the betas
+      if(trend_model != 'None'){
+        initf1 <- function() {
+          list(b_raw = runif(stan_objects$model_data$num_basis, -0.25, 0.25))
+        }
+      } else {
+        initf1 <- function() {
+          list(b_raw = runif(stan_objects$model_data$num_basis, -0.25, 0.25),
+               sigma = runif(stan_objects$model_data$n_series, 0.075, 1))
+        }
+      }
+      inits <- initf1
+
+      # Fit the model in stan
+      fit1 <- stan(model_code = stan_objects$stan_file,
+                   iter = burnin + 1000,
+                   chains = chains,
+                   data = stan_objects$model_data,
+                   cores = min(c(chains, parallel::detectCores() - 1)),
+                   init = initf1,
+                   verbose = F,
+                   pars = get_monitor_pars(family = family,
+                                           use_lv = use_lv,
+                                           trend_model = trend_model,
+                                           drift = drift),
+                   refresh = 500)
+
+      # Use Michael Betancourt's utility functions for checking diagnostics
+      source('https://raw.githubusercontent.com/betanalpha/knitr_case_studies/master/factor_modeling/stan_utility.R')
+      check_all_diagnostics(fit1)
+
+      # Convert stanfit object to samples
+      out_gam_mod <- coda::mcmc.list(lapply(1:NCOL(fit1),
+                                       function(x) coda::mcmc(as.array(fit1)[,x,])))
+    }
+
+    if(!use_stan){
+      fit_engine <- 'jags'
+      model_data <- ss_jagam$jags.data
+
+      # Set monitor parameters and initial values
+      param <- get_monitor_pars(family, use_lv, trend_model, drift)
+
+      initlist <- replicate(chains, ss_jagam$jags.ini,
+                            simplify = FALSE)
+      inits <- initlist
+      runjags::runjags.options(silent.jags = TRUE, silent.runjags = TRUE)
+      n.burn <- burnin
+
+      # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS
+      # will take a while to optimise the samplers, so long adaptation with little 'burnin'
+      # is more crucial than little adaptation but long 'burnin' https://mmeredith.net/blog/2016/Adapt_or_burn.htm
+      unlink('base_gam.txt')
+      cat(model_file, file = 'base_gam.txt', sep = '\n', append = T)
+      if(parallel){
+        cl <- parallel::makePSOCKcluster(min(c(chains, parallel::detectCores() - 1)))
+        setDefaultCluster(cl)
+        gam_mod <- runjags::run.jags(model = 'base_gam.txt',
+                                     data = ss_jagam$jags.data,
+                                     modules = 'glm',
+                                     inits = initlist,
+                                     n.chains = chains,
+                                     # Rely on long adaptation to tune samplers appropriately
+                                     adapt = max(1000, n.burn - 1000),
+                                     burnin = 1000,
+                                     sample = n_samples,
+                                     jags = jags_path,
+                                     thin = thin,
+                                     method = "rjparallel",
+                                     monitor = c(param, 'deviance'),
+                                     silent.jags = TRUE,
+                                     cl = cl)
+        stopCluster(cl)
+      } else {
+        gam_mod <- runjags::run.jags(model = 'base_gam.txt',
+                                     data = ss_jagam$jags.data,
+                                     modules = 'glm',
+                                     inits = initlist,
+                                     n.chains = chains,
+                                     # Rely on long adaptation to tune samplers appropriately
+                                     adapt = max(1000, n.burn - 1000),
+                                     burnin = 1000,
+                                     sample = n_samples,
+                                     jags = jags_path,
+                                     thin = thin,
+                                     method = "rjags",
+                                     monitor = c(param, 'deviance'),
+                                     silent.jags = TRUE)
+      }
+      out_gam_mod <- coda::as.mcmc.list(gam_mod)
+    }
+
   unlink('base_gam.txt')
   unlink(fil)
 
   # Get Dunn-Smyth Residual distributions for each series
   series_resids <- get_mvgam_resids(object = list(
-    jags_output = out_gam_mod,
+    model_output = out_gam_mod,
     family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
                               family == 'poisson' ~ 'Poisson',
                               TRUE ~ 'Negative Binomial'),
@@ -783,11 +924,30 @@ mvjagam = function(formula,
     ytimes = ytimes),
     n_cores = min(c(parallel::detectCores() - 1, NCOL(ytimes))))
 
-  # Get smooth penalty names in more interpretable format
-  sam <- suppressMessages(jags.samples(runjags::as.jags(gam_mod, adapt = 10, quiet = T),
-                                       c("b","rho"), n.iter = 100, thin = 1))
-  jam <- mgcv::sim2jam(sam, ss_jagam$pregam, edf.type = 1)
-  jam$sp <- exp(sam$rho)
+  # Create a jam object and get smooth penalty names in more interpretable format
+  ## Modified sim2jam function; takes simulation output
+  ## and a pregam object from jagam, and attempts to create a fake gam object suitable
+  ## for calculating estimated degrees of freedom
+  create_jam <- function(out_gam_mod, pregam) {
+
+    b <- t(MCMCvis::MCMCchains(out_gam_mod, 'b'))
+    pregam$Vp <- cov(t(b))
+    pregam$coefficients <- rowMeans(b)
+    pregam$sig2 <- 1
+
+    # Compute estimated degrees of freedom
+    eta <- pregam$X %*% pregam$coefficients
+    mu <- pregam$family$linkinv(eta)
+    w <- as.numeric(pregam$w * pregam$family$mu.eta(eta)^2 / pregam$family$variance(mu))
+    XWX <- t(pregam$X) %*% (w*pregam$X)
+
+    pregam$edf <- rowSums(pregam$Vp*t(XWX)) / pregam$sig2
+    class(pregam) <- "jam"
+    pregam
+  }
+
+  jam <- create_jam(out_gam_mod, ss_jagam$pregam)
+  jam$sp <- exp(colMeans(MCMCvis::MCMCchains(out_gam_mod, 'rho')))
 
   name_starts <- unlist(purrr:::map(jam$smooth, 'first.sp'))
   name_ends <- unlist(purrr:::map(jam$smooth, 'last.sp'))
@@ -803,7 +963,7 @@ mvjagam = function(formula,
   }))
 
 
-  if(return_jags_data){
+  if(return_model_data){
     output <- structure(list(call = formula,
                              family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
                                                        family == 'poisson' ~ 'Poisson',
@@ -811,20 +971,20 @@ mvjagam = function(formula,
                              trend_model = trend_model,
                              drift = drift,
                              pregam = ss_jagam$pregam,
-                             jags_output = out_gam_mod,
+                             model_output = out_gam_mod,
                              model_file = trimws(model_file),
                              sp_names = rho_names,
-                             jags_data = ss_jagam$jags.data,
-                             jags_inits = ss_jagam$jags.ini,
+                             model_data = model_data,
+                             inits = inits,
                              mgcv_model = ss_gam,
                              jam_model = jam,
-                             jags_model = gam_mod,
                              ytimes = ytimes,
                              resids = series_resids,
                              use_lv = use_lv,
                              n_lv = n_lv,
                              upper_bounds = upper_bounds,
-                             obs_data = data_train),
+                             obs_data = data_train,
+                             fit_engine = fit_engine),
                         class = 'mvgam')
   } else {
     output <- structure(list(call = formula,
@@ -834,18 +994,18 @@ mvjagam = function(formula,
                              trend_model = trend_model,
                              drift = drift,
                              pregam = ss_jagam$pregam,
-                             jags_output = out_gam_mod,
+                             model_output = out_gam_mod,
                              model_file = trimws(model_file),
                              sp_names = rho_names,
                              mgcv_model = ss_gam,
-                             jags_model = gam_mod,
                              jam_model = jam,
                              ytimes = ytimes,
                              resids = series_resids,
                              use_lv = use_lv,
                              n_lv = n_lv,
                              upper_bounds = upper_bounds,
-                             obs_data = data_train),
+                             obs_data = data_train,
+                             fit_engine = fit_engine),
                         class = 'mvgam')
   }
   }

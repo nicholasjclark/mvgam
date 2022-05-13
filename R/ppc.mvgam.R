@@ -10,8 +10,10 @@
 #'@param type \code{character} specifying the type of posterior predictive check to calculate and plot.
 #'Valid options are: 'rootogram', 'mean', 'hist', 'density', 'prop_zero', 'pit' and 'cdf'
 #'@param n_bins \code{integer} specifying the number of bins to use for binning observed values when plotting
-#'a rootogram or histogram. Default is `50` bins, which means that if there are `>50` unique observed values, bins will
-#'be used to prevent overplotting and facilitate interpretation
+#'a rootogram or histogram. Default is `50` bins for a rootogram, which means that if
+#'there are `>50` unique observed values, bins will
+#'be used to prevent overplotting and facilitate interpretation. Default for a histogram is to use the
+#'number of bins returned by a call to `hist` in base `R`
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
 #'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
 #'This places the legend on the inside of the plot frame at the given location.
@@ -74,23 +76,9 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
     }
   }
 
-  if(type == 'hist' & missing(n_bins)){
-    n_bins <- 50
-
-    if(sign(n_bins) != 1){
-      stop('argument "n_bins" must be a positive integer',
-           call. = FALSE)
-    } else {
-      if(n_bins%%1 != 0){
-        stop('argument "n_bins" must be a positive integer',
-             call. = FALSE)
-      }
-    }
-  }
-
   # Pull out observations and posterior predictions for the specified series
   data_train <- object$obs_data
-  ends <- seq(0, dim(MCMCvis::MCMCchains(object$jags_output, 'ypred'))[2],
+  ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
               length.out = NCOL(object$ytimes) + 1)
   starts <- ends + 1
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
@@ -134,7 +122,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
         dplyr::filter(series == s_name) %>%
         dplyr::pull(y)
 
-      preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
+      preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
       preds <- preds[,((length(data_train$y) / NCOL(object$ytimes))+1):
                        ((length(data_train$y) / NCOL(object$ytimes))+length(truths))]
 
@@ -146,7 +134,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
         dplyr::arrange(time) %>%
         dplyr::pull(y)
 
-      preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
+      preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
       preds <- preds[,((NROW(data_train) / NCOL(object$ytimes))+1):
                        ((NROW(data_train) / NCOL(object$ytimes))+length(truths))]
     }
@@ -173,7 +161,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
         dplyr::pull(y)
     }
 
-    preds <- MCMCvis::MCMCchains(object$jags_output, 'ypred')[,starts[series]:ends[series]]
+    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
     preds <- preds[,1:length(truths)]
 
     if(NROW(preds) > 4000){
@@ -418,16 +406,30 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
   }
 
   if(type == 'hist'){
-    posterior_values <- preds
-    bin_lims <- range(posterior_values)
-    delta <- diff(range(posterior_values)) / n_bins
+    if(missing(n_bins)){
+      n_bins <- max(c(length(hist(c(truths, as.vector(preds)), plot = F)$breaks),
+                      20))
+    }
+
+    if(sign(n_bins) != 1){
+      stop('argument "n_bins" must be a positive integer',
+           call. = FALSE)
+    } else {
+      if(n_bins%%1 != 0){
+        stop('argument "n_bins" must be a positive integer',
+             call. = FALSE)
+      }
+    }
+
+    bin_lims <- range(c(truths, as.vector(preds)))
+    delta <- diff(range(preds)) / n_bins
     breaks <- seq(bin_lims[1], bin_lims[2] + delta, delta)
     xlim <- c(0,
               max(max(density(preds[1,])$x),
                   max(density(truths)$x)))
     ylim <- c(0, max(c(max(hist(truths, breaks = breaks, plot = F)$density),
-                       max(hist(posterior_values, breaks = breaks, plot = F)$density))))
-    hist(posterior_values, breaks=breaks,
+                       max(hist(preds, breaks = breaks, plot = F)$density))))
+    hist(preds, breaks=breaks,
          main='',
          xlab = paste0('Predictive histogram for ', levels(data_train$series)[series]),
          ylim=ylim,
@@ -436,14 +438,16 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
          col = "#C79999",
          freq = F)
 
+    par(lwd=2)
     hist(truths, breaks=breaks,
          main='', xlab='',
          ylim=ylim,
          xlim=xlim,
          ylab='', yaxt='n',
-         col=rgb(red = 0, green = 0, blue = 0, alpha = 0.1),
-         border=rgb(red = 0, green = 0, blue = 0, alpha = 0.7),
+         col=rgb(red = 0, green = 0, blue = 0, alpha = 0),
+         border="black",
          add=T, freq = F)
+    par(lwd=1)
     box()
 
     if(missing(legend_position)){

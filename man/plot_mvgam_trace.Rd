@@ -10,9 +10,7 @@ plot_mvgam_trace(object, param = "rho", overlay_prior = TRUE)
 \item{object}{\code{list} object returned from \code{mvjagam}}
 
 \item{param}{\code{character} vector specifying which parameter(s) are to be plotted. Valid options are:
-'rho' (smoothing penalties), 'trend' (which returns traces for all latent trend parameters,
-including drift and autoregressive terms), 'b' (traces for all smooth beta coefficients) and
-'r' (the Negative Binomial overdispersion parameter)}
+'rho' (smoothing penalties), 'b' (traces for all smooth beta coefficients)}
 
 \item{overlay_prior}{\code{logical}. If \code{TRUE} and \code{param} is 'rho' or 'trend', the default prior densities
 are also shown to evaluate how informative the data were for shaping the posterior estimates. Note that these
