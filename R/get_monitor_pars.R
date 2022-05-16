@@ -57,6 +57,10 @@ get_monitor_pars = function(family, use_lv, trend_model, drift){
       param <- c(param, 'trend', 'tau', 'sigma', 'ar1', 'ar2', 'ar3')
     }
 
+    if(trend_model == 'GP'){
+      param <- c(param, 'trend', 'alpha_gp', 'rho_gp')
+    }
+
   }
 
   if(trend_model != 'None'){

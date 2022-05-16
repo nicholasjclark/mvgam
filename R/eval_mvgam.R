@@ -55,6 +55,12 @@ eval_mvgam = function(object,
     }
   }
 
+  # Convert stanfit objects to coda samples
+  if(class(object$model_output) == 'stanfit'){
+    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
+                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+  }
+
   #### 1. Generate linear predictor matrix for covariates and extract trend estimates at timepoint
   data_train <- object$obs_data
   n_series <- NCOL(object$ytimes)

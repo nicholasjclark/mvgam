@@ -29,6 +29,11 @@ pfilter_mvgam_init = function(object,
     stop('argument "object" must be of class "mvgam"')
   }
 
+  # Convert stanfit objects to coda samples
+  if(class(object$model_output) == 'stanfit'){
+    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
+                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+  }
 
 #### 1. Generate linear predictor matrix for the next timepoint and extract last trend estimates
 # (NOTE, all series must have observations for the next timepoint, even if they are NAs!!!!) ####

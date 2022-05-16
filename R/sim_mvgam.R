@@ -9,7 +9,9 @@
 #'@param n_series \code{integer}. Number of discrete time series
 #'@param seasonality \code{character}. Either \code{shared}, meaning that all series share the exact same seasonal pattern,
 #'or \code{hierarchical}, meaning that there is a global seasonality but each series' pattern can deviate slightly
-#'@param n_trends \code{integer}. Number of latent dynamic factors (as random walks with drift) for generating the series' trends
+#'@param n_lv \code{integer}. Number of latent dynamic factors for generating the series' trends
+#'@param trend_model \code{character} either 'RW' (trends evolve as random walks with drift) or 'GP'
+#'(trends evolve as smooth Gaussian Processes with squared exponential covariance kernels)
 #'@param trend_rel \code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}
 #'@param freq \code{integer}. The seasonal frequency of the series
 #'@param family \code{character} specifying the exponential observation family for the series. Must be either
@@ -28,7 +30,8 @@
 sim_mvgam = function(T = 100,
                      n_series = 3,
                      seasonality = 'shared',
-                     n_trends = 5,
+                     n_lv = 2,
+                     trend_model = 'RW',
                      trend_rel = 0.2,
                      freq = 12,
                      family = 'poisson',
@@ -39,12 +42,15 @@ sim_mvgam = function(T = 100,
 
   # Check arguments
   family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
-
-  # Sample trend drift terms so they are (hopefully) not too correlated
-  trend_alphas <- rnorm(n_trends, sd = 0.15)
+  trend_model <- match.arg(arg = trend_model, choices = c("RW", "GP"))
 
   if(missing(trend_rel)){
     trend_rel <- 0.2
+  }
+
+  if(n_lv > n_series){
+    warning('n_lv cannot be greater than n_series; changing n_lv to match n_series')
+    n_lv <- n_series
   }
 
   if(!seasonality %in% c('shared', 'hierarchical')){
@@ -71,19 +77,65 @@ sim_mvgam = function(T = 100,
     mu_obs <- rep(mu_obs[1], n_series)
   }
 
-  # Simulate the long-term trends, which evolve as random walks + drift
-  trends <- do.call(cbind, lapply(seq_len(n_trends), function(x){
-    trend <- rep(NA, length = T + 2)
-    trend[1] <- trend_alphas[x]
-    for (t in 2:(T+2)) {
-      trend[t] <- rnorm(
-        1,
-        trend_alphas[x] + trend[t - 1],
-        1
-      )
+  if(trend_model == 'RW'){
+    # Sample trend drift terms so they are (hopefully) not too correlated
+    trend_alphas <- rnorm(n_lv, sd = 0.15)
+
+    # Simulate the long-term trends, which evolve as random walks + drift
+    trends <- do.call(cbind, lapply(seq_len(n_lv), function(x){
+      trend <- rep(NA, length = T + 2)
+      trend[1] <- trend_alphas[x]
+      for (t in 2:(T+2)) {
+        trend[t] <- rnorm(
+          1,
+          trend_alphas[x] + trend[t - 1],
+          1
+        )
+      }
+      as.vector(scale(zoo::rollmean(as.vector(scale(trend)), k = 3, na.pad = F)))
+    }))
+  }
+
+  if(trend_model == 'GP'){
+
+    # Function to simulate from a latent GP with squared exponential covariance
+    sim_exp_gp = function(N = 50, alpha = 1, rho = 2){
+
+      # Squared exponential kernel function
+      exp_kernel <- function(x, y, alpha = 1, rho = 1) {
+        alpha^2 * exp(- (x - y)^2 / (2 * rho^2))
+      }
+
+      # Generate covariance matrix for points in sequence `x`
+      cov_matrix <- function(x, kernel_fn, ...) {
+        outer(x, x, function(a, b) kernel_fn(a, b, ...))
+      }
+
+      # Draw from kernel function
+      draw_samples <- function(x, kernel_fn, ...) {
+        K <- cov_matrix(x, kernel_fn, ...)
+        MASS::mvrnorm(1, mu = rep(0, times = length(x)), Sigma = K)
+      }
+
+      # Return evenly spaced draws
+      gp_true <- draw_samples(x = seq(0, N, length.out = N * 10),
+                              kernel_fn = exp_kernel,
+                              alpha = alpha,
+                              rho = rho)
+
+      gp_true[seq(1, length(gp_true), 10)]
     }
-    as.vector(scale(zoo::rollmean(as.vector(scale(trend)), k = 3, na.pad = F)))
-  }))
+
+    # Sample alpha and rho parameters
+    trend_alphas <- runif(n_lv, 0.5, 1.2)
+    trend_rhos <- runif(n_lv, 2.5, 9.5)
+
+    # Generate latent GP trends
+    trends <- do.call(cbind, lapply(seq_len(n_lv), function(lv){
+      sim_exp_gp(N = T, alpha = trend_alphas[lv], rho = trend_rhos[lv])
+    }))
+
+  }
 
   # Loadings on the trends for each series, with sparse but strong correlations
   sparse = function(n){
@@ -97,12 +149,12 @@ sim_mvgam = function(T = 100,
   diag(corMat) <- 1
   stddev <- rep(1, n_series)
   Sigma <- stddev %*% t(stddev) * corMat
-  loadings <- matrix(MASS::mvrnorm(n = n_trends, mu = rep(0, n_series),
+  loadings <- matrix(MASS::mvrnorm(n = n_lv, mu = rep(0, n_series),
                                       Sigma = as.matrix(Matrix::nearPD(Sigma)$mat)),
                      ncol = n_series)
 
   # Simulate the shared seasonal pattern
-  stl_season <- stl(smooth::sim.es(model = "ANA",frequency = freq, obs = T + 5,
+  stl_season <- stl(smooth::sim.es(model = "ANA" ,frequency = freq, obs = T + 5,
                                randomizer = "rnorm")$data, 'periodic')$time.series[,1]
   glob_season <- as.vector(scale(zoo::rollmean(stl_season, k = 6, na.pad = F)))
 

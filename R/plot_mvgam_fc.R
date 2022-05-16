@@ -21,6 +21,12 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
     stop('argument "object" must be of class "mvgam"')
   }
 
+  # Convert stanfit objects to coda samples
+  if(class(object$model_output) == 'stanfit'){
+    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
+                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+  }
+
   if(sign(series) != 1){
     stop('argument "series" must be a positive integer',
          call. = FALSE)

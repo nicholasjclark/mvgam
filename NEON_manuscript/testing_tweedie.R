@@ -12,23 +12,87 @@ plot(y, type = 'l')
 
 # Split data into training and testing
 data_train <-
-  data.frame(y = y[1:125],
-             season = season[1:125],
-             time = 1:125)
+  data.frame(y = y[1:85],
+             season = season[1:85],
+             time = 1:85)
 data_test <-
-  data.frame(y = y[126:length(season)],
-             season = season[126:length(season)],
-             time = 126:length(season))
+  data.frame(y = y[86:length(season)],
+             season = season[86:length(season)],
+             time = 86:length(season))
+
+library(mvgam)
+mod1 <- mvjagam(data_train = data_train,
+                data_test = data_test,
+                formula = y ~ s(season, k = 12, bs = 'cc'),
+                knots = list(season = c(0.5, 12.5)),
+                family = 'poisson',
+                trend_model = 'AR1',
+                chains = 4,
+                burnin = 1000)
+summary(mod1)
+
+model_file <- mod1$model_file
+
+Xp <- predict(mod1$mgcv_model, type = 'lpmatrix')
+
+# Zero out all other columns in Xp
+Xp[,!grepl(paste0('(', 'season', ')'), colnames(Xp), fixed = T)] <- 0
+betas <- MCMCvis::MCMCchains(mod1$model_output, 'b')
+preds <- matrix(NA, nrow = NROW(betas), ncol = NROW(Xp))
+for(i in 1:NROW(betas)){
+  preds[i,] <- (Xp %*% betas[i, ])
+}
+
+
+
+# Generate series with latent GP trends
+sim_data <- sim_mvgam(T = 80, n_series = 2, n_lv = 2,
+                      trend_model = 'GP',
+                      trend_rel = 0.5, family = 'poisson')
+mod1stan <- mvjagam(data_train = sim_data$data_train,
+                    data_test = sim_data$data_test,
+                    formula = y ~ s(season, k = 12, bs = 'cc'),
+                    knots = list(season = c(0.5, 12.5)),
+                    family = 'poisson',
+                    trend_model = 'GP',
+                    chains = 2,
+                    burnin = 500,
+                    use_stan = T, run_model = T)
+mod1stan$model_file
+class(mod1stan$model_output)
+plot(mod1stan, type = 'forecast', series = 1, data_test = sim_data$data_test)
+plot(mod1stan, type = 'forecast', series = 2, data_test = sim_data$data_test)
+plot(mod1stan, type = 'trend', series = 1, data_test = sim_data$data_test)
+plot(mod1stan, type = 'trend', series = 2, data_test = sim_data$data_test)
+summary(mod1stan)
+
+pairs(mod1stan$model_output, pars = c('rho', 'sigma'))
+
+
+
+sim_data <- sim_mvgam(T = 60, n_series = 2, trend_rel = 0.5, prop_missing = 0.2)
+mod1stan <- mvjagam(data_train = sim_data$data_train,
+                    data_test = sim_data$data_test,
+                    formula = y ~ s(season, k = 12, bs = 'cc'),
+                    knots = list(season = c(0.5, 12.5)),
+                    family = 'nb',
+                    trend_model = 'GP',
+                    chains = 4,
+                    burnin = 500,
+                    use_stan = T, run_model = T)
+mod1stan$model_file
+plot(mod1stan, type = 'forecast', series = 2, data_test = data_test)
+plot(mod1stan, type = 'trend', series = 1, data_test = data_test)
+summary(mod1stan)
 
 # Fit non-dynamic GAMs
 # Poisson model
 library(mvgam)
 mod1 <- mvjagam(data_train = data_train,
                 data_test = data_test,
-                formula = y ~ s(season, k = 15, bs = 'cc') +
-                  s(time, k = 4, bs = 'gp'),
-                knots = list(season = c(0.5, 24.5)),
-                family = 'nb',
+                formula = y ~ s(season, k = 12, bs = 'cc'),
+                knots = list(season = c(0.5, 12.5)),
+                family = 'poisson',
                 trend_model = 'AR1',
                 chains = 4,
                 burnin = 1000)
@@ -37,20 +101,25 @@ summary(mod1)
 
 mod1stan <- mvjagam(data_train = data_train,
                 data_test = data_test,
-                formula = y ~ s(season, k = 15, bs = 'cc') +
-                  s(time, k = 4, bs = 'gp'),
-                knots = list(season = c(0.5, 24.5)),
-                family = 'nb',
-                trend_model = 'AR1',
+                formula = y ~ s(season, k = 12, bs = 'cc'),
+                knots = list(season = c(0.5, 12.5)),
+                family = 'poisson',
+                trend_model = 'GP',
                 chains = 4,
                 burnin = 1000,
-                use_stan = T)
-mod1stan$model_file
-summary(mod1stan)
+                use_stan = T, run_model = T)
 
+MCMCvis::MCMCtrace(mod1stan$model_output,
+                   c('alpha_gp', 'rho_gp'), pdf = F)
 
-compare_mvgams(mod1, mod1stan, fc_horizon = 4,
-               n_evaluations = 20, n_cores = 5)
+plot(mod1, type = 'forecast', data_test = data_test)
+plot(mod1stan, type = 'forecast', data_test = data_test)
+
+plot(mod1, type = 'trend', data_test = data_test)
+plot(mod1stan, type = 'trend', data_test = data_test)
+
+plot(mod1, type = 'smooths', data_test = data_test)
+plot(mod1stan, type = 'smooths', data_test = data_test)
 
 # Check if overdispersion correctly captured
 ppc(mod1stan, type = 'hist', n_bins = 100)

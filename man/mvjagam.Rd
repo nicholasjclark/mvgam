@@ -80,7 +80,8 @@ and the observation process is the only source of error; similarly to what is es
 'RW' (random walk with possible drift),
 'AR1' (AR1 model with intercept),
 'AR2' (AR2 model with intercept) or
-'AR3' (AR3 model with intercept)}
+'AR3' (AR3 model with intercept) or
+'GP' (Gaussian process; currently under development)}
 
 \item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,

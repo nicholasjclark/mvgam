@@ -27,8 +27,8 @@ add_trend_lines = function(model_file, stan = FALSE,
         'y[i, s] ~ poisson_log(eta[ytimes[i, s]]);'
 
 
-      model_file[grep('ypred[i, s] =', model_file, fixed = T)] <-
-        "ypred[i, s] = poisson_log_rng(eta[ytimes[i, s]] );"
+      model_file[grep('ypred =', model_file, fixed = T)] <-
+        "ypred = poisson_log_rng(eta );"
 
       model_file <- model_file[-grep('tau =', model_file)]
 
@@ -37,7 +37,137 @@ add_trend_lines = function(model_file, stan = FALSE,
       model_file <- readLines(textConnection(model_file), n = -1)
     }
 
-    if(trend == 'RW'){
+    if(trend_model == 'GP'){
+
+      hilbert_approx = TRUE
+      if(hilbert_approx){
+        model_file <- model_file[-c((grep('// raw basis', model_file) + 3):
+                                      (grep('// raw basis', model_file) + 5))]
+
+        model_file <- model_file[-c((grep('// priors for latent trend', model_file)):
+                                      (grep('// priors for latent trend', model_file)+2))]
+
+        model_file <- model_file[-c((grep('// trend estimates', model_file)):
+                                      (grep('// trend estimates', model_file)+3))]
+        model_file <- model_file[-c((grep('trend[2:n', model_file, fixed = T)-1):
+                                      (grep('trend[2:n', model_file, fixed = T)+1))]
+        model_file <- model_file[-grep('tau =', model_file)]
+        model_file <- model_file[-grep('vector[n_series] tau', model_file, fixed = T)]
+        model_file[grep('##insert data', model_file)+1] <-
+          paste0('transformed data {\n',
+                 'vector<lower=1>[n] times;\n',
+                 'for (t in 1:n){\n',
+                 'times[t] = t;\n',
+                 '}\n\n',
+                 'real<lower=0> boundary;\n',
+                 'boundary = (5.0/4) * n;\n',
+                 'int<lower=1> num_gp_basis;\n',
+                 'num_gp_basis = max(30, n);\n',
+                 'matrix[n, num_gp_basis] gp_phi;\n',
+                 'for (m in 1:num_gp_basis){\n',
+                 'gp_phi[,m] = phi_SE(boundary, m, times);\n',
+                 '}\n}\n\n',
+                 'parameters {')
+
+        model_file[grep('##insert data', model_file)-1] <-
+          paste0('functions {\n',
+                 'real lambda_gp(real L, int m) {\n',
+                 'real lam;\n',
+                 'lam = ((m*pi())/(2*L))^2;\n',
+                 'return lam;\n',
+                 '}\n\n',
+                 'vector phi_SE(real L, int m, vector x) {\n',
+                 'vector[rows(x)] fi;\n',
+                 'fi = 1/sqrt(L) * sin(m*pi()/(2*L) * (x+L));\n',
+                 'return fi;\n',
+                 '}\n\n',
+                 'real spd_SE(real alpha, real rho, real w) {\n',
+                 'real S;\n',
+                 'S = (alpha^2) * sqrt(2*pi()) * rho * exp(-0.5*(rho^2)*(w^2));\n',
+                 'return S;\n',
+                 '}\n}\n')
+
+        model_file[grep('// latent trends', model_file)+2] <-
+          paste0('// gp parameters\n',
+                 'vector<lower=0>[n_series] alpha_gp;\n',
+                 'vector<lower=0>[n_series] rho_gp;\n\n',
+                 '// gp coefficient weights\n',
+                 'matrix[num_gp_basis, n_series] b_gp;\n')
+
+        model_file <- model_file[-c(grep('// latent trends', model_file):
+                                   (grep('// latent trends', model_file)+1))]
+
+        model_file[grep('// GAM contribution', model_file) + 3] <-
+          paste0('\n// gp spectral densities\n',
+                 'matrix[n, n_series] trend;\n',
+                 'matrix[num_gp_basis, n_series] diag_SPD;\n',
+                 'matrix[num_gp_basis, n_series] SPD_beta;\n',
+                 'for (m in 1:num_gp_basis){\n',
+                 'for (s in 1:n_series){\n',
+                  'diag_SPD[m, s] = sqrt(spd_SE(alpha_gp[s], rho_gp[s], sqrt(lambda_gp(boundary, m))));\n',
+                 '}\n}\n',
+                 'SPD_beta = diag_SPD .* b_gp;\n',
+                 'trend = gp_phi * SPD_beta;\n}\n')
+
+        model_file[grep('// priors for smoothing parameters', model_file)+2] <-
+          paste0('\n// priors for gp parameters\n',
+                 'for (s in 1:n_series){\n',
+                 'b_gp[1:num_gp_basis, s] ~ normal(0, 1);\n',
+                 '}\n',
+                 'alpha_gp ~ exponential(4);\n',
+                 'rho_gp ~ inv_gamma(4.6, 22.1);\n')
+
+        model_file <- readLines(textConnection(model_file), n = -1)
+      } else {
+        model_file <- model_file[-c((grep('// raw basis', model_file) + 3):
+                                      (grep('// raw basis', model_file) + 5))]
+
+        model_file <- model_file[-c((grep('// priors for latent trend', model_file)):
+                                      (grep('// priors for latent trend', model_file)+2))]
+
+        model_file <- model_file[-c((grep('// trend estimates', model_file)):
+                                      (grep('// trend estimates', model_file)+3))]
+        model_file <- model_file[-c((grep('trend[2:n', model_file, fixed = T)-1):
+                                      (grep('trend[2:n', model_file, fixed = T)+1))]
+        model_file <- model_file[-grep('tau =', model_file)]
+        model_file <- model_file[-grep('vector[n_series] tau', model_file, fixed = T)]
+        model_file[grep('##insert data', model_file)+1] <-
+          paste0('transformed data {\n',
+                 'real times[n];\n',
+                 'for (t in 1:n)\n',
+                 'times[t] = t;\n',
+                 '}\n\n',
+                 'parameters {')
+
+        model_file[grep('// latent trends', model_file)+1] <-
+          paste0('vector<lower=0>[n_series] alpha_gp;\n',
+                 'vector<lower=0>[n_series] rho_gp;\n',
+                 'vector[n] gp_std;\n')
+
+        model_file[grep('// basis coefficients', model_file)+2] <-
+          paste0('\n\n// gp estimates\n',
+                 'matrix[n, n_series] trend;\n',
+                 'for (s in 1:n_series) {\n',
+                 '// gp covariance matrices\n',
+                 'matrix[n, n] cov;\n',
+                 'matrix[n, n] L_cov;\n',
+                 'cov = cov_exp_quad(times, alpha_gp[s], rho_gp[s]) + diag_matrix(rep_vector(1e-10, n));\n',
+                 'L_cov = cholesky_decompose(cov);\n',
+                 '// non-centred parameterisation\n',
+                 'trend[1:n, s] = to_vector(L_cov * gp_std);\n',
+                 '}\n')
+
+        model_file[grep('// priors for smoothing parameters', model_file)+2] <-
+          paste0('\n// priors for gp parameters\n',
+                 'to_vector(gp_std) ~ normal(0, 1);\n',
+                 'alpha_gp ~ exponential(4);\n',
+                 'rho_gp ~ inv_gamma(4.6, 22.1);\n')
+
+        model_file <- readLines(textConnection(model_file), n = -1)
+      }
+    }
+
+    if(trend_model == 'RW'){
       if(drift){
         model_file[grep('// raw basis', model_file) + 1] <-
           paste0('row_vector[num_basis] b_raw;\n\n// latent trend drift terms\nvector<lower=-1, upper=1>[n_series] phi;\n')

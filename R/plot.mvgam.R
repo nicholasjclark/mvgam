@@ -39,6 +39,12 @@ plot.mvgam = function(object, type = 'smooths',
                                             "pterms", "forecast", "trend",
                                             "uncertainty", "factors"))
 
+  # Convert stanfit objects to coda samples
+  if(class(object$model_output) == 'stanfit'){
+    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
+                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+  }
+
   if(class(object) != 'mvgam'){
     stop('argument "object" must be of class "mvgam"')
   }

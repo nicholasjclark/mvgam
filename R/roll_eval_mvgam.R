@@ -31,6 +31,12 @@ roll_eval_mvgam = function(object,
     stop('argument "object" must be of class "mvgam"')
   }
 
+  # Convert stanfit objects to coda samples
+  if(class(object$model_output) == 'stanfit'){
+    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
+                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+  }
+
   if(object$trend_model == 'None'){
     stop('cannot compute rolling forecasts for mvgams that have no trend model',
          call. = FALSE)

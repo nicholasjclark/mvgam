@@ -15,6 +15,12 @@ summary.mvgam = function(object){
   # calculate effective degrees of freedom for smooth terms
   jam = object$jam_model
 
+  # Convert stanfit objects to coda samples
+  if(class(object$model_output) == 'stanfit'){
+    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
+                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+  }
+
 #### Standard summary of formula and model argumements ####
 message("GAM formula:")
 print(object$call)
@@ -214,6 +220,13 @@ if(!object$use_lv){
         print(MCMCvis::MCMCsummary(object$model_output, c('ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
         message()
       }
+    }
+
+    if(object$trend_model == 'GP'){
+        message("Latent trend marginal deviation (alpha) and length scale (rho) estimates:")
+        print(MCMCvis::MCMCsummary(object$model_output, c('alpha_gp', 'rho_gp'))[,c(3:7)])
+        message()
+
     }
   }
 }

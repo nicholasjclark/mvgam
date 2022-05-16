@@ -43,7 +43,8 @@
 #''RW' (random walk with possible drift),
 #''AR1' (AR1 model with intercept),
 #''AR2' (AR2 model with intercept) or
-#''AR3' (AR3 model with intercept)
+#''AR3' (AR3 model with intercept) or
+#''GP' (Gaussian process; currently under development)
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 #'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 #'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
@@ -160,7 +161,7 @@ mvjagam = function(formula,
                    jags_path){
 
   # Check arguments
-  trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1", "AR2", "AR3"))
+  trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1", "AR2", "AR3", "GP"))
   family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
 
   if(chains == 1){
@@ -816,7 +817,7 @@ mvjagam = function(formula,
 
       # Should never call library in a function, but just doing this for now while
       # developing stan functionality!!
-      library(rstan)
+      require(rstan)
       options(mc.cores = parallel::detectCores())
 
       # Sensible inits needed for the betas
@@ -847,12 +848,10 @@ mvjagam = function(formula,
                    refresh = 500)
 
       # Use Michael Betancourt's utility functions for checking diagnostics
-      source('https://raw.githubusercontent.com/betanalpha/knitr_case_studies/master/factor_modeling/stan_utility.R')
+      #source('https://raw.githubusercontent.com/betanalpha/knitr_case_studies/master/factor_modeling/stan_utility.R')
       check_all_diagnostics(fit1)
 
-      # Convert stanfit object to samples
-      out_gam_mod <- coda::mcmc.list(lapply(1:NCOL(fit1),
-                                       function(x) coda::mcmc(as.array(fit1)[,x,])))
+      out_gam_mod <- fit1
     }
 
     if(!use_stan){
@@ -962,6 +961,11 @@ mvjagam = function(formula,
            number_seq)
   }))
 
+  if(use_stan){
+    model_file <- stan_objects$stan_file
+  } else {
+    model_file <- trimws(model_file)
+  }
 
   if(return_model_data){
     output <- structure(list(call = formula,
@@ -972,7 +976,7 @@ mvjagam = function(formula,
                              drift = drift,
                              pregam = ss_jagam$pregam,
                              model_output = out_gam_mod,
-                             model_file = trimws(model_file),
+                             model_file = model_file,
                              sp_names = rho_names,
                              model_data = model_data,
                              inits = inits,
@@ -995,7 +999,7 @@ mvjagam = function(formula,
                              drift = drift,
                              pregam = ss_jagam$pregam,
                              model_output = out_gam_mod,
-                             model_file = trimws(model_file),
+                             model_file = model_file,
                              sp_names = rho_names,
                              mgcv_model = ss_gam,
                              jam_model = jam,

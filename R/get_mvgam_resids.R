@@ -9,6 +9,12 @@
 #'@return A \code{list} of residual distributions
 get_mvgam_resids = function(object, n_cores = 1){
 
+  # Convert stanfit objects to coda samples
+  if(class(object$model_output) == 'stanfit'){
+    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
+                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+  }
+
 # Functions for calculating randomised quantile (Dunn-Smyth) residuals
 ds_resids_nb = function(truth, fitted, draw, size){
   dsres_out <- matrix(NA, length(truth), 1)

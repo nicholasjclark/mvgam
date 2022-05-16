@@ -22,6 +22,12 @@ c_dark <- c("#8F2727")
 c_dark_highlight <- c("#7C0000")
 probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
 
+# Convert stanfit objects to coda samples
+if(class(object$model_output) == 'stanfit'){
+  object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
+                                                function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+}
+
 # Labels of smooths in formula
 smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
   data.frame(label = object$mgcv_model$smooth[[x]]$label,

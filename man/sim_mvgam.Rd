@@ -8,7 +8,8 @@ sim_mvgam(
   T = 100,
   n_series = 3,
   seasonality = "shared",
-  n_trends = 5,
+  n_lv = 2,
+  trend_model = "RW",
   trend_rel = 0.2,
   freq = 12,
   family = "poisson",
@@ -26,7 +27,10 @@ sim_mvgam(
 \item{seasonality}{\code{character}. Either \code{shared}, meaning that all series share the exact same seasonal pattern,
 or \code{hierarchical}, meaning that there is a global seasonality but each series' pattern can deviate slightly}
 
-\item{n_trends}{\code{integer}. Number of latent dynamic factors (as random walks with drift) for generating the series' trends}
+\item{n_lv}{\code{integer}. Number of latent dynamic factors for generating the series' trends}
+
+\item{trend_model}{\code{character} either 'RW' (trends evolve as random walks with drift) or 'GP'
+(trends evolve as smooth Gaussian Processes with squared exponential covariance kernels)}
 
 \item{trend_rel}{\code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}}
 

@@ -10,6 +10,12 @@
 print.mvgam = function(object){
 jam = object$jam_model
 
+# Convert stanfit objects to coda samples
+if(class(object$model_output) == 'stanfit'){
+  object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
+                                                function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+}
+
 message("GAM formula:")
 print(object$call)
 message()
@@ -44,9 +50,17 @@ if(class(object$obs_data)[1] == 'list'){
 }
 message()
 
-message('Status:')
-cat('Fitted using runjags::run.jags()', '\n')
-message()
+if(object$fit_engine == 'jags'){
+  message('Status:')
+  cat('Fitted using runjags::run.jags()', '\n')
+  message()
+}
+
+if(object$fit_engine == 'stan'){
+  message('Status:')
+  cat('Fitted using rstan::stan()', '\n')
+  message()
+}
 
 if(object$family == 'Negative Binomial'){
   message("Dispersion parameter estimates:")

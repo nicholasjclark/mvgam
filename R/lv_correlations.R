@@ -8,6 +8,13 @@
 #'@return A \code{list} object containing the mean posterior correlations and the full array of posterior correlations
 #'@export
 lv_correlations = function(object){
+
+  # Convert stanfit objects to coda samples
+  if(class(object$model_output) == 'stanfit'){
+    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
+                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+  }
+
   data_train <- object$obs_data
 
   # Series start and end indices

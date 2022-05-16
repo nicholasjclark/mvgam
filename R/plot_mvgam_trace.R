@@ -22,6 +22,12 @@ plot_mvgam_trace = function(object, param = 'rho', overlay_prior = TRUE){
     stop('argument "object" must be of class "mvgam"')
   }
 
+  # Convert stanfit objects to coda samples
+  if(class(object$model_output) == 'stanfit'){
+    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
+                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+  }
+
   if(param == 'rho'){
     param_names <- object$sp_names
     prior_mat <- matrix(NA, nrow = dim(MCMCvis::MCMCchains(object$model_output, 'rho'))[1],

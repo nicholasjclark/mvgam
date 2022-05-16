@@ -72,6 +72,17 @@ compare_mvgams = function(model1,
     }
   }
 
+  # Convert stanfit objects to coda samples
+  if(class(model1$model_output) == 'stanfit'){
+    model1$model_output <- coda::mcmc.list(lapply(1:NCOL(model1$model_output),
+                                                  function(x) coda::mcmc(as.array(model1$model_output)[,x,])))
+  }
+
+  if(class(model2$model_output) == 'stanfit'){
+    model2$model_output <- coda::mcmc.list(lapply(1:NCOL(model2$model_output),
+                                                  function(x) coda::mcmc(as.array(model2$model_output)[,x,])))
+  }
+
 # Evaluate the two models
 mod1_eval <- roll_eval_mvgam(model1,
                              n_samples = n_samples,
