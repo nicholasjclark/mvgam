@@ -1,7 +1,7 @@
-#'Evaluate forecasts from a fitted mvjagam object at a specific timepoint
+#'Evaluate forecasts from a fitted mvgam object at a specific timepoint
 #'
 #'This function generates a set of samples representing fixed parameters estimated from the full
-#'\code{mvjagam} model and latent trend states at a given point in time. The trends are rolled forward
+#'\code{mvgam} model and latent trend states at a given point in time. The trends are rolled forward
 #'a total of \code{fc_horizon} timesteps according to their estimated state space dynamics to
 #'generate an 'out-of-sample' forecast that is evaluated against the true observations in the horizon window.
 #'This function therefore simulates a situation where the model's parameters had already been estimated but
@@ -9,7 +9,7 @@
 #'latent trends. Evaluation involves calculating the Discrete Rank Probability Score and a binary indicator
 #'for whether or not the true value lies within the forecast's 90% prediction interval
 #'
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@param n_samples \code{integer} specifying the number of samples to generate from the model's
 #'posterior distribution
 #'@param eval_timepoint \code{integer} indexing the timepoint that represents our last 'observed'

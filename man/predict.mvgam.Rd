@@ -2,12 +2,12 @@
 % Please edit documentation in R/predict.mvgam.R
 \name{predict.mvgam}
 \alias{predict.mvgam}
-\title{Plot mvjagam posterior predictions for a specified series}
+\title{Plot mvgam posterior predictions for a specified series}
 \usage{
 \method{predict}{mvgam}(object, series = 1, newdata, type = "link")
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
@@ -28,8 +28,8 @@ posterior samples from the fitted object and \code{n_obs} is the number of test 
 in which the \code{series} variable matches the suppled \code{series} argument
 }
 \description{
-Plot mvjagam posterior predictions for a specified series
+Plot mvgam posterior predictions for a specified series
 }
 \details{
-Posterior predictions are calculated from the fitted \code{mvjagam} object.
+Posterior predictions are calculated from the fitted \code{mvgam} object.
 }

@@ -2,12 +2,12 @@
 % Please edit documentation in R/get_mvgam_resids.R
 \name{get_mvgam_resids}
 \alias{get_mvgam_resids}
-\title{Residual calculations for a fitted mvjagam object}
+\title{Residual calculations for a fitted mvgam object}
 \usage{
 get_mvgam_resids(object, n_cores = 1)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{n_cores}{\code{integer} specifying number of cores for generating residual distributions in parallel}
 }
@@ -15,7 +15,7 @@ get_mvgam_resids(object, n_cores = 1)
 A \code{list} of residual distributions
 }
 \description{
-This function takes a fitted \code{mvjagam} object and returns distributions of Dunn-Smyth residuals
+This function takes a fitted \code{mvgam} object and returns distributions of Dunn-Smyth residuals
 }
 \details{
 Dunn-Smyth residual distributions are calculated for each series in the fitted object

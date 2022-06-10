@@ -1,11 +1,11 @@
-#'Initiate particles for online filtering from a fitted mvjagam object
+#'Initiate particles for online filtering from a fitted mvgam object
 #'
 #'This function generates a set of particles that each captures a unique proposal about
 #'the current state of the system. The next observation in \code{data_assim} is assimilated
 #'and particles are weighted by their proposal's multivariate composite likelihood to update the model's
 #'forecast distribution
 #'
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@param data_assim A \code{dataframe} or \code{list} of test data containing at least one more observation per series
 #'(beyond the last observation seen by the model in \code{object}) to be assimilated by the particle filter.
 #'Should at least contain 'series' and 'time' for the one-step ahead horizon,
@@ -131,10 +131,22 @@ if(object$use_lv){
       dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
       NROW()
     trend_estimates <- trend_estimates[,1:end_train]
-    trend_estimates[,(NCOL(trend_estimates)-2):(NCOL(trend_estimates))]
+
+    # Only need last 3 timesteps if this is not a GP trend model
+    if(object$trend_model == 'GP'){
+      out <- trend_estimates
+    } else {
+      out <- trend_estimates[,(NCOL(trend_estimates)-2):(NCOL(trend_estimates))]
+    }
+    out
   })
 
-  taus <- MCMCvis::MCMCchains(object$model_output, 'tau')
+  if(object$trend_model == 'GP'){
+    taus <- NULL
+  } else {
+    taus <- MCMCvis::MCMCchains(object$model_output, 'tau')
+  }
+
   lvs <- NULL
 }
 
@@ -163,12 +175,24 @@ if(object$drift){
 }
 
 # AR term estimates
+if(object$trend_model == 'GP'){
+  alpha_gps <- MCMCvis::MCMCchains(object$model_output, 'alpha_gp')
+  rho_gps <- MCMCvis::MCMCchains(object$model_output, 'rho_gp')
+  ar1s <- NULL
+  ar2s <- NULL
+  ar3s <- NULL
+}
+
 if(object$trend_model == 'RW'){
   if(object$use_lv){
+    alpha_gps <- NULL
+    rho_gps <- NULL
     ar1s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
     ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
     ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
   } else {
+    alpha_gps <- NULL
+    rho_gps <- NULL
     ar1s <- matrix(0, nrow = NROW(betas), ncol = n_series)
     ar2s <- matrix(0, nrow = NROW(betas), ncol = n_series)
     ar3s <- matrix(0, nrow = NROW(betas), ncol = n_series)
@@ -177,6 +201,8 @@ if(object$trend_model == 'RW'){
 
 if(object$trend_model == 'AR1'){
   ar1s <- MCMCvis::MCMCchains(object$model_output, 'ar1')
+  alpha_gps <- NULL
+  rho_gps <- NULL
   if(object$use_lv){
     ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
     ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
@@ -189,6 +215,8 @@ if(object$trend_model == 'AR1'){
 if(object$trend_model == 'AR2'){
   ar1s <- MCMCvis::MCMCchains(object$model_output, 'ar1')
   ar2s <- MCMCvis::MCMCchains(object$model_output, 'ar2')
+  alpha_gps <- NULL
+  rho_gps <- NULL
 
   if(object$use_lv){
     ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
@@ -201,6 +229,8 @@ if(object$trend_model == 'AR3'){
   ar1s <- MCMCvis::MCMCchains(object$model_output, 'ar1')
   ar2s <- MCMCvis::MCMCchains(object$model_output, 'ar2')
   ar3s <- MCMCvis::MCMCchains(object$model_output, 'ar3')
+  alpha_gps <- NULL
+  rho_gps <- NULL
 }
 
 
@@ -232,10 +262,12 @@ use_lv <- object$use_lv
 truth <- series_test$y
 last_assim <- unique(series_test$time)
 upper_bounds <- object$upper_bounds
+trend_model <- object$trend_model
 
 cl <- parallel::makePSOCKcluster(n_cores)
 setDefaultCluster(cl)
 clusterExport(NULL, c('use_lv',
+                      'trend_model',
                       'Xp',
                       'betas',
                       'series_test',
@@ -246,6 +278,8 @@ clusterExport(NULL, c('use_lv',
                       'ar1s',
                       'ar2s',
                       'ar3s',
+                      'alpha_gps',
+                      'rho_gps',
                       'lvs',
                       'lv_coefs',
                       'trends',
@@ -363,14 +397,21 @@ particles <- pbapply::pblapply(sample_seq, function(x){
       trends[[trend]][samp_index, ]
     })
 
-    # Sample AR parameters
-    phi <- phis[samp_index, ]
-    ar1 <- ar1s[samp_index, ]
-    ar2 <- ar2s[samp_index, ]
-    ar3 <- ar3s[samp_index, ]
+    if(is.null(alpha_gps)){
+      # Sample AR parameters
+      phi <- phis[samp_index, ]
+      ar1 <- ar1s[samp_index, ]
+      ar2 <- ar2s[samp_index, ]
+      ar3 <- ar3s[samp_index, ]
+      alpha_gp <- rho_gp <- 0
 
-    # Sample trend precisions
-    tau <- taus[samp_index,]
+      # Sample trend precisions
+      tau <- taus[samp_index,]
+    } else {
+      phi <- ar1 <- ar2 <- ar3 <- tau <- 0
+      alpha_gp <- alpha_gps[samp_index, ]
+      rho_gp <- rho_gps[samp_index, ]
+    }
 
     # Family-specific parameters
     if(family == 'Negative Binomial'){
@@ -383,11 +424,30 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     }
 
     # Run the trends forward one timestep
-    trends <- do.call(cbind, lapply(seq_along(trends), function(trend){
-      rnorm(1, phi[trend] + ar1[trend] * last_trends[[trend]][3] +
-              ar2[trend] * last_trends[[trend]][2] +
-              ar3[trend] * last_trends[[trend]][1], sqrt(1 / tau[trend]))
-    }))
+    if(is.null(alpha_gps)){
+      trends <- do.call(cbind, lapply(seq_along(trends), function(trend){
+        rnorm(1, phi[trend] + ar1[trend] * last_trends[[trend]][3] +
+                ar2[trend] * last_trends[[trend]][2] +
+                ar3[trend] * last_trends[[trend]][1], sqrt(1 / tau[trend]))
+      }))
+    } else {
+      trends <- do.call(cbind, lapply(seq_along(trends), function(trend){
+        t <- 1:length(last_trends[[trend]])
+        t_new <- 1:(length(last_trends[[trend]]) + 1)
+
+        # Evaluate on a fine a grid of points to preserve the
+        # infinite dimensionality
+        scale_down <- (100 / length(last_trends[[trend]])) * rho_gp[trend]
+        t <- t / scale_down
+        t_new <- t_new / scale_down
+
+        Sigma_new <- alpha_gp[trend]^2 * exp(-(rho_gp[trend]/scale_down) * outer(t, t_new, "-")^2)
+        Sigma <- alpha_gp[trend]^2 * exp(-(rho_gp[trend]/scale_down) * outer(t, t, "-")^2) +
+          diag(1e-4, length(last_trends[[trend]]))
+
+        tail(t(Sigma_new) %*% solve(Sigma, last_trends[[trend]]), 1)
+      }))
+    }
 
     # Calculate weight for the particle in the form of a composite likelihood
     liks <- unlist(lapply(seq_len(n_series), function(series){
@@ -431,63 +491,126 @@ particles <- pbapply::pblapply(sample_seq, function(x){
 
   # Store important particle-specific information for later filtering
   if(family == 'Poisson'){
-    output <- list(use_lv = use_lv,
-                   n_lv = n_lv,
-                   family = family,
-                   lv_states = next_lvs,
-                   lv_coefs = lv_coefs,
-                   betas = as.numeric(betas),
-                   tau = as.numeric(tau),
-                   phi = as.numeric(phi),
-                   ar1 = as.numeric(ar1),
-                   ar2 = as.numeric(ar2),
-                   ar3 = as.numeric(ar3),
-                   trend_states = trends,
-                   weight = weight,
-                   liks = liks,
-                   upper_bounds = upper_bounds,
-                   last_assim = last_assim)
+    if(trend_model == 'GP'){
+      output <- list(use_lv = use_lv,
+                     n_lv = n_lv,
+                     family = family,
+                     trend_model = trend_model,
+                     lv_states = next_lvs,
+                     lv_coefs = lv_coefs,
+                     betas = as.numeric(betas),
+                     alpha_gp = as.numeric(alpha_gp),
+                     rho_gp = as.numeric(rho_gp),
+                     trend_states = lapply(last_trends, unname),
+                     trend_states = trends,
+                     weight = weight,
+                     liks = liks,
+                     upper_bounds = upper_bounds,
+                     last_assim = last_assim)
+    } else {
+      output <- list(use_lv = use_lv,
+                     n_lv = n_lv,
+                     family = family,
+                     trend_model = trend_model,
+                     lv_states = next_lvs,
+                     lv_coefs = lv_coefs,
+                     betas = as.numeric(betas),
+                     tau = as.numeric(tau),
+                     phi = as.numeric(phi),
+                     ar1 = as.numeric(ar1),
+                     ar2 = as.numeric(ar2),
+                     ar3 = as.numeric(ar3),
+                     trend_states = trends,
+                     weight = weight,
+                     liks = liks,
+                     upper_bounds = upper_bounds,
+                     last_assim = last_assim)
+    }
+
   }
 
   if(family == 'Negative Binomial'){
-    output <- list(use_lv = use_lv,
-                   n_lv = n_lv,
-                   family = family,
-                   lv_states = next_lvs,
-                   lv_coefs = lv_coefs,
-                   betas = as.numeric(betas),
-                   size = as.numeric(size),
-                   tau = as.numeric(tau),
-                   phi = as.numeric(phi),
-                   ar1 = as.numeric(ar1),
-                   ar2 = as.numeric(ar2),
-                   ar3 = as.numeric(ar3),
-                   trend_states = trends,
-                   weight = weight,
-                   liks = liks,
-                   upper_bounds = upper_bounds,
-                   last_assim = last_assim)
+    if(trend_model == 'GP'){
+      output <- list(use_lv = use_lv,
+                     n_lv = n_lv,
+                     family = family,
+                     trend_model = trend_model,
+                     lv_states = next_lvs,
+                     lv_coefs = lv_coefs,
+                     betas = as.numeric(betas),
+                     size = as.numeric(size),
+                     alpha_gp = as.numeric(alpha_gp),
+                     rho_gp = as.numeric(rho_gp),
+                     trend_states = lapply(last_trends, unname),
+                     trend_states = trends,
+                     weight = weight,
+                     liks = liks,
+                     upper_bounds = upper_bounds,
+                     last_assim = last_assim)
+    } else {
+      output <- list(use_lv = use_lv,
+                     n_lv = n_lv,
+                     family = family,
+                     trend_model = trend_model,
+                     lv_states = next_lvs,
+                     lv_coefs = lv_coefs,
+                     betas = as.numeric(betas),
+                     size = as.numeric(size),
+                     tau = as.numeric(tau),
+                     phi = as.numeric(phi),
+                     ar1 = as.numeric(ar1),
+                     ar2 = as.numeric(ar2),
+                     ar3 = as.numeric(ar3),
+                     trend_states = trends,
+                     weight = weight,
+                     liks = liks,
+                     upper_bounds = upper_bounds,
+                     last_assim = last_assim)
+    }
+
   }
 
   if(family == 'Tweedie'){
-    output <- list(use_lv = use_lv,
-                   n_lv = n_lv,
-                   family = family,
-                   lv_states = next_lvs,
-                   lv_coefs = lv_coefs,
-                   betas = as.numeric(betas),
-                   p = as.numeric(p),
-                   twdis = as.numeric(twdis),
-                   tau = as.numeric(tau),
-                   phi = as.numeric(phi),
-                   ar1 = as.numeric(ar1),
-                   ar2 = as.numeric(ar2),
-                   ar3 = as.numeric(ar3),
-                   trend_states = trends,
-                   weight = weight,
-                   liks = liks,
-                   upper_bounds = upper_bounds,
-                   last_assim = last_assim)
+    if(trend_model == 'GP'){
+      output <- list(use_lv = use_lv,
+                     n_lv = n_lv,
+                     family = family,
+                     trend_model = trend_model,
+                     lv_states = next_lvs,
+                     lv_coefs = lv_coefs,
+                     betas = as.numeric(betas),
+                     p = as.numeric(p),
+                     twdis = as.numeric(twdis),
+                     alpha_gp = as.numeric(alpha_gp),
+                     rho_gp = as.numeric(rho_gp),
+                     trend_states = lapply(last_trends, unname),
+                     trend_states = trends,
+                     weight = weight,
+                     liks = liks,
+                     upper_bounds = upper_bounds,
+                     last_assim = last_assim)
+    } else {
+      output <- list(use_lv = use_lv,
+                     n_lv = n_lv,
+                     family = family,
+                     trend_model = trend_model,
+                     lv_states = next_lvs,
+                     lv_coefs = lv_coefs,
+                     betas = as.numeric(betas),
+                     p = as.numeric(p),
+                     twdis = as.numeric(twdis),
+                     tau = as.numeric(tau),
+                     phi = as.numeric(phi),
+                     ar1 = as.numeric(ar1),
+                     ar2 = as.numeric(ar2),
+                     ar3 = as.numeric(ar3),
+                     trend_states = trends,
+                     weight = weight,
+                     liks = liks,
+                     upper_bounds = upper_bounds,
+                     last_assim = last_assim)
+    }
+
   }
 
   output

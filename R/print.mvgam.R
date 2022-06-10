@@ -1,8 +1,8 @@
-#'Summary for a fitted mvjagam object
+#'Summary for a fitted mvgam object
 #'
-#'This function takes a fitted \code{mvjagam} object and prints a quick summary
+#'This function takes a fitted \code{mvgam} object and prints a quick summary
 #'
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@author Nicholas J Clark
 #'@details A brief summary of the model's call is printed
 #'@return A \code{list} is printed on-screen

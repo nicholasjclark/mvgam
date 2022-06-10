@@ -2,7 +2,7 @@
 % Please edit documentation in R/roll_eval_mvgam.R
 \name{roll_eval_mvgam}
 \alias{roll_eval_mvgam}
-\title{Evaluate forecasts from a fitted mvjagam object using a rolling window}
+\title{Evaluate forecasts from a fitted mvgam object using a rolling window}
 \usage{
 roll_eval_mvgam(
   object,
@@ -14,7 +14,7 @@ roll_eval_mvgam(
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{n_evaluations}{\code{integer} specifying the total number of evaluations to perform
 (ignored if \code{evaluation_seq} is supplied)}

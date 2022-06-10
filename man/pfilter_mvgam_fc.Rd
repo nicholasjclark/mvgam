@@ -2,7 +2,7 @@
 % Please edit documentation in R/pfilter_mvgam_fc.R
 \name{pfilter_mvgam_fc}
 \alias{pfilter_mvgam_fc}
-\title{Forecast from a particle filtered mvjagam object}
+\title{Forecast from a particle filtered mvgam object}
 \usage{
 pfilter_mvgam_fc(
   file_path = "pfilter",
@@ -40,7 +40,7 @@ the actual forecasts are returned within the \code{list} as a separate \code{lis
 }
 \description{
 This function generates a forecast from a set of particles that each capture a unique proposal about
-the current state of the system that was modelled in the mvjagam object. The covariate and timepoint information
+the current state of the system that was modelled in the mvgam object. The covariate and timepoint information
 from \code{data_test} is used to generate the GAM component forecast, while the trends are run forward in time
 according to their state space dynamics. The forecast is a weighted ensemble, with weights determined by
 each particle's proposal likelihood prior to the most recent assimilation step

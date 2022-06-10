@@ -7,7 +7,7 @@
 #' @param use_lv Logical (use latent variable trends or not)
 #' @param trend_model The type of trend model to be added to the model file
 #' @param drift Logical (add drift or not)
-#' @return A modified `JAGS` model file
+#' @return A modified `JAGS` or `Stan` model file
 add_trend_lines = function(model_file, stan = FALSE,
                            use_lv, trend_model, drift){
 
@@ -39,7 +39,7 @@ add_trend_lines = function(model_file, stan = FALSE,
 
     if(trend_model == 'GP'){
 
-      hilbert_approx = TRUE
+      hilbert_approx = T
       if(hilbert_approx){
         model_file <- model_file[-c((grep('// raw basis', model_file) + 3):
                                       (grep('// raw basis', model_file) + 5))]
@@ -56,11 +56,17 @@ add_trend_lines = function(model_file, stan = FALSE,
         model_file[grep('##insert data', model_file)+1] <-
           paste0('transformed data {\n',
                  'vector<lower=1>[n] times;\n',
+                 'real mean_times;\n',
+                 'vector[n] times_cent;\n',
                  'for (t in 1:n){\n',
                  'times[t] = t;\n',
                  '}\n\n',
+                 'mean_times = mean(times);\n',
+                 'for (t in 1:n){\n',
+                 'times_cent[t] = t - mean_times;\n',
+                 '}\n\n',
                  'real<lower=0> boundary;\n',
-                 'boundary = (5.0/4) * n;\n',
+                 'boundary = (5.0/4) * max(times);\n',
                  'int<lower=1> num_gp_basis;\n',
                  'num_gp_basis = max(30, n);\n',
                  'matrix[n, num_gp_basis] gp_phi;\n',
@@ -114,7 +120,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                  'for (s in 1:n_series){\n',
                  'b_gp[1:num_gp_basis, s] ~ normal(0, 1);\n',
                  '}\n',
-                 'alpha_gp ~ exponential(4);\n',
+                 'alpha_gp ~ normal(0, 0.5);\n',
                  'rho_gp ~ inv_gamma(4.6, 22.1);\n')
 
         model_file <- readLines(textConnection(model_file), n = -1)

@@ -2,12 +2,12 @@
 % Please edit documentation in R/plot_mvgam_fc.R
 \name{plot_mvgam_fc}
 \alias{plot_mvgam_fc}
-\title{Plot mvjagam posterior predictions for a specified series}
+\title{Plot mvgam posterior predictions for a specified series}
 \usage{
 plot_mvgam_fc(object, series = 1, data_test, hide_xlabels = FALSE, ylab, ylim)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
@@ -27,10 +27,10 @@ simulations can be obtained}
 A base \code{R} graphics plot
 }
 \description{
-Plot mvjagam posterior predictions for a specified series
+Plot mvgam posterior predictions for a specified series
 }
 \details{
-Posterior predictions are drawn from the fitted \code{mvjagam} and used to calculate posterior
+Posterior predictions are drawn from the fitted \code{mvgam} and used to calculate posterior
 empirical quantiles. These are plotted along with the true observed data
 that was used to train the model.
 }

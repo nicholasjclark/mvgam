@@ -2,7 +2,7 @@
 % Please edit documentation in R/eval_mvgam.R
 \name{eval_mvgam}
 \alias{eval_mvgam}
-\title{Evaluate forecasts from a fitted mvjagam object at a specific timepoint}
+\title{Evaluate forecasts from a fitted mvgam object at a specific timepoint}
 \usage{
 eval_mvgam(
   object,
@@ -13,7 +13,7 @@ eval_mvgam(
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{n_samples}{\code{integer} specifying the number of samples to generate from the model's
 posterior distribution}
@@ -30,7 +30,7 @@ A \code{list} object containing information on specific evaluations for each ser
 }
 \description{
 This function generates a set of samples representing fixed parameters estimated from the full
-\code{mvjagam} model and latent trend states at a given point in time. The trends are rolled forward
+\code{mvgam} model and latent trend states at a given point in time. The trends are rolled forward
 a total of \code{fc_horizon} timesteps according to their estimated state space dynamics to
 generate an 'out-of-sample' forecast that is evaluated against the true observations in the horizon window.
 This function therefore simulates a situation where the model's parameters had already been estimated but

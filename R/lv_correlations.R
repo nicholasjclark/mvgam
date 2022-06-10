@@ -1,10 +1,10 @@
-#'Calculate trend correlations based on mvjagam latent factor loadings
+#'Calculate trend correlations based on mvgam latent factor loadings
 #'
 #'This function uses samples of latent trends for each series from a fitted
-#'mvjagam model to calculates correlations among series' trends
+#'mvgam model to calculates correlations among series' trends
 #'
 #'
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@return A \code{list} object containing the mean posterior correlations and the full array of posterior correlations
 #'@export
 lv_correlations = function(object){

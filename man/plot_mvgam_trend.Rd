@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_mvgam_trend.R
 \name{plot_mvgam_trend}
 \alias{plot_mvgam_trend}
-\title{Plot mvjagam latent trend for a specified series}
+\title{Plot mvgam latent trend for a specified series}
 \usage{
 plot_mvgam_trend(
   object,
@@ -13,7 +13,7 @@ plot_mvgam_trend(
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
@@ -27,5 +27,5 @@ estimated 1st derivative for the estimated trend}
 \code{axis} from base \code{R}. Ignored if \code{derivatives = TRUE}}
 }
 \description{
-Plot mvjagam latent trend for a specified series
+Plot mvgam latent trend for a specified series
 }

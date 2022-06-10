@@ -1,8 +1,8 @@
-#'Plot mvjagam trace plots
+#'Plot mvgam trace plots
 #'
 #'This function returns MCMC trace plots for the specified parameter(s)
 #'
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@param param \code{character} vector specifying which parameter(s) are to be plotted. Valid options are:
 #''rho' (smoothing penalties), 'b' (traces for all smooth beta coefficients)
 #'@param overlay_prior \code{logical}. If \code{TRUE} and \code{param} is 'rho' or 'trend', the default prior densities

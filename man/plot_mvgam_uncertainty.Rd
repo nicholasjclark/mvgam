@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_mvgam_uncertainty.R
 \name{plot_mvgam_uncertainty}
 \alias{plot_mvgam_uncertainty}
-\title{Plot mvjagam forecast uncertainty contributions for a specified series}
+\title{Plot mvgam forecast uncertainty contributions for a specified series}
 \usage{
 plot_mvgam_uncertainty(
   object,
@@ -13,7 +13,7 @@ plot_mvgam_uncertainty(
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
@@ -28,5 +28,5 @@ This places the legend on the inside of the plot frame at the given location (if
 \code{axis} from base \code{R}}
 }
 \description{
-Plot mvjagam forecast uncertainty contributions for a specified series
+Plot mvgam forecast uncertainty contributions for a specified series
 }

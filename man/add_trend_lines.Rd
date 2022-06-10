@@ -18,7 +18,7 @@ add_trend_lines(model_file, stan = FALSE, use_lv, trend_model, drift)
 \item{drift}{Logical (add drift or not)}
 }
 \value{
-A modified \code{JAGS} model file
+A modified \code{JAGS} or \code{Stan} model file
 }
 \description{
 Latent trend model file modifications

@@ -54,7 +54,7 @@ lynx_train = lynx_full[1:50, ]
 lynx_test = lynx_full[51:60, ]
 ```
 
-Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR2` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `JAGS` using MCMC sampling (installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/))
+Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR2` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `JAGS` using MCMC sampling (installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)). Note that for some models, it is now possible to estimate parameters using Hamiltonian Monte Carlo in the `Stan` software via a call to the `rstan` package, which can be found [here](https://mc-stan.org/users/interfaces/rstan)
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvjagam(data_train = lynx_train,
                data_test = lynx_test,
@@ -104,7 +104,7 @@ plot_mvgam_trace(lynx_mvgam, 'rho')
 
 and for the latent trend component parameters
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-MCMCvis::MCMCtrace(lynx_mvgam$jags_output, c('ar1', 'ar2', 'sigma'), pdf = F, n.eff = T, Rhat = T)
+MCMCvis::MCMCtrace(lynx_mvgam$model_output, c('ar1', 'ar2', 'sigma'), pdf = F, n.eff = T, Rhat = T)
 ```
 
 Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior quantiles of partial residuals (shown as ribbon rectangles in red), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model

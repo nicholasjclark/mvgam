@@ -1,5 +1,5 @@
-#'Plot mvjagam posterior predictions for a specified series
-#'@param object \code{list} object returned from \code{mvjagam}
+#'Plot mvgam posterior predictions for a specified series
+#'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 #'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
@@ -9,7 +9,7 @@
 #'\code{axis} from base \code{R}
 #'@param ylab Optional \code{character} string specifying the y-axis label
 #'@param ylim Optional \code{vector} of y-axis limits (min, max)
-#'@details Posterior predictions are drawn from the fitted \code{mvjagam} and used to calculate posterior
+#'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to calculate posterior
 #'empirical quantiles. These are plotted along with the true observed data
 #'that was used to train the model.
 #'@return A base \code{R} graphics plot
@@ -19,12 +19,6 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
   # Check arguments
   if(class(object) != 'mvgam'){
     stop('argument "object" must be of class "mvgam"')
-  }
-
-  # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
   }
 
   if(sign(series) != 1){
@@ -45,7 +39,12 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
   ends <- ends[-1]
 
-  preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+  if(object$fit_engine == 'stan'){
+    preds <- rstan::extract(object$model_output, 'ypred')[[1]][,starts[series]:ends[series]]
+  } else {
+    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+  }
+
   preds_last <- preds[1,]
 
   # Add variables to data_test if missing

@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_mvgam_smooth.R
 \name{plot_mvgam_smooth}
 \alias{plot_mvgam_smooth}
-\title{Plot mvjagam smooth terms}
+\title{Plot mvgam smooth terms}
 \usage{
 plot_mvgam_smooth(
   object,
@@ -15,7 +15,7 @@ plot_mvgam_smooth(
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 

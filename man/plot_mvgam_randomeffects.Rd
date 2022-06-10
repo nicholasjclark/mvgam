@@ -2,12 +2,12 @@
 % Please edit documentation in R/plot_mvgam_randomeffects.R
 \name{plot_mvgam_randomeffects}
 \alias{plot_mvgam_randomeffects}
-\title{Plot mvjagam random effect terms}
+\title{Plot mvgam random effect terms}
 \usage{
 plot_mvgam_randomeffects(object)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 }
 \value{
 A base \code{R} graphics plot

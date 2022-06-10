@@ -2,12 +2,12 @@
 % Please edit documentation in R/plot_mvgam_trace.R
 \name{plot_mvgam_trace}
 \alias{plot_mvgam_trace}
-\title{Plot mvjagam trace plots}
+\title{Plot mvgam trace plots}
 \usage{
 plot_mvgam_trace(object, param = "rho", overlay_prior = TRUE)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{param}{\code{character} vector specifying which parameter(s) are to be plotted. Valid options are:
 'rho' (smoothing penalties), 'b' (traces for all smooth beta coefficients)}

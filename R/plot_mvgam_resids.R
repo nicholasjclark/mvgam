@@ -1,8 +1,8 @@
-#'Residual diagnostics for a fitted mvjagam object
+#'Residual diagnostics for a fitted mvgam object
 #'
-#'This function takes a fitted \code{mvjagam} object and returns various residual diagnostic plots
+#'This function takes a fitted \code{mvgam} object and returns various residual diagnostic plots
 #'
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param n_bins \code{integer} specifying the number of bins to use for binning fitted values
 #'@author Nicholas J Clark

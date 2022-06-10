@@ -1,8 +1,8 @@
-#'Plot mvjagam parametric term partial effects
+#'Plot mvgam parametric term partial effects
 #'
 #'This function plots posterior empirical quantiles for partial effects of parametric terms
 #'
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@details Posterior empirical quantiles of each parametric term's partial effect estimates
 #'(on the link scale) are calculated and visualised as ribbon plots. These effects can
 #'be interpreted as the partial effect that a parametric term contributes when all other

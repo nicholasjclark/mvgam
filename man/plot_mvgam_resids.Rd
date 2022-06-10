@@ -2,12 +2,12 @@
 % Please edit documentation in R/plot_mvgam_resids.R
 \name{plot_mvgam_resids}
 \alias{plot_mvgam_resids}
-\title{Residual diagnostics for a fitted mvjagam object}
+\title{Residual diagnostics for a fitted mvgam object}
 \usage{
 plot_mvgam_resids(object, series = 1, n_bins = 25)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
@@ -17,7 +17,7 @@ plot_mvgam_resids(object, series = 1, n_bins = 25)
 A series of base \code{R} plots
 }
 \description{
-This function takes a fitted \code{mvjagam} object and returns various residual diagnostic plots
+This function takes a fitted \code{mvgam} object and returns various residual diagnostic plots
 }
 \details{
 A total of four base \code{R} plots are generated to examine Dunn-Smyth residuals for

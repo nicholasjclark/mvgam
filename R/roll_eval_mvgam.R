@@ -1,11 +1,11 @@
-#'Evaluate forecasts from a fitted mvjagam object using a rolling window
+#'Evaluate forecasts from a fitted mvgam object using a rolling window
 #'
 #'This function sets up a sequence of evaluation timepoints along a rolling window and iteratively
 #'calls \code{eval_mvgam} to evaluate 'out-of-sample' forecasts.
 #'Evaluation involves calculating the Discrete Rank Probability Score and a binary indicator
 #'for whether or not the true value lies within the forecast's 90% prediction interval
 #'
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@param n_samples \code{integer} specifying the number of samples to generate from the model's
 #'posterior distribution
 #'@param evaluation_seq Optional \code{integer sequence} specifying the exact set of timepoints for

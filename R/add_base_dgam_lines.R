@@ -1,4 +1,4 @@
-#' Dynamic GAM model file adds
+#' Dynamic GAM model file additions
 #'
 #'
 #' @export
@@ -12,7 +12,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
     ##insert data
     parameters {
     // raw basis coefficients
-    row_vector[num_basis] b_raw;
+    row_vector<lower=-30,upper=30>[num_basis] b_raw;
 
     // latent trend variance parameters
     vector<lower=0.05,upper=5>[n_series] sigma;
@@ -21,7 +21,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
     matrix[n, n_series] trend;
 
     // smoothing parameters
-    vector<lower=0.0001>[n_sp] lambda;
+    vector<lower=0.0005>[n_sp] lambda;
     }
 
     transformed parameters {
@@ -37,7 +37,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
     ##insert smooths
 
     // priors for smoothing parameters
-    lambda ~ exponential(0.1);
+    lambda ~ exponential(0.05);
 
     // priors for latent trend variance parameters
     sigma ~ exponential(1);

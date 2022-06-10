@@ -1,8 +1,8 @@
-#'Residual calculations for a fitted mvjagam object
+#'Residual calculations for a fitted mvgam object
 #'
-#'This function takes a fitted \code{mvjagam} object and returns distributions of Dunn-Smyth residuals
+#'This function takes a fitted \code{mvgam} object and returns distributions of Dunn-Smyth residuals
 #'
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@param n_cores \code{integer} specifying number of cores for generating residual distributions in parallel
 #'@author Nicholas J Clark
 #'@details Dunn-Smyth residual distributions are calculated for each series in the fitted object
@@ -10,9 +10,10 @@
 get_mvgam_resids = function(object, n_cores = 1){
 
   # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+  if(object$fit_engine == 'stan'){
+    preds <- rstan::extract(object$model_output, 'ypred')[[1]]
+  } else {
+    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')
   }
 
 # Functions for calculating randomised quantile (Dunn-Smyth) residuals
@@ -92,7 +93,7 @@ ds_resids_tw = function(truth, fitted, draw){
 }
 
 # Pull out starting and ending indices for each series in the object
-ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+ends <- seq(0, dim(preds)[2],
             length.out = NCOL(object$ytimes) + 1)
 starts <- ends + 1
 starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
@@ -105,6 +106,7 @@ setDefaultCluster(cl)
 clusterExport(NULL, c('ds_resids_nb',
                       'ds_resids_pois',
                       'ds_resids_tw',
+                      'preds',
                       'ends',
                       'starts',
                       'object'),
@@ -123,7 +125,7 @@ series_resids <- pbapply::pblapply(seq_len(NCOL(object$ytimes)), function(series
       dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
       nrow()
   }
-  preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+  preds <- preds[,starts[series]:ends[series]]
 
   if(class(object$obs_data)[1] == 'list'){
     obj_dat <- data.frame(y = object$obs_data$y,

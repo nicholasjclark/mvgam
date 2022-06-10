@@ -1,8 +1,8 @@
-#'Summary for a fitted mvjagam object
+#'Summary for a fitted mvgam object
 #'
-#'This function takes a fitted \code{mvjagam} object and prints various useful summaries from it
+#'This function takes a fitted \code{mvgam} object and prints various useful summaries from it
 #'
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@author Nicholas J Clark
 #'@details A brief summary of the model's call is printed, along with posterior intervals for
 #'some of the key parameters in the model. Note that some smooths have extra penalties on the null space,

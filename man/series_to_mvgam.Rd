@@ -3,24 +3,24 @@
 \name{series_to_mvgam}
 \alias{series_to_mvgam}
 \title{This function converts univariate or multivariate time series (\code{xts} or \code{ts} objects)
-to the format necessary for \code{\link{mvjagam}}}
+to the format necessary for \code{\link{mvgam}}}
 \usage{
 series_to_mvgam(series, freq, train_prop = 0.85)
 }
 \arguments{
-\item{series}{\code{\link[xts]{xts}} or \code{\link[stats]{ts}} object to be converted to \code{\link{mvjagam}} format}
+\item{series}{\code{\link[xts]{xts}} or \code{\link[stats]{ts}} object to be converted to \code{\link{mvgam}} format}
 
 \item{freq}{\code{integer}. The seasonal frequency of the series}
 
 \item{train_prop}{\code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.95}}
 }
 \value{
-A \code{list} object containing outputs needed for \code{\link{mvjagam}},
+A \code{list} object containing outputs needed for \code{\link{mvgam}},
 including 'data_train' and 'data_test'
 }
 \description{
 This function converts univariate or multivariate time series (\code{xts} or \code{ts} objects)
-to the format necessary for \code{\link{mvjagam}}
+to the format necessary for \code{\link{mvgam}}
 }
 \examples{
 # A ts object example

@@ -2,12 +2,12 @@
 % Please edit documentation in R/plot_mvgam_factors.R
 \name{plot_mvgam_factors}
 \alias{plot_mvgam_factors}
-\title{Latent factor summaries for a fitted mvjagam object}
+\title{Latent factor summaries for a fitted mvgam object}
 \usage{
 plot_mvgam_factors(object, plot = TRUE)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{plot}{\code{logical} specifying whether factors should be plotted}
 }
@@ -15,7 +15,7 @@ plot_mvgam_factors(object, plot = TRUE)
 A \code{dataframe} of factor contributions and, optionally, a series of base \code{R} plots
 }
 \description{
-This function takes a fitted \code{mvjagam} object and returns plots and summary statistics for
+This function takes a fitted \code{mvgam} object and returns plots and summary statistics for
 the latent dynamic factors
 }
 \details{

@@ -2,7 +2,7 @@
 % Please edit documentation in R/pfilter_mvgam_init.R
 \name{pfilter_mvgam_init}
 \alias{pfilter_mvgam_init}
-\title{Initiate particles for online filtering from a fitted mvjagam object}
+\title{Initiate particles for online filtering from a fitted mvgam object}
 \usage{
 pfilter_mvgam_init(
   object,
@@ -13,7 +13,7 @@ pfilter_mvgam_init(
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{data_assim}{A \code{dataframe} or \code{list} of test data containing at least one more observation per series
 (beyond the last observation seen by the model in \code{object}) to be assimilated by the particle filter.

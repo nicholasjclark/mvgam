@@ -8,6 +8,7 @@ sim_mvgam(
   T = 100,
   n_series = 3,
   seasonality = "shared",
+  use_lv = FALSE,
   n_lv = 2,
   trend_model = "RW",
   trend_rel = 0.2,
@@ -26,6 +27,9 @@ sim_mvgam(
 
 \item{seasonality}{\code{character}. Either \code{shared}, meaning that all series share the exact same seasonal pattern,
 or \code{hierarchical}, meaning that there is a global seasonality but each series' pattern can deviate slightly}
+
+\item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
+latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series}
 
 \item{n_lv}{\code{integer}. Number of latent dynamic factors for generating the series' trends}
 
@@ -51,7 +55,7 @@ be replicated \code{n_series} times}
 \item{train_prop}{\code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}}
 }
 \value{
-A \code{list} object containing outputs needed for \code{\link{mvjagam}}, including 'data_train' and 'data_test',
+A \code{list} object containing outputs needed for \code{\link{mvgam}}, including 'data_train' and 'data_test',
 as well as some additional information about the simulated seasonality and trend dependencies
 }
 \description{

@@ -1,12 +1,12 @@
-#'Compare fitted mvjagam objects for model selection using rolling forecast evaluations
+#'Compare fitted mvgam objects for model selection using rolling forecast evaluations
 #'
 #'This function compares two fitted models using rolling window forecast evaluation and
 #'provides a series of summary plots to facilitate model selection. It is essentially a wrapper for
 #'\code{roll_eval_mvgam}
 #'
-#'@param model1 \code{list} object returned from \code{mvjagam} representing the first model to be
+#'@param model1 \code{list} object returned from \code{mvgam} representing the first model to be
 #'evaluated
-#'@param model2 \code{list} object returned from \code{mvjagam} representing the second model to be
+#'@param model2 \code{list} object returned from \code{mvgam} representing the second model to be
 #'evaluated
 #'@param n_samples \code{integer} specifying the number of samples to generate from the model's
 #'posterior distribution
@@ -21,7 +21,7 @@
 #'that the model has not seen (i.e. next year), the smooth function will end up extrapolating, sometimes
 #'in very strange and unexpected ways. It is therefore recommended to only use smooth functions for
 #'covariates that are adequately measured in the data (i.e. 'seasonality', for example) to reduce possible
-#'extrapolation of smooths and let the latent trends in the \code{mvjagam} model capture any
+#'extrapolation of smooths and let the latent trends in the \code{mvgam} model capture any
 #'temporal dependencies in the data. These trends are time series models and so will provide much more
 #'stable forecasts
 #'@seealso \code{roll_eval_mvgam}, \code{eval_mvgam}

@@ -1,9 +1,9 @@
 #'Default mvgam plots
 #'
-#'This function takes a fitted \code{mvjagam} object and produces plots of smooth functions, forecasts, trends and
+#'This function takes a fitted \code{mvgam} object and produces plots of smooth functions, forecasts, trends and
 #'uncertainty components
 #'
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@param type \code{character} specifying which type of plot to return. Options are:
 #'residuals,
 #'smooths,
@@ -38,12 +38,6 @@ plot.mvgam = function(object, type = 'smooths',
   type <- match.arg(arg = type, choices = c("residuals", "smooths", "re",
                                             "pterms", "forecast", "trend",
                                             "uncertainty", "factors"))
-
-  # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
-  }
 
   if(class(object) != 'mvgam'){
     stop('argument "object" must be of class "mvgam"')

@@ -2,7 +2,7 @@
 % Please edit documentation in R/add_base_dgam_lines.R
 \name{add_base_dgam_lines}
 \alias{add_base_dgam_lines}
-\title{Dynamic GAM model file adds}
+\title{Dynamic GAM model file additions}
 \usage{
 add_base_dgam_lines(use_lv, stan = FALSE)
 }
@@ -15,5 +15,5 @@ add_base_dgam_lines(use_lv, stan = FALSE)
 A character string to add to the mgcv jagam model file
 }
 \description{
-Dynamic GAM model file adds
+Dynamic GAM model file additions
 }

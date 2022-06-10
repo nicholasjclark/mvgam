@@ -2,12 +2,12 @@
 % Please edit documentation in R/plot_mvgam_pterms.R
 \name{plot_mvgam_pterms}
 \alias{plot_mvgam_pterms}
-\title{Plot mvjagam parametric term partial effects}
+\title{Plot mvgam parametric term partial effects}
 \usage{
 plot_mvgam_pterms(object)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 }
 \value{
 A base \code{R} graphics plot

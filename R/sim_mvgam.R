@@ -9,6 +9,8 @@
 #'@param n_series \code{integer}. Number of discrete time series
 #'@param seasonality \code{character}. Either \code{shared}, meaning that all series share the exact same seasonal pattern,
 #'or \code{hierarchical}, meaning that there is a global seasonality but each series' pattern can deviate slightly
+#'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
+#'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
 #'@param n_lv \code{integer}. Number of latent dynamic factors for generating the series' trends
 #'@param trend_model \code{character} either 'RW' (trends evolve as random walks with drift) or 'GP'
 #'(trends evolve as smooth Gaussian Processes with squared exponential covariance kernels)
@@ -23,13 +25,14 @@
 #'be replicated `n_series` times
 #'@param prop_missing \code{numeric} stating proportion of observations that are missing
 #'@param train_prop \code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}
-#'@return A \code{list} object containing outputs needed for \code{\link{mvjagam}}, including 'data_train' and 'data_test',
+#'@return A \code{list} object containing outputs needed for \code{\link{mvgam}}, including 'data_train' and 'data_test',
 #'as well as some additional information about the simulated seasonality and trend dependencies
 #'@export
 
 sim_mvgam = function(T = 100,
                      n_series = 3,
                      seasonality = 'shared',
+                     use_lv = FALSE,
                      n_lv = 2,
                      trend_model = 'RW',
                      trend_rel = 0.2,
@@ -48,8 +51,12 @@ sim_mvgam = function(T = 100,
     trend_rel <- 0.2
   }
 
-  if(n_lv > n_series){
-    warning('n_lv cannot be greater than n_series; changing n_lv to match n_series')
+  if(use_lv){
+    if(n_lv > n_series){
+      warning('n_lv cannot be greater than n_series; changing n_lv to match n_series')
+      n_lv <- n_series
+    }
+  } else {
     n_lv <- n_series
   }
 
@@ -127,9 +134,11 @@ sim_mvgam = function(T = 100,
     }
 
     # Sample alpha and rho parameters
-    trend_alphas <- runif(n_lv, 0.5, 1.2)
-    trend_rhos <- runif(n_lv, 2.5, 9.5)
+    trend_alphas <- runif(n_lv, 0.75, 1.2)
+    trend_rhos <- runif(n_lv, 6, 12)
 
+    cat('trend_alphas = ', trend_alphas, '\n\n')
+    cat('trend_rhos = ', trend_rhos, '\n\n')
     # Generate latent GP trends
     trends <- do.call(cbind, lapply(seq_len(n_lv), function(lv){
       sim_exp_gp(N = T, alpha = trend_alphas[lv], rho = trend_rhos[lv])
@@ -137,23 +146,29 @@ sim_mvgam = function(T = 100,
 
   }
 
-  # Loadings on the trends for each series, with sparse but strong correlations
-  sparse = function(n){
-    x <- rep(0, n)
-    x[sample(seq(1, length(x)), ceiling(0.15*length(x)))] <-
-      sample(c(-0.75, -0.25, 0.25, 0.75), ceiling(0.15*length(x)), T)
-    x
-  }
-  corMat <- matrix(sparse(n_series ^ 2), n_series)
-  corMat[lower.tri(corMat)] = t(corMat)[lower.tri(corMat)]
-  diag(corMat) <- 1
-  stddev <- rep(1, n_series)
-  Sigma <- stddev %*% t(stddev) * corMat
-  loadings <- matrix(MASS::mvrnorm(n = n_lv, mu = rep(0, n_series),
-                                      Sigma = as.matrix(Matrix::nearPD(Sigma)$mat)),
-                     ncol = n_series)
+  if(use_lv){
+    # Loadings on the trends for each series, with sparse but strong correlations
+    sparse = function(n){
+      x <- rep(0, n)
+      x[sample(seq(1, length(x)), ceiling(0.15*length(x)))] <-
+        sample(c(-0.75, -0.25, 0.25, 0.75), ceiling(0.15*length(x)), T)
+      x
+    }
+    corMat <- matrix(sparse(n_series ^ 2), n_series)
+    corMat[lower.tri(corMat)] = t(corMat)[lower.tri(corMat)]
+    diag(corMat) <- 1
+    stddev <- rep(1, n_series)
+    Sigma <- stddev %*% t(stddev) * corMat
+    loadings <- matrix(MASS::mvrnorm(n = n_lv, mu = rep(0, n_series),
+                                     Sigma = as.matrix(Matrix::nearPD(Sigma)$mat)),
+                       ncol = n_series)
 
-  # Simulate the shared seasonal pattern
+  } else {
+    # Else use independent trend loadings
+    loadings <- diag(n_lv)
+  }
+
+  # Simulate the global seasonal pattern
   stl_season <- stl(smooth::sim.es(model = "ANA" ,frequency = freq, obs = T + 5,
                                randomizer = "rnorm")$data, 'periodic')$time.series[,1]
   glob_season <- as.vector(scale(zoo::rollmean(stl_season, k = 6, na.pad = F)))
@@ -207,7 +222,7 @@ sim_mvgam = function(T = 100,
     out
   })))
 
-  # Return simulated data in the format that is ready for mvjagam analysis
+  # Return simulated data in the format that is ready for mvgam analysis
   sim_data = data.frame(y = obs_ys,
                         season = rep(rep(seq(1, freq), ceiling(T/freq))[1:T], n_series),
                         year = rep(sort(rep(seq(1, ceiling(T/freq)), freq))[1:T], n_series),
@@ -220,6 +235,7 @@ sim_mvgam = function(T = 100,
   list(data_train = sim_data[1:(floor(nrow(sim_data) * train_prop)),],
        data_test = sim_data[((floor(nrow(sim_data) * train_prop)) + 1):nrow(sim_data),],
        true_corrs = cov2cor(cov(obs_trends)),
+       true_trends = trends,
        global_seasonality = glob_season)
 
 }

@@ -1,6 +1,6 @@
-#'@title Plot mvjagam posterior predictive checks for a specified series
+#'@title Plot mvgam posterior predictive checks for a specified series
 #'@name ppc.mvgam
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 #'for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
 #'included, the observed values in the test data are compared to the model's forecast distribution for exploring
@@ -17,7 +17,7 @@
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
 #'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
 #'This places the legend on the inside of the plot frame at the given location.
-#'@details Posterior predictions are drawn from the fitted \code{mvjagam} and compared against
+#'@details Posterior predictions are drawn from the fitted \code{mvgam} and compared against
 #'the empirical distribution of the observed data for a specified series to help evaluate the model's
 #'ability to generate unbiased predictions. For all plots apart from the 'rootogram', posterior predictions
 #'can also be compared to out of sample observations as long as these observations were included as

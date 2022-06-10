@@ -2,18 +2,18 @@
 % Please edit documentation in R/summary.mvgam.R
 \name{summary.mvgam}
 \alias{summary.mvgam}
-\title{Summary for a fitted mvjagam object}
+\title{Summary for a fitted mvgam object}
 \usage{
 \method{summary}{mvgam}(object)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 }
 \value{
 A \code{list} is printed on-screen showing the summaries for the model
 }
 \description{
-This function takes a fitted \code{mvjagam} object and prints various useful summaries from it
+This function takes a fitted \code{mvgam} object and prints various useful summaries from it
 }
 \details{
 A brief summary of the model's call is printed, along with posterior intervals for

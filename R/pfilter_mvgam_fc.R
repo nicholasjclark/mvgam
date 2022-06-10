@@ -1,7 +1,7 @@
-#'Forecast from a particle filtered mvjagam object
+#'Forecast from a particle filtered mvgam object
 #'
 #'This function generates a forecast from a set of particles that each capture a unique proposal about
-#'the current state of the system that was modelled in the mvjagam object. The covariate and timepoint information
+#'the current state of the system that was modelled in the mvgam object. The covariate and timepoint information
 #'from \code{data_test} is used to generate the GAM component forecast, while the trends are run forward in time
 #'according to their state space dynamics. The forecast is a weighted ensemble, with weights determined by
 #'each particle's proposal likelihood prior to the most recent assimilation step
@@ -55,6 +55,24 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                            ar3*states[t - 3], sqrt(1 / tau))
     }
     states[-c(1:3)]
+  }
+
+  # Function to simulate trends ahead using squared exponential GP
+  sim_gp = function(alpha_gp, rho_gp, state, h){
+    t <- 1:length(state)
+    t_new <- 1:(length(state) + h)
+
+    # Evaluate on a fine a grid of points to preserve the
+    # infinite dimensionality
+    scale_down <- (100 / length(state)) * rho_gp
+    t <- t / scale_down
+    t_new <- t_new / scale_down
+
+    Sigma_new <- alpha_gp^2 * exp(-(rho_gp/scale_down) * outer(t, t_new, "-")^2)
+    Sigma <- alpha_gp^2 * exp(-(rho_gp/scale_down) * outer(t, t, "-")^2) +
+      diag(1e-4, length(state))
+
+    tail(t(Sigma_new) %*% solve(Sigma, state), h)
   }
 
   if(missing(ylim)){
@@ -186,6 +204,13 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     } else {
       # Run the trends forward fc_horizon timesteps
       series_fcs <- lapply(seq_len(n_series), function(series){
+        if(particles[[x]]$trend_model == 'GP'){
+          trend_preds <- sim_gp(alpha_gp = particles[[x]]$alpha_gp[series],
+                                rho_gp = particles[[x]]$rho_gp[series],
+                                state = particles[[x]]$trend_states[[series]],
+                                h = fc_horizon)
+          #plot(c(particles[[1]]$trend_states[[series]], trend_preds), type = 'l')
+        } else {
           trend_preds <- sim_ar3(phi = particles[[x]]$phi[series],
                                  ar1 = particles[[x]]$ar1[series],
                                  ar2 = particles[[x]]$ar2[series],
@@ -193,6 +218,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                                  tau = particles[[x]]$tau[series],
                                  state = particles[[x]]$trend_states[[series]],
                                  h = fc_horizon)
+        }
 
           if(particles[[x]]$family == 'Negative Binomial'){
             fc <-  rnbinom(fc_horizon,

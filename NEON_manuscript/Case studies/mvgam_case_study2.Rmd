@@ -20,7 +20,7 @@ In this example we will examine multivariate forecasting models using `mvgam`, w
 ```{r}
 set.seed(500)
 library(mvgam)
-dat <- sim_mvgam(T = 80, n_series = 6, n_trends = 2,
+dat <- sim_mvgam(T = 80, n_series = 6, n_lv = 2,
                  family = 'poisson',
                  mu_obs = runif(8, 4, 6),
                  trend_rel = 0.6, train_prop = 0.8)
@@ -42,7 +42,7 @@ Clearly there are some correlations in the trends for these series. But how does
 
 A challenge with any factor model is the need to determine the number of factors `K`. Setting `K` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `K` too large leads to unnecessary computation. `mvgam` approaches this problem by formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines. Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
 ```{r, message=FALSE, warning=FALSE}
-mod1 <- mvjagam(data_train = dat$data_train,
+mod1 <- mvgam(data_train = dat$data_train,
                 data_test = dat$data_test,
                 formula = y ~ s(series, bs = 're') +
                   s(season, bs = c('cc'), k = 12),
@@ -52,7 +52,7 @@ mod1 <- mvjagam(data_train = dat$data_train,
                 family = 'poisson',
                 trend_model = 'RW',
                 chains = 4,
-                burnin = 4000)
+                burnin = 1000)
 ```
 
 Look at a few plots. The estimated smooth function
@@ -72,7 +72,7 @@ plot_mvgam_factors(mod1)
 
 Now we fit the same model but assume that we no nothing about how many factors to use, so we specify the maximum allowed (the total number of series; `8`). Note that this model is computationally more expensive so it will take longer to fit
 ```{r, message=FALSE, warning=FALSE}
-mod2 <- mvjagam(data_train = dat$data_train,
+mod2 <- mvgam(data_train = dat$data_train,
                 data_test = dat$data_test,
                 formula = y ~ s(series, bs = 're') +
                   s(season, bs = c('cc'), k = 12),
@@ -82,7 +82,7 @@ mod2 <- mvjagam(data_train = dat$data_train,
                 family = 'poisson',
                 trend_model = 'RW',
                 chains = 4,
-                burnin = 4000)
+                burnin = 1000)
 ```
 
 The same plots as model 1 to see if this model has also fit the data well
@@ -138,7 +138,7 @@ plot(series, legend.loc = 'topleft')
 
 Now we will fit an `mvgam` model with shared seasonality and random intercepts per series. Our first attempt will ignore any temporal component in the residuals so that we can identidy which GAM predictor combination gives us the best fit, prior to investigating how to deal with any remaining autocorrelation. We assume a Negative Binomial distrubution with series-specific overdispersion parameters for the response. We use a complexity-penalising prior for the overdispersion, which allows the model to reduce toward a more simple Poisson observation process unless the data provide adequate information to support overdispersion. Also note that any smooths using the random effects basis (`s(series, bs = "re")` below) are automatically re-parameterised to use the [non-centred parameterisation that is necessary to help avoid common posterior degeneracies in hierarchical models](https://betanalpha.github.io/assets/case_studies/hierarchical_modeling.html). This parameterisation tends to work better for most ecological problems where the data for each group / context are not highly informative, but it is still probably worth investigating whether a centred or even a mix of centred / non-centred will give better computational performance. We suppress the global intercept as it is not needed and will lead to identifiability issues when estimating the series-specific random intercepts
 ```{r, message=FALSE, warning=FALSE}
-trends_mod1 <- mvjagam(data_train = trends_data$data_train,
+trends_mod1 <- mvgam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
                       formula = y ~ s(series, bs = 're') + 
                         s(season, k = 12, m = 2, bs = 'cc') - 1,
@@ -151,7 +151,7 @@ trends_mod1 <- mvjagam(data_train = trends_data$data_train,
 
 Given that these series could potentially be following a hierarchical seasonality, we will also trial a slghtly more complex model with an extra smoothing term per series that allows its seasonal curve to deviate from the global seasonal smooth. Ignore the warning about repeated smooths, as this is not an issue for estimation.
 ```{r, message=FALSE, warning=FALSE}
-trends_mod2 <- mvjagam(data_train = trends_data$data_train,
+trends_mod2 <- mvgam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
                       formula = y ~ s(season, k = 12, m = 2, bs = 'cc') +
                         s(season, series, k = 5, bs = 'fs', m = 1),
@@ -181,18 +181,9 @@ summary(trends_mod1$mgcv_model)
 summary(trends_mod2$mgcv_model)
 ```
 
-WE can also use `JAGS` routines for interrogating models. Which model minimises in-sample DIC?
-```{r}
-dic(trends_mod1)
-```
-
-```{r}
-dic(trends_mod2)
-```
-
 Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow an AR1 process, and we will rely on the exponential penalties to help regularise any un-needed factors by setting `n_lv = 4`
 ```{r, message=FALSE, warning=FALSE}
-trends_mod3 <- mvjagam(data_train = trends_data$data_train,
+trends_mod3 <- mvgam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
                       formula = y ~ s(season, k = 12, m = 2, bs = 'cc') +
                         s(season, series, k = 5, bs = 'fs', m = 1),

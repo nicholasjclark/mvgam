@@ -1,12 +1,12 @@
-# Convert timeseries object to format necessary for mvjagam
+# Convert timeseries object to format necessary for mvgam
 #'
 #'This function converts univariate or multivariate time series (\code{xts} or \code{ts} objects)
-#'to the format necessary for \code{\link{mvjagam}}
+#'to the format necessary for \code{\link{mvgam}}
 #'
-#'@param series \code{\link[xts]{xts}} or \code{\link[stats]{ts}} object to be converted to \code{\link{mvjagam}} format
+#'@param series \code{\link[xts]{xts}} or \code{\link[stats]{ts}} object to be converted to \code{\link{mvgam}} format
 #'@param freq \code{integer}. The seasonal frequency of the series
 #'@param train_prop \code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.95}
-#'@return A \code{list} object containing outputs needed for \code{\link{mvjagam}},
+#'@return A \code{list} object containing outputs needed for \code{\link{mvgam}},
 #'including 'data_train' and 'data_test'
 #'
 #'@examples

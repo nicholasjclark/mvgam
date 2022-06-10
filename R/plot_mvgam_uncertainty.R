@@ -1,5 +1,5 @@
-#'Plot mvjagam forecast uncertainty contributions for a specified series
-#'@param object \code{list} object returned from \code{mvjagam}
+#'Plot mvgam forecast uncertainty contributions for a specified series
+#'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param data_test A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}

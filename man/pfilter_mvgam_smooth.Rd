@@ -18,7 +18,7 @@ pfilter_mvgam_smooth(
 \item{particles}{A \code{list} of particles that have been run up to one observation prior to the observation
 in \code{next_assim}}
 
-\item{mgcv_model}{A \code{\link[mgcv]{gam}} model returned through a call to \code{link{mvjagam}}}
+\item{mgcv_model}{A \code{\link[mgcv]{gam}} model returned through a call to \code{link{mvgam}}}
 
 \item{next_assim}{A \code{dataframe} of test data containing at one more observation per series
 (beyond the last observation seen by the model when initialising particles with

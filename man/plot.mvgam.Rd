@@ -7,7 +7,7 @@
 \method{plot}{mvgam}(object, type = "smooths", series = 1, residuals = FALSE, data_test)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{type}{\code{character} specifying which type of plot to return. Options are:
 residuals,
@@ -34,7 +34,7 @@ uncertainty components (\code{type = uncertainty}).}
 A base R plot or set of plots
 }
 \description{
-This function takes a fitted \code{mvjagam} object and produces plots of smooth functions, forecasts, trends and
+This function takes a fitted \code{mvgam} object and produces plots of smooth functions, forecasts, trends and
 uncertainty components
 }
 \details{

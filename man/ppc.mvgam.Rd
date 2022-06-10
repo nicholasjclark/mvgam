@@ -2,12 +2,12 @@
 % Please edit documentation in R/ppc.mvgam.R
 \name{ppc.mvgam}
 \alias{ppc.mvgam}
-\title{Plot mvjagam posterior predictive checks for a specified series}
+\title{Plot mvgam posterior predictive checks for a specified series}
 \usage{
 \method{ppc}{mvgam}(object, data_test, series = 1, type = "density", n_bins, legend_position)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{data_test}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
@@ -40,10 +40,10 @@ posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or 
 Integral Transform histogram (for \code{type == 'pit'}).
 }
 \description{
-Plot mvjagam posterior predictive checks for a specified series
+Plot mvgam posterior predictive checks for a specified series
 }
 \details{
-Posterior predictions are drawn from the fitted \code{mvjagam} and compared against
+Posterior predictions are drawn from the fitted \code{mvgam} and compared against
 the empirical distribution of the observed data for a specified series to help evaluate the model's
 ability to generate unbiased predictions. For all plots apart from the 'rootogram', posterior predictions
 can also be compared to out of sample observations as long as these observations were included as

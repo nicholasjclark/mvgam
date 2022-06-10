@@ -2,17 +2,17 @@
 % Please edit documentation in R/lv_correlations.R
 \name{lv_correlations}
 \alias{lv_correlations}
-\title{Calculate trend correlations based on mvjagam latent factor loadings}
+\title{Calculate trend correlations based on mvgam latent factor loadings}
 \usage{
 lv_correlations(object)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvjagam}}
+\item{object}{\code{list} object returned from \code{mvgam}}
 }
 \value{
 A \code{list} object containing the mean posterior correlations and the full array of posterior correlations
 }
 \description{
 This function uses samples of latent trends for each series from a fitted
-mvjagam model to calculates correlations among series' trends
+mvgam model to calculates correlations among series' trends
 }

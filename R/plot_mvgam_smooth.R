@@ -1,8 +1,8 @@
-#'Plot mvjagam smooth terms
+#'Plot mvgam smooth terms
 #'
 #'This function plots posterior empirical quantiles for a series-specific smooth term
 #'
-#'@param object \code{list} object returned from \code{mvjagam}
+#'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param smooth either a \code{character} or \code{integer} specifying which smooth term to be plotted
 #'@param residuals \code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added
