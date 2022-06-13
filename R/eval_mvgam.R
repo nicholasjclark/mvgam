@@ -55,11 +55,11 @@ eval_mvgam = function(object,
     }
   }
 
-  # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+  if(eval_timepoint < 3){
+    stop('argument "eval_timepoint" must be >= 3',
+         call. = FALSE)
   }
+
 
   #### 1. Generate linear predictor matrix for covariates and extract trend estimates at timepoint
   data_train <- object$obs_data
@@ -161,12 +161,37 @@ eval_mvgam = function(object,
     starts <- ends + 1
     starts <- c(1, starts[-c(1, (n_series + 1))])
     ends <- ends[-1]
-    trends <- lapply(seq_len(n_series), function(series){
-      trend_estimates <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
-      as.matrix(trend_estimates[,(eval_timepoint - 2):eval_timepoint])
-    })
 
-    taus <- MCMCvis::MCMCchains(object$model_output, 'tau')
+    if(object$trend_model == 'GP'){
+      # Pull out entire series of trend estimates up to the evaluation timepoint if this is a GP trend
+      trends <- lapply(seq_len(n_series), function(series){
+        MCMCvis::MCMCchains(object$model_output, 'trend')[,seq(series,
+                                                               dim(MCMCvis::MCMCchains(object$model_output,
+                                                                                       'trend'))[2],
+                                                               by = NCOL(object$ytimes))]
+      })
+
+      taus <- NULL
+    } else {
+      # Otherwise only keep the preceeding three trend estimates to save memory
+      if(object$fit_engine == 'stan'){
+        trends <- lapply(seq_len(n_series), function(series){
+          trend_estimates <- MCMCvis::MCMCchains(object$model_output, 'trend')[,seq(series,
+                                                                                    dim(MCMCvis::MCMCchains(object$model_output,
+                                                                                                            'trend'))[2],
+                                                                                    by = NCOL(object$ytimes))]
+          as.matrix(trend_estimates[,(eval_timepoint - 2):eval_timepoint])
+        })
+      } else {
+        trends <- lapply(seq_len(n_series), function(series){
+          trend_estimates <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
+          as.matrix(trend_estimates[,(eval_timepoint - 2):eval_timepoint])
+        })
+      }
+
+      taus <- MCMCvis::MCMCchains(object$model_output, 'tau')
+    }
+
     }
 
     lvs <- NULL
@@ -198,7 +223,17 @@ eval_mvgam = function(object,
   }
 
   # AR term estimates
+  if(object$trend_model == 'GP'){
+    alpha_gps <- MCMCvis::MCMCchains(object$model_output, 'alpha_gp')
+    rho_gps <- MCMCvis::MCMCchains(object$model_output, 'rho_gp')
+    ar1s <- NULL
+    ar2s <- NULL
+    ar3s <- NULL
+  }
+
   if(object$trend_model %in% c('RW', 'None')){
+    alpha_gps <- NULL
+    rho_gps <- NULL
     if(object$use_lv){
       ar1s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
       ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
@@ -212,6 +247,8 @@ eval_mvgam = function(object,
 
   if(object$trend_model == 'AR1'){
     ar1s <- MCMCvis::MCMCchains(object$model_output, 'ar1')
+    alpha_gps <- NULL
+    rho_gps <- NULL
 
     if(object$use_lv){
       ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
@@ -225,6 +262,8 @@ eval_mvgam = function(object,
   if(object$trend_model == 'AR2'){
     ar1s <- MCMCvis::MCMCchains(object$model_output, 'ar1')
     ar2s <- MCMCvis::MCMCchains(object$model_output, 'ar2')
+    alpha_gps <- NULL
+    rho_gps <- NULL
 
     if(object$use_lv){
       ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
@@ -234,6 +273,8 @@ eval_mvgam = function(object,
   }
 
   if(object$trend_model == 'AR3'){
+    alpha_gps <- NULL
+    rho_gps <- NULL
     ar1s <- MCMCvis::MCMCchains(object$model_output, 'ar1')
     ar2s <- MCMCvis::MCMCchains(object$model_output, 'ar2')
     ar3s <- MCMCvis::MCMCchains(object$model_output, 'ar3')
@@ -266,6 +307,7 @@ eval_mvgam = function(object,
   #### 2. Run trends forward fc_horizon steps to generate the forecast distribution ####
   use_lv <- object$use_lv
   upper_bounds <- object$upper_bounds
+  trend_model <- object$trend_model
 
   # Function to simulate trends / latent factors ahead using ar3 model
   sim_ar3 = function(phi, ar1, ar2, ar3, tau, state, h){
@@ -279,6 +321,21 @@ eval_mvgam = function(object,
                            ar3*states[t - 3], sqrt(1 / tau))
     }
     states[-c(1:3)]
+  }
+
+  # Function to simulate trends ahead using squared exponential GP
+  sim_gp = function(alpha_gp, rho_gp, state, h){
+    t <- 1:length(state)
+    t_new <- 1:(length(state) + h)
+
+    Sigma_new <- alpha_gp^2 * exp(- outer(t, t_new, "-")^2 / (2 * rho_gp^2))
+    Sigma_star <- alpha_gp^2 * exp(- outer(t_new, t_new, "-")^2 / (2 * rho_gp^2))
+    Sigma <- alpha_gp^2 * exp(- outer(t, t, "-")^2 / (2 * rho_gp^2)) +
+      diag(1e-4, length(state))
+
+    tail(t(Sigma_new) %*% solve(Sigma, state), h) +
+      tail(MASS::mvrnorm(1, mu = rep(0, dim(Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new))[2]),
+                         Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), h)
   }
 
   # Run particles forward in time to generate their forecasts
@@ -298,6 +355,9 @@ eval_mvgam = function(object,
                         'ar1s',
                         'ar2s',
                         'ar3s',
+                        'alpha_gps',
+                        'rho_gps',
+                        'trend_model',
                         'lvs',
                         'lv_coefs',
                         'trends',
@@ -306,7 +366,8 @@ eval_mvgam = function(object,
                         'twdis',
                         'n_series',
                         'upper_bounds',
-                        'sim_ar3'),
+                        'sim_ar3',
+                        'sim_gp'),
                 envir = environment())
 
   pbapply::pboptions(type = "none")
@@ -398,14 +459,19 @@ eval_mvgam = function(object,
         trends[[trend]][samp_index, ]
       })
 
-      # Sample AR parameters
-      phi <- phis[samp_index, ]
-      ar1 <- ar1s[samp_index, ]
-      ar2 <- ar2s[samp_index, ]
-      ar3 <- ar3s[samp_index, ]
+      if(trend_model == 'GP'){
+        alpha_gp <- alpha_gps[samp_index, ]
+        rho_gp <- rho_gps[samp_index, ]
+      } else {
+        # Sample AR parameters
+        phi <- phis[samp_index, ]
+        ar1 <- ar1s[samp_index, ]
+        ar2 <- ar2s[samp_index, ]
+        ar3 <- ar3s[samp_index, ]
 
-      # Sample trend precisions
-      tau <- taus[samp_index,]
+        # Sample trend precisions
+        tau <- taus[samp_index,]
+      }
 
       # Family-specific parameters
       if(family == 'Negative Binomial'){
@@ -418,13 +484,21 @@ eval_mvgam = function(object,
       }
 
       series_fcs <- lapply(seq_len(n_series), function(series){
-        trend_preds <- sim_ar3(phi = phi[series],
-                               ar1 = ar1[series],
-                               ar2 = ar2[series],
-                               ar3 = ar3[series],
-                               tau = tau[series],
-                               state = last_trends[[series]],
-                               h = fc_horizon)
+        if(trend_model == 'GP'){
+          trend_preds <- sim_gp(alpha_gp = alpha_gp[series],
+                                 rho_gp = rho_gp[series],
+                                 state = last_trends[[series]],
+                                 h = fc_horizon)
+        } else {
+          trend_preds <- sim_ar3(phi = phi[series],
+                                 ar1 = ar1[series],
+                                 ar2 = ar2[series],
+                                 ar3 = ar3[series],
+                                 tau = tau[series],
+                                 state = last_trends[[series]],
+                                 h = fc_horizon)
+        }
+
         if(family == 'Negative Binomial'){
           fc <-  rnbinom(fc_horizon,
                          mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
@@ -544,14 +618,19 @@ eval_mvgam = function(object,
           trends[[trend]][samp_index, ]
         })
 
-        # Sample AR parameters
-        phi <- phis[samp_index, ]
-        ar1 <- ar1s[samp_index, ]
-        ar2 <- ar2s[samp_index, ]
-        ar3 <- ar3s[samp_index, ]
+        if(trend_model == 'GP'){
+          alpha_gp <- alpha_gps[samp_index, ]
+          rho_gp <- rho_gps[samp_index, ]
+        } else {
+          # Sample AR parameters
+          phi <- phis[samp_index, ]
+          ar1 <- ar1s[samp_index, ]
+          ar2 <- ar2s[samp_index, ]
+          ar3 <- ar3s[samp_index, ]
 
-        # Sample trend precisions
-        tau <- taus[samp_index,]
+          # Sample trend precisions
+          tau <- taus[samp_index,]
+        }
 
         # Family-specific parameters
         if(family == 'Negative Binomial'){
@@ -564,13 +643,21 @@ eval_mvgam = function(object,
         }
 
         series_fcs <- lapply(seq_len(n_series), function(series){
-          trend_preds <- sim_ar3(phi = phi[series],
-                                 ar1 = ar1[series],
-                                 ar2 = ar2[series],
-                                 ar3 = ar3[series],
-                                 tau = tau[series],
-                                 state = last_trends[[series]],
-                                 h = fc_horizon)
+          if(trend_model == 'GP'){
+            trend_preds <- sim_gp(alpha_gp = alpha_gp[series],
+                                  rho_gp = rho_gp[series],
+                                  state = last_trends[[series]],
+                                  h = fc_horizon)
+          } else {
+            trend_preds <- sim_ar3(phi = phi[series],
+                                   ar1 = ar1[series],
+                                   ar2 = ar2[series],
+                                   ar3 = ar3[series],
+                                   tau = tau[series],
+                                   state = last_trends[[series]],
+                                   h = fc_horizon)
+          }
+
           if(family == 'Negative Binomial'){
             fc <-  rnbinom(fc_horizon,
                            mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
@@ -613,7 +700,7 @@ eval_mvgam = function(object,
 
   # Evaluate against the truth
   series_truths <- lapply(seq_len(n_series), function(series){
-    if(class(object$obs_data) == 'list'){
+    if(class(object$obs_data)[1] == 'list'){
       data_assim[['y']][which(as.numeric(data_assim$series) == series)]
     } else {
       data_assim[which(as.numeric(data_assim$series) == series),'y']
@@ -662,5 +749,4 @@ eval_mvgam = function(object,
   names(series_drps) <- levels(data_assim$series)
 
   return(series_drps)
-
 }

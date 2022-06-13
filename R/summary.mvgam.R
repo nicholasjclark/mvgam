@@ -15,12 +15,6 @@ summary.mvgam = function(object){
   # calculate effective degrees of freedom for smooth terms
   jam = object$jam_model
 
-  # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
-  }
-
 #### Standard summary of formula and model argumements ####
 message("GAM formula:")
 print(object$call)

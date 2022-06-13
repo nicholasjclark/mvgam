@@ -91,26 +91,31 @@ lynx_test = lynx_full[51:60, ]
 
 Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth
 function for `season` is estimated jointly with a full time series model
-for the errors (in this case an `AR2` process), rather than relying on
+for the errors (in this case an `AR3` process), rather than relying on
 smoothing splines that do not incorporate a concept of the future. We
 assume the outcome follows a Poisson distribution and estimate the model
-in `JAGS` using MCMC sampling (installation links are found
-[here](https://sourceforge.net/projects/mcmc-jags/files/)). Note that
-for some models, it is now possible to estimate parameters using
-Hamiltonian Monte Carlo in the `Stan` software via a call to the `rstan`
-package, which can be found
-[here](https://mc-stan.org/users/interfaces/rstan)
+in `Stan` using MCMC sampling (installation links are found
+[here](https://mc-stan.org/users/interfaces/rstan)). Note that for some
+models, it is now possible to estimate parameters using Hamiltonian
+Monte Carlo in the `Stan` software via a call to the `rstan` package,
+which can be found [here](https://mc-stan.org/users/interfaces/rstan)
 
 ``` r
-lynx_mvgam <- mvjagam(data_train = lynx_train,
+lynx_mvgam <- mvgam(data_train = lynx_train,
                data_test = lynx_test,
                formula = y ~ s(season, bs = 'cc', k = 19),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
-               trend_model = 'AR2',
-               drift = F,
-               burnin = 10000,
+               trend_model = 'AR3',
+               use_stan = T,
+               burnin = 1000,
                chains = 4)
+#> [1] "n_eff / iter looks reasonable for all parameters"
+#> [1] "Rhat looks reasonable for all parameters"
+#> [1] "0 of 4000 iterations ended with a divergence (0%)"
+#> [1] "69 of 4000 iterations saturated the maximum tree depth of 10 (1.725%)"
+#> [1] "  Run again with max_treedepth set to a larger value to avoid saturation"
+#> [1] "E-FMI indicated no pathological behavior"
 ```
 
 Perform a series of posterior predictive checks to see if the model is
@@ -193,7 +198,7 @@ summary(lynx_mvgam)
 #> log
 #> 
 #> Trend model:
-#> AR2
+#> AR3
 #> 
 #> N series:
 #> 1
@@ -202,42 +207,43 @@ summary(lynx_mvgam)
 #> 50
 #> 
 #> Status:
-#> Fitted using runjags::run.jags()
+#> Fitted using rstan::stan()
 #> 
 #> GAM smooth term estimated degrees of freedom:
 #>            edf df
-#> s(season) 5214 17
+#> s(season) 9011 17
 #> 
 #> GAM coefficient (beta) estimates:
-#>                    2.5%         50%       97.5% Rhat n.eff
-#> (Intercept)   6.6278432  6.76661720  6.89681964 1.03    87
-#> s(season).1  -1.1277700 -0.68473902 -0.22962380 1.34   133
-#> s(season).2  -0.2229482  0.28944913  0.86452547 1.16   103
-#> s(season).3   0.6519581  1.13340639  1.73032941 1.06    45
-#> s(season).4   1.2603487  1.74322315  2.34746633 1.14    53
-#> s(season).5   1.4442400  1.94342290  2.70066342 1.42    59
-#> s(season).6   0.4456740  1.02894020  1.61028936 1.14    51
-#> s(season).7  -0.8433434 -0.22754522  0.28449496 1.07    94
-#> s(season).8  -1.3271281 -0.72048653 -0.14820460 1.01   110
-#> s(season).9  -1.5807970 -0.79675279 -0.04589625 1.03   141
-#> s(season).10 -1.2656095 -0.44005281  0.41195850 1.05    82
-#> s(season).11 -0.3393578  0.33089693  0.99094619 1.07    75
-#> s(season).12  0.7295668  1.34967548  1.91774349 1.19    56
-#> s(season).13  0.7150178  1.46943619  2.20605335 1.47    47
-#> s(season).14  0.2769248  1.09164305  1.76202078 1.42    52
-#> s(season).15 -0.6892971 -0.07206227  0.46319419 1.07    88
-#> s(season).16 -1.3544063 -0.81086047 -0.26011986 1.02   144
-#> s(season).17 -1.5709996 -1.07117890 -0.54800861 1.09   170
+#>                     2.5%         50%       97.5% Rhat n.eff
+#> (Intercept)   6.79095318  6.80222670  6.81317305    1  6082
+#> s(season).1  -1.22012054 -0.70687316 -0.13550066    1  1533
+#> s(season).2  -0.34422058  0.23657666  0.84322640    1  1784
+#> s(season).3   0.44107251  1.10363234  1.72974673    1  1725
+#> s(season).4   0.95960079  1.74495643  2.40358999    1  1310
+#> s(season).5   1.15835797  2.00171701  2.70516103    1  1244
+#> s(season).6   0.42168311  1.17645507  1.82805556    1  1499
+#> s(season).7  -0.78622518 -0.11099717  0.58368607    1  1758
+#> s(season).8  -1.35633593 -0.67924442  0.05796520    1  1762
+#> s(season).9  -1.58002424 -0.81464343  0.07228273    1  1510
+#> s(season).10 -1.22512971 -0.45385323  0.48789845    1  1448
+#> s(season).11 -0.52903561  0.27259212  1.13203943    1  1948
+#> s(season).12  0.29771680  1.22695736  2.01184910    1  1826
+#> s(season).13  0.31480665  1.39836005  2.18521162    1  1223
+#> s(season).14  0.05866046  1.09845407  1.83787390    1  1041
+#> s(season).15 -0.77257545 -0.04440334  0.54493012    1  1373
+#> s(season).16 -1.37554751 -0.78647085 -0.21917617    1  2239
+#> s(season).17 -1.56201026 -1.06732513 -0.49428374    1  1756
 #> 
 #> GAM smoothing parameter (rho) estimates:
-#>              2.5%     50%    97.5% Rhat n.eff
-#> s(season) 3.08043 3.88746 4.563715 1.01  1930
+#>               2.5%      50%   97.5% Rhat n.eff
+#> s(season) 3.287832 4.159986 4.87422    1  2857
 #> 
 #> Latent trend parameter estimates:
-#>             2.5%        50%     97.5% Rhat n.eff
-#> ar1    0.4236962  0.7313141 1.0300245 1.03  1112
-#> ar2   -0.4069726 -0.1131876 0.1877084 1.03  1213
-#> sigma  0.3680085  0.4601895 0.5877884 1.00  1010
+#>                2.5%         50%     97.5% Rhat n.eff
+#> ar1[1]    0.5231943  0.82710459 0.9895406    1  2007
+#> ar2[1]   -0.5841628 -0.22174449 0.1588171    1  2723
+#> ar3[1]   -0.3304613  0.07239184 0.4249637    1  1279
+#> sigma[1]  0.3677681  0.46126809 0.5929270    1  2374
 #> 
 ```
 
@@ -294,6 +300,9 @@ the entire series (testing and training)
 
 ``` r
 plot(lynx_mvgam, type = 'forecast', data_test = lynx_test)
+#> Out of sample DRPS:
+#> [1] 683.5812
+#> 
 ```
 
 <img src="README-unnamed-chunk-17-1.png" style="display: block; margin: auto;" />
@@ -376,7 +385,7 @@ ignore the cyclic pattern of seasonality and force it to be fairly
 non-wiggly. We also use a random walk process for the trend
 
 ``` r
-lynx_mvgam_poor <- mvjagam(data_train = lynx_train,
+lynx_mvgam_poor <- mvgam(data_train = lynx_train,
                data_test = lynx_test,
                formula = y ~ s(season, bs = 'gp', k = 3),
                family = 'poisson',
@@ -404,11 +413,11 @@ markedly better (far lower DRPS) for this evaluation timepoint
 
 ``` r
 summary(mod1_eval$series1$drps)
-#>     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-#>   0.3335   8.4668  96.5577  94.4811 130.9125 232.9926
+#>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#>   1.781  11.172 106.428  97.483 136.918 227.490
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   40.37   46.08  300.00  282.02  436.08  658.25
+#>   39.26   48.04  299.49  284.69  446.13  672.41
 ```
 
 Nominal coverages for both models’ 90% prediction intervals

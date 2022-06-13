@@ -22,11 +22,13 @@
 #'the specified \code{threshold}. Note that resampling can result in loss of the original model's diversity of
 #'GAM beta coefficients, which may have undesirable consequences for the forecast distribution. If
 #'\code{use_resampling} is \code{TRUE}, some effort is made to remedy this by assigning randomly sampled draws of
-#'beta coefficients from the original model's distribution to each particle. This does not however guarantee that there
-#'will be no loss of diversity, especially if successive resamples take place. Default for this option is therefore
+#'GAM beta coefficients from the original model's distribution to each particle. This does not however guarantee there
+#'will be no loss of diversity, especially if successive resampling take place. Default for this option is therefore
 #'\code{FALSE}
 #'@param kernel_lambda \code{proportional numeric} specifying the strength of smoothing to use when
-#'pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}
+#'pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}. Note
+#'however that kernel smoothing is not currently supported for Gaussian Process trend models. For these models,
+#'it is still preferable to use resampling with a reasonable \code{threshold} value (i.e. \code{0.5})
 #'@param file_path \code{character} string specifying the file path for locating the particles
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
 #'@return A \code{list} object of \code{length = n_particles} containing information on parameters and
@@ -93,18 +95,17 @@ pfilter_mvgam_smooth = function(particles,
           t <- 1:length(particles[[x]]$trend_states[[series]])
           t_new <- 1:(length(particles[[x]]$trend_states[[series]])+1)
 
-          # Evaluate on a fine a grid of points to preserve the
-          # infinite dimensionality
-          scale_down <- (100 / length(particles[[x]]$trend_states[[series]])) * particles[[x]]$rho_gp[series]
-          t <- t / scale_down
-          t_new <- t_new / scale_down
-
-          Sigma_new <- particles[[x]]$alpha_gp[series]^2 * exp(-(particles[[x]]$rho_gp[series]/scale_down) * outer(t, t_new, "-")^2)
+          Sigma_new <- particles[[x]]$alpha_gp[series]^2 *
+            exp(- outer(t, t_new, "-")^2 / (2 * particles[[x]]$rho_gp[series]^2))
+          Sigma_star <- particles[[x]]$alpha_gp[series]^2 *
+            exp(- outer(t_new, t_new, "-")^2 / (2 * particles[[x]]$rho_gp[series]^2))
           Sigma <- particles[[x]]$alpha_gp[series]^2 *
-            exp(-(particles[[x]]$rho_gp[series]/scale_down) * outer(t, t, "-")^2) +
+            exp(- outer(t, t, "-")^2 / (2 * particles[[x]]$rho_gp[series]^2)) +
             diag(1e-4, length(particles[[x]]$trend_states[[series]]))
 
-          tail(t(Sigma_new) %*% solve(Sigma, particles[[x]]$trend_states[[series]]), 1)
+          tail(t(Sigma_new) %*% solve(Sigma, particles[[x]]$trend_states[[series]]), 1) +
+            tail(MASS::mvrnorm(1, mu = rep(0, dim(Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new))[2]),
+                               Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), 1)
 
         }))
       } else {
@@ -491,6 +492,7 @@ pfilter_mvgam_smooth = function(particles,
     orig_betas <- NULL
   } else {
     # If resampling, must preserve the original diversity of GAM beta coefficients
+    cat('Resampling particles ...\n')
     next_update_seq <- index
     orig_betas <- do.call(rbind, purrr::map(particles, 'betas'))
   }
@@ -661,7 +663,11 @@ pfilter_mvgam_smooth = function(particles,
     }
 
     # Return the updated particle, preserving original betas
-    betas <- particles[[x]]$betas
+    if(use_resampling){
+      betas <- orig_betas[x,]
+    } else {
+      betas <- particles[[x]]$betas
+    }
 
     if(particles[[x]]$family == 'Negative Binomial'){
       if(particles[[x]]$trend_model == 'GP'){

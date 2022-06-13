@@ -9,12 +9,8 @@
 #'@return A \code{list} of residual distributions
 get_mvgam_resids = function(object, n_cores = 1){
 
-  # Convert stanfit objects to coda samples
-  if(object$fit_engine == 'stan'){
-    preds <- rstan::extract(object$model_output, 'ypred')[[1]]
-  } else {
-    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')
-  }
+
+preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')
 
 # Functions for calculating randomised quantile (Dunn-Smyth) residuals
 ds_resids_nb = function(truth, fitted, draw, size){
@@ -125,7 +121,14 @@ series_resids <- pbapply::pblapply(seq_len(NCOL(object$ytimes)), function(series
       dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
       nrow()
   }
-  preds <- preds[,starts[series]:ends[series]]
+
+  if(object$fit_engine == 'stan'){
+    preds <- preds[,seq(series,
+                        dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+                        by = NCOL(object$ytimes))]
+  } else {
+    preds <- preds[,starts[series]:ends[series]]
+  }
 
   if(class(object$obs_data)[1] == 'list'){
     obj_dat <- data.frame(y = object$obs_data$y,

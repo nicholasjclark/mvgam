@@ -53,7 +53,7 @@ hyp3 = y ~
 
 # Fit each hypothesis
 burnin = 5000
-n_samples = 2000
+n_samples = 1000
 
 fit_null <- fit_mvgam(data_train = all_data$data_train,
                   data_test = all_data$data_test,

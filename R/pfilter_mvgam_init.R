@@ -29,12 +29,6 @@ pfilter_mvgam_init = function(object,
     stop('argument "object" must be of class "mvgam"')
   }
 
-  # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
-  }
-
 #### 1. Generate linear predictor matrix for the next timepoint and extract last trend estimates
 # (NOTE, all series must have observations for the next timepoint, even if they are NAs!!!!) ####
 data_train <- object$obs_data
@@ -124,7 +118,14 @@ if(object$use_lv){
   starts <- c(1, starts[-c(1, (n_series + 1))])
   ends <- ends[-1]
   trends <- lapply(seq_len(n_series), function(series){
-    trend_estimates <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
+    if(object$fit_engine == 'stan'){
+      trend_estimates <- MCMCvis::MCMCchains(object$model_output, 'trend')[,seq(series,
+                                                                                dim(MCMCvis::MCMCchains(object$model_output,
+                                                                                                        'trend'))[2],
+                                                                                by = NCOL(object$ytimes))]
+    } else {
+      trend_estimates <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
+    }
 
     # Need to only use estimates from the training period
     end_train <- object$obs_data %>%
@@ -435,17 +436,15 @@ particles <- pbapply::pblapply(sample_seq, function(x){
         t <- 1:length(last_trends[[trend]])
         t_new <- 1:(length(last_trends[[trend]]) + 1)
 
-        # Evaluate on a fine a grid of points to preserve the
-        # infinite dimensionality
-        scale_down <- (100 / length(last_trends[[trend]])) * rho_gp[trend]
-        t <- t / scale_down
-        t_new <- t_new / scale_down
 
-        Sigma_new <- alpha_gp[trend]^2 * exp(-(rho_gp[trend]/scale_down) * outer(t, t_new, "-")^2)
-        Sigma <- alpha_gp[trend]^2 * exp(-(rho_gp[trend]/scale_down) * outer(t, t, "-")^2) +
+        Sigma_new <- alpha_gp[trend]^2 * exp(- outer(t, t_new, "-")^2 / (2 * rho_gp[trend]^2))
+        Sigma_star <- alpha_gp[trend]^2 * exp(- outer(t_new, t_new, "-")^2 / (2 * rho_gp[trend]^2))
+        Sigma <- alpha_gp[trend]^2 * exp(- outer(t, t, "-")^2 / (2 * rho_gp[trend]^2)) +
           diag(1e-4, length(last_trends[[trend]]))
 
-        tail(t(Sigma_new) %*% solve(Sigma, last_trends[[trend]]), 1)
+        tail(t(Sigma_new) %*% solve(Sigma, last_trends[[trend]]), 1) +
+          tail(MASS::mvrnorm(1, mu = rep(0, dim(Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new))[2]),
+                             Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), 1)
       }))
     }
 
@@ -502,7 +501,6 @@ particles <- pbapply::pblapply(sample_seq, function(x){
                      alpha_gp = as.numeric(alpha_gp),
                      rho_gp = as.numeric(rho_gp),
                      trend_states = lapply(last_trends, unname),
-                     trend_states = trends,
                      weight = weight,
                      liks = liks,
                      upper_bounds = upper_bounds,
@@ -542,7 +540,6 @@ particles <- pbapply::pblapply(sample_seq, function(x){
                      alpha_gp = as.numeric(alpha_gp),
                      rho_gp = as.numeric(rho_gp),
                      trend_states = lapply(last_trends, unname),
-                     trend_states = trends,
                      weight = weight,
                      liks = liks,
                      upper_bounds = upper_bounds,
@@ -584,7 +581,6 @@ particles <- pbapply::pblapply(sample_seq, function(x){
                      alpha_gp = as.numeric(alpha_gp),
                      rho_gp = as.numeric(rho_gp),
                      trend_states = lapply(last_trends, unname),
-                     trend_states = trends,
                      weight = weight,
                      liks = liks,
                      upper_bounds = upper_bounds,

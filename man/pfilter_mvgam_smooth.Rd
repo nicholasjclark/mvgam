@@ -36,12 +36,14 @@ Should be between \code{0} and \code{1}}
 the specified \code{threshold}. Note that resampling can result in loss of the original model's diversity of
 GAM beta coefficients, which may have undesirable consequences for the forecast distribution. If
 \code{use_resampling} is \code{TRUE}, some effort is made to remedy this by assigning randomly sampled draws of
-beta coefficients from the original model's distribution to each particle. This does not however guarantee that there
-will be no loss of diversity, especially if successive resamples take place. Default for this option is therefore
+GAM beta coefficients from the original model's distribution to each particle. This does not however guarantee there
+will be no loss of diversity, especially if successive resampling take place. Default for this option is therefore
 \code{FALSE}}
 
 \item{kernel_lambda}{\code{proportional numeric} specifying the strength of smoothing to use when
-pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}}
+pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}. Note
+however that kernel smoothing is not currently supported for Gaussian Process trend models. For these models,
+it is still preferable to use resampling with a reasonable \code{threshold} value (i.e. \code{0.5})}
 
 \item{file_path}{\code{character} string specifying the file path for locating the particles}
 }

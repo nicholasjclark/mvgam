@@ -3,7 +3,7 @@
 calculate_pit = function(out_gam_mod, series, data_test, data_train){
 
   # Pull out predictions and truths for the specific series
-  ends <- seq(0, dim(MCMCvis::MCMCchains(out_gam_mod$jags_output, 'ypred'))[2],
+  ends <- seq(0, dim(MCMCvis::MCMCchains(out_gam_mod$model_output, 'ypred'))[2],
               length.out = NCOL(out_gam_mod$ytimes) + 1)
   starts <- ends + 1
   starts <- c(1, starts[-c(1, (NCOL(out_gam_mod$ytimes)+1))])
@@ -24,7 +24,7 @@ calculate_pit = function(out_gam_mod, series, data_test, data_train){
     dplyr::arrange(time) %>%
     dplyr::pull(y)
 
-  preds <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'ypred')[,starts[series]:ends[series]]
+  preds <- MCMCvis::MCMCchains(out_gam_mod$model_output, 'ypred')[,starts[series]:ends[series]]
   preds <- t(preds[, (last_obs +1):NCOL(preds)])
   if(any(!is.na(truth))){
 
@@ -83,7 +83,7 @@ calculate_drps = function(out_gam_mod, pred_matrix = NULL, series, data_test, da
     scores
   }
 
-  ends <- seq(0, dim(MCMCvis::MCMCchains(out_gam_mod$jags_output, 'ypred'))[2],
+  ends <- seq(0, dim(MCMCvis::MCMCchains(out_gam_mod$model_output, 'ypred'))[2],
               length.out = NCOL(out_gam_mod$ytimes) + 1)
   starts <- ends + 1
   starts <- c(1, starts[-c(1, (NCOL(out_gam_mod$ytimes)+1))])
@@ -105,7 +105,7 @@ calculate_drps = function(out_gam_mod, pred_matrix = NULL, series, data_test, da
     dplyr::pull(y)
 
   if(is.null(pred_matrix)){
-    preds <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'ypred')[,starts[series]:ends[series]]
+    preds <- MCMCvis::MCMCchains(out_gam_mod$model_output, 'ypred')[,starts[series]:ends[series]]
     preds <- t(preds[, (last_obs +1):NCOL(preds)])
   } else {
     preds <- t(pred_matrix[, (last_obs +1):NCOL(pred_matrix)])
@@ -136,7 +136,7 @@ plot_mvgam_season = function(out_gam_mod, series, data_test, data_train,
                           siteID = as.character(unique(data_train$siteID[which(data_train$series ==
                                                                                  levels(data_train$series)[series])])))
   Xp <- predict(out_gam_mod$mgcv_model, newdata = pred_dat, type = 'lpmatrix')
-  betas <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'b')
+  betas <- MCMCvis::MCMCchains(out_gam_mod$model_output, 'b')
   plot((Xp %*% betas[1,]) ~ pred_dat$season, ylim = range((Xp %*% betas[1,]) + 2.5,
                                                                          (Xp %*% betas[1,]) - 2.5),
 
@@ -172,11 +172,11 @@ plot_mvgam_gdd = function(out_gam_mod, series, data_test, data_train,
                           siteID = as.character(unique(data_train$siteID[which(data_train$series ==
                                                                                  levels(data_train$series)[series])])))
   Xp <- predict(out_gam_mod$mgcv_model, newdata = pred_dat, type = 'lpmatrix')
-  betas <- MCMCvis::MCMCchains(out_gam_mod$jags_output, 'b')
+  betas <- MCMCvis::MCMCchains(out_gam_mod$model_output, 'b')
   preds <- matrix(NA, nrow = 1000, ncol = length(pred_dat$cum_gdd))
   for(i in 1:1000){
     preds[i,] <- rnbinom(length(pred_dat$cum_gdd), mu = exp((Xp %*% betas[i,])),
-                         size = MCMCvis::MCMCsummary(out_gam_mod$jags_output, 'r')$mean)
+                         size = MCMCvis::MCMCsummary(out_gam_mod$model_output, 'r')$mean)
   }
   int <- apply(preds,
                2, hpd, 0.95)
@@ -343,7 +343,7 @@ fit_mvgam = function(data_train,
 
   # Condition the model on the observed data
   if(missing(knots)){
-    out_gam_mod <- mvjagam(formula = formula,
+    out_gam_mod <- mvgam(formula = formula,
                            data_train = data_train,
                            data_test = data_test,
                            burnin = burnin,
@@ -355,7 +355,7 @@ fit_mvgam = function(data_train,
                            family = family,
                            phi_prior = phi_prior)
   } else {
-    out_gam_mod <- mvjagam(formula = formula,
+    out_gam_mod <- mvgam(formula = formula,
                            data_train = data_train,
                            data_test = data_test,
                            burnin = burnin,
@@ -373,7 +373,7 @@ fit_mvgam = function(data_train,
   #### If GAM component is LESS supported, we should see evidence in the form of: ####
   # 1. Poorer convergence of smoothing parameter estimates, suggesting the model
   # is more 'mis-specified' and harder to fit
-  rho_summary <- MCMCvis::MCMCsummary(out_gam_mod$jags_output,
+  rho_summary <- MCMCvis::MCMCsummary(out_gam_mod$model_output,
                                        c('rho'), HPD = TRUE)
 
   # 2. Stronger residual correlations, suggesting we are missing some site-level structure

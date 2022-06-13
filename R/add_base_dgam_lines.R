@@ -67,8 +67,12 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
     tau = sigma ^ -2;
 
     // posterior predictions
-    int<lower=0> ypred[total_obs];
-    ypred = poisson_log_rng(eta + to_vector(trend));
+    matrix[n, n_series] ypred;
+    for(i in 1:n){
+    for(s in 1:n_series){
+    ypred[i, s] = poisson_log_rng(eta[ytimes[i, s]] + trend[i, s]);
+    }
+    }
     }
     "
 

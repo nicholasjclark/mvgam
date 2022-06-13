@@ -17,12 +17,6 @@ plot_mvgam_uncertainty = function(object, series = 1, data_test, legend_position
     stop('argument "object" must be of class "mvgam"')
   }
 
-  # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
-  }
-
   if(sign(series) != 1){
     stop('argument "series" must be a positive integer',
          call. = FALSE)
@@ -81,7 +75,14 @@ plot_mvgam_uncertainty = function(object, series = 1, data_test, legend_position
   betas <- MCMCvis::MCMCchains(object$model_output, 'b')
 
   # Extract current trend estimates
-  trend <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
+  if(object$fit_engine == 'stan'){
+    trend <- MCMCvis::MCMCchains(object$model_output, 'trend')[,seq(series,
+                                                                    dim(MCMCvis::MCMCchains(object$model_output,
+                                                                                            'trend'))[2],
+                                                                    by = NCOL(object$ytimes))]
+  } else {
+    trend <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
+  }
 
   if(length(unique(data_train$series)) == 1){
     trend <- matrix(trend[, NCOL(trend)])
@@ -93,7 +94,6 @@ plot_mvgam_uncertainty = function(object, series = 1, data_test, legend_position
 
     }
   }
-
 
   # Function to calculate intersection of two uncertainty distributions
   intersect_hist = function(fullpreds, gampreds){

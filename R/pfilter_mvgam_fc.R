@@ -62,17 +62,14 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     t <- 1:length(state)
     t_new <- 1:(length(state) + h)
 
-    # Evaluate on a fine a grid of points to preserve the
-    # infinite dimensionality
-    scale_down <- (100 / length(state)) * rho_gp
-    t <- t / scale_down
-    t_new <- t_new / scale_down
-
-    Sigma_new <- alpha_gp^2 * exp(-(rho_gp/scale_down) * outer(t, t_new, "-")^2)
-    Sigma <- alpha_gp^2 * exp(-(rho_gp/scale_down) * outer(t, t, "-")^2) +
+    Sigma_new <- alpha_gp^2 * exp(- outer(t, t_new, "-")^2 / (2 * rho_gp^2))
+    Sigma_star <- alpha_gp^2 * exp(- outer(t_new, t_new, "-")^2 / (2 * rho_gp^2))
+    Sigma <- alpha_gp^2 * exp(- outer(t, t, "-")^2 / (2 * rho_gp^2)) +
       diag(1e-4, length(state))
 
-    tail(t(Sigma_new) %*% solve(Sigma, state), h)
+    tail(t(Sigma_new) %*% solve(Sigma, state), h) +
+      tail(MASS::mvrnorm(1, mu = rep(0, dim(Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new))[2]),
+                         Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), h)
   }
 
   if(missing(ylim)){

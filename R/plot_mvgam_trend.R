@@ -16,12 +16,6 @@ plot_mvgam_trend = function(object, series = 1, data_test,
     stop('argument "object" must be of class "mvgam"')
   }
 
-  # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
-  }
-
   if(sign(series) != 1){
     stop('argument "series" must be a positive integer',
          call. = FALSE)
@@ -40,7 +34,14 @@ plot_mvgam_trend = function(object, series = 1, data_test,
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
   ends <- ends[-1]
 
-  preds <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
+  if(object$fit_engine == 'stan'){
+    preds <- MCMCvis::MCMCchains(object$model_output, 'trend')[,seq(series,
+                                                           dim(MCMCvis::MCMCchains(object$model_output,
+                                                                                   'trend'))[2],
+                                                           by = NCOL(object$ytimes))]
+  } else {
+    preds <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
+  }
   preds_last <- preds[1,]
   pred_vals <- seq(1:length(preds_last))
 

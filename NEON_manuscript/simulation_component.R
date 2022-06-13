@@ -31,7 +31,7 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                         seasonality = 'hierarchical')
 
   # Fit a multivariate gam with no seasonality (null model)
-  nullmod <- mvjagam(data_train = sim_data$data_train,
+  nullmod <- mvgam(data_train = sim_data$data_train,
                   data_test = sim_data$data_test,
                   formula = y ~ s(series, bs = 're'),
                   family = 'nb',
@@ -80,7 +80,7 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                                                            correlations$mean_correlations))
 
   # Fit a multivariate gam with hierarchical seasonality
-  hier_mod <- mvjagam(data_train = sim_data$data_train,
+  hier_mod <- mvgam(data_train = sim_data$data_train,
                       data_test = sim_data$data_test,
                       formula = y ~ s(series, bs = 're') +
                         s(season, k = 12, m = 2, bs = 'cc') +
@@ -117,7 +117,7 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
   Xp <- rbind(predict(mgcv_hier_mod, type = 'lpmatrix'),
               predict(mgcv_hier_mod, newdata = sim_data$data_test, type = 'lpmatrix'))
   vc <- vcov(mgcv_hier_mod)
-  sim <- MASS::mvrnorm(dim(MCMCvis::MCMCchains(hier_mod$jags_output, 'ypred'))[1],
+  sim <- MASS::mvrnorm(dim(MCMCvis::MCMCchains(hier_mod$model_output, 'ypred'))[1],
                        mu = coef(mgcv_hier_mod), Sigma = vc)
   dims_needed <- dim(exp(Xp %*% t(sim)))
   mus <- as.vector(exp(Xp %*% t(sim)))

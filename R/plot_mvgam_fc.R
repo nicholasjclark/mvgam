@@ -40,7 +40,11 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
   ends <- ends[-1]
 
   if(object$fit_engine == 'stan'){
-    preds <- rstan::extract(object$model_output, 'ypred')[[1]][,starts[series]:ends[series]]
+
+    # For stan objects, ypred is stored as a vector in column-major order
+    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
+                                                                    dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+                                                                    by = NCOL(object$ytimes))]
   } else {
     preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
   }
@@ -130,6 +134,7 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
                                time = data_test$time)
     }
 
+    # Plot training and testing points
     points(dplyr::bind_rows(data_train, data_test) %>%
              dplyr::filter(series == s_name) %>%
              dplyr::select(time, y) %>%
@@ -143,6 +148,56 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
              dplyr::arrange(time) %>%
              dplyr::pull(y), pch = 16, col = "black", cex = 0.55)
     abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
+
+    # Calculate out of sample DRPS and print the score
+    drps_score <- function(truth, fc, interval_width = 0.9){
+      nsum <- 1000
+      Fy = ecdf(fc)
+      ysum <- 0:nsum
+      indicator <- ifelse(ysum - truth >= 0, 1, 0)
+      score <- sum((indicator - Fy(ysum))^2)
+
+      # Is value within empirical interval?
+      interval <- quantile(fc, probs = c((1-interval_width)/2, (interval_width + (1-interval_width)/2)))
+      in_interval <- ifelse(truth <= interval[2] & truth >= interval[1], 1, 0)
+      return(c(score, in_interval))
+    }
+
+    # Wrapper to operate on all observations in fc_horizon
+    drps_mcmc_object <- function(truth, fc, interval_width = 0.9){
+      indices_keep <- which(!is.na(truth))
+      if(length(indices_keep) == 0){
+        scores = data.frame('drps' = rep(NA, length(truth)),
+                            'interval' = rep(NA, length(truth)))
+      } else {
+        scores <- matrix(NA, nrow = length(truth), ncol = 2)
+        for(i in indices_keep){
+          scores[i,] <- drps_score(truth = as.vector(truth)[i],
+                                   fc = fc[,i], interval_width)
+        }
+      }
+      scores
+    }
+
+    truth <- as.matrix(data_test %>%
+                         dplyr::filter(series == s_name) %>%
+                         dplyr::select(time, y) %>%
+                         dplyr::distinct() %>%
+                         dplyr::arrange(time) %>%
+                         dplyr::pull(y))
+    last_train <- length(data_train %>%
+      dplyr::filter(series == s_name) %>%
+      dplyr::select(time, y) %>%
+      dplyr::distinct() %>%
+      dplyr::arrange(time) %>%
+      dplyr::pull(y))
+
+    fc <- preds[,(last_train+1):NCOL(preds)]
+
+    message('Out of sample DRPS:')
+    print(sum(drps_mcmc_object(as.vector(truth),
+                                fc)[,1]))
+    message()
   } else {
     if(class(data_train)[1] == 'list'){
       data_train <- data.frame(series = data_train$series,
