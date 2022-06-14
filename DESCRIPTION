@@ -15,9 +15,11 @@ Description: This package is for fitting Bayesian Generalised Additive Models to
              uses sequential importance sampling to assimilate new observations as they become available.
 Maintainer: Nicholas J Clark <nicholas.j.clark1214@gmail.com>
 License: MIT + file LICENSE
-Depends: R (>= 3.6.0), mgcv, rjags, parallel, runjags
+Depends: R (>= 3.6.0), mgcv, parallel
 Imports: 
     pbapply,
+    rjags,
+    runjags,
     tweedie,
     lubridate,
     MASS,
