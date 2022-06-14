@@ -24,12 +24,6 @@ probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
 # Look for parametric terms in the model
 pterms <- attr(object$mgcv_model$pterms, 'term.labels')
 
-# Convert stanfit objects to coda samples
-if(class(object$model_output) == 'stanfit'){
-  object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                function(x) coda::mcmc(as.array(object$model_output)[,x,])))
-}
-
 if(length(pterms) > 0){
   # Graphical parameters
   .pardefault <- par(no.readonly=T)
@@ -63,7 +57,7 @@ if(length(pterms) > 0){
     Xp[,!betas_keep] <- 0
 
     # X-axis values
-    if(class(pred_dat)[1] == 'list'){
+    if(class(object$obs_data)[1] == 'list'){
       pred_vals_orig <- sort(object$obs_data[[pterms[i]]])
     } else {
       pred_vals_orig <- sort(object$obs_data %>%
