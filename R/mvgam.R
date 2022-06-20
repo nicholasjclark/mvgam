@@ -628,6 +628,10 @@ mvgam = function(formula,
     dplyr::arrange(time, series) -> X
 
   # Matrix of indices in X that correspond to timepoints for each series
+  # if((length(unique(X$time)) * length(unique(X$series))) != NROW(x)){
+  #   stop('N observations != N timepoints x N series')
+  # }
+
   ytimes <- matrix(NA, nrow = length(unique(X$time)), ncol = length(unique(X$series)))
   for(i in 1:length(unique(X$series))){
     ytimes[,i] <- which(X$series == i)

@@ -52,8 +52,8 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson'){
         add_exp_cl <- gsub('trend[i, s]', 'trend[i, s])',
                            add_exp_open, fixed = T)
       } else {
-        add_exp_cl <- gsub('eta[i, s])', 'eta[i, s],),',
-                           add_exp_open)
+        add_exp_cl <- gsub('eta[ytimes[i, s]]', 'eta[ytimes[i, s]])',
+                           add_exp_open, fixed = T)
       }
 
       stan_file[grep('ypred[i, s] = neg_binomial', stan_file, fixed = T)] <-
@@ -105,7 +105,8 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson'){
     idx_data <- vector()
     for(i in 1:length(idx_locations)){
       list_vals <- unlist(strsplit(gsub('^.*c\\(*|\\s*).*$', '', jags_file[idx_locations[i]]), ','))
-      idx_vals[[i]] <- unlist(lapply(list_vals, seq_character))
+      idx_vals[[i]] <- array(unlist(lapply(list_vals, seq_character)),
+                             dim = length(unlist(lapply(list_vals, seq_character))))
       idx_data[i] <- paste0('int idx', i, '[', length(idx_vals[[i]]), ']; // discontiguous index values')
       jags_file[idx_locations][i] <- sub("in.*\\)\\)", paste0("in idx", i, ')'), jags_file[idx_locations][i])
     }
@@ -217,25 +218,33 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson'){
     b_raw_indices <- grep('b_raw\\[i\\] ~', stan_file)
     for(i in 1:length(b_raw_indices)){
 
-      b_raw_text[i] <- paste0('for (i in ', as.numeric(sub('.*(?=.$)', '',
-                                                           sub("\\:.*", "",
-                                                               stan_file[b_raw_indices[i] - 1]), perl=T)),
-                              ':', as.numeric(substr(sub(".*\\:", "",
-                                                         stan_file[b_raw_indices[i]-1]),
-                                                     1, 1)),') {\nb[i] <- mu_raw[', i, '] + b_raw[i] * sigma_raw[',i,
+      b_raw_text[i] <- paste0('for (i in ', as.numeric(unlist(gregexpr("[[:digit:]]+",
+                                                                       sub("\\:.*", "",
+                                                                           stan_file[b_raw_indices[i] - 1])))),
+                              ':', as.numeric(sub(" ", "",
+                                                  sub("\\{", "",
+                                                      sub("\\)", "",
+                                                          sub(".*\\:", "",
+                                                              stan_file[b_raw_indices[i]-1]))))),
+                              ') {\nb[i] <- mu_raw[', i, '] + b_raw[i] * sigma_raw[',i,
                               '];\n}')
     }
 
     # If parametric coefficients are included, they'll come before random effects
-    min_re_betas <- as.numeric(sub('.*(?=.$)', '',
-                                   sub("\\:.*", "",
-                                       stan_file[b_raw_indices[1]-1]), perl=T))
+    min_re_betas <- as.numeric(sub(" ", "",
+                                   sub("\\{", "",
+                                       sub("\\)", "",
+                                           sub(".*\\:", "",
+                                               stan_file[b_raw_indices[i]-1])))))
     if(min_re_betas > 1){
       b_raw_text <- c(paste0('\nfor (i in 1:',
                              min_re_betas - 1, ') {\nb[i] <- b_raw[i];\n}'),
-                      b_raw_text,
-                      paste0('\nfor (i in ',  n_b_raw+1,':num_basis) {\nb[i] <- b_raw[i];\n}\n'))
+                      b_raw_text)
     } else {
+      b_raw_text <- b_raw_text
+    }
+
+    if(n_b_raw < dim(jags_data$X)[2]){
       b_raw_text <- c(b_raw_text,
                       paste0('\nfor (i in ',  n_b_raw+1,':num_basis) {\nb[i] <- b_raw[i];\n}\n'))
     }
