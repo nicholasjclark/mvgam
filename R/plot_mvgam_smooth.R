@@ -42,12 +42,6 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     stop('argument "object" must be of class "mvgam"')
   }
 
-  # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
-  }
-
   if(sign(series) != 1){
     stop('argument "series" must be a positive integer',
          call. = FALSE)
@@ -152,29 +146,42 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
       colnames(pred_dat) <- gsub('smooth.var', smooth, colnames(pred_dat))
 
     } else if(missing(newdata) && class(object$obs_data)[1] == 'list'){
-      pred_dat <- object$obs_data
-      indices_series <- which(pred_dat$series == (levels(data_train$series)[series]))
-
-      pred_dat <- lapply(pred_dat, function(x){
-        if(is.matrix(x)){
-          matrix(x[indices_series,], ncol = NCOL(x))
+      # Make fake data by zeroing all other terms apart from the selected smooth
+      # and the series indicator
+      pred_dat <- vector(mode = 'list')
+      for(x in 1:length(data_train)){
+        if(is.matrix(data_train[[x]])){
+          pred_dat[[x]] <- matrix(0, nrow = 500, ncol = NCOL(data_train[[x]]))
         } else {
-          x[indices_series]
+          pred_dat[[x]] <- rep(0, 500)
         }
-      })
+      }
+      names(pred_dat) <- names(object$obs_data)
+      pred_dat$series <- rep((levels(data_train$series)[series]), 500)
 
-      if(is.matrix(pred_dat[[smooth]])){
-        pred_dat[[smooth]] <- pred_dat[[smooth]][order(pred_dat[[smooth]][,1]), ]
+      if(!is.matrix(pred_dat[[smooth]])){
+        pred_dat[[smooth]] <- seq(min(data_train[[smooth]]), max(data_train[[smooth]]),
+                                  length.out = 500)
       } else {
-        pred_dat[[smooth]] <- pred_dat[[smooth]][order(pred_dat[[smooth]])]
+        pred_dat[[smooth]] <- matrix(seq(min(data_train[[smooth]]), max(data_train[[smooth]]),
+                                         length.out = length(pred_dat[[smooth]])),
+                                     nrow = nrow(pred_dat[[smooth]]),
+                                     ncol = ncol(pred_dat[[smooth]]))
       }
 
+      if('lag' %in% names(pred_dat)){
+        pred_dat[['lag']] <- matrix(0:(NCOL(data_train$lag)-1),
+                                    nrow(pred_dat$lag), NCOL(data_train$lag),
+                                    byrow = TRUE)
+      }
     } else {
       pred_dat <- newdata
     }
 
     # Generate linear predictor matrix from fitted mgcv model
-    Xp <- predict(object$mgcv_model, newdata = pred_dat, type = 'lpmatrix')
+    suppressWarnings(Xp <- predict(object$mgcv_model,
+                                   newdata = pred_dat,
+                                   type = 'lpmatrix'))
 
     # Zero out all other columns in Xp
     Xp[,!grepl(paste0('(', smooth, ')'), colnames(Xp), fixed = T)] <- 0
@@ -201,7 +208,8 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
   if(residuals){
     # Need to predict from a reduced set that zeroes out all terms apart from the
     # smooth of interest
-    Xp2 <- predict(object$mgcv_model, newdata = object$obs_data, type = 'lpmatrix')
+    suppressWarnings(Xp2 <- predict(object$mgcv_model,
+                                    newdata = object$obs_data, type = 'lpmatrix'))
 
     # Zero out all other columns in Xp2
     Xp2[,!grepl(paste0('(', smooth, ')'), colnames(Xp2), fixed = T)] <- 0

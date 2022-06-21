@@ -27,6 +27,8 @@ mvgam(
   r_prior,
   twdis_prior,
   sigma_prior,
+  rho_gp_prior,
+  alpha_gp_prior,
   upper_bounds,
   use_stan = FALSE,
   jags_path
@@ -110,15 +112,21 @@ in the latent trends}
 in the latent trends}
 
 \item{r_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
-overdispersion parameters. Note that this prior acts on the SQUARE ROOT of \code{r}, which is convenient
+overdispersion parameters. Note that this prior acts on the inverse of \code{r}, which is convenient
 for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
 as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tweedie}
 
 \item{twdis_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Tweedie
 overdispersion parameters. Ignored if family is Poisson or Negative Binomial}
 
-\item{sigma_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
+\item{sigma_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the independent Gaussian
 variances used for the latent trends (ignored if \code{use_lv == TRUE})}
+
+\item{rho_gp_prior}{\code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
+Process length scale parameters}
+
+\item{alpha_gp_prior}{\code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
+Process marginal deviation parameters}
 
 \item{upper_bounds}{Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification

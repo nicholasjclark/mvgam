@@ -38,7 +38,7 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson'){
                'vector[n_series] r;\n',
                'r = inv(r_inv);\n',
                'for (s in 1:n_series) {\n',
-               'r_vec[1:n,s] = rep_vector(inv(r_inv[s]), n);\n}\n')
+               'r_vec[1:n,s] = rep_vector(r[s], n);\n}\n')
 
       to_negbin <- gsub('poisson_log_rng', 'neg_binomial_2_rng',
                         stan_file[grep('ypred[i, s] = poisson_log_rng', stan_file, fixed = T)])
@@ -192,6 +192,9 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson'){
     n_b_raw <- max(as.numeric(unlist(regmatches(b_raw_string,
                                                 gregexpr("[[:digit:]]+",
                                                          b_raw_string)))))
+    min_b_raw <- min(as.numeric(unlist(regmatches(b_raw_string,
+                                                gregexpr("[[:digit:]]+",
+                                                         b_raw_string)))))
 
     n_sigma_raw <- max(as.numeric(unlist(regmatches(grep('sigma_raw', stan_file, value = T),
                                                     gregexpr("[[:digit:]]+",
@@ -215,12 +218,13 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson'){
              paste0('vector<lower=0>[',n_sigma_raw,'] mu_raw', ';\n', collapse = ''))
 
     b_raw_text <- vector()
+    min_beta <- vector()
     b_raw_indices <- grep('b_raw\\[i\\] ~', stan_file)
     for(i in 1:length(b_raw_indices)){
 
-      b_raw_text[i] <- paste0('for (i in ', as.numeric(unlist(gregexpr("[[:digit:]]+",
-                                                                       sub("\\:.*", "",
-                                                                           stan_file[b_raw_indices[i] - 1])))),
+      b_raw_text[i] <- paste0('for (i in ', as.numeric(sub("for \\(i in ", "",
+                                                           sub("\\:.*", "",
+                                                               stan_file[b_raw_indices[i] - 1]))),
                               ':', as.numeric(sub(" ", "",
                                                   sub("\\{", "",
                                                       sub("\\)", "",
@@ -228,14 +232,13 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson'){
                                                               stan_file[b_raw_indices[i]-1]))))),
                               ') {\nb[i] <- mu_raw[', i, '] + b_raw[i] * sigma_raw[',i,
                               '];\n}')
+      min_beta[i] <- as.numeric(sub("for \\(i in ", "",
+                                    sub("\\:.*", "",
+                                        stan_file[b_raw_indices[i] - 1])))
     }
 
     # If parametric coefficients are included, they'll come before random effects
-    min_re_betas <- as.numeric(sub(" ", "",
-                                   sub("\\{", "",
-                                       sub("\\)", "",
-                                           sub(".*\\:", "",
-                                               stan_file[b_raw_indices[i]-1])))))
+    min_re_betas <- min(min_beta)
     if(min_re_betas > 1){
       b_raw_text <- c(paste0('\nfor (i in 1:',
                              min_re_betas - 1, ') {\nb[i] <- b_raw[i];\n}'),

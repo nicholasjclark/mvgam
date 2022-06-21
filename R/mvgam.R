@@ -64,13 +64,17 @@
 #'@param ar_prior \code{character} specifying (in JAGS syntax) the prior distribution for the AR terms
 #'in the latent trends
 #'@param r_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
-#'overdispersion parameters. Note that this prior acts on the SQUARE ROOT of \code{r}, which is convenient
+#'overdispersion parameters. Note that this prior acts on the inverse of \code{r}, which is convenient
 #'for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
 #'as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tweedie
 #'@param twdis_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Tweedie
 #'overdispersion parameters. Ignored if family is Poisson or Negative Binomial
-#'@param sigma_prior \code{character} specifying (in JAGS syntax) the prior distributions for the independent gaussian
+#'@param sigma_prior \code{character} specifying (in JAGS syntax) the prior distributions for the independent Gaussian
 #'variances used for the latent trends (ignored if \code{use_lv == TRUE})
+#'@param rho_gp_prior \code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
+#'Process length scale parameters
+#'@param alpha_gp_prior \code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
+#'Process marginal deviation parameters
 #'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 #'this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
@@ -148,30 +152,32 @@
 #'@export
 
 mvgam = function(formula,
-                   knots,
-                   data_train,
-                   data_test,
-                   run_model = TRUE,
-                   prior_simulation = FALSE,
-                   return_model_data = FALSE,
-                   family = 'poisson',
-                   use_lv = FALSE,
-                   n_lv,
-                   trend_model = 'RW',
-                   drift = FALSE,
-                   chains = 2,
-                   burnin = 5000,
-                   n_samples = 2000,
-                   thin = 4,
-                   parallel = TRUE,
-                   phi_prior,
-                   ar_prior,
-                   r_prior,
-                   twdis_prior,
-                   sigma_prior,
-                   upper_bounds,
-                   use_stan = FALSE,
-                   jags_path){
+                 knots,
+                 data_train,
+                 data_test,
+                 run_model = TRUE,
+                 prior_simulation = FALSE,
+                 return_model_data = FALSE,
+                 family = 'poisson',
+                 use_lv = FALSE,
+                 n_lv,
+                 trend_model = 'RW',
+                 drift = FALSE,
+                 chains = 2,
+                 burnin = 5000,
+                 n_samples = 2000,
+                 thin = 4,
+                 parallel = TRUE,
+                 phi_prior,
+                 ar_prior,
+                 r_prior,
+                 twdis_prior,
+                 sigma_prior,
+                 rho_gp_prior,
+                 alpha_gp_prior,
+                 upper_bounds,
+                 use_stan = FALSE,
+                 jags_path){
 
   # Check arguments
   trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1", "AR2", "AR3", "GP"))
@@ -371,9 +377,9 @@ mvgam = function(formula,
 
   # Fill in missing observations in data_train so the size of the dataset is correct when
   # building the JAGS model
-  data_train$y[which(is.na(data_train$y))] <- round(predict(ss_gam,
+  suppressWarnings(data_train$y[which(is.na(data_train$y))] <- round(predict(ss_gam,
                                                               newdata = data_train,
-                                                              type = 'response'), 0)[which(is.na(data_train$y))]
+                                                              type = 'response'), 0)[which(is.na(data_train$y))])
 
 
   # Make jags file and appropriate data structures; note this has to use Poisson but the
@@ -552,8 +558,8 @@ mvgam = function(formula,
 
   # Covariate dataframe including training and testing observations
   if(!missing(data_test)){
-    X <- data.frame(rbind(ss_jagam$jags.data$X,
-                          predict(ss_gam, newdata = data_test, type = 'lpmatrix')))
+    suppressWarnings(X <- data.frame(rbind(ss_jagam$jags.data$X,
+                          predict(ss_gam, newdata = data_test, type = 'lpmatrix'))))
 
     # Add a time variable
     if(class(data_train)[1] == 'list'){
@@ -768,6 +774,8 @@ mvgam = function(formula,
 
       # Add necessary trend structure
       base_stan_model <- add_trend_lines(model_file = base_stan_model,
+                                         rho_gp_prior = rho_gp_prior,
+                                         alpha_gp_prior = alpha_gp_prior,
                                          stan = T,
                                          trend_model = trend_model,
                                          drift = drift)
@@ -779,18 +787,34 @@ mvgam = function(formula,
                                     jags_data = ss_jagam$jags.data,
                                     family = family)
 
-      # Sensible inits needed for the betas
+      # Sensible inits needed for the betas, sigmas and overdispersion parameters
+      if(family == 'nb'){
       if(trend_model != 'None'){
-        initf1 <- function() {
-          list(b_raw = runif(stan_objects$model_data$num_basis, -0.25, 0.25))
+        inits <- function() {
+          list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
+               r_inv = runif(NCOL(ytimes), 1, 50))
         }
       } else {
-        initf1 <- function() {
-          list(b_raw = runif(stan_objects$model_data$num_basis, -0.25, 0.25),
+        inits <- function() {
+          list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
+               r_inv = runif(NCOL(ytimes), 1, 50),
                sigma = runif(stan_objects$model_data$n_series, 0.075, 1))
         }
       }
-      inits <- initf1
+      }
+
+      if(family == 'poisson'){
+        if(trend_model != 'None'){
+          inits <- function() {
+            list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2))
+          }
+        } else {
+          inits <- function() {
+            list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
+                 sigma = runif(stan_objects$model_data$n_series, 0.075, 1))
+          }
+        }
+      }
 
       output <- structure(list(call = formula,
                                family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
@@ -850,6 +874,8 @@ mvgam = function(formula,
       # Add necessary trend structure
       base_stan_model <- add_trend_lines(model_file = base_stan_model,
                                          stan = T,
+                                         rho_gp_prior = rho_gp_prior,
+                                         alpha_gp_prior = alpha_gp_prior,
                                          trend_model = trend_model,
                                          drift = drift)
 
@@ -866,18 +892,34 @@ mvgam = function(formula,
       require(rstan)
       options(mc.cores = parallel::detectCores())
 
-      # Sensible inits needed for the betas (and trend alphas??)
-      if(trend_model != 'None'){
-        initf1 <- function() {
-          list(b_raw = runif(stan_objects$model_data$num_basis, -0.25, 0.25))
-        }
-      } else {
-        initf1 <- function() {
-          list(b_raw = runif(stan_objects$model_data$num_basis, -0.25, 0.25),
-               sigma = runif(stan_objects$model_data$n_series, 0.075, 1))
+      # Sensible inits needed for the betas, sigmas and overdispersion parameters
+      if(family == 'nb'){
+        if(trend_model != 'None'){
+          inits <- function() {
+            list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
+                 r_inv = runif(NCOL(ytimes), 1, 50))
+          }
+        } else {
+          inits <- function() {
+            list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
+                 r_inv = runif(NCOL(ytimes), 1, 50),
+                 sigma = runif(stan_objects$model_data$n_series, 0.075, 1))
+          }
         }
       }
-      inits <- initf1
+
+      if(family == 'poisson'){
+        if(trend_model != 'None'){
+          inits <- function() {
+            list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2))
+          }
+        } else {
+          inits <- function() {
+            list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
+                 sigma = runif(stan_objects$model_data$n_series, 0.075, 1))
+          }
+        }
+      }
 
       # Fit the model in stan
       if(trend_model == 'GP'){

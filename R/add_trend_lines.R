@@ -6,9 +6,14 @@
 #' @param stan Logical (convert existing model to a Stan model?)
 #' @param use_lv Logical (use latent variable trends or not)
 #' @param trend_model The type of trend model to be added to the model file
+#' @param rho_gp_prior \code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
+#'Process length scale parameters
+#' @param alpha_gp_prior \code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
+#'Process marginal deviation parameters
 #' @param drift Logical (add drift or not)
 #' @return A modified `JAGS` or `Stan` model file
 add_trend_lines = function(model_file, stan = FALSE,
+                           rho_gp_prior, alpha_gp_prior,
                            use_lv, trend_model, drift){
 
   # Add in necessary trend structure
@@ -116,13 +121,25 @@ add_trend_lines = function(model_file, stan = FALSE,
                  'SPD_beta = diag_SPD .* b_gp;\n',
                  'trend = gp_phi * SPD_beta;\n}\n')
 
+        if(missing(rho_gp_prior)){
+          rho_line <- 'rho_gp ~ inv_gamma(4, 24);\n'
+        } else {
+          rho_line <- paste0('rho_gp ~ ', rho_gp_prior, ';\n')
+        }
+
+        if(missing(alpha_gp_prior)){
+          alpha_line <- 'alpha_gp ~ normal(0, 0.5);\n'
+        } else {
+          rho_line <- paste0('alpha_gp ~ ', alpha_gp_prior, ';\n')
+        }
+
         model_file[grep('// priors for smoothing parameters', model_file)+2] <-
           paste0('\n// priors for gp parameters\n',
                  'for (s in 1:n_series){\n',
                  'b_gp[1:num_gp_basis, s] ~ normal(0, 1);\n',
                  '}\n',
-                 'alpha_gp ~ normal(0, 0.5);\n',
-                 'rho_gp ~ inv_gamma(4.6, 22.1);\n')
+                 alpha_line,
+                 rho_line)
 
         model_file <- readLines(textConnection(model_file), n = -1)
       } else {
