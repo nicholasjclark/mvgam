@@ -42,6 +42,37 @@ plot_mvgam_trend = function(object, series = 1, data_test,
   } else {
     preds <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
   }
+
+  # If the posterior predictions do not already cover the data_test period, the forecast needs to be
+  # generated using the latent trend dynamics; note, this assumes that there is no gap between the training and
+  # testing datasets
+  # Add variables to data_test if missing
+  s_name <- levels(data_train$series)[series]
+  if(!missing(data_test)){
+    if(!'y' %in% names(data_test)){
+      data_test$y <- rep(NA, NROW(data_test))
+    }
+
+    all_obs <- c(data_train %>%
+                   dplyr::filter(series == s_name) %>%
+                   dplyr::select(time, y) %>%
+                   dplyr::distinct() %>%
+                   dplyr::arrange(time) %>%
+                   dplyr::pull(y),
+                 data_test %>%
+                   dplyr::filter(series == s_name) %>%
+                   dplyr::select(time, y) %>%
+                   dplyr::distinct() %>%
+                   dplyr::arrange(time) %>%
+                   dplyr::pull(y))
+
+    if(dim(preds)[2] != length(all_obs)){
+      fc_preds <- forecast.mvgam(object, series = series, data_test = data_test,
+                                 type = 'trend')
+      preds <- cbind(preds, fc_preds)
+    }
+  }
+
   preds_last <- preds[1,]
   pred_vals <- seq(1:length(preds_last))
 

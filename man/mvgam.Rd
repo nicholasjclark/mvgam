@@ -18,7 +18,7 @@ mvgam(
   trend_model = "RW",
   drift = FALSE,
   chains = 2,
-  burnin = 5000,
+  burnin = 1000,
   n_samples = 2000,
   thin = 4,
   parallel = TRUE,
@@ -102,7 +102,7 @@ sampling the posterior distribution}
 \item{thin}{Thinning interval for monitors}
 
 \item{parallel}{\code{logical} specifying whether multiple cores should be used for
-for generating \code{JAGS} simulations in parallel. If \code{TRUE}, the number of cores to use will be
+for generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to use will be
 \code{min(c(chains, parallel::detectCores() - 1))}}
 
 \item{phi_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the drift terms/intercepts
@@ -190,7 +190,23 @@ The \code{p} parameter is therefore fixed at \code{1.5} (i.e. a so-called Geomet
 \emph{Factor regularisation}: When using a dynamic factor model for the trends, factor precisions are given
 regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
-capture dependencies in the data, so it can often be advantageous to set \verb{n_lv`` to a slightly larger number. However larger numbers of factors do come with additional computational costs so these should be balanced as well. \\cr \\cr *Residuals*: For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics If the fitted model is appropriate then Dunn-Smyth residuals will be standard normal in distribution and no autocorrelation will be evident. When a particular observation is missing, the residual is calculated by comparing independent draws from the model's posterior distribution \\cr \\cr *Using Stan*: An in-development feature of }mvgam\verb{is the ability to use Hamiltonian Monte Carlo for parameter estimation via the software}Stan\verb{(using the}rstan\verb{interface). Note that the}rstan\verb{library is currently required for this option to work, though support for other}Stan\verb{interfaces will be added in future. Also note that currently there is no support for fitting}Tweedie\verb{responses or dynamic factor models in}Stan\verb{, though again these will be added in future. However there are great advantages when using }Stan\verb{, which includes the option to estimate smooth latent trends via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408). This often makes sense for ecological series, which we expect to change smoothly. In }mvgam`, latent squared exponential GP trends are approximated using
+capture dependencies in the data, so it can often be advantageous to set \code{n_lv} to a slightly larger number. However
+larger numbers of factors do come with additional computational costs so these should be balanced as well.
+\cr
+\cr
+\emph{Residuals}: For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics
+If the fitted model is appropriate then Dunn-Smyth residuals will be standard normal in distribution and no
+autocorrelation will be evident. When a particular observation is missing, the residual is calculated by comparing independent
+draws from the model's posterior distribution
+\cr
+\cr
+\emph{Using Stan}: An in-development feature of \code{mvgam} is the ability to use Hamiltonian Monte Carlo for parameter estimation
+via the software \code{Stan} (using the \code{rstan} interface). Note that the \code{rstan} library is currently required for this option to work,
+though support for other \code{Stan} interfaces will be added in future. Also note that currently there is no support for
+fitting \code{Tweedie} responses or dynamic factor models in \code{Stan}, though again these will be added in future.
+However there are great advantages when using \code{Stan}, which includes the option to estimate smooth latent trends
+via \href{https://arxiv.org/abs/2004.11408}{Hilbert space approximate Gaussian Processes}. This often makes sense for
+ecological series, which we expect to change smoothly. In \code{mvgam}, latent squared exponential GP trends are approximated using
 by default \code{40} basis functions, which saves computational costs compared to fitting full GPs while adequately estimating
 GP \code{alpha} and \code{rho} parameters
 }

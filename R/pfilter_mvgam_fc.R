@@ -18,7 +18,7 @@
 #'@param ylim Optional \code{vector} of y-axis limits (min, max). The same limits will be used for all plots
 #'@param return_forecasts \code{logical}. If \code{TRUE}, the returned list object will contain plots of forecasts
 #'as well as the forecast objects (each as a \code{matrix} of dimension \code{n_particles} x \code{horizon})
-#'@return A named \code{list} contaning functions that call base \code{R} plots of each series' forecast. Optionally
+#'@return A named \code{list} containing functions that call base \code{R} plots of each series' forecast. Optionally
 #'the actual forecasts are returned within the \code{list} as a separate \code{list} of \code{matrices}
 #'@export
 pfilter_mvgam_fc = function(file_path = 'pfilter',
@@ -124,8 +124,13 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
 
     data_test %>%
       dplyr::arrange(time, series) -> data_test
-    last_row <- max(which(data_test$time == last_assim))
-    series_test <- data_test[(last_row + 1):NROW(data_test),]
+
+    if(min(data_test$time) > last_assim){
+      series_test <- data_test
+    } else {
+      last_row <- max(which(data_test$time == last_assim))
+      series_test <- data_test[(last_row + 1):NROW(data_test),]
+    }
   }
 
   n_series <- (length(levels(data_test$series)))

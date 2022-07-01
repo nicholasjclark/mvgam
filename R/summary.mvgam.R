@@ -42,6 +42,12 @@ message('N series:')
 cat(NCOL(object$ytimes), '\n')
 message()
 
+if(!is.null(object$upper_bounds)){
+  message('Upper bounds:')
+  cat(object$upper_bounds, '\n')
+  message()
+}
+
 message('N observations:')
 if(class(object$obs_data)[1] == 'list'){
   cat(length(object$obs_data$y), '\n')

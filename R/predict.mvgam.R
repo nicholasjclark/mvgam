@@ -1,31 +1,29 @@
 #'Plot mvgam posterior predictions for a specified series
 #'@param object \code{list} object returned from \code{mvgam}
-#'@param series \code{integer} specifying which series in the set is to be plotted
+#'@param series \code{integer} specifying which series in the set is to be predicted
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time
 #'for prediction, in addition to any other variables included in the linear predictor of \code{formula}. If not supplied,
 #'predictions are generated for the original observations used for the model fit.
 #'@param type When this has the value \code{link} (default) the linear predictor is calculated on the log link scale.
-#'When \code{response} is used, the predictions take uncertainty in the obsevation process into account to return
-#'predictions on the outcome (discrete) scale. Note that for both sets of predictions, the temporal
-#'dynamics of any fitted latent trends will be ignored but the precisions of latent trends / factors will
+#'When \code{response} is used, the predictions take uncertainty in the observation process into account to return
+#'predictions on the outcome (discrete) scale.
+#'@details Note that for both sets of predictions, the temporal
+#'dynamics of any fitted latent trends will be ignored but the precisions of latent trends / factors, or the
+#'covariance function if a Gaussian process trend was implemented in the model, will
 #'be used to give more realistic estimates of uncertainty surrounding predictions. In essence, the predictions are what
-#'the model would expect to see if the latent trends were all centred at \code{zero}
-#'@details Posterior predictions are calculated from the fitted \code{mvgam} object.
+#'the model would expect to see if the latent trends were all centred at \code{zero}. This function is therefore more
+#'suited to posterior simulation for interrogating a model's estimated smooth functions, while the forecasting functions
+#'\code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better suited to generate h-step ahead forecasts
+#'that respect the temporal dynamics of estimated latent trends.
 #'@return A \code{matrix} of dimension \code{n_samples x new_obs}, where \code{n_samples} is the number of
 #'posterior samples from the fitted object and \code{n_obs} is the number of test observations in \code{newdata}
-#'in which the \code{series} variable matches the suppled \code{series} argument
+#'in which the \code{series} variable matches the supplied \code{series} argument
 #'@export
 predict.mvgam = function(object, series = 1, newdata, type = 'link'){
 
   # Argument checks
   if(class(object) != 'mvgam'){
     stop('argument "object" must be of class "mvgam"')
-  }
-
-  # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
   }
 
   if(sign(series) != 1){
@@ -77,7 +75,7 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
       as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
     })
   } else {
-    if(object$trend_model == 'GP'){
+    if(object$trend_model %in% c('GP', 'None')){
       taus <- NULL
     } else {
       taus <- MCMCvis::MCMCchains(object$model_output, 'tau')
@@ -129,11 +127,15 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
     } else {
       if(type == 'link'){
         if(object$trend_model == 'GP'){
-          Sigma <- alpha_gps[x, series]^2 * exp(-(rho_gps[x, series]) * outer(1, 1, "-")^2) +
-            diag(1e-4, 1)
+          Sigma <- alpha_gps[x, series]^2 * exp(-(rho_gps[x, series]) *
+                                                  outer(1:length(newdata$series),
+                                                        1:length(newdata$series), "-")^2) +
+            diag(1e-4, length(newdata$series))
 
           out <- as.vector(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
-                             MASS::mvrnorm(1, 0, Sigma))
+                             MASS::mvrnorm(1, rep(0,length(newdata$series)), Sigma))
+        } else if(object$trend_model == 'None'){
+          out <- as.vector(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])))
         } else {
           out <- as.vector(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
                              (rnorm(length(newdata$series),
@@ -144,12 +146,17 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
       if(type == 'response'){
         if(family == 'Negative Binomial'){
           if(object$trend_model == 'GP'){
-            Sigma <- alpha_gps[x, series]^2 * exp(-(rho_gps[x, series]) * outer(1, 1, "-")^2) +
-              diag(1e-4, 1)
+            Sigma <- alpha_gps[x, series]^2 * exp(-(rho_gps[x, series]) *
+                                                    outer(1:length(newdata$series),
+                                                          1:length(newdata$series), "-")^2) +
+              diag(1e-4, length(newdata$series))
             out <- rnbinom(n = length(newdata$series), size = sizes[x, series],
                            mu = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
-                                      (MASS::mvrnorm(1, 0, Sigma))))
-          } else {
+                                      (MASS::mvrnorm(1, rep(0,length(newdata$series)), Sigma))))
+          } else if(object$trend_model == 'None'){
+            out <- rnbinom(n = length(newdata$series), size = sizes[x, series],
+                           mu = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,]))))
+            } else {
             out <- rnbinom(n = length(newdata$series), size = sizes[x, series],
                            mu = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
                                       (rnorm(length(newdata$series), 0, sqrt(1 / taus[x,series])))))
@@ -158,23 +165,37 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
         }
 
         if(family == 'Tweedie'){
-          out <- rpois(n = length(newdata$series),
-                lambda = mgcv::rTweedie(
-                  mu = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
-                             (rnorm(length(newdata$series),
-                                    0, sqrt(1 / taus[x,series])))),
-                p = ps[x],
-                phi = twdiss[x, series]))
+          if(object$trend_model == 'None'){
+            out <- rpois(n = length(newdata$series),
+                         lambda = mgcv::rTweedie(
+                           mu = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,]))),
+                           p = ps[x],
+                           phi = twdiss[x, series]))
+          } else {
+            out <- rpois(n = length(newdata$series),
+                         lambda = mgcv::rTweedie(
+                           mu = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
+                                      (rnorm(length(newdata$series),
+                                             0, sqrt(1 / taus[x,series])))),
+                           p = ps[x],
+                           phi = twdiss[x, series]))
+          }
+
         }
 
         if(family == 'Poisson'){
           if(object$trend_model == 'GP'){
-            Sigma <- alpha_gps[x, series]^2 * exp(-(rho_gps[x, series]) * outer(1, 1, "-")^2) +
-              diag(1e-4, 1)
+            Sigma <- alpha_gps[x, series]^2 * exp(-(rho_gps[x, series]) *
+                                                    outer(1:length(newdata$series),
+                                                          1:length(newdata$series), "-")^2) +
+              diag(1e-4, length(newdata$series))
             out <- rpois(n = length(newdata$series),
                          lambda = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
-                                        (MASS::mvrnorm(1, 0, Sigma))))
-          } else {
+                                        (MASS::mvrnorm(1, rep(0,length(newdata$series)), Sigma))))
+          } else if(object$trend_model == 'None'){
+            out <- rpois(n = length(newdata$series),
+                         lambda = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,]))))
+            } else {
             out <- rpois(n = length(newdata$series),
                          lambda = exp(((Xp[which(as.numeric(newdata$series) == series),] %*% betas[x,])) +
                                         (rnorm(length(newdata$series),

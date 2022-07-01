@@ -27,20 +27,23 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                         n_series = run_parameters$n_series[x],
                         prop_missing = run_parameters$prop_missing[x],
                         train_prop = 0.833,
+                        mu_obs = 6,
+                        phi_obs = 5,
+                        family = 'nb',
                         trend_rel = run_parameters$trend_rel[x],
                         seasonality = 'hierarchical')
 
-  # Fit a multivariate gam with no seasonality (null model)
+  # Fit a multivariate DGAM with no seasonality (null model)
   nullmod <- mvgam(data_train = sim_data$data_train,
                   data_test = sim_data$data_test,
                   formula = y ~ s(series, bs = 're'),
                   family = 'nb',
-                  trend_model = 'RW',
+                  trend_model = 'AR1',
                   use_lv = T,
-                  burnin = 1000)
+                  burnin = 2000)
 
   # Calculate model out of sample DRPS and 90% interval coverage
-  model_drps <- data.frame(model = c('null', 'hierarchical', 'mgcv_hierarchical'),
+  model_drps <- data.frame(model = c('null', 'hierarchical', 'mgcv_hierarchical', 'mgcv_autoregressive'),
                            drps_lower = NA,
                            drps_med = NA,
                            drps_upper = NA)
@@ -52,7 +55,8 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
 
   model_drps[1,] <- c('null', quantile(all_drps$norm_drps, probs = c(0.1, 0.5, 0.9), na.rm = T))
 
-  model_coverages <- data.frame(model = c('null', 'hierarchical', 'mgcv_hierarchical'),
+  model_coverages <- data.frame(model = c('null', 'hierarchical', 'mgcv_hierarchical',
+                                          'mgcv_autoregressive'),
                            coverage = NA)
   model_coverages[1,] <- c('null', sum(all_drps$In_90, na.rm = T) / length(which(!is.na(all_drps$Truth))))
 
@@ -79,17 +83,17 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
   model_correlations[1,] <- c('null', compare_correlations(sim_data$true_corrs,
                                                            correlations$mean_correlations))
 
-  # Fit a multivariate gam with hierarchical seasonality
+  # Fit a multivariate DGAM with hierarchical seasonality
   hier_mod <- mvgam(data_train = sim_data$data_train,
                       data_test = sim_data$data_test,
                       formula = y ~ s(series, bs = 're') +
-                        s(season, k = 12, m = 2, bs = 'cc') +
+                        s(season, k = 8, m = 2, bs = 'cc') +
                         s(season, by = series, m = 1, k = 4),
                       knots = list(season = c(0.5, 12.5)),
                       family = 'nb',
-                      trend_model = 'RW',
+                      trend_model = 'AR1',
                       use_lv = T,
-                      burnin = 4000)
+                      burnin = 5000)
 
   # Extract all performance information
   all_drps <- do.call(rbind, lapply(seq_len(run_parameters$n_series[x]), function(series){
@@ -105,11 +109,12 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                                                              correlations$mean_correlations))
 
   # Fit a standard mgcv version of the hierarchical model as a final comparison, including
-  # non-wiggly series-specific year smooths with penalty on the first derivative
+  # hierarchical yearly smooths
   mgcv_hier_mod <- gam(y ~ s(series, bs = 're') +
-                         s(season, k = 12, m = 2, bs = 'cc') +
+                         s(season, k = 8, m = 2, bs = 'cc') +
                          s(season, by = series, m = 1, k = 4) +
-                         s(year, by = series, k = 4, bs = 'gp', m = 1),
+                         s(year, k = 4) +
+                         s(year, by = series, k = 4, m = 1),
                        knots = list(season = c(0.5, 12.5)),
                        family = nb(), data = sim_data$data_train)
 
@@ -129,9 +134,108 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
                    data_train = sim_data$data_train, series = series, interval_width = 0.9)
   })) %>%
     dplyr::mutate(norm_drps = DRPS * (1 / Horizon))
-  model_drps[3,] <- c('mgcv_hierarchical', quantile(all_drps$norm_drps, probs = c(0.1, 0.5, 0.9), na.rm = T))
+  model_drps[3,] <- c('mgcv_hierarchical',
+                      quantile(all_drps$norm_drps, probs = c(0.1, 0.5, 0.9), na.rm = T))
   model_coverages[3,] <- c('mgcv_hierarchical',
                            sum(all_drps$In_90, na.rm = T) / length(which(!is.na(all_drps$Truth))))
+
+  # Finally, fit an mgcv version with a stochastic trend and hierarchical seasonality, but only
+  # do this if prop_missing is 0 or 0.1 (if 0.5, there will not be enough complete.cases observations
+  # to estimate model parameters; this is one of the major drawbacks of the autoregressive observation
+  # model form)
+  if(run_parameters$prop_missing[x] < 0.5){
+    rbind(sim_data$data_train,
+          sim_data$data_test) %>%
+      # A lag of n_series is needed to ensure the lagged value is for the correct
+      # series at each timepoint
+      dplyr::mutate(lag1 = log(lag(y, run_parameters$n_series[x]) + 0.01)) -> sim_dat_lags
+    sim_dat_lags_train <- sim_dat_lags[1:NROW(sim_data$data_train),]
+    sim_dat_lags_test <- sim_dat_lags[(NROW(sim_data$data_train)+1):NROW(sim_dat_lags),]
+    mgcv_lag_mod <- gam(y ~ s(series, bs = 're') +
+                          s(season, k = 6, m = 2, bs = 'cc') +
+                          s(season, by = series, m = 1, k = 4) +
+                          # Ensure a separate AR1 function
+                          # is estimated for each series
+                          lag1*series,
+                        knots = list(season = c(0.5, 12.5)),
+                        family = nb(), data = sim_dat_lags_train)
+
+    # Define a function to iteratively propagate a forecast forward according
+    # to the AR1 observation model
+    recurse_ar1 = function(model, n_series, lagged_vals, h, log_lags = F){
+      # Initiate state matrix
+      states <- matrix(NA, ncol = n_series, nrow = h+1)
+      # Last values of the conditional expectations begins the state matrix
+      if(log_lags){
+        states[1,] <- exp(as.numeric(lagged_vals))
+      } else {
+        states[1,] <- as.numeric(lagged_vals)
+      }
+
+      # Get a random sample of the smooth coefficient uncertainty matrix
+      # to use for the entire forecast horizon of this particular path
+      gam_coef_index <- sample(seq(1, NROW(coef_sim)), size = 1)
+      # For each following timestep, recursively predict based on the
+      # predictions at each previous lag
+      for (t in 2:(h + 1)) {
+          newdata <- sim_dat_lags_test[(t-1):((t-1)+n_series-1), ]
+          if(log_lags){
+            newdata$lag1 <- log(states[(t-1), ] + 0.01)
+          } else {
+            newdata$lag1 <- states[t-1, ]
+          }
+
+        colnames(newdata) <- colnames(sim_dat_lags_test)
+        Xp <- predict(model, newdata = newdata, type = 'lpmatrix')
+        # Calculate the posterior predictions for this timepoint
+        mu <- rnbinom(n_series, mu = exp(Xp %*% coef_sim[gam_coef_index,]),
+                      size = model$family$getTheta(TRUE))
+        # Fill in the state vector and iterate to the next timepoint
+        states[t, ] <- mu
+      }
+      # Return the forecast path
+      as.vector(t(states[-c(1),]))
+    }
+
+    # Draw 1000 parameter estimates from the GAM posterior and use these to propagate the forecast
+    # for 10 timesteps ahead
+    coef_sim <- gam.mh(mgcv_lag_mod)$bs
+
+    # Forecasting will fail if there are NAs around the beginning of the test sample, because
+    # these NAs will propagate into the lagged estimates. So if there are any, we will impute them
+    # from the posterior predictions of the hierarchical GAM above
+    if(anyNA(sim_dat_lags_test$lag1[1:run_parameters$n_series[x]])){
+      lag_inits <- log(colMeans(fits)[(NROW(sim_data$data_train)+1):
+                                         (NROW(sim_data$data_train)+run_parameters$n_series[x])] + 0.01)
+    } else {
+      lag_inits <- sim_dat_lags_test$lag1[1:run_parameters$n_series[x]]
+    }
+
+    # Propagate the stochastic trend model forward to calculate the forecast distribution
+    gam_sims <- matrix(NA, nrow = 1000, ncol = NROW(sim_dat_lags_test))
+    for(i in 1:1000){
+      gam_sims[i,] <- recurse_ar1(model = mgcv_lag_mod,
+                                  n_series = run_parameters$n_series[x],
+                                  lagged_vals = lag_inits,
+                                  h = length(unique(sim_dat_lags_test$time)),
+                                  log_lags = TRUE)
+    }
+
+    # Calculate forecast evaluation scores
+    all_drps <- do.call(rbind, lapply(seq_len(run_parameters$n_series[x]), function(series){
+      calculate_drps(out_gam_mod = hier_mod,
+                     pred_matrix = cbind(fits[1:1000,1:NROW(sim_data$data_train)], gam_sims),
+                     data_test = sim_data$data_test,
+                     data_train = sim_data$data_train,
+                     series = series, interval_width = 0.9)
+    })) %>%
+      dplyr::mutate(norm_drps = DRPS * (1 / Horizon))
+    model_drps[4,] <- c('mgcv_autoregressive', quantile(all_drps$norm_drps,
+                                                        probs = c(0.1, 0.5, 0.9), na.rm = T))
+    model_coverages[4,] <- c('mgcv_autoregressive',
+                             sum(all_drps$In_90, na.rm = T) / length(which(!is.na(all_drps$Truth))))
+
+  }
 
   rm(hier_mod, mgcv_hier_mod, nullmod)
   gc()
@@ -143,4 +247,4 @@ sim_results <- lapply(seq_len(nrow(run_parameters)), function(x){
 
 })
 dir.create('Results')
-save(sim_results, file = 'Results/sim_results.rda')
+save(sim_results, file = 'NEON_manuscript/Results/sim_results.rda')

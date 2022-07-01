@@ -1,6 +1,36 @@
 #### Simulation analysis ####
-# Simulate a series with a nonlinear trend to visualise how a spline extrapolates
+# Simulate series with moderate and strong temporal dynamics for illustration
 library(mvgam)
+pdf('NEON_manuscript/Figures/FigS1_trenddynamics.pdf', width = 6.25, height = 5.85)
+seed <- 500
+set.seed(seed)
+s1 <- sim_mvgam(trend_rel = 0.3,
+                mu_obs = 10, T = 84, freq = 12,
+                n_series = 1,
+                trend_model = 'RW',
+                train_prop = 1)
+par(mfrow = c(2, 1),
+    mgp = c(2.5, 1, 0),
+    mai = c(0.7, 0.7, 0.2, 0.2))
+plot(s1$data_train$y, type = 'l',
+     lwd = 2, ylab = 'Observations',
+     xlab = '',
+     xaxt = 'none',
+     main = 'Moderate dynamics (trend strength = 0.3)')
+set.seed(seed)
+s1 <- sim_mvgam(trend_rel = 0.75,
+                mu_obs = 10, T = 84, freq = 12,
+                n_series = 1,
+                trend_model = 'RW',
+                train_prop = 1)
+plot(s1$data_train$y, type = 'l',
+     lwd = 2, ylab = 'Observations',
+     xlab = 'Time',
+     xaxt = 'none',
+     main = 'Strong dynamics (trend strength = 0.7)')
+dev.off()
+
+# Simulate a series with a nonlinear trend to visualise how a spline extrapolates
 library(xts)
 library(forecast)
 data("AirPassengers")
@@ -194,10 +224,10 @@ prop_missing <- vector()
 T <- vector()
 n_series <- vector()
 for(i in 1:nrow(run_parameters)){
-  trend_rel <- c(trend_rel, rep(run_parameters$trend_rel[i], 3))
-  prop_missing <- c(prop_missing, rep(run_parameters$prop_missing[i], 3))
-  T <- c(T, rep(run_parameters$T[i], 3))
-  n_series <- c(n_series , rep(run_parameters$n_series[i], 3))
+  trend_rel <- c(trend_rel, rep(run_parameters$trend_rel[i], 4))
+  prop_missing <- c(prop_missing, rep(run_parameters$prop_missing[i], 4))
+  T <- c(T, rep(run_parameters$T[i], 4))
+  n_series <- c(n_series , rep(run_parameters$n_series[i], 4))
 }
 drps_plot_dat$trend_rel <- trend_rel
 drps_plot_dat$T <- T
@@ -213,23 +243,27 @@ drps_plot_dat %>%
   dplyr::mutate(model = dplyr::case_when(
     model == 'null' ~ 'Nonseasonal DGAM',
     model == 'hierarchical' ~ 'Seasonal DGAM',
-    model == 'mgcv_hierarchical' ~ 'Seasonal GAM'
+    model == 'mgcv_hierarchical' ~ 'Seasonal GAM',
+    model == 'mgcv_autoregressive' ~ 'Seasonal ARGAM'
   )) -> drps_plot_dat
 drps_plot_dat$model <- factor(drps_plot_dat$model,
                               levels = c('Nonseasonal DGAM',
                                          'Seasonal DGAM',
-                                         'Seasonal GAM'))
+                                         'Seasonal GAM',
+                                         'Seasonal ARGAM'))
 
 coverage_plot_dat %>%
   dplyr::mutate(model = dplyr::case_when(
     model == 'null' ~ 'Nonseasonal DGAM',
     model == 'hierarchical' ~ 'Seasonal DGAM',
-    model == 'mgcv_hierarchical' ~ 'Seasonal GAM'
+    model == 'mgcv_hierarchical' ~ 'Seasonal GAM',
+    model == 'mgcv_autoregressive' ~ 'Seasonal ARGAM'
   )) -> coverage_plot_dat
 coverage_plot_dat$model <- factor(coverage_plot_dat$model,
                               levels = c('Nonseasonal DGAM',
                                          'Seasonal DGAM',
-                                         'Seasonal GAM'))
+                                         'Seasonal GAM',
+                                         'Seasonal ARGAM'))
 
 library(ggplot2)
 library(viridis)
@@ -247,7 +281,8 @@ n_names <- c(
 drps_plot_dat$drps_med[drps_plot_dat$drps_med > 2] <- 2
 ggplot(drps_plot_dat %>%
          dplyr::filter(trend_rel == 0.3),
-       aes(y = as.numeric(drps_med), x = model, fill = model)) +
+       aes(y = as.numeric((as.numeric(drps_upper) - as.numeric(drps_lower))/2),
+           x = model, fill = model)) +
   geom_boxplot() +
   facet_wrap(~prop_missing, labeller = as_labeller(prop_names), scales = 'free_x') +
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
@@ -256,7 +291,8 @@ ggplot(drps_plot_dat %>%
 
 ggplot(drps_plot_dat %>%
          dplyr::filter(trend_rel == 0.7),
-       aes(y = as.numeric(drps_med), x = model, fill = model)) +
+       aes(y = as.numeric((as.numeric(drps_upper) - as.numeric(drps_lower))/2),
+           x = model, fill = model)) +
   geom_boxplot() +
   facet_wrap(~prop_missing, labeller = as_labeller(prop_names), scales = 'free_x') +
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
@@ -269,7 +305,8 @@ dev.off()
 
 ggplot(drps_plot_dat %>%
          dplyr::filter(trend_rel == 0.3),
-       aes(y = as.numeric(drps_med), x = model, fill = model)) +
+       aes(y = as.numeric((as.numeric(drps_upper) - as.numeric(drps_lower))/2),
+           x = model, fill = model)) +
   geom_boxplot() +
   facet_wrap(~n_series, labeller = as_labeller(n_names), scales = 'free_x') +
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
@@ -278,13 +315,14 @@ ggplot(drps_plot_dat %>%
 
 ggplot(drps_plot_dat %>%
          dplyr::filter(trend_rel == 0.7),
-       aes(y = as.numeric(drps_med), x = model, fill = model)) +
+       aes(y = as.numeric((as.numeric(drps_upper) - as.numeric(drps_lower))/2),
+           x = model, fill = model)) +
   geom_boxplot() +
   facet_wrap(~n_series, labeller = as_labeller(n_names), scales = 'free_x') +
   scale_fill_viridis(discrete = T, begin = 0.2, end = 1, guide = FALSE) +
   theme_bw() + coord_flip() + labs(x = '', y = 'Normalised DRPS calibration (lower is better)',
                                    title = 'Strong dynamics') -> plot2
-pdf('NEON_manuscript/Figures/FigS1_simulation_drps_nseries_plot.pdf')
+pdf('NEON_manuscript/Figures/FigS2_simulation_drps_nseries_plot.pdf')
 cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()
 
@@ -309,7 +347,7 @@ ggplot(coverage_plot_dat %>%
   ylim(0, 1) +
   theme_bw() + coord_flip() + labs(x = '', y = '90% interval coverage',
                                    title = 'Strong dynamics') -> plot2
-pdf('NEON_manuscript/Figures/FigS2_simulation_coverage_missing_plot.pdf')
+pdf('NEON_manuscript/Figures/FigS3_simulation_coverage_missing_plot.pdf')
 cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()
 

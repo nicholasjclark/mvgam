@@ -4,7 +4,13 @@
 \alias{add_stan_data}
 \title{Add remaining data, model and parameter blocks to a Stan model}
 \usage{
-add_stan_data(jags_file, stan_file, jags_data, family = "poisson")
+add_stan_data(
+  jags_file,
+  stan_file,
+  jags_data,
+  family = "poisson",
+  upper_bounds
+)
 }
 \arguments{
 \item{jags_file}{Prepared JAGS mvgam model file}
@@ -12,6 +18,13 @@ add_stan_data(jags_file, stan_file, jags_data, family = "poisson")
 \item{stan_file}{Incomplete Stan model file to be edited}
 
 \item{jags_data}{Prepared mvgam data for JAGS modelling}
+
+\item{family}{\code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'}
+
+\item{upper_bounds}{Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
+this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
+is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
+truncation entirely (i.e. there is no upper bound for each series)}
 }
 \value{
 A \code{list} containing the updated Stan model and model data

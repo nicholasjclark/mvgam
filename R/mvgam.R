@@ -57,7 +57,7 @@
 #'sampling the posterior distribution
 #'@param thin Thinning interval for monitors
 #'@param parallel \code{logical} specifying whether multiple cores should be used for
-#'for generating \code{JAGS} simulations in parallel. If \code{TRUE}, the number of cores to use will be
+#'for generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to use will be
 #'\code{min(c(chains, parallel::detectCores() - 1))}
 #'@param phi_prior \code{character} specifying (in JAGS syntax) the prior distribution for the drift terms/intercepts
 #'in the latent trends
@@ -122,7 +122,7 @@
 #'*Factor regularisation*: When using a dynamic factor model for the trends, factor precisions are given
 #'regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 #'factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
-#'capture dependencies in the data, so it can often be advantageous to set `n_lv`` to a slightly larger number. However
+#'capture dependencies in the data, so it can often be advantageous to set `n_lv` to a slightly larger number. However
 #'larger numbers of factors do come with additional computational costs so these should be balanced as well.
 #'\cr
 #'\cr
@@ -164,7 +164,7 @@ mvgam = function(formula,
                  trend_model = 'RW',
                  drift = FALSE,
                  chains = 2,
-                 burnin = 5000,
+                 burnin = 1000,
                  n_samples = 2000,
                  thin = 4,
                  parallel = TRUE,
@@ -287,6 +287,14 @@ mvgam = function(formula,
 
     if(!'time' %in% names(data_train)){
       stop('data_train does not contain a "time" column')
+    }
+  }
+
+  # Upper bounds needs to be same length as number of series
+  if(!missing(upper_bounds)){
+    if(length(upper_bounds) != length(unique(data_train$series))){
+      upper_bounds <- rep(upper_bounds,
+                          length(unique(data_train$series)))[1:length(unique(data_train$series))]
     }
   }
 
@@ -634,10 +642,6 @@ mvgam = function(formula,
     dplyr::arrange(time, series) -> X
 
   # Matrix of indices in X that correspond to timepoints for each series
-  # if((length(unique(X$time)) * length(unique(X$series))) != NROW(x)){
-  #   stop('N observations != N timepoints x N series')
-  # }
-
   ytimes <- matrix(NA, nrow = length(unique(X$time)), ncol = length(unique(X$series)))
   for(i in 1:length(unique(X$series))){
     ytimes[,i] <- which(X$series == i)
@@ -696,16 +700,21 @@ mvgam = function(formula,
   # Add information about the call and necessary data structures to the model file
   # Get dimensions and numbers of smooth terms
   snames <- names(ss_jagam$jags.data)[grep('S.*', names(ss_jagam$jags.data))]
-  smooth_dims <- matrix(NA, ncol = 2, nrow = length(snames))
-  for(i in 1:length(snames)){
-    smooth_dims[i,] <- dim(ss_jagam$jags.data[[snames[i]]])
+  if(length(snames) == 0){
+    smooth_penalty_data <- NULL
+  } else {
+    smooth_dims <- matrix(NA, ncol = 2, nrow = length(snames))
+    for(i in 1:length(snames)){
+      smooth_dims[i,] <- dim(ss_jagam$jags.data[[snames[i]]])
+    }
+    smooth_penalty_data <- vector()
+    for(i in 1:length(snames)){
+      smooth_penalty_data[i] <- paste0('matrix ',
+                                       snames[i],
+                                       ';  mgcv smooth penalty matrix ', snames[i])
+    }
   }
-  smooth_penalty_data <- vector()
-  for(i in 1:length(snames)){
-    smooth_penalty_data[i] <- paste0('matrix ',
-                                     snames[i],
-                                     ';  mgcv smooth penalty matrix ', snames[i])
-  }
+
 
   if('sp' %in% names(ss_jagam$jags.data)){
     if(length(ss_jagam$jags.data$sp) == 1){
@@ -785,20 +794,21 @@ mvgam = function(formula,
       stan_objects <- add_stan_data(jags_file = trimws(model_file),
                                     stan_file = base_stan_model,
                                     jags_data = ss_jagam$jags.data,
-                                    family = family)
+                                    family = family,
+                                    upper_bounds = upper_bounds)
 
       # Sensible inits needed for the betas, sigmas and overdispersion parameters
       if(family == 'nb'){
       if(trend_model != 'None'){
         inits <- function() {
-          list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
-               r_inv = runif(NCOL(ytimes), 1, 50))
+          list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+               r_inv = runif(NCOL(model_data$ytimes), 1, 50))
         }
       } else {
         inits <- function() {
-          list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
-               r_inv = runif(NCOL(ytimes), 1, 50),
-               sigma = runif(stan_objects$model_data$n_series, 0.075, 1))
+          list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+               r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+               sigma = runif(model_data$n_series, 0.075, 1))
         }
       }
       }
@@ -806,12 +816,12 @@ mvgam = function(formula,
       if(family == 'poisson'){
         if(trend_model != 'None'){
           inits <- function() {
-            list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2))
+            list(b_raw = runif(model_data$num_basis, -0.2, 0.2))
           }
         } else {
           inits <- function() {
-            list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
-                 sigma = runif(stan_objects$model_data$n_series, 0.075, 1))
+            list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                 sigma = runif(model_data$n_series, 0.075, 1))
           }
         }
       }
@@ -884,7 +894,8 @@ mvgam = function(formula,
       stan_objects <- add_stan_data(jags_file = trimws(model_file),
                                     stan_file = base_stan_model,
                                     jags_data = ss_jagam$jags.data,
-                                    family = family)
+                                    family = family,
+                                    upper_bounds = upper_bounds)
       model_data <- stan_objects$model_data
 
       # Should never call library in a function, but just doing this for now while

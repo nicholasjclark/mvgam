@@ -229,10 +229,14 @@ prep_neon_data = function(species = 'Ambloyomma_americanum', split_prop = 0.9){
                          dplyr::select(siteID, plotID) %>%
                          dplyr::distinct()) %>%
       # Remove winter tick abundances as we are not interested in modelling them
-      dplyr::filter(epiWeek > 14) %>%
-      dplyr::filter(epiWeek < 41) %>%
+      # dplyr::filter(epiWeek > 14) %>%
+      # dplyr::filter(epiWeek < 41) %>%
+      # dplyr::mutate(series = plotID,
+      #               season = epiWeek - 14,
+      #               year = as.vector(scale(Year_orig)),
+      #               y = target) %>%
       dplyr::mutate(series = plotID,
-                    season = epiWeek - 14,
+                    season = epiWeek,
                     year = as.vector(scale(Year_orig)),
                     y = target) %>%
       dplyr::select(-Year, -epiWeek, -target) %>%
@@ -277,10 +281,14 @@ prep_neon_data = function(species = 'Ambloyomma_americanum', split_prop = 0.9){
                          dplyr::select(siteID, plotID) %>%
                          dplyr::distinct()) %>%
       # Remove winter tick abundances as we are not interested in modelling them
-      dplyr::filter(epiWeek > 14) %>%
-      dplyr::filter(epiWeek < 41) %>%
+      #dplyr::filter(epiWeek > 14) %>%
+      #dplyr::filter(epiWeek < 41) %>%
+      # dplyr::mutate(series = plotID,
+      #               season = epiWeek - 14,
+      #               year = as.vector(scale(Year_orig)),
+      #               y = target) %>%
       dplyr::mutate(series = plotID,
-                    season = epiWeek - 14,
+                    season = epiWeek,
                     year = as.vector(scale(Year_orig)),
                     y = target) %>%
       dplyr::select(-Year, -epiWeek, -target) %>%
@@ -344,29 +352,31 @@ fit_mvgam = function(data_train,
   # Condition the model on the observed data
   if(missing(knots)){
     out_gam_mod <- mvgam(formula = formula,
-                           data_train = data_train,
-                           data_test = data_test,
-                           burnin = burnin,
-                           n_samples = n_samples,
-                           thin = thin,
-                           use_lv = use_lv,
-                           n_lv = n_lv,
-                           chains = 4,
-                           family = family,
-                           phi_prior = phi_prior)
+                         data_train = data_train,
+                         data_test = data_test,
+                         burnin = burnin,
+                         n_samples = n_samples,
+                         thin = thin,
+                         use_lv = use_lv,
+                         trend_model = 'RW',
+                         n_lv = n_lv,
+                         chains = 4,
+                         family = family,
+                         phi_prior = phi_prior)
   } else {
     out_gam_mod <- mvgam(formula = formula,
-                           data_train = data_train,
-                           data_test = data_test,
-                           burnin = burnin,
-                           n_samples = n_samples,
-                           knots = knots,
-                           thin = thin,
-                           use_lv = use_lv,
-                           n_lv = n_lv,
-                           chains = 4,
-                           family = family,
-                           phi_prior = phi_prior)
+                         data_train = data_train,
+                         data_test = data_test,
+                         burnin = burnin,
+                         n_samples = n_samples,
+                         knots = knots,
+                         thin = thin,
+                         use_lv = use_lv,
+                         trend_model = 'RW',
+                         n_lv = n_lv,
+                         chains = 4,
+                         family = family,
+                         phi_prior = phi_prior)
   }
 
 

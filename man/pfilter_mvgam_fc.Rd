@@ -35,7 +35,7 @@ This places the legend on the inside of the plot frame at the given location.}
 as well as the forecast objects (each as a \code{matrix} of dimension \code{n_particles} x \code{horizon})}
 }
 \value{
-A named \code{list} contaning functions that call base \code{R} plots of each series' forecast. Optionally
+A named \code{list} containing functions that call base \code{R} plots of each series' forecast. Optionally
 the actual forecasts are returned within the \code{list} as a separate \code{list} of \code{matrices}
 }
 \description{

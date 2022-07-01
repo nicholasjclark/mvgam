@@ -3,18 +3,27 @@
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 #'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
-#'observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
-#'simulations can be obtained
+#'covariate information in \code{data_test} will be used to generate forecasts from the fitted model equations. If
+#'this same \code{data_test} was originally included in the call to \code{mvgam}, then forecasts have already been
+#'produced by the generative model and these will simply be extracted and plotted. However if no \code{data_test} was
+#'supplied to the original model call, an assumption is made that the \code{data_test} supplied here comes sequentially
+#'after the data supplied as \code{data_train} in the original model (i.e. we assume there is no time gap between the last
+#'observation of series 1 in \code{data_train} and the first observation for series 1 in \code{data_test}). If
+#'\code{data_test} contains observations in column \code{y}, these observations will be used to compute a Discrete Rank
+#'Probability Score for the forecast distribution
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
 #'@param ylab Optional \code{character} string specifying the y-axis label
 #'@param ylim Optional \code{vector} of y-axis limits (min, max)
+#'@param return_forecasts \code{logical}. If \code{TRUE}, the function will plot the forecast
+#'as well as returning the forecast object (as a \code{matrix} of dimension \code{n_samples} x \code{horizon})
 #'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to calculate posterior
 #'empirical quantiles. These are plotted along with the true observed data
 #'that was used to train the model.
-#'@return A base \code{R} graphics plot
+#'@return A base \code{R} graphics plot and an optional \code{matrix} of the forecast distribution
 #'@export
-plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, ylab, ylim){
+plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, ylab, ylim,
+                         return_forecasts = FALSE){
 
   # Check arguments
   if(class(object) != 'mvgam'){
@@ -49,10 +58,14 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
     preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
   }
 
-  preds_last <- preds[1,]
 
   # Add variables to data_test if missing
+  s_name <- levels(data_train$series)[series]
   if(!missing(data_test)){
+
+    if(!'y' %in% names(data_test)){
+      data_test$y <- rep(NA, NROW(data_test))
+    }
 
     if(class(data_test)[1] == 'list'){
       if(!'time' %in% names(data_test)){
@@ -73,9 +86,31 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
       }
     }
 
+  # If the posterior predictions do not already cover the data_test period, the forecast needs to be
+  # generated using the latent trend dynamics; note, this assumes that there is no gap between the training and
+  # testing datasets
+  all_obs <- c(data_train %>%
+                 dplyr::filter(series == s_name) %>%
+                 dplyr::select(time, y) %>%
+                 dplyr::distinct() %>%
+                 dplyr::arrange(time) %>%
+                 dplyr::pull(y),
+               data_test %>%
+                 dplyr::filter(series == s_name) %>%
+                 dplyr::select(time, y) %>%
+                 dplyr::distinct() %>%
+                 dplyr::arrange(time) %>%
+                 dplyr::pull(y))
+
+  if(dim(preds)[2] != length(all_obs)){
+    fc_preds <- forecast.mvgam(object, series = series, data_test = data_test)
+    preds <- cbind(preds, fc_preds)
+  }
+
   }
 
   # Plot quantiles of the forecast distribution
+  preds_last <- preds[1,]
   probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
   cred <- sapply(1:NCOL(preds),
                  function(n) quantile(preds[,n],
@@ -122,7 +157,6 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
           col = c_mid_highlight, border = NA)
   lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
 
-  s_name <- levels(data_train$series)[series]
   if(!missing(data_test)){
 
     if(class(data_train)[1] == 'list'){
@@ -194,10 +228,17 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
 
     fc <- preds[,(last_train+1):NCOL(preds)]
 
-    message('Out of sample DRPS:')
-    print(sum(drps_mcmc_object(as.vector(truth),
-                                fc)[,1]))
-    message()
+
+    if(all(is.na(truth))){
+      message('No non-missing values in data_test$y; cannot calculate DRPS')
+      message()
+    } else {
+      message('Out of sample DRPS:')
+      print(sum(drps_mcmc_object(as.vector(truth),
+                                 fc)[,1], na.rm = TRUE))
+      message()
+    }
+
   } else {
     if(class(data_train)[1] == 'list'){
       data_train <- data.frame(series = data_train$series,
@@ -217,6 +258,15 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
             dplyr::distinct() %>%
             dplyr::arrange(time) %>%
             dplyr::pull(y),pch = 16, col = "black", cex = 0.55 )
+  }
+
+  if(return_forecasts){
+    if(!missing(data_test)){
+      return(preds[,(last_train+1):NCOL(preds)])
+    } else {
+      return(preds)
+    }
+
   }
 
 }

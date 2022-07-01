@@ -9,27 +9,31 @@
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
 
-\item{series}{\code{integer} specifying which series in the set is to be plotted}
+\item{series}{\code{integer} specifying which series in the set is to be predicted}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time
 for prediction, in addition to any other variables included in the linear predictor of \code{formula}. If not supplied,
 predictions are generated for the original observations used for the model fit.}
 
 \item{type}{When this has the value \code{link} (default) the linear predictor is calculated on the log link scale.
-When \code{response} is used, the predictions take uncertainty in the obsevation process into account to return
-predictions on the outcome (discrete) scale. Note that for both sets of predictions, the temporal
-dynamics of any fitted latent trends will be ignored but the precisions of latent trends / factors will
-be used to give more realistic estimates of uncertainty surrounding predictions. In essence, the predictions are what
-the model would expect to see if the latent trends were all centred at \code{zero}}
+When \code{response} is used, the predictions take uncertainty in the observation process into account to return
+predictions on the outcome (discrete) scale.}
 }
 \value{
 A \code{matrix} of dimension \code{n_samples x new_obs}, where \code{n_samples} is the number of
 posterior samples from the fitted object and \code{n_obs} is the number of test observations in \code{newdata}
-in which the \code{series} variable matches the suppled \code{series} argument
+in which the \code{series} variable matches the supplied \code{series} argument
 }
 \description{
 Plot mvgam posterior predictions for a specified series
 }
 \details{
-Posterior predictions are calculated from the fitted \code{mvgam} object.
+Note that for both sets of predictions, the temporal
+dynamics of any fitted latent trends will be ignored but the precisions of latent trends / factors, or the
+covariance function if a Gaussian process trend was implemented in the model, will
+be used to give more realistic estimates of uncertainty surrounding predictions. In essence, the predictions are what
+the model would expect to see if the latent trends were all centred at \code{zero}. This function is therefore more
+suited to posterior simulation for interrogating a model's estimated smooth functions, while the forecasting functions
+\code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better suited to generate h-step ahead forecasts
+that respect the temporal dynamics of estimated latent trends.
 }

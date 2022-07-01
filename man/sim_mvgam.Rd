@@ -17,7 +17,7 @@ sim_mvgam(
   phi_obs,
   mu_obs = 4,
   prop_missing = 0,
-  train_prop = 8.85
+  train_prop = 0.85
 )
 }
 \arguments{

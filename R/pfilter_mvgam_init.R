@@ -188,13 +188,13 @@ if(object$trend_model == 'RW'){
   if(object$use_lv){
     alpha_gps <- NULL
     rho_gps <- NULL
-    ar1s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+    ar1s <- matrix(1, nrow = NROW(betas), ncol = object$n_lv)
     ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
     ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
   } else {
     alpha_gps <- NULL
     rho_gps <- NULL
-    ar1s <- matrix(0, nrow = NROW(betas), ncol = n_series)
+    ar1s <- matrix(1, nrow = NROW(betas), ncol = n_series)
     ar2s <- matrix(0, nrow = NROW(betas), ncol = n_series)
     ar3s <- matrix(0, nrow = NROW(betas), ncol = n_series)
   }
@@ -455,19 +455,19 @@ particles <- pbapply::pblapply(sample_seq, function(x){
         weight <- 1
       } else {
         if(family == 'Negative Binomial'){
-          weight <- 1 + (dnbinom(truth[series], size = size[series],
-                                 mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                            (trends[series]))))
+          weight <- (dnbinom(truth[series], size = size[series],
+                             mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
+                                        (trends[series]))))
         }
 
         if(family == 'Poisson'){
-          weight <- 1 + (dpois(truth[series],
+          weight <- (dpois(truth[series],
                                lambda = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
                                               (trends[series]))))
         }
 
         if(family == 'Tweedie'){
-          weight <- 1 + exp(mgcv::ldTweedie(y = truth[series],
+          weight <- exp(mgcv::ldTweedie(y = truth[series],
                                             mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
                                                        (trends[series])),
                                             p = p,

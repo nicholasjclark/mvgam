@@ -41,7 +41,7 @@ sim_mvgam = function(T = 100,
                      phi_obs,
                      mu_obs = 4,
                      prop_missing = 0,
-                     train_prop = 8.85){
+                     train_prop = 0.85){
 
   # Check arguments
   family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
@@ -175,15 +175,6 @@ sim_mvgam = function(T = 100,
   glob_season <- as.vector(scale(zoo::rollmean(stl_season, k = 6, na.pad = F)))
 
   # Simulate observed series as discrete draws dependent on seasonality and trend
-  invlogit = function(x){
-    exp(x)/(1+exp(x))
-  }
-  scale01 <- function(x){
-    x = (x-min(x))/(max(x)-min(x))
-    x[x == 0] <- 0.0001
-    x[x == 1] <- 0.9999
-    x
-  }
 
   obs_trends <- matrix(NA, nrow = T, ncol = n_series)
    for(s in 1:n_series){
@@ -192,27 +183,29 @@ sim_mvgam = function(T = 100,
 
   obs_ys <- c(unlist(lapply(seq_len(n_series), function(x){
     if(seasonality == 'shared'){
-      obs <- scale01(invlogit(as.vector(scale(as.vector(loadings[,x] %*%  t(trends))) * trend_rel) +
-                                glob_season * (1 - trend_rel)))
+      obs <- exp(log(mu_obs[x]) + (glob_season * (1-trend_rel)) +
+                   (obs_trends[,x] * trend_rel))
+
+
     } else {
       yseason <- as.vector(scale(stl(ts(rnorm(T, glob_season, sd = 2),
                                         frequency = freq), 'periodic')$time.series[,1]))
-      obs <- scale01(invlogit(as.vector(scale(as.vector(loadings[,x] %*%  t(trends))) * trend_rel) +
-                                 yseason * (1 - trend_rel)))
+      obs <- exp(log(mu_obs[x]) + (yseason * (1-trend_rel)) +
+            (obs_trends[,x] * trend_rel))
     }
 
     if(family == 'nb'){
       out <- rnbinom(length(obs), size = phi_obs[x],
-                     mu = mu_obs[x]*obs)
+                     mu = obs)
     }
 
     if(family == 'poisson'){
-      out <- rpois(length(obs), lambda = mu_obs[x]*obs)
+      out <- rpois(length(obs), lambda = obs)
     }
 
     if(family == 'tw'){
       out <- rpois(n = length(obs),
-                   lambda = tweedie::rtweedie(length(obs), mu = mu_obs[x]*obs,
+                   lambda = tweedie::rtweedie(length(obs), mu = obs,
                                               power = 1.5, phi = phi_obs[x]))
     }
 
@@ -233,8 +226,20 @@ sim_mvgam = function(T = 100,
     dplyr::mutate(time = 1:dplyr::n()) %>%
     dplyr::ungroup()
 
-  list(data_train = sim_data[1:(floor(nrow(sim_data) * train_prop)),],
-       data_test = sim_data[((floor(nrow(sim_data) * train_prop)) + 1):nrow(sim_data),],
+  data_train <- sim_data %>%
+    dplyr::filter(time <= floor(max(sim_data$time) * train_prop)) %>%
+    dplyr::ungroup() %>%
+    dplyr::group_by(series) %>%
+    dplyr::arrange(time)
+
+  data_test <- sim_data %>%
+    dplyr::filter(time > max(data_train$time)) %>%
+    dplyr::ungroup() %>%
+    dplyr::group_by(series) %>%
+    dplyr::arrange(time)
+
+  list(data_train = data.frame(data_train),
+       data_test = data.frame(data_test),
        true_corrs = cov2cor(cov(obs_trends)),
        true_trends = trends,
        global_seasonality = glob_season)

@@ -143,7 +143,7 @@ pfilter_mvgam_smooth = function(particles,
       series_weight <- 1
     } else {
       if(particles[[x]]$family == 'Negative Binomial'){
-        series_weight <- 1 + (dnbinom(next_assim$y[series],
+        series_weight <- (dnbinom(next_assim$y[series],
                                       size = particles[[x]]$size[series],
                                       mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
                                                    particles[[x]]$betas)) +
@@ -151,14 +151,14 @@ pfilter_mvgam_smooth = function(particles,
       }
 
       if(particles[[x]]$family == 'Poisson'){
-        series_weight <- 1 + (dpois(next_assim$y[series],
+        series_weight <- (dpois(next_assim$y[series],
                                       lambda = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
                                                    particles[[x]]$betas)) +
                                                  (trend_states[series]))))
       }
 
       if(particles[[x]]$family == 'Tweedie'){
-        series_weight <- 1 + exp(mgcv::ldTweedie(y = next_assim$y[series],
+        series_weight <- exp(mgcv::ldTweedie(y = next_assim$y[series],
                                                  mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
                                                               particles[[x]]$betas)) + (trend_states[series])),
                                                  p = particles[[x]]$p,
@@ -396,9 +396,6 @@ pfilter_mvgam_smooth = function(particles,
     nlist(k, sigma)
   }
 
-
-  # internal ----------------------------------------------------------------
-
   lx <- function(a,x) {
     a <- -a
     k <- vapply(a, FUN = function(a_i) mean(log1p(a_i * x)), FUN.VALUE = numeric(1))
@@ -411,8 +408,6 @@ pfilter_mvgam_smooth = function(particles,
   psis_smooth_tail <- function(x, cutoff) {
     len <- length(x)
     exp_cutoff <- exp(cutoff)
-
-    # save time not sorting since x already sorted
     fit <- gpdfit(exp(x) - exp_cutoff, sort_x = FALSE)
     k <- fit$k
     sigma <- fit$sigma
@@ -498,7 +493,9 @@ pfilter_mvgam_smooth = function(particles,
   }
 
   # Function to use importance sampling to generate draws from each trend state's
-  # highest likelihood distribution
+  # highest likelihood distribution; this is useful as the high likelihood
+  # space will not necessarily be multivariate Gaussian but we want to smooth
+  # low weight particles toward this distribution
   imp_samp = function(x, N = 500){
     # Draw from proposal distribution which is normal(mu, sd = 1)
     mean_x <- mean(x)
@@ -509,7 +506,7 @@ pfilter_mvgam_smooth = function(particles,
     w <- sapply(sam, function(input) sum(dnorm(input, mean = x, sd = bw)) /
                   dnorm(input, mean_x, 1))
 
-    # Resample according to the weights to obtain an un-weighted sample
+    # Resample according to the importance weights
     sample(sam, length(particles), replace = TRUE, prob = w)
 
   }
@@ -607,7 +604,7 @@ pfilter_mvgam_smooth = function(particles,
       # Else particles can be kernel smooothed towards higher likelihood space.
       # For kernel smoothing, how much a particle may be pulled towards the high-likelihood
       # space is determined  by its last fitness estimate (weight)
-      # Particles with low weight (less than 10th percentile) are pulled more strongly towards the
+      # Particles with low weight are pulled more strongly towards the
       # state space of the high weight particles. Particles with moderate weights are only moderatly
       # shifted, while high weight particles are not moved by much
       weight <- norm_weights[x]
@@ -694,7 +691,10 @@ pfilter_mvgam_smooth = function(particles,
                            lv_coefs = lv_coefs_evolve,
                            betas = betas,
                            size = particles[[x]]$size,
-                           tau = particles[[x]]$tau,
+                           tau = ifelse(use_resampling,
+                                        min(100, particles[[x]]$tau +
+                                              runif(1, 0, evolve)),
+                                        particles[[x]]$tau),
                            phi = particles[[x]]$phi,
                            ar1 = particles[[x]]$ar1,
                            ar2 = particles[[x]]$ar2,
@@ -730,7 +730,10 @@ pfilter_mvgam_smooth = function(particles,
                            lv_states = lv_evolve,
                            lv_coefs = lv_coefs_evolve,
                            betas = betas,
-                           tau = particles[[x]]$tau,
+                           tau = ifelse(use_resampling,
+                                        min(100, particles[[x]]$tau +
+                                              runif(1, 0, evolve)),
+                                        particles[[x]]$tau),
                            phi = particles[[x]]$phi,
                            ar1 = particles[[x]]$ar1,
                            ar2 = particles[[x]]$ar2,
@@ -770,7 +773,10 @@ pfilter_mvgam_smooth = function(particles,
                            p = particles[[x]]$p,
                            twdis = particles[[x]]$twdis,
                            betas = betas,
-                           tau = particles[[x]]$tau,
+                           tau = ifelse(use_resampling,
+                                        min(100, particles[[x]]$tau +
+                                              runif(1, 0, evolve)),
+                                        particles[[x]]$tau),
                            phi = particles[[x]]$phi,
                            ar1 = particles[[x]]$ar1,
                            ar2 = particles[[x]]$ar2,
