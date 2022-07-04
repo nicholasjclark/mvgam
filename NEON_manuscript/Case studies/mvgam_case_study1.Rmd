@@ -177,7 +177,7 @@ for(i in 1:1000){
 
 Now we will fit a competing Dynamic GAM model, which estimates a latent temporal process rather than using an autoregressive observation model. This model's parameters are estimated in a Bayesian framework using (by default) the Gibbs sampling algorithms available in the `JAGS` software. `mvgam` takes a fitted `gam` model and adapts the model file to fit in `JAGS`, with possible extensions to deal with stochastic trend components and other features.
 ```{r message=FALSE, warning = FALSE}
-m_mvgam <- mvgam(y ~ s(cov1, k = 3),
+m_mvgam <- mvgam(formula = y ~ s(cov1, k = 3),
                  data_train = data_train,
                  data_test = data_test,
                  family = 'nb',
@@ -724,11 +724,9 @@ ppc(m_mvgam, series = 1, type = 'cdf', data_test = data_test)
 ppc(m_mvgam, series = 1, type = 'pit', data_test = data_test)
 ```
 
-There are some problems with the way this model is generating future predictions, so we would need to perform a more rigorous and principled model development strategy to improve our model's predictive abilities. But there are two other utilities available in `mvgam` that are worth highlighting. The first is model comparison. Benchmarking against "null" models is a very important part of evaluating a proposed forecast model. After all, if our complex dynamic model can't generate better predictions then a random walk or mean forecast, is it really telling us anything new about the data-generating process? Here we examine the model comparison utilities in `mvgam`. Here we illustrate how this can be done in `mvgam` by fitting a simpler model by smoothing on a white noise covariate rather than on the seasonal variable. Because the white noise covariate is not informative and we are using a random walk for the trend process, this model essentially becomes a Negative Binomial observation model over a dynamic random walk process.
+There are some problems with the way this model is generating future predictions, so we would need to perform a more rigorous and principled model development strategy to improve our model's predictive abilities. But there are two other utilities available in `mvgam` that are worth highlighting. The first is model comparison. Benchmarking against "null" models is a very important part of evaluating a proposed forecast model. After all, if our complex dynamic model can't generate better predictions then a random walk or mean forecast, is it really telling us anything new about the data-generating process? Here we examine the model comparison utilities in `mvgam`. Here we illustrate how this can be done in `mvgam` by fitting a basic random walk model with a Negative Binomial observation process. No smooth terms are included here, the observation model simply has an intercept term.
 ```{r, message=FALSE, warning=FALSE}
-data_train$fake_cov <- rnorm(NROW(data_train))
-data_test$fake_cov <- rnorm(NROW(data_test))
-m_mvgam2 <- mvgam(y ~ s(fake_cov, k = 3),
+m_mvgam2 <- mvgam(y ~ 1,
                  data_train = data_train,
                  data_test = data_test,
                  family = 'nb',
@@ -745,11 +743,6 @@ plot(m_mvgam2, series = 1, type = 'forecast', data_test = data_test)
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 plot(m_mvgam, series = 1, type = 'forecast', data_test = data_test)
-```
-
-Inspecting the model's smooth function for the fake covariate `fake_cov` shows that the function is essentially flat and there is no structure in the expected partial residuals, suggesting there would be no stucture remaining if we were to drop this term from the model. Together this evidence indicates that the function is unimportant
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_smooth(m_mvgam2, series = 1, smooth = 'fake_cov', residuals = T)
 ```
 
 Now we will showcase how different dynamic models can be compared using rolling probabilistic forecast evaluation, which is especially useful if we don't already have out of sample observations for comparing forecasts. This function sets up a sequence of evaluation timepoints along a rolling window within the training data to evaluate 'out-of-sample' forecasts. The trends are rolled forward a total of `fc_horizon` timesteps according to their estimated state space dynamics to generate an 'out-of-sample' forecast that is evaluated against the true observations in the `horizon` window. We are therefore simulating a situation where the model's parameters had already been estimated but we have only observed data up to the evaluation timepoint and would like to generate forecasts that consider the possible future paths for the latent trends and the true observed values for any other covariates in the `horizon` window. Evaluation involves calculating the Discrete Rank Probability Score and a binary indicator for whether or not the true value lies within the forecast's 90% prediction interval. For this test we compare the two models on the exact same sequence of `30` evaluation points using `horizon = 6`
@@ -1030,7 +1023,8 @@ lynx_mvgam <- mvgam(data_train = lynx_train,
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR1',
-               burnin = 8000,
+               use_stan = TRUE,
+               burnin = 1000,
                chains = 4)
 ```
 

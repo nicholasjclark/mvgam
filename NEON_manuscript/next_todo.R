@@ -1,18 +1,22 @@
 library(mvgam)
-dat <- sim_mvgam(T = 50, n_series=2)
-mod1 <- mvgam(y~s(season)-1,
+dat <- sim_mvgam(T = 50, n_series=2, n_lv = 1)
+mod1 <- mvgam(formula = y~1,
               data_train = dat$data_train,
               trend_model = 'RW',
-              family = 'pois',
+              family = 'poisson',
+              use_stan = TRUE,
               run_model = TRUE)
-
-# Use Michael Betancourt's utility functions for checking diagnostics
-#source('https://raw.githubusercontent.com/betanalpha/knitr_case_studies/master/factor_modeling/stan_utility.R')
-check_all_diagnostics(fit1)
-
+mod2 <- mvgam(formula = y~s(season),
+              data_train = dat$data_train,
+              trend_model = 'RW',
+              family = 'poisson',
+              run_model = TRUE)
+compare_mvgams(model1 = mod1, model2 = mod2, fc_horizon = 6,
+               n_evaluations = 30, n_cores = 3)
+eval_mvgam(object = mod2, n_cores = 1)
 plot(mod1, type = 'forecast', realisations = TRUE)
-plot(mod1, type = 'trend', realisations = TRUE,
-     derivatives = TRUE)
+plot(mod1, type = 'trend', realisations = TRUE)
+
 plot_mvgam_smooth(mod1, 1, 'season', realisations = TRUE, n_realisations = 10)
 plot_mvgam_fc(object = mod1, series = 1,
               realisations = TRUE, n_realisations = 15)
@@ -25,6 +29,15 @@ dim(obj)
 
 plot_mvgam_trend(object = mod1, series = 1, data_test = fake,
                  realisations = TRUE)
+
+
+
+
+
+
+pfilter_mvgam_init(object = mod1, n_particles = 2000,
+                   n_cores = 3, data_assim = model_dat[28,])
+
 
 # models with no smooths
 # predictions with new data by extending the temporal process forward

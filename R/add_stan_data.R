@@ -84,19 +84,24 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson',
 
   # Get dimensions and numbers of smooth terms
   snames <- names(jags_data)[grep('S.*', names(jags_data))]
-  smooth_dims <- matrix(NA, ncol = 2, nrow = length(snames))
-  for(i in 1:length(snames)){
-    smooth_dims[i,] <- dim(jags_data[[snames[i]]])
-  }
+  if(length(snames) == 0){
+    smooth_penalty_data <- NULL
+  } else {
+    smooth_dims <- matrix(NA, ncol = 2, nrow = length(snames))
+    for(i in 1:length(snames)){
+      smooth_dims[i,] <- dim(jags_data[[snames[i]]])
+    }
 
-  # Insert the data block for the model
-  smooth_penalty_data <- vector()
-  for(i in 1:length(snames)){
-    smooth_penalty_data[i] <- paste0('matrix[', smooth_dims[i, 1],
-                                     ',',
-                                     smooth_dims[i, 2], '] ',
-                                     snames[i],
-                                     '; // mgcv smooth penalty matrix ', snames[i])
+    # Insert the data block for the model
+    smooth_penalty_data <- vector()
+    for(i in 1:length(snames)){
+      smooth_penalty_data[i] <- paste0('matrix[', smooth_dims[i, 1],
+                                       ',',
+                                       smooth_dims[i, 2], '] ',
+                                       snames[i],
+                                       '; // mgcv smooth penalty matrix ', snames[i])
+    }
+
   }
 
   # Get parametric prior locations and precisions if necessary
@@ -112,6 +117,15 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson',
     bounds <- paste0('int U[', length(upper_bounds), ']; // upper bounds\n')
   } else {
     bounds <- NULL
+  }
+
+  # Remove smooth parameter info if no smooth terms are included
+  if(any(grepl('## smoothing parameter priors...', jags_file))){
+    zero_data <- paste0('vector[num_basis] zero; // prior locations for basis coefficients\n')
+    n_sp_data <- paste0('int<lower=0> n_sp; // number of smoothing parameters\n')
+  } else {
+    zero_data <- NULL
+    n_sp_data <- NULL
   }
 
   # Search for any non-contiguous indices that sometimes are used by mgcv
@@ -147,11 +161,11 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson',
                                                paste0(idx_data, collapse = '\n'), '\n',
                                                'int<lower=0> total_obs; // total number of observations\n',
                                                'int<lower=0> n; // number of timepoints per series\n',
-                                               'int<lower=0> n_sp; // number of smoothing parameters\n',
+                                               n_sp_data,
                                                'int<lower=0> n_series; // number of series\n',
                                                'int<lower=0> num_basis; // total number of basis coefficients\n',
                                                p_terms,
-                                               'vector[num_basis] zero; // prior locations for basis coefficients\n',
+                                               zero_data,
                                                'matrix[num_basis, total_obs] X; // transposed mgcv GAM design matrix\n',
                                                'int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)\n',
                                                paste0(smooth_penalty_data, collapse = '\n'), '\n',
@@ -167,10 +181,10 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson',
                                                bounds,
                                                'int<lower=0> total_obs; // total number of observations\n',
                                                'int<lower=0> n; // number of timepoints per series\n',
-                                               'int<lower=0> n_sp; // number of smoothing parameters\n',
+                                               n_sp_data,
                                                'int<lower=0> n_series; // number of series\n',
                                                'int<lower=0> num_basis; // total number of basis coefficients\n',
-                                               'vector[num_basis] zero; // prior locations for basis coefficients\n',
+                                               zero_data,
                                                p_terms,
                                                'matrix[num_basis, total_obs] X; // transposed mgcv GAM design matrix\n',
                                                'int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)\n',
@@ -182,130 +196,166 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson',
   stan_file <- readLines(textConnection(stan_file), n = -1)
 
   # Modify the model block to include each smooth term
-  smooths_start <- grep('## GAM-specific priors', jags_file) + 1
-  smooths_end <- grep('## smoothing parameter priors...', jags_file) - 1
-  jags_smooth_text <- jags_file[smooths_start:smooths_end]
-  jags_smooth_text <- gsub('##', '//', jags_smooth_text)
-  jags_smooth_text <- gsub('dexp', 'exponential', jags_smooth_text)
+  if(any(grepl('## smoothing parameter priors...', jags_file))){
+    smooths_start <- grep('## GAM-specific priors', jags_file) + 1
+    smooths_end <- grep('## smoothing parameter priors...', jags_file) - 1
+    jags_smooth_text <- jags_file[smooths_start:smooths_end]
+    jags_smooth_text <- gsub('##', '//', jags_smooth_text)
+    jags_smooth_text <- gsub('dexp', 'exponential', jags_smooth_text)
 
-  K_starts <- grep('K.* <- ', jags_smooth_text)
-  for(i in 1:length(K_starts)){
-    jags_smooth_text[K_starts[i]+1] <- gsub('\\bb\\b', 'b_raw',
-                                            gsub('dmnorm', 'multi_normal_prec',
-                                                 paste0(gsub('K.*',
-                                                             trimws(gsub('K.* <- ', '',
-                                                                         jags_smooth_text[K_starts[i]])),
-                                                             jags_smooth_text[K_starts[i]+1]), ')')))
-  }
-  jags_smooth_text <- jags_smooth_text[-K_starts]
-  if(any(grep('b\\[i\\] <- b_raw', jags_smooth_text))){
-    jags_smooth_text <- jags_smooth_text[-grep('b\\[i\\] <- b_raw', jags_smooth_text)]
-  }
-  jags_smooth_text <- gsub('dnorm', 'normal', jags_smooth_text)
-  jags_smooth_text <- gsub('  ', ' ', jags_smooth_text)
-  jags_smooth_text[-grep('//|\\}|\\{', jags_smooth_text)] <-
-    paste0(jags_smooth_text[-grep('//|\\}|\\{', jags_smooth_text)], ';')
-  jags_smooth_text <- gsub(') }', '); }', jags_smooth_text)
-  jags_smooth_text <- gsub('}', '}\n', jags_smooth_text)
-  jags_smooth_text[(grep('//',
-                         jags_smooth_text) - 1)[-1]] <-
-    paste0(jags_smooth_text[(grep('//',
-                                  jags_smooth_text) - 1)[-1]], '\n')
-  stan_file[grep('##insert smooths',
-                       stan_file)] <- paste0(jags_smooth_text, collapse = '\n')
-  stan_file <- readLines(textConnection(stan_file), n = -1)
-
-  # Deal with any random effect priors
-  if(any(grep('b_raw\\[i\\] ~', stan_file))){
-    b_raw_string <- paste0(stan_file[grep('b_raw\\[i\\] ~', stan_file)-1], collapse = ',')
-    n_b_raw <- max(as.numeric(unlist(regmatches(b_raw_string,
-                                                gregexpr("[[:digit:]]+",
-                                                         b_raw_string)))))
-    min_b_raw <- min(as.numeric(unlist(regmatches(b_raw_string,
-                                                gregexpr("[[:digit:]]+",
-                                                         b_raw_string)))))
-
-    n_sigma_raw <- max(as.numeric(unlist(regmatches(grep('sigma_raw', stan_file, value = T),
-                                                    gregexpr("[[:digit:]]+",
-                                                             grep('sigma_raw',
-                                                                  stan_file, value = T))))))
-
-
-    stan_file <- stan_file[-grep('mu_raw.* ~ ', stan_file)]
-    stan_file <- stan_file[-grep('<- mu_raw', stan_file)]
-    stan_file <- stan_file[-grep('sigma_raw.* ~ ', stan_file)]
-    stan_file[grep('model \\{', stan_file)] <-
-      paste0('model {\n// prior for random effect population variances\nsigma_raw ~ exponential(0.5);\n\n',
-             '// prior for random effect population means\nmu_raw ~ normal(0, 1);\n')
-
-    stan_file[grep('parameters \\{', stan_file)[1] + 2] <-
-      paste0(stan_file[grep('parameters \\{', stan_file)[1] + 2],
-             '\n',
-             '\n// random effect variances\n',
-             paste0('vector<lower=0>[',n_sigma_raw,'] sigma_raw', ';\n', collapse = ''),
-             '\n',
-             paste0('vector<lower=0>[',n_sigma_raw,'] mu_raw', ';\n', collapse = ''))
-
-    b_raw_text <- vector()
-    min_beta <- vector()
-    b_raw_indices <- grep('b_raw\\[i\\] ~', stan_file)
-    for(i in 1:length(b_raw_indices)){
-
-      b_raw_text[i] <- paste0('for (i in ', as.numeric(sub("for \\(i in ", "",
-                                                           sub("\\:.*", "",
-                                                               stan_file[b_raw_indices[i] - 1]))),
-                              ':', as.numeric(sub(" ", "",
-                                                  sub("\\{", "",
-                                                      sub("\\)", "",
-                                                          sub(".*\\:", "",
-                                                              stan_file[b_raw_indices[i]-1]))))),
-                              ') {\nb[i] <- mu_raw[', i, '] + b_raw[i] * sigma_raw[',i,
-                              '];\n}')
-      min_beta[i] <- as.numeric(sub("for \\(i in ", "",
-                                    sub("\\:.*", "",
-                                        stan_file[b_raw_indices[i] - 1])))
+    K_starts <- grep('K.* <- ', jags_smooth_text)
+    for(i in 1:length(K_starts)){
+      jags_smooth_text[K_starts[i]+1] <- gsub('\\bb\\b', 'b_raw',
+                                              gsub('dmnorm', 'multi_normal_prec',
+                                                   paste0(gsub('K.*',
+                                                               trimws(gsub('K.* <- ', '',
+                                                                           jags_smooth_text[K_starts[i]])),
+                                                               jags_smooth_text[K_starts[i]+1]), ')')))
     }
-
-    # If parametric coefficients are included, they'll come before random effects
-    min_re_betas <- min(min_beta)
-    if(min_re_betas > 1){
-      b_raw_text <- c(paste0('\nfor (i in 1:',
-                             min_re_betas - 1, ') {\nb[i] <- b_raw[i];\n}'),
-                      b_raw_text)
-    } else {
-      b_raw_text <- b_raw_text
+    jags_smooth_text <- jags_smooth_text[-K_starts]
+    if(any(grep('b\\[i\\] <- b_raw', jags_smooth_text))){
+      jags_smooth_text <- jags_smooth_text[-grep('b\\[i\\] <- b_raw', jags_smooth_text)]
     }
-
-    if(n_b_raw < dim(jags_data$X)[2]){
-      b_raw_text <- c(b_raw_text,
-                      paste0('\nfor (i in ',  n_b_raw+1,':num_basis) {\nb[i] <- b_raw[i];\n}\n'))
-    }
-
-    stan_file[grep('// basis coefficients', stan_file) + 2] <- paste0(b_raw_text,
-                                                                                  collapse = '\n')
+    jags_smooth_text <- gsub('dnorm', 'normal', jags_smooth_text)
+    jags_smooth_text <- gsub('  ', ' ', jags_smooth_text)
+    jags_smooth_text[-grep('//|\\}|\\{', jags_smooth_text)] <-
+      paste0(jags_smooth_text[-grep('//|\\}|\\{', jags_smooth_text)], ';')
+    jags_smooth_text <- gsub(') }', '); }', jags_smooth_text)
+    jags_smooth_text <- gsub('}', '}\n', jags_smooth_text)
+    jags_smooth_text[(grep('//',
+                           jags_smooth_text) - 1)[-1]] <-
+      paste0(jags_smooth_text[(grep('//',
+                                    jags_smooth_text) - 1)[-1]], '\n')
+    stan_file[grep('##insert smooths',
+                   stan_file)] <- paste0(jags_smooth_text, collapse = '\n')
     stan_file <- readLines(textConnection(stan_file), n = -1)
 
-    # If no random effects, betas are equal to beta_raws
+    # Deal with any random effect priors
+    if(any(grep('b_raw\\[i\\] ~', stan_file))){
+      b_raw_string <- paste0(stan_file[grep('b_raw\\[i\\] ~', stan_file)-1], collapse = ',')
+      n_b_raw <- max(as.numeric(unlist(regmatches(b_raw_string,
+                                                  gregexpr("[[:digit:]]+",
+                                                           b_raw_string)))))
+      min_b_raw <- min(as.numeric(unlist(regmatches(b_raw_string,
+                                                    gregexpr("[[:digit:]]+",
+                                                             b_raw_string)))))
+
+      n_sigma_raw <- max(as.numeric(unlist(regmatches(grep('sigma_raw', stan_file, value = T),
+                                                      gregexpr("[[:digit:]]+",
+                                                               grep('sigma_raw',
+                                                                    stan_file, value = T))))))
+
+
+      stan_file <- stan_file[-grep('mu_raw.* ~ ', stan_file)]
+      stan_file <- stan_file[-grep('<- mu_raw', stan_file)]
+      stan_file <- stan_file[-grep('sigma_raw.* ~ ', stan_file)]
+      stan_file[grep('model \\{', stan_file)] <-
+        paste0('model {\n// prior for random effect population variances\nsigma_raw ~ exponential(0.5);\n\n',
+               '// prior for random effect population means\nmu_raw ~ normal(0, 1);\n')
+
+      stan_file[grep('parameters \\{', stan_file)[1] + 2] <-
+        paste0(stan_file[grep('parameters \\{', stan_file)[1] + 2],
+               '\n',
+               '\n// random effect variances\n',
+               paste0('vector<lower=0>[',n_sigma_raw,'] sigma_raw', ';\n', collapse = ''),
+               '\n',
+               paste0('vector<lower=0>[',n_sigma_raw,'] mu_raw', ';\n', collapse = ''))
+
+      b_raw_text <- vector()
+      min_beta <- vector()
+      b_raw_indices <- grep('b_raw\\[i\\] ~', stan_file)
+      for(i in 1:length(b_raw_indices)){
+
+        b_raw_text[i] <- paste0('for (i in ', as.numeric(sub("for \\(i in ", "",
+                                                             sub("\\:.*", "",
+                                                                 stan_file[b_raw_indices[i] - 1]))),
+                                ':', as.numeric(sub(" ", "",
+                                                    sub("\\{", "",
+                                                        sub("\\)", "",
+                                                            sub(".*\\:", "",
+                                                                stan_file[b_raw_indices[i]-1]))))),
+                                ') {\nb[i] <- mu_raw[', i, '] + b_raw[i] * sigma_raw[',i,
+                                '];\n}')
+        min_beta[i] <- as.numeric(sub("for \\(i in ", "",
+                                      sub("\\:.*", "",
+                                          stan_file[b_raw_indices[i] - 1])))
+      }
+
+      # If parametric coefficients are included, they'll come before random effects
+      min_re_betas <- min(min_beta)
+      if(min_re_betas > 1){
+        b_raw_text <- c(paste0('\nfor (i in 1:',
+                               min_re_betas - 1, ') {\nb[i] <- b_raw[i];\n}'),
+                        b_raw_text)
+      } else {
+        b_raw_text <- b_raw_text
+      }
+
+      if(n_b_raw < dim(jags_data$X)[2]){
+        b_raw_text <- c(b_raw_text,
+                        paste0('\nfor (i in ',  n_b_raw+1,':num_basis) {\nb[i] <- b_raw[i];\n}\n'))
+      }
+
+      stan_file[grep('// basis coefficients', stan_file) + 2] <- paste0(b_raw_text,
+                                                                        collapse = '\n')
+      stan_file <- readLines(textConnection(stan_file), n = -1)
+
+      # If no random effects, betas are equal to beta_raws
+    } else {
+      stan_file[grep('// basis coefficients', stan_file) + 2] <-
+        paste0('\nfor (i in ','1:num_basis) {\nb[i] <- b_raw[i];\n}')
+      stan_file <- readLines(textConnection(stan_file), n = -1)
+    }
+
+    # Update parametric effect priors
+    if(any(grep('// parametric effect', stan_file))){
+      stan_file[grep('// parametric effect', stan_file) + 1] <-
+        paste0('for (i in ',
+
+               as.numeric(sub('.*(?=.$)', '',
+                              sub("\\:.*", "",
+                                  stan_file[grep('// parametric effect', stan_file) + 1]), perl=T)),
+               ':', as.numeric(substr(sub(".*\\:", "",
+                                          stan_file[grep('// parametric effect', stan_file) + 1]),
+                                      1, 1)),
+               ') {\nb_raw[i] ~ normal(p_coefs[i], 1 / p_taus[i]);\n}')
+      stan_file <- readLines(textConnection(stan_file), n = -1)
+    }
+
   } else {
+    ## No smooths included
+    stan_file <- stan_file[-grep('// priors for smoothing parameters', stan_file,
+                                 fixed = TRUE)]
+    stan_file <- stan_file[-grep('lambda ~ exponential', stan_file,
+                                 fixed = TRUE)]
+    stan_file <- stan_file[-grep('vector[n_sp] rho', stan_file,
+                                 fixed = TRUE)]
+    stan_file <- stan_file[-grep('rho = log', stan_file,
+                                 fixed = TRUE)]
+    stan_file <- stan_file[-grep('// smoothing parameters', stan_file,
+                                 fixed = TRUE)]
+    stan_file <- stan_file[-grep('[n_sp] lambda', stan_file,
+                                 fixed = TRUE)]
+
     stan_file[grep('// basis coefficients', stan_file) + 2] <-
       paste0('\nfor (i in ','1:num_basis) {\nb[i] <- b_raw[i];\n}')
-    stan_file <- readLines(textConnection(stan_file), n = -1)
+
+    if(any(grep('## parametric effect priors', jags_file))){
+      stan_file[grep('##insert smooths', stan_file)] <-
+        paste0('for (i in ',
+
+               as.numeric(sub('.*(?=.$)', '',
+                              sub("\\:.*", "",
+                                  jags_file[grep('## parametric effect', jags_file) + 1]), perl=T)),
+               ':', as.numeric(substr(sub(".*\\:", "",
+                                          jags_file[grep('## parametric effect', jags_file) + 1]),
+                                      1, 1)),
+               ') {\nb_raw[i] ~ normal(p_coefs[i], 1 / p_taus[i]);\n}')
+      stan_file <- readLines(textConnection(stan_file), n = -1)
+    }
+
   }
 
-  # Update parametric effect priors
-  if(any(grep('// parametric effect', stan_file))){
-    stan_file[grep('// parametric effect', stan_file) + 1] <-
-      paste0('for (i in ',
-
-             as.numeric(sub('.*(?=.$)', '',
-                            sub("\\:.*", "",
-                                stan_file[grep('// parametric effect', stan_file) + 1]), perl=T)),
-             ':', as.numeric(substr(sub(".*\\:", "",
-                                        stan_file[grep('// parametric effect', stan_file) + 1]),
-                                    1, 1)),
-             ') {\nb_raw[i] ~ normal(p_coefs[i], 1 / p_taus[i]);\n}')
-    stan_file <- readLines(textConnection(stan_file), n = -1)
-  }
   unlink('base_gam_stan.txt')
   stan_file <- readLines(textConnection(stan_file), n = -1)
 
@@ -343,10 +393,13 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson',
   stan_data$X <- t(stan_data$X)
   stan_data$total_obs <- NCOL(stan_data$X)
   stan_data$num_basis <- NROW(stan_data$X)
-  stan_data$n_sp <- as.numeric(sub('\\) \\{', '',
-                                   sub('for \\(i in 1\\:', '',
-                                       jags_file[grep('lambda\\[i\\] ~ ',
-                                                       trimws(jags_file)) - 1])))
+
+  if(any(grepl('## smoothing parameter priors...', jags_file))){
+    stan_data$n_sp <- as.numeric(sub('\\) \\{', '',
+                                     sub('for \\(i in 1\\:', '',
+                                         jags_file[grep('lambda\\[i\\] ~ ',
+                                                        trimws(jags_file)) - 1])))
+  }
 
   # Add discontiguous index values if required
   if(add_idxs){

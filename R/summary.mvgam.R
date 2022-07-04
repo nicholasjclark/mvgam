@@ -82,21 +82,23 @@ if(object$family == 'Tweedie'){
 
 #### Summary table for smooth functions ####
 coef_names <- names(object$mgcv_model$coefficients)
-m <- length(object$mgcv_model$smooth)
+if(length(object$mgcv_model$smooth) > 0){
+  m <- length(object$mgcv_model$smooth)
 
-edf_table <- matrix(NA, nrow = m, ncol = 2)
-for(i in 1:m){
-  start <- object$mgcv_model$smooth[[i]]$first.para
-  stop <- object$mgcv_model$smooth[[i]]$last.para
-  edf_table[i, 1] <- sum(jam$edf[start:stop])
-  edf_table[i, 2] <- sum(object$mgcv_model$smooth[[i]]$df)
+  edf_table <- matrix(NA, nrow = m, ncol = 2)
+  for(i in 1:m){
+    start <- object$mgcv_model$smooth[[i]]$first.para
+    stop <- object$mgcv_model$smooth[[i]]$last.para
+    edf_table[i, 1] <- sum(jam$edf[start:stop])
+    edf_table[i, 2] <- sum(object$mgcv_model$smooth[[i]]$df)
+  }
+  dimnames(edf_table) <- list(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
+                              c("edf", "df"))
+
+  message('GAM smooth term estimated degrees of freedom:')
+  printCoefmat(edf_table, digits = 4, signif.stars = T)
+  message()
 }
-dimnames(edf_table) <- list(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
-                            c("edf", "df"))
-
-message('GAM smooth term estimated degrees of freedom:')
-printCoefmat(edf_table, digits = 4, signif.stars = T)
-message()
 
 message("GAM coefficient (beta) estimates:")
 mvgam_coefs <- MCMCvis::MCMCsummary(object$model_output, 'b')[,c(3:7)]
@@ -104,24 +106,26 @@ rownames(mvgam_coefs) <- coef_names
 print(mvgam_coefs)
 message()
 
-message("GAM smoothing parameter (rho) estimates:")
-rho_coefs <- MCMCvis::MCMCsummary(object$model_output, 'rho')[,c(3:7)]
+if(length(object$mgcv_model$smooth) > 0){
+  message("GAM smoothing parameter (rho) estimates:")
+  rho_coefs <- MCMCvis::MCMCsummary(object$model_output, 'rho')[,c(3:7)]
 
-name_starts <- unlist(purrr:::map(jam$smooth, 'first.sp'))
-name_ends <- unlist(purrr:::map(jam$smooth, 'last.sp'))
+  name_starts <- unlist(purrr:::map(jam$smooth, 'first.sp'))
+  name_ends <- unlist(purrr:::map(jam$smooth, 'last.sp'))
 
-rho_names <- unlist(lapply(seq(1:length(object$mgcv_model$smooth)), function(i){
+  rho_names <- unlist(lapply(seq(1:length(object$mgcv_model$smooth)), function(i){
 
-  number_seq <- seq(1:(1 + name_ends[i] - name_starts[i]))
-  number_seq[1] <- ''
+    number_seq <- seq(1:(1 + name_ends[i] - name_starts[i]))
+    number_seq[1] <- ''
 
-  paste0(rep(object$mgcv_model$smooth[[i]]$label,
-      length(number_seq)),
-      number_seq)
-}))
-rownames(rho_coefs) <- rho_names
-print(rho_coefs)
-message()
+    paste0(rep(object$mgcv_model$smooth[[i]]$label,
+               length(number_seq)),
+           number_seq)
+  }))
+  rownames(rho_coefs) <- rho_names
+  print(rho_coefs)
+  message()
+}
 
 if(object$use_lv){
   if(object$trend_model != 'None'){

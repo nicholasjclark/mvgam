@@ -73,7 +73,7 @@ plot_mvgam_trend = function(object, series = 1, data_test,
                    dplyr::pull(y))
 
     if(dim(preds)[2] != length(all_obs)){
-      fc_preds <- forecast.mvgam(object, series = series, data_test = data_test,
+      fc_preds <- forecast(object, series = series, data_test = data_test,
                                  type = 'trend')
       preds <- cbind(preds, fc_preds)
     }

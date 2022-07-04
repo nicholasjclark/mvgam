@@ -125,9 +125,9 @@ eval_mvgam = function(object,
 
 
   # Linear predictor matrix for the evaluation observations
-  Xp <- predict(object$mgcv_model,
-                newdata = data_assim,
-                type = 'lpmatrix')
+  Xp <- as.data.frame(predict(object$mgcv_model,
+                       newdata = data_assim,
+                       type = 'lpmatrix'))
 
   # Extract trend / latent variable estimates at the correct timepoint
   if(object$use_lv){
@@ -423,21 +423,24 @@ eval_mvgam = function(object,
 
         if(family == 'Negative Binomial'){
           fc <- rnbinom(fc_horizon,
-                                 mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                                 mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
+                                                            ncol = NCOL(Xp)) %*%
                                                        betas)) + (trend_preds)),
                                  size = size[series])
         }
 
         if(family == 'Poisson'){
           fc <- rpois(fc_horizon,
-                        lambda = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                        lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
+                                                       ncol = NCOL(Xp)) %*%
                                               betas)) + (trend_preds)))
         }
 
         if(family == 'Tweedie'){
           fc <- rpois(fc_horizon,
                       lambda = mgcv::rTweedie(
-                        mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                        mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
+                                                   ncol = NCOL(Xp)) %*%
                                               betas)) + (trend_preds)),
                         p = p,
                         phi = twdis[series]))
@@ -501,21 +504,24 @@ eval_mvgam = function(object,
 
         if(family == 'Negative Binomial'){
           fc <-  rnbinom(fc_horizon,
-                         mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                         mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
+                                                    ncol = NCOL(Xp)) %*%
                                                betas)) + (trend_preds)),
                          size = size[series])
         }
 
         if(family == 'Poisson'){
           fc <-  rpois(fc_horizon,
-                         lambda = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                         lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
+                                                        ncol = NCOL(Xp)) %*%
                                                betas)) + (trend_preds)))
         }
 
         if(family == 'Tweedie'){
           fc <-  rpois(fc_horizon,
                        lambda = mgcv::rTweedie(
-                         mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                         mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
+                                                    ncol = NCOL(Xp)) %*%
                                                betas)) + (trend_preds)),
                          p = p,
                          phi = twdis[series]))
@@ -582,21 +588,24 @@ eval_mvgam = function(object,
 
           if(family == 'Negative Binomial'){
             fc <- rnbinom(fc_horizon,
-                          mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                          mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
+                                                     ncol = NCOL(Xp)) %*%
                                                 betas)) + (trend_preds)),
                           size = size[series])
           }
 
           if(family == 'Poisson'){
             fc <- rpois(fc_horizon,
-                        lambda = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                        lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
+                                                       ncol = NCOL(Xp)) %*%
                                                   betas)) + (trend_preds)))
           }
 
           if(family == 'Tweedie'){
             fc <- rpois(fc_horizon,
                         lambda = mgcv::rTweedie(
-                          mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                          mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
+                                                     ncol = NCOL(Xp)) %*%
                                                 betas)) + (trend_preds)),
                           p = p,
                           phi = twdis[series]))
@@ -660,21 +669,24 @@ eval_mvgam = function(object,
 
           if(family == 'Negative Binomial'){
             fc <-  rnbinom(fc_horizon,
-                           mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                           mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
+                                                      ncol = NCOL(Xp)) %*%
                                                  betas)) + (trend_preds)),
                            size = size[series])
           }
 
           if(family == 'Poisson'){
             fc <-  rpois(fc_horizon,
-                         lambda = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                         lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
+                                                        ncol = NCOL(Xp)) %*%
                                                    betas)) + (trend_preds)))
           }
 
           if(family == 'Tweedie'){
             fc <-  rpois(fc_horizon,
                          lambda = mgcv::rTweedie(
-                           mu = exp(as.vector((Xp[which(as.numeric(data_assim$series) == series),] %*%
+                           mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
+                                                      ncol = NCOL(Xp)) %*%
                                                  betas)) + (trend_preds)),
                            p = p,
                            phi = twdis[series]))

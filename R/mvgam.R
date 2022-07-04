@@ -181,6 +181,9 @@ mvgam = function(formula,
 
   # Check arguments
   trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1", "AR2", "AR3", "GP"))
+  if(class(family) == 'family'){
+    family <- family$family
+  }
   family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
 
   if(chains == 1){
@@ -316,7 +319,7 @@ mvgam = function(formula,
 
   # Ensure outcome is labelled 'y'
   form_terms <- terms(formula(formula))
-  if(dimnames(attr(form_terms, 'factors'))[[1]][1] != 'y'){
+  if(terms(formula(formula))[[2]] != 'y'){
     stop('Outcome variable must be named "y"')
   }
 
@@ -395,7 +398,45 @@ mvgam = function(formula,
 
 
   # Make jags file and appropriate data structures; note this has to use Poisson but the
-  # resulting JAGS file will be modified to accomodate the specified response distribution accordingly
+  # resulting JAGS file will be modified to accommodate the specified response distribution accordingly
+  if(length(ss_gam$smooth) == 0){
+    smooths_included <- FALSE
+    # If no smooth terms are included, jagam will fail; so add a fake one and remove
+    # it from the model and data structures later
+    data_train$fakery <- rnorm(NROW(data_train))
+    form_fake <- update(formula, ~ + s(fakery))
+
+    fakery_names <- names(mgcv::gam(form_fake,
+                              data = data_train,
+                              family = poisson(),
+                              drop.unused.levels = FALSE,
+                              control = list(nthreads = parallel::detectCores()-1,
+                                             maxit = 1))$coefficients)
+    xcols_drop <- grep('s(fakery', fakery_names, fixed = TRUE)
+    if(!missing(knots)){
+      ss_jagam <- mgcv::jagam(form_fake,
+                              data = data_train,
+                              family = poisson(),
+                              drop.unused.levels = FALSE,
+                              file = 'base_gam.txt',
+                              sp.prior = 'gamma',
+                              diagonalize = F,
+                              knots = knots)
+    } else {
+      ss_jagam <- mgcv::jagam(form_fake,
+                              data = data_train,
+                              family = poisson(),
+                              drop.unused.levels = FALSE,
+                              file = 'base_gam.txt',
+                              sp.prior = 'gamma',
+                              diagonalize = F)
+    }
+
+    data_train$fakery <- NULL
+  } else {
+    smooths_included <- TRUE
+
+    # If smooth terms included, use the original formula
   if(!missing(knots)){
     ss_jagam <- mgcv::jagam(formula,
                             data = data_train,
@@ -414,15 +455,20 @@ mvgam = function(formula,
                             sp.prior = 'gamma',
                             diagonalize = F)
   }
+  }
 
   # Update initial values of lambdas using the full estimates from the
-  # fitted bam model to speed convergence; remove initial betas so that the
+  # fitted gam model to speed convergence; remove initial betas so that the
   # chains can start in very different regions of the parameter space
   ss_jagam$jags.ini$b <- NULL
 
   if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
     ss_jagam$jags.ini$lambda <- ss_gam$sp
     ss_jagam$jags.ini$lambda[log(ss_jagam$jags.ini$lambda) > 10] <- exp(10)
+  }
+
+  if(length(ss_gam$smooth)){
+    ss_jagam$jags.ini$lambda <- NULL
   }
 
   # Fill y with NAs if this is a simulation from the priors
@@ -503,6 +549,12 @@ mvgam = function(formula,
   base_model[grep('smoothing parameter priors',
                   base_model)] <- c('   ## smoothing parameter priors...')
 
+  # Remove the fakery lines if they were added
+  if(!smooths_included){
+    base_model <- base_model[-c(grep('## prior for s(fakery)', trimws(base_model), fixed = TRUE):
+                                  (grep('## prior for s(fakery)', trimws(base_model), fixed = TRUE) + 7))]
+  }
+
   # Add replacement lines for priors, trends and the linear predictor
   fil <- tempfile(fileext = ".xt")
   modification <- add_base_dgam_lines(use_lv)
@@ -545,7 +597,7 @@ mvgam = function(formula,
   }
 
   # Modify lines needed for the specified trend model
-  model_file <- add_trend_lines(model_file, stan = F,
+  model_file <- add_trend_lines(model_file, stan = FALSE,
                                 use_lv = use_lv,
                                 trend_model = trend_model,
                                 drift = drift)
@@ -568,10 +620,17 @@ mvgam = function(formula,
 
   model_file_jags <- textConnection(model_file)
 
+
   # Covariate dataframe including training and testing observations
   if(!missing(data_test)){
-    suppressWarnings(X <- data.frame(rbind(ss_jagam$jags.data$X,
-                          predict(ss_gam, newdata = data_test, type = 'lpmatrix'))))
+    suppressWarnings(lp_test <- predict(ss_gam, newdata = data_test, type = 'lpmatrix'))
+
+    # Remove fakery columns from design matrix if no smooth terms were included
+    if(!smooths_included){
+      ss_jagam$jags.data$X <- matrix(ss_jagam$jags.data$X[,-c(xcols_drop)])
+    }
+
+    X <- data.frame(rbind(ss_jagam$jags.data$X, lp_test))
 
     # Add a time variable
     if(class(data_train)[1] == 'list'){
@@ -597,8 +656,8 @@ mvgam = function(formula,
 
     } else {
 
-    X$time <- rbind(data_train, data_test[,1:ncol(data_train)]) %>%
-      dplyr::left_join(rbind(data_train, data_test[,1:ncol(data_train)]) %>%
+    X$time <- rbind(data_train, data_test[,1:NCOL(data_train)]) %>%
+      dplyr::left_join(rbind(data_train, data_test[,1:NCOL(data_train)]) %>%
                          dplyr::select(time) %>%
                          dplyr::distinct() %>%
                          dplyr::arrange(time) %>%
@@ -615,6 +674,11 @@ mvgam = function(formula,
 
   } else {
     X <- data.frame(ss_jagam$jags.data$X)
+
+    # Remove fakery columns from design matrix if no smooth terms were included
+    if(!smooths_included){
+      X[,xcols_drop] <- NULL
+    }
 
     if(class(data_train)[1] == 'list'){
       temp_dat <- data.frame(time = data_train$time)
@@ -664,6 +728,10 @@ mvgam = function(formula,
   ss_jagam$jags.data$n_series <- NCOL(ytimes)
   ss_jagam$jags.data$X <- as.matrix(X %>%
                                      dplyr::select(-time, -series, -outcome))
+  if(NCOL(ss_jagam$jags.data$X) == 1){
+    model_file[grep('eta <-', model_file, fixed = TRUE)] <- 'eta <- X * b'
+  }
+
   if(!missing(upper_bounds)){
     ss_jagam$jags.data$upper_bound <- upper_bounds
   }
@@ -701,6 +769,13 @@ mvgam = function(formula,
     n_lv <- NULL
   }
 
+  # Remove Smooth penalty matrix if no smooths were used in the formula
+  if(!smooths_included){
+    ss_jagam$jags.data[[grep('S.*', names(ss_jagam$jags.data))]] <- NULL
+    ss_jagam$jags.data$sp <- NULL
+    ss_jagam$jags.data$zero <- NULL
+  }
+
   # Add information about the call and necessary data structures to the model file
   # Get dimensions and numbers of smooth terms
   snames <- names(ss_jagam$jags.data)[grep('S.*', names(ss_jagam$jags.data))]
@@ -718,7 +793,6 @@ mvgam = function(formula,
                                        ';  mgcv smooth penalty matrix ', snames[i])
     }
   }
-
 
   if('sp' %in% names(ss_jagam$jags.data)){
     if(length(ss_jagam$jags.data$sp) == 1){
@@ -751,6 +825,12 @@ mvgam = function(formula,
     parametric_tdata <- NULL
   }
 
+  if(smooths_included){
+    zeros <- paste0('vector zero; prior basis coefficient locations vector of length ncol(X)\n')
+  } else {
+    zeros <- NULL
+  }
+
   model_file <- c('JAGS model code generated by package mvgam',
                        '\n',
                        'GAM formula:',
@@ -766,7 +846,7 @@ mvgam = function(formula,
                   'matrix ytimes;  time-ordered n x n_series matrix (which row in X belongs to each [time, series] observation?)\n',
                   'matrix X;  mgcv GAM design matrix of dimension (n x n_series) x basis dimension\n',
                   paste0(smooth_penalty_data),
-                  'vector zero; prior basis coefficient locations vector of length ncol(X)\n',
+                  zeros,
                   paste0(parametric_ldata),
                   paste0(parametric_tdata),
                   sp_data,
@@ -789,7 +869,7 @@ mvgam = function(formula,
       base_stan_model <- add_trend_lines(model_file = base_stan_model,
                                          rho_gp_prior = rho_gp_prior,
                                          alpha_gp_prior = alpha_gp_prior,
-                                         stan = T,
+                                         stan = TRUE,
                                          trend_model = trend_model,
                                          drift = drift)
 
@@ -803,7 +883,7 @@ mvgam = function(formula,
 
       # Sensible inits needed for the betas, sigmas and overdispersion parameters
       if(family == 'nb'){
-      if(trend_model != 'None'){
+      if(trend_model %in% c('None', 'GP')){
         inits <- function() {
           list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
                r_inv = runif(NCOL(model_data$ytimes), 1, 50))
@@ -818,7 +898,7 @@ mvgam = function(formula,
       }
 
       if(family == 'poisson'){
-        if(trend_model != 'None'){
+        if(trend_model %in% c('None', 'GP')){
           inits <- function() {
             list(b_raw = runif(model_data$num_basis, -0.2, 0.2))
           }
@@ -850,7 +930,10 @@ mvgam = function(formula,
                                fit_engine = 'stan'),
                           class = 'mvgam_prefit')
     } else {
-      initlist <- replicate(chains, ss_jagam$jags.ini,
+
+      inits <- vector(mode = 'list')
+      inits$b <- runif(NCOL(ss_jagam$jags.data$X), -0.5, 0.5)
+      initlist <- replicate(chains, inits,
                             simplify = FALSE)
       inits <- initlist
       output <- structure(list(call = formula,
@@ -909,7 +992,7 @@ mvgam = function(formula,
 
       # Sensible inits needed for the betas, sigmas and overdispersion parameters
       if(family == 'nb'){
-        if(trend_model != 'None'){
+        if(trend_model %in% c('None', 'GP')){
           inits <- function() {
             list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
                  r_inv = runif(NCOL(ytimes), 1, 50))
@@ -924,7 +1007,7 @@ mvgam = function(formula,
       }
 
       if(family == 'poisson'){
-        if(trend_model != 'None'){
+        if(trend_model %in% c('None', 'GP')){
           inits <- function() {
             list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2))
           }
@@ -954,6 +1037,7 @@ mvgam = function(formula,
                    verbose = F,
                    control = stan_control,
                    pars = get_monitor_pars(family = family,
+                                           smooths_included = smooths_included,
                                            use_lv = use_lv,
                                            trend_model = trend_model,
                                            drift = drift),
@@ -967,9 +1051,12 @@ mvgam = function(formula,
       model_data <- ss_jagam$jags.data
 
       # Set monitor parameters and initial values
-      param <- get_monitor_pars(family, use_lv, trend_model, drift)
+      param <- get_monitor_pars(family, smooths_included = smooths_included,
+                                use_lv, trend_model, drift)
 
-      initlist <- replicate(chains, ss_jagam$jags.ini,
+      inits <- vector(mode = 'list')
+      inits$b <- runif(NCOL(ss_jagam$jags.data$X), -0.5, 0.5)
+      initlist <- replicate(chains, inits,
                             simplify = FALSE)
       inits <- initlist
       runjags::runjags.options(silent.jags = TRUE, silent.runjags = TRUE)
@@ -1040,6 +1127,10 @@ mvgam = function(formula,
   ## Modified sim2jam function; takes simulation output
   ## and a pregam object from jagam, and attempts to create a fake gam object suitable
   ## for calculating estimated degrees of freedom
+  if(!smooths_included){
+    ss_jagam$pregam$X <- ss_jagam$jags.data$X
+  }
+
   create_jam <- function(out_gam_mod, pregam) {
 
     b <- t(MCMCvis::MCMCchains(out_gam_mod, 'b'))
@@ -1058,21 +1149,26 @@ mvgam = function(formula,
     pregam
   }
 
-  jam <- create_jam(out_gam_mod, ss_jagam$pregam)
-  jam$sp <- exp(colMeans(MCMCvis::MCMCchains(out_gam_mod, 'rho')))
+  suppressWarnings(jam <- create_jam(out_gam_mod, ss_jagam$pregam))
+  if(smooths_included){
+    jam$sp <- exp(colMeans(MCMCvis::MCMCchains(out_gam_mod, 'rho')))
 
-  name_starts <- unlist(purrr:::map(jam$smooth, 'first.sp'))
-  name_ends <- unlist(purrr:::map(jam$smooth, 'last.sp'))
+    name_starts <- unlist(purrr:::map(jam$smooth, 'first.sp'))
+    name_ends <- unlist(purrr:::map(jam$smooth, 'last.sp'))
 
-  rho_names <- unlist(lapply(seq(1:length(ss_gam$smooth)), function(i){
+    rho_names <- unlist(lapply(seq(1:length(ss_gam$smooth)), function(i){
 
-    number_seq <- seq(1:(1 + name_ends[i] - name_starts[i]))
-    number_seq[1] <- ''
+      number_seq <- seq(1:(1 + name_ends[i] - name_starts[i]))
+      number_seq[1] <- ''
 
-    paste0(rep(ss_gam$smooth[[i]]$label,
-               length(number_seq)),
-           number_seq)
-  }))
+      paste0(rep(ss_gam$smooth[[i]]$label,
+                 length(number_seq)),
+             number_seq)
+    }))
+  } else {
+    jam$sp <- NULL
+    rho_names <- NA
+  }
 
   if(use_stan){
     model_file <- stan_objects$stan_file

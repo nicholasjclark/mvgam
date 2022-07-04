@@ -396,14 +396,15 @@ forecast.mvgam = function(object, data_test, series = 1,
         t_new <- 1:(length(last_trends) + NROW(series_test))
 
 
-        Sigma_new <- alpha_gp[trend]^2 * exp(- outer(t, t_new, "-")^2 / (2 * rho_gp[trend]^2))
-        Sigma_star <- alpha_gp[trend]^2 * exp(- outer(t_new, t_new, "-")^2 / (2 * rho_gp[trend]^2))
-        Sigma <- alpha_gp[trend]^2 * exp(- outer(t, t, "-")^2 / (2 * rho_gp[trend]^2)) +
+        Sigma_new <- alpha_gp[series]^2 * exp(- outer(t, t_new, "-")^2 / (2 * rho_gp[series]^2))
+        Sigma_star <- alpha_gp[series]^2 * exp(- outer(t_new, t_new, "-")^2 / (2 * rho_gp[series]^2))
+        Sigma <- alpha_gp[series]^2 * exp(- outer(t, t, "-")^2 / (2 * rho_gp[series]^2)) +
           diag(1e-4, length(last_trends))
 
-        trends <- tail(t(Sigma_new) %*% solve(Sigma, last_trends), 1) +
+        trends <- as.vector(tail(t(Sigma_new) %*% solve(Sigma, last_trends), NROW(series_test)) +
           tail(MASS::mvrnorm(1, mu = rep(0, dim(Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new))[2]),
-                             Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), 1)
+                             Sigma = Sigma_star -
+                               t(Sigma_new) %*% solve(Sigma, Sigma_new)), NROW(series_test)))
       }
 
       if(type == 'trend'){
