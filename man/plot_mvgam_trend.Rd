@@ -8,6 +8,8 @@ plot_mvgam_trend(
   object,
   series = 1,
   data_test,
+  realisations = FALSE,
+  n_realisations = 15,
   derivatives = FALSE,
   hide_xlabels = FALSE
 )
@@ -19,6 +21,13 @@ plot_mvgam_trend(
 
 \item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season' and 'year'
 forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}}
+
+\item{realisations}{\code{logical}. If \code{TRUE}, posterior trend realisations are shown as a spaghetti plot,
+making it easier to visualise the diversity of possible trend paths. If \code{FALSE}, the default,
+empirical quantiles of the posterior distribution are shown}
+
+\item{n_realisations}{\code{integer} specifying the number of posterior realisations to plot, if
+\code{realisations = TRUE}. Ignored otherwise}
 
 \item{derivatives}{\code{logical}. If \code{TRUE}, an additional plot will be returned to show the
 estimated 1st derivative for the estimated trend}

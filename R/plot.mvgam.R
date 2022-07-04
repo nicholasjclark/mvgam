@@ -15,12 +15,11 @@
 #'factors
 #'@param series \code{integer} specifying which series in the set is to be plotted. This is ignored
 #'if \code{type == 're'}
-#'@param residuals \code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added
-#'to plots of 1-D smooths as a series of ribbon rectangles.
 #'@param data_test A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}. This argument is optional when
 #'plotting out of sample forecast period observations (when \code{type = forecast}) and required when plotting
 #'uncertainty components (\code{type = uncertainty}).
+#'@param ... Additional arguments for each individual plotting function.
 #'@details These plots are useful for getting an overview of the fitted model and its estimated
 #'random effects or smooth functions,
 #'but the individual plotting functions generally offer more customisation.
@@ -32,7 +31,7 @@
 #'@export
 plot.mvgam = function(object, type = 'smooths',
                       series = 1, residuals = FALSE,
-                      data_test){
+                      data_test, ...){
 
   # Argument checks
   type <- match.arg(arg = type, choices = c("residuals", "smooths", "re",
@@ -53,7 +52,7 @@ plot.mvgam = function(object, type = 'smooths',
   }
 
   if(type == 'residuals'){
-    plot_mvgam_resids(object, series = series)
+    plot_mvgam_resids(object, series = series, ...)
   }
 
   if(type == 'factors'){
@@ -66,17 +65,17 @@ plot.mvgam = function(object, type = 'smooths',
 
   if(type == 'forecast'){
     if(missing(data_test)){
-      plot_mvgam_fc(object, series = series)
+      plot_mvgam_fc(object, series = series, ...)
     } else {
-      plot_mvgam_fc(object, series = series, data_test = data_test)
+      plot_mvgam_fc(object, series = series, data_test = data_test, ...)
     }
   }
 
   if(type == 'trend'){
     if(missing(data_test)){
-      plot_mvgam_trend(object, series = series)
+      plot_mvgam_trend(object, series = series, ...)
     } else {
-      plot_mvgam_trend(object, series = series, data_test = data_test)
+      plot_mvgam_trend(object, series = series, data_test = data_test, ...)
     }
   }
 
@@ -84,7 +83,7 @@ plot.mvgam = function(object, type = 'smooths',
     if(missing(data_test)){
       stop('data_test is required for plotting uncertainty contributions')
     } else {
-      plot_mvgam_uncertainty(object, series = series, data_test = data_test)
+      plot_mvgam_uncertainty(object, series = series, data_test = data_test, ...)
     }
   }
 
@@ -140,7 +139,7 @@ plot.mvgam = function(object, type = 'smooths',
     # Plot the smooths
     for(i in which_to_plot){
       plot_mvgam_smooth(object = object, smooth = i, series = series,
-                        residuals = residuals)
+                        residuals = residuals, ...)
     }
 
     invisible()

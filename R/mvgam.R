@@ -326,8 +326,9 @@ mvgam = function(formula,
 
     if(!missing(knots)){
 
-      # Estimate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
-      # when simulating from the JAGS model later on
+      # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
+      # when simulating from the Bayesian model later on; we don't need convergence, just enough
+      # iterations to get a sensible set of priors for any parametric coefficients
       if(family == 'nb'){
         ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
@@ -336,7 +337,7 @@ mvgam = function(formula,
                             drop.unused.levels = FALSE,
                             knots = knots,
                             control = list(nthreads = parallel::detectCores()-1,
-                                           maxit = 100))
+                                           maxit = 50))
       } else if(family == 'poisson'){
         ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
@@ -345,7 +346,7 @@ mvgam = function(formula,
                             drop.unused.levels = FALSE,
                             knots = knots,
                             control = list(nthreads = parallel::detectCores()-1,
-                                           maxit = 100))
+                                           maxit = 50))
       } else {
         ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
@@ -354,7 +355,7 @@ mvgam = function(formula,
                             drop.unused.levels = FALSE,
                             knots = knots,
                             control = list(nthreads = parallel::detectCores()-1,
-                                           maxit = 100))
+                                           maxit = 50))
       }
 
     } else {
@@ -364,21 +365,24 @@ mvgam = function(formula,
                             method = "REML",
                             family = nb(),
                             drop.unused.levels = FALSE,
-                            control = list(nthreads = parallel::detectCores()-1))
+                            control = list(nthreads = parallel::detectCores()-1,
+                                           maxit = 50))
       } else if(family == 'poisson'){
         ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
                             method = "REML",
                             family = poisson(),
                             drop.unused.levels = FALSE,
-                            control = list(nthreads = parallel::detectCores()-1))
+                            control = list(nthreads = parallel::detectCores()-1,
+                                           maxit = 50))
       } else {
         ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
                             method = "REML",
                             family = tw(),
                             drop.unused.levels = FALSE,
-                            control = list(nthreads = parallel::detectCores()-1))
+                            control = list(nthreads = parallel::detectCores()-1,
+                                           maxit = 50))
       }
 
     }
@@ -954,10 +958,6 @@ mvgam = function(formula,
                                            trend_model = trend_model,
                                            drift = drift),
                    refresh = 500)
-
-      # Use Michael Betancourt's utility functions for checking diagnostics
-      #source('https://raw.githubusercontent.com/betanalpha/knitr_case_studies/master/factor_modeling/stan_utility.R')
-      check_all_diagnostics(fit1)
 
       out_gam_mod <- fit1
     }

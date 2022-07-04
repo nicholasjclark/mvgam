@@ -18,7 +18,7 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson',
   # Update lines associated with particular family
   if(family == 'poisson'){
 
-    if(!missing(upper_bounds)){
+    if(!is.null(upper_bounds)){
       stan_file[grep('~ poisson_log', stan_file)] <-
         gsub(';', 'T[,U[s]];', stan_file[grep('~ poisson_log', stan_file)])
       stan_file[grep('~ poisson_log', stan_file)] <-
@@ -74,7 +74,7 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson',
       stan_file[grep('ypred[i, s] = neg_binomial', stan_file, fixed = T)] <-
         add_exp_cl
 
-      if(!missing(upper_bounds)){
+      if(!is.null(upper_bounds)){
         stan_file[grep('~ neg_binomial_2', stan_file)] <-
           gsub(';', 'T[,U[s]];', stan_file[grep('~ neg_binomial_2', stan_file)])
       }
@@ -108,7 +108,7 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson',
   }
 
   # Add lines for upper bounds if supplied
-  if(!missing(upper_bounds)){
+  if(!is.null(upper_bounds)){
     bounds <- paste0('int U[', length(upper_bounds), ']; // upper bounds\n')
   } else {
     bounds <- NULL
@@ -361,7 +361,7 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson',
   }
 
   # Add bounds if required
-  if(!missing(upper_bounds)){
+  if(!is.null(upper_bounds)){
     stan_data$U <- upper_bounds
   }
 

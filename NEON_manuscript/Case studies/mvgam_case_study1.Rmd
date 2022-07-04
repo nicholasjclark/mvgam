@@ -374,7 +374,40 @@ layout(1)
 plot(m_mvgam, 'forecast', data_test = data_test)
 ```
 
-It is sensible to conclude that an autocorrelated observation model will be extremely sensitive to the measurement process (particularly when there is overdispersion, outliers or missing observations), which is not a problem for the latent temporal process model. With this information in mind, could we improve the autocorrelated observation model by using logs of lagged observations, rather than raw lagged observations?
+We can get a better idea of what is happening for the autoregressive observation model by plotting posterior realisations on the log scale. Here each line is a realisation, and we show these lines as a spaghetti plot to make it easier to visualise the diversity of possible forecast paths that are compatible with our model configuration.
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot(1, type = "n",
+     xlab = 'Time',
+     ylab = 'GAMAR simulations (log scale)',
+     xlim = c(0, NCOL(gam_sims)),
+     ylim = range(log(gam_sims + 0.01)))
+for(i in 1:60){
+  lines(x = 1:NCOL(gam_sims),
+        y = log(gam_sims[i,] + 0.01),
+        col = 'white',
+        lwd = 3)
+  lines(x = 1:NCOL(gam_sims),
+        y = log(gam_sims[i,] + 0.01),
+        col = sample(c("#DCBCBC80",
+                       "#C7999980",
+                       "#B97C7C80",
+                       "#A2505080",
+                       "#7C000080"), 1),
+        lwd = 2.75)
+}
+box()
+```
+
+`mvgam` offers options to plot realisations for most types of plots as well. Repeating the trend plot above (which automatically shows the expected latent trend on the log scale) shows that the dynamic GAM does not suffer from the same explosion towards infinity that the autoregressive model suffers from
+```{r, fig.width = 6, fig.height = 6, fig.align='center'}
+layout(matrix(1:2, ncol = 1, nrow = 2))
+plot(trend[4:53], xlim = c(0, 50), type = 'l', lwd = 2, col = 'grey',
+     ylab = 'True trend')
+plot(m_mvgam, 'trend', data_test = data_test, realisations = TRUE)
+layout(1)
+```
+
+From the plots above it is apparent that although some of the realisations are sensible, as soon as a path climbs upward it tends to skyrocket up towards infinity. It is sensible then to conclude that an autocorrelated observation model will be extremely sensitive to the measurement process (particularly when there is overdispersion, outliers or missing observations), which is not a problem for the latent temporal process model. With this information in mind, could we improve the autocorrelated observation model by using logs of lagged observations, rather than raw lagged observations?
 ```{r}
 data.frame(y = observations) %>%
   dplyr::mutate(lag1 = log(lag(y) + 0.01),
@@ -415,6 +448,30 @@ plot_fc_horizon(gam_sims = MCMCvis::MCMCchains(m_mvgam$model_output,
                                                'ypred')[,(NROW(m_mvgam$obs_data)+1):
                                                           (NROW(m_mvgam$obs_data)+10)],
                 main = 'mvgam')
+```
+
+We should also re-check the autoregressive model's realisations, which look much better now
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot(1, type = "n",
+     xlab = 'Time',
+     ylab = 'GAMAR simulations (log scale)',
+     xlim = c(0, NCOL(gam_sims)),
+     ylim = range(log(gam_sims + 0.01)))
+for(i in 1:60){
+  lines(x = 1:NCOL(gam_sims),
+        y = log(gam_sims[i,] + 0.01),
+        col = 'white',
+        lwd = 3)
+  lines(x = 1:NCOL(gam_sims),
+        y = log(gam_sims[i,] + 0.01),
+        col = sample(c("#DCBCBC80",
+                       "#C7999980",
+                       "#B97C7C80",
+                       "#A2505080",
+                       "#7C000080"), 1),
+        lwd = 2.75)
+}
+box()
 ```
 
 This version (with logged lags) performs much better than the raw lag version, with sensible forecasts that are not blowing up to infinity. However the forecast is still inferior to the dynamic GAM where the latent temporal process is estimated separately from the observation process, at least for this particular simulation. There are of course many other advantages to the state-space representation that is used by `mvgam`, including: 
@@ -527,6 +584,11 @@ m_mvgam <- mvgam(y ~ s(p_whiting, k = 5),
 Inference on `mvgam` smooth functions can be conducted using posterior predictions. This model clearly finds a negative relationship between whiting landings and ling cod landings
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 plot(m_mvgam, 'smooths')
+```
+
+Inspect posterior realisations of the smooth function
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot(m_mvgam, 'smooths', realisations = TRUE)
 ```
 
 The `plot_mvgam_smooth` function allows more flexibility for plotting smooth functions, including an ability to supply `newdata` for plotting posterior marginal simulations. Overlay the partial Dunn-Smyth residuals on the smooth plot for `p_whiting`. These residuals suggest there is still structure left in the data and that perhaps the smooth for this term is not as flexible as it could be (i.e. we would be justified to try this model again by increasing `k` for the smooth term). But we will leave it as-is for now

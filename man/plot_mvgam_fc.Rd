@@ -8,6 +8,8 @@ plot_mvgam_fc(
   object,
   series = 1,
   data_test,
+  realisations = FALSE,
+  n_realisations = 15,
   hide_xlabels = FALSE,
   ylab,
   ylim,
@@ -30,6 +32,13 @@ observation of series 1 in \code{data_train} and the first observation for serie
 \code{data_test} contains observations in column \code{y}, these observations will be used to compute a Discrete Rank
 Probability Score for the forecast distribution}
 
+\item{realisations}{\code{logical}. If \code{TRUE}, forecast realisations are shown as a spaghetti plot,
+making it easier to visualise the diversity of possible forecasts. If \code{FALSE}, the default,
+empirical quantiles of the forecast distribution are shown}
+
+\item{n_realisations}{\code{integer} specifying the number of posterior realisations to plot, if
+\code{realisations = TRUE}. Ignored otherwise}
+
 \item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 \code{axis} from base \code{R}}
 
@@ -48,6 +57,7 @@ Plot mvgam posterior predictions for a specified series
 }
 \details{
 Posterior predictions are drawn from the fitted \code{mvgam} and used to calculate posterior
-empirical quantiles. These are plotted along with the true observed data
-that was used to train the model.
+empirical quantiles. If \code{realisations = FALSE}, these posterior quantiles are plotted along
+with the true observed data that was used to train the model. Otherwise, a spaghetti plot is returned
+to show possible forecast paths.
 }

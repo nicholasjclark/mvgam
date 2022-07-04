@@ -10,6 +10,8 @@ plot_mvgam_smooth(
   smooth,
   residuals = FALSE,
   n_resid_bins = 25,
+  realisations = FALSE,
+  n_realisations = 15,
   derivatives = FALSE,
   newdata
 )
@@ -35,8 +37,14 @@ around the smooth function if the function is well estimated}
 Setting this argument too high can make for messy plots that are difficult to interpret, while setting it too
 low will likely mask some potentially useful patterns in the partial residuals. Default is \code{25}}
 
+\item{n_realisations}{\code{integer} specifying the number of posterior realisations to plot, if
+\code{realisations = TRUE}. Ignored otherwise}
+
 \item{derivatives}{\code{logical}. If \code{TRUE}, an additional plot will be returned to show the
-estimated 1st derivative for the specified smooth (Note, this only works for univariate smooths)}
+estimated 1st derivative for the specified smooth (Note, this only works for univariate smooths)
+#'@param realisations \code{logical}. If \code{TRUE}, posterior realisations are shown as a spaghetti plot,
+making it easier to visualise the diversity of possible functions. If \code{FALSE}, the default,
+empirical quantiles of the posterior distribution are shown}
 
 \item{newdata}{Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
 in addition to any other variables included in the linear predictor of the original model's \code{formula}.
@@ -49,7 +57,7 @@ A base \code{R} graphics plot
 This function plots posterior empirical quantiles for a series-specific smooth term
 }
 \details{
-Smooth functions are shown as empirical quantiles of posterior partial expectations
+Smooth functions are shown as empirical quantiles (or spaghetti plots) of posterior partial expectations
 across a sequence of 500 values between the variable's \code{min} and \code{max},
 while zeroing out effects of all other variables. At present, only univariate and bivariate smooth plots
 are allowed, though note that bivariate smooths rely on default behaviour from

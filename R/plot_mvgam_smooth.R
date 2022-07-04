@@ -19,10 +19,15 @@
 #'low will likely mask some potentially useful patterns in the partial residuals. Default is \code{25}
 #'@param derivatives \code{logical}. If \code{TRUE}, an additional plot will be returned to show the
 #'estimated 1st derivative for the specified smooth (Note, this only works for univariate smooths)
+#'#'@param realisations \code{logical}. If \code{TRUE}, posterior realisations are shown as a spaghetti plot,
+#'making it easier to visualise the diversity of possible functions. If \code{FALSE}, the default,
+#'empirical quantiles of the posterior distribution are shown
+#'@param n_realisations \code{integer} specifying the number of posterior realisations to plot, if
+#'\code{realisations = TRUE}. Ignored otherwise
 #'@param newdata Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
 #'in addition to any other variables included in the linear predictor of the original model's \code{formula}.
 #'Note that this currently is only supported for plotting univariate smooths
-#'@details Smooth functions are shown as empirical quantiles of posterior partial expectations
+#'@details Smooth functions are shown as empirical quantiles (or spaghetti plots) of posterior partial expectations
 #' across a sequence of 500 values between the variable's \code{min} and \code{max},
 #'while zeroing out effects of all other variables. At present, only univariate and bivariate smooth plots
 #'are allowed, though note that bivariate smooths rely on default behaviour from
@@ -34,6 +39,7 @@
 plot_mvgam_smooth = function(object, series = 1, smooth,
                              residuals = FALSE,
                              n_resid_bins = 25,
+                             realisations = FALSE, n_realisations = 15,
                              derivatives = FALSE,
                              newdata){
 
@@ -271,15 +277,33 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
            ylim = c(min(cred) - sd(preds), max(cred) + sd(preds)))
     }
 
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
-            col = c_light, border = NA)
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
-            col = c_light_highlight, border = NA)
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
-            col = c_mid, border = NA)
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
-            col = c_mid_highlight, border = NA)
-    lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+    if(realisations){
+      for(i in 1:n_realisations){
+        lines(x = pred_vals,
+              y = preds[i,],
+              col = 'white',
+              lwd = 3)
+        lines(x = pred_vals,
+              y = preds[i,],
+              col = sample(c("#DCBCBC80",
+                             "#C7999980",
+                             "#B97C7C80",
+                             "#A2505080",
+                             "#7C000080"), 1),
+              lwd = 2.75)
+      }
+      box()
+    } else {
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+              col = c_light, border = NA)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+              col = c_light_highlight, border = NA)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+              col = c_mid, border = NA)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+              col = c_mid_highlight, border = NA)
+      lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+    }
 
     # Show observed values of the smooth as a rug
     if(class(object$obs_data)[1] == 'list'){
@@ -303,15 +327,35 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
          xlim = c(min(pred_vals), max(pred_vals)),
          ylim = c(min(cred, na.rm = T) - sd(first_derivs, na.rm = T),
                   max(cred, na.rm = T) + sd(first_derivs, na.rm = T)))
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
-            col = c_light, border = NA)
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
-            col = c_light_highlight, border = NA)
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
-            col = c_mid, border = NA)
-    polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
-            col = c_mid_highlight, border = NA)
-    lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+
+    if(realisations){
+      for(i in 1:n_realisations){
+        lines(x = pred_vals,
+              y = first_derivs[i,],
+              col = 'white',
+              lwd = 3)
+        lines(x = pred_vals,
+              y = first_derivs[i,],
+              col = sample(c("#DCBCBC80",
+                             "#C7999980",
+                             "#B97C7C80",
+                             "#A2505080",
+                             "#7C000080"), 1),
+              lwd = 2.75)
+      }
+      box()
+    } else {
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+              col = c_light, border = NA)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+              col = c_light_highlight, border = NA)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+              col = c_mid, border = NA)
+      polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+              col = c_mid_highlight, border = NA)
+      lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+    }
+
     abline(h = 0, lty = 'dashed', col = 'grey70', lwd = 2)
 
     invisible()
@@ -410,15 +454,34 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
            xlim = c(min(pred_vals), max(pred_vals)),
            ylim = c(min(cred) - sd(preds), max(cred) + sd(preds)))
 
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
-              col = c_light, border = NA)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
-              col = c_light_highlight, border = NA)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
-              col = c_mid, border = NA)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
-              col = c_mid_highlight, border = NA)
-      lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+      if(realisations){
+        for(i in 1:n_realisations){
+          lines(x = pred_vals,
+                y = preds[i,],
+                col = 'white',
+                lwd = 3)
+          lines(x = pred_vals,
+                y = preds[i,],
+                col = sample(c("#DCBCBC80",
+                               "#C7999980",
+                               "#B97C7C80",
+                               "#A2505080",
+                               "#7C000080"), 1),
+                lwd = 2.75)
+        }
+        box()
+      } else {
+        polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+                col = c_light, border = NA)
+        polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+                col = c_light_highlight, border = NA)
+        polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+                col = c_mid, border = NA)
+        polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+                col = c_mid_highlight, border = NA)
+        lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+      }
+
     }
 
     # Show observed values of the smooth as a rug

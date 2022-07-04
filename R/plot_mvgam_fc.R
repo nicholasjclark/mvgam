@@ -11,6 +11,11 @@
 #'observation of series 1 in \code{data_train} and the first observation for series 1 in \code{data_test}). If
 #'\code{data_test} contains observations in column \code{y}, these observations will be used to compute a Discrete Rank
 #'Probability Score for the forecast distribution
+#'@param realisations \code{logical}. If \code{TRUE}, forecast realisations are shown as a spaghetti plot,
+#'making it easier to visualise the diversity of possible forecasts. If \code{FALSE}, the default,
+#'empirical quantiles of the forecast distribution are shown
+#'@param n_realisations \code{integer} specifying the number of posterior realisations to plot, if
+#'\code{realisations = TRUE}. Ignored otherwise
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
 #'@param ylab Optional \code{character} string specifying the y-axis label
@@ -18,11 +23,14 @@
 #'@param return_forecasts \code{logical}. If \code{TRUE}, the function will plot the forecast
 #'as well as returning the forecast object (as a \code{matrix} of dimension \code{n_samples} x \code{horizon})
 #'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to calculate posterior
-#'empirical quantiles. These are plotted along with the true observed data
-#'that was used to train the model.
+#'empirical quantiles. If \code{realisations = FALSE}, these posterior quantiles are plotted along
+#'with the true observed data that was used to train the model. Otherwise, a spaghetti plot is returned
+#'to show possible forecast paths.
 #'@return A base \code{R} graphics plot and an optional \code{matrix} of the forecast distribution
 #'@export
-plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, ylab, ylim,
+plot_mvgam_fc = function(object, series = 1, data_test,
+                         realisations = FALSE, n_realisations = 15,
+                         hide_xlabels = FALSE, ylab, ylim,
                          return_forecasts = FALSE){
 
   # Check arguments
@@ -36,6 +44,16 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
   } else {
     if(series%%1 != 0){
       stop('argument "series" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+  if(sign(n_realisations) != 1){
+    stop('argument "n_realisations" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_realisations%%1 != 0){
+      stop('argument "n_realisations" must be a positive integer',
            call. = FALSE)
     }
   }
@@ -147,15 +165,33 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
          ylim = ylim)
   }
 
-  polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
-          col = c_light, border = NA)
-  polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
-          col = c_light_highlight, border = NA)
-  polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
-          col = c_mid, border = NA)
-  polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
-          col = c_mid_highlight, border = NA)
-  lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+  if(realisations){
+    for(i in 1:n_realisations){
+      lines(x = pred_vals,
+            y = preds[i,],
+            col = 'white',
+            lwd = 3)
+      lines(x = pred_vals,
+            y = preds[i,],
+            col = sample(c("#DCBCBC80",
+                           "#C7999980",
+                           "#B97C7C80",
+                           "#A2505080",
+                           "#7C000080"), 1),
+            lwd = 2.75)
+    }
+    box()
+  } else {
+    polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+            col = c_light, border = NA)
+    polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+            col = c_light_highlight, border = NA)
+    polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+            col = c_mid, border = NA)
+    polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+            col = c_mid_highlight, border = NA)
+    lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+  }
 
   if(!missing(data_test)){
 
@@ -174,13 +210,13 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
              dplyr::select(time, y) %>%
              dplyr::distinct() %>%
              dplyr::arrange(time) %>%
-             dplyr::pull(y), pch = 16, col = "white", cex = 0.65)
+             dplyr::pull(y), pch = 16, col = "white", cex = 0.75)
     points(dplyr::bind_rows(data_train, data_test) %>%
              dplyr::filter(series == s_name) %>%
              dplyr::select(time, y) %>%
              dplyr::distinct() %>%
              dplyr::arrange(time) %>%
-             dplyr::pull(y), pch = 16, col = "black", cex = 0.55)
+             dplyr::pull(y), pch = 16, col = "black", cex = 0.65)
     abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
 
     # Calculate out of sample DRPS and print the score
@@ -251,13 +287,13 @@ plot_mvgam_fc = function(object, series = 1, data_test, hide_xlabels = FALSE, yl
              dplyr::select(time, y) %>%
              dplyr::distinct() %>%
              dplyr::arrange(time) %>%
-             dplyr::pull(y),pch = 16, col = "white", cex = 0.65)
+             dplyr::pull(y),pch = 16, col = "white", cex = 0.75)
     points(data_train %>%
             dplyr::filter(series == s_name) %>%
             dplyr::select(time, y) %>%
             dplyr::distinct() %>%
             dplyr::arrange(time) %>%
-            dplyr::pull(y),pch = 16, col = "black", cex = 0.55 )
+            dplyr::pull(y),pch = 16, col = "black", cex = 0.65 )
   }
 
   if(return_forecasts){

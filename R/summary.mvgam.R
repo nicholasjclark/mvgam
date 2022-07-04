@@ -231,6 +231,10 @@ if(!object$use_lv){
   }
 }
 
+if(object$fit_engine == 'stan'){
+  check_all_diagnostics(object$model_output)
+}
+
 
 }
 
