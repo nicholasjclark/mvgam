@@ -132,9 +132,18 @@ forecast.mvgam = function(object, data_test, series = 1,
   }
 
   # Need to only use estimates from the training period
-  end_train <- object$obs_data %>%
-    dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-    NROW()
+  if(class(object$obs_data)[1] == 'list'){
+    end_train <- data.frame(y = object$obs_data$y,
+                            series = object$obs_data$series,
+                            time = object$obs_data$time) %>%
+      dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
+      NROW()
+  } else {
+    end_train <- object$obs_data %>%
+      dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
+      NROW()
+  }
+
   trend_estimates <- trend_estimates[,1:end_train]
 
   # Only need last 3 timesteps if this is not a GP trend model
@@ -145,12 +154,27 @@ forecast.mvgam = function(object, data_test, series = 1,
   }
 
   # Generate the linear predictor matrix
-  series_test <- data_test %>%
-    dplyr::filter(series == s_name) %>%
-    dplyr::arrange(time)
-  Xp <- predict(object$mgcv_model,
-                newdata = series_test,
-                type = 'lpmatrix')
+  if(class(data_test)[1] == 'list'){
+    Xp <- predict(object$mgcv_model,
+                  newdata = data_test,
+                  type = 'lpmatrix')
+    obs_keep <- data.frame(y = data_test$y,
+                           series = data_test$series,
+                           time = data_test$time,
+                           rowid = 1:length(data_test$y)) %>%
+      dplyr::filter(series == s_name) %>%
+      dplyr::arrange(time) %>%
+      dplyr::pull(rowid)
+    Xp <- Xp[obs_keep, ]
+
+  } else {
+    series_test <- data_test %>%
+      dplyr::filter(series == s_name) %>%
+      dplyr::arrange(time)
+    Xp <- predict(object$mgcv_model,
+                  newdata = series_test,
+                  type = 'lpmatrix')
+  }
 
   # Beta coefficients for GAM component
   betas <- MCMCvis::MCMCchains(object$model_output, 'b')
@@ -199,9 +223,19 @@ forecast.mvgam = function(object, data_test, series = 1,
       lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[lv]:ends[lv]]
 
       # Need to only use estimates from the training period
-      end_train <- object$obs_data %>%
-        dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-        NROW()
+      # Need to only use estimates from the training period
+      if(class(object$obs_data)[1] == 'list'){
+        end_train <- data.frame(y = object$obs_data$y,
+                                series = object$obs_data$series,
+                                time = object$obs_data$time) %>%
+          dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
+          NROW()
+      } else {
+        end_train <- object$obs_data %>%
+          dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
+          NROW()
+      }
+
       lv_estimates <- lv_estimates[,1:end_train]
       lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
     })

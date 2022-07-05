@@ -76,7 +76,6 @@ plot_mvgam_fc = function(object, series = 1, data_test,
     preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
   }
 
-
   # Add variables to data_test if missing
   s_name <- levels(data_train$series)[series]
   if(!missing(data_test)){
