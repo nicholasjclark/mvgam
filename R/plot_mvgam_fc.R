@@ -107,18 +107,36 @@ plot_mvgam_fc = function(object, series = 1, data_test,
   # If the posterior predictions do not already cover the data_test period, the forecast needs to be
   # generated using the latent trend dynamics; note, this assumes that there is no gap between the training and
   # testing datasets
-  all_obs <- c(data_train %>%
-                 dplyr::filter(series == s_name) %>%
-                 dplyr::select(time, y) %>%
-                 dplyr::distinct() %>%
-                 dplyr::arrange(time) %>%
-                 dplyr::pull(y),
-               data_test %>%
-                 dplyr::filter(series == s_name) %>%
-                 dplyr::select(time, y) %>%
-                 dplyr::distinct() %>%
-                 dplyr::arrange(time) %>%
-                 dplyr::pull(y))
+    if(class(data_test)[1] == 'list'){
+      all_obs <- c(data_train %>%
+                     dplyr::filter(series == s_name) %>%
+                     dplyr::select(time, y) %>%
+                     dplyr::distinct() %>%
+                     dplyr::arrange(time) %>%
+                     dplyr::pull(y),
+                   data.frame(y = data_test$y,
+                              series = data_test$series,
+                              time = data_test$time) %>%
+                     dplyr::filter(series == s_name) %>%
+                     dplyr::select(time, y) %>%
+                     dplyr::distinct() %>%
+                     dplyr::arrange(time) %>%
+                     dplyr::pull(y))
+    } else {
+      all_obs <- c(data_train %>%
+                     dplyr::filter(series == s_name) %>%
+                     dplyr::select(time, y) %>%
+                     dplyr::distinct() %>%
+                     dplyr::arrange(time) %>%
+                     dplyr::pull(y),
+                   data_test %>%
+                     dplyr::filter(series == s_name) %>%
+                     dplyr::select(time, y) %>%
+                     dplyr::distinct() %>%
+                     dplyr::arrange(time) %>%
+                     dplyr::pull(y))
+    }
+
 
   if(dim(preds)[2] != length(all_obs)){
     fc_preds <- forecast.mvgam(object, series = series, data_test = data_test)

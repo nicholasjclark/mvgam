@@ -59,18 +59,35 @@ plot_mvgam_trend = function(object, series = 1, data_test,
       data_test$y <- rep(NA, NROW(data_test))
     }
 
-    all_obs <- c(data_train %>%
-                   dplyr::filter(series == s_name) %>%
-                   dplyr::select(time, y) %>%
-                   dplyr::distinct() %>%
-                   dplyr::arrange(time) %>%
-                   dplyr::pull(y),
-                 data_test %>%
-                   dplyr::filter(series == s_name) %>%
-                   dplyr::select(time, y) %>%
-                   dplyr::distinct() %>%
-                   dplyr::arrange(time) %>%
-                   dplyr::pull(y))
+    if(class(data_test)[1] == 'list'){
+      all_obs <- c(data_train %>%
+                     dplyr::filter(series == s_name) %>%
+                     dplyr::select(time, y) %>%
+                     dplyr::distinct() %>%
+                     dplyr::arrange(time) %>%
+                     dplyr::pull(y),
+                   data.frame(y = data_test$y,
+                              series = data_test$series,
+                              time = data_test$time) %>%
+                     dplyr::filter(series == s_name) %>%
+                     dplyr::select(time, y) %>%
+                     dplyr::distinct() %>%
+                     dplyr::arrange(time) %>%
+                     dplyr::pull(y))
+    } else {
+      all_obs <- c(data_train %>%
+                     dplyr::filter(series == s_name) %>%
+                     dplyr::select(time, y) %>%
+                     dplyr::distinct() %>%
+                     dplyr::arrange(time) %>%
+                     dplyr::pull(y),
+                   data_test %>%
+                     dplyr::filter(series == s_name) %>%
+                     dplyr::select(time, y) %>%
+                     dplyr::distinct() %>%
+                     dplyr::arrange(time) %>%
+                     dplyr::pull(y))
+    }
 
     if(dim(preds)[2] != length(all_obs)){
       fc_preds <- forecast(object, series = series, data_test = data_test,

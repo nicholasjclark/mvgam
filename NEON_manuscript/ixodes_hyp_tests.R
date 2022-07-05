@@ -52,7 +52,7 @@ hyp3 = y ~
   s(season, series, m = 1, k = 4, bs = 'fs')
 
 # Fit each hypothesis
-burnin = 5000
+burnin = 5
 n_samples = 1000
 
 fit_null <- fit_mvgam(data_train = all_data$data_train,
@@ -186,7 +186,7 @@ pdf('NEON_manuscript/Figures/Fig4_Ixodes_performances.pdf', width = 6.25, height
 cowplot::plot_grid(plot1, plot2, ncol = 1)
 dev.off()
 
-pdf('NEON_manuscript/Figures/FigS4_Ixodes_sitewise_analysis.pdf',
+pdf('NEON_manuscript/Figures/FigS3_Ixodes_sitewise_analysis.pdf',
     width = 6.25, height = 4)
 ggplot(plot_dat %>% dplyr::filter(Formula %in% c('Null_hyp','Hyp1', 'Hyp2','Hyp3')),
        aes(y = scale_drps,x = Series, fill = Formula))+
@@ -245,7 +245,7 @@ plot3 <- ggplot(fit_hyp3$mean_correlations %>%
         title = element_text(size = 9))
 
 
-pdf('NEON_manuscript/Figures/FigS6_Ixodes_trendcorrelations.pdf',
+pdf('NEON_manuscript/Figures/FigS5_Ixodes_trendcorrelations.pdf',
     width = 6.25, height = 5)
 cowplot::plot_grid(plot1 + theme(legend.position = 'none'),
                    plot2 + theme(legend.position = 'none'),
@@ -276,7 +276,7 @@ formulas <- c('Null_hyp',
               'Hyp3')
 colours <- rev(viridis::plasma(n = 4, begin = 0.35, end = 1))
 
-pdf('NEON_manuscript/Figures/FigS5_Ixodes_PITs.pdf',
+pdf('NEON_manuscript/Figures/FigS4_Ixodes_PITs.pdf',
     width = 6.25, height = 3.75)
 par(mfrow = c(1, 4),
     mai = c(.38,.35,.45,.05),
