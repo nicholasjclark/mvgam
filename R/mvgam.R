@@ -688,7 +688,7 @@ mvgam = function(formula,
                            dplyr::distinct() %>%
                            dplyr::arrange(time) %>%
                            dplyr::mutate(time = dplyr::row_number()),
-                         by = c('r')) %>%
+                         by = c('time')) %>%
         dplyr::pull(time)
     } else {
       X$time <- data_train %>%

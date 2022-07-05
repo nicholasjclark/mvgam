@@ -165,6 +165,12 @@ forecast.mvgam = function(object, data_test, series = 1,
       dplyr::filter(series == s_name) %>%
       dplyr::arrange(time) %>%
       dplyr::pull(rowid)
+    series_test <- data.frame(y = data_test$y,
+                              series = data_test$series,
+                              time = data_test$time,
+                              rowid = 1:length(data_test$y)) %>%
+      dplyr::filter(series == s_name) %>%
+      dplyr::arrange(time)
     Xp <- Xp[obs_keep, ]
 
   } else {

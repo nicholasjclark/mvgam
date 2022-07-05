@@ -106,8 +106,10 @@ plot_mvgam_fc = function(object, series = 1, data_test,
   # If the posterior predictions do not already cover the data_test period, the forecast needs to be
   # generated using the latent trend dynamics; note, this assumes that there is no gap between the training and
   # testing datasets
-    if(class(data_test)[1] == 'list'){
-      all_obs <- c(data_train %>%
+    if(class(data_train)[1] == 'list'){
+      all_obs <- c(data.frame(y = data_train$y,
+                              series = data_train$series,
+                              time = data_train$time) %>%
                      dplyr::filter(series == s_name) %>%
                      dplyr::select(time, y) %>%
                      dplyr::distinct() %>%

@@ -60,7 +60,9 @@ plot_mvgam_trend = function(object, series = 1, data_test,
     }
 
     if(class(data_test)[1] == 'list'){
-      all_obs <- c(data_train %>%
+      all_obs <- c(data.frame(y = data_train$y,
+                              series = data_train$series,
+                              time = data_train$time) %>%
                      dplyr::filter(series == s_name) %>%
                      dplyr::select(time, y) %>%
                      dplyr::distinct() %>%
