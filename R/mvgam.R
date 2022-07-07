@@ -392,10 +392,15 @@ mvgam = function(formula,
 
   # Fill in missing observations in data_train so the size of the dataset is correct when
   # building the JAGS model
-  suppressWarnings(data_train$y[which(is.na(data_train$y))] <- round(predict(ss_gam,
-                                                              newdata = data_train,
-                                                              type = 'response'), 0)[which(is.na(data_train$y))])
-
+  suppressWarnings(data_train$y[which(is.na(data_train$y))] <- round(predict(gam(y ~ time, data = data_train,
+                                                                method = "REML",
+                                                                family = poisson(),
+                                                                drop.unused.levels = FALSE,
+                                                                control = list(nthreads = parallel::detectCores()-1,
+                                                                               maxit = 50)),
+                                                                newdata = data.frame(time = data_train$time),
+                                                                type = 'response'),
+                                                    0)[which(is.na(data_train$y))])
 
   # Make jags file and appropriate data structures; note this has to use Poisson but the
   # resulting JAGS file will be modified to accommodate the specified response distribution accordingly
@@ -403,8 +408,8 @@ mvgam = function(formula,
     smooths_included <- FALSE
     # If no smooth terms are included, jagam will fail; so add a fake one and remove
     # it from the model and data structures later
-    data_train$fakery <- rnorm(NROW(data_train))
-    form_fake <- update(formula, ~ + s(fakery))
+    data_train$fakery <- rnorm(length(data_train$y))
+    form_fake <- update(formula, ~ . + s(fakery))
 
     fakery_names <- names(mgcv::gam(form_fake,
                               data = data_train,
@@ -467,7 +472,7 @@ mvgam = function(formula,
     ss_jagam$jags.ini$lambda[log(ss_jagam$jags.ini$lambda) > 10] <- exp(10)
   }
 
-  if(length(ss_gam$smooth)){
+  if(length(ss_gam$smooth) == 0){
     ss_jagam$jags.ini$lambda <- NULL
   }
 
@@ -623,11 +628,35 @@ mvgam = function(formula,
 
   # Covariate dataframe including training and testing observations
   if(!missing(data_test)){
-    suppressWarnings(lp_test <- predict(ss_gam, newdata = data_test, type = 'lpmatrix'))
+    #suppressWarnings(lp_test <- predict(ss_gam, newdata = data_test, type = 'lpmatrix'))
+    suppressWarnings(lp_test  <- try(predict(ss_gam,
+                                             newdata = data_test,
+                                             type = 'lpmatrix'),
+                                     silent = TRUE))
+
+    if(inherits(lp_test, 'try-error')){
+      testdat <- data.frame(time = data_test$time)
+
+      terms_include <- names(ss_gam$coefficients)[which(!names(ss_gam$coefficients) %in% '(Intercept)')]
+      if(length(terms_include) > 0){
+        newnames <- vector()
+        newnames[1] <- 'time'
+        for(i in 1:length(terms_include)){
+          testdat <- cbind(testdat, data.frame(data_test[[terms_include[i]]]))
+          newnames[i+1] <- terms_include[i]
+        }
+        colnames(testdat) <- newnames
+      }
+
+      suppressWarnings(lp_test  <- predict(ss_gam,
+                                           newdata = testdat,
+                                           type = 'lpmatrix'))
+    }
 
     # Remove fakery columns from design matrix if no smooth terms were included
     if(!smooths_included){
-      ss_jagam$jags.data$X <- matrix(ss_jagam$jags.data$X[,-c(xcols_drop)])
+      ss_jagam$jags.data$X <- as.matrix(ss_jagam$jags.data$X[,-c(xcols_drop)],
+                                        ncol = NCOL(lp_test))
     }
 
     X <- data.frame(rbind(ss_jagam$jags.data$X, lp_test))
@@ -931,8 +960,12 @@ mvgam = function(formula,
                           class = 'mvgam_prefit')
     } else {
 
-      inits <- vector(mode = 'list')
-      inits$b <- runif(NCOL(ss_jagam$jags.data$X), -0.5, 0.5)
+      if(!smooths_included){
+        inits <- vector(mode = 'list')
+        inits$b <- ss_gam$coefficients
+      } else {
+        inits <- ss_jagam$jags.ini
+      }
       initlist <- replicate(chains, inits,
                             simplify = FALSE)
       inits <- initlist
@@ -1054,11 +1087,16 @@ mvgam = function(formula,
       param <- get_monitor_pars(family, smooths_included = smooths_included,
                                 use_lv, trend_model, drift)
 
-      inits <- vector(mode = 'list')
-      inits$b <- runif(NCOL(ss_jagam$jags.data$X), -0.5, 0.5)
+      if(!smooths_included){
+        inits <- vector(mode = 'list')
+        inits$b <- ss_gam$coefficients
+      } else {
+        inits <- ss_jagam$jags.ini
+      }
       initlist <- replicate(chains, inits,
                             simplify = FALSE)
       inits <- initlist
+
       runjags::runjags.options(silent.jags = TRUE, silent.runjags = TRUE)
       n.burn <- burnin
 

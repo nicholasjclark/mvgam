@@ -85,9 +85,7 @@ preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[
 median_preds <- apply(preds, 2, function(x) quantile(x, 0.5))
 
 # Graphical parameters
-.pardefault <- par(no.readonly=T)
-par(.pardefault)
-par(mfrow = c(2, 2))
+layout(matrix(1:4, ncol = 2, nrow = 2, byrow = TRUE))
 
 # Fitted vs redisuals plot
 n_fitted_bins = n_bins
@@ -349,7 +347,6 @@ abline(h = clim, lty = 'dashed', col = 'black', lwd = 2.5)
 abline(h = -clim, lty = 'dashed', col = 'white', lwd = 2.85)
 abline(h = -clim, lty = 'dashed', col = 'black', lwd = 2.5)
 
-invisible()
-par(mfrow = c(1,1))
+layout(1)
 
 }

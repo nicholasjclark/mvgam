@@ -142,9 +142,30 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   }
 
   # Generate linear predictor matrix
-  Xp <- predict(mgcv_model,
-                newdata = series_test,
-                type = 'lpmatrix')
+  suppressWarnings(Xp  <- try(predict(mgcv_model,
+                                      newdata = series_test,
+                                      type = 'lpmatrix'),
+                              silent = TRUE))
+
+  if(inherits(Xp, 'try-error')){
+    testdat <- data.frame(time = series_test$time)
+
+    terms_include <- names(mgcv_model$coefficients)[which(!names(mgcv_model$coefficients) %in% '(Intercept)')]
+    if(length(terms_include) > 0){
+      newnames <- vector()
+      newnames[1] <- 'time'
+      for(i in 1:length(terms_include)){
+        testdat <- cbind(testdat, data.frame(series_test[[terms_include[i]]]))
+        newnames[i+1] <- terms_include[i]
+      }
+      colnames(testdat) <- newnames
+    }
+
+    suppressWarnings(Xp  <- predict(mgcv_model,
+                                    newdata = testdat,
+                                    type = 'lpmatrix'))
+  }
+
 
   # Run particles forward in time to generate their forecasts
   cl <- parallel::makePSOCKcluster(n_cores)
@@ -178,15 +199,19 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
 
         if(particles[[x]]$family == 'Negative Binomial'){
           fc <- rnbinom(fc_horizon,
-                        mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                        mu = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
+                                                      ncol = NCOL(Xp)) %*%
                                               particles[[x]]$betas)) +
                                    (trend_preds)),
                         size = particles[[x]]$size[series])
+
+
         }
 
         if(particles[[x]]$family == 'Poisson'){
           fc <- rpois(fc_horizon,
-                        lambda = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                        lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
+                                                          ncol = NCOL(Xp)) %*%
                                               particles[[x]]$betas)) +
                                    (trend_preds)))
         }
@@ -194,7 +219,8 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
         if(particles[[x]]$family == 'Tweedie'){
           fc <- rpois(fc_horizon,
                         lambda = mgcv::rTweedie(
-                          mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                          mu = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
+                                                        ncol = NCOL(Xp)) %*%
                                                   particles[[x]]$betas)) +
                                        (trend_preds)),
                           p = particles[[x]]$p,
@@ -224,20 +250,23 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
 
           if(particles[[x]]$family == 'Negative Binomial'){
             fc <-  rnbinom(fc_horizon,
-                           mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                           mu = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
+                                                         ncol = NCOL(Xp)) %*%
                                                  particles[[x]]$betas)) + (trend_preds)),
                            size = particles[[x]]$size[series])
           }
 
           if(particles[[x]]$family == 'Poisson'){
             fc <-  rpois(fc_horizon,
-                           lambda = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                           lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
+                                                             ncol = NCOL(Xp)) %*%
                                                  particles[[x]]$betas)) + (trend_preds)))
           }
 
           if(particles[[x]]$family == 'Tweedie'){
             fc <-  rpois(fc_horizon,
-                         lambda = mgcv::rTweedie(mu = exp(as.vector((Xp[which(as.numeric(series_test$series) == series),] %*%
+                         lambda = mgcv::rTweedie(mu = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
+                                                                               ncol = NCOL(Xp)) %*%
                                                                        particles[[x]]$betas)) + (trend_preds)),
                                                  p = particles[[x]]$p,
                                                  phi = particles[[x]]$twdis))
@@ -297,7 +326,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     c_dark <- c("#8F2727")
     c_dark_highlight <- c("#7C0000")
 
-    plot(1, type = "n",
+    plot(1, type = "n", bty = 'L',
          xlab = 'Time',
          ylab = paste0('Predictions for ', levels(obs_data$series)[series]),
          xlim = c(0, length(preds_last)),
@@ -344,6 +373,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
              pch = c(16, 8),
              ncol = 1)
     }
+    box(bty = 'L', lwd = 2)
   }
 
   fc_plots <- lapply(seq_len(n_series), function(series){

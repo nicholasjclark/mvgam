@@ -155,9 +155,35 @@ forecast.mvgam = function(object, data_test, series = 1,
 
   # Generate the linear predictor matrix
   if(class(data_test)[1] == 'list'){
-    Xp <- predict(object$mgcv_model,
-                  newdata = data_test,
-                  type = 'lpmatrix')
+    # Xp <- predict(object$mgcv_model,
+    #               newdata = data_test,
+    #               type = 'lpmatrix')
+
+    suppressWarnings(Xp  <- try(predict(object$mgcv_model,
+                                             newdata = data_test,
+                                             type = 'lpmatrix'),
+                                     silent = TRUE))
+
+    if(inherits(Xp, 'try-error')){
+      testdat <- data.frame(time = data_test$time)
+
+      terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients)
+                                                                   %in% '(Intercept)')]
+      if(length(terms_include) > 0){
+        newnames <- vector()
+        newnames[1] <- 'time'
+        for(i in 1:length(terms_include)){
+          testdat <- cbind(testdat, data.frame(data_test[[terms_include[i]]]))
+          newnames[i+1] <- terms_include[i]
+        }
+        colnames(testdat) <- newnames
+      }
+
+      suppressWarnings(Xp  <- predict(object$mgcv_model,
+                                           newdata = testdat,
+                                           type = 'lpmatrix'))
+    }
+
     obs_keep <- data.frame(y = data_test$y,
                            series = data_test$series,
                            time = data_test$time,
@@ -255,7 +281,7 @@ forecast.mvgam = function(object, data_test, series = 1,
     if(object$use_lv){
       phis <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
     } else {
-      phis <- matrix(0, nrow = NROW(betas), ncol = 1)
+      phis <- matrix(0, nrow = NROW(betas), ncol = NCOL(object$ytimes))
     }
   }
 
@@ -278,9 +304,9 @@ forecast.mvgam = function(object, data_test, series = 1,
     } else {
       alpha_gps <- NULL
       rho_gps <- NULL
-      ar1s <- matrix(1, nrow = NROW(betas), ncol = 1)
-      ar2s <- matrix(0, nrow = NROW(betas), ncol = 1)
-      ar3s <- matrix(0, nrow = NROW(betas), ncol = 1)
+      ar1s <- matrix(1, nrow = NROW(betas), ncol = NCOL(object$ytimes))
+      ar2s <- matrix(0, nrow = NROW(betas), ncol = NCOL(object$ytimes))
+      ar3s <- matrix(0, nrow = NROW(betas), ncol = NCOL(object$ytimes))
     }
   }
 
@@ -292,8 +318,8 @@ forecast.mvgam = function(object, data_test, series = 1,
       ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
       ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
     } else {
-      ar2s <- matrix(0, nrow = NROW(betas), ncol = 1)
-      ar3s <- matrix(0, nrow = NROW(betas), ncol = 1)
+      ar2s <- matrix(0, nrow = NROW(betas), ncol = NCOL(object$ytimes))
+      ar3s <- matrix(0, nrow = NROW(betas), ncol = NCOL(object$ytimes))
     }
   }
 
@@ -306,7 +332,7 @@ forecast.mvgam = function(object, data_test, series = 1,
     if(object$use_lv){
       ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
     } else {
-      ar3s <- matrix(0, nrow = NROW(betas), ncol = 1)
+      ar3s <- matrix(0, nrow = NROW(betas), ncol = NCOL(object$ytimes))
     }
   }
 
@@ -370,18 +396,19 @@ forecast.mvgam = function(object, data_test, series = 1,
         # Calculate predictions
         if(family == 'Negative Binomial'){
           out <- rnbinom(NROW(series_test), size = size[series],
-                         mu = exp(((Xp %*% betas)) + (trends)))
+                         mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)))
         }
 
         if(family == 'Poisson'){
-          out <- rpois(NROW(series_test), lambda = exp(((Xp %*% betas)) + (trends)))
+          out <- rpois(NROW(series_test), lambda = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)))
         }
 
         if(family == 'Tweedie'){
-          out <- mgcv::rTweedie(mu = exp(((Xp %*% betas)) + (trends)),
+          out <- mgcv::rTweedie(mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)),
                                 p = p, phi = twdis[series])
         }
       }
+
 
 
     } else {
@@ -454,15 +481,15 @@ forecast.mvgam = function(object, data_test, series = 1,
         # Calculate predictions
         if(family == 'Negative Binomial'){
           out <- rnbinom(NROW(series_test), size = size[series],
-                         mu = exp(((Xp %*% betas)) + (trends)))
+                         mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)))
         }
 
         if(family == 'Poisson'){
-          out <- rpois(NROW(series_test), lambda = exp(((Xp %*% betas)) + (trends)))
+          out <- rpois(NROW(series_test), lambda = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)))
         }
 
         if(family == 'Tweedie'){
-          out <- mgcv::rTweedie(mu = exp(((Xp %*% betas)) + (trends)),
+          out <- mgcv::rTweedie(mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)),
                                 p = p, phi = twdis[series])
         }
       }

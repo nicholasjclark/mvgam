@@ -68,7 +68,7 @@ if(length(pterms) > 0){
     cred <- as.matrix(beta_creds) %*% pred_vals
 
     # Plot
-    plot(1, type = "n",
+    plot(1, type = "n", bty = 'L',
          xlab = pterms[i],
          ylab = paste0('Partial effect of ', pterms[i]),
          xlim = c(min(pred_vals), max(pred_vals)),
@@ -84,11 +84,13 @@ if(length(pterms) > 0){
     lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
     rug(pred_vals_orig,
         lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)
+    box(bty = 'L', lwd = 2)
 
   }
 
   invisible()
   par(.pardefault)
+  layout(1)
 } else {
   stop('No parametric terms (apart from intercept) found in model')
 }

@@ -121,7 +121,7 @@ plot_mvgam_trend = function(object, series = 1, data_test,
         mgp = c(2.5, 1, 0),
         mai = c(0.8, 0.8, 0.4, 0.4))
 
-    plot(1, type = "n",
+    plot(1, type = "n", bty = 'L',
            xlab = 'Time',
            ylab = paste0('Estimated trend for ', levels(data_train$series)[series]),
            xlim = c(0, length(preds_last)),
@@ -132,17 +132,16 @@ plot_mvgam_trend = function(object, series = 1, data_test,
         lines(x = pred_vals,
               y = preds[i,],
               col = 'white',
-              lwd = 3)
+              lwd = 2.5)
         lines(x = pred_vals,
               y = preds[i,],
-              col = sample(c("#DCBCBC80",
-                             "#C7999980",
-                             "#B97C7C80",
-                             "#A2505080",
-                             "#7C000080"), 1),
-              lwd = 2.75)
+              col = sample(c("#DCBCBC",
+                             "#C79999",
+                             "#B97C7C",
+                             "#A25050",
+                             "#7C0000"), 1),
+              lwd = 2.25)
       }
-      box()
     } else {
       polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
               col = c_light, border = NA)
@@ -154,6 +153,7 @@ plot_mvgam_trend = function(object, series = 1, data_test,
               col = c_mid_highlight, border = NA)
       lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
     }
+    box(bty = 'L', lwd = 2)
 
     if(!missing(data_test)){
       if(class(data_train)[1] == 'list'){
@@ -170,7 +170,7 @@ plot_mvgam_trend = function(object, series = 1, data_test,
                    function(n) quantile(first_derivs[,n],
                                         probs = probs, na.rm = T))
 
-    plot(1, type = "n",
+    plot(1, type = "n", bty = "L",
          xlab = 'Time',
          ylab = '1st derivative',
          xlim = c(min(pred_vals), max(pred_vals)),
@@ -183,17 +183,16 @@ plot_mvgam_trend = function(object, series = 1, data_test,
         lines(x = pred_vals,
               y = first_derivs[i,],
               col = 'white',
-              lwd = 3)
+              lwd = 2.5)
         lines(x = pred_vals,
               y = first_derivs[i,],
-              col = sample(c("#DCBCBC80",
-                             "#C7999980",
-                             "#B97C7C80",
-                             "#A2505080",
-                             "#7C000080"), 1),
-              lwd = 2.75)
+              col = sample(c("#DCBCBC",
+                             "#C79999",
+                             "#B97C7C",
+                             "#A25050",
+                             "#7C0000"), 1),
+              lwd = 2.25)
       }
-      box()
     } else {
       polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
               col = c_light, border = NA)
@@ -205,6 +204,7 @@ plot_mvgam_trend = function(object, series = 1, data_test,
               col = c_mid_highlight, border = NA)
       lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
     }
+    box(bty = 'L', lwd = 2)
 
     abline(h = 0, lty = 'dashed', col = 'grey70', lwd = 2)
 
@@ -213,7 +213,7 @@ plot_mvgam_trend = function(object, series = 1, data_test,
 
   } else {
     if(hide_xlabels){
-      plot(1, type = "n",
+      plot(1, type = "n", bty = 'L',
            xlab = '',
            xaxt = 'n',
            ylab = paste0('Estimated trend for ', levels(data_train$series)[series]),
@@ -221,7 +221,7 @@ plot_mvgam_trend = function(object, series = 1, data_test,
            ylim = range(cred))
 
     } else {
-      plot(1, type = "n",
+      plot(1, type = "n", bty = 'L',
            xlab = 'Time',
            ylab = paste0('Estimated trend for ', levels(data_train$series)[series]),
            xlim = c(0, length(preds_last)),
@@ -233,17 +233,16 @@ plot_mvgam_trend = function(object, series = 1, data_test,
         lines(x = pred_vals,
               y = preds[i,],
               col = 'white',
-              lwd = 3)
+              lwd = 2.5)
         lines(x = pred_vals,
               y = preds[i,],
-              col = sample(c("#DCBCBC80",
-                             "#C7999980",
-                             "#B97C7C80",
-                             "#A2505080",
-                             "#7C000080"), 1),
-              lwd = 2.75)
+              col = sample(c("#DCBCBC",
+                             "#C79999",
+                             "#B97C7C",
+                             "#A25050",
+                             "#7C0000"), 1),
+              lwd = 2.25)
       }
-      box()
     } else {
       polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
               col = c_light, border = NA)
@@ -255,6 +254,7 @@ plot_mvgam_trend = function(object, series = 1, data_test,
               col = c_mid_highlight, border = NA)
       lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
     }
+    box(bty = 'L', lwd = 2)
 
     if(!missing(data_test)){
       if(class(data_train)[1] == 'list'){
@@ -265,8 +265,6 @@ plot_mvgam_trend = function(object, series = 1, data_test,
 
     }
   }
-
-
 
 
 }

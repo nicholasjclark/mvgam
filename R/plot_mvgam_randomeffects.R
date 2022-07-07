@@ -70,7 +70,7 @@ if(any(smooth_labs$class == 'random.effect')){
                   repped_x[k] + min(diff(x))/2 else
                     repped_x[k] - min(diff(x))/2)
 
-    plot(1, type = "n",
+    plot(1, type = "n", bty = 'L',
          ylab = re_smooths[i],
          xlab = '',
          xlim = range(x),
@@ -106,6 +106,7 @@ if(any(smooth_labs$class == 'random.effect')){
             y = c(beta_creds[5,k], beta_creds[5,k]),
             col = c_dark, lwd = 2)
     }
+    box(bty = 'L', lwd = 2)
 
     # Label x-axis with the factor variable levels
     factor_var_name <- tail(strsplit(gsub('\\)', '',
@@ -124,6 +125,7 @@ if(any(smooth_labs$class == 'random.effect')){
 
   invisible()
   par(.pardefault)
+  layout(1)
 
 } else {
   stop('No random effect smooths (bs = "re") in model formula')

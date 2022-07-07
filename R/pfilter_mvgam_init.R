@@ -86,9 +86,29 @@ if(length(unique(series_test$time)) > 1){
 }
 
 # Linear predictor matrix for the next observation
-Xp <- predict(object$mgcv_model,
-              newdata = series_test,
-              type = 'lpmatrix')
+suppressWarnings(Xp  <- try(predict(object$mgcv_model,
+                                    newdata = series_test,
+                                    type = 'lpmatrix'),
+                                 silent = TRUE))
+
+if(inherits(Xp, 'try-error')){
+  testdat <- data.frame(time = series_test$time)
+
+  terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients) %in% '(Intercept)')]
+  if(length(terms_include) > 0){
+    newnames <- vector()
+    newnames[1] <- 'time'
+    for(i in 1:length(terms_include)){
+      testdat <- cbind(testdat, data.frame(series_test[[terms_include[i]]]))
+      newnames[i+1] <- terms_include[i]
+    }
+    colnames(testdat) <- newnames
+  }
+
+  suppressWarnings(Xp  <- predict(object$mgcv_model,
+                                       newdata = testdat,
+                                       type = 'lpmatrix'))
+}
 
 # Extract last trend / latent variable and precision estimates
 if(object$use_lv){
@@ -102,7 +122,7 @@ if(object$use_lv){
     lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[lv]:ends[lv]]
 
     # Need to only use estimates from the training period
-    end_train <- object$obs_data %>%
+    end_train <- data.frame(series = object$obs_data$series) %>%
       dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
       NROW()
     lv_estimates <- lv_estimates[,1:end_train]
@@ -128,7 +148,7 @@ if(object$use_lv){
     }
 
     # Need to only use estimates from the training period
-    end_train <- object$obs_data %>%
+    end_train <- data.frame(series = object$obs_data$series) %>%
       dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
       NROW()
     trend_estimates <- trend_estimates[,1:end_train]

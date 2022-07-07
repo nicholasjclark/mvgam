@@ -76,7 +76,7 @@ plot_mvgam_factors = function(object, plot = TRUE){
       ylim <- c(min(cred) - 1, max(cred) + 1)
       ylab <- paste0('Factor ', x)
       pred_vals <- seq(1:length(preds_last))
-      plot(1, type = "n",
+      plot(1, type = "n", bty = 'L',
            xlab = 'Time',
            ylab = ylab,
            xlim = c(0, length(preds_last)),
@@ -90,6 +90,7 @@ plot_mvgam_factors = function(object, plot = TRUE){
       polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
               col = c_mid_highlight, border = NA)
       lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+      box(bty = 'L', lwd = 2)
 
     }
 
@@ -109,6 +110,7 @@ plot_mvgam_factors = function(object, plot = TRUE){
   if(plot){
     invisible()
     par(.pardefault)
+    layout(1)
   }
 
   lv_estimates / sum(lv_estimates)

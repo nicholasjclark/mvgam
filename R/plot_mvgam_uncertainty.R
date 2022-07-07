@@ -68,8 +68,30 @@ plot_mvgam_uncertainty = function(object, series = 1, data_test, legend_position
                                      levels(data_train$series)[series]),]
   }
 
-  Xp <- predict(object$mgcv_model, newdata = series_test,
-                type = 'lpmatrix')
+  suppressWarnings(Xp  <- try(predict(object$mgcv_model,
+                                      newdata = series_test,
+                                      type = 'lpmatrix'),
+                              silent = TRUE))
+
+  if(inherits(Xp, 'try-error')){
+    testdat <- data.frame(time = series_test$time)
+
+    terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients)
+                                                                 %in% '(Intercept)')]
+    if(length(terms_include) > 0){
+      newnames <- vector()
+      newnames[1] <- 'time'
+      for(i in 1:length(terms_include)){
+        testdat <- cbind(testdat, data.frame(series_test[[terms_include[i]]]))
+        newnames[i+1] <- terms_include[i]
+      }
+      colnames(testdat) <- newnames
+    }
+
+    suppressWarnings(Xp  <- predict(object$mgcv_model,
+                                    newdata = testdat,
+                                    type = 'lpmatrix'))
+  }
 
   # Extract beta coefs
   betas <- MCMCvis::MCMCchains(object$model_output, 'b')
@@ -139,12 +161,12 @@ plot_mvgam_uncertainty = function(object, series = 1, data_test, legend_position
 
   # Plot and return
   if(hide_xlabels){
-  plot(gam_cont,
+  plot(gam_cont, bty = "L",
        ylim=c(0,1),type='n',
        ylab=paste0('Uncertainty contributions for ', levels(data_train$series)[series]),
        xlab="", xaxt = 'n')
    } else {
-      plot(gam_cont,
+      plot(gam_cont, bty = 'L',
            ylim=c(0,1),type='n',
            ylab=paste0('Uncertainty contributions for ', levels(data_train$series)[series]),
            xlab="Forecast horizon")
@@ -156,6 +178,7 @@ plot_mvgam_uncertainty = function(object, series = 1, data_test, legend_position
   polygon(c(seq(1:(NCOL(gampreds))), rev(seq(1:NCOL(gampreds)))),
           c(gam_cont, rep(1, NCOL(gampreds))),
           col = '#DCBCBC', border = NA)
+  box(bty = 'L', lwd = 2)
   if(legend_position != 'none'){
     legend(legend_position,legend=c("Trend","GAM"),
            bg = 'white',

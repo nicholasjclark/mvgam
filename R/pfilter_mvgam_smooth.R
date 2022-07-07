@@ -43,9 +43,30 @@ pfilter_mvgam_smooth = function(particles,
                                 kernel_lambda = 1){
 
   # Linear predictor matrix for the next observation
-  Xp <- predict(mgcv_model,
-                newdata = next_assim,
-                type = 'lpmatrix')
+  suppressWarnings(Xp  <- try(predict(mgcv_model,
+                                      newdata = next_assim,
+                                      type = 'lpmatrix'),
+                              silent = TRUE))
+
+  if(inherits(Xp, 'try-error')){
+    testdat <- data.frame(time = next_assim$time)
+
+    terms_include <- names(mgcv_model$coefficients)[which(!names(mgcv_model$coefficients) %in% '(Intercept)')]
+    if(length(terms_include) > 0){
+      newnames <- vector()
+      newnames[1] <- 'time'
+      for(i in 1:length(terms_include)){
+        testdat <- cbind(testdat, data.frame(next_assim[[terms_include[i]]]))
+        newnames[i+1] <- terms_include[i]
+      }
+      colnames(testdat) <- newnames
+    }
+
+    suppressWarnings(Xp  <- predict(mgcv_model,
+                                    newdata = testdat,
+                                    type = 'lpmatrix'))
+  }
+
 
   use_lv <- particles[[1]]$use_lv
   last_assim = unique(next_assim$time)
@@ -691,10 +712,11 @@ pfilter_mvgam_smooth = function(particles,
                            lv_coefs = lv_coefs_evolve,
                            betas = betas,
                            size = particles[[x]]$size,
-                           tau = ifelse(use_resampling,
-                                        min(100, particles[[x]]$tau +
-                                              runif(1, 0, evolve)),
-                                        particles[[x]]$tau),
+                           tau = if(use_resampling){
+                             particles[[x]]$tau
+                           } else {
+                             pmin(100, particles[[x]]$tau + runif(length(particles[[x]]$tau), 0, evolve))
+                           },
                            phi = particles[[x]]$phi,
                            ar1 = particles[[x]]$ar1,
                            ar2 = particles[[x]]$ar2,
@@ -730,10 +752,11 @@ pfilter_mvgam_smooth = function(particles,
                            lv_states = lv_evolve,
                            lv_coefs = lv_coefs_evolve,
                            betas = betas,
-                           tau = ifelse(use_resampling,
-                                        min(100, particles[[x]]$tau +
-                                              runif(1, 0, evolve)),
-                                        particles[[x]]$tau),
+                           tau = if(use_resampling){
+                             particles[[x]]$tau
+                           } else {
+                             pmin(100, particles[[x]]$tau + runif(length(particles[[x]]$tau), 0, evolve))
+                           },
                            phi = particles[[x]]$phi,
                            ar1 = particles[[x]]$ar1,
                            ar2 = particles[[x]]$ar2,
@@ -773,10 +796,11 @@ pfilter_mvgam_smooth = function(particles,
                            p = particles[[x]]$p,
                            twdis = particles[[x]]$twdis,
                            betas = betas,
-                           tau = ifelse(use_resampling,
-                                        min(100, particles[[x]]$tau +
-                                              runif(1, 0, evolve)),
-                                        particles[[x]]$tau),
+                           tau = if(use_resampling){
+                             particles[[x]]$tau
+                           } else {
+                             pmin(100, particles[[x]]$tau + runif(length(particles[[x]]$tau), 0, evolve))
+                           },
                            phi = particles[[x]]$phi,
                            ar1 = particles[[x]]$ar1,
                            ar2 = particles[[x]]$ar2,

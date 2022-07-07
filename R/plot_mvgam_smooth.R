@@ -185,9 +185,30 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     }
 
     # Generate linear predictor matrix from fitted mgcv model
-    suppressWarnings(Xp <- predict(object$mgcv_model,
-                                   newdata = pred_dat,
-                                   type = 'lpmatrix'))
+    suppressWarnings(Xp  <- try(predict(object$mgcv_model,
+                                        newdata = pred_dat,
+                                        type = 'lpmatrix'),
+                                silent = TRUE))
+
+    if(inherits(Xp, 'try-error')){
+      testdat <- data.frame(time = pred_dat$time)
+
+      terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients)
+                                                                   %in% '(Intercept)')]
+      if(length(terms_include) > 0){
+        newnames <- vector()
+        newnames[1] <- 'time'
+        for(i in 1:length(terms_include)){
+          testdat <- cbind(testdat, data.frame(pred_dat[[terms_include[i]]]))
+          newnames[i+1] <- terms_include[i]
+        }
+        colnames(testdat) <- newnames
+      }
+
+      suppressWarnings(Xp  <- predict(object$mgcv_model,
+                                      newdata = testdat,
+                                      type = 'lpmatrix'))
+    }
 
     # Zero out all other columns in Xp
     Xp[,!grepl(paste0('(', smooth, ')'), colnames(Xp), fixed = T)] <- 0
@@ -263,14 +284,14 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
         mai = c(0.8, 0.8, 0.4, 0.4))
 
     if(residuals){
-      plot(1, type = "n",
+      plot(1, type = "n", bty = 'L',
            xlab = smooth,
            ylab = paste0('s(', smooth, ') for ', unique(pred_dat$series)),
            xlim = c(min(pred_vals), max(pred_vals)),
            ylim = c(min(min(partial_resids, min(cred) - sd(preds), na.rm = T)),
                     max(max(partial_resids, max(cred) + sd(preds), na.rm = T))))
     } else {
-      plot(1, type = "n",
+      plot(1, type = "n", bty = 'L',
            xlab = smooth,
            ylab = paste0('s(', smooth, ') for ', unique(pred_dat$series)),
            xlim = c(min(pred_vals), max(pred_vals)),
@@ -282,17 +303,16 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
         lines(x = pred_vals,
               y = preds[i,],
               col = 'white',
-              lwd = 3)
+              lwd = 2.5)
         lines(x = pred_vals,
               y = preds[i,],
-              col = sample(c("#DCBCBC80",
-                             "#C7999980",
-                             "#B97C7C80",
-                             "#A2505080",
-                             "#7C000080"), 1),
-              lwd = 2.75)
+              col = sample(c("#DCBCBC",
+                             "#C79999",
+                             "#B97C7C",
+                             "#A25050",
+                             "#7C0000"), 1),
+              lwd = 2.25)
       }
-      box()
     } else {
       polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
               col = c_light, border = NA)
@@ -304,6 +324,8 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
               col = c_mid_highlight, border = NA)
       lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
     }
+
+    box(bty = 'L', lwd = 2)
 
     # Show observed values of the smooth as a rug
     if(class(object$obs_data)[1] == 'list'){
@@ -321,7 +343,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     cred <- sapply(1:NCOL(first_derivs),
                    function(n) quantile(first_derivs[,n],
                                         probs = probs, na.rm = T))
-    plot(1, type = "n",
+    plot(1, type = "n", bty = 'L',
          xlab = smooth,
          ylab = '1st derivative',
          xlim = c(min(pred_vals), max(pred_vals)),
@@ -333,17 +355,17 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
         lines(x = pred_vals,
               y = first_derivs[i,],
               col = 'white',
-              lwd = 3)
+              lwd = 2.5)
         lines(x = pred_vals,
               y = first_derivs[i,],
-              col = sample(c("#DCBCBC80",
-                             "#C7999980",
-                             "#B97C7C80",
-                             "#A2505080",
-                             "#7C000080"), 1),
-              lwd = 2.75)
+              col = sample(c("#DCBCBC",
+                             "#C79999",
+                             "#B97C7C",
+                             "#A25050",
+                             "#7C0000"), 1),
+              lwd = 2.25)
       }
-      box()
+
     } else {
       polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
               col = c_light, border = NA)
@@ -355,6 +377,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
               col = c_mid_highlight, border = NA)
       lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
     }
+    box(bty = 'L', lwd = 2)
 
     abline(h = 0, lty = 'dashed', col = 'grey70', lwd = 2)
 
@@ -363,7 +386,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
 
   } else {
     if(residuals){
-      plot(1, type = "n",
+      plot(1, type = "n", bty = 'L',
            xlab = smooth,
            ylab = paste0('s(', smooth, ') for ', unique(pred_dat$series)),
            xlim = c(min(pred_vals), max(pred_vals)),
@@ -371,13 +394,13 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
                     max(max(partial_resids, max(cred) + sd(preds), na.rm = T))))
 
       # Get x-axis values and bin if necessary to prevent overplotting
-      sorted_x <- sort(unique(round(object$obs_data %>%
-                                      dplyr::pull(smooth), 6)))
+      sorted_x <- sort(unique(round(object$obs_data[[smooth]], 6)))
 
       s_name <- levels(object$obs_data$series)[series]
-      obs_x <- round(object$obs_data %>%
+      obs_x <- round(data.frame(series = object$obs_data$series,
+                                smooth_vals = object$obs_data[[smooth]]) %>%
                        dplyr::filter(series == s_name) %>%
-                       dplyr::pull(smooth), 6)
+                       dplyr::pull(smooth_vals), 6)
 
       if(length(sorted_x) > n_resid_bins){
         sorted_x <- seq(min(sorted_x), max(sorted_x), length.out = n_resid_bins)
@@ -446,9 +469,10 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
       lines(pred_vals, cred[5,],
             col = rgb(red = 0, green = 0, blue = 0, alpha = 45, maxColorValue = 200),
             lwd = 3)
+      box(bty = 'L', lwd = 2)
 
     } else {
-      plot(1, type = "n",
+      plot(1, type = "n", bty = 'L',
            xlab = smooth,
            ylab = paste0('s(', smooth, ') for ', unique(pred_dat$series)),
            xlim = c(min(pred_vals), max(pred_vals)),
@@ -459,17 +483,16 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
           lines(x = pred_vals,
                 y = preds[i,],
                 col = 'white',
-                lwd = 3)
+                lwd = 2.5)
           lines(x = pred_vals,
                 y = preds[i,],
-                col = sample(c("#DCBCBC80",
-                               "#C7999980",
-                               "#B97C7C80",
-                               "#A2505080",
-                               "#7C000080"), 1),
-                lwd = 2.75)
+                col = sample(c("#DCBCBC",
+                               "#C79999",
+                               "#B97C7C",
+                               "#A25050",
+                               "#7C0000"), 1),
+                lwd = 2.25)
         }
-        box()
       } else {
         polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
                 col = c_light, border = NA)
@@ -481,6 +504,7 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
                 col = c_mid_highlight, border = NA)
         lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
       }
+      box(bty = 'L', lwd = 2)
 
     }
 
