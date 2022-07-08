@@ -36,10 +36,13 @@
 #'@return A base \code{R} graphics plot
 #'@seealso \code{\link[mgcv]{plot.gam}}
 #'@export
-plot_mvgam_smooth = function(object, series = 1, smooth,
+plot_mvgam_smooth = function(object,
+                             series = 1,
+                             smooth,
                              residuals = FALSE,
                              n_resid_bins = 25,
-                             realisations = FALSE, n_realisations = 15,
+                             realisations = FALSE,
+                             n_realisations = 15,
                              derivatives = FALSE,
                              newdata){
 
@@ -286,16 +289,20 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     if(residuals){
       plot(1, type = "n", bty = 'L',
            xlab = smooth,
-           ylab = paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+           ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
            ylim = c(min(min(partial_resids, min(cred) - sd(preds), na.rm = T)),
                     max(max(partial_resids, max(cred) + sd(preds), na.rm = T))))
+      title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+            adj = 0)
     } else {
       plot(1, type = "n", bty = 'L',
            xlab = smooth,
-           ylab = paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+           ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
            ylim = c(min(cred) - sd(preds), max(cred) + sd(preds)))
+      title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+            adj = 0)
     }
 
     if(realisations){
@@ -314,15 +321,99 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
               lwd = 2.25)
       }
     } else {
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
-              col = c_light, border = NA)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
-              col = c_light_highlight, border = NA)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
-              col = c_mid, border = NA)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
-              col = c_mid_highlight, border = NA)
-      lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+
+      if(residuals){
+
+        # Get x-axis values and bin if necessary to prevent overplotting
+        sorted_x <- sort(unique(round(object$obs_data[[smooth]], 6)))
+
+        s_name <- levels(object$obs_data$series)[series]
+        obs_x <- round(data.frame(series = object$obs_data$series,
+                                  smooth_vals = object$obs_data[[smooth]]) %>%
+                         dplyr::filter(series == s_name) %>%
+                         dplyr::pull(smooth_vals), 6)
+
+        if(length(sorted_x) > n_resid_bins){
+          sorted_x <- seq(min(sorted_x), max(sorted_x), length.out = n_resid_bins)
+          resid_probs <- do.call(rbind, lapply(2:n_resid_bins, function(i){
+            quantile(as.vector(partial_resids[,which(obs_x <= sorted_x[i] &
+                                                       obs_x > sorted_x[i-1])]),
+                     probs = probs)
+          }))
+          resid_probs <- rbind(quantile(as.vector(partial_resids[,which(obs_x == sorted_x[1])]),
+                                        probs = probs),
+                               resid_probs)
+
+        } else {
+          resid_probs <- do.call(rbind, lapply(sorted_x, function(i){
+            quantile(as.vector(partial_resids[,which(obs_x == i)]),
+                     probs = probs)
+          }))
+        }
+
+
+        # Get polygon coordinates and plot
+        N <- length(sorted_x)
+        idx <- rep(1:N, each = 2)
+        repped_x <- rep(sorted_x, each = 2)
+
+        x <- sapply(1:length(idx),
+                    function(k) if(k %% 2 == 0)
+                      repped_x[k] + min(diff(sorted_x))/2 else
+                        repped_x[k] - min(diff(sorted_x))/2)
+
+        rect(xleft = x[seq(1, N*2, by = 2)],
+             xright = x[seq(2, N*2, by = 2)],
+             ytop =  resid_probs[,9],
+             ybottom =  resid_probs[,1],
+             col = c_light,
+             border = 'transparent')
+        rect(xleft = x[seq(1, N*2, by = 2)],
+             xright = x[seq(2, N*2, by = 2)],
+             ytop =  resid_probs[,8],
+             ybottom =  resid_probs[,2],
+             col = c_light_highlight,
+             border = 'transparent')
+        rect(xleft = x[seq(1, N*2, by = 2)],
+             xright = x[seq(2, N*2, by = 2)],
+             ytop =  resid_probs[,7],
+             ybottom =  resid_probs[,3],
+             col = c_mid,
+             border = 'transparent')
+        rect(xleft = x[seq(1, N*2, by = 2)],
+             xright = x[seq(2, N*2, by = 2)],
+             ytop =  resid_probs[,6],
+             ybottom =  resid_probs[,4],
+             col = c_mid_highlight,
+             border = 'transparent')
+
+        for (k in 1:N) {
+          lines(x = c(x[seq(1, N*2, by = 2)][k],x[seq(2, N*2, by = 2)][k]),
+                y = c(resid_probs[k,5], resid_probs[k,5]),
+                col = c_dark, lwd = 2)
+        }
+
+        # Overlay a minimalist version of the estimated smooth function
+        polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+                col = rgb(red = 0, green = 0, blue = 0, alpha = 30, maxColorValue = 200),
+                border = NA)
+        lines(pred_vals, cred[5,],
+              col = rgb(red = 0, green = 0, blue = 0, alpha = 45, maxColorValue = 200),
+              lwd = 3)
+        box(bty = 'L', lwd = 2)
+
+      } else {
+        polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+                col = c_light, border = NA)
+        polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+                col = c_light_highlight, border = NA)
+        polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+                col = c_mid, border = NA)
+        polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+                col = c_mid_highlight, border = NA)
+        lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+      }
+
     }
 
     box(bty = 'L', lwd = 2)
@@ -388,10 +479,12 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     if(residuals){
       plot(1, type = "n", bty = 'L',
            xlab = smooth,
-           ylab = paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+           ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
            ylim = c(min(min(partial_resids, min(cred) - sd(preds), na.rm = T)),
                     max(max(partial_resids, max(cred) + sd(preds), na.rm = T))))
+      title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+            adj = 0)
 
       # Get x-axis values and bin if necessary to prevent overplotting
       sorted_x <- sort(unique(round(object$obs_data[[smooth]], 6)))
@@ -474,9 +567,11 @@ plot_mvgam_smooth = function(object, series = 1, smooth,
     } else {
       plot(1, type = "n", bty = 'L',
            xlab = smooth,
-           ylab = paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+           ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
            ylim = c(min(cred) - sd(preds), max(cred) + sd(preds)))
+      title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+            adj = 0)
 
       if(realisations){
         for(i in 1:n_realisations){

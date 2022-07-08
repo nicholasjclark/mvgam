@@ -121,7 +121,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
                ar3[s] ~ dnorm(0, 10)
                }
 
-               ## shrinkage penalties for each factor squeeze the factor to a flat line and squeeze
+               ## shrinkage penalties for each factor's precision parameter act to squeeze
                ## the entire factor toward a flat white noise process if supported by
                ## the data. The prior for individual factor penalties allows each factor to possibly
                ## have a relatively large penalty, which shrinks the prior for that factor's variance

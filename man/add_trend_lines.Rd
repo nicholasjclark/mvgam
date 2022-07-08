@@ -7,6 +7,10 @@
 add_trend_lines(
   model_file,
   stan = FALSE,
+  ar_prior,
+  phi_prior,
+  r_prior,
+  sigma_prior,
   rho_gp_prior,
   alpha_gp_prior,
   use_lv,
@@ -18,6 +22,15 @@ add_trend_lines(
 \item{model_file}{A template \code{JAGS} model file to be modified}
 
 \item{stan}{Logical (convert existing model to a Stan model?)}
+
+\item{ar_prior}{\code{character} specifying (in Stan syntax) the prior distribution for the AR terms
+in the latent trends}
+
+\item{phi_prior}{\code{character} specifying (in Stan syntax) the prior distribution for the drift terms/intercepts
+in the latent trends}
+
+\item{sigma_prior}{\code{character} specifying (in Stan syntax) the prior distributions for the independent Gaussian
+variances used for the latent trends (ignored if \code{use_lv == TRUE})}
 
 \item{rho_gp_prior}{\code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
 Process length scale parameters}

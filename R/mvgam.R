@@ -63,13 +63,13 @@
 #'in the latent trends
 #'@param ar_prior \code{character} specifying (in JAGS syntax) the prior distribution for the AR terms
 #'in the latent trends
-#'@param r_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
+#'@param r_prior \code{character} specifying (in JAGS or Stan syntax) the prior distribution for the Negative Binomial
 #'overdispersion parameters. Note that this prior acts on the inverse of \code{r}, which is convenient
 #'for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
 #'as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tweedie
 #'@param twdis_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Tweedie
 #'overdispersion parameters. Ignored if family is Poisson or Negative Binomial
-#'@param sigma_prior \code{character} specifying (in JAGS syntax) the prior distributions for the independent Gaussian
+#'@param sigma_prior \code{character} specifying (in JAGS or Stan syntax) the prior distributions for the independent Gaussian
 #'variances used for the latent trends (ignored if \code{use_lv == TRUE})
 #'@param rho_gp_prior \code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
 #'Process length scale parameters
@@ -101,7 +101,10 @@
 #'sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 #'accordingly. However more control over the model specification can be accomplished by first using `mvgam` as a
 #'baseline, then editing the returned model accordingly. The model file can be edited and run outside
-#'of `mvgam` by setting \code{run_model = TRUE} and this is encouraged for complex modelling tasks
+#'of `mvgam` by setting \code{run_model = FALSE} and this is encouraged for complex modelling tasks. Note, no priors are
+#'formally checked to ensure they are in the right syntax for the respective probabilistic modelling framework, so it is
+#'up to the user to ensure these are correct (i.e. use `dnorm` for normal densities in `JAGS`, with the mean and precision
+#'parameterisation; but use `normal` for normal densities in `Stan`, with the mean and standard deviation parameterisation)
 #'\cr
 #'\cr
 #'*Random effects*: For any smooth terms using the random effect basis (\code{\link[mcgv]{smooth.construct.re.smooth.spec}}),
@@ -855,7 +858,7 @@ mvgam = function(formula,
   }
 
   if(smooths_included){
-    zeros <- paste0('vector zero; prior basis coefficient locations vector of length ncol(X)\n')
+    zeros <- paste0('vector zero;  prior basis coefficient locations vector of length ncol(X)\n')
   } else {
     zeros <- NULL
   }
@@ -896,6 +899,9 @@ mvgam = function(formula,
 
       # Add necessary trend structure
       base_stan_model <- add_trend_lines(model_file = base_stan_model,
+                                         ar_prior = ar_prior,
+                                         phi_prior = phi_prior,
+                                         sigma_prior = sigma_prior,
                                          rho_gp_prior = rho_gp_prior,
                                          alpha_gp_prior = alpha_gp_prior,
                                          stan = TRUE,
@@ -906,6 +912,7 @@ mvgam = function(formula,
       # gather Stan data structure
       stan_objects <- add_stan_data(jags_file = trimws(model_file),
                                     stan_file = base_stan_model,
+                                    r_prior = r_prior,
                                     jags_data = ss_jagam$jags.data,
                                     family = family,
                                     upper_bounds = upper_bounds)
@@ -1000,10 +1007,13 @@ mvgam = function(formula,
       cat(modification, file = 'base_gam_stan.txt', sep = '\n', append = T)
       base_stan_model <- trimws(suppressWarnings(readLines('base_gam_stan.txt')))
       unlink('base_gam_stan.txt')
-
+      mod$model_file
       # Add necessary trend structure
       base_stan_model <- add_trend_lines(model_file = base_stan_model,
-                                         stan = T,
+                                         stan = TRUE,
+                                         ar_prior = ar_prior,
+                                         phi_prior = phi_prior,
+                                         sigma_prior = sigma_prior,
                                          rho_gp_prior = rho_gp_prior,
                                          alpha_gp_prior = alpha_gp_prior,
                                          trend_model = trend_model,
@@ -1013,6 +1023,7 @@ mvgam = function(formula,
       # gather Stan data structure
       stan_objects <- add_stan_data(jags_file = trimws(model_file),
                                     stan_file = base_stan_model,
+                                    r_prior = r_prior,
                                     jags_data = ss_jagam$jags.data,
                                     family = family,
                                     upper_bounds = upper_bounds)

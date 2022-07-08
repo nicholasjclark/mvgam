@@ -5,13 +5,19 @@
 #' @param jags_file Prepared JAGS mvgam model file
 #' @param stan_file Incomplete Stan model file to be edited
 #' @param jags_data Prepared mvgam data for JAGS modelling
+#' @param r_prior \code{character} specifying (in Stan syntax) the prior distribution for the Negative Binomial
+#'overdispersion parameters. Note that this prior acts on the inverse of \code{r}, which is convenient
+#'for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
+#'as the sampled parameter approaches \code{0}
 #' @param family \code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'
 #' @param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 #' this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 #' is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 #' truncation entirely (i.e. there is no upper bound for each series)
 #' @return A `list` containing the updated Stan model and model data
-add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson',
+add_stan_data = function(jags_file, stan_file,
+                         r_prior,
+                         jags_data, family = 'poisson',
                          upper_bounds){
 
   #### Modify the Stan file ####
@@ -33,8 +39,15 @@ add_stan_data = function(jags_file, stan_file, jags_data, family = 'poisson',
     stan_file[grep('// raw basis', stan_file) + 2] <-
   '\n// negative binomial overdispersion\nvector<lower=0>[n_series] r_inv;\n'
 
-    stan_file[grep('// priors for smoothing', stan_file) + 2] <-
-    '\n// priors for overdispersion parameters\nr_inv ~ normal(0, 10);\n'
+    if(missing(r_prior)){
+      stan_file[grep('// priors for smoothing', stan_file) + 2] <-
+        '\n// priors for overdispersion parameters\nr_inv ~ normal(0, 10);\n'
+    } else {
+      stan_file[grep('// priors for smoothing', stan_file) + 2] <-
+        paste0('\n// priors for overdispersion parameters\n',
+        'r_inv ~ ', r_prior, ';\n')
+    }
+
 
       to_negbin <- gsub('poisson_log', 'neg_binomial_2',
            stan_file[grep('y[i, s] ~ poisson', stan_file, fixed = T)])

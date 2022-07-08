@@ -70,9 +70,10 @@ if(length(pterms) > 0){
     # Plot
     plot(1, type = "n", bty = 'L',
          xlab = pterms[i],
-         ylab = paste0('Partial effect of ', pterms[i]),
+         ylab = paste0('Partial effect'),
          xlim = c(min(pred_vals), max(pred_vals)),
          ylim = c(min(cred), max(cred)))
+    title(pterms[i], adj = 0)
     polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
             col = c_light, border = NA)
     polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),

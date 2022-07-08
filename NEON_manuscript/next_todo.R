@@ -1,16 +1,18 @@
 library(mvgam)
-dat <- sim_mvgam(T = 50, n_series=2, n_lv = 1)
-mod1 <- mvgam(formula = y~1,
+dat <- sim_mvgam(T = 100, n_series=4, n_lv = 1)
+mod1 <- mvgam(formula = y ~ s(season) + s(series, bs = 're'),
               data_train = dat$data_train,
-              trend_model = 'RW',
-              family = 'poisson',
-              use_stan = TRUE,
-              run_model = TRUE)
+              trend_model = 'AR2',
+              family = 'nb',
+              use_stan = TRUE)
+mod1$model_file
+
 mod2 <- mvgam(formula = y~s(season),
               data_train = dat$data_train,
               trend_model = 'RW',
               family = 'poisson',
               run_model = TRUE)
+plot(mod2, 'smooths', residuals = TRUE, derivatives = TRUE)
 compare_mvgams(model1 = mod1, model2 = mod2, fc_horizon = 6,
                n_evaluations = 30, n_cores = 3)
 eval_mvgam(object = mod2, n_cores = 1)

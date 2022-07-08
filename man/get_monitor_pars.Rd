@@ -4,10 +4,12 @@
 \alias{get_monitor_pars}
 \title{Return parameters to monitor during modelling}
 \usage{
-get_monitor_pars(family, use_lv, trend_model, drift)
+get_monitor_pars(family, smooths_included = TRUE, use_lv, trend_model, drift)
 }
 \arguments{
 \item{family}{\code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'}
+
+\item{smooths_included}{Logical. Are smooth terms included in the model formula?}
 
 \item{use_lv}{Logical (use latent variable trends or not)}
 

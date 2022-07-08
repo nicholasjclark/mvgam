@@ -71,11 +71,12 @@ if(any(smooth_labs$class == 'random.effect')){
                     repped_x[k] - min(diff(x))/2)
 
     plot(1, type = "n", bty = 'L',
-         ylab = re_smooths[i],
+         ylab = 'Partial effect',
          xlab = '',
          xlim = range(x),
          xaxt = 'n',
          ylim = range(c(as.vector(beta_creds))))
+    title(re_smooths[i], adj = 0)
     rect(xleft = x[seq(1, N*2, by = 2)],
          xright = x[seq(2, N*2, by = 2)],
          ytop =  as.numeric(c(beta_creds[9,])),

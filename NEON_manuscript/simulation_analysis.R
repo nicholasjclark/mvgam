@@ -13,10 +13,12 @@ par(mfrow = c(2, 1),
     mgp = c(2.5, 1, 0),
     mai = c(0.7, 0.7, 0.2, 0.2))
 plot(s1$data_train$y, type = 'l',
+     bty = 'L', col = 'darkred',
      lwd = 2, ylab = 'Observations',
-     xlab = '',
-     xaxt = 'none',
-     main = 'Moderate dynamics (trend strength = 0.3)')
+     xlab = '')
+title('Moderate dynamics (trend strength = 0.3)',
+      adj = 0)
+box(bty = 'L', lwd = 2)
 set.seed(seed)
 s1 <- sim_mvgam(trend_rel = 0.75,
                 mu_obs = 10, T = 84, freq = 12,
@@ -24,10 +26,12 @@ s1 <- sim_mvgam(trend_rel = 0.75,
                 trend_model = 'RW',
                 train_prop = 1)
 plot(s1$data_train$y, type = 'l',
+     bty = 'L', col = 'darkblue',
      lwd = 2, ylab = 'Observations',
-     xlab = 'Time',
-     xaxt = 'none',
-     main = 'Strong dynamics (trend strength = 0.7)')
+     xlab = 'Time')
+title('Strong dynamics (trend strength = 0.7)',
+      adj = 0)
+box(bty = 'L', lwd = 2)
 dev.off()
 
 # Simulate a series with a nonlinear trend to visualise how a spline extrapolates
@@ -82,11 +86,12 @@ trend_fits <- predict(gam_mod, newdata = expand.grid(year = pred_vals,
                       se.fit = T, type = 'terms')
 ylims <- c(min(trend_fits$fit[,1] - (2*trend_fits$se.fit[,1])),
            max(trend_fits$fit[,1] + (2*trend_fits$se.fit[,1])))
-plot(1, type = "n",
+plot(1, type = "n", bty = 'L',
      xlab = '',
-     ylab = 's(year)',
+     ylab = 'Partial effect of year',
      xlim = c(min(fake_data$data_train$year), max(fake_data$data_test$year)),
      ylim = ylims)
+box(bty = 'L', lwd = 2)
 cred_95 <- trend_fits$fit[,1] + (2*trend_fits$se.fit[,1])
 cred_05 <- trend_fits$fit[,1] - (2*trend_fits$se.fit[,1])
 polygon(c(pred_vals, rev(pred_vals)), c(cred_05, rev(cred_95)),
@@ -105,10 +110,9 @@ cred <- sapply(1:NCOL(fits),
 pred_vals <- seq(min(fake_data$data_train$year),
                  max(fake_data$data_test$year),
                  length.out = NCOL(fits))
-ylims <- c(180,
-           max(max(as.vector(series)), max(cred) + 2))
+ylims <- c(180, 1100)
 
-plot(1, type = "n",
+plot(1, type = "n", bty = 'L',
      xlab = '',
      ylab = 'Predicted counts',
      xlim = c(min(fake_data$data_train$year), max(fake_data$data_test$year)),
@@ -129,6 +133,7 @@ points(x = pred_vals, y = as.vector(series),
        pch = 16, col = 'black', cex = 0.6)
 abline(v = pred_vals[NROW(fake_data$data_train)],
        lty = 'dashed')
+box(bty = 'L', lwd = 2)
 
 # Repeat by using a first derivative penalty
 fake_data <- series_to_mvgam(series, freq = 365, train_prop = 0.74)
@@ -146,11 +151,12 @@ trend_fits <- predict(gam_mod, newdata = expand.grid(year = pred_vals,
         se.fit = T, type = 'terms')
 ylims <- c(min(trend_fits$fit[,1] - (2*trend_fits$se.fit[,1])),
            max(trend_fits$fit[,1] + (2*trend_fits$se.fit[,1])))
-plot(1, type = "n",
+plot(1, type = "n", bty = 'L',
      xlab = '',
-     ylab = 's(year)',
+     ylab = 'Partial effect of year',
      xlim = c(min(fake_data$data_train$year), max(fake_data$data_test$year)),
      ylim = ylims)
+box(bty = 'L', lwd = 2)
 cred_95 <- trend_fits$fit[,1] + (2*trend_fits$se.fit[,1])
 cred_05 <- trend_fits$fit[,1] - (2*trend_fits$se.fit[,1])
 polygon(c(pred_vals, rev(pred_vals)), c(cred_05, rev(cred_95)),
@@ -175,9 +181,8 @@ fits <- t(matrix(fits, nrow = dims_needed[1], ncol = dims_needed[2]))
 cred <- sapply(1:NCOL(fits),
                function(n) quantile(fits[,n],
                                     probs = probs))
-ylims <- c(180,
-           max(max(as.vector(series)), max(cred) + 2))
-plot(1, type = "n",
+ylims <- c(180, 1100)
+plot(1, type = "n", bty = 'L',
      xlab = '',
      ylab = 'Predicted counts',
      xlim = c(min(fake_data$data_train$year), max(fake_data$data_test$year)),
@@ -198,6 +203,7 @@ points(x = pred_vals, y = as.vector(series),
        pch = 16, col = 'black', cex = 0.6)
 abline(v = pred_vals[NROW(fake_data$data_train)],
        lty = 'dashed')
+box(bty = 'L', lwd = 2)
 
 dev.off()
 

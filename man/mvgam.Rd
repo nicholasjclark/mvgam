@@ -111,7 +111,7 @@ in the latent trends}
 \item{ar_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the AR terms
 in the latent trends}
 
-\item{r_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Negative Binomial
+\item{r_prior}{\code{character} specifying (in JAGS or Stan syntax) the prior distribution for the Negative Binomial
 overdispersion parameters. Note that this prior acts on the inverse of \code{r}, which is convenient
 for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
 as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tweedie}
@@ -119,7 +119,7 @@ as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tw
 \item{twdis_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Tweedie
 overdispersion parameters. Ignored if family is Poisson or Negative Binomial}
 
-\item{sigma_prior}{\code{character} specifying (in JAGS syntax) the prior distributions for the independent Gaussian
+\item{sigma_prior}{\code{character} specifying (in JAGS or Stan syntax) the prior distributions for the independent Gaussian
 variances used for the latent trends (ignored if \code{use_lv == TRUE})}
 
 \item{rho_gp_prior}{\code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
@@ -169,7 +169,10 @@ temporal processes. Prior distributions for most important model parameters can 
 sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 accordingly. However more control over the model specification can be accomplished by first using \code{mvgam} as a
 baseline, then editing the returned model accordingly. The model file can be edited and run outside
-of \code{mvgam} by setting \code{run_model = TRUE} and this is encouraged for complex modelling tasks
+of \code{mvgam} by setting \code{run_model = FALSE} and this is encouraged for complex modelling tasks. Note, no priors are
+formally checked to ensure they are in the right syntax for the respective probabilistic modelling framework, so it is
+up to the user to ensure these are correct (i.e. use \code{dnorm} for normal densities in \code{JAGS}, with the mean and precision
+parameterisation; but use \code{normal} for normal densities in \code{Stan}, with the mean and standard deviation parameterisation)
 \cr
 \cr
 \emph{Random effects}: For any smooth terms using the random effect basis (\code{\link[mcgv]{smooth.construct.re.smooth.spec}}),

@@ -6,6 +6,12 @@
 #' @param stan Logical (convert existing model to a Stan model?)
 #' @param use_lv Logical (use latent variable trends or not)
 #' @param trend_model The type of trend model to be added to the model file
+#' @param phi_prior \code{character} specifying (in Stan syntax) the prior distribution for the drift terms/intercepts
+#'in the latent trends
+#' @param ar_prior \code{character} specifying (in Stan syntax) the prior distribution for the AR terms
+#'in the latent trends
+#' @param sigma_prior \code{character} specifying (in Stan syntax) the prior distributions for the independent Gaussian
+#'variances used for the latent trends (ignored if \code{use_lv == TRUE})
 #' @param rho_gp_prior \code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
 #'Process length scale parameters
 #' @param alpha_gp_prior \code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
@@ -13,6 +19,8 @@
 #' @param drift Logical (add drift or not)
 #' @return A modified `JAGS` or `Stan` model file
 add_trend_lines = function(model_file, stan = FALSE,
+                           ar_prior, phi_prior,
+                           r_prior, sigma_prior,
                            rho_gp_prior, alpha_gp_prior,
                            use_lv, trend_model, drift){
 
@@ -202,9 +210,22 @@ add_trend_lines = function(model_file, stan = FALSE,
         model_file[grep('// trend estimates', model_file) + 6] <-
           paste0('trend[2:n, s] ~ normal(phi[s] + trend[1:(n - 1), s], sigma[s]);')
 
-        model_file[grep('model \\{', model_file) + 2] <-
-          paste0('\n// priors for trend parameters\nphi ~ normal(0, 0.5);\n')
+        if(missing(phi_prior)){
+          model_file[grep('model \\{', model_file) + 2] <-
+            paste0('\n// priors for trend parameters\nphi ~ normal(0, 0.5);\n')
+        } else {
+          model_file[grep('model \\{', model_file) + 2] <-
+            paste0('\n// priors for trend parameters\nphi ~ ',
+            phi_prior,
+            ';\n')
+        }
 
+        model_file <- readLines(textConnection(model_file), n = -1)
+      }
+
+      if(!missing(sigma_prior)){
+        model_file <- readLines(textConnection(model_file), n = -1)
+        model_file[grep('sigma ~ exponential(1);',model_file, fixed = TRUE)] <- paste0('sigma ~ ', sigma_prior, ';\n')
         model_file <- readLines(textConnection(model_file), n = -1)
       }
     }
@@ -221,8 +242,15 @@ add_trend_lines = function(model_file, stan = FALSE,
         model_file[grep('// trend estimates', model_file) + 6] <-
           paste0('trend[2:n, s] ~ normal(phi[s] + ar1[s] * trend[1:(n - 1), s], sigma[s]);')
 
-        model_file[grep('model \\{', model_file) + 2] <-
-          paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nphi ~ normal(0, 0.5);\n')
+        if(missing(phi_prior)){
+          model_file[grep('model \\{', model_file) + 2] <-
+            paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nphi ~ normal(0, 0.5);\n')
+        } else {
+          model_file[grep('model \\{', model_file) + 2] <-
+            paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nphi ~ ',
+                   phi_prior,
+                   ';\n')
+        }
       } else {
         model_file[grep('// raw basis', model_file) + 1] <-
           paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1, upper=1>[n_series] ar1;')
@@ -232,6 +260,16 @@ add_trend_lines = function(model_file, stan = FALSE,
 
         model_file[grep('model \\{', model_file) + 2] <-
           paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\n')
+      }
+
+      if(!missing(sigma_prior)){
+        model_file <- readLines(textConnection(model_file), n = -1)
+        model_file[grep('sigma ~ exponential(1);',model_file, fixed = TRUE)] <- paste0('sigma ~ ', sigma_prior, ';\n')
+      }
+
+      if(!missing(ar_prior)){
+        model_file <- readLines(textConnection(model_file), n = -1)
+        model_file[grep('ar1 ~ normal', model_file, fixed = TRUE)] <-paste0('ar1 ~ ', ar_prior, ';\n')
       }
 
       model_file <- readLines(textConnection(model_file), n = -1)
@@ -258,9 +296,15 @@ add_trend_lines = function(model_file, stan = FALSE,
                  'trend[i, s] ~ normal(phi[s] + ar1[s] * trend[i - 1, s] + ar2[s] * trend[i - 2, s], sigma[s]);\n',
                  '}\n}\n')
 
-        model_file[grep('model \\{', model_file) + 2] <-
-          paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\nphi ~ normal(0, 0.5);\n')
-
+        if(missing(phi_prior)){
+          model_file[grep('model \\{', model_file) + 2] <-
+            paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\nphi ~ normal(0, 0.5);\n')
+        } else {
+          model_file[grep('model \\{', model_file) + 2] <-
+            paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\nphi ~ ',
+                   phi_prior,
+                   ';\n')
+        }
       } else {
         model_file[grep('// raw basis', model_file) + 1] <-
           paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1, upper=1>[n_series] ar1;\n\n',
@@ -280,6 +324,17 @@ add_trend_lines = function(model_file, stan = FALSE,
 
         model_file[grep('model \\{', model_file) + 2] <-
           paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\n')
+      }
+
+      if(!missing(sigma_prior)){
+        model_file <- readLines(textConnection(model_file), n = -1)
+        model_file[grep('sigma ~ exponential(1);',model_file, fixed = TRUE)] <- paste0('sigma ~ ', sigma_prior, ';\n')
+      }
+
+      if(!missing(ar_prior)){
+        model_file <- readLines(textConnection(model_file), n = -1)
+        model_file[grep('ar1 ~ normal', model_file, fixed = TRUE)] <-paste0('ar1 ~ ', ar_prior, ';')
+        model_file[grep('ar2 ~ normal', model_file, fixed = TRUE)] <-paste0('ar2 ~ ', ar_prior, ';\n')
       }
 
       model_file <- readLines(textConnection(model_file), n = -1)
@@ -316,6 +371,18 @@ add_trend_lines = function(model_file, stan = FALSE,
           paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\nar3 ~ normal(0, 0.5);\n',
                  'phi ~ normal(0, 0.5);\n')
 
+        if(missing(phi_prior)){
+          model_file[grep('model \\{', model_file) + 2] <-
+            paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\nar3 ~ normal(0, 0.5);\n',
+            'phi ~ normal(0, 0.5);\n')
+        } else {
+          model_file[grep('model \\{', model_file) + 2] <-
+            paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\nar3 ~ normal(0, 0.5);\n',
+                   'phi ~ ',
+                   phi_prior,
+                   ';\n')
+        }
+
       } else {
         model_file[grep('// raw basis', model_file) + 1] <-
           paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1, upper=1>[n_series] ar1;\n\n',
@@ -341,6 +408,18 @@ add_trend_lines = function(model_file, stan = FALSE,
 
         model_file[grep('model \\{', model_file) + 2] <-
           paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\nar3 ~ normal(0, 0.5);\n')
+      }
+
+      if(!missing(sigma_prior)){
+        model_file <- readLines(textConnection(model_file), n = -1)
+        model_file[grep('sigma ~ exponential(1);',model_file, fixed = TRUE)] <- paste0('sigma ~ ', sigma_prior, ';\n')
+      }
+
+      if(!missing(ar_prior)){
+        model_file <- readLines(textConnection(model_file), n = -1)
+        model_file[grep('ar1 ~ normal', model_file, fixed = TRUE)] <-paste0('ar1 ~ ', ar_prior, ';')
+        model_file[grep('ar2 ~ normal', model_file, fixed = TRUE)] <-paste0('ar2 ~ ', ar_prior, ';')
+        model_file[grep('ar3 ~ normal', model_file, fixed = TRUE)] <-paste0('ar3 ~ ', ar_prior, ';\n')
       }
 
       model_file <- readLines(textConnection(model_file), n = -1)
