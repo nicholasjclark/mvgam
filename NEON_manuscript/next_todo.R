@@ -2,9 +2,10 @@ library(mvgam)
 dat <- sim_mvgam(T = 100, n_series=4, n_lv = 1)
 mod1 <- mvgam(formula = y ~ s(season) + s(series, bs = 're'),
               data_train = dat$data_train,
-              trend_model = 'AR2',
+              trend_model = 'GP',
               family = 'nb',
-              use_stan = TRUE)
+              use_stan = TRUE,
+              run_model = FALSE)
 mod1$model_file
 
 mod2 <- mvgam(formula = y~s(season),

@@ -1007,7 +1007,7 @@ mvgam = function(formula,
       cat(modification, file = 'base_gam_stan.txt', sep = '\n', append = T)
       base_stan_model <- trimws(suppressWarnings(readLines('base_gam_stan.txt')))
       unlink('base_gam_stan.txt')
-      mod$model_file
+
       # Add necessary trend structure
       base_stan_model <- add_trend_lines(model_file = base_stan_model,
                                          stan = TRUE,
