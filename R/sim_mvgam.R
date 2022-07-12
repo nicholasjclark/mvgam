@@ -12,8 +12,13 @@
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
 #'@param n_lv \code{integer}. Number of latent dynamic factors for generating the series' trends
-#'@param trend_model \code{character} either 'RW' (trends evolve as random walks with drift) or 'GP'
-#'(trends evolve as smooth Gaussian Processes with squared exponential covariance kernels)
+#'@param trend_model \code{character} specifying the time series dynamics for the latent trends. Options are:
+#''RW' (random walk with possible drift),
+#''AR1' (AR1 model with intercept),
+#''AR2' (AR2 model with intercept) or
+#''AR3' (AR3 model with intercept) or
+#''GP' (Gaussian process with squared exponential kernel
+#'@param drift \code{logical}, simulate a drift term for each trend
 #'@param trend_rel \code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}
 #'@param freq \code{integer}. The seasonal frequency of the series
 #'@param family \code{character} specifying the exponential observation family for the series. Must be either
@@ -35,6 +40,7 @@ sim_mvgam = function(T = 100,
                      use_lv = FALSE,
                      n_lv = 2,
                      trend_model = 'RW',
+                     drift = FALSE,
                      trend_rel = 0.2,
                      freq = 12,
                      family = 'poisson',
@@ -45,7 +51,7 @@ sim_mvgam = function(T = 100,
 
   # Check arguments
   family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
-  trend_model <- match.arg(arg = trend_model, choices = c("RW", "GP"))
+  trend_model <- match.arg(arg = trend_model, choices = c("RW", "GP", 'AR1', 'AR2', 'AR3'))
 
   if(missing(trend_rel)){
     trend_rel <- 0.2
@@ -85,21 +91,59 @@ sim_mvgam = function(T = 100,
   }
 
   if(trend_model == 'RW'){
-    # Sample trend drift terms so they are (hopefully) not too correlated
-    trend_alphas <- rnorm(n_lv, sd = 0.15)
+    ar1s <- rep(1, n_lv)
+    ar2s <- rep(0, n_lv)
+    ar3s <- rep(0, n_lv)
+  }
 
-    # Simulate the long-term trends, which evolve as random walks + drift
-    trends <- do.call(cbind, lapply(seq_len(n_lv), function(x){
-      trend <- rep(NA, length = T + 2)
-      trend[1] <- trend_alphas[x]
-      for (t in 2:(T+2)) {
-        trend[t] <- rnorm(
-          1,
-          trend_alphas[x] + trend[t - 1],
-          1
-        )
+  if(trend_model == 'AR1'){
+    ar1s <- rnorm(n_lv, sd = 0.15)
+    ar2s <- rep(0, n_lv)
+    ar3s <- rep(0, n_lv)
+  }
+
+  if(trend_model == 'AR2'){
+    ar1s <- rnorm(n_lv, sd = 0.15)
+    ar2s <- rnorm(n_lv, sd = 0.15)
+    ar3s <- rep(0, n_lv)
+  }
+
+  if(trend_model == 'AR3'){
+    ar1s <- rnorm(n_lv, sd = 0.15)
+    ar2s <- rnorm(n_lv, sd = 0.15)
+    ar3s <- rep(0, n_lv)
+  }
+
+  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+    # Sample trend drift terms so they are (hopefully) not too correlated
+    if(drift){
+      trend_alphas <- rnorm(n_lv, sd = 0.15)
+    } else {
+      trend_alphas <- rep(0, n_lv)
+    }
+
+    # Function to simulate trends ahead using ar3 model
+    sim_ar3 = function(phi, ar1, ar2, ar3, T){
+      states <- rep(NA, length = T + 3)
+      inits <- cumsum(rnorm(3, 0, 0.1))
+      states[1] <- inits[1]
+      states[2] <- inits[2]
+      states[3] <- inits[3]
+      for (t in 4:(T + 3)) {
+        states[t] <- rnorm(1, phi + ar1*states[t - 1] +
+                             ar2*states[t - 2] +
+                             ar3*states[t - 3], 1)
       }
-      as.vector(scale(zoo::rollmean(as.vector(scale(trend)), k = 3, na.pad = F)))
+      states[-c(1:3)]
+    }
+
+    # Simulate latent trends
+    trends <- do.call(cbind, lapply(seq_len(n_lv), function(x){
+      sim_ar3(phi = trend_alphas[x],
+              ar1 = ar1s[x],
+              ar2 = ar2s[x],
+              ar3 = ar3s[x],
+              T = T)
     }))
   }
 
@@ -175,10 +219,9 @@ sim_mvgam = function(T = 100,
   glob_season <- as.vector(scale(zoo::rollmean(stl_season, k = 6, na.pad = F)))
 
   # Simulate observed series as discrete draws dependent on seasonality and trend
-
   obs_trends <- matrix(NA, nrow = T, ncol = n_series)
    for(s in 1:n_series){
-      obs_trends[,s] <- as.vector(loadings[,s] %*%  t(trends))
+      obs_trends[,s] <- as.vector(scale(as.vector(loadings[,s] %*% t(trends))))
    }
 
   obs_ys <- c(unlist(lapply(seq_len(n_series), function(x){
@@ -241,7 +284,7 @@ sim_mvgam = function(T = 100,
   list(data_train = data.frame(data_train),
        data_test = data.frame(data_test),
        true_corrs = cov2cor(cov(obs_trends)),
-       true_trends = trends,
+       true_trends = obs_trends,
        global_seasonality = glob_season)
 
 }

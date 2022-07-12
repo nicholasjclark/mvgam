@@ -24,7 +24,7 @@
 #'empirical quantiles of the posterior distribution are shown
 #'@param n_realisations \code{integer} specifying the number of posterior realisations to plot, if
 #'\code{realisations = TRUE}. Ignored otherwise
-#'@param newdata Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
+#'@param newdata Optional \code{dataframe} for predicting the smooth, containing at least 'series'
 #'in addition to any other variables included in the linear predictor of the original model's \code{formula}.
 #'Note that this currently is only supported for plotting univariate smooths
 #'@details Smooth functions are shown as empirical quantiles (or spaghetti plots) of posterior partial expectations
@@ -194,13 +194,13 @@ plot_mvgam_smooth = function(object,
                                 silent = TRUE))
 
     if(inherits(Xp, 'try-error')){
-      testdat <- data.frame(time = pred_dat$time)
+      testdat <- data.frame(series = pred_dat$series)
 
       terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients)
                                                                    %in% '(Intercept)')]
       if(length(terms_include) > 0){
         newnames <- vector()
-        newnames[1] <- 'time'
+        newnames[1] <- 'series'
         for(i in 1:length(terms_include)){
           testdat <- cbind(testdat, data.frame(pred_dat[[terms_include[i]]]))
           newnames[i+1] <- terms_include[i]
@@ -213,8 +213,10 @@ plot_mvgam_smooth = function(object,
                                       type = 'lpmatrix'))
     }
 
-    # Zero out all other columns in Xp
-    Xp[,!grepl(paste0('(', smooth, ')'), colnames(Xp), fixed = T)] <- 0
+    if(missing(newdata)){
+      # Zero out all other columns in Xp
+      Xp[,!grepl(paste0('(', smooth, ')'), colnames(Xp), fixed = T)] <- 0
+    }
 
     # Extract GAM coefficients
     #betas <- t(matrix(coef(object$mgcv_model)))
@@ -240,6 +242,10 @@ plot_mvgam_smooth = function(object,
     # smooth of interest
     suppressWarnings(Xp2 <- predict(object$mgcv_model,
                                     newdata = object$obs_data, type = 'lpmatrix'))
+
+    if(!missing(newdata)){
+      stop('Partial residual plots not available when using newdata')
+    }
 
     # Zero out all other columns in Xp2
     Xp2[,!grepl(paste0('(', smooth, ')'), colnames(Xp2), fixed = T)] <- 0

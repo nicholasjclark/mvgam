@@ -2,10 +2,10 @@
 title: 'mvgam case study 1: model comparison and data assimilation'
 author: "Nicholas Clark (n.clark@uq.edu.au)"
 output:
-  html_document:
-    df_print: paged
   pdf_document:
     highlight: zenburn
+  html_document:
+    df_print: paged
   word_document: default
 urlcolor: blue
 ---
@@ -18,7 +18,7 @@ opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
 
 Generalised Additive Models (GAMs) are incredibly flexible tools that have found particular application in the analysis of time series. In ecology, a host of recent papers and workshops (i.e. the [2018 Ecological Society of America workshop on GAMs](https://noamross.github.io/mgcv-esa-2018/) that was hosted by Eric Pedersen, David L. Miller, Gavin Simpson, and Noam Ross) have drawn special attention to the wide range of applications that GAMs have for addressing complex ecological problems. Given the many ways that GAMs can model temporal data, it is tempting to use the smooth functions estimated by a GAM to produce out of sample forecasts. Here we will inspect the behaviours of smoothing splines when extrapolating to data outside the range of the training data to examine whether this can be useful in practice. 
 
-We will work in the `mvgam` package, which fits dynamic GAMs (DGAMs) using MCMC sampling via the `JAGS` software (Note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a discrete response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Asssuming $\boldsymbol{y}$ is drawn from an exponential distribution (such as Poisson or Negative Binomial) with a log link function, the linear predictor for a dynamic GAM is written as:
+We will work in the `mvgam` package, which fits dynamic GAMs (DGAMs) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a discrete response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Asssuming $\boldsymbol{y}$ is drawn from an exponential distribution (such as Poisson or Negative Binomial) with a log link function, the linear predictor for a dynamic GAM is written as:
 
 $$log(\tilde{\boldsymbol{y}}_{t})={\boldsymbol{B}}_0+\sum\limits_{i=1}^I\boldsymbol{s}_{i,t}\boldsymbol{x}_{i,t}+\boldsymbol{z}_{t}\,,$$
 Here $\boldsymbol{B}_{0}$ is the unknown intercept, the $\boldsymbol{s}$'s are unknown smooth functions of the covariates ($\boldsymbol{x}$'s) and $\boldsymbol{z}$ is a dynamic latent trend component. Each smooth function $\boldsymbol{s}_{i}$ is composed of spline like basis expansions whose coefficients, which must be estimated, control the shape of the functional relationship between $\boldsymbol{x}_{i}$ and $log(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity, with a larger set of basis functions allowing greater flexibility. Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson, Negative Binomial, Tweedie-Poisson) that accommodate common ecological features such as zero-inflation or overdispersion, and that they can be formulated to include hierarchical smoothing for multivariate responses. For the dynamic component, in its most basic form we assume a random walk with drift:
@@ -114,6 +114,9 @@ summary(m_mgcv)
 ```
 
 Forecasting from this model requires us to write a custom function that can recursively update the design matrix at each successive one-step ahead prediction. Here we define a function to iteratively propagate a forecast forward according to the AR3 observation model. Note that we have used an argument to allow the lags to be fed into the model on the log scale, this will make more sense in a moment as we inspect the forecasts of the model
+
+<details>
+<summary>Click for definition of `recurse_ar3`</summary>
 ```{r}
 recurse_ar3 = function(model, lagged_vals, h, log_lags = F){
   # Initiate state vector
@@ -159,6 +162,7 @@ recurse_ar3 = function(model, lagged_vals, h, log_lags = F){
   states[-c(1:3)]
 }
 ```
+</details>
 
 Draw 1000 parameter estimates from the GAM posterior and use these to propagate the forecast for 10 timesteps ahead
 ```{r}
@@ -231,6 +235,8 @@ The `Stan` model file is also designed to be as descriptive as possible about th
 mod_skeleton$model_file
 ```
 Now we will evaluate the forecasts for each of the models. Here we define a function to plot posterior empirical forecast quantiles and calculate the Discrete Rank Probability Score (DRPS, a proper scoring rule for evaluating probabilistic forecast distributions) for each of the out of sample forecasts. The final score for each forecast is the sum of DRPS values at each forecast horizon, with the lower score being the favoured forecast. The function returns a plot of the forecast distribution and also prints the DRPS score
+<details>
+<summary>Click for definition of `plot_fc_horizon`</summary>
 ```{r}
 plot_fc_horizon = function(gam_sims, main){
   probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
@@ -311,6 +317,7 @@ plot_fc_horizon = function(gam_sims, main){
 }
 
 ```
+</details>
 
 Evaluate forecasts for the two models; first the `mgcv` autoregressive observation model
 ```{r, fig.width = 6, fig.height = 5, fig.align='center'}
@@ -864,6 +871,8 @@ coef_sim <- gam.mh(lynx_mgcv)$bs
 
 
 Now we define a function to perform forecast simulations from the nonlinear lag model in a recursive fashion. Using starting values for the last two lags, the function will iteratively project the path ahead with a random sample from the model's coefficient posterior
+<details>
+<summary>Click for definition of `recurse_nonlin`</summary>
 ```{r}
 recurse_nonlin = function(model, lagged_vals, h){
   # Initiate state vector
@@ -894,6 +903,7 @@ recurse_nonlin = function(model, lagged_vals, h){
   states[-c(1:2)]
 }
 ```
+</details>
 
 Create the GAM's forecast distribution by generating `1000` simulated forecast paths. Each path is fed the true observed values for the last two lags of the first out of sample timepoint, but they can deviate when simulating ahead depending on their particular draw of possible coefficients. Note, this is a bit slow and could easily be parallelised to speed up computations
 ```{r}
@@ -929,6 +939,8 @@ lines(lynx_test$population[1:10])
 ```
 
 A decent forecast? The shape is certainly correct, but the 95% uncertainty intervals appear to be far too wide (i.e. our upper interval extends to up to ~8 times the maximum number of trappings that have ever been recorded up to this point). This is almost entirely due to the extrapolation behaviour of the B spline, as the lag smooth functions are not encountering values very far outside the ranges they've already been trained on so they are resorting mostly to interpolation. But a better way to evaluate than simply using visuals is to calculate a probabilistic score. Here we use the Discrete Rank Probabiilty Score, which gives us an indication of how well calibrated our forecast's uncertainty intervals are by comparing the mass of the forecast density against the true observed values. Forecasts with overly wide intervals are penalised, as are forecasts with overly narrow intervals that do not contain the true observations. At the same time we calculate coverage of the forecast's 90% intervals, which is another useful way of evaluating different forecast proposals
+<details>
+<summary>Click for definition of `drps_score`</summary>
 ```{r}
   # Discrete Rank Probability Score and coverage of 90% interval
   drps_score <- function(truth, fc, interval_width = 0.9){
@@ -959,8 +971,11 @@ A decent forecast? The shape is certainly correct, but the 95% uncertainty inter
     }
     scores
   }
+```
+</details>
 
-# Calculate DRPS over the 10-year horizon for the mgcv model
+Calculate DRPS over the 10-year horizon for the mgcv model
+```{r}
 lynx_mgcv1_drps <- drps_mcmc_object(truth = lynx_test$population[1:10], 
                    fc = gam_sims)
 ```

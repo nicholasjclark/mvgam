@@ -2,10 +2,10 @@
 title: 'mvgam case study 2: multivariate models'
 author: "Nicholas Clark (n.clark@uq.edu.au)"
 output:
-  html_document:
-    df_print: paged
   pdf_document:
     highlight: zenburn
+  html_document:
+    df_print: paged
   word_document: default
 urlcolor: blue
 ---
@@ -16,14 +16,14 @@ library(knitr)
 opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
 ```
 
-In this example we will examine multivariate forecasting models using `mvgam`, which fits GAMs using MCMC sampling via the `JAGS` software (Note that `JAGS` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `K` can be difficult. The approach used by `mvgam` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated in an exponentially increasing manner (following Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291), we hope that we can guard against specying too large a `K`. But we should test this property to see how it behaves in different scenarios. Begin by simulating `6` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `80` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Poisson distributions
+In this example we will examine multivariate forecasting models using `mvgam`, which fits dynamic GAMs (DGAMs) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `M` can be difficult. The approach used by `mvgam` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated in an exponentially increasing manner (following Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291), we hope that we can guard against specifying too large a `M`. But we should test this property to see how it behaves in different scenarios. Begin by simulating `6` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `100` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Poisson distributions
 ```{r}
-set.seed(500)
+set.seed(1111)
 library(mvgam)
-dat <- sim_mvgam(T = 80, n_series = 6, n_lv = 2,
+dat <- sim_mvgam(T = 100, n_series = 6, n_lv = 2,
                  family = 'poisson',
                  mu_obs = runif(8, 4, 6),
-                 trend_rel = 0.6, train_prop = 0.8)
+                 trend_rel = 0.6, train_prop = 0.85)
 ```
 
 Have a look at the series
@@ -31,7 +31,8 @@ Have a look at the series
 par(mfrow = c(3,2))
 for(i in 1:6){
   plot(dat$data_train$y[which(as.numeric(dat$data_train$series) == i)], type = 'l',
-       ylab = paste('Series', i), xlab = 'Time')
+       ylab = paste('Series', i), xlab = 'Time', bty = 'L')
+  box(bty = 'L', lwd = 2)
 }
 par(mfrow = c(1,1))
 ```
@@ -40,19 +41,19 @@ Clearly there are some correlations in the trends for these series. But how does
 
 ![](df.gif)
 
-A challenge with any factor model is the need to determine the number of factors `K`. Setting `K` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `K` too large leads to unnecessary computation. `mvgam` approaches this problem by formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines. Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
+A challenge with any factor model is the need to determine the number of factors `M`. Setting `M` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `M` too large leads to unnecessary computation. `mvgam` approaches this problem by formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines. Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
 ```{r, message=FALSE, warning=FALSE}
 mod1 <- mvgam(data_train = dat$data_train,
                 data_test = dat$data_test,
                 formula = y ~ s(series, bs = 're') +
-                  s(season, bs = c('cc'), k = 12),
+                  s(season, bs = c('cc'), k = 8),
                 knots = list(season = c(0.5, 12.5)),
                 use_lv = T,
                 n_lv = 2,
                 family = 'poisson',
                 trend_model = 'RW',
                 chains = 4,
-                burnin = 1000)
+                burnin = 4000)
 ```
 
 Look at a few plots. The estimated smooth function
@@ -62,7 +63,7 @@ plot_mvgam_smooth(object = mod1, series = 1, smooth = 'season')
 
 And the true seasonal function in the simulation
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot(dat$global_seasonality[1:12], type = 'l')
+plot(dat$global_seasonality[1:12], type = 'l', bty = 'L', ylab = 'True function', xlab = 'season')
 ```
 
 Check whether each factor was retained using the `plot_mvgam_factors` function. Here, each factor is tested against a null hypothesis of white noise by calculating the sum of the factor's 1st derivatives. A factor that has a larger contribution to the series' latent trends will have a larger sum, both because that factor's absolute magnitudes will be larger (due to the weaker penalty on the factor's precision) and because the factor will move around more. By normalising these estimated first derivative sums, it should be apparent whether some factors have been dropped from the model. Here we see that each factor is contributing to the series' latent trends, and the plots show that neither has been forced to evolve as white noise
@@ -75,14 +76,14 @@ Now we fit the same model but assume that we no nothing about how many factors t
 mod2 <- mvgam(data_train = dat$data_train,
                 data_test = dat$data_test,
                 formula = y ~ s(series, bs = 're') +
-                  s(season, bs = c('cc'), k = 12),
+                  s(season, bs = c('cc'), k = 8),
                 knots = list(season = c(0.5, 12.5)),
                 use_lv = T,
                 n_lv = 6,
                 family = 'poisson',
                 trend_model = 'RW',
                 chains = 4,
-                burnin = 1000)
+                burnin = 4000)
 ```
 
 The same plots as model 1 to see if this model has also fit the data well
@@ -91,7 +92,7 @@ plot_mvgam_smooth(object = mod2, series = 1, smooth = 'season')
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot(dat$global_seasonality[1:12], type = 'l')
+plot(dat$global_seasonality[1:12], type = 'l', bty = 'L', ylab = 'True function', xlab = 'season')
 ```
 
 Examining the factor contributions gives us some insight into whether we set `n_lv` larger than we perhaps needed to. These contributions can be interpreted similarly to ordination axes when deciding how many latent variables to specify
@@ -136,15 +137,15 @@ Plot the series to see how similar their seasonal shapes are over time
 plot(series, legend.loc = 'topleft')
 ```
 
-Now we will fit an `mvgam` model with shared seasonality and random intercepts per series. Our first attempt will ignore any temporal component in the residuals so that we can identidy which GAM predictor combination gives us the best fit, prior to investigating how to deal with any remaining autocorrelation. We assume a Negative Binomial distrubution with series-specific overdispersion parameters for the response. We use a complexity-penalising prior for the overdispersion, which allows the model to reduce toward a more simple Poisson observation process unless the data provide adequate information to support overdispersion. Also note that any smooths using the random effects basis (`s(series, bs = "re")` below) are automatically re-parameterised to use the [non-centred parameterisation that is necessary to help avoid common posterior degeneracies in hierarchical models](https://betanalpha.github.io/assets/case_studies/hierarchical_modeling.html). This parameterisation tends to work better for most ecological problems where the data for each group / context are not highly informative, but it is still probably worth investigating whether a centred or even a mix of centred / non-centred will give better computational performance. We suppress the global intercept as it is not needed and will lead to identifiability issues when estimating the series-specific random intercepts
+Now we will fit an `mvgam` model with shared seasonality and random intercepts per series. Our first attempt will ignore any temporal component in the residuals so that we can identidy which GAM predictor combination gives us the best fit, prior to investigating how to deal with any remaining autocorrelation. We assume a Poisson observation model for the response. Also note that any smooths using the random effects basis (`s(series, bs = "re")` below) are automatically re-parameterised to use the [non-centred parameterisation that is necessary to help avoid common posterior degeneracies in hierarchical models](https://betanalpha.github.io/assets/case_studies/hierarchical_modeling.html). This parameterisation tends to work better for most ecological problems where the data for each group / context are not highly informative, but it is still probably worth investigating whether a centred or even a mix of centred / non-centred will give better computational performance. We suppress the global intercept as it is not needed and will lead to identifiability issues when estimating the series-specific random intercepts
 ```{r, message=FALSE, warning=FALSE}
 trends_mod1 <- mvgam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
                       formula = y ~ s(series, bs = 're') + 
-                        s(season, k = 12, m = 2, bs = 'cc') - 1,
+                        s(season, k = 8, m = 2, bs = 'cc') - 1,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
-                      family = 'nb',
+                      family = 'poisson',
                       chains = 4,
                       burnin = 8000)
 ```
@@ -153,11 +154,11 @@ Given that these series could potentially be following a hierarchical seasonalit
 ```{r, message=FALSE, warning=FALSE}
 trends_mod2 <- mvgam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
-                      formula = y ~ s(season, k = 12, m = 2, bs = 'cc') +
+                      formula = y ~ s(season, k = 8, m = 2, bs = 'cc') +
                         s(season, series, k = 5, bs = 'fs', m = 1),
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
-                      family = 'nb',
+                      family = 'poisson',
                       chains = 4,
                       burnin = 8000)
 ```
@@ -185,13 +186,13 @@ Model 2 seems to fit better so far, suggesting that hierarchical seasonality giv
 ```{r, message=FALSE, warning=FALSE}
 trends_mod3 <- mvgam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
-                      formula = y ~ s(season, k = 12, m = 2, bs = 'cc') +
+                      formula = y ~ s(season, k = 8, m = 2, bs = 'cc') +
                         s(season, series, k = 5, bs = 'fs', m = 1),
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'AR1',
-                      use_lv = T,
+                      use_lv = TRUE,
                       n_lv = 4,
-                      family = 'nb',
+                      family = 'poisson',
                       chains = 4,
                       burnin = 8000)
 ```
@@ -285,21 +286,41 @@ plot_mvgam_trend(object = trends_mod3, series = 3, data_test = trends_data$data_
 plot_mvgam_trend(object = trends_mod3, series = 4, data_test = trends_data$data_test)
 ```
 
-Given that we fit a model with hierarchical seasonality, the seasonal smooths are able to deviate from one another (though they share the same wiggliness and all deviate from a common 'global' seasonal function)
+Given that we fit a model with hierarchical seasonality, the seasonal smooths are able to deviate from one another (though they share the same wiggliness and all deviate from a common 'global' seasonal function). Here we use the `newdata` argument to generate predictions for each of the hierarchical smooth functions (note that the intercept is still included in these plots so they do not center on zero)
 ```{r, fig.width = 4, fig.height = 3, fig.align='center'}
-plot_mvgam_smooth(object = trends_mod3, series = 1, smooth = 'season')
+newdat <- data.frame(season = seq(1, 12, length.out = 100),
+                     series = levels(trends_data$data_train$series)[1])
+  
+plot_mvgam_smooth(object = trends_mod3, series = 1, 
+                  smooth = 'season',
+                  newdata = newdat)
 ```
 
 ```{r, fig.width = 4, fig.height = 3, fig.align='center'}
-plot_mvgam_smooth(object = trends_mod3, series = 2, smooth = 'season')
+newdat <- data.frame(season = seq(1, 12, length.out = 100),
+                     series = levels(trends_data$data_train$series)[2])
+  
+plot_mvgam_smooth(object = trends_mod3, series = 2, 
+                  smooth = 'season',
+                  newdata = newdat)
 ```
 
 ```{r, fig.width = 4, fig.height = 3, fig.align='center'}
-plot_mvgam_smooth(object = trends_mod3, series = 3, smooth = 'season')
+newdat <- data.frame(season = seq(1, 12, length.out = 100),
+                     series = levels(trends_data$data_train$series)[3])
+  
+plot_mvgam_smooth(object = trends_mod3, series = 3, 
+                  smooth = 'season',
+                  newdata = newdat)
 ```
 
 ```{r, fig.width = 4, fig.height = 3, fig.align='center'}
-plot_mvgam_smooth(object = trends_mod3, series = 4, smooth = 'season')
+newdat <- data.frame(season = seq(1, 12, length.out = 100),
+                     series = levels(trends_data$data_train$series)[4])
+  
+plot_mvgam_smooth(object = trends_mod3, series = 4, 
+                  smooth = 'season',
+                  newdata = newdat)
 ```
 
 Plot posterior mean estimates of latent trend correlations. These correlations are more useful than looking at latent factor loadings, for example to inspect ordinations. This is because the orders of the loadings (although constrained for identifiability purposes) can vary from chain to chain

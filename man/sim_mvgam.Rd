@@ -11,6 +11,7 @@ sim_mvgam(
   use_lv = FALSE,
   n_lv = 2,
   trend_model = "RW",
+  drift = FALSE,
   trend_rel = 0.2,
   freq = 12,
   family = "poisson",
@@ -33,8 +34,14 @@ latent trends in a reduced dimension format. If \code{FALSE}, estimate independe
 
 \item{n_lv}{\code{integer}. Number of latent dynamic factors for generating the series' trends}
 
-\item{trend_model}{\code{character} either 'RW' (trends evolve as random walks with drift) or 'GP'
-(trends evolve as smooth Gaussian Processes with squared exponential covariance kernels)}
+\item{trend_model}{\code{character} specifying the time series dynamics for the latent trends. Options are:
+'RW' (random walk with possible drift),
+'AR1' (AR1 model with intercept),
+'AR2' (AR2 model with intercept) or
+'AR3' (AR3 model with intercept) or
+'GP' (Gaussian process with squared exponential kernel}
+
+\item{drift}{\code{logical}, simulate a drift term for each trend}
 
 \item{trend_rel}{\code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}}
 

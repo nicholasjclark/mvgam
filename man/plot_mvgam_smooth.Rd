@@ -46,7 +46,7 @@ estimated 1st derivative for the specified smooth (Note, this only works for uni
 making it easier to visualise the diversity of possible functions. If \code{FALSE}, the default,
 empirical quantiles of the posterior distribution are shown}
 
-\item{newdata}{Optional \code{dataframe} for predicting the smooth, containing at least 'series', 'season' and 'year',
+\item{newdata}{Optional \code{dataframe} for predicting the smooth, containing at least 'series'
 in addition to any other variables included in the linear predictor of the original model's \code{formula}.
 Note that this currently is only supported for plotting univariate smooths}
 }

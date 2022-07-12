@@ -2,10 +2,10 @@
 title: 'mvgam case study 3: distributed lag models'
 author: "Nicholas Clark (n.clark@uq.edu.au)"
 output:
-  html_document:
-    df_print: paged
   pdf_document:
     highlight: zenburn
+  html_document:
+    df_print: paged
   word_document: default
 urlcolor: blue
 ---
@@ -22,7 +22,15 @@ $$log(\tilde{\boldsymbol{y}}_{t})={\boldsymbol{B}}_0+\sum\limits_{k=1}^K{f}(\bol
 where $\boldsymbol{B}_{0}$ is the unknown intercept, the $\boldsymbol{b}$'s are unknown spline coefficients estimating how the functional effect of covariate ($\boldsymbol{x}$) on $log(\tilde{\boldsymbol{y}}_{t})$ changes over increasing lags (up to a maximum lag of ($\boldsymbol{K}$)) and $\boldsymbol{z}$ is a dynamic latent trend component. 
 
 To demonstrate how these models are estimated in `mvgam`, first we load the Portal rodents capture data, which are available from the `portalr` package
-```{r message=FALSE, warning = FALSE}
+```{r message=FALSE, warning = FALSE, eval=FALSE}
+#devtools::install_github("nicholasjclark/mvgam")
+library(mvgam)
+library(dplyr)
+portal_dat <- read.csv('https://raw.githubusercontent.com/nicholasjclark/mvgam/
+                       master/NEON_manuscript/Case studies/rodents_data.csv', as.is = T)
+```
+
+```{r echo=FALSE}
 #devtools::install_github("nicholasjclark/mvgam")
 library(mvgam)
 library(dplyr)
@@ -107,7 +115,7 @@ mod1 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                 data_test = data_test,
                 family = 'poisson',
                 chains = 4,
-                burnin = 10000,
+                burnin = 15000,
                 trend_model = 'None')
 ```
 
@@ -130,7 +138,7 @@ mod2 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                 data_test = data_test,
                 family = 'tw',
                 chains = 4,
-                burnin = 10000,
+                burnin = 15000,
                 trend_model = 'None')
 ```
 
@@ -158,7 +166,7 @@ mod3 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                 family = 'tw',
                 sigma_prior = 'dexp(2.5)T(0.15, 2)',
                 chains = 4,
-                burnin = 10000,
+                burnin = 15000,
                 trend_model = 'AR3')
 summary(mod3)
 ```
@@ -187,9 +195,9 @@ mod4 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                 data_test = data_test,
                 family = 'nb',
                 chains = 4,
-                burnin = 2000,
+                burnin = 1000,
                 trend_model = 'GP',
-              use_stan = T)
+              use_stan = TRUE)
 summary(mod4)
 ```
 
