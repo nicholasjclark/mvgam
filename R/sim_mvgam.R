@@ -97,21 +97,21 @@ sim_mvgam = function(T = 100,
   }
 
   if(trend_model == 'AR1'){
-    ar1s <- rnorm(n_lv, sd = 0.15)
+    ar1s <- rnorm(n_lv, sd = 0.5)
     ar2s <- rep(0, n_lv)
     ar3s <- rep(0, n_lv)
   }
 
   if(trend_model == 'AR2'){
-    ar1s <- rnorm(n_lv, sd = 0.15)
-    ar2s <- rnorm(n_lv, sd = 0.15)
+    ar1s <- rnorm(n_lv, sd = 0.5)
+    ar2s <- rnorm(n_lv, sd = 0.5)
     ar3s <- rep(0, n_lv)
   }
 
   if(trend_model == 'AR3'){
-    ar1s <- rnorm(n_lv, sd = 0.15)
-    ar2s <- rnorm(n_lv, sd = 0.15)
-    ar3s <- rep(0, n_lv)
+    ar1s <- rnorm(n_lv, sd = 0.5)
+    ar2s <- rnorm(n_lv, sd = 0.5)
+    ar3s <- rnorm(n_lv, sd = 0.5)
   }
 
   if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){

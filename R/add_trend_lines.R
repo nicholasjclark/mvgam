@@ -202,7 +202,7 @@ add_trend_lines = function(model_file, stan = FALSE,
     if(trend_model == 'RW'){
       if(drift){
         model_file[grep('// raw basis', model_file) + 1] <-
-          paste0('row_vector[num_basis] b_raw;\n\n// latent trend drift terms\nvector<lower=-1, upper=1>[n_series] phi;\n')
+          paste0('row_vector[num_basis] b_raw;\n\n// latent trend drift terms\nvector[n_series] phi;\n')
 
         model_file[grep('trend[1, s] ~ ', model_file, fixed = T)] <-
           "trend[1, s] ~ normal(phi[s], sigma[s]);"
@@ -233,8 +233,8 @@ add_trend_lines = function(model_file, stan = FALSE,
     if(trend_model == 'AR1'){
       if(drift){
         model_file[grep('// raw basis', model_file) + 1] <-
-          paste0(c('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1, upper=1>[n_series] ar1;\n\n'),
-          '// latent trend drift terms\nvector<lower=-1, upper=1>[n_series] phi;')
+          paste0(c('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector[n_series] ar1;\n\n'),
+          '// latent trend drift terms\nvector[n_series] phi;')
 
         model_file[grep('trend[1, s] ~ ', model_file, fixed = T)] <-
           "trend[1, s] ~ normal(phi[s], sigma[s]);"
@@ -253,7 +253,7 @@ add_trend_lines = function(model_file, stan = FALSE,
         }
       } else {
         model_file[grep('// raw basis', model_file) + 1] <-
-          paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1, upper=1>[n_series] ar1;')
+          paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector[n_series] ar1;')
 
         model_file[grep('// trend estimates', model_file) + 6] <-
           paste0('trend[2:n, s] ~ normal(ar1[s] * trend[1:(n - 1), s], sigma[s]);')
@@ -279,9 +279,9 @@ add_trend_lines = function(model_file, stan = FALSE,
 
       if(drift){
         model_file[grep('// raw basis', model_file) + 1] <-
-          paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1, upper=1>[n_series] ar1;\n\n',
-                 '// latent trend AR2 terms\nvector<lower=-1, upper=1>[n_series] ar2;\n\n',
-                 '// latent trend drift terms\nvector<lower=-1, upper=1>[n_series] phi;')
+          paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector[n_series] ar1;\n\n',
+                 '// latent trend AR2 terms\nvector[n_series] ar2;\n\n',
+                 '// latent trend drift terms\nvector[n_series] phi;')
 
         model_file[grep('trend[1, s] ~ ', model_file, fixed = T)] <-
           "trend[1, s] ~ normal(phi[s], sigma[s]);"
@@ -307,8 +307,8 @@ add_trend_lines = function(model_file, stan = FALSE,
         }
       } else {
         model_file[grep('// raw basis', model_file) + 1] <-
-          paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1, upper=1>[n_series] ar1;\n\n',
-                 '// latent trend AR2 terms\nvector<lower=-1, upper=1>[n_series] ar2;')
+          paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector[n_series] ar1;\n\n',
+                 '// latent trend AR2 terms\nvector[n_series] ar2;')
         model_file[grep('// trend estimates', model_file) + 2] <-
           paste0('trend[1, s] ~ normal(0, sigma[s]);')
 
@@ -344,10 +344,10 @@ add_trend_lines = function(model_file, stan = FALSE,
 
       if(drift){
         model_file[grep('// raw basis', model_file) + 1] <-
-          paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1, upper=1>[n_series] ar1;\n\n',
-                 '// latent trend AR2 terms\nvector<lower=-1, upper=1>[n_series] ar2;\n\n',
-                 '// latent trend AR3 terms\nvector<lower=-1, upper=1>[n_series] ar3;\n\n',
-                 '// latent trend drift terms\nvector<lower=-1, upper=1>[n_series] phi;')
+          paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector[n_series] ar1;\n\n',
+                 '// latent trend AR2 terms\nvector[n_series] ar2;\n\n',
+                 '// latent trend AR3 terms\nvector[n_series] ar3;\n\n',
+                 '// latent trend drift terms\nvector[n_series] phi;')
 
         model_file[grep('trend[1, s] ~ ', model_file, fixed = T)] <-
           "trend[1, s] ~ normal(phi[s], sigma[s]);"
@@ -364,7 +364,7 @@ add_trend_lines = function(model_file, stan = FALSE,
 
                  'for (i in 4:n) {\n',
                  'for (s in 1:n_series) {\n',
-                 'trend[i, s] ~ normal(phi[s] + ar1[s] * trend[i - 1, s] + ar2[s] * trend[i - 2, s] +ar3[s] * trend[i - 3, s], sigma[s]);\n',
+                 'trend[i, s] ~ normal(phi[s] + ar1[s] * trend[i - 1, s] + ar2[s] * trend[i - 2, s] + ar3[s] * trend[i - 3, s], sigma[s]);\n',
                  '}\n}\n')
 
         model_file[grep('model \\{', model_file) + 2] <-
@@ -385,9 +385,9 @@ add_trend_lines = function(model_file, stan = FALSE,
 
       } else {
         model_file[grep('// raw basis', model_file) + 1] <-
-          paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1, upper=1>[n_series] ar1;\n\n',
-                 '// latent trend AR2 terms\nvector<lower=-1, upper=1>[n_series] ar2;\n\n',
-                 '// latent trend AR3 terms\nvector<lower=-1, upper=1>[n_series] ar3;')
+          paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector[n_series] ar1;\n\n',
+                 '// latent trend AR2 terms\nvector[n_series] ar2;\n\n',
+                 '// latent trend AR3 terms\nvector[n_series] ar3;')
         model_file[grep('// trend estimates', model_file) + 2] <-
           paste0('trend[1, s] ~ normal(0, sigma[s]);')
 
@@ -403,7 +403,7 @@ add_trend_lines = function(model_file, stan = FALSE,
 
                  'for (i in 4:n) {\n',
                  'for (s in 1:n_series) {\n',
-                 'trend[i, s] ~ normal(ar1[s] * trend[i - 1, s] + ar2[s] * trend[i - 2, s] +ar3[s] * trend[i - 3, s], sigma[s]);\n',
+                 'trend[i, s] ~ normal(ar1[s] * trend[i - 1, s] + ar2[s] * trend[i - 2, s] + ar3[s] * trend[i - 3, s], sigma[s]);\n',
                  '}\n}\n')
 
         model_file[grep('model \\{', model_file) + 2] <-

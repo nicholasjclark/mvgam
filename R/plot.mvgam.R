@@ -52,7 +52,7 @@ plot.mvgam = function(object, type = 'smooths',
   }
 
   if(type == 'residuals'){
-    plot_mvgam_resids(object, series = series, ...)
+    plot_mvgam_resids(object, series = series, data_test = data_test, ...)
   }
 
   if(type == 'factors'){

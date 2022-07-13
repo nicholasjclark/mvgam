@@ -5,6 +5,15 @@
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param n_bins \code{integer} specifying the number of bins to use for binning fitted values
+#'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'y', and 'time'
+#'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
+#'covariate information in \code{data_test} will be used to generate forecasts from the fitted model equations. If
+#'this same \code{data_test} was originally included in the call to \code{mvgam}, then forecasts have already been
+#'produced by the generative model and these will simply be extracted and used to calculate residuals.
+#'However if no \code{data_test} was supplied to the original model call, an assumption is made that
+#'the \code{data_test} supplied here comes sequentially after the data supplied as \code{data_train} in
+#'the original model (i.e. we assume there is no time gap between the last
+#'observation of series 1 in \code{data_train} and the first observation for series 1 in \code{data_test}).
 #'@author Nicholas J Clark
 #'@details A total of four base \code{R} plots are generated to examine Dunn-Smyth residuals for
 #'the specified series. Plots include a residuals vs fitted values plot,
@@ -12,7 +21,8 @@
 #'Note, all plots use posterior medians of fitted values / residuals, so uncertainty is not represented.
 #'@return A series of base \code{R} plots
 #'@export
-plot_mvgam_resids = function(object, series = 1, n_bins = 25){
+plot_mvgam_resids = function(object, series = 1, n_bins = 25,
+                             data_test){
 
   # Check arguments
   if(class(object) != 'mvgam'){
@@ -79,9 +89,195 @@ if(class(data_train)[1] == 'list'){
                          dplyr::pull(y))
 }
 
-# Resids and predictions for only the training period
-series_residuals <- series_residuals[, 1:obs_length]
-preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]][, 1:obs_length]
+if(missing(data_test)){
+  # Resids and predictions for only the training period
+  series_residuals <- series_residuals[, 1:obs_length]
+  preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]][, 1:obs_length]
+} else {
+  preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+
+  # Add variables to data_test if missing
+  s_name <- levels(data_train$series)[series]
+  if(!missing(data_test)){
+
+    if(!'y' %in% names(data_test)){
+      data_test$y <- rep(NA, NROW(data_test))
+    }
+
+    if(class(data_test)[1] == 'list'){
+      if(!'time' %in% names(data_test)){
+        stop('data_train does not contain a "time" column')
+      }
+
+      if(!'series' %in% names(data_test)){
+        data_test$series <- factor('series1')
+      }
+
+    } else {
+      if(!'time' %in% colnames(data_test)){
+        stop('data_train does not contain a "time" column')
+      }
+
+      if(!'series' %in% colnames(data_test)){
+        data_test$series <- factor('series1')
+      }
+    }
+    # If the posterior predictions do not already cover the data_test period, the forecast needs to be
+    # generated using the latent trend dynamics; note, this assumes that there is no gap between the training and
+    # testing datasets
+    if(class(data_train)[1] == 'list'){
+      all_obs <- c(data.frame(y = data_train$y,
+                              series = data_train$series,
+                              time = data_train$time) %>%
+                     dplyr::filter(series == s_name) %>%
+                     dplyr::select(time, y) %>%
+                     dplyr::distinct() %>%
+                     dplyr::arrange(time) %>%
+                     dplyr::pull(y),
+                   data.frame(y = data_test$y,
+                              series = data_test$series,
+                              time = data_test$time) %>%
+                     dplyr::filter(series == s_name) %>%
+                     dplyr::select(time, y) %>%
+                     dplyr::distinct() %>%
+                     dplyr::arrange(time) %>%
+                     dplyr::pull(y))
+    } else {
+      all_obs <- c(data_train %>%
+                     dplyr::filter(series == s_name) %>%
+                     dplyr::select(time, y) %>%
+                     dplyr::distinct() %>%
+                     dplyr::arrange(time) %>%
+                     dplyr::pull(y),
+                   data_test %>%
+                     dplyr::filter(series == s_name) %>%
+                     dplyr::select(time, y) %>%
+                     dplyr::distinct() %>%
+                     dplyr::arrange(time) %>%
+                     dplyr::pull(y))
+    }
+
+    if(dim(preds)[2] != length(all_obs)){
+      fc_preds <- forecast.mvgam(object, series = series, data_test = data_test)
+      preds <- cbind(preds, fc_preds)
+    }
+
+    # Calculate out of sample residuals
+    preds <- preds[,tail(1:dim(preds)[2], length(data_test$time))]
+    truth <- data_test$y
+
+    # Functions for calculating randomised quantile (Dunn-Smyth) residuals
+    ds_resids_nb = function(truth, fitted, draw, size){
+      dsres_out <- matrix(NA, length(truth), 1)
+      for(i in 1:length(truth)){
+        if(is.na(truth[i])){
+          a <- pnbinom(as.vector(draw[i]) - 1, mu = fitted[i], size = size)
+          b <- pnbinom(as.vector(draw[i]), mu = fitted[i], size = size)
+        } else {
+          a <- pnbinom(as.vector(truth[i]) - 1, mu = fitted[i], size = size)
+          b <- pnbinom(as.vector(truth[i]), mu = fitted[i], size = size)
+        }
+
+        u <- runif(n = 1, min = a, max = b)
+        if(u <= 0){
+          u <- runif(n = 1, min = 0.0000001, max = 0.01)
+        }
+        if(u >=1){
+          u <- runif(n = 1, min = 0.99, max = 0.9999999)
+        }
+        dsres_out[i, ] <- qnorm(u)
+      }
+      resids <- dsres_out[,1]
+      resids[is.infinite(resids)] <- NaN
+      resids
+    }
+
+    ds_resids_pois = function(truth, fitted, draw){
+      dsres_out <- matrix(NA, length(truth), 1)
+      for(i in 1:length(truth)){
+        if(is.na(truth[i])){
+          a <- ppois(as.vector(draw[i]) - 1, lambda = fitted[i])
+          b <- ppois(as.vector(draw[i]), lambda = fitted[i])
+        } else {
+          a <- ppois(as.vector(truth[i]) - 1, lambda = fitted[i])
+          b <- ppois(as.vector(truth[i]), lambda = fitted[i])
+        }
+
+        u <- runif(n = 1, min = a, max = b)
+        if(u <= 0){
+          u <- runif(n = 1, min = 0.0000001, max = 0.01)
+        }
+        if(u >=1){
+          u <- runif(n = 1, min = 0.99, max = 0.9999999)
+        }
+        dsres_out[i, ] <- qnorm(u)
+      }
+      resids <- dsres_out[,1]
+      resids[is.infinite(resids)] <- NaN
+      resids
+    }
+
+    ds_resids_tw = function(truth, fitted, draw){
+      dsres_out <- matrix(NA, length(truth), 1)
+      for(i in 1:length(truth)){
+        if(is.na(truth[i])){
+          a <- ppois(as.vector(draw[i]) - 1, lambda = fitted[i])
+          b <- ppois(as.vector(draw[i]), lambda = fitted[i])
+        } else {
+          a <- ppois(as.vector(truth[i]) - 1, lambda = fitted[i])
+          b <- ppois(as.vector(truth[i]), lambda = fitted[i])
+        }
+
+        u <- runif(n = 1, min = a, max = b)
+        if(u <= 0){
+          u <- runif(n = 1, min = 0.0000001, max = 0.01)
+        }
+        if(u >=1){
+          u <- runif(n = 1, min = 0.99, max = 0.9999999)
+        }
+        dsres_out[i, ] <- qnorm(u)
+      }
+      resids <- dsres_out[,1]
+      resids[is.infinite(resids)] <- NaN
+      resids
+    }
+
+   n_obs <- length(truth)
+
+   if(NROW(preds) > 2000){
+     sample_seq <- sample(1:NROW(preds), 2000, F)
+   } else {
+     sample_seq <- 1:NROW(preds)
+   }
+
+   if(object$family == 'Poisson'){
+     resids <- do.call(rbind, lapply(sample_seq, function(x){
+       suppressWarnings(ds_resids_pois(truth = truth,
+                                       fitted = preds[x, ],
+                                       draw = preds[x, ]))
+     }))
+   }
+
+   if(object$family == 'Negative Binomial'){
+     size <- MCMCvis::MCMCchains(object$model_output, 'r')[,series]
+     resids <- do.call(rbind, lapply(sample_seq, function(x){
+       suppressWarnings(ds_resids_nb(truth = truth,
+                                     fitted = preds[x, ],
+                                     draw = preds[x, ],
+                                     size = size[x]))
+     }))
+   }
+
+   if(object$family == 'Tweedie'){
+     resids <- do.call(rbind, lapply(sample_seq, function(x){
+       suppressWarnings(ds_resids_tw(truth = truth,
+                                     fitted = preds[x, ],
+                                     draw = preds[x, ]))
+     }))
+  }
+  }
+}
+
 median_preds <- apply(preds, 2, function(x) quantile(x, 0.5))
 
 # Graphical parameters
