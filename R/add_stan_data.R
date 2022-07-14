@@ -226,8 +226,8 @@ add_stan_data = function(jags_file, stan_file,
                                                                jags_smooth_text[K_starts[i]+1]), ')')))
     }
     jags_smooth_text <- jags_smooth_text[-K_starts]
-    if(any(grep('b\\[i\\] <- b_raw', jags_smooth_text))){
-      jags_smooth_text <- jags_smooth_text[-grep('b\\[i\\] <- b_raw', jags_smooth_text)]
+    if(any(grep('b\\[i\\] = b_raw', jags_smooth_text))){
+      jags_smooth_text <- jags_smooth_text[-grep('b\\[i\\] = b_raw', jags_smooth_text)]
     }
     jags_smooth_text <- gsub('dnorm', 'normal', jags_smooth_text)
     jags_smooth_text <- gsub('  ', ' ', jags_smooth_text)
@@ -298,7 +298,7 @@ add_stan_data = function(jags_file, stan_file,
       min_re_betas <- min(min_beta)
       if(min_re_betas > 1){
         b_raw_text <- c(paste0('\nfor (i in 1:',
-                               min_re_betas - 1, ') {\nb[i] <- b_raw[i];\n}'),
+                               min_re_betas - 1, ') {\nb[i] = b_raw[i];\n}'),
                         b_raw_text)
       } else {
         b_raw_text <- b_raw_text
@@ -306,7 +306,7 @@ add_stan_data = function(jags_file, stan_file,
 
       if(n_b_raw < dim(jags_data$X)[2]){
         b_raw_text <- c(b_raw_text,
-                        paste0('\nfor (i in ',  n_b_raw+1,':num_basis) {\nb[i] <- b_raw[i];\n}\n'))
+                        paste0('\nfor (i in ',  n_b_raw+1,':num_basis) {\nb[i] = b_raw[i];\n}\n'))
       }
 
       stan_file[grep('// basis coefficients', stan_file) + 2] <- paste0(b_raw_text,
@@ -316,7 +316,7 @@ add_stan_data = function(jags_file, stan_file,
       # If no random effects, betas are equal to beta_raws
     } else {
       stan_file[grep('// basis coefficients', stan_file) + 2] <-
-        paste0('\nfor (i in ','1:num_basis) {\nb[i] <- b_raw[i];\n}')
+        paste0('\nfor (i in ','1:num_basis) {\nb[i] = b_raw[i];\n}')
       stan_file <- readLines(textConnection(stan_file), n = -1)
     }
 
@@ -351,7 +351,7 @@ add_stan_data = function(jags_file, stan_file,
                                  fixed = TRUE)]
 
     stan_file[grep('// basis coefficients', stan_file) + 2] <-
-      paste0('\nfor (i in ','1:num_basis) {\nb[i] <- b_raw[i];\n}')
+      paste0('\nfor (i in ','1:num_basis) {\nb[i] = b_raw[i];\n}')
 
     if(any(grep('## parametric effect priors', jags_file))){
       stan_file[grep('##insert smooths', stan_file)] <-

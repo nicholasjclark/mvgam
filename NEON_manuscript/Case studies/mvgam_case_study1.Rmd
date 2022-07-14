@@ -21,7 +21,7 @@ Generalised Additive Models (GAMs) are incredibly flexible tools that have found
 We will work in the `mvgam` package, which fits dynamic GAMs (DGAMs) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a discrete response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Asssuming $\boldsymbol{y}$ is drawn from an exponential distribution (such as Poisson or Negative Binomial) with a log link function, the linear predictor for a dynamic GAM is written as:
 
 $$log(\tilde{\boldsymbol{y}}_{t})={\boldsymbol{B}}_0+\sum\limits_{i=1}^I\boldsymbol{s}_{i,t}\boldsymbol{x}_{i,t}+\boldsymbol{z}_{t}\,,$$
-Here $\boldsymbol{B}_{0}$ is the unknown intercept, the $\boldsymbol{s}$'s are unknown smooth functions of the covariates ($\boldsymbol{x}$'s) and $\boldsymbol{z}$ is a dynamic latent trend component. Each smooth function $\boldsymbol{s}_{i}$ is composed of spline like basis expansions whose coefficients, which must be estimated, control the shape of the functional relationship between $\boldsymbol{x}_{i}$ and $log(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity, with a larger set of basis functions allowing greater flexibility. Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson, Negative Binomial, Tweedie-Poisson) that accommodate common ecological features such as zero-inflation or overdispersion, and that they can be formulated to include hierarchical smoothing for multivariate responses. For the dynamic component, in its most basic form we assume a random walk with drift:
+Here $\boldsymbol{B}_{0}$ is the unknown intercept, the $\boldsymbol{s}$'s are unknown smooth functions of the covariates ($\boldsymbol{x}$'s) and $\boldsymbol{z}$ is a dynamic latent trend component. Each smooth function $\boldsymbol{s}_{i}$ is composed of basis expansions whose coefficients, which must be estimated, control the shape of the functional relationship between $\boldsymbol{x}_{i}$ and $log(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity, with a larger set of basis functions allowing greater flexibility. Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson, Negative Binomial, Tweedie-Poisson) that accommodate common ecological features such as zero-inflation or overdispersion, and that they can be formulated to include hierarchical smoothing for multivariate responses. For the dynamic component, in its most basic form we assume a random walk with drift:
 
 $$\boldsymbol{z}_{t}=\phi+\boldsymbol{z}_{t-1}+\boldsymbol{e}_{t}\,,$$
 where $\phi$ is an optional drift parameter (if the latent trend is assumed to not be stationary) and $\boldsymbol{e}$ is drawn from a zero-centred Gaussian distribution. This model is easily modified to include autoregressive terms, which `mvgam` accomodates up to `order = 3`.
@@ -33,7 +33,7 @@ Dynamic GAMs are useful when we wish to predict future values from time series t
 # Fit a model to the mcycle dataset in the MASS package, fixing the smoothing parameter at an abnormally large value
 par(mfrow = c(2, 2),
     mgp = c(2.5, 1, 0),
-    mai = c(0.6, 0.6, 0.2, 0.2))
+    mai=c(c(0.7, 0.7, 0.2, 0.2)))
 library(mgcv)
 data(mcycle, package = 'MASS')
 
@@ -113,7 +113,7 @@ We can view the summary of the `mgcv` model to see that the posterior estimates 
 summary(m_mgcv)
 ```
 
-Forecasting from this model requires us to write a custom function that can recursively update the design matrix at each successive one-step ahead prediction. Here we define a function to iteratively propagate a forecast forward according to the AR3 observation model. Note that we have used an argument to allow the lags to be fed into the model on the log scale, this will make more sense in a moment as we inspect the forecasts of the model
+Forecasting from this model requires us to write a custom function that can recursively update the design matrix (by filling in the values for the dynamic `lag(y)` covariates) at each successive one-step ahead prediction. Here we define a function to iteratively propagate a forecast forward according to the AR3 observation model. Note that we have used an argument to allow the lags to be fed into the model on the log scale, this will make more sense in a moment as we inspect the forecasts of the model
 
 <details>
 <summary>Click for definition of `recurse_ar3`</summary>
@@ -194,7 +194,7 @@ summary(m_mvgam)
 ```
 
 
-The model file can also be viewed, which can be handy for making modifications to the model so that extra stochastic elements can be added to a user's bespoke model. Notice how the summary at the top of the model file describes the data elements (and their dimensions) that are needed to condition the model, again the hope is tht this simplifies the task of modifying the model for any additional user-specific requirements
+The model file can also be viewed, which can be handy for making modifications to the model so that extra stochastic elements can be added to a user's bespoke model. Notice how the summary at the top of the model file describes the data elements (and their dimensions) that are needed to condition the model, again the hope is that this simplifies the task of modifying the model for any additional user-specific requirements
 ```{r}
 m_mvgam$model_file
 ```
@@ -1113,4 +1113,9 @@ plot(lynx_mvgam, type = 'uncertainty', data_test = lynx_test)
 Both components contribute to forecast uncertainty, with the trend component contributing more over time (as it should since this is the stochastic forecast component). This suggests we would still need some more work to learn about factors driving the dynamics of the system. But we will leave the model as-is for this example. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's Dunn-Smyth randomised quantile residuals. Again we have more options for plotting when using the `plot_mvgam_resids()` function compared to the `S3` generic `plot.mvgam()`. Here we use this flexibility to modify the number of bins for the residuals vs fitted plot (top-left) so that the patterns are more clear. We are primarily looking for a lack of autocorrelation, which would suggest our AR1 model is appropriate for the latent trend
 ```{r, fig.width=6, fig.height=6, fig.align='center'}
 plot_mvgam_resids(lynx_mvgam, n_bins = 25)
+```
+
+This same plot can also be produced for out of sample residuals if a set of test data is supplied (note that the function will assume that the test data come immediately sequential to the training data, there are no formal checks of this so it is up to the user to ensure this holds)
+```{r, fig.width=6, fig.height=6, fig.align='center'}
+plot_mvgam_resids(lynx_mvgam, n_bins = 25, data_test = lynx_test)
 ```

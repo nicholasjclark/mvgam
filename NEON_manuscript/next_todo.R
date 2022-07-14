@@ -8,11 +8,14 @@ mod1 <- mvgam(formula = y ~ s(season) + s(series, bs = 're'),
               run_model = FALSE)
 mod1$model_file
 
-mod2 <- mvgam(formula = y~s(season),
+mod2 <- mvgam(formula = y~year,
               data_train = dat$data_train,
               trend_model = 'RW',
               family = 'poisson',
-              run_model = TRUE)
+              run_model = TRUE,
+              use_stan = TRUE)
+mod2$model_file
+
 plot(mod2, 'smooths', residuals = TRUE, derivatives = TRUE)
 compare_mvgams(model1 = mod1, model2 = mod2, fc_horizon = 6,
                n_evaluations = 30, n_cores = 3)
