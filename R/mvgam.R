@@ -122,11 +122,12 @@
 #'The `p` parameter is therefore fixed at `1.5` (i.e. a so-called Geometric Poisson model).
 #'\cr
 #'\cr
-#'*Factor regularisation*: When using a dynamic factor model for the trends, factor precisions are given
+#'*Factor regularisation*: When using a dynamic factor model for the trends with `JAGS` sa,[;omg], factor precisions are given
 #'regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 #'factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
 #'capture dependencies in the data, so it can often be advantageous to set `n_lv` to a slightly larger number. However
-#'larger numbers of factors do come with additional computational costs so these should be balanced as well.
+#'larger numbers of factors do come with additional computational costs so these should be balanced as well. When using
+#'`Stan`, all factors are parameterised with `sd = 1`
 #'\cr
 #'\cr
 #'*Residuals*: For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics
@@ -138,7 +139,7 @@
 #'*Using Stan*: An in-development feature of `mvgam` is the ability to use Hamiltonian Monte Carlo for parameter estimation
 #'via the software `Stan` (using the `rstan` interface). Note that the `rstan` library is currently required for this option to work,
 #'though support for other `Stan` interfaces will be added in future. Also note that currently there is no support for
-#'fitting `Tweedie` responses or dynamic factor models in `Stan`, though again these will be added in future.
+#'fitting `Tweedie` responses in `Stan`, though again this will be added in future.
 #'However there are great advantages when using `Stan`, which includes the option to estimate smooth latent trends
 #'via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408). This often makes sense for
 #'ecological series, which we expect to change smoothly. In `mvgam`, latent squared exponential GP trends are approximated using
@@ -232,10 +233,10 @@ mvgam = function(formula,
   }
 
   # Stan can only handle certain options in the development phase
-  if(use_stan & use_lv){
-    warning('dynamic factor trends not yet supported for stan; reverting to JAGS')
-    use_stan <- FALSE
-  }
+  # if(use_stan & use_lv){
+  #   warning('dynamic factor trends not yet supported for stan; reverting to JAGS')
+  #   use_stan <- FALSE
+  # }
 
   if(use_stan & family == 'tw'){
     warning('Tweedie family not yet supported for stan; reverting to JAGS')
@@ -891,7 +892,7 @@ mvgam = function(formula,
     unlink('base_gam.txt')
     if(use_stan){
       # Import the base Stan model file
-      modification <- add_base_dgam_lines(stan = TRUE)
+      modification <- add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
       unlink('base_gam_stan.txt')
       cat(modification, file = 'base_gam_stan.txt', sep = '\n', append = T)
       base_stan_model <- trimws(suppressWarnings(readLines('base_gam_stan.txt')))
@@ -904,6 +905,7 @@ mvgam = function(formula,
                                          sigma_prior = sigma_prior,
                                          rho_gp_prior = rho_gp_prior,
                                          alpha_gp_prior = alpha_gp_prior,
+                                         use_lv = use_lv,
                                          stan = TRUE,
                                          trend_model = trend_model,
                                          drift = drift)
@@ -912,10 +914,16 @@ mvgam = function(formula,
       # gather Stan data structure
       stan_objects <- add_stan_data(jags_file = trimws(model_file),
                                     stan_file = base_stan_model,
+                                    use_lv = use_lv,
+                                    n_lv = n_lv,
                                     r_prior = r_prior,
                                     jags_data = ss_jagam$jags.data,
                                     family = family,
                                     upper_bounds = upper_bounds)
+
+      if(use_lv){
+        stan_objects$model_data$n_lv <- n_lv
+      }
 
       # Sensible inits needed for the betas, sigmas and overdispersion parameters
       if(family == 'nb'){
@@ -1002,7 +1010,7 @@ mvgam = function(formula,
     if(use_stan){
       fit_engine <- 'stan'
       # Import the base Stan model file
-      modification <- add_base_dgam_lines(stan = TRUE)
+      modification <- add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
       unlink('base_gam_stan.txt')
       cat(modification, file = 'base_gam_stan.txt', sep = '\n', append = T)
       base_stan_model <- trimws(suppressWarnings(readLines('base_gam_stan.txt')))
@@ -1017,17 +1025,23 @@ mvgam = function(formula,
                                          rho_gp_prior = rho_gp_prior,
                                          alpha_gp_prior = alpha_gp_prior,
                                          trend_model = trend_model,
+                                         use_lv = use_lv,
                                          drift = drift)
 
       # Add remaining data, model and parameters blocks to the Stan model file;
       # gather Stan data structure
       stan_objects <- add_stan_data(jags_file = trimws(model_file),
                                     stan_file = base_stan_model,
+                                    use_lv = use_lv,
+                                    n_lv = n_lv,
                                     r_prior = r_prior,
                                     jags_data = ss_jagam$jags.data,
                                     family = family,
                                     upper_bounds = upper_bounds)
       model_data <- stan_objects$model_data
+      if(use_lv){
+        model_data$n_lv <- n_lv
+      }
 
       # Should never call library in a function, but just doing this for now while
       # developing stan functionality!!
@@ -1066,6 +1080,12 @@ mvgam = function(formula,
       # Fit the model in stan
       if(trend_model == 'GP'){
         stan_control <- list(max_treedepth = 12)
+      } else {
+        stan_control <- list(max_treedepth = 10)
+      }
+
+      if(use_lv){
+        stan_control <- list(max_treedepth = 12, adapt_delta = 0.92)
       } else {
         stan_control <- list(max_treedepth = 10)
       }

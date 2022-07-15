@@ -4,6 +4,8 @@
 #' @export
 #' @param jags_file Prepared JAGS mvgam model file
 #' @param stan_file Incomplete Stan model file to be edited
+#' @param use_lv logical
+#' @param n_lv \code{integer} number of latent dynamic factors (if \code{use_lv = TRUE})
 #' @param jags_data Prepared mvgam data for JAGS modelling
 #' @param r_prior \code{character} specifying (in Stan syntax) the prior distribution for the Negative Binomial
 #'overdispersion parameters. Note that this prior acts on the inverse of \code{r}, which is convenient
@@ -15,7 +17,8 @@
 #' is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 #' truncation entirely (i.e. there is no upper bound for each series)
 #' @return A `list` containing the updated Stan model and model data
-add_stan_data = function(jags_file, stan_file,
+add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
+                         n_lv,
                          r_prior,
                          jags_data, family = 'poisson',
                          upper_bounds){
@@ -141,6 +144,13 @@ add_stan_data = function(jags_file, stan_file,
     n_sp_data <- NULL
   }
 
+  # latent variable lines
+  if(use_lv){
+    lv_data <- paste0('int<lower=0> n_lv; // number of dynamic factors\n')
+  } else {
+    lv_data <- NULL
+  }
+
   # Search for any non-contiguous indices that sometimes are used by mgcv
   if(any(grep('in c\\(', jags_file))){
     add_idxs <- TRUE
@@ -174,6 +184,7 @@ add_stan_data = function(jags_file, stan_file,
                                                paste0(idx_data, collapse = '\n'), '\n',
                                                'int<lower=0> total_obs; // total number of observations\n',
                                                'int<lower=0> n; // number of timepoints per series\n',
+                                               lv_data,
                                                n_sp_data,
                                                'int<lower=0> n_series; // number of series\n',
                                                'int<lower=0> num_basis; // total number of basis coefficients\n',
@@ -194,6 +205,7 @@ add_stan_data = function(jags_file, stan_file,
                                                bounds,
                                                'int<lower=0> total_obs; // total number of observations\n',
                                                'int<lower=0> n; // number of timepoints per series\n',
+                                               lv_data,
                                                n_sp_data,
                                                'int<lower=0> n_series; // number of series\n',
                                                'int<lower=0> num_basis; // total number of basis coefficients\n',

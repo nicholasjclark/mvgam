@@ -113,21 +113,44 @@ if(inherits(Xp, 'try-error')){
 # Extract last trend / latent variable and precision estimates
 if(object$use_lv){
   n_lv <- object$n_lv
-  ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2],
-              length.out = n_lv + 1)
-  starts <- ends + 1
-  starts <- c(1, starts[-c(1, (n_lv + 1))])
-  ends <- ends[-1]
-  lvs <- lapply(seq_len(n_lv), function(lv){
-    lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[lv]:ends[lv]]
+  if(object$fit_engine == 'stan'){
+    lvs <- lapply(seq_len(n_lv), function(lv){
+      inds_lv <- seq(lv, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2], by = n_lv)
+      lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,inds_lv]
+      # Need to only use estimates from the training period
+      if(class(object$obs_data)[1] == 'list'){
+        end_train <- data.frame(y = object$obs_data$y,
+                                series = object$obs_data$series,
+                                time = object$obs_data$time) %>%
+          dplyr::filter(series == !!(levels(object$obs_data$series)[1])) %>%
+          NROW()
+      } else {
+        end_train <- object$obs_data %>%
+          dplyr::filter(series == !!(levels(data_train$series)[1])) %>%
+          NROW()
+      }
 
-    # Need to only use estimates from the training period
-    end_train <- data.frame(series = object$obs_data$series) %>%
-      dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-      NROW()
-    lv_estimates <- lv_estimates[,1:end_train]
-    lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
-  })
+      lv_estimates <- lv_estimates[,1:end_train]
+      lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
+    })
+
+  } else {
+    ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2],
+                length.out = n_lv + 1)
+    starts <- ends + 1
+    starts <- c(1, starts[-c(1, (n_lv + 1))])
+    ends <- ends[-1]
+    lvs <- lapply(seq_len(n_lv), function(lv){
+      lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[lv]:ends[lv]]
+
+      # Need to only use estimates from the training period
+      end_train <- data.frame(series = object$obs_data$series) %>%
+        dplyr::filter(series == !!(levels(data_train$series)[1])) %>%
+        NROW()
+      lv_estimates <- lv_estimates[,1:end_train]
+      lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
+    })
+  }
 
   taus <- MCMCvis::MCMCchains(object$model_output, 'penalty')
   trends <- NULL
@@ -173,10 +196,19 @@ if(object$use_lv){
 
 # If use_lv, extract latent variable loadings
 if(object$use_lv){
+
   lv_coefs <- lapply(seq_len(n_series), function(series){
-    lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
-    as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
+    if(object$fit_engine == 'stan'){
+      coef_start <- min(which(sort(rep(1:n_series, n_lv)) == series))
+      coef_end <- coef_start + n_lv - 1
+      as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,coef_start:coef_end])
+    } else {
+      lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
+      as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
+    }
+
   })
+
 } else {
   lv_coefs <- NULL
 }
@@ -370,25 +402,25 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   names(next_lvs) <- paste0('lv', seq(1:length(lvs)))
 
   # Calculate weight for the particle in the form of a composite likelihood
-  weight <- prod(unlist(lapply(seq_len(n_series), function(series){
+  liks <- unlist(lapply(seq_len(n_series), function(series){
 
     if(is.na(truth[series])){
       weight <- 1
     } else {
       if(family == 'Negative Binomial'){
-        weight <- 1 + (dnbinom(truth[series], size = size[series],
+        weight <- (dnbinom(truth[series], size = size[series],
                                mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
                                           (trends[series]))))
       }
 
       if(family == 'Poisson'){
-        weight <- 1 + (dpois(truth[series],
+        weight <- (dpois(truth[series],
                                lambda = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
                                           (trends[series]))))
       }
 
       if(family == 'Tweedie'){
-        weight <- 1 + exp(mgcv::ldTweedie(y = truth[series],
+        weight <- exp(mgcv::ldTweedie(y = truth[series],
                                        mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
                                             (trends[series])),
                                        p = p,
@@ -398,7 +430,8 @@ particles <- pbapply::pblapply(sample_seq, function(x){
 
     }
     weight
-  })), na.rm = T)
+  }))
+  weight <- prod(liks, na.rm = T)
   n_lv <- length(lvs)
   trends <- NULL
 

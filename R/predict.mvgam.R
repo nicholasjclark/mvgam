@@ -93,8 +93,15 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
     n_series <- NCOL(object$ytimes)
     n_lv <- object$n_lv
     lv_coefs <- lapply(seq_len(n_series), function(series){
-      lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
-      as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
+      if(object$fit_engine == 'stan'){
+        coef_start <- min(which(sort(rep(1:n_series, n_lv)) == series))
+        coef_end <- coef_start + n_lv - 1
+        as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,coef_start:coef_end])
+      } else {
+        lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
+        as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
+      }
+
     })
   } else {
     if(object$trend_model %in% c('GP', 'None')){

@@ -236,7 +236,12 @@ if(!object$use_lv){
 }
 
 if(object$fit_engine == 'stan'){
-  check_all_diagnostics(object$model_output)
+  if(object$use_lv || object$trend_model == 'GP'){
+    max_treedepth <- 12
+  } else {
+    max_treedepth <- 10
+  }
+  check_all_diagnostics(object$model_output, max_treedepth = max_treedepth)
 }
 
 

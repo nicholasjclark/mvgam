@@ -155,10 +155,6 @@ forecast.mvgam = function(object, data_test, series = 1,
 
   # Generate the linear predictor matrix
   if(class(data_test)[1] == 'list'){
-    # Xp <- predict(object$mgcv_model,
-    #               newdata = data_test,
-    #               type = 'lpmatrix')
-
     suppressWarnings(Xp  <- try(predict(object$mgcv_model,
                                              newdata = data_test,
                                              type = 'lpmatrix'),
@@ -232,8 +228,15 @@ forecast.mvgam = function(object, data_test, series = 1,
     n_series <- NCOL(object$ytimes)
     n_lv <- object$n_lv
     lv_coefs <- lapply(seq_len(n_series), function(series){
-      lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
-      as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
+      if(object$fit_engine == 'stan'){
+        coef_start <- min(which(sort(rep(1:n_series, n_lv)) == series))
+        coef_end <- coef_start + n_lv - 1
+        as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,coef_start:coef_end])
+      } else {
+        lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
+        as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
+      }
+
     })
   } else {
     if(object$trend_model %in% c('GP', 'None')){
@@ -246,31 +249,53 @@ forecast.mvgam = function(object, data_test, series = 1,
   # Latent trend estimates
   if(object$use_lv){
     n_lv <- object$n_lv
-    ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2],
-                length.out = n_lv + 1)
-    starts <- ends + 1
-    starts <- c(1, starts[-c(1, (n_lv + 1))])
-    ends <- ends[-1]
-    lvs <- lapply(seq_len(n_lv), function(lv){
-      lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[lv]:ends[lv]]
+    if(object$fit_engine == 'stan'){
+      lvs <- lapply(seq_len(n_lv), function(lv){
+        inds_lv <- seq(lv, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2], by = n_lv)
+        lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,inds_lv]
+        # Need to only use estimates from the training period
+        if(class(object$obs_data)[1] == 'list'){
+          end_train <- data.frame(y = object$obs_data$y,
+                                  series = object$obs_data$series,
+                                  time = object$obs_data$time) %>%
+            dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
+            NROW()
+        } else {
+          end_train <- object$obs_data %>%
+            dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
+            NROW()
+        }
 
-      # Need to only use estimates from the training period
-      # Need to only use estimates from the training period
-      if(class(object$obs_data)[1] == 'list'){
-        end_train <- data.frame(y = object$obs_data$y,
-                                series = object$obs_data$series,
-                                time = object$obs_data$time) %>%
-          dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
-          NROW()
-      } else {
-        end_train <- object$obs_data %>%
-          dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-          NROW()
-      }
+        lv_estimates <- lv_estimates[,1:end_train]
+        lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
+      })
+    } else {
+      ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2],
+                  length.out = n_lv + 1)
+      starts <- ends + 1
+      starts <- c(1, starts[-c(1, (n_lv + 1))])
+      ends <- ends[-1]
 
-      lv_estimates <- lv_estimates[,1:end_train]
-      lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
-    })
+      lvs <- lapply(seq_len(n_lv), function(lv){
+        lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[lv]:ends[lv]]
+
+        # Need to only use estimates from the training period
+        if(class(object$obs_data)[1] == 'list'){
+          end_train <- data.frame(y = object$obs_data$y,
+                                  series = object$obs_data$series,
+                                  time = object$obs_data$time) %>%
+            dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
+            NROW()
+        } else {
+          end_train <- object$obs_data %>%
+            dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
+            NROW()
+        }
+
+        lv_estimates <- lv_estimates[,1:end_train]
+        lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
+      })
+    }
 
   }
 
@@ -386,7 +411,7 @@ forecast.mvgam = function(object, data_test, series = 1,
       }))
 
       # Multiply lv states with loadings to generate each series' forecast trend state
-      trends <- as.numeric(next_lvs %*% t(lv_coefs))
+      trends <- as.numeric(next_lvs %*% lv_coefs)
 
 
       if(type == 'trend'){
@@ -413,7 +438,7 @@ forecast.mvgam = function(object, data_test, series = 1,
 
     } else {
 
-      # Sample index for the particle
+      # Sample index
       samp_index <- i
 
       # Sample beta coefs

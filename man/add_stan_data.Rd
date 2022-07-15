@@ -7,6 +7,8 @@
 add_stan_data(
   jags_file,
   stan_file,
+  use_lv = FALSE,
+  n_lv,
   r_prior,
   jags_data,
   family = "poisson",
@@ -17,6 +19,10 @@ add_stan_data(
 \item{jags_file}{Prepared JAGS mvgam model file}
 
 \item{stan_file}{Incomplete Stan model file to be edited}
+
+\item{use_lv}{logical}
+
+\item{n_lv}{\code{integer} number of latent dynamic factors (if \code{use_lv = TRUE})}
 
 \item{r_prior}{\code{character} specifying (in Stan syntax) the prior distribution for the Negative Binomial
 overdispersion parameters. Note that this prior acts on the inverse of \code{r}, which is convenient

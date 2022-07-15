@@ -8,7 +8,112 @@
 add_base_dgam_lines = function(use_lv, stan = FALSE){
 
   if(stan){
-    add <- "
+    if(use_lv){
+      add <- "
+    ##insert data
+    transformed data{
+    // Number of non-zero lower triangular factor loadings
+    // Ensures identifiability of the model - no rotation of factors
+    int<lower=1> M;
+    M = n_lv * (n_series - n_lv) + n_lv * (n_lv - 1) / 2 + n_lv;
+    }
+
+    parameters {
+    // raw basis coefficients
+    row_vector<lower=-30,upper=30>[num_basis] b_raw;
+
+    // dynamic factors
+    matrix[n, n_lv] LV;
+
+    // dynamic factor lower triangle loading coefficients
+    vector[M] L;
+
+    // smoothing parameters
+    vector<lower=0.0005>[n_sp] lambda;
+    }
+
+    transformed parameters {
+    // basis coefficients
+    row_vector[num_basis] b;
+
+    // dynamic factor loading matrix
+    matrix[n_series, n_lv] lv_coefs;
+
+    // constraints allow identifiability of loadings
+    for (i in 1:(n_lv - 1)) {
+    for (j in (i + 1):(n_lv)){
+    lv_coefs[i, j] = 0;
+    }
+    }
+    {
+    int index;
+    index = 0;
+    for (j in 1:n_lv) {
+      for (i in j:n_series) {
+        index = index + 1;
+        lv_coefs[i, j] = L[index];
+      }
+    }
+    }
+
+    // derived latent trends
+    matrix[n, n_series] trend;
+    for (i in 1:n){;
+    for (s in 1:n_series){
+    trend[i, s] = dot_product(lv_coefs[s,], LV[i,]);
+    }
+    }
+
+    // GAM contribution to expectations (log scale)
+    vector[total_obs] eta;
+    eta = to_vector(b * X);
+    }
+
+    model {
+    ##insert smooths
+
+    // priors for smoothing parameters
+    lambda ~ exponential(0.05);
+
+    // priors for dynamic factor loading coefficients
+    L ~ double_exponential(0, 1);
+
+    // dynamic factor estimates
+    for (j in 1:n_lv) {
+    LV[1, j] ~ normal(0, 1);
+    }
+
+    for (j in 1:n_lv) {
+    LV[2:n, j] ~ normal(LV[1:(n - 1), j], 1);
+    }
+
+    // likelihood functions
+    for (i in 1:n) {
+    for (s in 1:n_series) {
+    if (y_observed[i, s])
+    y[i, s] ~ poisson_log(eta[ytimes[i, s]] + trend[i, s]);
+    }
+    }
+    }
+
+    generated quantities {
+    vector[n_sp] rho;
+    rho = log(lambda);
+    vector[n_lv] penalty;
+    penalty = rep_vector(1.0, n_lv);
+
+    // posterior predictions
+    matrix[n, n_series] ypred;
+    for(i in 1:n){
+    for(s in 1:n_series){
+    ypred[i, s] = poisson_log_rng(eta[ytimes[i, s]] + trend[i, s]);
+    }
+    }
+    }
+    "
+
+    } else {
+      add <- "
     ##insert data
     parameters {
     // raw basis coefficients
@@ -75,6 +180,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
     }
     }
     "
+    }
 
   } else {
     if(use_lv){

@@ -1,52 +1,42 @@
 library(mvgam)
 dat <- sim_mvgam(T = 100, n_series=4, n_lv = 1)
-mod1 <- mvgam(formula = y ~ s(season) + s(series, bs = 're'),
-              data_train = dat$data_train,
-              trend_model = 'GP',
-              family = 'nb',
-              use_stan = TRUE,
-              run_model = FALSE)
-mod1$model_file
+dat$true_corrs
 
-mod2 <- mvgam(formula = y~year,
+
+mod1 <- mvgam(formula = y ~ s(season, bs = 'cc') +
+                s(series, bs = 're'),
+              data_train = dat$data_train,
+              trend_model = 'AR3',
+              family = 'poisson',
+              use_lv = TRUE,
+              n_lv = 2,
+              use_stan = TRUE,
+              run_model = T,
+              burnin = 10)
+summary(mod1)
+
+# Good for testing model files without compiling
+stanc(model_code = mod1$model_file)$model_name
+model_file <- mod1$model_file
+
+mod2 <- mvgam(formula = y ~ s(season, bs = 'cc') +
+                s(series, bs = 're'),
               data_train = dat$data_train,
               trend_model = 'RW',
               family = 'poisson',
+              use_lv = TRUE,
+              n_lv = 2,
               run_model = TRUE,
-              use_stan = TRUE)
-mod2$model_file
-
-plot(mod2, 'smooths', residuals = TRUE, derivatives = TRUE)
-compare_mvgams(model1 = mod1, model2 = mod2, fc_horizon = 6,
-               n_evaluations = 30, n_cores = 3)
-eval_mvgam(object = mod2, n_cores = 1)
-plot(mod1, type = 'forecast', realisations = TRUE)
-plot(mod1, type = 'trend', realisations = TRUE)
-
-plot_mvgam_smooth(mod1, 1, 'season', realisations = TRUE, n_realisations = 10)
-plot_mvgam_fc(object = mod1, series = 1,
-              realisations = TRUE, n_realisations = 15)
-fake <- dat$data_test
-fake$y <- NULL
-plot_mvgam_fc(object = mod1, series = 1, data_test = fake)
-obj <- forecast(mod1, data_test = fake)
-dim(obj)
+              burnin = 10)
 
 
-plot_mvgam_trend(object = mod1, series = 1, data_test = fake,
-                 realisations = TRUE)
+plot(mod1, series = 3, 'forecast', data_test = dat$data_test)
+plot(mod2, series = 3, 'forecast', data_test = dat$data_test)
+
+plot(mod1, series = 4, 'trend', data_test = dat$data_test)
+plot(mod2, series = 4, 'trend', data_test = dat$data_test)
 
 
-
-
-
-
-pfilter_mvgam_init(object = mod1, n_particles = 2000,
-                   n_cores = 3, data_assim = model_dat[28,])
-
-
-# models with no smooths
-# predictions with new data by extending the temporal process forward
 # respect upper bounds for forecasts, prediction, particle filtering
 trunc_poiss = function(lambda, bound){
   out <- vector(length = length(lambda))

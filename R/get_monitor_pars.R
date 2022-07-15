@@ -30,17 +30,17 @@ get_monitor_pars = function(family, smooths_included = TRUE, use_lv, trend_model
     }
 
     if(trend_model == 'AR1'){
-      param <- c(param, 'trend', 'tau', 'sigma', 'ar1', 'LV',
+      param <- c(param, 'trend', 'ar1', 'LV',
                  'penalty', 'lv_coefs')
     }
 
     if(trend_model == 'AR2'){
-      param <- c(param, 'trend', 'tau', 'sigma', 'ar1', 'ar2', 'LV',
+      param <- c(param, 'trend', 'ar1', 'ar2', 'LV',
                  'penalty', 'lv_coefs')
     }
 
     if(trend_model == 'AR3'){
-      param <- c(param, 'trend', 'tau', 'sigma', 'ar1', 'ar2', 'ar3',
+      param <- c(param, 'trend', 'ar1', 'ar2', 'ar3',
                  'LV', 'penalty', 'lv_coefs')
     }
   }

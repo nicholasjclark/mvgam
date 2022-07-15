@@ -190,11 +190,12 @@ models, estimating the power parameter \code{p} alongside the overdispersion par
 The \code{p} parameter is therefore fixed at \code{1.5} (i.e. a so-called Geometric Poisson model).
 \cr
 \cr
-\emph{Factor regularisation}: When using a dynamic factor model for the trends, factor precisions are given
+\emph{Factor regularisation}: When using a dynamic factor model for the trends with \code{JAGS} sa,\link{;omg}, factor precisions are given
 regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
 capture dependencies in the data, so it can often be advantageous to set \code{n_lv} to a slightly larger number. However
-larger numbers of factors do come with additional computational costs so these should be balanced as well.
+larger numbers of factors do come with additional computational costs so these should be balanced as well. When using
+\code{Stan}, all factors are parameterised with \code{sd = 1}
 \cr
 \cr
 \emph{Residuals}: For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics
@@ -206,7 +207,7 @@ draws from the model's posterior distribution
 \emph{Using Stan}: An in-development feature of \code{mvgam} is the ability to use Hamiltonian Monte Carlo for parameter estimation
 via the software \code{Stan} (using the \code{rstan} interface). Note that the \code{rstan} library is currently required for this option to work,
 though support for other \code{Stan} interfaces will be added in future. Also note that currently there is no support for
-fitting \code{Tweedie} responses or dynamic factor models in \code{Stan}, though again these will be added in future.
+fitting \code{Tweedie} responses in \code{Stan}, though again this will be added in future.
 However there are great advantages when using \code{Stan}, which includes the option to estimate smooth latent trends
 via \href{https://arxiv.org/abs/2004.11408}{Hilbert space approximate Gaussian Processes}. This often makes sense for
 ecological series, which we expect to change smoothly. In \code{mvgam}, latent squared exponential GP trends are approximated using
