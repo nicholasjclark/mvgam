@@ -858,6 +858,13 @@ mvgam = function(formula,
     parametric_tdata <- NULL
   }
 
+  # A second check for any smooth parameters
+  if(any(grep('K.* <- ', model_file))){
+    smooths_included <- TRUE
+  } else {
+    smooths_included <- FALSE
+  }
+
   if(smooths_included){
     zeros <- paste0('vector zero;  prior basis coefficient locations vector of length ncol(X)\n')
   } else {

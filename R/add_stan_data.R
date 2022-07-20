@@ -228,16 +228,39 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
     jags_smooth_text <- gsub('##', '//', jags_smooth_text)
     jags_smooth_text <- gsub('dexp', 'exponential', jags_smooth_text)
 
-    K_starts <- grep('K.* <- ', jags_smooth_text)
-    for(i in 1:length(K_starts)){
-      jags_smooth_text[K_starts[i]+1] <- gsub('\\bb\\b', 'b_raw',
-                                              gsub('dmnorm', 'multi_normal_prec',
-                                                   paste0(gsub('K.*',
-                                                               trimws(gsub('K.* <- ', '',
-                                                                           jags_smooth_text[K_starts[i]])),
-                                                               jags_smooth_text[K_starts[i]+1]), ')')))
+    if(any(grep('K.* <- ', jags_smooth_text))){
+      K_starts <- grep('K.* <- ', jags_smooth_text)
+      for(i in 1:length(K_starts)){
+        jags_smooth_text[K_starts[i]+1] <- gsub('\\bb\\b', 'b_raw',
+                                                gsub('dmnorm', 'multi_normal_prec',
+                                                     paste0(gsub('K.*',
+                                                                 trimws(gsub('K.* <- ', '',
+                                                                             jags_smooth_text[K_starts[i]])),
+                                                                 jags_smooth_text[K_starts[i]+1]), ')')))
+      }
+      jags_smooth_text <- jags_smooth_text[-K_starts]
+    } else {
+      # If no K terms then there are no smoothing parameters in the model
+      # (probably the only smooth terms included are random effect bases, which don't need
+      # smoothing parameters when we use the non-centred parameterisation)
+      stan_file <- stan_file[-grep('// priors for smoothing parameters', stan_file,
+                                   fixed = TRUE)]
+      stan_file <- stan_file[-grep('lambda ~ exponential', stan_file,
+                                   fixed = TRUE)]
+      stan_file <- stan_file[-grep('vector[n_sp] rho', stan_file,
+                                   fixed = TRUE)]
+      stan_file <- stan_file[-grep('rho = log', stan_file,
+                                   fixed = TRUE)]
+      stan_file <- stan_file[-grep('// smoothing parameters', stan_file,
+                                   fixed = TRUE)]
+      stan_file <- stan_file[-grep('[n_sp] lambda', stan_file,
+                                   fixed = TRUE)]
+      stan_file <- stan_file[-grep('vector[num_basis] zero; //', stan_file,
+                                   fixed = TRUE)]
+      stan_file <- stan_file[-grep('int<lower=0> n_sp; //', stan_file,
+                                   fixed = TRUE)]
     }
-    jags_smooth_text <- jags_smooth_text[-K_starts]
+
     if(any(grep('b\\[i\\] = b_raw', jags_smooth_text))){
       jags_smooth_text <- jags_smooth_text[-grep('b\\[i\\] = b_raw', jags_smooth_text)]
     }
@@ -284,6 +307,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                '\n// random effect variances\n',
                paste0('vector<lower=0>[',n_sigma_raw,'] sigma_raw', ';\n', collapse = ''),
                '\n',
+               '\n// random effect means\n',
                paste0('vector<lower=0>[',n_sigma_raw,'] mu_raw', ';\n', collapse = ''))
 
       b_raw_text <- vector()
@@ -300,7 +324,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                                                             sub(".*\\:", "",
                                                                 stan_file[b_raw_indices[i]-1]))))),
                                 ') {\nb[i] = mu_raw[', i, '] + b_raw[i] * sigma_raw[',i,
-                                '];\n}')
+                                '];\n}\n')
         min_beta[i] <- as.numeric(sub("for \\(i in ", "",
                                       sub("\\:.*", "",
                                           stan_file[b_raw_indices[i] - 1])))
@@ -419,7 +443,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
   stan_data$total_obs <- NCOL(stan_data$X)
   stan_data$num_basis <- NROW(stan_data$X)
 
-  if(any(grepl('## smoothing parameter priors...', jags_file))){
+  if(any(grepl('// priors for smoothing parameters', stan_file, fixed = TRUE))){
     stan_data$n_sp <- as.numeric(sub('\\) \\{', '',
                                      sub('for \\(i in 1\\:', '',
                                          jags_file[grep('lambda\\[i\\] ~ ',

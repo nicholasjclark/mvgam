@@ -33,11 +33,15 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
     }
 
     transformed parameters {
+    // GAM contribution to expectations (log scale)
+    vector[total_obs] eta;
+
+    // trends and dynamic factor loading matrix
+    matrix[n, n_series] trend;
+    matrix[n_series, n_lv] lv_coefs;
+
     // basis coefficients
     row_vector[num_basis] b;
-
-    // dynamic factor loading matrix
-    matrix[n_series, n_lv] lv_coefs;
 
     // constraints allow identifiability of loadings
     for (i in 1:(n_lv - 1)) {
@@ -57,15 +61,12 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
     }
 
     // derived latent trends
-    matrix[n, n_series] trend;
     for (i in 1:n){;
     for (s in 1:n_series){
     trend[i, s] = dot_product(lv_coefs[s,], LV[i,]);
     }
     }
 
-    // GAM contribution to expectations (log scale)
-    vector[total_obs] eta;
     eta = to_vector(b * X);
     }
 
@@ -98,12 +99,12 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
 
     generated quantities {
     vector[n_sp] rho;
-    rho = log(lambda);
     vector[n_lv] penalty;
+    matrix[n, n_series] ypred;
+    rho = log(lambda);
     penalty = rep_vector(1.0, n_lv);
 
     // posterior predictions
-    matrix[n, n_series] ypred;
     for(i in 1:n){
     for(s in 1:n_series){
     ypred[i, s] = poisson_log_rng(eta[ytimes[i, s]] + trend[i, s]);
@@ -130,11 +131,12 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
     }
 
     transformed parameters {
+    // GAM contribution to expectations (log scale)
+    vector[total_obs] eta;
+
     // basis coefficients
     row_vector[num_basis] b;
 
-    // GAM contribution to expectations (log scale)
-    vector[total_obs] eta;
     eta = to_vector(b * X);
     }
 
@@ -167,12 +169,12 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
 
     generated quantities {
     vector[n_sp] rho;
-    rho = log(lambda);
     vector[n_series] tau;
+    matrix[n, n_series] ypred;
+    rho = log(lambda);
     tau = sigma ^ -2;
 
     // posterior predictions
-    matrix[n, n_series] ypred;
     for(i in 1:n){
     for(s in 1:n_series){
     ypred[i, s] = poisson_log_rng(eta[ytimes[i, s]] + trend[i, s]);

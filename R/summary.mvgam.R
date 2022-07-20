@@ -106,7 +106,7 @@ rownames(mvgam_coefs) <- coef_names
 print(mvgam_coefs)
 message()
 
-if(length(object$mgcv_model$smooth) > 0){
+if(any(grep('rho', rownames(MCMCvis::MCMCsummary(object$model_output))))){
   message("GAM smoothing parameter (rho) estimates:")
   rho_coefs <- MCMCvis::MCMCsummary(object$model_output, 'rho')[,c(3:7)]
 
