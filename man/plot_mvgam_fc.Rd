@@ -11,9 +11,11 @@ plot_mvgam_fc(
   realisations = FALSE,
   n_realisations = 15,
   hide_xlabels = FALSE,
+  xlab,
   ylab,
   ylim,
-  return_forecasts = FALSE
+  return_forecasts = FALSE,
+  ...
 )
 }
 \arguments{
@@ -42,12 +44,16 @@ empirical quantiles of the forecast distribution are shown}
 \item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 \code{axis} from base \code{R}}
 
-\item{ylab}{Optional \code{character} string specifying the y-axis label}
+\item{xlab}{label for x axis.}
+
+\item{ylab}{label for y axis.}
 
 \item{ylim}{Optional \code{vector} of y-axis limits (min, max)}
 
 \item{return_forecasts}{\code{logical}. If \code{TRUE}, the function will plot the forecast
 as well as returning the forecast object (as a \code{matrix} of dimension \code{n_samples} x \code{horizon})}
+
+\item{...}{further \code{\link[graphics]{par}} graphical parameters.}
 }
 \value{
 A base \code{R} graphics plot and an optional \code{matrix} of the forecast distribution

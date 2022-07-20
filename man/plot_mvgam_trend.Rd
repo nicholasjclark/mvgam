@@ -11,7 +11,9 @@ plot_mvgam_trend(
   realisations = FALSE,
   n_realisations = 15,
   derivatives = FALSE,
-  hide_xlabels = FALSE
+  hide_xlabels = FALSE,
+  xlab,
+  ...
 )
 }
 \arguments{
@@ -34,6 +36,10 @@ estimated 1st derivative for the estimated trend}
 
 \item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 \code{axis} from base \code{R}. Ignored if \code{derivatives = TRUE}}
+
+\item{xlab}{label for x axis.}
+
+\item{...}{further \code{\link[graphics]{par}} graphical parameters.}
 }
 \description{
 Plot mvgam latent trend for a specified series

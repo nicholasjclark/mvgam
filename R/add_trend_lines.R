@@ -280,7 +280,7 @@ add_trend_lines = function(model_file, stan = FALSE,
             paste0('row_vector[num_basis] b_raw;\n\n// latent factor AR1 terms\nvector<lower=-1.5,upper=1.5>[n_lv] ar1;')
 
           model_file[grep('// dynamic factor estimates', model_file) + 6] <-
-            paste0('LV[2:n, j] ~ normal(ar1[j] * LV[1:(n - 1), j], sigma[s]);')
+            paste0('LV[2:n, j] ~ normal(ar1[j] * LV[1:(n - 1), j], 1);')
 
           model_file[grep('model \\{', model_file) + 2] <-
             paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\n')

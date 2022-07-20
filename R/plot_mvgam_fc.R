@@ -18,8 +18,10 @@
 #'\code{realisations = TRUE}. Ignored otherwise
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
-#'@param ylab Optional \code{character} string specifying the y-axis label
+#'@param xlab label for x axis.
+#'@param ylab label for y axis.
 #'@param ylim Optional \code{vector} of y-axis limits (min, max)
+#'@param ... further \code{\link[graphics]{par}} graphical parameters.
 #'@param return_forecasts \code{logical}. If \code{TRUE}, the function will plot the forecast
 #'as well as returning the forecast object (as a \code{matrix} of dimension \code{n_samples} x \code{horizon})
 #'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to calculate posterior
@@ -30,8 +32,8 @@
 #'@export
 plot_mvgam_fc = function(object, series = 1, data_test,
                          realisations = FALSE, n_realisations = 15,
-                         hide_xlabels = FALSE, ylab, ylim,
-                         return_forecasts = FALSE){
+                         hide_xlabels = FALSE, xlab, ylab, ylim,
+                         return_forecasts = FALSE, ...){
 
   # Check arguments
   if(class(object) != 'mvgam'){
@@ -168,6 +170,10 @@ plot_mvgam_fc = function(object, series = 1, data_test,
     ylab <- paste0('Predicitons for ', levels(data_train$series)[series])
   }
 
+  if(missing(xlab)){
+    xlab <- 'Time'
+  }
+
   pred_vals <- seq(1:length(preds_last))
   if(hide_xlabels){
     plot(1, type = "n", bty = 'L',
@@ -175,13 +181,13 @@ plot_mvgam_fc = function(object, series = 1, data_test,
          xaxt = 'n',
          ylab = ylab,
          xlim = c(0, length(preds_last)),
-         ylim = ylim)
+         ylim = ylim, ...)
   } else {
     plot(1, type = "n", bty = 'L',
-         xlab = 'Time',
+         xlab = xlab,
          ylab = ylab,
          xlim = c(0, length(preds_last)),
-         ylim = ylim)
+         ylim = ylim, ...)
   }
 
   if(realisations){
@@ -223,20 +229,29 @@ plot_mvgam_fc = function(object, series = 1, data_test,
                                time = data_test$time)
     }
 
+    # Show historical distribution in grey
+    last_train <- (NROW(data_train) / NCOL(object$ytimes))
+    polygon(c(pred_vals[1:(NROW(data_train) / NCOL(object$ytimes))],
+                        rev(pred_vals[1:(NROW(data_train) / NCOL(object$ytimes))])),
+            c(cred[1,1:(NROW(data_train) / NCOL(object$ytimes))],
+              rev(cred[9,1:(NROW(data_train) / NCOL(object$ytimes))])),
+            col = 'grey70', border = NA)
+
     # Plot training and testing points
     points(dplyr::bind_rows(data_train, data_test) %>%
              dplyr::filter(series == s_name) %>%
              dplyr::select(time, y) %>%
              dplyr::distinct() %>%
              dplyr::arrange(time) %>%
-             dplyr::pull(y), pch = 16, col = "white", cex = 0.75)
+             dplyr::pull(y), pch = 16, col = "white", cex = 0.8)
     points(dplyr::bind_rows(data_train, data_test) %>%
              dplyr::filter(series == s_name) %>%
              dplyr::select(time, y) %>%
              dplyr::distinct() %>%
              dplyr::arrange(time) %>%
              dplyr::pull(y), pch = 16, col = "black", cex = 0.65)
-    abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
+    abline(v = last_train, col = '#FFFFFF60', lwd = 2.85)
+    abline(v = last_train, col = 'black', lwd = 2.5, lty = 'dashed')
 
     # Calculate out of sample DRPS and print the score
     drps_score <- function(truth, fc, interval_width = 0.9){
@@ -306,13 +321,13 @@ plot_mvgam_fc = function(object, series = 1, data_test,
              dplyr::select(time, y) %>%
              dplyr::distinct() %>%
              dplyr::arrange(time) %>%
-             dplyr::pull(y),pch = 16, col = "white", cex = 0.75)
+             dplyr::pull(y),pch = 16, col = "white", cex = 0.8)
     points(data_train %>%
             dplyr::filter(series == s_name) %>%
             dplyr::select(time, y) %>%
             dplyr::distinct() %>%
             dplyr::arrange(time) %>%
-            dplyr::pull(y),pch = 16, col = "black", cex = 0.65 )
+            dplyr::pull(y),pch = 16, col = "black", cex = 0.65)
   }
 
   if(return_forecasts){

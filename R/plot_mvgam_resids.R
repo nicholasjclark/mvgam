@@ -320,13 +320,14 @@ x <- sapply(1:length(idx),
 # Plot
 plot(median_preds[1:length(object$resids[[series]])],
      object$resids[[series]],
-     main = 'Resids vs Fitted Values',
+     bty = 'L',
      xlab = 'Fitted values',
-     ylab = 'Residuals',
+     ylab = 'DS residuals',
      pch = 16,
      col = 'white',
      cex = 1,
      ylim = range(resid_probs, na.rm = T))
+title('Resids vs Fitted Values', line = 0)
 
 rect(xleft = x[seq(1, N*2, by = 2)],
      xright = x[seq(2, N*2, by = 2)],
@@ -358,8 +359,8 @@ for (k in 1:N) {
         y = c(resid_probs[k,5], resid_probs[k,5]),
         col = c_dark, lwd = 2)
 }
-abline(h = 0, lty = 'dashed', col = 'white', lwd = 2.85)
-abline(h = 0, lty = 'dashed', col = 'black', lwd = 2.5)
+abline(h = 0, col = '#FFFFFF60', lwd = 2.85)
+abline(h = 0, col = 'black', lwd = 2.5, lty = 'dashed')
 
 # Q-Q plot
 coords <- qqnorm(series_residuals[1,], plot.it = F)
@@ -379,13 +380,15 @@ pred_vals <- coords$x[order(coords$x)]
 pred_vals <- pred_vals[complete.cases(cred[1,])]
 plot(x = pred_vals,
      y = cred[5,][complete.cases(cred[1,])],
-     main = 'Normal Q-Q Plot',
+     bty = 'L',
      xlab = 'Theoretical Quantiles',
      ylab = 'Sample Quantiles',
      pch = 16,
      col = 'white',
      cex = 1,
-     ylim = range(cred, na.rm = T))
+     ylim = range(cred, na.rm = T),
+     tck = -0.04)
+title('Normal Q-Q Plot', line = 0)
 polygon(c(pred_vals, rev(pred_vals)), c(cred[1,][complete.cases(cred[1,])],
                                         rev(cred[9,][complete.cases(cred[1,])])),
         col = c_light, border = NA)
@@ -399,7 +402,7 @@ polygon(c(pred_vals, rev(pred_vals)), c(cred[4,][complete.cases(cred[1,])],
                                         rev(cred[6,][complete.cases(cred[1,])])),
         col = c_mid_highlight, border = NA)
 lines(pred_vals, cred[5,][complete.cases(cred[1,])], col = c_dark, lwd = 2.5)
-qqline(cred[5,][complete.cases(cred[1,])], col = 'white', lwd = 3)
+qqline(cred[5,][complete.cases(cred[1,])], col = '#FFFFFF60', lwd = 3)
 qqline(cred[5,][complete.cases(cred[1,])], col = 'black', lwd = 2.5)
 
 # ACF plot
@@ -426,16 +429,16 @@ cred <- sapply(1:NCOL(resid_acf),
                                     probs = probs, na.rm = T))
 cred <- cred[, -1]
 clim <- qnorm((1 + .95)/2)/sqrt(acf1$n.used)
-plot(1, type = "n",
+plot(1, type = "n", bty = 'L',
      xlab = 'Lag',
-     ylab = 'ACF',
-     main = 'ACF',
+     ylab = 'Autocorrelation',
      xlim = c(1, N-1),
      xaxt = 'n',
      ylim = range(c(cred,
                     -clim - 0.05,
                     clim + 0.05)))
 axis(1, at = seq(1, NCOL(cred), by = 2))
+title('ACF', line = 0)
 
 N <- N - 1
 rect(xleft = x[seq(1, N*2, by = 2)],
@@ -468,10 +471,10 @@ for (k in 1:N) {
         y = c(cred[5,k], cred[5,k]),
         col = c_dark, lwd = 2)
 }
-abline(h = clim, lty = 'dashed', col = 'white', lwd = 2.85)
-abline(h = clim, lty = 'dashed', col = 'black', lwd = 2.5)
-abline(h = -clim, lty = 'dashed', col = 'white', lwd = 2.85)
-abline(h = -clim, lty = 'dashed', col = 'black', lwd = 2.5)
+abline(h = clim,  col = '#FFFFFF60', lwd = 2.85)
+abline(h = clim,  col = 'black', lwd = 2.5, lty = 'dashed')
+abline(h = -clim,  col = '#FFFFFF60', lwd = 2.85)
+abline(h = -clim, col = 'black', lwd = 2.5, lty = 'dashed')
 
 # PACF plot
 pacf1 <- pacf(series_residuals[1,], plot = F,
@@ -497,16 +500,16 @@ cred <- sapply(1:NCOL(resid_pacf),
                                     probs = probs, na.rm = T))
 
 clim <- qnorm((1 + .95)/2)/sqrt(pacf1$n.used)
-plot(1, type = "n",
+plot(1, type = "n", bty = 'L',
      xlab = 'Lag',
-     ylab = 'Partial ACF',
-     main = 'pACF',
+     ylab = 'Autocorrelation',
      xlim = c(1, length(sorted_x)),
      xaxt = 'n',
      ylim = range(c(cred,
                     -clim - 0.05,
                     clim + 0.05)))
 axis(1, at = seq(1, NCOL(cred), by = 2))
+title('pACF', line = 0)
 
 rect(xleft = x[seq(1, N*2, by = 2)],
      xright = x[seq(2, N*2, by = 2)],
@@ -538,11 +541,10 @@ for (k in 1:N) {
         y = c(cred[5,k], cred[5,k]),
         col = c_dark, lwd = 2)
 }
-abline(h = clim, lty = 'dashed', col = 'white', lwd = 2.85)
-abline(h = clim, lty = 'dashed', col = 'black', lwd = 2.5)
-abline(h = -clim, lty = 'dashed', col = 'white', lwd = 2.85)
-abline(h = -clim, lty = 'dashed', col = 'black', lwd = 2.5)
-
+abline(h = clim, col = '#FFFFFF60', lwd = 2.85)
+abline(h = clim, col = 'black', lwd = 2.5, lty = 'dashed')
+abline(h = -clim, col = '#FFFFFF60', lwd = 2.85)
+abline(h = -clim, col = 'black', lwd = 2.5, lty = 'dashed')
 layout(1)
 
 }

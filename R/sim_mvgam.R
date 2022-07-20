@@ -181,8 +181,6 @@ sim_mvgam = function(T = 100,
     trend_alphas <- runif(n_lv, 0.75, 1.2)
     trend_rhos <- runif(n_lv, 6, 12)
 
-    cat('trend_alphas = ', trend_alphas, '\n\n')
-    cat('trend_rhos = ', trend_rhos, '\n\n')
     # Generate latent GP trends
     trends <- do.call(cbind, lapply(seq_len(n_lv), function(lv){
       set.seed(runif(1, 1, 100))

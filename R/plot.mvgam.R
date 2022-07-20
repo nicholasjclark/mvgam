@@ -44,11 +44,11 @@ plot.mvgam = function(object, type = 'smooths',
 
   # Other errors and warnings will propagate from individual functions below
   if(type == 're'){
-    plot_mvgam_randomeffects(object)
+    plot_mvgam_randomeffects(object, ...)
   }
 
   if(type == 'pterms'){
-    plot_mvgam_pterms(object)
+    plot_mvgam_pterms(object, ...)
   }
 
   if(type == 'residuals'){

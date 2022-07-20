@@ -12,10 +12,14 @@
 #'\code{realisations = TRUE}. Ignored otherwise
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}. Ignored if \code{derivatives = TRUE}
+#'@param xlab label for x axis.
+#'@param ... further \code{\link[graphics]{par}} graphical parameters.
 #'@export
 plot_mvgam_trend = function(object, series = 1, data_test,
                             realisations = FALSE, n_realisations = 15,
-                            derivatives = FALSE, hide_xlabels = FALSE){
+                            derivatives = FALSE, hide_xlabels = FALSE,
+                            xlab,
+                            ...){
 
   # Check arguments
   if(class(object) != 'mvgam'){
@@ -114,6 +118,10 @@ plot_mvgam_trend = function(object, series = 1, data_test,
   c_dark <- c("#8F2727")
   c_dark_highlight <- c("#7C0000")
 
+  if(missing(xlab)){
+    xlab <- 'Time'
+  }
+
   if(derivatives){
     .pardefault <- par(no.readonly=T)
     par(.pardefault)
@@ -122,10 +130,10 @@ plot_mvgam_trend = function(object, series = 1, data_test,
         mai = c(0.8, 0.8, 0.4, 0.4))
 
     plot(1, type = "n", bty = 'L',
-           xlab = 'Time',
+           xlab = xlab,
            ylab = paste0('Estimated trend for ', levels(data_train$series)[series]),
            xlim = c(0, length(preds_last)),
-           ylim = range(cred))
+           ylim = range(cred), ...)
 
     if(realisations){
       for(i in 1:n_realisations){
@@ -157,9 +165,11 @@ plot_mvgam_trend = function(object, series = 1, data_test,
 
     if(!missing(data_test)){
       if(class(data_train)[1] == 'list'){
-        abline(v = length(data_train$y) / NCOL(object$ytimes), lty = 'dashed')
+        abline(v = length(data_train$y) / NCOL(object$ytimes), col = '#FFFFFF60', lwd = 2.85)
+        abline(v = length(data_train$y) / NCOL(object$ytimes), col = 'black', lwd = 2.5, lty = 'dashed')
       } else {
-        abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
+        abline(v = NROW(data_train) / NCOL(object$ytimes), col = '#FFFFFF60', lwd = 2.85)
+        abline(v = NROW(data_train) / NCOL(object$ytimes), col = 'black', lwd = 2.5, lty = 'dashed')
       }
 
     }
@@ -171,11 +181,11 @@ plot_mvgam_trend = function(object, series = 1, data_test,
                                         probs = probs, na.rm = T))
 
     plot(1, type = "n", bty = "L",
-         xlab = 'Time',
+         xlab = xlab,
          ylab = '1st derivative',
          xlim = c(min(pred_vals), max(pred_vals)),
          ylim = c(min(cred, na.rm = T) - sd(first_derivs, na.rm = T),
-                  max(cred, na.rm = T) + sd(first_derivs, na.rm = T)))
+                  max(cred, na.rm = T) + sd(first_derivs, na.rm = T)), ...)
 
 
     if(realisations){
@@ -222,10 +232,10 @@ plot_mvgam_trend = function(object, series = 1, data_test,
 
     } else {
       plot(1, type = "n", bty = 'L',
-           xlab = 'Time',
+           xlab = xlab,
            ylab = paste0('Estimated trend for ', levels(data_train$series)[series]),
            xlim = c(0, length(preds_last)),
-           ylim = range(cred))
+           ylim = range(cred), ...)
     }
 
     if(realisations){
@@ -258,9 +268,11 @@ plot_mvgam_trend = function(object, series = 1, data_test,
 
     if(!missing(data_test)){
       if(class(data_train)[1] == 'list'){
-        abline(v = length(data_train$y) / NCOL(object$ytimes), lty = 'dashed')
+        abline(v = length(data_train$y) / NCOL(object$ytimes), col = '#FFFFFF60', lwd = 2.85)
+        abline(v = length(data_train$y) / NCOL(object$ytimes), col = 'black', lwd = 2.5, lty = 'dashed')
       } else {
-        abline(v = NROW(data_train) / NCOL(object$ytimes), lty = 'dashed')
+        abline(v = NROW(data_train) / NCOL(object$ytimes), col = '#FFFFFF60', lwd = 2.85)
+        abline(v = NROW(data_train) / NCOL(object$ytimes), col = 'black', lwd = 2.5, lty = 'dashed')
       }
 
     }

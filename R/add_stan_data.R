@@ -299,7 +299,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                                                         sub("\\)", "",
                                                             sub(".*\\:", "",
                                                                 stan_file[b_raw_indices[i]-1]))))),
-                                ') {\nb[i] <- mu_raw[', i, '] + b_raw[i] * sigma_raw[',i,
+                                ') {\nb[i] = mu_raw[', i, '] + b_raw[i] * sigma_raw[',i,
                                 '];\n}')
         min_beta[i] <- as.numeric(sub("for \\(i in ", "",
                                       sub("\\:.*", "",

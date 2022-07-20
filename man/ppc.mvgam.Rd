@@ -4,7 +4,17 @@
 \alias{ppc.mvgam}
 \title{Plot mvgam posterior predictive checks for a specified series}
 \usage{
-\method{ppc}{mvgam}(object, data_test, series = 1, type = "density", n_bins, legend_position)
+\method{ppc}{mvgam}(
+  object,
+  data_test,
+  series = 1,
+  type = "density",
+  n_bins,
+  legend_position,
+  xlab,
+  ylab,
+  ...
+)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
@@ -28,7 +38,14 @@ number of bins returned by a call to \code{hist} in base \code{R}}
 
 \item{legend_position}{The location may also be specified by setting x to a single keyword from the
 list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
-This places the legend on the inside of the plot frame at the given location.}
+This places the legend on the inside of the plot frame at the given location. Or alternatively,
+use "none" to hide the legend.}
+
+\item{xlab}{label for x axis.}
+
+\item{ylab}{label for y axis.}
+
+\item{...}{further \code{\link[graphics]{par}} graphical parameters.}
 }
 \value{
 A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram'}),

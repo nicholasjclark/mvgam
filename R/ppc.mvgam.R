@@ -16,7 +16,11 @@
 #'number of bins returned by a call to `hist` in base `R`
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
 #'list "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
-#'This places the legend on the inside of the plot frame at the given location.
+#'This places the legend on the inside of the plot frame at the given location. Or alternatively,
+#'use "none" to hide the legend.
+#'@param xlab label for x axis.
+#'@param ylab label for y axis.
+#'@param ... further \code{\link[graphics]{par}} graphical parameters.
 #'@details Posterior predictions are drawn from the fitted \code{mvgam} and compared against
 #'the empirical distribution of the observed data for a specified series to help evaluate the model's
 #'ability to generate unbiased predictions. For all plots apart from the 'rootogram', posterior predictions
@@ -41,12 +45,14 @@ ppc <- function(x, what, ...){
 #'@method ppc mvgam
 #'@export
 ppc.mvgam = function(object, data_test, series = 1, type = 'density',
-                     n_bins, legend_position){
+                     n_bins, legend_position, xlab, ylab, ...){
 
   # Check arguments
   type <- match.arg(arg = type, choices = c("rootogram", "mean", "hist",
                                             "density", "pit", "cdf",
                                             "prop_zero"))
+
+  optional_args <- list(...)
 
   if(class(object) != 'mvgam'){
     stop('argument "object" must be of class "mvgam"')
@@ -194,6 +200,15 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
       pred_props <- pred_props[-which(pred_props < lower)]
     }
     obs_prop <- length(which(truths == 0)) / length(truths)
+
+    if(missing(ylab)){
+      ylab <- 'Density'
+    }
+
+    if(missing(xlab)){
+      xlab <- paste0('Predicted proportion of zeroes for ', levels(data_train$series)[series])
+    }
+
     hist(pred_props, lwd = 2,
          xlim = c(min(min(pred_props), min(obs_prop)),
                   max(max(pred_props), max(obs_prop))),
@@ -202,8 +217,9 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
                       length.out = 15),
          border = "#B97C7C",
          col = "#C79999",
-         ylab = 'Density',
-         xlab = paste0('Predicted proportion of zeroes for ', levels(data_train$series)[series]))
+         ylab = ylab,
+         xlab = xlab,
+         ...)
     abline(v = obs_prop, lwd = 3, col = 'white')
     abline(v = obs_prop, lwd = 2.5, col = 'black')
     box(bty = 'L', lwd = 2)
@@ -212,14 +228,17 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
       legend_position = 'topright'
     }
 
-    legend(legend_position,
-           legend = c(expression(hat(y)[propzero]),
-                      expression(y[propzero])),
-           bg = 'white',
-           col = c(c_mid,
-                   'black'),
-           lty = 1, lwd = 2,
-           bty = 'n')
+    if(legend_position != 'none'){
+      legend(legend_position,
+             legend = c(expression(hat(y)[propzero]),
+                        expression(y[propzero])),
+             bg = 'white',
+             col = c(c_mid,
+                     'black'),
+             lty = 1, lwd = 2,
+             bty = 'n')
+    }
+
   }
 
   if(type == 'rootogram'){
@@ -276,14 +295,23 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
                   repped_x[k] + min(diff(xpos))/2 else
                     repped_x[k] - min(diff(xpos))/2)
 
+    if(missing(xlab)){
+      xlab <- expression(y)
+    }
+
+    if(missing(ylab)){
+      ylab <- expression(sqrt(frequency))
+    }
+
     # Plot the rootogram
     plot(1, type = "n", bty = 'L',
-         xlab = expression(y),
-         ylab = expression(sqrt(frequency)),
+         xlab = xlab,
+         ylab = ylab,
          xlim = range(xpos),
          ylim = range(c(data$tyexp, data[,13],
                         data[,5],
-                        data$tyexp - data$ty)))
+                        data$tyexp - data$ty)),
+         ...)
     rect(xleft = x[seq(1, N*2, by = 2)],
          xright = x[seq(2, N*2, by = 2)],
          ytop =  data$tyexp,
@@ -335,6 +363,15 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
       pred_means <- pred_means[-which(pred_means < lower)]
     }
     obs_mean <- mean(truths)
+
+    if(missing(ylab)){
+      ylab <- 'Density'
+    }
+
+    if(missing(xlab)){
+      xlab <- paste0('Predicted mean for ', levels(data_train$series)[series])
+    }
+
     hist(pred_means,
          xlim = c(min(min(pred_means), min(obs_mean)),
                   max(max(pred_means), max(obs_mean))),
@@ -343,8 +380,9 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
          breaks = seq(min(pred_means), max(pred_means), length.out = 20),
          border = "#B97C7C",
          col = "#C79999",
-         ylab = 'Density',
-         xlab = paste0('Predicted mean for ', levels(data_train$series)[series]))
+         ylab = ylab,
+         xlab = xlab,
+         ...)
     abline(v = obs_mean, lwd = 3, col = 'white')
     abline(v = obs_mean, lwd = 2.5, col = 'black')
     box(bty = 'L', lwd = 2)
@@ -353,6 +391,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
       legend_position = 'topright'
     }
 
+    if(legend_position != 'none'){
     legend(legend_position,
            legend = c(expression(hat(mu)),
                       expression(mu)),
@@ -361,6 +400,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
                    'black'),
            lty = 1, lwd = 2,
            bty = 'n')
+    }
   }
 
 
@@ -384,11 +424,20 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
     ymax <- max(c(max(cred),
                   max(true_dens$y)))
 
+    if(missing(ylab)){
+      ylab <- paste0('Predictive density for ', levels(data_train$series)[series])
+    }
+
+    if(missing(xlab)){
+      xlab <- ''
+    }
+
     plot(1, type = "n", bty = 'L',
-         xlab = '',
-         ylab = paste0('Predictive density for ', levels(data_train$series)[series]),
+         xlab = xlab,
+         ylab = ylab,
          xlim = c(min_x, max_x),
-         ylim = c(0, ymax))
+         ylim = c(0, ymax),
+         ...)
 
     polygon(c(true_dens$x, rev(true_dens$x)), c(cred[1,], rev(cred[9,])),
             col = c_light, border = NA)
@@ -407,6 +456,8 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
     if(missing(legend_position)){
       legend_position = 'topright'
     }
+
+    if(legend_position != 'none'){
     legend(legend_position,
            legend = c(expression(hat(y)),
                       'y'),
@@ -416,6 +467,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
            lty = 1,
            lwd = 2,
            bty = 'n')
+    }
     box(bty = 'L', lwd = 2)
   }
 
@@ -436,21 +488,32 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
     }
 
     bin_lims <- range(c(truths, as.vector(preds)))
-    delta <- diff(range(preds)) / n_bins
-    breaks <- seq(bin_lims[1], bin_lims[2] + delta, delta)
+    #delta <- diff(range(preds)) / n_bins
+    breaks <- seq(bin_lims[1], bin_lims[2], length.out = n_bins)
     xlim <- c(0,
               max(max(density(preds[1,])$x),
                   max(density(truths)$x)))
     ylim <- c(0, max(c(max(hist(truths, breaks = breaks, plot = F)$density),
                        max(hist(preds, breaks = breaks, plot = F)$density))))
+
+    if(missing(xlab)){
+      xlab <- paste0('Count')
+    }
+
+    if(missing(ylab)){
+      ylab = ''
+    }
+
     hist(preds, breaks=breaks, lwd = 2,
          main='',
-         xlab = paste0('Predictive histogram for ', levels(data_train$series)[series]),
+         xlab = xlab,
+         ylab = ylab,
          ylim=ylim,
          xlim=xlim,
          border = "#B97C7C",
          col = "#C79999",
-         freq = F)
+         freq = F,
+         ...)
 
     par(lwd=2)
     hist(truths, breaks=breaks,
@@ -467,6 +530,8 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
     if(missing(legend_position)){
       legend_position = 'topright'
     }
+
+    if(legend_position != 'none'){
     legend(legend_position,
            legend = c(expression(hat(y)),
                       'y'),
@@ -476,6 +541,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
            lty = 1,
            lwd = 2,
            bty = 'n')
+    }
   }
 
 
@@ -497,11 +563,20 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
                    function(n) quantile(pred_cdfs[,n],
                                         probs = probs))
 
+    if(missing(ylab)){
+      ylab = paste0('Predictive CDF for ', levels(data_train$series)[series])
+    }
+
+    if(missing(xlab)){
+      xlab = ''
+    }
+
     plot(1, type = "n", bty = 'L',
-         xlab = '',
-         ylab = paste0('Predictive CDF for ', levels(data_train$series)[series]),
+         xlab = xlab,
+         ylab = ylab,
          xlim = c(min(plot_x), max(plot_x)),
-         ylim = c(0, 1))
+         ylim = c(0, 1),
+         ...)
 
     polygon(c(plot_x, rev(plot_x)), c(cred[1,], rev(cred[9,])),
             col = c_light, border = NA)
@@ -528,6 +603,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
       legend_position = 'bottomright'
     }
 
+    if(legend_position != 'none'){
     legend(legend_position,
            legend = c(expression(hat(y)),
                       'y'),
@@ -536,6 +612,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
                    'black'),
            lty = 1, lwd = 2,
            bty = 'n')
+    }
     box(bty = 'L', lwd = 2)
   }
 
@@ -563,8 +640,10 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
     barplot(pit_hist, lwd = 2,
             col = "#B97C7C",
             xlab = paste0('Predictive PIT for ', levels(data_train$series)[series]),
-            border = NA)
-    abline(h = 1, lty = 'dashed', lwd = 2)
+            border = NA,
+            ...)
+    abline(h = 1, col = '#FFFFFF60', lwd = 2.85)
+    abline(h = 1, col = 'black', lwd = 2.5, lty = 'dashed')
     box(bty = 'L', lwd = 2)
   }
 }
