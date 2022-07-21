@@ -10,6 +10,7 @@
 \item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{type}{\code{character} specifying which type of plot to return. Options are:
+'series,
 residuals,
 smooths,
 re (random effect smooths),

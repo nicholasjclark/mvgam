@@ -5,6 +5,7 @@
 #'
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param type \code{character} specifying which type of plot to return. Options are:
+#''series,
 #'residuals,
 #'smooths,
 #'re (random effect smooths),
@@ -36,13 +37,17 @@ plot.mvgam = function(object, type = 'smooths',
   # Argument checks
   type <- match.arg(arg = type, choices = c("residuals", "smooths", "re",
                                             "pterms", "forecast", "trend",
-                                            "uncertainty", "factors"))
+                                            "uncertainty", "factors", "series"))
 
   if(class(object) != 'mvgam'){
     stop('argument "object" must be of class "mvgam"')
   }
 
   # Other errors and warnings will propagate from individual functions below
+  if(type == 'series'){
+    plot_mvgam_series(object, series = series, data_test = data_test, ...)
+  }
+
   if(type == 're'){
     plot_mvgam_randomeffects(object, ...)
   }

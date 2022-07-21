@@ -1,15 +1,14 @@
 library(mvgam)
 dat <- sim_mvgam(T = 100, n_series=3, prop_missing = .4)
-plot_mvgam_series(data_train = dat$data_train, series = 1)
+plot_mvgam_series(data_train = dat$data_train, series = 'all')
 
 
-mod1 <- mvgam(formula = y ~ s(series, bs = 're'),
+mod1 <- mvgam(formula = y ~ 1,
               data_train = dat$data_train,
-              trend_model = 'AR1',
-              family = 'poisson',
-              use_lv = TRUE,
+              trend_model = 'GP',
+              family = 'nb',
               use_stan = TRUE,
-              run_model = TRUE,
+              run_model = F,
               burnin = 10)
 mod1$model_file
 mod1$model_data
@@ -17,7 +16,7 @@ mod1$model_data
 
 summary(mod1)
 plot_mvgam_factors(mod1)
-plot(mod1, type = 'residuals')
+plot(mod1, type = 'series')
 fake <- dat$data_test
 fake$y <- NULL
 plot(mod1, 'trend', data_test = fake)

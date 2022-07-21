@@ -71,6 +71,10 @@ add_trend_lines = function(model_file, stan = FALSE,
                  'vector<lower=1>[n] times;\n',
                  'real mean_times;\n',
                  'vector[n] times_cent;\n',
+                 'real<lower=0> boundary;\n',
+                 'int<lower=1> num_gp_basis;\n',
+                 'num_gp_basis = max(40, n);\n',
+                 'matrix[n, num_gp_basis] gp_phi;\n\n',
                  'for (t in 1:n){\n',
                  'times[t] = t;\n',
                  '}\n\n',
@@ -78,11 +82,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                  'for (t in 1:n){\n',
                  'times_cent[t] = t - mean_times;\n',
                  '}\n\n',
-                 'real<lower=0> boundary;\n',
                  'boundary = (5.0/4) * max(times);\n',
-                 'int<lower=1> num_gp_basis;\n',
-                 'num_gp_basis = max(40, n);\n',
-                 'matrix[n, num_gp_basis] gp_phi;\n',
                  'for (m in 1:num_gp_basis){\n',
                  'gp_phi[,m] = phi_SE(boundary, m, times);\n',
                  '}\n}\n\n',
@@ -117,12 +117,14 @@ add_trend_lines = function(model_file, stan = FALSE,
         model_file <- model_file[-c(grep('// latent trends', model_file):
                                    (grep('// latent trends', model_file)+1))]
 
-        model_file[grep('// GAM contribution', model_file) + 3] <-
+        model_file[grep('vector[total_obs] eta;', model_file, fixed = TRUE) + 1] <-
           paste0('\n// gp spectral densities\n',
                  'matrix[n, n_series] trend;\n',
                  'matrix[num_gp_basis, n_series] diag_SPD;\n',
-                 'matrix[num_gp_basis, n_series] SPD_beta;\n',
-                 'for (m in 1:num_gp_basis){\n',
+                 'matrix[num_gp_basis, n_series] SPD_beta;\n')
+
+        model_file[grep('eta = to_vector', model_file) + 1] <-
+          paste0('\nfor (m in 1:num_gp_basis){\n',
                  'for (s in 1:n_series){\n',
                   'diag_SPD[m, s] = sqrt(spd_SE(alpha_gp[s], rho_gp[s], sqrt(lambda_gp(boundary, m))));\n',
                  '}\n}\n',
