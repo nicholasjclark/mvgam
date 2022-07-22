@@ -5,10 +5,10 @@ plot_mvgam_series(data_train = dat$data_train, series = 'all')
 
 mod1 <- mvgam(formula = y ~ 1,
               data_train = dat$data_train,
-              trend_model = 'GP',
+              trend_model = 'AR1',
               family = 'poisson',
               use_stan = TRUE,
-              run_model = T,
+              run_model = TRUE,
               burnin = 10)
 pairs(mod1$model_output, pars = c('rho_gp', 'r'))
 stan_trace(mod1$model_output, pars = c('rho_gp', 'r'))
