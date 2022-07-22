@@ -6,13 +6,18 @@ plot_mvgam_series(data_train = dat$data_train, series = 'all')
 mod1 <- mvgam(formula = y ~ 1,
               data_train = dat$data_train,
               trend_model = 'GP',
-              family = 'nb',
+              family = 'poisson',
               use_stan = TRUE,
-              run_model = F,
+              run_model = T,
               burnin = 10)
+pairs(mod1$model_output, pars = c('rho_gp', 'r'))
+stan_trace(mod1$model_output, pars = c('rho_gp', 'r'))
 mod1$model_file
 mod1$model_data
 
+r_inv <- abs(rnorm(1000, 4, 2.5))
+summary(r_inv)
+hist(r_inv)
 
 summary(mod1)
 plot_mvgam_factors(mod1)
