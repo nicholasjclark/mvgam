@@ -43,9 +43,12 @@ add_trend_lines = function(model_file, stan = FALSE,
       model_file[grep('ypred[i, s] =', model_file, fixed = T)] <-
         "ypred[i, s] = poisson_log_rng(eta[ytimes[i, s]]);"
 
-      model_file <- model_file[-grep('tau =', model_file)]
-
+      model_file <- model_file[-c((grep('tau[s] = pow(sigma[s], -2.0);',
+                                        model_file, fixed = TRUE)-1):
+                                    (grep('tau[s] = pow(sigma[s], -2.0);',
+                                          model_file, fixed = TRUE)+1))]
       model_file <- model_file[-grep('vector[n_series] tau', model_file, fixed = T)]
+
 
       model_file <- readLines(textConnection(model_file), n = -1)
     }
@@ -64,7 +67,10 @@ add_trend_lines = function(model_file, stan = FALSE,
                                       (grep('// trend estimates', model_file)+3))]
         model_file <- model_file[-c((grep('trend[2:n', model_file, fixed = T)-1):
                                       (grep('trend[2:n', model_file, fixed = T)+1))]
-        model_file <- model_file[-grep('tau =', model_file)]
+        model_file <- model_file[-c((grep('tau[s] = pow(sigma[s], -2.0);',
+                                        model_file, fixed = TRUE)-1):
+                                   (grep('tau[s] = pow(sigma[s], -2.0);',
+                                         model_file, fixed = TRUE)+1))]
         model_file <- model_file[-grep('vector[n_series] tau', model_file, fixed = T)]
         model_file[grep('##insert data', model_file)+1] <-
           paste0('transformed data {\n',
@@ -163,7 +169,10 @@ add_trend_lines = function(model_file, stan = FALSE,
                                       (grep('// trend estimates', model_file)+3))]
         model_file <- model_file[-c((grep('trend[2:n', model_file, fixed = T)-1):
                                       (grep('trend[2:n', model_file, fixed = T)+1))]
-        model_file <- model_file[-grep('tau =', model_file)]
+        model_file <- model_file[-c((grep('tau[s] = pow(sigma[s], -2.0);',
+                                          model_file, fixed = TRUE)-1):
+                                      (grep('tau[s] = pow(sigma[s], -2.0);',
+                                            model_file, fixed = TRUE)+1))]
         model_file <- model_file[-grep('vector[n_series] tau', model_file, fixed = T)]
         model_file[grep('##insert data', model_file)+1] <-
           paste0('transformed data {\n',

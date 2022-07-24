@@ -2,10 +2,10 @@
 title: 'mvgam case study 2: multivariate models'
 author: "Nicholas Clark (n.clark@uq.edu.au)"
 output:
-  pdf_document:
-    highlight: zenburn
   html_document:
     df_print: paged
+  pdf_document:
+    highlight: zenburn
   word_document: default
 urlcolor: blue
 ---
@@ -16,7 +16,7 @@ library(knitr)
 opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
 ```
 
-In this example we will examine multivariate forecasting models using `mvgam`, which fits dynamic GAMs (DGAMs) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `M` can be difficult. The approach used by `mvgam` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated in an exponentially increasing manner (following Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291), we hope that we can guard against specifying too large a `M`. But we should test this property to see how it behaves in different scenarios. Begin by simulating `6` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `100` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Poisson distributions
+In this example we will examine multivariate forecasting models using `mvgam`, which fits dynamic GAMs (DGAMs) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `M` can be difficult. The approach used by `mvgam` when sampling with `JAGS` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated in an exponentially increasing manner (following Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291), we hope that we can guard against specifying too large a `M`. Note that when sampling with `Stan`, we capitalise on the superior sampling and exploration of Hamiltonian Monte Carlo to choose the number of factors by placing independent normal priors on factor standard deviations. Begin by simulating `6` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `100` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Poisson distributions
 ```{r}
 set.seed(1111)
 library(mvgam)
@@ -48,12 +48,13 @@ mod1 <- mvgam(data_train = dat$data_train,
                 formula = y ~ s(series, bs = 're') +
                   s(season, bs = c('cc'), k = 8),
                 knots = list(season = c(0.5, 12.5)),
-                use_lv = T,
+                use_lv = TRUE,
                 n_lv = 2,
                 family = 'poisson',
                 trend_model = 'RW',
+                use_stan = TRUE,
                 chains = 4,
-                burnin = 4000)
+                burnin = 500)
 ```
 
 Look at a few plots. The estimated smooth function
@@ -71,22 +72,23 @@ Check whether each factor was retained using the `plot_mvgam_factors` function. 
 plot_mvgam_factors(mod1)
 ```
 
-Now we fit the same model but assume that we no nothing about how many factors to use, so we specify the maximum allowed (the total number of series; `8`). Note that this model is computationally more expensive so it will take longer to fit
+Now we fit the same model but assume that we no nothing about how many factors to use, so we specify the maximum allowed (the total number of series; `6`). Note that this model is computationally more expensive so it will take longer to fit
 ```{r, message=FALSE, warning=FALSE}
 mod2 <- mvgam(data_train = dat$data_train,
                 data_test = dat$data_test,
                 formula = y ~ s(series, bs = 're') +
                   s(season, bs = c('cc'), k = 8),
                 knots = list(season = c(0.5, 12.5)),
-                use_lv = T,
+                use_lv = TRUE,
                 n_lv = 6,
                 family = 'poisson',
+                use_stan = TRUE,
                 trend_model = 'RW',
                 chains = 4,
-                burnin = 4000)
+                burnin = 500)
 ```
 
-The same plots as model 1 to see if this model has also fit the data well
+Use the same plots as model 1 to see if this model has also fit the data well
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
 plot_mvgam_smooth(object = mod2, series = 1, smooth = 'season')
 ```
@@ -95,7 +97,7 @@ plot_mvgam_smooth(object = mod2, series = 1, smooth = 'season')
 plot(dat$global_seasonality[1:12], type = 'l', bty = 'L', ylab = 'True function', xlab = 'season')
 ```
 
-Examining the factor contributions gives us some insight into whether we set `n_lv` larger than we perhaps needed to. These contributions can be interpreted similarly to ordination axes when deciding how many latent variables to specify
+Examining the factor contributions gives us some insight into whether we set `n_lv` larger than we perhaps needed to (with some of the factors clearly evolving as unconstrained, zero-centred random walks). These contributions can be interpreted similarly to ordination axes when deciding how many latent variables to specify
 ```{r}
 plot_mvgam_factors(mod2)
 ```
@@ -146,8 +148,9 @@ trends_mod1 <- mvgam(data_train = trends_data$data_train,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
                       family = 'poisson',
+                      use_stan = TRUE,
                       chains = 4,
-                      burnin = 8000)
+                      burnin = 1000)
 ```
 
 Given that these series could potentially be following a hierarchical seasonality, we will also trial a slghtly more complex model with an extra smoothing term per series that allows its seasonal curve to deviate from the global seasonal smooth. Ignore the warning about repeated smooths, as this is not an issue for estimation.
@@ -159,8 +162,9 @@ trends_mod2 <- mvgam(data_train = trends_data$data_train,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
                       family = 'poisson',
+                      use_stan = TRUE,
                       chains = 4,
-                      burnin = 8000)
+                      burnin = 1000)
 ```
 
 How can we compare these models to ensure we choose one that performs well and provides useful inferences? Beyond posterior retrodictive and predictive checks, we can take advantage of the fact that `mvgam` fits an `mgcv` model to provide all the necessary penalty matrices, as well as to identify good initial values for smoothing parameters. Because we did not modify this model by adding a trend component (the only modification is that we estimated series-specific overdispersion parameters), we can still employ the usual `mgcv` model comparison routines
@@ -182,23 +186,24 @@ summary(trends_mod1$mgcv_model)
 summary(trends_mod2$mgcv_model)
 ```
 
-Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow an AR1 process, and we will rely on the exponential penalties to help regularise any un-needed factors by setting `n_lv = 4`
+Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow a RW process, and we will rely on the exponential penalties to help regularise any un-needed factors by setting `n_lv = 4`
 ```{r, message=FALSE, warning=FALSE}
 trends_mod3 <- mvgam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
                       formula = y ~ s(season, k = 8, m = 2, bs = 'cc') +
                         s(season, series, k = 5, bs = 'fs', m = 1),
                       knots = list(season = c(0.5, 12.5)),
-                      trend_model = 'AR1',
+                      trend_model = 'RW',
                       use_lv = TRUE,
                       n_lv = 4,
                       family = 'poisson',
+                      use_stan = TRUE,
                       chains = 4,
-                      burnin = 8000)
+                      burnin = 1000)
 ```
 
 
-Have a look at the returned `JAGS` model file to see how the dynamic factors are incorporated. Notice that the precisions of factors, together with each factor's set of loadings, are penalised using a regularised horseshoe prior 
+Have a look at the returned `Stan` model file to see how the dynamic factors are incorporated
 ```{r}
 trends_mod3$model_file
 ```
@@ -208,7 +213,7 @@ Inspection of the dynamic factors and their relative contributions indicates tha
 plot_mvgam_factors(trends_mod3)
 ```
 
-Model 3 (with the dynamic trend) should provide far superior forecasts than relying only on the estimated smooths. Inspect the model summary (note again that p-value approximations are a work in progress here and so may not be totally reliable).
+Model 3 (with the dynamic trend) should provide far superior forecasts than relying only on the estimated smooths. Inspect the model summary
 ```{r}
 summary(trends_mod3)
 ```

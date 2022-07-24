@@ -117,7 +117,6 @@ if(any(grep('rho', rownames(MCMCvis::MCMCsummary(object$model_output))))){
 
     number_seq <- seq(1:(1 + name_ends[i] - name_starts[i]))
     number_seq[1] <- ''
-
     paste0(rep(object$mgcv_model$smooth[[i]]$label,
                length(number_seq)),
            number_seq)

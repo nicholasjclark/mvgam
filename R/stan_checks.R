@@ -74,7 +74,7 @@ check_energy <- function(fit, quiet=FALSE) {
 #' @details Utility function written by Michael Betancourt (https://betanalpha.github.io/)
 #' @noRd
 check_n_eff <- function(fit, quiet=FALSE) {
-  fit_summary <- rstan::summary(mod1$model_output, probs = c(0.5))$summary
+  fit_summary <- rstan::summary(fit, probs = c(0.5))$summary
   if(any(grep('LV', rownames(fit_summary)))){
     fit_summary <- fit_summary[-grep('LV', rownames(fit_summary)), ]
     fit_summary <- fit_summary[-grep('lv_coefs', rownames(fit_summary)), ]
@@ -115,7 +115,7 @@ check_n_eff <- function(fit, quiet=FALSE) {
 #' @details Utility function written by Michael Betancourt (https://betanalpha.github.io/)
 #' @noRd
 check_rhat <- function(fit, quiet=FALSE) {
-  fit_summary <- rstan::summary(mod1$model_output, probs = c(0.5))$summary
+  fit_summary <- rstan::summary(fit, probs = c(0.5))$summary
   if(any(grep('LV', rownames(fit_summary)))){
     fit_summary <- fit_summary[-grep('LV', rownames(fit_summary)), ]
     fit_summary <- fit_summary[-grep('lv_coefs', rownames(fit_summary)), ]

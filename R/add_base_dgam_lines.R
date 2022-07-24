@@ -172,7 +172,9 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
     vector[n_series] tau;
     matrix[n, n_series] ypred;
     rho = log(lambda);
-    tau = pow(sigma, -2.0);
+    for (s in 1:n_series) {
+    tau[s] = pow(sigma[s], -2.0);
+    }
 
     // posterior predictions
     for(i in 1:n){

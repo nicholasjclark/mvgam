@@ -387,7 +387,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                                  fixed = TRUE)]
 
     stan_file[grep('// basis coefficients', stan_file) + 2] <-
-      paste0('\nfor (i in ','1:num_basis) {\nb[i] = b_raw[i];\n}')
+      paste0('\nfor (i in ','1:num_basis) {\nb[i] = b_raw[i];\n}\n')
 
     if(any(grep('## parametric effect priors', jags_file))){
       stan_file[grep('##insert smooths', stan_file)] <-
@@ -399,7 +399,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                ':', as.numeric(substr(sub(".*\\:", "",
                                           jags_file[grep('## parametric effect', jags_file) + 1]),
                                       1, 1)),
-               ') {\nb_raw[i] ~ normal(p_coefs[i], 1 / p_taus[i]);\n}')
+               ') {\nb_raw[i] ~ normal(p_coefs[i], 1 / p_taus[i]);\n}\n')
       stan_file <- readLines(textConnection(stan_file), n = -1)
     }
 
