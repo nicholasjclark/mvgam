@@ -43,6 +43,8 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
     newdata <- object$obs_data
   }
 
+  s_name <- levels(object$obs_data$series)[series]
+
   suppressWarnings(Xp  <- try(predict(object$mgcv_model,
                                       newdata = newdata,
                                       type = 'lpmatrix'),
@@ -121,27 +123,28 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
 
     if(object$use_lv){
       lv_preds <- do.call(cbind, lapply(seq_len(object$n_lv), function(lv){
-        rnorm(length(which(as.numeric(newdata$series) == series)), 0, sqrt(1 / taus[x,lv]))
+        rnorm(length(which(newdata$series == s_name)), 0, sqrt(1 / taus[x,lv]))
       }))
 
       if(type == 'link'){
-        out <- as.vector(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+        out <- as.vector(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp),
+                                     nrow = length(which(newdata$series == s_name))) %*%
                              betas[x,])) +
                            ( lv_preds %*% lv_coefs[[series]][x,]))
       }
 
       if(type == 'response'){
         if(family == 'Negative Binomial'){
-          out <- rnbinom(n = length(which(as.numeric(newdata$series) == series)), size = sizes[x, series],
-                  mu = exp(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+          out <- rnbinom(n = length(which(newdata$series == s_name)), size = sizes[x, series],
+                  mu = exp(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                betas[x,])) +
                              ( lv_preds %*% lv_coefs[[series]][x,])))
         }
 
         if(family == 'Tweedie'){
-          out <- rpois(n = length(which(as.numeric(newdata$series) == series)),
+          out <- rpois(n = length(which(newdata$series == s_name)),
                 lambda = mgcv::rTweedie(
-                  mu = exp(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+                  mu = exp(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                betas[x,])) +
                              (lv_preds %*% lv_coefs[[series]][x,])),
                   p = ps[x],
@@ -149,8 +152,8 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
         }
 
         if(family == 'Poisson'){
-          out <- rpois(n = length(which(as.numeric(newdata$series) == series)),
-                lambda = exp(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+          out <- rpois(n = length(which(newdata$series == s_name)),
+                lambda = exp(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                  betas[x,])) +
                              (lv_preds %*% lv_coefs[[series]][x,])))
         }
@@ -161,20 +164,20 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
       if(type == 'link'){
         if(object$trend_model == 'GP'){
           Sigma <- alpha_gps[x, series]^2 * exp(-(rho_gps[x, series]) *
-                                                  outer(1:length(which(as.numeric(newdata$series) == series)),
-                                                        1:length(which(as.numeric(newdata$series) == series)), "-")^2) +
-            diag(1e-4, length(which(as.numeric(newdata$series) == series)))
+                                                  outer(1:length(which(newdata$series == s_name)),
+                                                        1:length(which(newdata$series == s_name)), "-")^2) +
+            diag(1e-4, length(which(newdata$series == s_name)))
 
-          out <- as.vector(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+          out <- as.vector(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                betas[x,])) +
-                             MASS::mvrnorm(1, rep(0,length(which(as.numeric(newdata$series) == series))), Sigma))
+                             MASS::mvrnorm(1, rep(0,length(which(newdata$series == s_name))), Sigma))
         } else if(object$trend_model == 'None'){
-          out <- as.vector(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+          out <- as.vector(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                betas[x,])))
         } else {
-          out <- as.vector(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+          out <- as.vector(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                betas[x,])) +
-                             (rnorm(length(which(as.numeric(newdata$series) == series)),
+                             (rnorm(length(which(newdata$series == s_name)),
                                     0, sqrt(1 / taus[x,series]))))
         }
       }
@@ -183,40 +186,40 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
         if(family == 'Negative Binomial'){
           if(object$trend_model == 'GP'){
             Sigma <- alpha_gps[x, series]^2 * exp(-(rho_gps[x, series]) *
-                                                    outer(1:length(which(as.numeric(newdata$series) == series)),
-                                                          1:length(which(as.numeric(newdata$series) == series)), "-")^2) +
-              diag(1e-4, length(which(as.numeric(newdata$series) == series)))
-            out <- rnbinom(n = length(which(as.numeric(newdata$series) == series)), size = sizes[x, series],
-                           mu = exp(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+                                                    outer(1:length(which(newdata$series == s_name)),
+                                                          1:length(which(newdata$series == s_name)), "-")^2) +
+              diag(1e-4, length(which(newdata$series == s_name)))
+            out <- rnbinom(n = length(which(newdata$series == s_name)), size = sizes[x, series],
+                           mu = exp(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                         betas[x,])) +
-                                      (MASS::mvrnorm(1, rep(0,length(which(as.numeric(newdata$series) == series))), Sigma))))
+                                      (MASS::mvrnorm(1, rep(0,length(which(newdata$series == s_name))), Sigma))))
           } else if(object$trend_model == 'None'){
-            out <- rnbinom(n = length(which(as.numeric(newdata$series) == series)), size = sizes[x, series],
-                           mu = exp(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+            out <- rnbinom(n = length(which(newdata$series == s_name)), size = sizes[x, series],
+                           mu = exp(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                         betas[x,]))))
             } else {
-            out <- rnbinom(n = length(which(as.numeric(newdata$series) == series)), size = sizes[x, series],
-                           mu = exp(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+            out <- rnbinom(n = length(which(newdata$series == s_name)), size = sizes[x, series],
+                           mu = exp(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                         betas[x,])) +
-                                      (rnorm(length(which(as.numeric(newdata$series) == series)), 0, sqrt(1 / taus[x,series])))))
+                                      (rnorm(length(which(newdata$series == s_name)), 0, sqrt(1 / taus[x,series])))))
           }
 
         }
 
         if(family == 'Tweedie'){
           if(object$trend_model == 'None'){
-            out <- rpois(n = length(which(as.numeric(newdata$series) == series)),
+            out <- rpois(n = length(which(newdata$series == s_name)),
                          lambda = mgcv::rTweedie(
-                           mu = exp(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+                           mu = exp(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                         betas[x,]))),
                            p = ps[x],
                            phi = twdiss[x, series]))
           } else {
-            out <- rpois(n = length(which(as.numeric(newdata$series) == series)),
+            out <- rpois(n = length(which(newdata$series == s_name)),
                          lambda = mgcv::rTweedie(
-                           mu = exp(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+                           mu = exp(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                         betas[x,])) +
-                                      (rnorm(length(which(as.numeric(newdata$series) == series)),
+                                      (rnorm(length(which(newdata$series == s_name)),
                                              0, sqrt(1 / taus[x,series])))),
                            p = ps[x],
                            phi = twdiss[x, series]))
@@ -227,22 +230,22 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
         if(family == 'Poisson'){
           if(object$trend_model == 'GP'){
             Sigma <- alpha_gps[x, series]^2 * exp(-(rho_gps[x, series]) *
-                                                    outer(1:length(which(as.numeric(newdata$series) == series)),
-                                                          1:length(which(as.numeric(newdata$series) == series)), "-")^2) +
-              diag(1e-4, length(which(as.numeric(newdata$series) == series)))
-            out <- rpois(n = length(which(as.numeric(newdata$series) == series)),
-                         lambda = exp(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+                                                    outer(1:length(which(newdata$series == s_name)),
+                                                          1:length(which(newdata$series == s_name)), "-")^2) +
+              diag(1e-4, length(which(newdata$series == s_name)))
+            out <- rpois(n = length(which(newdata$series == s_name)),
+                         lambda = exp(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                           betas[x,])) +
-                                        (MASS::mvrnorm(1, rep(0,length(which(as.numeric(newdata$series) == series))), Sigma))))
+                                        (MASS::mvrnorm(1, rep(0,length(which(newdata$series == s_name))), Sigma))))
           } else if(object$trend_model == 'None'){
-            out <- rpois(n = length(which(as.numeric(newdata$series) == series)),
-                         lambda = exp(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+            out <- rpois(n = length(which(newdata$series == s_name)),
+                         lambda = exp(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                           betas[x,]))))
             } else {
-            out <- rpois(n = length(which(as.numeric(newdata$series) == series)),
-                         lambda = exp(((as.matrix(Xp[which(as.numeric(newdata$series) == series),], ncol = NCOL(Xp)) %*%
+            out <- rpois(n = length(which(newdata$series == s_name)),
+                         lambda = exp(((matrix(Xp[which(newdata$series == s_name),], ncol = NCOL(Xp)) %*%
                                           betas[x,])) +
-                                        (rnorm(length(which(as.numeric(newdata$series) == series)),
+                                        (rnorm(length(which(newdata$series == s_name)),
                                                0, sqrt(1 / taus[x,series])))))
           }
         }

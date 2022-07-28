@@ -346,7 +346,7 @@ fit_mvgam = function(data_train,
                      knots,
                      burnin = 1000,
                      n_samples = 1000,
-                     thin = 2,
+                     thin = 1,
                      interval_width = 0.9){
 
   # Condition the model on the observed data

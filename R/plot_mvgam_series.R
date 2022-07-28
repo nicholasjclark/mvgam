@@ -27,7 +27,7 @@
 #'only a single focal series is highlighted, with all remaining series shown as faint gray lines.
 #'@export
 plot_mvgam_series = function(object, data_train, data_test,
-                             series, n_bins,
+                             series = 1, n_bins,
                              log_scale = FALSE){
 
   # Check arguments

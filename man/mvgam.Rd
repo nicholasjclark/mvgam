@@ -17,10 +17,10 @@ mvgam(
   n_lv,
   trend_model = "RW",
   drift = FALSE,
-  chains = 2,
+  chains = 4,
   burnin = 1000,
-  n_samples = 2000,
-  thin = 4,
+  n_samples = 1000,
+  thin = 1,
   parallel = TRUE,
   phi_prior,
   ar_prior,
@@ -134,7 +134,8 @@ is computationally expensive in \code{JAGS} but can lead to better estimates whe
 truncation entirely (i.e. there is no upper bound for each series)}
 
 \item{use_stan}{Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
-the Hamiltonian Monte Carlo with a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
+the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if \code{cmdstanr} is not available,
+a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
 not all options that are available in \code{JAGS} can be used, including: no option for a Tweedie family and no option for
 dynamic factor trends. However, as \code{rstan} can estimate Hilbert base approximate gaussian processes, which
 are much more computationally tractable than full GPs for time series with \verb{>100} observations, estimation
@@ -151,7 +152,7 @@ for other functions in the package
 }
 \description{
 This function estimates the posterior distribution for Generalised Additive Models (GAMs) that can include
-smooth functions, specified in the GAM formula, as well as latent temporal processes, specified by trend_model.
+smooth spline functions, specified in the GAM formula, as well as latent temporal processes, specified by trend_model.
 There are currently two options for specifying the structures of the trends (either as latent
 dynamic factors to capture trend dependencies among series in a reduced dimension format, or as independent trends)
 }
@@ -190,12 +191,12 @@ models, estimating the power parameter \code{p} alongside the overdispersion par
 The \code{p} parameter is therefore fixed at \code{1.5} (i.e. a so-called Geometric Poisson model).
 \cr
 \cr
-\emph{Factor regularisation}: When using a dynamic factor model for the trends with \code{JAGS} sa,\link{;omg}, factor precisions are given
+\emph{Factor regularisation}: When using a dynamic factor model for the trends with \code{JAGS} factor precisions are given
 regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
 capture dependencies in the data, so it can often be advantageous to set \code{n_lv} to a slightly larger number. However
 larger numbers of factors do come with additional computational costs so these should be balanced as well. When using
-\code{Stan}, all factors are parameterised with \code{sd = 1}
+\code{Stan}, all factors are parameterised with \code{sd = 0.1}
 \cr
 \cr
 \emph{Residuals}: For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics
@@ -204,18 +205,101 @@ autocorrelation will be evident. When a particular observation is missing, the r
 draws from the model's posterior distribution
 \cr
 \cr
-\emph{Using Stan}: An in-development feature of \code{mvgam} is the ability to use Hamiltonian Monte Carlo for parameter estimation
-via the software \code{Stan} (using the \code{rstan} interface). Note that the \code{rstan} library is currently required for this option to work,
-though support for other \code{Stan} interfaces will be added in future. Also note that currently there is no support for
-fitting \code{Tweedie} responses in \code{Stan}, though again this will be added in future.
+\emph{Using Stan}: A useful feature of \code{mvgam} is the ability to use Hamiltonian Monte Carlo for parameter estimation
+via the software \code{Stan} (using either the \code{cmdstanr} or \code{rstan} interface). Note that the \code{rstan} library is
+currently required for this option to work, even if using \code{cmdstanr} as the backend. Also note that currently there is no support for
+fitting \code{Tweedie} responses in \code{Stan}.
 However there are great advantages when using \code{Stan}, which includes the option to estimate smooth latent trends
 via \href{https://arxiv.org/abs/2004.11408}{Hilbert space approximate Gaussian Processes}. This often makes sense for
 ecological series, which we expect to change smoothly. In \code{mvgam}, latent squared exponential GP trends are approximated using
 by default \code{40} basis functions, which saves computational costs compared to fitting full GPs while adequately estimating
 GP \code{alpha} and \code{rho} parameters
 }
+\examples{
+\donttest{
+# Simulate a collection of three time series that have shared seasonal dynamics
+dat <- sim_mvgam(T = 80, n_series = 3, prop_missing = 0.1,
+                trend_rel = 0.6)
+
+# Plot key summary statistics for a single series
+plot_mvgam_series(data_train = dat$data_train, series = 1)
+
+# Plot all series together
+plot_mvgam_series(data_train = dat$data_train, series = 'all')
+
+# Formulate a model using Stan where series share a cyclic smooth for
+# seasonality and each series has an independent random walk temporal process;
+# Set run_model = FALSE to inspect the returned objects
+mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
+             data_train = dat$data_train,
+             trend_model = 'RW',
+             family = 'poisson',
+             use_stan = TRUE,
+             run_model = FALSE)
+
+# View the model code in Stan language
+mod1$model_file
+
+# Inspect the data objects needed to condition the model
+str(mod1$model_data)
+
+# Inspect the initial value function used to initialise the MCMC chains
+mod1$inits
+
+# The following code can be used to run the model outside of mvgam; first using rstan
+model_data <- mod1$model_data
+library(rstan)
+fit <- stan(model_code = mod1$model_file,
+           data = model_data,
+           init = mod1$inits)
+
+# Now using cmdstanr
+library(cmdstanr)
+model_data <- mod1$model_data
+cmd_mod <- cmdstan_model(write_stan_file(mod1$model_file),
+                        stanc_options = list('canonicalize=deprecations,braces,parentheses'))
+cmd_mod$print()
+fit <- cmd_mod$sample(data = model_data,
+                     chains = 4,
+                     parallel_chains = 4,
+                     refresh = 500,
+                     init = mod1$inits)
+
+# Fit the model using mvgam and the stan backend
+mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
+              data_train = dat$data_train,
+              trend_model = 'RW',
+              family = 'poisson',
+              use_stan = TRUE)
+
+# Extract the model summary
+summary(mod1)
+
+# Plot the estimated historical trend and forecast for one series
+plot(mod1, type = 'trend', series = 1)
+plot(mod1, type = 'forecast', series = 1)
+
+# Compute the forecast using covariate information in data_test
+plot(object = mod1, type = 'trend', data_test = dat$data_test,
+     series = 1)
+plot(object = mod1, type = 'forecast', data_test = dat$data_test,
+     series = 1)
+
+# Plot the estimated seasonal smooth function
+plot(mod1, type = 'smooths')
+
+# Plot estimated first derivatives of the smooth
+plot(mod1, type = 'smooths', derivatives = TRUE)
+
+# Plot partial residuals of the smooth
+plot(mod1, type = 'smooths', residuals = TRUE)
+
+# Plot posterior realisations for the smooth
+plot(mod1, type = 'smooths', realisations = TRUE)
+}
+}
 \seealso{
-\code{\link[rjags]{jags.model}}, \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
+\code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
 }
 \author{
 Nicholas J Clark

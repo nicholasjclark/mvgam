@@ -58,13 +58,13 @@ message()
 
 if(object$fit_engine == 'jags'){
   message('Status:')
-  cat('Fitted using runjags::run.jags()', '\n')
+  cat('Fitted using JAGS', '\n')
   message()
 }
 
 if(object$fit_engine == 'stan'){
   message('Status:')
-  cat('Fitted using rstan::stan()', '\n')
+  cat('Fitted using Stan', '\n')
   message()
 }
 

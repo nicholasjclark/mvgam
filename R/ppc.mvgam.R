@@ -58,12 +58,6 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
     stop('argument "object" must be of class "mvgam"')
   }
 
-  # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
-  }
-
   if(sign(series) != 1){
     stop('argument "series" must be a positive integer',
          call. = FALSE)
@@ -134,7 +128,16 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
         dplyr::filter(series == s_name) %>%
         dplyr::pull(y)
 
-      preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+      if(object$fit_engine == 'stan'){
+
+        # For stan objects, ypred is stored as a vector in column-major order
+        preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
+                                                                        dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+                                                                        by = NCOL(object$ytimes))]
+      } else {
+        preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+      }
+
       preds <- preds[,((length(data_train$y) / NCOL(object$ytimes))+1):
                        ((length(data_train$y) / NCOL(object$ytimes))+length(truths))]
 
@@ -146,7 +149,16 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
         dplyr::arrange(time) %>%
         dplyr::pull(y)
 
-      preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+      if(object$fit_engine == 'stan'){
+
+        # For stan objects, ypred is stored as a vector in column-major order
+        preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
+                                                                        dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+                                                                        by = NCOL(object$ytimes))]
+      } else {
+        preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+      }
+
       preds <- preds[,((NROW(data_train) / NCOL(object$ytimes))+1):
                        ((NROW(data_train) / NCOL(object$ytimes))+length(truths))]
     }
@@ -173,7 +185,16 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
         dplyr::pull(y)
     }
 
-    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+    if(object$fit_engine == 'stan'){
+
+      # For stan objects, ypred is stored as a vector in column-major order
+      preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
+                                                                      dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+                                                                      by = NCOL(object$ytimes))]
+    } else {
+      preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+    }
+
     preds <- preds[,1:length(truths)]
 
     if(NROW(preds) > 4000){

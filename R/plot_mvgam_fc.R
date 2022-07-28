@@ -142,7 +142,12 @@ plot_mvgam_fc = function(object, series = 1, data_test,
 
 
   if(dim(preds)[2] != length(all_obs)){
-    fc_preds <- forecast.mvgam(object, series = series, data_test = data_test)
+    if(object$trend_model == 'None'){
+      fc_preds <- predict.mvgam(object, series = series, newdata = data_test,
+                                type = 'response')
+    } else {
+      fc_preds <- forecast.mvgam(object, series = series, data_test = data_test)
+    }
     preds <- cbind(preds, fc_preds)
   }
 
@@ -229,13 +234,19 @@ plot_mvgam_fc = function(object, series = 1, data_test,
                                time = data_test$time)
     }
 
-    # Show historical distribution in grey
     last_train <- (NROW(data_train) / NCOL(object$ytimes))
-    polygon(c(pred_vals[1:(NROW(data_train) / NCOL(object$ytimes))],
-                        rev(pred_vals[1:(NROW(data_train) / NCOL(object$ytimes))])),
-            c(cred[1,1:(NROW(data_train) / NCOL(object$ytimes))],
-              rev(cred[9,1:(NROW(data_train) / NCOL(object$ytimes))])),
-            col = 'grey70', border = NA)
+
+    # Show historical (hindcast) distribution in grey
+    if(!realisations){
+      polygon(c(pred_vals[1:(NROW(data_train) / NCOL(object$ytimes))],
+                rev(pred_vals[1:(NROW(data_train) / NCOL(object$ytimes))])),
+              c(cred[1,1:(NROW(data_train) / NCOL(object$ytimes))],
+                rev(cred[9,1:(NROW(data_train) / NCOL(object$ytimes))])),
+              col = 'grey70', border = NA)
+      lines(pred_vals[1:(NROW(data_train) / NCOL(object$ytimes))],
+            cred[5,1:(NROW(data_train) / NCOL(object$ytimes))],
+            col = 'grey70', lwd = 2.5)
+    }
 
     # Plot training and testing points
     points(dplyr::bind_rows(data_train, data_test) %>%

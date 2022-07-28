@@ -96,15 +96,20 @@ plot.mvgam = function(object, type = 'smooths',
 
     # Get labels of all included smooths from the object
     smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
-      data.frame(label = object$mgcv_model$smooth[[x]]$label, class = class(object$mgcv_model$smooth[[x]])[1])
+      data.frame(label = object$mgcv_model$smooth[[x]]$label,
+                 class = class(object$mgcv_model$smooth[[x]])[1],
+                 mgcv_plottable = object$mgcv_model$smooth[[x]]$plot.me)
     }))
     n_smooths <- NROW(smooth_labs)
     smooth_labs$smooth_index <- 1:NROW(smooth_labs)
     if(n_smooths == 0) stop("No terms to plot - nothing for plot.mvgam() to do.")
 
-    # Cannot yet make sensible plots of random effects
+    # Leave out random effects and MRF smooths, and any others that are not
+    # considered plottable by mgcv
     smooth_labs %>%
-      dplyr::filter(class != 'random.effect') -> smooth_labs
+      dplyr::filter(class != 'random.effect') %>%
+      dplyr::filter(class != 'mrf.smooth') %>%
+      dplyr::filter(mgcv_plottable) -> smooth_labs
 
     # Check which ones plot_mvgam_smooth can handle (no more than 2 dimensions)
     plottable = function(x){

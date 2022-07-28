@@ -8,7 +8,7 @@ plot_mvgam_series(
   object,
   data_train,
   data_test,
-  series,
+  series = 1,
   n_bins,
   log_scale = FALSE
 )

@@ -1,7 +1,7 @@
 #'Fit a Bayesian dynamic GAM to a univariate or multivariate set of discrete time series
 #'
 #'This function estimates the posterior distribution for Generalised Additive Models (GAMs) that can include
-#'smooth functions, specified in the GAM formula, as well as latent temporal processes, specified by trend_model.
+#'smooth spline functions, specified in the GAM formula, as well as latent temporal processes, specified by trend_model.
 #'There are currently two options for specifying the structures of the trends (either as latent
 #'dynamic factors to capture trend dependencies among series in a reduced dimension format, or as independent trends)
 #'
@@ -80,7 +80,8 @@
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 #'truncation entirely (i.e. there is no upper bound for each series)
 #'@param use_stan Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
-#'the Hamiltonian Monte Carlo with a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
+#'the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if `cmdstanr` is not available,
+#'a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
 #'not all options that are available in \code{JAGS} can be used, including: no option for a Tweedie family and no option for
 #'dynamic factor trends. However, as \code{rstan} can estimate Hilbert base approximate gaussian processes, which
 #'are much more computationally tractable than full GPs for time series with `>100` observations, estimation
@@ -122,12 +123,12 @@
 #'The `p` parameter is therefore fixed at `1.5` (i.e. a so-called Geometric Poisson model).
 #'\cr
 #'\cr
-#'*Factor regularisation*: When using a dynamic factor model for the trends with `JAGS` sa,[;omg], factor precisions are given
+#'*Factor regularisation*: When using a dynamic factor model for the trends with `JAGS` factor precisions are given
 #'regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 #'factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
 #'capture dependencies in the data, so it can often be advantageous to set `n_lv` to a slightly larger number. However
 #'larger numbers of factors do come with additional computational costs so these should be balanced as well. When using
-#'`Stan`, all factors are parameterised with `sd = 1`
+#'`Stan`, all factors are parameterised with `sd = 0.1`
 #'\cr
 #'\cr
 #'*Residuals*: For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics
@@ -136,10 +137,10 @@
 #'draws from the model's posterior distribution
 #'\cr
 #'\cr
-#'*Using Stan*: An in-development feature of `mvgam` is the ability to use Hamiltonian Monte Carlo for parameter estimation
-#'via the software `Stan` (using the `rstan` interface). Note that the `rstan` library is currently required for this option to work,
-#'though support for other `Stan` interfaces will be added in future. Also note that currently there is no support for
-#'fitting `Tweedie` responses in `Stan`, though again this will be added in future.
+#'*Using Stan*: A useful feature of `mvgam` is the ability to use Hamiltonian Monte Carlo for parameter estimation
+#'via the software `Stan` (using either the `cmdstanr` or `rstan` interface). Note that the `rstan` library is
+#'currently required for this option to work, even if using `cmdstanr` as the backend. Also note that currently there is no support for
+#'fitting `Tweedie` responses in `Stan`.
 #'However there are great advantages when using `Stan`, which includes the option to estimate smooth latent trends
 #'via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408). This often makes sense for
 #'ecological series, which we expect to change smoothly. In `mvgam`, latent squared exponential GP trends are approximated using
@@ -147,12 +148,95 @@
 #'GP \code{alpha} and \code{rho} parameters
 #'@author Nicholas J Clark
 #'
-#'@seealso \code{\link[rjags]{jags.model}}, \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
+#'@seealso \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
 #'@return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
 #'unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
 #'for other functions in the package
 #'
+#'@examples
+#'\donttest{
+#'# Simulate a collection of three time series that have shared seasonal dynamics
+# # and independent random walk trends, with a Poisson observation process
+#'dat <- sim_mvgam(T = 80, n_series = 3, prop_missing = 0.1,
+#'                 trend_rel = 0.6)
+#'
+#'# Plot key summary statistics for a single series
+#'plot_mvgam_series(data_train = dat$data_train, series = 1)
+#'
+#'# Plot all series together
+#'plot_mvgam_series(data_train = dat$data_train, series = 'all')
+#'
+#'# Formulate a model using Stan where series share a cyclic smooth for
+#'# seasonality and each series has an independent random walk temporal process;
+#'# Set run_model = FALSE to inspect the returned objects
+#'mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
+#'              data_train = dat$data_train,
+#'              trend_model = 'RW',
+#'              family = 'poisson',
+#'              use_stan = TRUE,
+#'              run_model = FALSE)
+#'
+#'# View the model code in Stan language
+#' mod1$model_file
+#'
+#' # Inspect the data objects needed to condition the model
+#' str(mod1$model_data)
+#'
+#' # Inspect the initial value function used to initialise the MCMC chains
+#' mod1$inits
+#'
+#' # The following code can be used to run the model outside of mvgam; first using rstan
+#' model_data <- mod1$model_data
+#' library(rstan)
+#' fit <- stan(model_code = mod1$model_file,
+#'            data = model_data,
+#'            init = mod1$inits)
+#'
+#' # Now using cmdstanr
+#' library(cmdstanr)
+#' model_data <- mod1$model_data
+#' cmd_mod <- cmdstan_model(write_stan_file(mod1$model_file),
+#'                         stanc_options = list('canonicalize=deprecations,braces,parentheses'))
+#' cmd_mod$print()
+#' fit <- cmd_mod$sample(data = model_data,
+#'                      chains = 4,
+#'                      parallel_chains = 4,
+#'                      refresh = 500,
+#'                      init = mod1$inits)
+#'
+#' # Fit the model using mvgam and the stan backend
+#' mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
+#'               data_train = dat$data_train,
+#'               trend_model = 'RW',
+#'               family = 'poisson',
+#'               use_stan = TRUE)
+#'
+#' # Extract the model summary
+#' summary(mod1)
+#'
+#' # Plot the estimated historical trend and forecast for one series
+#' plot(mod1, type = 'trend', series = 1)
+#' plot(mod1, type = 'forecast', series = 1)
+#'
+#' # Compute the forecast using covariate information in data_test
+#' plot(object = mod1, type = 'trend', data_test = dat$data_test,
+#'      series = 1)
+#' plot(object = mod1, type = 'forecast', data_test = dat$data_test,
+#'      series = 1)
+#'
+#' # Plot the estimated seasonal smooth function
+#'plot(mod1, type = 'smooths')
+#'
+#' # Plot estimated first derivatives of the smooth
+#' plot(mod1, type = 'smooths', derivatives = TRUE)
+#'
+#' # Plot partial residuals of the smooth
+#' plot(mod1, type = 'smooths', residuals = TRUE)
+#'
+#' # Plot posterior realisations for the smooth
+#' plot(mod1, type = 'smooths', realisations = TRUE)
+#' }
 #'@export
 
 mvgam = function(formula,
@@ -167,10 +251,10 @@ mvgam = function(formula,
                  n_lv,
                  trend_model = 'RW',
                  drift = FALSE,
-                 chains = 2,
+                 chains = 4,
                  burnin = 1000,
-                 n_samples = 2000,
-                 thin = 4,
+                 n_samples = 1000,
+                 thin = 1,
                  parallel = TRUE,
                  phi_prior,
                  ar_prior,
@@ -190,9 +274,6 @@ mvgam = function(formula,
   }
   family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
 
-  if(chains == 1){
-    stop('number of chains must be >1')
-  }
   if(sign(chains) != 1){
     stop('argument "chains" must be a positive integer',
          call. = FALSE)
@@ -1050,11 +1131,6 @@ mvgam = function(formula,
         model_data$n_lv <- n_lv
       }
 
-      # Should never call library in a function, but just doing this for now while
-      # developing stan functionality!!
-      require(rstan)
-      options(mc.cores = parallel::detectCores())
-
       # Sensible inits needed for the betas, sigmas and overdispersion parameters
       if(family == 'nb'){
         if(trend_model %in% c('None', 'GP')){
@@ -1084,37 +1160,99 @@ mvgam = function(formula,
         }
       }
 
-      # Fit the model in stan
-      if(trend_model == 'GP'){
-        stan_control <- list(max_treedepth = 12)
-      } else {
-        stan_control <- list(max_treedepth = 10)
+      # Check if cmdstan is accessible; if not, use rstan
+      if(require(cmdstanr)){
+        use_cmdstan <- TRUE
       }
 
-      if(use_lv){
-        stan_control <- list(max_treedepth = 12, adapt_delta = 0.92)
-      } else {
-        stan_control <- list(max_treedepth = 10)
+      if(is.null(cmdstan_version(error_on_NA = FALSE))){
+        use_cmdstan <- FALSE
       }
 
-      message("Compiling the Stan model")
-      message()
-      fit1 <- stan(model_code = stan_objects$stan_file,
-                   iter = burnin + 1000,
-                   chains = chains,
-                   data = stan_objects$model_data,
-                   cores = min(c(chains, parallel::detectCores() - 1)),
-                   init = inits,
-                   verbose = F,
-                   control = stan_control,
-                   pars = get_monitor_pars(family = family,
-                                           smooths_included = smooths_included,
-                                           use_lv = use_lv,
-                                           trend_model = trend_model,
-                                           drift = drift),
-                   refresh = 500)
+      if(use_cmdstan){
+        message('Using cmdstanr as the backend')
+        message()
 
-      out_gam_mod <- fit1
+        cmd_mod <- cmdstan_model(write_stan_file(stan_objects$stan_file),
+                                 stanc_options = list('canonicalize=deprecations,braces,parentheses'))
+
+        if(trend_model == 'GP'){
+          max_treedepth = 12
+          adapt_delta = 0.9
+        } else {
+          max_treedepth = 10
+          adapt_delta = 0.95
+        }
+
+        if(use_lv){
+          max_treedepth = 12
+          adapt_delta = 0.95
+        } else {
+          max_treedepth = 10
+        }
+
+        # Condition the model using Cmdstan
+        fit1 <- cmd_mod$sample(data = stan_objects$model_data,
+                              chains = chains,
+                              parallel_chains = min(c(chains, parallel::detectCores() - 1)),
+                              refresh = 500,
+                              init = inits,
+                              max_treedepth = max_treedepth,
+                              adapt_delta = adapt_delta,
+                              iter_sampling = n_samples,
+                              iter_warmup = burnin)
+
+        # Convert model files to stan_fit class for consistency
+        stanfit <- rstan::read_stan_csv(fit1$output_files())
+        stanfit@sim$samples <- lapply(seq_along(stanfit@sim$samples), function(x){
+          samps <- as.list(stanfit@sim$samples[[1]])
+          names(samps) <- row.names(rstan::summary(stanfit)$summary)
+          samps
+        })
+
+        out_gam_mod <- stanfit
+
+      } else {
+        require(rstan)
+        message('Using rstan as the backend')
+        message()
+        options(mc.cores = parallel::detectCores())
+
+        # Fit the model in rstan using custom control parameters
+        if(trend_model == 'GP'){
+          stan_control <- list(max_treedepth = 12)
+        } else {
+          stan_control <- list(max_treedepth = 10)
+        }
+
+        if(use_lv){
+          stan_control <- list(max_treedepth = 12, adapt_delta = 0.95)
+        } else {
+          stan_control <- list(max_treedepth = 10)
+        }
+
+        message("Compiling the Stan program...")
+        message()
+        fit1 <- stan(model_code = stan_objects$stan_file,
+                     iter = n_samples,
+                     warmup = burnin,
+                     chains = chains,
+                     data = stan_objects$model_data,
+                     cores = min(c(chains, parallel::detectCores() - 1)),
+                     init = inits,
+                     verbose = FALSE,
+                     thin = thin,
+                     control = stan_control,
+                     pars = get_monitor_pars(family = family,
+                                             smooths_included = smooths_included,
+                                             use_lv = use_lv,
+                                             trend_model = trend_model,
+                                             drift = drift),
+                     refresh = 500)
+
+        out_gam_mod <- fit1
+      }
+
     }
 
     if(!use_stan){
@@ -1144,7 +1282,7 @@ mvgam = function(formula,
       unlink('base_gam.txt')
       cat(model_file, file = 'base_gam.txt', sep = '\n', append = T)
 
-      message("Compiling the JAGS model")
+      message("Compiling the JAGS program...")
       message()
 
       if(parallel){

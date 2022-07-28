@@ -36,6 +36,11 @@ plot_mvgam_trend = function(object, series = 1, data_test,
     }
   }
 
+  if(object$trend_model == 'None'){
+    stop('no trend was estimated in object',
+         call. = FALSE)
+  }
+
   # Prediction indices for the particular series
   data_train <- object$obs_data
   ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],

@@ -84,6 +84,15 @@ plot_mvgam_smooth = function(object,
       stop(smooth, ' not found in smooth terms of object')
     }
     smooth_int <- which(smooth_terms == smooth)
+  } else {
+    smooth_int <- smooth
+  }
+
+  # Check whether this type of smooth is even plottable
+  if(!object$mgcv_model$smooth[[smooth_int]]$plot.me){
+    stop(paste0('unable to plot ', object$mgcv_model$smooth[[smooth_int]]$label,
+                ' (class = ', attr(object$mgcv_model$smooth[[smooth_int]], 'class')[1]),
+         ')')
   }
 
   if(is.numeric(smooth)){
