@@ -1015,30 +1015,66 @@ mvgam = function(formula,
 
       # Sensible inits needed for the betas, sigmas and overdispersion parameters
       if(family == 'nb'){
-      if(trend_model %in% c('None', 'GP')){
-        inits <- function() {
-          list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
-               r_inv = runif(NCOL(model_data$ytimes), 1, 50))
+        if(trend_model %in% c('None', 'GP')){
+          if(smooths_included){
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+            }
+          } else {
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   r_inv = runif(NCOL(model_data$ytimes), 1, 50))
+            }
+          }
+
+        } else {
+          if(smooths_included){
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+                   sigma = runif(model_data$n_series, 0.075, 1),
+                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+            }
+          } else {
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+                   sigma = runif(model_data$n_series, 0.075, 1))
+            }
+          }
+
         }
-      } else {
-        inits <- function() {
-          list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
-               r_inv = runif(NCOL(model_data$ytimes), 1, 50),
-               sigma = runif(model_data$n_series, 0.075, 1))
-        }
-      }
       }
 
       if(family == 'poisson'){
         if(trend_model %in% c('None', 'GP')){
-          inits <- function() {
-            list(b_raw = runif(model_data$num_basis, -0.2, 0.2))
+          if(smooths_included){
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+            }
+          } else {
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2))
+            }
           }
+
         } else {
-          inits <- function() {
-            list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
-                 sigma = runif(model_data$n_series, 0.075, 1))
+          if(smooths_included){
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   sigma = runif(model_data$n_series, 0.075, 1),
+                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+            }
+          } else {
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   sigma = runif(model_data$n_series, 0.075, 1))
+            }
           }
+
         }
       }
 
@@ -1134,29 +1170,65 @@ mvgam = function(formula,
       # Sensible inits needed for the betas, sigmas and overdispersion parameters
       if(family == 'nb'){
         if(trend_model %in% c('None', 'GP')){
-          inits <- function() {
-            list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
-                 r_inv = runif(NCOL(ytimes), 1, 50))
+          if(smooths_included){
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+            }
+          } else {
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   r_inv = runif(NCOL(model_data$ytimes), 1, 50))
+            }
           }
+
         } else {
-          inits <- function() {
-            list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
-                 r_inv = runif(NCOL(ytimes), 1, 50),
-                 sigma = runif(stan_objects$model_data$n_series, 0.075, 1))
+          if(smooths_included){
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+                   sigma = runif(model_data$n_series, 0.075, 1),
+                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+            }
+          } else {
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+                   sigma = runif(model_data$n_series, 0.075, 1))
+            }
           }
+
         }
       }
 
       if(family == 'poisson'){
         if(trend_model %in% c('None', 'GP')){
-          inits <- function() {
-            list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2))
+          if(smooths_included){
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+            }
+          } else {
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2))
+            }
           }
+
         } else {
-          inits <- function() {
-            list(b_raw = runif(stan_objects$model_data$num_basis, -0.2, 0.2),
-                 sigma = runif(stan_objects$model_data$n_series, 0.075, 1))
+          if(smooths_included){
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   sigma = runif(model_data$n_series, 0.075, 1),
+                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+            }
+          } else {
+            inits <- function() {
+              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+                   sigma = runif(model_data$n_series, 0.075, 1))
+            }
           }
+
         }
       }
 
@@ -1180,7 +1252,7 @@ mvgam = function(formula,
           max_treedepth = 12
           adapt_delta = 0.9
         } else {
-          max_treedepth = 10
+          max_treedepth = 11
           adapt_delta = 0.95
         }
 
@@ -1188,7 +1260,7 @@ mvgam = function(formula,
           max_treedepth = 12
           adapt_delta = 0.95
         } else {
-          max_treedepth = 10
+          max_treedepth = 11
         }
 
         # Condition the model using Cmdstan
@@ -1222,13 +1294,13 @@ mvgam = function(formula,
         if(trend_model == 'GP'){
           stan_control <- list(max_treedepth = 12)
         } else {
-          stan_control <- list(max_treedepth = 10)
+          stan_control <- list(max_treedepth = 11)
         }
 
         if(use_lv){
           stan_control <- list(max_treedepth = 12, adapt_delta = 0.95)
         } else {
-          stan_control <- list(max_treedepth = 10)
+          stan_control <- list(max_treedepth = 11)
         }
 
         message("Compiling the Stan program...")

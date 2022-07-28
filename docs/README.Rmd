@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
 *mvgam*
 ================
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalised Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others.
+The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others.
   
 ## Installation
 Install the development version from `GitHub` using:
@@ -54,17 +54,27 @@ lynx_train = lynx_full[1:50, ]
 lynx_test = lynx_full[51:60, ]
 ```
 
+Inspect the series in a bit more detail using `mvgam`'s plotting utility
+```{r, fig.width=6, fig.height=6, fig.align='center', message=FALSE, warning=FALSE}
+plot_mvgam_series(data_train = lynx_train)
+```
+
 Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `Stan` using MCMC sampling (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan) and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvgam(data_train = lynx_train,
                data_test = lynx_test,
-               formula = y ~ s(season, bs = 'cc', k = 10),
+               formula = y ~ s(season, bs = 'cc', k = 19),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
                use_stan = TRUE,
                burnin = 1000,
                chains = 4)
+```
+
+Inspect the resulting model file, which is written in the `Stan` probabilistic programming language
+```{r}
+lynx_mvgam$model_file
 ```
 
 Perform a series of posterior predictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine histograms for posterior predictions (`yhat`) and compare to the histogram of the observations (`y`)
@@ -129,7 +139,7 @@ plot_mvgam_trend(lynx_mvgam, data_test = lynx_test, derivatives = T)
 
 We can also re-do the posterior predictive checks, but this time focusing only on the out of sample period. This will give us better insight into how the model is performing and whether it is able to simulate realistic and unbiased future values
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(lynx_mvgam, series = 1, type = 'hist', data_test = lynx_test, n_bins = 150)
+ppc(lynx_mvgam, series = 1, type = 'rootogram', data_test = lynx_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
@@ -162,7 +172,7 @@ Another useful utility of `mvgam` is the ability to use rolling window forecasts
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam_poor <- mvgam(data_train = lynx_train,
                data_test = lynx_test,
-               formula = y ~ s(season, bs = 'gp', k = 3),
+               formula = y ~ s(season, k = 3),
                family = 'poisson',
                trend_model = 'RW',
                drift = FALSE,
