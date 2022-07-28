@@ -54,15 +54,15 @@ lynx_train = lynx_full[1:50, ]
 lynx_test = lynx_full[51:60, ]
 ```
 
-Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `Stan` using MCMC sampling (installation links are found [here](https://mc-stan.org/users/interfaces/rstan)). Note that for some models, it is now possible to estimate parameters using Hamiltonian Monte Carlo in the `Stan` software via a call to the `rstan` package, which can be found [here](https://mc-stan.org/users/interfaces/rstan)
+Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `Stan` using MCMC sampling (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan) and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvgam(data_train = lynx_train,
                data_test = lynx_test,
-               formula = y ~ s(season, bs = 'cc', k = 19),
+               formula = y ~ s(season, bs = 'cc', k = 10),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               use_stan = T,
+               use_stan = TRUE,
                burnin = 1000,
                chains = 4)
 ```
@@ -166,7 +166,8 @@ lynx_mvgam_poor <- mvgam(data_train = lynx_train,
                family = 'poisson',
                trend_model = 'RW',
                drift = FALSE,
-               burnin = 10000,
+               use_stan = TRUE,
+               burnin = 1000,
                chains = 4)
 ```
 

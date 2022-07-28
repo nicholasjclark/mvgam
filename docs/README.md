@@ -32,13 +32,7 @@ library(mvgam)
 #> Loading required package: mgcv
 #> Loading required package: nlme
 #> This is mgcv 1.8-33. For overview type 'help("mgcv-package")'.
-#> Loading required package: rjags
-#> Loading required package: coda
-#> Linked to JAGS 4.3.0
-#> Loaded modules: basemod,bugs
 #> Loading required package: parallel
-#> Loading required package: runjags
-#> Warning: package 'runjags' was built under R version 4.0.5
 data(lynx)
 lynx_full = data.frame(year = 1821:1934, 
                        population = as.numeric(lynx))
@@ -94,11 +88,9 @@ function for `season` is estimated jointly with a full time series model
 for the errors (in this case an `AR3` process), rather than relying on
 smoothing splines that do not incorporate a concept of the future. We
 assume the outcome follows a Poisson distribution and estimate the model
-in `Stan` using MCMC sampling (installation links are found
-[here](https://mc-stan.org/users/interfaces/rstan)). Note that for some
-models, it is now possible to estimate parameters using Hamiltonian
-Monte Carlo in the `Stan` software via a call to the `rstan` package,
-which can be found [here](https://mc-stan.org/users/interfaces/rstan)
+in `Stan` using MCMC sampling (installation links for `rstan` and
+`cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan)
+and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
 
 ``` r
 lynx_mvgam <- mvgam(data_train = lynx_train,
@@ -107,15 +99,43 @@ lynx_mvgam <- mvgam(data_train = lynx_train,
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               use_stan = T,
+               use_stan = TRUE,
                burnin = 1000,
                chains = 4)
-#> [1] "n_eff / iter looks reasonable for all parameters"
-#> [1] "Rhat looks reasonable for all parameters"
-#> [1] "0 of 4000 iterations ended with a divergence (0%)"
-#> [1] "69 of 4000 iterations saturated the maximum tree depth of 10 (1.725%)"
-#> [1] "  Run again with max_treedepth set to a larger value to avoid saturation"
-#> [1] "E-FMI indicated no pathological behavior"
+#> Running MCMC with 4 parallel chains...
+#> 
+#> Chain 1 Iteration:    1 / 2000 [  0%]  (Warmup) 
+#> Chain 2 Iteration:    1 / 2000 [  0%]  (Warmup) 
+#> Chain 3 Iteration:    1 / 2000 [  0%]  (Warmup) 
+#> Chain 4 Iteration:    1 / 2000 [  0%]  (Warmup) 
+#> Chain 3 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 2 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 4 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 1 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 3 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 2 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 1 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 2 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 1 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 2 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 3 finished in 40.4 seconds.
+#> Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 4 finished in 42.0 seconds.
+#> Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 2 finished in 43.9 seconds.
+#> Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 1 finished in 44.3 seconds.
+#> 
+#> All 4 chains finished successfully.
+#> Mean chain execution time: 42.6 seconds.
+#> Total execution time: 44.5 seconds.
 ```
 
 Perform a series of posterior predictive checks to see if the model is
@@ -207,44 +227,50 @@ summary(lynx_mvgam)
 #> 50
 #> 
 #> Status:
-#> Fitted using rstan::stan()
+#> Fitted using Stan
 #> 
 #> GAM smooth term estimated degrees of freedom:
-#>            edf df
-#> s(season) 9011 17
+#>             edf df
+#> s(season) 10592 17
 #> 
 #> GAM coefficient (beta) estimates:
-#>                     2.5%         50%       97.5% Rhat n.eff
-#> (Intercept)   6.79095318  6.80222670  6.81317305    1  6082
-#> s(season).1  -1.22012054 -0.70687316 -0.13550066    1  1533
-#> s(season).2  -0.34422058  0.23657666  0.84322640    1  1784
-#> s(season).3   0.44107251  1.10363234  1.72974673    1  1725
-#> s(season).4   0.95960079  1.74495643  2.40358999    1  1310
-#> s(season).5   1.15835797  2.00171701  2.70516103    1  1244
-#> s(season).6   0.42168311  1.17645507  1.82805556    1  1499
-#> s(season).7  -0.78622518 -0.11099717  0.58368607    1  1758
-#> s(season).8  -1.35633593 -0.67924442  0.05796520    1  1762
-#> s(season).9  -1.58002424 -0.81464343  0.07228273    1  1510
-#> s(season).10 -1.22512971 -0.45385323  0.48789845    1  1448
-#> s(season).11 -0.52903561  0.27259212  1.13203943    1  1948
-#> s(season).12  0.29771680  1.22695736  2.01184910    1  1826
-#> s(season).13  0.31480665  1.39836005  2.18521162    1  1223
-#> s(season).14  0.05866046  1.09845407  1.83787390    1  1041
-#> s(season).15 -0.77257545 -0.04440334  0.54493012    1  1373
-#> s(season).16 -1.37554751 -0.78647085 -0.21917617    1  2239
-#> s(season).17 -1.56201026 -1.06732513 -0.49428374    1  1756
+#>                    2.5%         50%       97.5% Rhat n.eff
+#> (Intercept)   6.7903687  6.80207000  6.81400225 1.00  6766
+#> s(season).1  -1.2195360 -0.69113600 -0.01805058 1.00  1148
+#> s(season).2  -0.3756616  0.23255700  0.87754060 1.00  1686
+#> s(season).3   0.3311623  1.08547000  1.74926050 1.00  1291
+#> s(season).4   0.7601807  1.71293000  2.40989250 1.00   943
+#> s(season).5   0.9775409  1.99061000  2.74627725 1.00  1008
+#> s(season).6   0.2905659  1.17240000  1.88569200 1.00  1335
+#> s(season).7  -0.8170403 -0.07231265  0.70870172 1.00  1568
+#> s(season).8  -1.3389330 -0.62788900  0.21804803 1.00  1527
+#> s(season).9  -1.5114313 -0.73440500  0.25402155 1.01  1289
+#> s(season).10 -1.2088775 -0.40804900  0.61770060 1.01  1360
+#> s(season).11 -0.5854214  0.26404500  1.15971500 1.00  1840
+#> s(season).12  0.1264563  1.17210000  2.02600850 1.00  1331
+#> s(season).13 -0.0829266  1.30776000  2.16766900 1.01   898
+#> s(season).14 -0.2867956  1.00881000  1.83292975 1.01   876
+#> s(season).15 -0.8963223 -0.11125900  0.52009368 1.01  1097
+#> s(season).16 -1.4019710 -0.79470750 -0.20794542 1.00  1767
+#> s(season).17 -1.5885960 -1.05080000 -0.39074417 1.00  1153
 #> 
 #> GAM smoothing parameter (rho) estimates:
-#>               2.5%      50%   97.5% Rhat n.eff
-#> s(season) 3.287832 4.159986 4.87422    1  2857
+#>               2.5%      50%    97.5% Rhat n.eff
+#> s(season) 3.342319 4.193245 4.924771    1  2348
 #> 
 #> Latent trend parameter estimates:
-#>                2.5%         50%     97.5% Rhat n.eff
-#> ar1[1]    0.5231943  0.82710459 0.9895406    1  2007
-#> ar2[1]   -0.5841628 -0.22174449 0.1588171    1  2723
-#> ar3[1]   -0.3304613  0.07239184 0.4249637    1  1279
-#> sigma[1]  0.3677681  0.46126809 0.5929270    1  2374
+#>                2.5%        50%     97.5% Rhat n.eff
+#> ar1[1]    0.5480065  0.8894520 1.2333835    1  1485
+#> ar2[1]   -0.6901515 -0.2757840 0.1333838    1  3345
+#> ar3[1]   -0.3370276  0.0536795 0.4015857    1  1235
+#> sigma[1]  0.3656957  0.4580050 0.5918796    1  2251
 #> 
+#> [1] "n_eff / iter looks reasonable for all parameters"
+#> [1] "Rhat looks reasonable for all parameters"
+#> [1] "0 of 4000 iterations ended with a divergence (0%)"
+#> [1] "1084 of 4000 iterations saturated the maximum tree depth of 10 (27.1%)"
+#> [1] "  Run again with max_treedepth set to a larger value to avoid saturation"
+#> [1] "E-FMI indicated no pathological behavior"
 ```
 
 The `plot_mvgam_...()` functions offer more flexibility than the generic
@@ -301,7 +327,7 @@ the entire series (testing and training)
 ``` r
 plot(lynx_mvgam, type = 'forecast', data_test = lynx_test)
 #> Out of sample DRPS:
-#> [1] 683.5812
+#> [1] 709.4488
 #> 
 ```
 
@@ -391,8 +417,43 @@ lynx_mvgam_poor <- mvgam(data_train = lynx_train,
                family = 'poisson',
                trend_model = 'RW',
                drift = FALSE,
-               burnin = 10000,
+               use_stan = TRUE,
+               burnin = 1000,
                chains = 4)
+#> Running MCMC with 4 parallel chains...
+#> 
+#> Chain 1 Iteration:    1 / 2000 [  0%]  (Warmup) 
+#> Chain 2 Iteration:    1 / 2000 [  0%]  (Warmup) 
+#> Chain 3 Iteration:    1 / 2000 [  0%]  (Warmup) 
+#> Chain 4 Iteration:    1 / 2000 [  0%]  (Warmup) 
+#> Chain 4 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 1 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 2 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 3 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 1 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 2 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 1 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 2 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 3 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 2 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 1 finished in 12.5 seconds.
+#> Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 3 finished in 12.7 seconds.
+#> Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 2 finished in 12.8 seconds.
+#> Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 4 finished in 13.0 seconds.
+#> 
+#> All 4 chains finished successfully.
+#> Mean chain execution time: 12.7 seconds.
+#> Total execution time: 13.1 seconds.
 ```
 
 We choose a set of timepoints within the training data to forecast from,
@@ -414,10 +475,10 @@ markedly better (far lower DRPS) for this evaluation timepoint
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   1.781  11.172 106.428  97.483 136.918 227.490
+#>    4.06   16.79  117.14  106.48  154.41  248.58
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   39.26   48.04  299.49  284.69  446.13  672.41
+#>   39.99   49.87  294.22  283.56  445.04  666.35
 ```
 
 Nominal coverages for both models’ 90% prediction intervals
