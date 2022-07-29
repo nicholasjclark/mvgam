@@ -1,0 +1,1125 @@
+---
+title: 'mvgam case study 1: model comparison and data assimilation'
+author: "Nicholas Clark (n.clark@uq.edu.au)"
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    highlight: zenburn
+  word_document: default
+urlcolor: blue
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
+```
+
+Generalized Additive Models (GAMs) are incredibly flexible tools that have found particular application in the analysis of time series. In ecology, a host of recent papers and workshops (i.e. the [2018 Ecological Society of America workshop on GAMs](https://noamross.github.io/mgcv-esa-2018/) that was hosted by Eric Pedersen, David L. Miller, Gavin Simpson, and Noam Ross) have drawn special attention to the wide range of applications that GAMs have for addressing complex ecological analyses. Given the many ways that GAMs can model temporal data, it is tempting to extrapolate from the smooth functions estimated by a GAM to produce out of sample forecasts. Here we will inspect the behaviours of smoothing splines when extrapolating to data outside the range of the training data to examine whether this can be useful in practice. 
+
+We will work in the `mvgam` package, which fits Dynamic GAMs (DGAMs) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a discrete response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Asssuming $\boldsymbol{y}$ is drawn from an exponential distribution (such as Poisson or Negative Binomial) with a log link function, the linear predictor for a dynamic GAM is written as:
+
+$$log(\tilde{\boldsymbol{y}}_{t})={\boldsymbol{B}}_0+\sum\limits_{i=1}^I\boldsymbol{s}_{i,t}\boldsymbol{x}_{i,t}+\boldsymbol{z}_{t}\,,$$
+Here $\boldsymbol{B}_{0}$ is the unknown intercept, the $\boldsymbol{s}$'s are unknown smooth functions of the covariates ($\boldsymbol{x}$'s) and $\boldsymbol{z}$ is a dynamic latent trend component. Each smooth function $\boldsymbol{s}_{i}$ is composed of basis expansions whose coefficients, which must be estimated, control the shape of the functional relationship between $\boldsymbol{x}_{i}$ and $log(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity, with a larger set of basis functions allowing greater flexibility. Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson, Negative Binomial, Tweedie-Poisson) that accommodate common ecological features such as zero-inflation or overdispersion, and that they can be formulated to include hierarchical smoothing for multivariate responses. For the dynamic component, in its most basic form we assume a random walk with drift:
+
+$$\boldsymbol{z}_{t}=\phi+\boldsymbol{z}_{t-1}+\boldsymbol{e}_{t}\,,$$
+where $\phi$ is an optional drift parameter (if the latent trend is assumed to not be stationary) and $\boldsymbol{e}$ is drawn from a zero-centred Gaussian distribution. This model is easily modified to include autoregressive terms, which `mvgam` accomodates up to `order = 3`.
+
+**Why DGAMs?**    
+  
+Dynamic GAMs are useful when we wish to predict future values from time series that show temporal dependence and we want to avoid extrapolating from a smooth (which, as you’ll see below, can sometimes lead to unpredictable and unrealistic behaviours). In addition, smooths can often try to wiggle excessively to capture any autocorrelation that is present in a time series, which exacerbates the problem of forecasting ahead. Here we use an exaggerated example to show how a smooth tries to wiggle excessively, leading to overfitting by lessening the smoothing penalty $\lambda$. 
+```{r, fig.width = 6, fig.height = 5.5, fig.align='center'}
+# Fit a model to the mcycle dataset in the MASS package, fixing the smoothing parameter at an abnormally large value
+par(mfrow = c(2, 2),
+    mgp = c(2.5, 1, 0),
+    mai=c(c(0.7, 0.7, 0.2, 0.2)))
+library(mgcv)
+data(mcycle, package = 'MASS')
+
+m1 <- gam(accel ~ s(times, k = 50), data = mcycle, method = 'REML', sp = 5)
+
+plot(m1, scheme = 1, residuals = TRUE, pch= 16,
+     bty = 'L',
+     ylab = expression(lambda == 5), xlab = '',
+     shade.col = scales::alpha("#B97C7C", 0.6))
+
+# Fit models with increasingly relaxed smooths (lambdas approaching zero)
+m2 <- gam(accel ~ s(times, k = 50), data = mcycle, method = 'REML', sp = 1)
+plot(m2, scheme = 1, residuals = TRUE, pch= 16,
+     bty = 'L',
+     ylab = expression(lambda == 1), xlab = '',
+     shade.col = scales::alpha("#B97C7C", 0.6))
+
+m3 <- gam(accel ~ s(times, k = 50), data = mcycle, method = 'REML', sp = 0.01)
+plot(m3, scheme = 1, residuals = TRUE, pch= 16,
+     bty = 'L',
+     ylab = expression(lambda == 0.01), xlab = '',
+     shade.col = scales::alpha("#B97C7C", 0.6))
+
+m4 <- gam(accel ~ s(times, k = 50), data = mcycle, method = 'REML', sp = 0.0000001)
+plot(m4, scheme = 1, residuals = TRUE, pch= 16,
+     bty = 'L',
+     ylab = expression(lambda == 0.0000001), xlab = '',
+     shade.col = scales::alpha("#B97C7C", 0.6))
+```
+
+Notice how wiggly the function becomes in the last plot when $\lambda$ is very small, indicating that the function is overfitting to the in-sample training data. Incidentally, this behaviour mirrors what `mgcv`’s `gam.check` function will often tell you to do if you are trying to model an autocorrelated time series with a smooth function, as the function will need to have a very high degree of flexibility in order to model both the true function and the autocorrelation
+
+**Simulation example**  
+   
+A simple simulation example is first used to demonstrate a comparison between a dynamic GAM with a latent trend process vs a conventional GAM that includes an autoregressive observation model. First we simulate an autocorrelated trend and then draw noisy observations of that trend using a Negative Binomial observation process with overdispersion parameter = `10`
+```{r message=FALSE, warning = FALSE}
+#devtools::install_github("nicholasjclark/mvgam")
+library(mvgam)
+library(dplyr)
+set.seed(1111)
+trend <- cumsum(rnorm(53, -0.1, 0.5))
+```
+
+View the trend and the observation series. Here it is clear that there is autocorrelation in the trend and in the observations
+```{r, fig.width = 5, fig.height = 6, fig.align='center'}
+layout(matrix(1:2, ncol = 1, nrow = 2))
+plot(trend, type = 'l', lwd = 2, col = 'grey', bty = 'none',
+     xlab = 'Time')
+observations <- rnbinom(53, size = 10, mu = 4 + exp(trend))
+plot(observations, type = 'l', lwd = 2, bty = 'none',
+     xlab = 'Time')
+```
+
+Gather the data into a dataframe format and calculate observation lags for lag = 1, 2, and 3
+```{r}
+data.frame(y = observations) %>%
+  dplyr::mutate(lag1 = lag(y),
+                lag2 = lag(y, 2),
+                lag3 = lag(y, 3)) %>%
+  dplyr::slice_tail(n = 50) -> sim_dat
+sim_dat$time <- 1:50
+```
+
+Split the data into training and testing portions and examine the objects
+```{r}
+data_train <- sim_dat[1:40,]
+data_test <- sim_dat[41:50,]
+head(data_train)
+head(data_test)
+```
+
+As a first pass at modelling this series, we will fit a GAM with parametric effects of lags 1, 2, and 3 and a smooth function of the fake covariate. We set `k = 3` for the smooth function as we don't want the model to overfit the noise created by this fake covariate, our primary interest is to estimate the AR parameters and the overdispersion parameter of the Negative Binomial observation process
+```{r, message=FALSE, warning=FALSE}
+m_mgcv <- gam(y ~ lag1 + lag2 + lag3,
+              data = data_train,
+              method = "REML", family = nb())
+```
+
+We can view the summary of the `mgcv` model to see that the posterior estimates for the AR terms for lags 1 and 3 are strongly non-zero
+```{r}
+summary(m_mgcv)
+```
+
+Forecasting from this model requires us to write a custom function that can recursively update the design matrix (by filling in the values for the dynamic `lag(y)` covariates) at each successive one-step ahead prediction. Here we define a function to iteratively propagate a forecast forward according to the AR3 observation model. Note that we have used an argument to allow the lags to be fed into the model on the log scale, this will make more sense in a moment as we inspect the forecasts of the model
+
+<details>
+<summary>Click for definition of `recurse_ar3`</summary>
+```{r}
+recurse_ar3 = function(model, lagged_vals, h, log_lags = F){
+  # Initiate state vector
+  states <- rep(NA, length = h + 3)
+  # Last three values of the conditional expectations begin the state vector
+  if(log_lags){
+    states[1] <- exp(as.numeric(lagged_vals[3]))
+    states[2] <- exp(as.numeric(lagged_vals[2]))
+    states[3] <- exp(as.numeric(lagged_vals[1]))
+  } else {
+    states[1] <- as.numeric(lagged_vals[3])
+    states[2] <- as.numeric(lagged_vals[2])
+    states[3] <- as.numeric(lagged_vals[1])
+  }
+
+  # Get a random sample of the smooth coefficient uncertainty matrix
+  # to use for the entire forecast horizon of this particular path
+  gam_coef_index <- sample(seq(1, NROW(coef_sim)), size = 1)
+  # For each following timestep, recursively predict based on the
+  # predictions at each previous lag
+  for (t in 4:(h + 3)) {
+    newdata <- data_test[t-3, ]
+    if(log_lags){
+      newdata$lag1 <- log(states[t-1] + 0.01)
+      newdata$lag2 <- log(states[t-2] + 0.01)
+      newdata$lag3 <- log(states[t-3] + 0.01)
+    } else {
+      newdata$lag1 <- states[t-1]
+      newdata$lag2 <- states[t-2]
+      newdata$lag3 <- states[t-3]
+    }
+
+    colnames(newdata) <- colnames(data_test)
+    Xp <- predict(model, newdata = newdata, type = 'lpmatrix')
+    # Calculate the posterior prediction for this timepoint; use an upper constraint
+    # to ensure the values don't blow up to infinity
+    mu <- rnbinom(1, mu = min(100000, exp(Xp %*% coef_sim[gam_coef_index,])),
+                  size = model$family$getTheta(TRUE))
+    # Fill in the state vector and iterate to the next timepoint
+    states[t] <- mu
+  }
+  # Return the forecast path
+  states[-c(1:3)]
+}
+```
+</details>
+
+Draw 1000 parameter estimates from the GAM posterior and use these to propagate the forecast for 10 timesteps ahead
+```{r}
+coef_sim <- MASS::mvrnorm(1000, mu = m_mgcv$coefficients, Sigma = m_mgcv$Vp)
+gam_sims <- matrix(NA, nrow = 1000, ncol = 10)
+for(i in 1:1000){
+  gam_sims[i,] <- recurse_ar3(m_mgcv,
+                              lagged_vals = c(data_test$lag1[1],
+                                              data_test$lag2[1],
+                                              data_test$lag3[1]),
+                              h = 10)
+}
+```
+
+Now we will fit a competing Dynamic GAM model, which estimates a latent temporal process rather than using an autoregressive observation model. This model's parameters are estimated in a Bayesian framework using (by default) the Gibbs sampling algorithms available in the `JAGS` software. `mvgam` takes a fitted `gam` model and adapts the model file to fit in `JAGS`, with possible extensions to deal with stochastic trend components and other features.
+```{r message=FALSE, warning = FALSE}
+m_mvgam <- mvgam(formula = y ~ 1,
+                 data_train = data_train,
+                 data_test = data_test,
+                 family = 'nb',
+                 trend_model = 'AR3',
+                 chains = 4,
+                 burnin = 1000)
+```
+
+You can view the summary of the resulting model using the `summary.mvgam S3` function, which gives an overview of convergence and effective sample size diagnostics for the model's parameters 
+```{r}
+summary(m_mvgam)
+```
+
+
+The model file can also be viewed, which can be handy for making modifications to the model so that extra stochastic elements can be added to a user's bespoke model. Notice how the summary at the top of the model file describes the data elements (and their dimensions) that are needed to condition the model, again the hope is that this simplifies the task of modifying the model for any additional user-specific requirements
+```{r}
+m_mvgam$model_file
+```
+
+Users can also view the data and initial values that `mvgam` uses to condition the model by either setting the argument `return_model_data = TRUE` or by setting `run_model = FALSE`. The latter is faster for simply generating the necessary objects and initial value functions. These options will also return the `pregam` structure that is necessary to convert `MCMC` samples into an object that can be readily used by `mgcv` to generate predictions and calculate important quantities such as effective degrees of freedom (see `help(jagam)` for more details)
+```{r}
+mod_skeleton <- mvgam(y ~ 1,
+                 data_train = data_train,
+                 data_test = data_test,
+                 family = 'nb',
+                 trend_model = 'AR3',
+                 chains = 4,
+                 burnin = 1000,
+                 run_model = FALSE)
+str(mod_skeleton$model_data)
+mod_skeleton$inits
+head(mod_skeleton$pregam)
+```
+
+The same steps above can be used to generate `Stan` data and modelling files, with all options available apart from the use of latent variable trends (these are currently being implemented in the development version of `mvgam`):
+```{r}
+mod_skeleton <- mvgam(y ~ 1,
+                 data_train = data_train,
+                 data_test = data_test,
+                 family = 'nb',
+                 trend_model = 'AR3',
+                 chains = 4,
+                 burnin = 1000,
+                 use_stan = TRUE,
+                 run_model = FALSE)
+str(mod_skeleton$model_data)
+mod_skeleton$inits
+head(mod_skeleton$pregam)
+```
+
+The `Stan` model file is also designed to be as descriptive as possible about the data objects that are required to condition the model
+```{r}
+mod_skeleton$model_file
+```
+Now we will evaluate the forecasts for each of the models. Here we define a function to plot posterior empirical forecast quantiles and calculate the Discrete Rank Probability Score (DRPS, a proper scoring rule for evaluating probabilistic forecast distributions) for each of the out of sample forecasts. The final score for each forecast is the sum of DRPS values at each forecast horizon, with the lower score being the favoured forecast. The function returns a plot of the forecast distribution and also prints the DRPS score
+<details>
+<summary>Click for definition of `plot_fc_horizon`</summary>
+```{r}
+plot_fc_horizon = function(gam_sims, main){
+  probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+  cred <- sapply(1:NCOL(gam_sims),
+                 function(n) quantile(gam_sims[,n],
+                                      probs = probs))
+
+  c_light <- c("#DCBCBC")
+  c_light_highlight <- c("#C79999")
+  c_mid <- c("#B97C7C")
+  c_mid_highlight <- c("#A25050")
+  c_dark <- c("#8F2727")
+  c_dark_highlight <- c("#7C0000")
+
+  ylim <- range(c(0, data_test$y[1:NCOL(cred)] * 1.25,
+                  cred * 1.25))
+  pred_vals <- 1:NCOL(cred)
+  plot(1, xlim = c(1, NCOL(cred)),
+       bty = 'L',
+       col = rgb(1,0,0, alpha = 0),
+       ylim = ylim,
+       ylab = 'Predicted counts',
+       xlab = 'Forecast horizon',
+       main = main)
+
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+          col = c_light, border = NA)
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+          col = c_light_highlight, border = NA)
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+          col = c_mid, border = NA)
+  polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+          col = c_mid_highlight, border = NA)
+  lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+  points(data_test$y[1:NCOL(cred)], pch = 16, cex = .65, col = 'white')
+  points(data_test$y[1:NCOL(cred)], pch = 16, cex = .55)
+  box(bty = 'L', lwd = 2)
+
+  # Calculate out of sample DRPS and print the score
+  drps_score <- function(truth, fc, interval_width = 0.9){
+    nsum <- 1000
+    Fy = ecdf(fc)
+    ysum <- 0:nsum
+    indicator <- ifelse(ysum - truth >= 0, 1, 0)
+    score <- sum((indicator - Fy(ysum))^2)
+
+    # Is value within empirical interval?
+    interval <- quantile(fc, probs = c((1-interval_width)/2,
+                                       (interval_width + (1-interval_width)/2)))
+    in_interval <- ifelse(truth <= interval[2] & truth >= interval[1], 1, 0)
+    return(c(score, in_interval))
+  }
+
+  # Wrapper to operate on all observations in fc_horizon
+  drps_mcmc_object <- function(truth, fc, interval_width = 0.9){
+    indices_keep <- which(!is.na(truth))
+    if(length(indices_keep) == 0){
+      scores = data.frame('drps' = rep(NA, length(truth)),
+                          'interval' = rep(NA, length(truth)))
+    } else {
+      scores <- matrix(NA, nrow = length(truth), ncol = 2)
+      for(i in indices_keep){
+        scores[i,] <- drps_score(truth = as.vector(truth)[i],
+                                 fc = fc[,i], interval_width)
+      }
+    }
+    scores
+  }
+
+  truth <- data_test$y[1:NCOL(cred)]
+  fc <- gam_sims
+
+  message('Out of sample DRPS:')
+  print(sum(drps_mcmc_object(as.vector(truth),
+                             fc)[,1]))
+  message()
+
+}
+
+```
+</details>
+
+Evaluate forecasts for the two models; first the `mgcv` autoregressive observation model
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot_fc_horizon(gam_sims = gam_sims[,1:10], main = 'mgcv')
+```
+
+And now the `mvgam` latent trend model
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot_fc_horizon(gam_sims = MCMCvis::MCMCchains(m_mvgam$model_output,
+                                               'ypred')[,(NROW(m_mvgam$obs_data)+1):
+                                                          (NROW(m_mvgam$obs_data)+10)],
+                main = 'mvgam')
+```
+
+Generally the uncertainy blows out when forecasting further ahead for the `mgcv` model (why might this be?); if we only look 2 timesteps ahead, it is not quite as terrible but it becomes more clear what is happening
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot_fc_horizon(gam_sims = gam_sims[,1:2], main = 'mgcv')
+```
+
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot_fc_horizon(gam_sims = MCMCvis::MCMCchains(m_mvgam$model_output,
+                                               'ypred')[,(NROW(m_mvgam$obs_data)+1):
+                                                          (NROW(m_mvgam$obs_data)+2)],
+                main = 'mvgam')
+```
+
+Why does autocorrelated observation model perform so badly? Q-Q plots give some insight, as they clearly indicate the dynamic latent trend model shows a better fit of the observation process to the data compared to the autocorrelated observation model
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot(m_mvgam, 'residuals')
+```
+
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+qq.gam(m_mgcv, pch = 16, lwd = 3, cex = 0.8)
+```
+
+In fact the the autocorrelated observation model is overestimating the amount of overdispersion in the
+data. This can partially explain the exponentially growing uncertainties in the mgcv forecast The truth for the ovderdispersion parameter is `10`. This is likely driven by the autoregressive model's high sensitivity to the noisy observation process. Observations in ecology very often display properties of overdispersion, and this results in observation 'outliers' that can have large leverage on resulting parameter estimates for autoregressive models. The noisy observation process is not a problem for latent trend models such as those estimated by `mvgam`, as the observation model is estimated separately from the temporal process (as is the norm for state-space models)
+```{r}
+m_mgcv$family$getTheta(TRUE)
+quantile(MCMCvis::MCMCchains(m_mvgam$model_output, 'r'), c(0.1, 0.5, 0.9))
+```
+Looking at estimates for the full trend and forecast distributions shows how the `mvgam` model is clearly doing a decent job of tracking the latent state up to the end of the training period while also giving reasonable estimates for the overdispersion in the data
+```{r, fig.width = 6, fig.height = 6, fig.align='center'}
+layout(matrix(1:2, ncol = 1, nrow = 2))
+plot(trend[4:53], xlim = c(0, 50), bty = 'L', type = 'l', lwd = 2, col = 'grey',
+     ylab = 'True trend')
+box(bty = 'L', lwd = 2)
+plot(m_mvgam, 'trend', data_test = data_test)
+layout(1)
+```
+
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot(m_mvgam, 'forecast', data_test = data_test)
+```
+
+We can get a better idea of what is happening for the autoregressive observation model by plotting posterior realisations on the log scale. Here each line is a realisation, and we show these lines as a spaghetti plot to make it easier to visualise the diversity of possible forecast paths that are compatible with our model configuration.
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot(1, type = "n", bty = 'L',
+     xlab = 'Time',
+     ylab = 'GAMAR simulations (log scale)',
+     xlim = c(0, NCOL(gam_sims)),
+     ylim = range(log(gam_sims + 0.01)))
+for(i in 1:30){
+  lines(x = 1:NCOL(gam_sims),
+        y = log(gam_sims[i,] + 0.01),
+        col = 'white',
+        lwd = 3)
+  lines(x = 1:NCOL(gam_sims),
+        y = log(gam_sims[i,] + 0.01),
+        col = sample(c("#DCBCBC80",
+                       "#C7999980",
+                       "#B97C7C80",
+                       "#A2505080",
+                       "#7C000080"), 1),
+        lwd = 2.75)
+}
+box(bty = 'L', lwd = 2)
+```
+
+`mvgam` offers options to plot realisations for most types of plots as well. Repeating the trend plot above (which automatically shows the expected latent trend on the log scale) shows that the dynamic GAM does not suffer from the same explosion towards infinity that the autoregressive model suffers from
+```{r, fig.width = 6, fig.height = 6, fig.align='center'}
+layout(matrix(1:2, ncol = 1, nrow = 2))
+plot(trend[4:53], xlim = c(0, 50), type = 'l', lwd = 2, col = 'grey',
+     ylab = 'True trend', bty = 'L')
+box(bty = 'L', lwd = 2)
+plot(m_mvgam, 'trend', data_test = data_test, realisations = TRUE,
+     n_realisations = 10)
+layout(1)
+```
+
+From the plots above it is apparent that although some of the realisations are sensible, as soon as a path climbs upward it tends to skyrocket up towards infinity. It is sensible then to conclude that an autocorrelated observation model will be extremely sensitive to the measurement process (particularly when there is overdispersion, outliers or missing observations), which is not a problem for the latent temporal process model. With this information in mind, could we improve the autocorrelated observation model by using logs of lagged observations, rather than raw lagged observations?
+```{r}
+data.frame(y = observations) %>%
+  dplyr::mutate(lag1 = log(lag(y) + 0.01),
+                lag2 = log(lag(y, 2) + 0.01),
+                lag3 = log(lag(y, 3) + 0.01)) %>%
+  dplyr::mutate(cov1 = rnorm(53)) %>%
+  dplyr::slice_tail(n = 50) -> sim_dat
+sim_dat$time <- 1:50
+data_train <- sim_dat[1:40,]
+data_test <- sim_dat[41:50,]
+m_mgcv <- gam(y ~ lag1 + lag2 + lag3,
+              data = data_train,
+              method = "REML", family = nb())
+```
+
+Compute the forecasts but use logged lags instead of raw lags
+```{r}
+coef_sim <- MASS::mvrnorm(1000, mu = m_mgcv$coefficients, Sigma = m_mgcv$Vp)
+gam_sims <- matrix(NA, nrow = 1000, ncol = 10)
+for(i in 1:1000){
+  gam_sims[i,] <- recurse_ar3(m_mgcv,
+                              lagged_vals = c(data_test$lag1[1],
+                                              data_test$lag2[1],
+                                              data_test$lag3[1]),
+                              log_lags = TRUE,
+                              h = 10)
+}
+```
+
+Evaluate the log-AR model against the dynamic GAM
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot_fc_horizon(gam_sims = gam_sims[,1:10], main = 'mgcv')
+```
+
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot_fc_horizon(gam_sims = MCMCvis::MCMCchains(m_mvgam$model_output,
+                                               'ypred')[,(NROW(m_mvgam$obs_data)+1):
+                                                          (NROW(m_mvgam$obs_data)+10)],
+                main = 'mvgam')
+```
+
+We should also re-check the autoregressive model's realisations, which look much better now
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+plot(1, type = "n", bty = 'L',
+     xlab = 'Time',
+     ylab = 'GAMAR simulations (log scale)',
+     xlim = c(0, NCOL(gam_sims)),
+     ylim = range(log(gam_sims + 0.01)))
+for(i in 1:30){
+  lines(x = 1:NCOL(gam_sims),
+        y = log(gam_sims[i,] + 0.01),
+        col = 'white',
+        lwd = 3)
+  lines(x = 1:NCOL(gam_sims),
+        y = log(gam_sims[i,] + 0.01),
+        col = sample(c("#DCBCBC80",
+                       "#C7999980",
+                       "#B97C7C80",
+                       "#A2505080",
+                       "#7C000080"), 1),
+        lwd = 2.75)
+}
+box(bty = 'L', lwd = 2)
+```
+
+This version (with logged lags) performs much better than the raw lag version, with sensible forecasts that are not blowing up to infinity. In fact, this forecast is now more comparable to the dynamic GAM where the latent temporal process is estimated separately from the observation process, at least for this particular simulation. There are of course many other advantages to the state-space representation that is used by `mvgam`, including: 
+  
+1. It is far easier to handle missing values (which will result in loss of many observations when fitting `mgcv` models, especially at higher order lags, due to missing outcomes AND missing predictors) and measurement error  
+  
+2. Latent trend processes provide recursive expressions for h-step ahead prediction and historical filtering  
+  
+3. Irregularly sampled observational time series can be readily modeled as the latent temporal process can simply be 'forecasted' over the missing observations  
+  
+4. Multiple observation processes can depend on shared latent states
+        
+
+**Fisheries landings example**  
+  
+Now for an empirical example of DGAMs, using historical data on US fisheries landings made available by a recent paper published in `Methods in Ecology and Evolution` ([Smoothed dynamic factor analysis for identifying trends in multivariate time series; Ward et al 2021](https://besjournals.onlinelibrary.wiley.com/doi/abs/10.1111/2041-210X.13788)). The data  consists  of  adjusted landings for 13  species  or  groups reported annually from multiple fisheries over a 39-year period (1981–2019)
+```{r, echo = FALSE}
+load('fisheries_dat.rda')
+```
+
+```{r, eval=FALSE}
+data <- read.csv('https://raw.githubusercontent.com/fate-ewi/gpdfa/main/data/port_landings_table2.csv')
+head(data)
+```
+
+First some data wrangling to clean the column names, create logged lags for the species of interest (the Ling cod) and gather values for an additional species that will be used as a (potentially nonlinear) covariate (the whiting). These two species were chosen in an ad-hoc fashion based on results of the above paper, which found that they demonstrated somewhat opposing patterns in their historical trends. Note that this is not meant to be a full in-depth analysis of these data, but rather a simple example to demonstrate how `mvgam` can be used for empirical series. 
+```{r,eval=FALSE}
+data %>%
+  janitor::clean_names() %>%
+  dplyr::mutate(y = lingcod) %>%
+  dplyr::mutate(lag1 = log(lag(y) + 0.01),
+                lag2 = log(lag(y, 2) + 0.01),
+                lag3 = log(lag(y, 3) + 0.01)) %>%
+  dplyr::select(y,
+                lag1,
+                lag2,
+                lag3,
+                p_whiting) %>%
+  # The nonlinear covariate will be a smooth of standardised whiting landings
+  dplyr::mutate(p_whiting = as.vector(scale(p_whiting))) %>%
+  dplyr::slice_tail(n = 36) -> model_dat
+model_dat$time <- 1:NROW(model_dat)
+```
+
+View the modelling dataframe and check for any `NAs` (which will be omitted by `mgcv` automatically)
+```{r}
+head(model_dat)
+anyNA(model_dat)
+```
+
+Plot the time series for the species of interest (the ling cod)
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+with(model_dat, plot(time, y, 'l', bty = 'L', lwd = 2, ylab = 'Ling cod landings'))
+```
+
+And for the covariate (whiting landings)
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+with(model_dat, plot(time, p_whiting, 'l', bty = 'L', lwd = 2, ylab = 'Whiting landings'))
+```
+
+Split into 75% train and 25% test periods
+```{r}
+data_train <- model_dat[1:27,]
+data_test <- model_dat[28:36,]
+```
+
+Fit an `mgcv` autocorrelated observation model, with an additional TPRS smooth function
+of time and a TRPS smooth function of whiting landings
+```{r}
+m_mgcv <- gam(y ~ s(p_whiting, k = 5) +
+                s(time, k = 12) +
+                lag1 + lag2 + lag3,
+              data = data_train,
+              method = "REML", family = nb())
+summary(m_mgcv)
+```
+
+```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+plot(m_mgcv, pages=1, shade = TRUE)
+```
+
+The `AR1` term is estimated to be highly important, while the smooth functions of `time` and of `whiting landings` are regularized toward flat lines. But how does the model forecast? Draw posterior coefficients and generate the iterative `mgcv` forecast
+```{r}
+coef_sim <- gam.mh(m_mgcv)$bs
+
+# Forecast 9 years ahead
+gam_sims <- matrix(NA, nrow = 1000, ncol = 9)
+for(i in 1:1000){
+  gam_sims[i,] <- recurse_ar3(m_mgcv,
+                              lagged_vals = c(data_test$lag1[1],
+                                              data_test$lag2[1],
+                                              data_test$lag3[1]),
+                              log_lags = TRUE,
+                              h = 9)
+}
+```
+
+Now fit an `mvgam` model where the latent trend is modelled as an `AR3` process. We will use `Stan` for this example, which generally explores the joint posterior much more efficiently (and more fully) than `JAGS`
+```{r, message=FALSE, warning=FALSE}
+m_mvgam <- mvgam(y ~ s(p_whiting, k = 5),
+                 data_train = data_train,
+                 data_test = data_test,
+                 family = 'nb',
+                 trend_model = 'AR3',
+                 use_stan = TRUE,
+                 chains = 4,
+                 burnin = 500)
+```
+                 
+Inference on `mvgam` smooth functions can be conducted using posterior predictions. This model clearly finds a negative relationship between whiting landings and ling cod landings
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot(m_mvgam, 'smooths')
+```
+
+Inspect posterior realisations of the smooth function
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot(m_mvgam, 'smooths', realisations = TRUE)
+```
+
+The `plot_mvgam_smooth` function allows more flexibility for plotting smooth functions, including an ability to supply `newdata` for plotting posterior marginal simulations. Overlay the partial Dunn-Smyth residuals on the smooth plot for `p_whiting`. These residuals suggest there is still structure left in the data and that perhaps the smooth for this term is not as flexible as it could be (i.e. we would be justified to try this model again by increasing `k` for the smooth term). But we will leave it as-is for now
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_mvgam_smooth(m_mvgam, series = 1, smooth = 'p_whiting', residuals = TRUE)
+```
+
+We can also perform a series of posterior predictive checks (using the `ppc()` function) to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine simulated histograms for posterior predictions (`yhat`) and compare to the observations (`y`)
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(m_mvgam, series = 1, type = 'hist', legend_position = 'bottomright')
+```
+
+Now plot the distribution of predicted means compared to the observed mean
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(m_mvgam, series = 1, type = 'mean')
+```
+
+Next examine simulated empirical Cumulative Distribution Functions (CDF) for posterior predictions (`yhat`) and compare to the CDF of the observations (`y`)
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(m_mvgam, series = 1, type = 'cdf')
+```
+
+Finally look for any biases in predictions by examining a Probability Integral Transform (PIT) histogram. If our predictions are not biased one way or another (i.e. not consistently under- or over-predicting), this histogram should look roughly uniform
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(m_mvgam, series = 1, type = 'pit')
+```
+
+All of these plots indicate the model is well calibrated against the training data, with no apparent pathological behaviors exhibited. Now for some investigation of the estimated relationships and forecasts. We can also perform residual diagnostics using randomised quantile (Dunn-Smyth) residuals. These look reasonable overall, though there is some autocorrelation at recent lags left in the residuals for this series
+```{r, fig.width = 7, fig.height = 7, fig.align='center'}
+plot(m_mvgam, series = 1, type = 'residuals')
+```
+
+Ok so the model is doing well when fitting against the training data, but how are its forecasts? We can now evaluate the forecasts of the two competing models just as we did above for the simulated data
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_fc_horizon(gam_sims = gam_sims, main = 'mgcv')
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_fc_horizon(gam_sims = MCMCvis::MCMCchains(m_mvgam$model_output,
+                                               'ypred')[,(NROW(m_mvgam$obs_data)+1):
+                                                          (NROW(m_mvgam$obs_data)+9)],
+                main = 'mvgam')
+```
+
+Both models fail to anticipate the upward swing in landings following the end of the training data, but as with the simulations above, the autocorrelated observation model fitted by `mgcv` is providing inferior forecasts compared to the dynamic trend model estimated by `mvgam`. What if we try to improve the smooth function of time to do improve the forecasts? To try and capture the long-term trend we can use a `B` spline with multiple penalties, following the excellent example by Gavin Simpson about [extrapolating with smooth terms](https://fromthebottomoftheheap.net/2020/06/03/extrapolating-with-gams/). This is similar to what we might do when trying to forecast ahead from a more wiggly function, as `B` splines have useful properties by allowing the penalty to be extended into the range of values we wish to predict (in this case, the years in `data_test`).
+```{r, message=FALSE, warning=FALSE}
+m_mgcv <- gam(y ~ s(p_whiting, k = 5) +
+                s(time, bs = "bs", m = c(2, 1)) +
+                lag1 + lag2 + lag3,
+              knots = list(time = c(min(data_train$time) - 1,
+                                    min(data_train$time),
+                                    max(data_train$time),
+                                    max(data_test$time))),
+              data = data_train,
+              method = "REML", family = nb())
+```
+
+Forecast and evaluate against the dynamic GAM
+```{r}
+coef_sim <- gam.mh(m_mgcv)$bs
+gam_sims <- matrix(NA, nrow = 1000, ncol = 9)
+for(i in 1:1000){
+  gam_sims[i,] <- recurse_ar3(m_mgcv,
+                              lagged_vals = c(data_test$lag1[1],
+                                              data_test$lag2[1],
+                                              data_test$lag3[1]),
+                              log_lags = TRUE,
+                              h = 9)
+}
+```
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_fc_horizon(gam_sims = gam_sims, main = 'mgcv')
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_fc_horizon(gam_sims = MCMCvis::MCMCchains(m_mvgam$model_output,
+                                               'ypred')[,(NROW(m_mvgam$obs_data)+1):
+                                                          (NROW(m_mvgam$obs_data)+9)],
+                main = 'mvgam')
+```
+
+This model shows an improvement in forecasting ability as the uncertainty in the temporal smooth function is more realistically growing into the future. But again, the dynamic GAM is superior in forecasting ability. Perhaps the `AR` terms are doing more harm than good for the model's forecasts? For a final comparison, drop the `AR` functions
+```{r, message=FALSE, warning=FALSE}
+m_mgcv <- gam(y ~ s(p_whiting, k = 5) +
+                s(time, bs = "bs", m = c(2, 1), k = 15),
+              knots = list(time = c(min(data_train$time) - 1,
+                                    min(data_train$time),
+                                    max(data_train$time),
+                                    max(data_test$time))),
+              data = data_train,
+              method = "REML", family = nb())
+```
+
+```{r}
+coef_sim <- gam.mh(m_mgcv)$bs
+gam_sims <- matrix(NA, nrow = 1000, ncol = 9)
+for(i in 1:1000){
+  gam_sims[i,] <- recurse_ar3(m_mgcv,
+                              lagged_vals = c(data_test$lag1[1],
+                                              data_test$lag2[1],
+                                              data_test$lag3[1]),
+                              log_lags = TRUE,
+                              h = 9)
+}
+```
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_fc_horizon(gam_sims = gam_sims, main = 'mgcv')
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot_fc_horizon(gam_sims = MCMCvis::MCMCchains(m_mvgam$model_output,
+                                               'ypred')[,(NROW(m_mvgam$obs_data)+1):
+                                                          (NROW(m_mvgam$obs_data)+9)],
+                main = 'mvgam')
+```
+
+
+The dynamic GAM is difficult to beat for this example. But what other utilities does the `mvgam` package make available? We can also re-do the posterior predictive checks, but this time focusing only on the out of sample period. This will give us better insight into how the model is performing and whether it is able to simulate realistic and unbiased future values
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(m_mvgam, series = 1, type = 'hist', data_test = data_test,
+               legend_position = 'topright', n_bins = 200)
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(m_mvgam, series = 1, type = 'mean', data_test = data_test)
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(m_mvgam, series = 1, type = 'cdf', data_test = data_test)
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(m_mvgam, series = 1, type = 'pit', data_test = data_test)
+```
+
+There are some problems with the way this model is generating future predictions, so we would need to perform a more rigorous and principled model development strategy to improve our model's predictive abilities. But there are two other utilities available in `mvgam` that are worth highlighting. The first is model comparison. Benchmarking against "null" models is a very important part of evaluating a proposed forecast model. After all, if our complex dynamic model can't generate better predictions then a random walk or mean forecast, is it really telling us anything new about the data-generating process? Here we examine the model comparison utilities in `mvgam`. Here we illustrate how this can be done in `mvgam` by fitting a basic random walk model with a Negative Binomial observation process. No smooth terms are included here, the observation model simply has an intercept term.
+```{r, message=FALSE, warning=FALSE}
+m_mvgam2 <- mvgam(y ~ 1,
+                 data_train = data_train,
+                 data_test = data_test,
+                 family = 'nb',
+                 trend_model = 'RW',
+                 use_stan = TRUE,
+                 chains = 4,
+                 burnin = 500)
+```
+
+Look at this model's proposed forecast, which incidentally isn't too bad compared to the original `AR3` model
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot(m_mvgam2, series = 1, type = 'forecast', data_test = data_test)
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot(m_mvgam, series = 1, type = 'forecast', data_test = data_test)
+```
+
+Now we will showcase how different dynamic models can be compared using rolling probabilistic forecast evaluation, which is especially useful if we don't already have out of sample observations for comparing forecasts. This function sets up a sequence of evaluation timepoints along a rolling window within the training data to evaluate 'out-of-sample' forecasts. The trends are rolled forward a total of `fc_horizon` timesteps according to their estimated state space dynamics to generate an 'out-of-sample' forecast that is evaluated against the true observations in the `horizon` window. We are therefore simulating a situation where the model's parameters had already been estimated but we have only observed data up to the evaluation timepoint and would like to generate forecasts that consider the possible future paths for the latent trends and the true observed values for any other covariates in the `horizon` window. Evaluation involves calculating the Discrete Rank Probability Score and a binary indicator for whether or not the true value lies within the forecast's 90% prediction interval. For this test we compare the two models on the exact same sequence of `30` evaluation points using `horizon = 6`
+```{r, fig.width = 6, fig.height = 5, fig.align='center'}
+compare_mvgams(model1 = m_mvgam, model2 = m_mvgam2, fc_horizon = 6,
+               n_evaluations = 30, n_cores = 3)
+```
+
+The series of plots generated by `compare_mvgams` clearly show that the first dynamic model generates better predictions. In each plot, DRPS for the forecast `horizon` is lower for the first model than for the second model. This kind of evaluation is often more appropriate for forecast models than complexity-penalising fit metrics such as [`AIC` or `BIC`](https://www.sciencedirect.com/science/article/pii/S0169207020301096) Now we proceed by exploring how forecast distributions from an `mvgam` object can be automatically updated in light of new incoming observations. This works by generating a set of "particles" that each captures a unique proposal about the current state of the system (in this case, the current estimate of the latent trend component). The next observation in `data_assim` is assimilated and particles are weighted by how well their proposal (i.e. their proposed forecast, prior to seeing the new data) matched the new observations. For univariate models such as the ones we've fitted so far, this weight is represented by the proposal's Negative Binomial log-likelihood. For multivariate models, a multivariate composite likelihood is used for weights. Once weights are calculated, we use importance sampling to update the model's forecast distribution for the remaining forecast horizon. Begin by initiating a set of `20000` particles by assimilating the next observation in `data_test` and storing the particles in the default location (in a directory called `particles` within the working directory)
+```{r}
+pfilter_mvgam_init(object = m_mvgam, n_particles = 20000,
+                   n_cores = 3, data_assim = model_dat[28,])
+```
+
+Now we are ready to run the particle filter. This function will assimilate the next two out of sample observations in `data_test` and update the forecast after each assimilation step. This works in an iterative fashion by calculating each particle's weight, then using a kernel smoothing algorithm to "pull" low weight particles toward the high-likelihood space before assimilating the next observation. The strength of the kernel smoother is controlled by `kernel_lambda`, which in our experience works well when left to the default of `1`. If the Effective Sample Size of particles drops too low, suggesting we are putting most of our belief in a very small set of particles, an automatic resampling step is triggered to increase particle diversity and reduce the chance that our forecast intervals become too narrow and incapable of adapting to changing conditions
+```{r}
+pfilter_mvgam_online(data_assim = model_dat[29:30, ], n_cores = 3,
+                     kernel_lambda = 1, use_resampling = TRUE)
+```
+
+Once assimilation is complete, generate the updated forecast from the particles using the covariate information in remaining `data_test` observations. This function is designed to hopefully make it simpler to assimilate observations, as all that needs to be provided once the particles are initiated as a dataframe of test data in exactly the same format as the data that were used to train the initial model. If no new observations are found (observations are arranged by `time` so the consistent indexing of these two variables is very important!) then the function returns a `NULL` and the particles remain where they are in state space.
+```{r}
+pfilter_fc <- pfilter_mvgam_fc(file_path = "pfilter",
+                       n_cores = 3, data_test = model_dat[31:36,],
+                       return_forecasts = TRUE,
+                       ylim = c(0, 5100))
+```
+
+Compare the updated forecast to the original forecast to see how it has changed in light of the most recent observations. As with the `plot_mvgam_smooth()` function, the `plot_mvgam_fc()` function has more flexibility for plotting posterior predictive distributions than the generic `plot.mvgam() S3` function 
+```{r, fig.width = 7.5, fig.height = 4.5, fig.align='center'}
+layout(matrix(1:2,nrow=1,ncol=2))
+plot_mvgam_fc(m_mvgam,
+     ylim = c(0, 5100))
+points(model_dat$y, pch = 16, cex = 0.4)
+pfilter_fc$fc_plots$series1()
+points(model_dat$y, pch = 16, cex = 0.4)
+```
+
+Here it is apparent that the distribution has shifted upward in light of the `3` observations that have been assimilated. This is an advantageous way of allowing a model to slowly adapt to new conditions while breaking free of restrictive assumptions about residual distributions. [See some of the many particle filtering lectures by Nathaniel Osgood for more details](https://www.youtube.com/user/NathanielOsgood). Remove the particles from their stored directory when finished
+```{r}
+unlink('pfilter', recursive = T)
+```
+
+**Lynx example**  
+  
+For our next univariate example, we will again pursue how challenging it can be to forecast ahead with conventional GAMs and how `mvgam` overcomes these challenges. We begin by replicating the lynx analysis from [2018 Ecological Society of America workshop on GAMs](https://noamross.github.io/mgcv-esa-2018/) that was hosted by Eric Pedersen, David L. Miller, Gavin Simpson, and Noam Ross, with some minor adjustments. First, load the data and plot the series as well as its estimated autocorrelation function
+```{r, fig.show='hold', fig.align='center'}
+data(lynx)
+lynx_full = data.frame(year = 1821:1934, 
+                       population = as.numeric(lynx),
+                       time = 1:NROW(lynx))
+plot(lynx_full$population, type = 'l', ylab = 'Lynx trappings',
+     xlab = 'Time')
+acf(lynx_full$population, main = '')
+```
+
+
+There is a clear ~19-year cyclic pattern to the data, so I create a `season` term that can be used to model this effect and give a better representation of the data generating process. I also create a new `year` term that represents which long-term cycle each observation is in
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'))
+lynx_full$season <- (lynx_full$year %%19) + 1
+cycle_ends <- c(which(lynx_full$season == 19), NROW(lynx_full))
+cycle_starts <- c(1, cycle_ends[1:length(which(lynx_full$season == 19))] + 1)
+cycle <- vector(length = NROW(lynx_full))
+for(i in 1:length(cycle_starts)){
+  cycle[cycle_starts[i]:cycle_ends[i]] <- i
+}
+lynx_full$year <- cycle
+```
+
+
+Add lag indicators needed to fit the nonlinear lag models that gave the best one step ahead point forecasts in the ESA workshop example. As in the example, we specify the `default` argument in the `lag` function as the mean log population.
+```{r}
+mean_pop_l = mean(log(lynx_full$population))
+lynx_full = dplyr::mutate(lynx_full,
+                   popl = log(population),
+                   lag1 = dplyr::lag(popl,1, default = mean_pop_l),
+                   lag2 = dplyr::lag(popl,2, default = mean_pop_l),
+                   lag3 = dplyr::lag(popl,3, default = mean_pop_l),
+                   lag4 = dplyr::lag(popl,4, default = mean_pop_l),
+                   lag5 = dplyr::lag(popl,5, default = mean_pop_l),
+                   lag6 = dplyr::lag(popl,6, default = mean_pop_l))
+```
+
+For `mvgam` models, the response needs to be labelled `y` and we also need an indicator of the series name as a `factor` variable
+```{r}
+lynx_full$y <- lynx_full$population
+lynx_full$series <- factor('series1')
+```
+
+Split the data into training (first 40 years) and testing (next 10 years of data) to evaluate multi-step ahead forecasts
+```{r}
+lynx_train = lynx_full[1:40, ]
+lynx_test = lynx_full[41:50, ]
+```
+
+The best-forecasting model in the course was with nonlinear smooths of lags 1 and 2; we use those here is that we also include a cyclic smooth for the 19-year cycles as this seems like an important feature, as well as a yearly smooth for the long-term trend. Following the information about spline extrapolation above, we again fit a cubic `B` spline for the trend with a mix of penalties to try and reign in wacky extrapolation behaviours, and we extend the penalty to cover the years that we wish to predict. This will hopefully give us better uncertainty estimates for the forecast. In this example we assume the observations are Poisson distributed
+```{r, message=FALSE, warning=FALSE}
+lynx_mgcv = gam(population ~ 
+                  s(season, bs = 'cc', k = 19) +
+                  s(year, bs = 'bs', m = c(3, 2, 1, 0)) + 
+                  s(lag1, k = 5) +
+                  s(lag2, k = 5),
+               knots = list(season = c(0.5, 19.5),
+                            year = c(min(lynx_train$year - 1),
+                                     min(lynx_train$year),
+                                     max(lynx_test$year),
+                                     max(lynx_test$year) + 1)),
+                data = lynx_train, family = "poisson",
+                method = "REML")
+```
+
+Inspect the model's summary and estimated smooth functions for the season, year and lag terms
+```{r, fig.show='hold', fig.align='center'}
+summary(lynx_mgcv)
+plot(lynx_mgcv, select = 1)
+plot(lynx_mgcv, select = 2)
+plot(lynx_mgcv, select = 3)
+plot(lynx_mgcv, select = 4)
+```
+
+This model captures most of the deviance in the series and the functions are all confidently estimated to be non-zero and non-flat. So far, so good. Now for some forecasts for the out of sample period. First we must take posterior draws of smooth beta coefficients to incorporate the uncertainties around smooth functions when simulating forecast paths
+```{r}
+coef_sim <- gam.mh(lynx_mgcv)$bs
+```
+
+
+Now we define a function to perform forecast simulations from the nonlinear lag model in a recursive fashion. Using starting values for the last two lags, the function will iteratively project the path ahead with a random sample from the model's coefficient posterior
+<details>
+<summary>Click for definition of `recurse_nonlin`</summary>
+```{r}
+recurse_nonlin = function(model, lagged_vals, h){
+  # Initiate state vector
+  states <- rep(NA, length = h + 2)
+  # Last two values of the conditional expectations begin the state vector
+  states[1] <- as.numeric(exp(lagged_vals[2]))
+  states[2] <- as.numeric(exp(lagged_vals[1]))
+  # Get a random sample of the smooth coefficient uncertainty matrix
+  # to use for the entire forecast horizon of this particular path
+  gam_coef_index <- sample(seq(1, NROW(coef_sim)), 1, T)
+  # For each following timestep, recursively predict based on the
+  # predictions at each previous lag
+  for (t in 3:(h + 2)) {
+    # Build the GAM linear predictor matrix using the two previous lags
+    # of the (log) density
+    newdata <- data.frame(lag1 = log(states[t-1] + 0.01),
+                          lag2 = log(states[t-2] + 0.01),
+                          season = lynx_test$season[t-2],
+                          year = lynx_test$year[t-2])
+    colnames(newdata) <- c('lag1', 'lag2', 'season', 'year')
+    Xp <- predict(model, newdata = newdata, type = 'lpmatrix')
+    # Calculate the posterior prediction for this timepoint
+    mu <- rpois(1, lambda = exp(Xp %*% coef_sim[gam_coef_index,]))
+    # Fill in the state vector and iterate to the next timepoint
+    states[t] <- mu
+  }
+  # Return the forecast path
+  states[-c(1:2)]
+}
+```
+</details>
+
+Create the GAM's forecast distribution by generating `1000` simulated forecast paths. Each path is fed the true observed values for the last two lags of the first out of sample timepoint, but they can deviate when simulating ahead depending on their particular draw of possible coefficients. Note, this is a bit slow and could easily be parallelised to speed up computations
+```{r}
+gam_sims <- matrix(NA, nrow = 1000, ncol = 10)
+for(i in 1:1000){
+  gam_sims[i,] <- recurse_nonlin(lynx_mgcv,
+                                 lagged_vals = c(lynx_test$lag1[1],
+                                                 lynx_test$lag2[1]),
+                                 h = 10)
+}
+```
+
+Plot the mgcv model's out of sample forecast for the next 10 years ahead
+```{r, fig.width=5, fig.height=4, fig.align='center'}
+cred_ints <- apply(gam_sims, 2, function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
+yupper <- max(cred_ints) * 1.25
+plot(cred_ints[3,] ~ seq(1:NCOL(cred_ints)), type = 'l',
+     col = rgb(1,0,0, alpha = 0),
+     ylim = c(0, yupper),
+     ylab = 'Predicted lynx trappings',
+     xlab = 'Forecast horizon',
+     main = 'mgcv')
+polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
+        c(cred_ints[1,],rev(cred_ints[3,])),
+        col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
+cred_ints <- apply(gam_sims, 2, function(x) quantile(x, probs = c(0.15, 0.5, 0.85)))
+polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
+        c(cred_ints[1,],rev(cred_ints[3,])),
+        col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
+lines(cred_ints[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
+points(lynx_test$population[1:10], pch = 16)
+lines(lynx_test$population[1:10])
+```
+
+A decent forecast? The shape is certainly correct, but the 95% uncertainty intervals appear to be far too wide (i.e. our upper interval extends to up to ~8 times the maximum number of trappings that have ever been recorded up to this point). This is almost entirely due to the extrapolation behaviour of the B spline, as the lag smooth functions are not encountering values very far outside the ranges they've already been trained on so they are resorting mostly to interpolation. But a better way to evaluate than simply using visuals is to calculate a probabilistic score. Here we use the Discrete Rank Probabiilty Score, which gives us an indication of how well calibrated our forecast's uncertainty intervals are by comparing the mass of the forecast density against the true observed values. Forecasts with overly wide intervals are penalised, as are forecasts with overly narrow intervals that do not contain the true observations. At the same time we calculate coverage of the forecast's 90% intervals, which is another useful way of evaluating different forecast proposals
+<details>
+<summary>Click for definition of `drps_score`</summary>
+```{r}
+  # Discrete Rank Probability Score and coverage of 90% interval
+  drps_score <- function(truth, fc, interval_width = 0.9){
+    nsum <- 1000
+    Fy = ecdf(fc)
+    ysum <- 0:nsum
+    indicator <- ifelse(ysum - truth >= 0, 1, 0)
+    score <- sum((indicator - Fy(ysum))^2)
+
+    # Is value within 90% HPD?
+    interval <- quantile(fc, probs = c(((1-0.9)/2), 0.5, 1-((1-interval_width)/2)))
+    in_interval <- ifelse(truth <= interval[3] & truth >= interval[1], 1, 0)
+    return(c(score, in_interval))
+  }
+
+  # Wrapper to operate on all observations in fc_horizon
+  drps_mcmc_object <- function(truth, fc, interval_width = 0.9){
+    indices_keep <- which(!is.na(truth))
+    if(length(indices_keep) == 0){
+      scores = data.frame('drps' = rep(NA, length(truth)),
+                          'interval' = rep(NA, length(truth)))
+    } else {
+      scores <- matrix(NA, nrow = length(truth), ncol = 2)
+      for(i in indices_keep){
+        scores[i,] <- drps_score(truth = as.vector(truth)[i],
+                                 fc = fc[,i], interval_width)
+      }
+    }
+    scores
+  }
+```
+</details>
+
+Calculate DRPS over the 10-year horizon for the mgcv model
+```{r}
+lynx_mgcv1_drps <- drps_mcmc_object(truth = lynx_test$population[1:10], 
+                   fc = gam_sims)
+```
+
+What if we remove the yearly trend and let the lag smooths capture more of the temporal dependencies? Will that improve the forecast distribution? Run a second model and plot the forecast (note that this plot will be on quite a different y-axis scale compared to the first plot above)
+```{r, fig.width=5, fig.height=4, fig.align='center'}
+lynx_mgcv2 = gam(population ~ 
+                  s(season, bs = 'cc', k = 19) +
+                  s(lag1, k = 5) +
+                  s(lag2, k = 5),
+                data = lynx_train, family = "poisson",
+                method = "REML")
+coef_sim <- gam.mh(lynx_mgcv2)$bs
+gam_sims <- matrix(NA, nrow = 1000, ncol = 10)
+for(i in 1:1000){
+  gam_sims[i,] <- recurse_nonlin(lynx_mgcv2,
+                                 lagged_vals = c(lynx_test$lag1[1],
+                                                 lynx_test$lag2[1]),
+                                 h = 10)
+}
+cred_ints <- apply(gam_sims, 2, function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
+yupper <- max(cred_ints) * 1.25
+plot(cred_ints[3,] ~ seq(1:NCOL(cred_ints)), type = 'l',
+     col = rgb(1,0,0, alpha = 0),
+     ylim = c(0, yupper),
+     ylab = 'Predicted lynx trappings',
+     xlab = 'Forecast horizon',
+     main = 'mgcv')
+polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
+        c(cred_ints[1,],rev(cred_ints[3,])),
+        col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
+cred_ints <- apply(gam_sims, 2, function(x) quantile(x, probs = c(0.15, 0.5, 0.85)))
+polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
+        c(cred_ints[1,],rev(cred_ints[3,])),
+        col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
+lines(cred_ints[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
+points(lynx_test$population[1:10], pch = 16)
+lines(lynx_test$population[1:10])
+```
+
+Calculate DRPS over the 10-year horizon for the second mgcv model
+```{r}
+lynx_mgcv2_drps <- drps_mcmc_object(truth = lynx_test$population[1:10], 
+                   fc = gam_sims)
+```
+
+                   
+This forecast is highly overconfident, with very unrealistic uncertainty intervals due to the interpolation behaviours of the lag smooths. You can certainly keep trying different formulations (our experience is that the B spline variant above produces the best forecasts from any tested `mgcv` model, but we did not test an exhaustive set), but hopefully it is clear that forecasting using splines is tricky business and it is likely that each time you do it you'll end up honing in on different combinations of penalties, knot selections etc.... Now we will fit an `mvgam` model for comparison. This model fits a similar model to the `mgcv` model directly above but with a full time series model for the errors (in this case an `AR1` process), rather than smoothing splines that do not incorporate a concept of the future. We do not use a `year` term to reduce any possible extrapolation and because the latent dynamic component should capture this temporal variation.
+```{r, message=FALSE, warning=FALSE}
+lynx_mvgam <- mvgam(data_train = lynx_train,
+               data_test = lynx_test,
+               formula = y ~ s(season, bs = 'cc', k = 19),
+               knots = list(season = c(0.5, 19.5)),
+               family = 'poisson',
+               trend_model = 'AR1',
+               use_stan = TRUE,
+               burnin = 1000,
+               chains = 4)
+```
+
+Calculate the out of sample forecast from the fitted `mvgam` model and plot
+```{r, fig.width=5, fig.height=4, fig.align='center'}
+fits <- MCMCvis::MCMCchains(lynx_mvgam$model_output, 'ypred')
+fits <- fits[,(NROW(lynx_mvgam$obs_data)+1):(NROW(lynx_mvgam$obs_data)+10)]
+cred_ints <- apply(fits, 2, function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
+yupper <- max(cred_ints) * 1.25
+plot(cred_ints[3,] ~ seq(1:NCOL(cred_ints)), type = 'l',
+     col = rgb(1,0,0, alpha = 0),
+     ylim = c(0, yupper),
+     ylab = '',
+     xlab = 'Forecast horizon',
+     main = 'mvgam')
+polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
+        c(cred_ints[1,],rev(cred_ints[3,])),
+        col = rgb(150, 0, 0, max = 255, alpha = 100), border = NA)
+cred_ints <- apply(fits, 2, function(x) quantile(x, probs = c(0.15, 0.5, 0.85)))
+polygon(c(seq(1:(NCOL(cred_ints))), rev(seq(1:NCOL(cred_ints)))),
+        c(cred_ints[1,],rev(cred_ints[3,])),
+        col = rgb(150, 0, 0, max = 255, alpha = 180), border = NA)
+lines(cred_ints[2,], col = rgb(150, 0, 0, max = 255), lwd = 2, lty = 'dashed')
+points(lynx_test$population[1:10], pch = 16)
+lines(lynx_test$population[1:10])
+```
+
+Calculate DRPS over the 10-year horizon for the mvgam model
+```{r}
+lynx_mvgam_drps <- drps_mcmc_object(truth = lynx_test$population[1:10], 
+                   fc = fits)
+```
+
+How do the out of sample DRPS scores stack up for these three models? Remember, our goal is to minimise DRPS while providing 90% intervals that are near, but not less than, `0.9`. The DRPS and 90% interval coverage for the first `mgcv` model (with the `B` spline year term)
+```{r}
+sum(lynx_mgcv1_drps[,1])
+mean(lynx_mgcv1_drps[,2])
+```
+
+For the second `mgcv` model
+```{r}
+sum(lynx_mgcv2_drps[,1])
+mean(lynx_mgcv2_drps[,2])
+```
+
+And for the `mvgam` model
+```{r}
+sum(lynx_mvgam_drps[,1])
+mean(lynx_mvgam_drps[,2])
+```
+
+The `mvgam` has much more realistic uncertainty than the `mgcv` versions above. Of course this is just one out of sample comparison, and to really determine which model is most appropriate for forecasting we would want to run many of these tests using a [rolling window approach](https://robjhyndman.com/hyndsight/tscv/). Have a look at this model's summary to see what is being estimated (note that longer MCMC runs would probably be needed to increase effective sample sizes)
+```{r}
+summary(lynx_mvgam)
+```
+
+Now inspect each model's estimated smooth for the 19-year cyclic pattern. Note that the `mvgam` smooth plot is on a different scale compared to the `mgcv` plot, but interpretation is similar. The `mgcv` smooth is much wigglier, likely because it is compensating for any remaining autocorrelation not captured by the lag smooths. We could probably remedy this by reducing `k` in the seasonal smooth for the `mgcv` model (in practice this works well, but leaving `k` larger for the `mvgam`'s seasonal smooth is recommended as our experience is that this tends to lead to better performance and convergence)
+```{r, fig.show='hold', fig.align='center'}
+plot(lynx_mgcv, select=1, shade=T)
+plot_mvgam_smooth(lynx_mvgam, 1, 'season')
+```
+
+We can also view the mvgam's posterior predictions for the entire series (testing and training)
+```{r, fig.width=5, fig.height=4, fig.align='center'}
+plot(lynx_mvgam, type = 'forecast', data_test = lynx_test)
+```
+
+And the estimated trend
+```{r, fig.width=5, fig.height=4, fig.align='center'}
+plot(lynx_mvgam, type = 'trend', data_test = lynx_test)
+```
+
+A key aspect of ecological forecasting is to understand [how different components of a model contribute to forecast uncertainty](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589). We can estimate contributions to forecast uncertainty for the GAM smooth functions and the latent trend using `mvgam`
+```{r, fig.width=5, fig.height=4, fig.align='center'}
+plot(lynx_mvgam, type = 'uncertainty', data_test = lynx_test)
+```
+
+Both components contribute to forecast uncertainty, with the trend component contributing more over time (as it should since this is the stochastic forecast component). This suggests we would still need some more work to learn about factors driving the dynamics of the system. But we will leave the model as-is for this example. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's Dunn-Smyth randomised quantile residuals. Again we have more options for plotting when using the `plot_mvgam_resids()` function compared to the `S3` generic `plot.mvgam()`. Here we use this flexibility to modify the number of bins for the residuals vs fitted plot (top-left) so that the patterns are more clear. We are primarily looking for a lack of autocorrelation, which would suggest our AR1 model is appropriate for the latent trend
+```{r, fig.width=6, fig.height=6, fig.align='center'}
+plot_mvgam_resids(lynx_mvgam, n_bins = 25)
+```
+
+This same plot can also be produced for out of sample residuals if a set of test data is supplied (note that the function will assume that the test data come immediately sequential to the training data, there are no formal checks of this so it is up to the user to ensure this holds)
+```{r, fig.width=6, fig.height=6, fig.align='center'}
+plot_mvgam_resids(lynx_mvgam, n_bins = 25, data_test = lynx_test)
+```

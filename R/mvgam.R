@@ -1100,8 +1100,7 @@ mvgam = function(formula,
     } else {
 
       if(!smooths_included){
-        inits <- vector(mode = 'list')
-        inits$b <- ss_gam$coefficients
+        inits <- NULL
       } else {
         inits <- ss_jagam$jags.ini
       }
@@ -1336,8 +1335,7 @@ mvgam = function(formula,
                                 use_lv, trend_model, drift)
 
       if(!smooths_included){
-        inits <- vector(mode = 'list')
-        inits$b <- ss_gam$coefficients
+        inits <- NULL
       } else {
         inits <- ss_jagam$jags.ini
       }
