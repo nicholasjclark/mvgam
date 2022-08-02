@@ -12,8 +12,8 @@ get_mvgam_resids = function(object, n_cores = 1){
 
 preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')
 n_series <- NCOL(object$ytimes)
-series_levels <- levels(obs_series)
 obs_series <- object$obs_data$series
+series_levels <- levels(obs_series)
 family <- object$family
 obs_data <- object$obs_dat
 fit_engine <- object$fit_engine
