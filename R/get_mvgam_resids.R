@@ -11,6 +11,18 @@ get_mvgam_resids = function(object, n_cores = 1){
 
 
 preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')
+n_series <- NCOL(object$ytimes)
+series_levels <- levels(obs_series)
+obs_series <- object$obs_data$series
+family <- object$family
+obs_data <- object$obs_dat
+fit_engine <- object$fit_engine
+
+if(family == 'Negative Binomial'){
+  rs <- MCMCvis::MCMCchains(object$model_output, 'r')
+} else {
+  rs <- NULL
+}
 
 # Functions for calculating randomised quantile (Dunn-Smyth) residuals
 ds_resids_nb = function(truth, fitted, draw, size){
@@ -90,9 +102,9 @@ ds_resids_tw = function(truth, fitted, draw){
 
 # Pull out starting and ending indices for each series in the object
 ends <- seq(0, dim(preds)[2],
-            length.out = NCOL(object$ytimes) + 1)
+            length.out = n_series + 1)
 starts <- ends + 1
-starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
+starts <- c(1, starts[-c(1, (n_series+1))])
 ends <- ends[-1]
 
 
@@ -102,44 +114,50 @@ setDefaultCluster(cl)
 clusterExport(NULL, c('ds_resids_nb',
                       'ds_resids_pois',
                       'ds_resids_tw',
+                      'n_series',
+                      'series_levels',
+                      'family',
+                      'rs',
                       'preds',
                       'ends',
                       'starts',
-                      'object'),
+                      'obs_series',
+                      'obs_data',
+                      'fit_engine'),
               envir = environment())
 clusterEvalQ(cl, library(dplyr))
 clusterEvalQ(cl, library(MCMCvis))
 
 pbapply::pboptions(type = "none")
-series_resids <- pbapply::pblapply(seq_len(NCOL(object$ytimes)), function(series){
-  if(class(object$obs_data)[1] == 'list'){
-    n_obs <- data.frame(series = object$obs_data$series) %>%
-      dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
+series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
+  if(class(obs_data)[1] == 'list'){
+    n_obs <- data.frame(series = obs_series) %>%
+      dplyr::filter(series == !!(series_levels[series])) %>%
       nrow()
   } else {
-    n_obs <- object$obs_data %>%
-      dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
+    n_obs <- obs_data %>%
+      dplyr::filter(series == !!(series_levels[series])) %>%
       nrow()
   }
 
-  if(object$fit_engine == 'stan'){
+  if(fit_engine == 'stan'){
     preds <- preds[,seq(series,
-                        dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
-                        by = NCOL(object$ytimes))]
+                        dim(preds)[2],
+                        by = n_series)]
   } else {
     preds <- preds[,starts[series]:ends[series]]
   }
 
-  if(class(object$obs_data)[1] == 'list'){
-    obj_dat <- data.frame(y = object$obs_data$y,
-                          series = factor(object$obs_data$series,
-                                          levels = levels(object$obs_data$series)))
+  if(class(obs_data)[1] == 'list'){
+    obj_dat <- data.frame(y = obs_data$y,
+                          series = factor(obs_series,
+                                          levels = series_levels))
     truth <- as.vector(obj_dat %>%
-                         dplyr::filter(series == !!(levels(obj_dat$series)[series])) %>%
+                         dplyr::filter(series == !!(series_levels[series])) %>%
                          dplyr::pull(y))
   } else {
-    truth <- as.vector(object$obs_data %>%
-                         dplyr::filter(series == !!(levels(object$obs_data$series)[series])) %>%
+    truth <- as.vector(obs_data %>%
+                         dplyr::filter(series == !!(series_levels[series])) %>%
                          dplyr::pull(y))
   }
 
@@ -150,7 +168,7 @@ series_resids <- pbapply::pblapply(seq_len(NCOL(object$ytimes)), function(series
     sample_seq <- 1:NROW(preds)
   }
 
-  if(object$family == 'Poisson'){
+  if(family == 'Poisson'){
    resids <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_pois(truth = truth,
                                       fitted = preds[x, ],
@@ -158,8 +176,8 @@ series_resids <- pbapply::pblapply(seq_len(NCOL(object$ytimes)), function(series
     }))
   }
 
-  if(object$family == 'Negative Binomial'){
-    size <- MCMCvis::MCMCchains(object$model_output, 'r')[,series]
+  if(family == 'Negative Binomial'){
+    size <- rs[,series]
     resids <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_nb(truth = truth,
                                     fitted = preds[x, ],
@@ -168,7 +186,7 @@ series_resids <- pbapply::pblapply(seq_len(NCOL(object$ytimes)), function(series
     }))
   }
 
-  if(object$family == 'Tweedie'){
+  if(family == 'Tweedie'){
     resids <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_tw(truth = truth,
                                     fitted = preds[x, ],
@@ -180,6 +198,6 @@ resids
 
 }, cl = cl)
 stopCluster(cl)
-names(series_resids) <- levels(object$obs_data$series)
+names(series_resids) <- series_levels
 return(series_resids)
 }
