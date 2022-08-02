@@ -132,18 +132,25 @@ eval_mvgam = function(object,
   # Extract trend / latent variable estimates at the correct timepoint
   if(object$use_lv){
     n_lv <- object$n_lv
-    ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2],
-                length.out = n_lv + 1)
-    starts <- ends + 1
-    starts <- c(1, starts[-c(1, (n_lv + 1))])
-    ends <- ends[-1]
-    lvs <- lapply(seq_len(n_lv), function(lv){
-      lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[lv]:ends[lv]]
-      lv_estimates[,(eval_timepoint - 2):eval_timepoint]
-    })
+    if(object$fit_engine == 'stan'){
+      lvs <- lapply(seq_len(n_lv), function(lv){
+        inds_lv <- seq(lv, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2], by = n_lv)
+        lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,inds_lv]
+        lv_estimates[,(eval_timepoint - 2):eval_timepoint]
+      })
+    } else {
+      ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2],
+                  length.out = n_lv + 1)
+      starts <- ends + 1
+      starts <- c(1, starts[-c(1, (n_lv + 1))])
+      ends <- ends[-1]
+      lvs <- lapply(seq_len(n_lv), function(lv){
+        lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[lv]:ends[lv]]
+        lv_estimates[,(eval_timepoint - 2):eval_timepoint]
+      })
+    }
 
     taus <- MCMCvis::MCMCchains(object$model_output, 'penalty')
-
     trends <- NULL
   } else {
     if(object$trend_model == 'None'){
@@ -201,8 +208,15 @@ eval_mvgam = function(object,
   # If use_lv, extract latent variable loadings
   if(object$use_lv){
     lv_coefs <- lapply(seq_len(n_series), function(series){
-      lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
-      as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
+      if(object$fit_engine == 'stan'){
+        coef_start <- min(which(sort(rep(1:n_series, n_lv)) == series))
+        coef_end <- coef_start + n_lv - 1
+        as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,coef_start:coef_end])
+      } else {
+        lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
+        as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
+      }
+
     })
   } else {
     lv_coefs <- NULL
