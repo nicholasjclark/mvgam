@@ -1,4 +1,4 @@
-#'Fit a Bayesian multivariate GAM to a set of discrete time series
+#'Simulate a set of discrete time series for mvgam modelling
 #'
 #'This function simulates discrete time series data for fitting a multivariate GAM that includes
 #'shared seasonality and dependence on state-space latent dynamic factors. Random dependencies among series, i.e.

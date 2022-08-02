@@ -946,6 +946,13 @@ mvgam = function(formula,
     smooths_included <- FALSE
   }
 
+  # Add in additional data structure information for the model file heading
+  if(family == 'nb'){
+    min_eps <- paste0('min_eps; .Machine$double.eps (smallest floating-point number x such that 1 + x != 1)\n')
+  } else {
+    min_eps <- NULL
+  }
+
   if(smooths_included){
     zeros <- paste0('vector zero;  prior basis coefficient locations vector of length ncol(X)\n')
   } else {
@@ -971,6 +978,7 @@ mvgam = function(formula,
                   paste0(parametric_ldata),
                   paste0(parametric_tdata),
                   sp_data,
+                  min_eps,
                   '\n',
                   model_file)
 
@@ -1232,12 +1240,12 @@ mvgam = function(formula,
       }
 
       # Check if cmdstan is accessible; if not, use rstan
-      if(require(cmdstanr)){
-        use_cmdstan <- TRUE
-      }
-
-      if(is.null(cmdstan_version(error_on_NA = FALSE))){
+      if(!require(cmdstanr, quietly = TRUE)){
         use_cmdstan <- FALSE
+      } else {
+        if(is.null(cmdstan_version(error_on_NA = FALSE))){
+          use_cmdstan <- FALSE
+        }
       }
 
       if(use_cmdstan){
@@ -1304,6 +1312,10 @@ mvgam = function(formula,
 
         message("Compiling the Stan program...")
         message()
+        if(n_samples <= burnin){
+          n_samples <- burnin + n_samples
+        }
+
         fit1 <- stan(model_code = stan_objects$stan_file,
                      iter = n_samples,
                      warmup = burnin,
