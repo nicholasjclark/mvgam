@@ -1140,6 +1140,7 @@ mvgam = function(formula,
 
     if(use_stan){
       fit_engine <- 'stan'
+      use_cmdstan <- FALSE
       # Import the base Stan model file
       modification <- add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
       unlink('base_gam_stan.txt')
@@ -1243,6 +1244,7 @@ mvgam = function(formula,
       if(!require(cmdstanr, quietly = TRUE)){
         use_cmdstan <- FALSE
       } else {
+        use_cmdstan <- TRUE
         if(is.null(cmdstan_version(error_on_NA = FALSE))){
           use_cmdstan <- FALSE
         }
