@@ -1419,7 +1419,7 @@ mvgam = function(formula,
                               TRUE ~ 'Negative Binomial'),
     obs_data = data_train,
     ytimes = ytimes),
-    n_cores = min(c(parallel::detectCores() - 1, NCOL(ytimes))))
+    n_cores = min(c(chains, parallel::detectCores() - 1)))
 
   # Create a jam object and get smooth penalty names in more interpretable format
   ## Modified sim2jam function; takes simulation output
