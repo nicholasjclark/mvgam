@@ -2,7 +2,7 @@
 % Please edit documentation in R/sim_mvgam.R
 \name{sim_mvgam}
 \alias{sim_mvgam}
-\title{Fit a Bayesian multivariate GAM to a set of discrete time series}
+\title{Simulate a set of discrete time series for mvgam modelling}
 \usage{
 sim_mvgam(
   T = 100,

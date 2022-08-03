@@ -57,7 +57,7 @@ observations in \code{data_test} will be set to \code{NA} when fitting the model
 simulations can be obtained}
 
 \item{run_model}{\code{logical}. If \code{FALSE}, the model is not fitted but instead the function will
-return the model file and the data / initial values that are needed to fit the \code{JAGS} model}
+return the model file and the data / initial values that are needed to fit the model outside of \code{mvgam}}
 
 \item{prior_simulation}{\code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
 simulations from prior distributions are returned}
@@ -74,7 +74,7 @@ the size of the returned object, unless \code{run_model == FALSE}}
 latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series}
 
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
-Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(5, floor(n_series / 2))}}
+Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
 
 \item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
 'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
@@ -102,13 +102,13 @@ sampling the posterior distribution}
 \item{thin}{Thinning interval for monitors}
 
 \item{parallel}{\code{logical} specifying whether multiple cores should be used for
-for generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to use will be
+generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to use will be
 \code{min(c(chains, parallel::detectCores() - 1))}}
 
-\item{phi_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the drift terms/intercepts
+\item{phi_prior}{\code{character} specifying (in JAGS or Stan syntax) the prior distribution for the drift terms/intercepts
 in the latent trends}
 
-\item{ar_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the AR terms
+\item{ar_prior}{\code{character} specifying (in JAGS or Stan syntax) the prior distribution for the AR terms
 in the latent trends}
 
 \item{r_prior}{\code{character} specifying (in JAGS or Stan syntax) the prior distribution for the Negative Binomial
@@ -207,7 +207,9 @@ draws from the model's posterior distribution
 \cr
 \emph{Using Stan}: A useful feature of \code{mvgam} is the ability to use Hamiltonian Monte Carlo for parameter estimation
 via the software \code{Stan} (using either the \code{cmdstanr} or \code{rstan} interface). Note that the \code{rstan} library is
-currently required for this option to work, even if using \code{cmdstanr} as the backend. Also note that currently there is no support for
+currently required for this option to work, even if using \code{cmdstanr} as the backend. This is because \code{rstan}'s functions
+are needed to arrange the posterior samples into the correct format for all of \code{mvgam}'s other functions to work.
+Also note that currently there is no support for
 fitting \code{Tweedie} responses in \code{Stan}.
 However there are great advantages when using \code{Stan}, which includes the option to estimate smooth latent trends
 via \href{https://arxiv.org/abs/2004.11408}{Hilbert space approximate Gaussian Processes}. This often makes sense for
