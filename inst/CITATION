@@ -1,0 +1,17 @@
+citHeader("To cite mvgam in publications use:")
+
+citEntry(entry = "Article",
+         title        = "Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series",
+         author       = personList(as.person("Nicholas J. Clark"),
+                                   as.person("Konstans Wells")),
+         journal      = "Methods in Ecology and Evolution",
+         year         = "2022",
+         url          = "IN PRESS",
+
+
+         textVersion  =
+           paste("Nicholas J. Clark, Konstans Wells (2022).",
+                 "Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series",
+                 "Methods in Ecology and Evolution",
+                 "IN PRESS")
+)

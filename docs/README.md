@@ -7,23 +7,55 @@ The goal of `mvgam` is to use a Bayesian framework to estimate
 parameters of Generalized Additive Models for discrete time series with
 dynamic trend components. The motivation for the package and some of its
 primary objectives are described in detail by [Clark & Wells
-2022](https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1), with
-additional inspiration on the use of Bayesian probabilistic modelling to
-quantify uncertainty and advise principled decision making coming from
-[Michael Betancourt](https://betanalpha.github.io/writing/), [Michael
+2022](https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1) (in
+press at *Methods in Ecology and Evolution*), with additional
+inspiration on the use of Bayesian probabilistic modelling to quantify
+uncertainty and advise principled decision making coming from [Michael
+Betancourt](https://betanalpha.github.io/writing/), [Michael
 Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily
 Fox](https://emilybfox.su.domains/), among many others.
+
+## Resources
+
+A number of case studies have been compiled to highlight how DGAMs can
+be estimated using MCMC sampling. These are hosted currently on `RPubs`
+at the following links:
+
+-   [mvgam case study 1: model comparison and data
+    assimilation](https://rpubs.com/NickClark47/mvgam)
+-   [mvgam case study 2: multivariate
+    models](https://rpubs.com/NickClark47/mvgam2)
+-   [mvgam case study 3: distributed lag
+    models](https://rpubs.com/NickClark47/mvgam3)
+
+The package can also be used to generate all necessary data structures,
+initial value functions and modelling code necessary to fit DGAMs using
+`Stan` or `JAGS`. This can be helpful if users wish to make changes to
+the model to better suit their own bespoke research / analysis goals.
+The following resources can be helpful to troubleshoot:
+
+-   [Stan Discourse](https://discourse.mc-stan.org/)
+-   [JAGS Discourse](https://sourceforge.net/projects/mcmc-jags/)
 
 ## Installation
 
 Install the development version from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`
+`devtools::install_github("nicholasjclark/mvgam")`. Note that to
+actually condition models with MCMC sampling, either the `JAGS` software
+must be installed (along with the `R` packages `rjags` and `runjags`) or
+the `Stan` software must be installed (along with the package `rstan`
+and, optionally, the `cmdstanr` package). These are not listed as
+dependencies of `mvgam` to ensure that installation is less difficult.
+If users wish to fit the models using `mvgam`, please refer to
+installation links for `JAGS`
+[here](https://sourceforge.net/projects/mcmc-jags/files/) or for `Stan`
+and `rstan` [here](https://mc-stan.org/users/interfaces/rstan)).
 
 ## Brief introduction to the package
 
 We can explore the model’s primary functions using a test dataset that
-is available with all `R` installations. We introduce dynamic
-Generalised Additive Models and some of the key utility functions
+is available with all `R` installations. We introduce Dynamic
+Generalized Additive Models and some of the key utility functions
 provided in `mvgam`. First, load the `lynx` data and plot the series as
 well as its estimated autocorrelation function
 
@@ -96,9 +128,10 @@ function for `season` is estimated jointly with a full time series model
 for the errors (in this case an `AR3` process), rather than relying on
 smoothing splines that do not incorporate a concept of the future. We
 assume the outcome follows a Poisson distribution and estimate the model
-in `Stan` using MCMC sampling (installation links for `rstan` and
-`cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan)
-and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
+in `Stan` using MCMC sampling with the `Cmdstan` interface (installation
+links for `rstan` and `cmdstanr` are found
+[here](https://mc-stan.org/users/interfaces/rstan) and
+[here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
 
 ``` r
 lynx_mvgam <- mvgam(data_train = lynx_train,
@@ -116,34 +149,34 @@ lynx_mvgam <- mvgam(data_train = lynx_train,
 #> Chain 2 Iteration:    1 / 2000 [  0%]  (Warmup) 
 #> Chain 3 Iteration:    1 / 2000 [  0%]  (Warmup) 
 #> Chain 4 Iteration:    1 / 2000 [  0%]  (Warmup) 
-#> Chain 3 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 4 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 1 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 2 Iteration:  500 / 2000 [ 25%]  (Warmup) 
-#> Chain 3 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
-#> Chain 3 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 3 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-#> Chain 1 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
-#> Chain 1 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 3 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 2 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 2 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-#> Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-#> Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-#> Chain 2 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 1 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 1 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-#> Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 3 finished in 43.4 seconds.
-#> Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 1 finished in 44.5 seconds.
-#> Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 2 finished in 44.8 seconds.
+#> Chain 2 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 4 finished in 45.5 seconds.
+#> Chain 4 finished in 40.1 seconds.
+#> Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 2 finished in 43.0 seconds.
+#> Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 1 finished in 44.6 seconds.
+#> Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 3 finished in 44.9 seconds.
 #> 
 #> All 4 chains finished successfully.
-#> Mean chain execution time: 44.5 seconds.
-#> Total execution time: 45.8 seconds.
+#> Mean chain execution time: 43.1 seconds.
+#> Total execution time: 45.2 seconds.
 ```
 
 Inspect the resulting model file, which is written in the `Stan`
@@ -364,45 +397,45 @@ summary(lynx_mvgam)
 #> Fitted using Stan
 #> 
 #> GAM smooth term estimated degrees of freedom:
-#>            edf df
-#> s(season) 9799 17
+#>             edf df
+#> s(season) 10770 17
 #> 
 #> GAM coefficient (beta) estimates:
-#>                     2.5%         50%       97.5% Rhat n.eff
-#> (Intercept)   6.79015950  6.80218000  6.81431000    1  6808
-#> s(season).1  -1.20317400 -0.68312750  0.01746606    1  1039
-#> s(season).2  -0.34217647  0.25609150  0.90302028    1  1803
-#> s(season).3   0.38097955  1.10338500  1.79252475    1  1762
-#> s(season).4   0.80091535  1.72666500  2.44061925    1  1272
-#> s(season).5   1.03276175  1.99367500  2.72996700    1  1117
-#> s(season).6   0.29843772  1.17278500  1.89230325    1  1392
-#> s(season).7  -0.84398567 -0.08065355  0.68787680    1  1811
-#> s(season).8  -1.41318800 -0.64321500  0.20129283    1  1323
-#> s(season).9  -1.56880575 -0.76334700  0.31739575    1  1094
-#> s(season).10 -1.24017525 -0.42983750  0.64996255    1  1280
-#> s(season).11 -0.60767142  0.24961800  1.17260975    1  1705
-#> s(season).12  0.08591474  1.17380000  2.00801000    1  1208
-#> s(season).13 -0.03388641  1.29483500  2.15689075    1   839
-#> s(season).14 -0.33679847  0.99392500  1.82216725    1   813
-#> s(season).15 -0.96419433 -0.11696200  0.54524333    1  1123
-#> s(season).16 -1.42184425 -0.80551700 -0.22757412    1  1959
-#> s(season).17 -1.57080350 -1.05019000 -0.41779690    1  1377
+#>                     2.5%         50%        97.5% Rhat n.eff
+#> (Intercept)   6.79049875  6.80217000  6.813410250 1.00  6417
+#> s(season).1  -1.21519550 -0.67820550  0.009223027 1.00  1171
+#> s(season).2  -0.36867852  0.24713550  0.922955225 1.00  1905
+#> s(season).3   0.35196375  1.08608000  1.771353500 1.00  1848
+#> s(season).4   0.69536595  1.71590000  2.451143500 1.00  1111
+#> s(season).5   0.88175000  1.99443500  2.735168000 1.01   983
+#> s(season).6   0.27543875  1.17810000  1.939605250 1.00  1234
+#> s(season).7  -0.88168742 -0.08642385  0.748863150 1.00  1629
+#> s(season).8  -1.39258625 -0.64060150  0.263789800 1.00  1459
+#> s(season).9  -1.52862450 -0.74953350  0.383355700 1.00  1001
+#> s(season).10 -1.27417100 -0.40057850  0.764683350 1.00  1316
+#> s(season).11 -0.59974103  0.28615800  1.239020250 1.00  2044
+#> s(season).12  0.05075248  1.17083500  2.034569000 1.00  1568
+#> s(season).13 -0.16826293  1.28988000  2.138907250 1.00  1150
+#> s(season).14 -0.37138412  0.98390450  1.813663500 1.00   943
+#> s(season).15 -0.96946715 -0.12159850  0.499800575 1.00  1117
+#> s(season).16 -1.42660800 -0.80002800 -0.208301525 1.00  2057
+#> s(season).17 -1.60469425 -1.05336000 -0.386262675 1.00  1464
 #> 
 #> GAM smoothing parameter (rho) estimates:
 #>               2.5%      50%    97.5% Rhat n.eff
-#> s(season) 3.321265 4.190605 4.934154    1  2996
+#> s(season) 3.308014 4.206365 4.933834    1  2762
 #> 
 #> Latent trend parameter estimates:
-#>                2.5%         50%     97.5% Rhat n.eff
-#> ar1[1]    0.5430310  0.89219950 1.2556305    1  1493
-#> ar2[1]   -0.6911293 -0.27678200 0.1547917    1  2967
-#> ar3[1]   -0.3486109  0.05792415 0.4070008    1  1333
-#> sigma[1]  0.3651319  0.45930700 0.5985543    1  1955
+#>                2.5%        50%     97.5% Rhat n.eff
+#> ar1[1]    0.5499403  0.8970245 1.2497820    1  1257
+#> ar2[1]   -0.6775489 -0.2694540 0.1335424    1  3090
+#> ar3[1]   -0.3455837  0.0499296 0.4038517    1  1338
+#> sigma[1]  0.3664907  0.4614340 0.5957892    1  2661
 #> 
 #> [1] "n_eff / iter looks reasonable for all parameters"
 #> [1] "Rhat looks reasonable for all parameters"
 #> [1] "0 of 4000 iterations ended with a divergence (0%)"
-#> [1] "24 of 4000 iterations saturated the maximum tree depth of 11 (0.6%)"
+#> [1] "20 of 4000 iterations saturated the maximum tree depth of 11 (0.5%)"
 #> [1] "  Run again with max_treedepth set to a larger value to avoid saturation"
 #> [1] "E-FMI indicated no pathological behavior"
 ```
@@ -461,7 +494,7 @@ the entire series (testing and training)
 ``` r
 plot(lynx_mvgam, type = 'forecast', data_test = lynx_test)
 #> Out of sample DRPS:
-#> [1] 682.8037
+#> [1] 703.2443
 #> 
 ```
 
@@ -560,34 +593,34 @@ lynx_mvgam_poor <- mvgam(data_train = lynx_train,
 #> Chain 2 Iteration:    1 / 2000 [  0%]  (Warmup) 
 #> Chain 3 Iteration:    1 / 2000 [  0%]  (Warmup) 
 #> Chain 4 Iteration:    1 / 2000 [  0%]  (Warmup) 
-#> Chain 4 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 1 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 4 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 3 Iteration:  500 / 2000 [ 25%]  (Warmup) 
-#> Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
-#> Chain 3 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
-#> Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-#> Chain 3 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 2 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 1 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 1 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-#> Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-#> Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-#> Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 2 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 2 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-#> Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 4 finished in 6.7 seconds.
-#> Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 3 finished in 7.1 seconds.
+#> Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 2 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 1 finished in 7.7 seconds.
+#> Chain 1 finished in 7.4 seconds.
 #> Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 2 finished in 8.8 seconds.
+#> Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 2 finished in 7.8 seconds.
+#> Chain 3 finished in 7.7 seconds.
+#> Chain 4 finished in 7.6 seconds.
 #> 
 #> All 4 chains finished successfully.
 #> Mean chain execution time: 7.6 seconds.
-#> Total execution time: 8.9 seconds.
+#> Total execution time: 7.9 seconds.
 ```
 
 We choose a set of timepoints within the training data to forecast from,
@@ -609,10 +642,10 @@ markedly better (far lower DRPS) for this evaluation timepoint
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   2.815  14.735 111.162 103.530 151.525 244.586
+#>   3.606  16.599 111.630 102.849 148.646 240.145
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   34.93   41.65  311.68  289.32  456.17  675.74
+#>   35.73   41.56  312.86  288.23  455.09  671.61
 ```
 
 Nominal coverages for both models’ 90% prediction intervals
@@ -630,6 +663,43 @@ each competing model at the same set of timepoints. There are many more
 extended uses for `mvgam` models, including the ability to fit dynamic
 factor processes for analysing and forecasting sets of multivariate
 discrete time series
+
+## Citing mvgam and related software
+
+When using open source software (or software in general), please make
+sure to appropriately acknowledge the hard work that developers and
+maintainers put into making these packages available. Citations are
+currently the best way to formally acknowledge this work, so we highly
+encourage you to cite any packages that you rely on for your research.
+
+When using `mvgam`, please cite the following publication:
+
+-   Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive
+    Models (DGAMs) for forecasting discrete ecological time series.
+    *Methods in Ecology and Evolution*. *In Press*
+
+As `mvgam` acts as an interface to `Stan` and `JAGS`, please
+additionally cite whichever software you use for parameter estimation:
+
+-   Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B.,
+    Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017).
+    Stan: A probabilistic programming language. *Journal of Statistical
+    Software*. 76(1). 10.18637/jss.v076.i01
+-   Plummer, M. (2013). JAGS: A program for analysis of Bayesian
+    graphical models using Gibbs sampling. *Proceedings of the 3rd
+    international workshop on distributed statistical computing*.
+    124(125.10).
+
+Further, `mvgam` relies on several other `R` packages and, of course, on
+`R` itself. To find out how to cite R and its packages, use the
+`citation` function. There are some features of `mvgam` which
+specifically rely on certain packages. The most important of these is
+the generation of data necessary to estimate smoothing splines, which
+entirely rely on `mgcv`. The `rstan` and `cmdstanr` packages together
+with `Rcpp` makes `Stan` conveniently accessible in `R`, while the
+`rjags` and `runjags` packages together with the `coda` package make
+`JAGS` accessible in `R`. If you use some of these features, please also
+consider citing the related packages.
 
 # License
 

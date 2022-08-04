@@ -15,16 +15,31 @@ knitr::opts_chunk$set(
 *mvgam*
 ================
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others.
+The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1) (in press at *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others.
+
+## Resources
+A number of case studies have been compiled to highlight how DGAMs can be estimated using MCMC sampling. These are hosted currently on `RPubs` at the following links:
+  
+* [mvgam case study 1: model comparison and data assimilation](https://rpubs.com/NickClark47/mvgam)
+* [mvgam case study 2: multivariate models](https://rpubs.com/NickClark47/mvgam2)
+* [mvgam case study 3: distributed lag models](https://rpubs.com/NickClark47/mvgam3)
+  
+The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan` or `JAGS`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The following resources can be helpful to troubleshoot:
+  
+* [Stan Discourse](https://discourse.mc-stan.org/)
+* [JAGS Discourse](https://sourceforge.net/projects/mcmc-jags/)
   
 ## Installation
 Install the development version from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`
+`devtools::install_github("nicholasjclark/mvgam")`. Note that to actually condition models with MCMC sampling, either the `JAGS` software must be installed (along with the `R` packages `rjags` and `runjags`) or the `Stan` 
+software must be installed (along with the package `rstan` and, optionally, the `cmdstanr` package). These are not 
+listed as dependencies of `mvgam` to ensure that installation is less difficult. If users wish to fit the models
+using `mvgam`, please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/) or for `Stan` and `rstan` [here](https://mc-stan.org/users/interfaces/rstan)).
 
 ## Brief introduction to the package
 
 We can explore the model’s primary functions using a test dataset that
-is available with all `R` installations. We introduce dynamic Generalised Additive Models and some of the key utility functions provided in `mvgam`. First, load the `lynx` data and plot the series as well as its estimated autocorrelation function
+is available with all `R` installations. We introduce Dynamic Generalized Additive Models and some of the key utility functions provided in `mvgam`. First, load the `lynx` data and plot the series as well as its estimated autocorrelation function
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 library(mvgam)
 data(lynx)
@@ -59,7 +74,7 @@ Inspect the series in a bit more detail using `mvgam`'s plotting utility
 plot_mvgam_series(data_train = lynx_train)
 ```
 
-Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `Stan` using MCMC sampling (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan) and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
+Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `Stan` using MCMC sampling with the `Cmdstan` interface (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan) and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvgam(data_train = lynx_train,
                data_test = lynx_test,
@@ -200,6 +215,26 @@ mean(mod2_eval$series1$in_interval)
 ```
 
 The `compare_mvgams` function automates this process by rolling along a set of timepoints for each model, ensuring a more in-depth evaluation of each competing model at the same set of timepoints. There are many more extended uses for `mvgam` models, including the ability to fit dynamic factor processes for analysing and forecasting sets of multivariate discrete time series
+
+## Citing mvgam and related software
+
+When using open source software (or software in general), please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work, so we highly encourage you to cite any packages that you rely on for your research.
+
+When using `mvgam`, please cite the following publication:
+
+- Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting      discrete ecological time series. *Methods in Ecology and Evolution*. *In Press*
+
+As `mvgam` acts as an interface to `Stan` and `JAGS`, please additionally cite whichever software you use for parameter estimation:
+
+- Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B., Betancourt M.,
+  Brubaker M., Guo J., Li P., and Riddell A. (2017). Stan: A probabilistic
+  programming language. *Journal of Statistical Software*. 76(1).
+  10.18637/jss.v076.i01
+- Plummer, M. (2013). JAGS: A program for analysis of Bayesian graphical models using Gibbs          sampling. *Proceedings of the 3rd international workshop on distributed statistical computing*.    124(125.10).
+
+Further, `mvgam` relies on several other `R` packages and, of course, on `R` itself. To
+find out how to cite R and its packages, use the `citation` function. There are
+some features of `mvgam` which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines, which entirely rely on `mgcv`. The `rstan` and `cmdstanr` packages together with `Rcpp` makes `Stan` conveniently accessible in `R`, while the `rjags` and `runjags` packages together with the `coda` package make `JAGS` accessible in `R`. If you use some of these features, please also consider citing the related packages.
 
 # License
 This project is licensed under an `MIT` open source license

@@ -207,7 +207,7 @@
 #'                      refresh = 500,
 #'                      init = mod1$inits)
 #'
-#' # Fit the model using mvgam and the stan backend
+#' # Now fit the model using mvgam with the Stan backend
 #' mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
 #'               data_train = dat$data_train,
 #'               trend_model = 'RW',
@@ -296,30 +296,20 @@ mvgam = function(formula,
     }
   }
 
+  # If Stan is to be used, make sure it is installed
+  if(use_stan & run_model){
+    if(!require(rstan)){
+      warning('rstan library is required but not found; setting run_model = FALSE')
+      run_model <- FALSE
+    }
+  }
+
   # JAGS cannot support latent GP trends as there is no easy way to use Hilbert base
   # approximation to reduce the computational demands
   if(!use_stan & trend_model == 'GP'){
-    if(!require(rstan)){
-      stop('gaussian process trends not yet supported for JAGS and cannot find rstan library')
-    } else {
-      warning('gaussian process trends not yet supported for JAGS; reverting to stan')
-      use_stan <- TRUE
-    }
+    warning('gaussian process trends not yet supported for JAGS; reverting to Stan')
+    use_stan <- TRUE
   }
-
-  # If Stan is to be used, make sure it is installed
-  if(use_stan){
-    if(!require(rstan)){
-      warning('rstan library not installed; reverting to JAGS')
-      use_stan <- FALSE
-    }
-  }
-
-  # Stan can only handle certain options in the development phase
-  # if(use_stan & use_lv){
-  #   warning('dynamic factor trends not yet supported for stan; reverting to JAGS')
-  #   use_stan <- FALSE
-  # }
 
   if(use_stan & family == 'tw'){
     warning('Tweedie family not yet supported for stan; reverting to JAGS')
@@ -329,6 +319,15 @@ mvgam = function(formula,
   # If the model is to be run in JAGS, make sure the JAGS software can be located
   if(!use_stan){
     if(run_model){
+      if(!require(runjags)){
+        warning('runjags library is required but not found; setting run_model = FALSE')
+        run_model <- FALSE
+      }
+    }
+  }
+
+  if(!use_stan){
+    if(run_model){
       if(missing(jags_path)){
         jags_path <- runjags::findjags()
       }
@@ -336,7 +335,7 @@ mvgam = function(formula,
       # Code borrowed from the runjags package
       jags_status <- runjags::testjags(jags_path, silent = TRUE)
       if(!jags_status$JAGS.available){
-        if(jags_status$os=="windows"){
+        if(jags_status$os == "windows"){
           # Try it again - sometimes this helps
           Sys.sleep(0.2)
           jags_status <- runjags::testjags(jags_path, silent = TRUE)
@@ -344,8 +343,8 @@ mvgam = function(formula,
 
         if(!jags_status$JAGS.available){
           cat("Unable to call JAGS using '", jags_path,
-              "'\nTry specifying the path to the JAGS binary as the jags_path argument, or installing the rjags package.\nUse the runjags::testjags() function for more detailed diagnostics.\n", sep="")
-          stop("Unable to call JAGS", call. = FALSE)
+              "'\nTry specifying the path to the JAGS binary as jags_path argument, or re-installing the rjags package.\nUse the runjags::testjags() function for more detailed diagnostics.\n", sep="")
+          stop("Unable to call JAGS.\nEither use the Stan backend or follow examples in ?mvgam to generate data / model files and run outside of mvgam", call. = FALSE)
         }
       }
     }
@@ -1256,8 +1255,12 @@ mvgam = function(formula,
         message('Using cmdstanr as the backend')
         message()
 
+        if(cmdstanr::cmdstan_version() >= "2.29.0"){
         cmd_mod <- cmdstan_model(write_stan_file(stan_objects$stan_file),
-                                 stanc_options = list('canonicalize=deprecations,braces,parentheses'))
+                                 stanc_options = list('O1', 'canonicalize=deprecations,braces,parentheses'))
+        } else {
+          cmd_mod <- cmdstan_model(write_stan_file(stan_objects$stan_file))
+        }
 
         if(trend_model == 'GP'){
           max_treedepth = 12
@@ -1343,6 +1346,7 @@ mvgam = function(formula,
     }
 
     if(!use_stan){
+      require(runjags)
       fit_engine <- 'jags'
       model_data <- ss_jagam$jags.data
 
@@ -1390,6 +1394,7 @@ mvgam = function(formula,
                                      silent.jags = TRUE,
                                      cl = cl)
         stopCluster(cl)
+
       } else {
         gam_mod <- runjags::run.jags(model = 'base_gam.txt',
                                      data = ss_jagam$jags.data,

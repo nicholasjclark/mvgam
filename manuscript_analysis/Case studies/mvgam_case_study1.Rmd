@@ -18,7 +18,7 @@ opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
 
 Generalized Additive Models (GAMs) are incredibly flexible tools that have found particular application in the analysis of time series. In ecology, a host of recent papers and workshops (i.e. the [2018 Ecological Society of America workshop on GAMs](https://noamross.github.io/mgcv-esa-2018/) that was hosted by Eric Pedersen, David L. Miller, Gavin Simpson, and Noam Ross) have drawn special attention to the wide range of applications that GAMs have for addressing complex ecological analyses. Given the many ways that GAMs can model temporal data, it is tempting to extrapolate from the smooth functions estimated by a GAM to produce out of sample forecasts. Here we will inspect the behaviours of smoothing splines when extrapolating to data outside the range of the training data to examine whether this can be useful in practice. 
 
-We will work in the `mvgam` package, which fits Dynamic GAMs (DGAMs) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a discrete response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Asssuming $\boldsymbol{y}$ is drawn from an exponential distribution (such as Poisson or Negative Binomial) with a log link function, the linear predictor for a dynamic GAM is written as:
+We will work in the `mvgam` package, which fits Dynamic GAMs (DGAMs) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a discrete response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Assuming $\boldsymbol{y}$ is drawn from an exponential distribution (such as Poisson or Negative Binomial) with a log link function, the linear predictor for a Dynamic GAM is written as:
 
 $$log(\tilde{\boldsymbol{y}}_{t})={\boldsymbol{B}}_0+\sum\limits_{i=1}^I\boldsymbol{s}_{i,t}\boldsymbol{x}_{i,t}+\boldsymbol{z}_{t}\,,$$
 Here $\boldsymbol{B}_{0}$ is the unknown intercept, the $\boldsymbol{s}$'s are unknown smooth functions of the covariates ($\boldsymbol{x}$'s) and $\boldsymbol{z}$ is a dynamic latent trend component. Each smooth function $\boldsymbol{s}_{i}$ is composed of basis expansions whose coefficients, which must be estimated, control the shape of the functional relationship between $\boldsymbol{x}_{i}$ and $log(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity, with a larger set of basis functions allowing greater flexibility. Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson, Negative Binomial, Tweedie-Poisson) that accommodate common ecological features such as zero-inflation or overdispersion, and that they can be formulated to include hierarchical smoothing for multivariate responses. For the dynamic component, in its most basic form we assume a random walk with drift:
@@ -68,7 +68,7 @@ Notice how wiggly the function becomes in the last plot when $\lambda$ is very s
 
 **Simulation example**  
    
-A simple simulation example is first used to demonstrate a comparison between a dynamic GAM with a latent trend process vs a conventional GAM that includes an autoregressive observation model. First we simulate an autocorrelated trend and then draw noisy observations of that trend using a Negative Binomial observation process with overdispersion parameter = `10`
+A simple simulation example is first used to demonstrate a comparison between a Dynamic GAM with a latent trend process vs a conventional GAM that includes an autoregressive observation model. First we simulate an autocorrelated trend and then draw noisy observations of that trend using a Negative Binomial observation process with overdispersion parameter = `10`
 ```{r message=FALSE, warning = FALSE}
 #devtools::install_github("nicholasjclark/mvgam")
 library(mvgam)
@@ -181,7 +181,10 @@ for(i in 1:1000){
 }
 ```
 
-Now we will fit a competing Dynamic GAM model, which estimates a latent temporal process rather than using an autoregressive observation model. This model's parameters are estimated in a Bayesian framework using (by default) the Gibbs sampling algorithms available in the `JAGS` software. `mvgam` takes a fitted `gam` model and adapts the model file to fit in `JAGS`, with possible extensions to deal with stochastic trend components and other features.
+Now we will fit a competing Dynamic GAM model, which estimates a latent temporal process rather than using an autoregressive observation model. Note that to actually condition models with MCMC sampling, either the `JAGS` software must be installed (along with the `R` packages `rjags` and `runjags`) or the `Stan` 
+software must be installed (along with the package `rstan` and, optionally, the `cmdstanr` package). These are not 
+listed as dependencies of `mvgam` to ensure that installation is less difficult. If users wish to fit the models
+using `mvgam`, please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/) or for `Stan` and `rstan` [here](https://mc-stan.org/users/interfaces/rstan)). This model's parameters are estimated in a Bayesian framework using (by default) the Gibbs sampling algorithms available in the `JAGS` software. `mvgam` takes a fitted `gam` model and adapts the model file to fit in `JAGS`, with possible extensions to deal with stochastic trend components and other features.
 ```{r message=FALSE, warning = FALSE}
 m_mvgam <- mvgam(formula = y ~ 1,
                  data_train = data_train,
@@ -218,7 +221,7 @@ mod_skeleton$inits
 head(mod_skeleton$pregam)
 ```
 
-The same steps above can be used to generate `Stan` data and modelling files, with all options available apart from the use of latent variable trends (these are currently being implemented in the development version of `mvgam`):
+The same steps above can be used to generate `Stan` data and modelling files, with all options available apart from the use of a Tweedie-Poisson distribution:
 ```{r}
 mod_skeleton <- mvgam(y ~ 1,
                  data_train = data_train,
@@ -238,6 +241,7 @@ The `Stan` model file is also designed to be as descriptive as possible about th
 ```{r}
 mod_skeleton$model_file
 ```
+
 Now we will evaluate the forecasts for each of the models. Here we define a function to plot posterior empirical forecast quantiles and calculate the Discrete Rank Probability Score (DRPS, a proper scoring rule for evaluating probabilistic forecast distributions) for each of the out of sample forecasts. The final score for each forecast is the sum of DRPS values at each forecast horizon, with the lower score being the favoured forecast. The function returns a plot of the forecast distribution and also prints the DRPS score
 <details>
 <summary>Click for definition of `plot_fc_horizon`</summary>

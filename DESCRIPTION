@@ -1,6 +1,7 @@
 Package: mvgam
-Title: Multivariate Bayesian Generalised Additive Models for discrete time series
-Version: 1.0.0
+Title: Multivariate Bayesian Generalized Additive Models for discrete time series
+Version: 1.0.3
+Date: 2022-08-03
 Authors@R: 
     person(given = "Nicholas",
            family = "Clark",
@@ -12,14 +13,13 @@ Description: This package is for fitting Bayesian Generalised Additive Models to
              for time series analysis and forecasting. Estimation is performed using Markov Chain Monte Carlo (MCMC) with
              either the Gibbs sampling software JAGS or with Hamiltonian Monte Carlo in the software Stan. The package also includes 
              utilities for online updating of  forecast distributions with a recursive particle filter that 
-             uses sequential importance sampling to assimilate new observations as they become available.
+             uses sequential importance sampling to assimilate new observations as they become available. References: 
+             Clark & Wells (2022) <https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1>
 Maintainer: Nicholas J Clark <nicholas.j.clark1214@gmail.com>
 License: MIT + file LICENSE
 Depends: R (>= 3.6.0), mgcv, parallel
 Imports: 
     pbapply,
-    rjags,
-    runjags,
     tweedie,
     lubridate,
     MASS,
@@ -28,7 +28,6 @@ Imports:
     smooth,
     coda,
     MCMCpack,
-    runjags,
     MCMCvis,
     dplyr,
     magrittr
@@ -36,5 +35,12 @@ Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
-Suggests: knitr, rmarkdown
+Suggests: 
+    knitr, 
+    rmarkdown, 
+    rstan (>= 2.19.2),
+    cmdstanr (>= 0.4.0),
+    rjags,
+    runjags
 VignetteBuilder: knitr
+URL: https://github.com/nicholasjclark/mvgam

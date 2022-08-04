@@ -267,7 +267,7 @@ fit <- cmd_mod$sample(data = model_data,
                      refresh = 500,
                      init = mod1$inits)
 
-# Fit the model using mvgam and the stan backend
+# Now fit the model using mvgam with the Stan backend
 mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
               data_train = dat$data_train,
               trend_model = 'RW',
