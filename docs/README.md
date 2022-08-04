@@ -51,7 +51,44 @@ installation links for `JAGS`
 [here](https://sourceforge.net/projects/mcmc-jags/files/) or for `Stan`
 and `rstan` [here](https://mc-stan.org/users/interfaces/rstan)).
 
-## Brief introduction to the package
+## Citing mvgam and related software
+
+When using open source software (or software in general), please make
+sure to appropriately acknowledge the hard work that developers and
+maintainers put into making these packages available. Citations are
+currently the best way to formally acknowledge this work, so we highly
+encourage you to cite any packages that you rely on for your research.
+
+When using `mvgam`, please cite the following publication:
+
+-   Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive
+    Models (DGAMs) for forecasting discrete ecological time series.
+    *Methods in Ecology and Evolution*. *In Press*
+
+As `mvgam` acts as an interface to `Stan` and `JAGS`, please
+additionally cite whichever software you use for parameter estimation:
+
+-   Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B.,
+    Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017).
+    Stan: A probabilistic programming language. *Journal of Statistical
+    Software*. 76(1). 10.18637/jss.v076.i01
+-   Plummer, M. (2013). JAGS: A program for analysis of Bayesian
+    graphical models using Gibbs sampling. *Proceedings of the 3rd
+    International Workshop on Distributed Statistical Computing*.
+    124(125.10).
+
+Further, `mvgam` relies on several other `R` packages and, of course, on
+`R` itself. To find out how to cite R and its packages, use the
+`citation` function. There are some features of `mvgam` which
+specifically rely on certain packages. The most important of these is
+the generation of data necessary to estimate smoothing splines, which
+entirely rely on `mgcv`. The `rstan` and `cmdstanr` packages together
+with `Rcpp` makes `Stan` conveniently accessible in `R`, while the
+`rjags` and `runjags` packages together with the `coda` package make
+`JAGS` accessible in `R`. If you use some of these features, please also
+consider citing the related packages.
+
+## A brief introduction to the package
 
 We can explore the model’s primary functions using a test dataset that
 is available with all `R` installations. We introduce Dynamic
@@ -65,6 +102,7 @@ library(mvgam)
 #> Loading required package: nlme
 #> This is mgcv 1.8-33. For overview type 'help("mgcv-package")'.
 #> Loading required package: parallel
+#> Welcome to mvgam. Please cite as: Clark, NJ, and Wells, K. 2022. Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. Methods in Ecology and Evolution IN PRESS
 data(lynx)
 lynx_full = data.frame(year = 1821:1934, 
                        population = as.numeric(lynx))
@@ -149,34 +187,34 @@ lynx_mvgam <- mvgam(data_train = lynx_train,
 #> Chain 2 Iteration:    1 / 2000 [  0%]  (Warmup) 
 #> Chain 3 Iteration:    1 / 2000 [  0%]  (Warmup) 
 #> Chain 4 Iteration:    1 / 2000 [  0%]  (Warmup) 
-#> Chain 4 Iteration:  500 / 2000 [ 25%]  (Warmup) 
-#> Chain 1 Iteration:  500 / 2000 [ 25%]  (Warmup) 
-#> Chain 2 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 3 Iteration:  500 / 2000 [ 25%]  (Warmup) 
-#> Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
-#> Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 2 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 1 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 4 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 3 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 3 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 2 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 2 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 1 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 1 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-#> Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 2 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-#> Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 4 finished in 40.1 seconds.
+#> Chain 4 finished in 40.6 seconds.
 #> Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 2 finished in 43.0 seconds.
-#> Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 1 finished in 44.6 seconds.
+#> Chain 2 finished in 41.0 seconds.
 #> Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 3 finished in 44.9 seconds.
+#> Chain 3 finished in 42.6 seconds.
+#> Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 1 finished in 44.1 seconds.
 #> 
 #> All 4 chains finished successfully.
-#> Mean chain execution time: 43.1 seconds.
-#> Total execution time: 45.2 seconds.
+#> Mean chain execution time: 42.1 seconds.
+#> Total execution time: 44.3 seconds.
 ```
 
 Inspect the resulting model file, which is written in the `Stan`
@@ -398,44 +436,44 @@ summary(lynx_mvgam)
 #> 
 #> GAM smooth term estimated degrees of freedom:
 #>             edf df
-#> s(season) 10770 17
+#> s(season) 10159 17
 #> 
 #> GAM coefficient (beta) estimates:
-#>                     2.5%         50%        97.5% Rhat n.eff
-#> (Intercept)   6.79049875  6.80217000  6.813410250 1.00  6417
-#> s(season).1  -1.21519550 -0.67820550  0.009223027 1.00  1171
-#> s(season).2  -0.36867852  0.24713550  0.922955225 1.00  1905
-#> s(season).3   0.35196375  1.08608000  1.771353500 1.00  1848
-#> s(season).4   0.69536595  1.71590000  2.451143500 1.00  1111
-#> s(season).5   0.88175000  1.99443500  2.735168000 1.01   983
-#> s(season).6   0.27543875  1.17810000  1.939605250 1.00  1234
-#> s(season).7  -0.88168742 -0.08642385  0.748863150 1.00  1629
-#> s(season).8  -1.39258625 -0.64060150  0.263789800 1.00  1459
-#> s(season).9  -1.52862450 -0.74953350  0.383355700 1.00  1001
-#> s(season).10 -1.27417100 -0.40057850  0.764683350 1.00  1316
-#> s(season).11 -0.59974103  0.28615800  1.239020250 1.00  2044
-#> s(season).12  0.05075248  1.17083500  2.034569000 1.00  1568
-#> s(season).13 -0.16826293  1.28988000  2.138907250 1.00  1150
-#> s(season).14 -0.37138412  0.98390450  1.813663500 1.00   943
-#> s(season).15 -0.96946715 -0.12159850  0.499800575 1.00  1117
-#> s(season).16 -1.42660800 -0.80002800 -0.208301525 1.00  2057
-#> s(season).17 -1.60469425 -1.05336000 -0.386262675 1.00  1464
+#>                     2.5%        50%        97.5% Rhat n.eff
+#> (Intercept)   6.79137975  6.8021500  6.813060250 1.00  5835
+#> s(season).1  -1.21310225 -0.6848265  0.007933415 1.01   795
+#> s(season).2  -0.33875902  0.2585940  0.933929175 1.00  1687
+#> s(season).3   0.37890977  1.1085050  1.780403000 1.00  1602
+#> s(season).4   0.79057713  1.7351950  2.449421500 1.01   822
+#> s(season).5   0.95817748  2.0073100  2.763706500 1.01   771
+#> s(season).6   0.26672547  1.1824250  1.923650500 1.00  1035
+#> s(season).7  -0.82938468 -0.0678411  0.696989275 1.00  1627
+#> s(season).8  -1.34704850 -0.6325070  0.225866975 1.00  1413
+#> s(season).9  -1.47981825 -0.7533885  0.315684225 1.00  1023
+#> s(season).10 -1.21779300 -0.4211650  0.658708600 1.00  1173
+#> s(season).11 -0.60858420  0.2570000  1.159796250 1.00  1786
+#> s(season).12  0.08138890  1.1585000  1.979469500 1.01  1150
+#> s(season).13 -0.09381449  1.2803300  2.101127750 1.01   697
+#> s(season).14 -0.33100875  0.9802165  1.796408750 1.01   602
+#> s(season).15 -0.93567278 -0.1239895  0.528814800 1.01   840
+#> s(season).16 -1.41926150 -0.8126590 -0.239660375 1.00  1787
+#> s(season).17 -1.60886300 -1.0628500 -0.398178875 1.00   935
 #> 
 #> GAM smoothing parameter (rho) estimates:
-#>               2.5%      50%    97.5% Rhat n.eff
-#> s(season) 3.308014 4.206365 4.933834    1  2762
+#>               2.5%     50% 97.5% Rhat n.eff
+#> s(season) 3.365781 4.19124 4.922    1  2845
 #> 
 #> Latent trend parameter estimates:
-#>                2.5%        50%     97.5% Rhat n.eff
-#> ar1[1]    0.5499403  0.8970245 1.2497820    1  1257
-#> ar2[1]   -0.6775489 -0.2694540 0.1335424    1  3090
-#> ar3[1]   -0.3455837  0.0499296 0.4038517    1  1338
-#> sigma[1]  0.3664907  0.4614340 0.5957892    1  2661
+#>                2.5%         50%     97.5% Rhat n.eff
+#> ar1[1]    0.5416637  0.89273550 1.2541355 1.01  1158
+#> ar2[1]   -0.6874001 -0.27628350 0.1291174 1.00  3114
+#> ar3[1]   -0.3266922  0.04769725 0.4027873 1.00  1032
+#> sigma[1]  0.3690128  0.45778400 0.5962831 1.00  2109
 #> 
 #> [1] "n_eff / iter looks reasonable for all parameters"
 #> [1] "Rhat looks reasonable for all parameters"
 #> [1] "0 of 4000 iterations ended with a divergence (0%)"
-#> [1] "20 of 4000 iterations saturated the maximum tree depth of 11 (0.5%)"
+#> [1] "56 of 4000 iterations saturated the maximum tree depth of 11 (1.4%)"
 #> [1] "  Run again with max_treedepth set to a larger value to avoid saturation"
 #> [1] "E-FMI indicated no pathological behavior"
 ```
@@ -494,7 +532,7 @@ the entire series (testing and training)
 ``` r
 plot(lynx_mvgam, type = 'forecast', data_test = lynx_test)
 #> Out of sample DRPS:
-#> [1] 703.2443
+#> [1] 665.6868
 #> 
 ```
 
@@ -593,34 +631,34 @@ lynx_mvgam_poor <- mvgam(data_train = lynx_train,
 #> Chain 2 Iteration:    1 / 2000 [  0%]  (Warmup) 
 #> Chain 3 Iteration:    1 / 2000 [  0%]  (Warmup) 
 #> Chain 4 Iteration:    1 / 2000 [  0%]  (Warmup) 
-#> Chain 1 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 4 Iteration:  500 / 2000 [ 25%]  (Warmup) 
-#> Chain 3 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 1 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 2 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 3 Iteration:  500 / 2000 [ 25%]  (Warmup) 
+#> Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 1 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 1 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-#> Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 3 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
-#> Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-#> Chain 2 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 3 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 2 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 2 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 2 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-#> Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-#> Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 1 finished in 7.4 seconds.
-#> Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
 #> Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 2 finished in 7.8 seconds.
-#> Chain 3 finished in 7.7 seconds.
-#> Chain 4 finished in 7.6 seconds.
+#> Chain 4 finished in 7.2 seconds.
+#> Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 1 finished in 7.6 seconds.
+#> Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 3 finished in 7.8 seconds.
+#> Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 2 finished in 8.1 seconds.
 #> 
 #> All 4 chains finished successfully.
-#> Mean chain execution time: 7.6 seconds.
-#> Total execution time: 7.9 seconds.
+#> Mean chain execution time: 7.7 seconds.
+#> Total execution time: 8.3 seconds.
 ```
 
 We choose a set of timepoints within the training data to forecast from,
@@ -642,10 +680,10 @@ markedly better (far lower DRPS) for this evaluation timepoint
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   3.606  16.599 111.630 102.849 148.646 240.145
+#>   3.128  16.787 113.044 104.322 153.197 245.332
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   35.73   41.56  312.86  288.23  455.09  671.61
+#>   32.43   41.85  312.08  293.78  468.14  686.28
 ```
 
 Nominal coverages for both models’ 90% prediction intervals
@@ -664,43 +702,6 @@ extended uses for `mvgam` models, including the ability to fit dynamic
 factor processes for analysing and forecasting sets of multivariate
 discrete time series
 
-## Citing mvgam and related software
-
-When using open source software (or software in general), please make
-sure to appropriately acknowledge the hard work that developers and
-maintainers put into making these packages available. Citations are
-currently the best way to formally acknowledge this work, so we highly
-encourage you to cite any packages that you rely on for your research.
-
-When using `mvgam`, please cite the following publication:
-
--   Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive
-    Models (DGAMs) for forecasting discrete ecological time series.
-    *Methods in Ecology and Evolution*. *In Press*
-
-As `mvgam` acts as an interface to `Stan` and `JAGS`, please
-additionally cite whichever software you use for parameter estimation:
-
--   Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B.,
-    Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017).
-    Stan: A probabilistic programming language. *Journal of Statistical
-    Software*. 76(1). 10.18637/jss.v076.i01
--   Plummer, M. (2013). JAGS: A program for analysis of Bayesian
-    graphical models using Gibbs sampling. *Proceedings of the 3rd
-    international workshop on distributed statistical computing*.
-    124(125.10).
-
-Further, `mvgam` relies on several other `R` packages and, of course, on
-`R` itself. To find out how to cite R and its packages, use the
-`citation` function. There are some features of `mvgam` which
-specifically rely on certain packages. The most important of these is
-the generation of data necessary to estimate smoothing splines, which
-entirely rely on `mgcv`. The `rstan` and `cmdstanr` packages together
-with `Rcpp` makes `Stan` conveniently accessible in `R`, while the
-`rjags` and `runjags` packages together with the `coda` package make
-`JAGS` accessible in `R`. If you use some of these features, please also
-consider citing the related packages.
-
-# License
+## License
 
 This project is licensed under an `MIT` open source license
