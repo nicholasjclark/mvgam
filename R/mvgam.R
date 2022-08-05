@@ -425,7 +425,7 @@ mvgam = function(formula,
                             family = nb(),
                             drop.unused.levels = FALSE,
                             knots = knots,
-                            control = list(nthreads = parallel::detectCores()-1,
+                            control = list(nthreads = min(4, parallel::detectCores()-1),
                                            maxit = 50))
       } else if(family == 'poisson'){
         ss_gam <- mgcv::gam(formula(formula),
@@ -434,7 +434,7 @@ mvgam = function(formula,
                             family = poisson(),
                             drop.unused.levels = FALSE,
                             knots = knots,
-                            control = list(nthreads = parallel::detectCores()-1,
+                            control = list(nthreads = min(4, parallel::detectCores()-1),
                                            maxit = 50))
       } else {
         ss_gam <- mgcv::gam(formula(formula),
@@ -443,7 +443,7 @@ mvgam = function(formula,
                             family = tw(),
                             drop.unused.levels = FALSE,
                             knots = knots,
-                            control = list(nthreads = parallel::detectCores()-1,
+                            control = list(nthreads = min(4, parallel::detectCores()-1),
                                            maxit = 50))
       }
 
@@ -454,7 +454,7 @@ mvgam = function(formula,
                             method = "REML",
                             family = nb(),
                             drop.unused.levels = FALSE,
-                            control = list(nthreads = parallel::detectCores()-1,
+                            control = list(nthreads = min(4, parallel::detectCores()-1),
                                            maxit = 50))
       } else if(family == 'poisson'){
         ss_gam <- mgcv::gam(formula(formula),
@@ -462,7 +462,7 @@ mvgam = function(formula,
                             method = "REML",
                             family = poisson(),
                             drop.unused.levels = FALSE,
-                            control = list(nthreads = parallel::detectCores()-1,
+                            control = list(nthreads = min(4, parallel::detectCores()-1),
                                            maxit = 50))
       } else {
         ss_gam <- mgcv::gam(formula(formula),
@@ -470,7 +470,7 @@ mvgam = function(formula,
                             method = "REML",
                             family = tw(),
                             drop.unused.levels = FALSE,
-                            control = list(nthreads = parallel::detectCores()-1,
+                            control = list(nthreads = min(4, parallel::detectCores()-1),
                                            maxit = 50))
       }
 
@@ -501,7 +501,7 @@ mvgam = function(formula,
                               data = data_train,
                               family = poisson(),
                               drop.unused.levels = FALSE,
-                              control = list(nthreads = parallel::detectCores()-1,
+                              control = list(nthreads = min(4, parallel::detectCores()-1),
                                              maxit = 1))$coefficients)
     xcols_drop <- grep('s(fakery', fakery_names, fixed = TRUE)
     if(!missing(knots)){
