@@ -92,9 +92,28 @@ if(class(data_train)[1] == 'list'){
 if(missing(data_test)){
   # Resids and predictions for only the training period
   series_residuals <- series_residuals[, 1:obs_length]
-  preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]][, 1:obs_length]
+
+  if(object$fit_engine == 'stan'){
+
+    # For stan objects, ypred is stored as a vector in column-major order
+    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
+                                                                    dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+                                                                    by = NCOL(object$ytimes))][, 1:obs_length]
+  } else {
+    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]][, 1:obs_length]
+  }
+
 } else {
-  preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+
+  if(object$fit_engine == 'stan'){
+
+    # For stan objects, ypred is stored as a vector in column-major order
+    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
+                                                                    dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+                                                                    by = NCOL(object$ytimes))]
+  } else {
+    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+  }
 
   # Add variables to data_test if missing
   s_name <- levels(data_train$series)[series]
