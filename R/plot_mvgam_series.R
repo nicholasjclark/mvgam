@@ -280,7 +280,6 @@ plot_mvgam_series = function(object, data_train, data_test,
       box(bty = 'L', lwd = 2)
     }
 
-    layout(1)
   }
-
+  layout(1)
 }

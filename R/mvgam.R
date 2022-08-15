@@ -270,7 +270,8 @@ mvgam = function(formula,
                  jags_path){
 
   # Check arguments
-  trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1", "AR2", "AR3", "GP"))
+  trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1",
+                                                          "AR2", "AR3", "GP"))
   if(class(family) == 'family'){
     family <- family$family
   }
