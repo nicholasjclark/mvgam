@@ -595,7 +595,7 @@ mvgam = function(formula,
 
     beta_sims <- rmvn(1000, coef(ss_gam), ss_gam$Vp)
     ss_jagam$jags.data$p_taus <- apply(as.matrix(beta_sims[,1:n_terms]),
-                                       2, function(x) 1 / sd(x))
+                                       2, function(x) 0.7 / sd(x))
 
     base_model[grep('Parametric effect priors',
                       base_model) + 1] <- paste0('  for (i in 1:',

@@ -151,6 +151,16 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
     lv_data <- NULL
   }
 
+  # shared smoothing parameter lines
+  if('L' %in% names(jags_data)){
+    lambda_links <- paste0('matrix[',
+                           NROW(jags_data$L),',',
+                           NCOL(jags_data$L),'] lambda_links; // smooth parameter linking matrix\n',
+                           'int<lower=0> n_raw_sp; // number of raw smoothing parameters to estimate\n')
+  } else {
+    lambda_links <- NULL
+  }
+
   # Search for any non-contiguous indices that sometimes are used by mgcv
   if(any(grep('in c\\(', jags_file))){
     add_idxs <- TRUE
@@ -186,6 +196,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                                                'int<lower=0> n; // number of timepoints per series\n',
                                                lv_data,
                                                n_sp_data,
+                                               lambda_links,
                                                'int<lower=0> n_series; // number of series\n',
                                                'int<lower=0> num_basis; // total number of basis coefficients\n',
                                                p_terms,
@@ -207,6 +218,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                                                'int<lower=0> n; // number of timepoints per series\n',
                                                lv_data,
                                                n_sp_data,
+                                               lambda_links,
                                                'int<lower=0> n_series; // number of series\n',
                                                'int<lower=0> num_basis; // total number of basis coefficients\n',
                                                zero_data,
@@ -371,6 +383,25 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
       stan_file <- readLines(textConnection(stan_file), n = -1)
     }
 
+    # Check for shared smoothing parameters and link them accordingly
+    if('L' %in% names(jags_data)){
+      stan_file[grep('lambda ~ exponential', stan_file,
+                     fixed = TRUE)] <- "lambda_raw ~ exponential(0.05);"
+
+      stan_file[grep("vector<lower=0.0005>[n_sp] lambda;", stan_file,
+                     fixed = TRUE)] <- "vector<lower=0.0005>[n_raw_sp] lambda_raw;"
+
+      stan_file[grep('// GAM contribution to expectations',
+                     stan_file, fixed = TRUE)] <-
+        "// GAM contribution to expectations (log scale)\n// linked smoothing parameters\nvector[n_sp] lambda;\n"
+
+      stan_file[grep('model {',
+                     stan_file, fixed = TRUE) - 2] <-
+        'lambda = to_vector(lambda_links * lambda_raw);\n}\n'
+
+      stan_file <- readLines(textConnection(stan_file), n = -1)
+    }
+
   } else {
     ## No smooths included
     stan_file <- stan_file[-grep('// priors for smoothing parameters', stan_file,
@@ -444,10 +475,18 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
   stan_data$num_basis <- NROW(stan_data$X)
 
   if(any(grepl('// priors for smoothing parameters', stan_file, fixed = TRUE))){
-    stan_data$n_sp <- as.numeric(sub('\\) \\{', '',
-                                     sub('for \\(i in 1\\:', '',
-                                         jags_file[grep('lambda\\[i\\] ~ ',
-                                                        trimws(jags_file)) - 1])))
+    if('L' %in% names(jags_data)){
+      stan_data$lambda_links <- jags_data$L
+      stan_data$L <- NULL
+      stan_data$n_raw_sp <- NCOL(stan_data$lambda_links)
+      stan_data$n_sp <- NROW(stan_data$lambda_links)
+
+    } else {
+      stan_data$n_sp <- as.numeric(sub('\\) \\{', '',
+                                       sub('for \\(i in 1\\:', '',
+                                           jags_file[grep('lambda\\[i\\] ~ ',
+                                                          trimws(jags_file)) - 1])))
+    }
   }
 
   # Add discontiguous index values if required
