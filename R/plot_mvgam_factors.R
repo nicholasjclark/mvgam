@@ -22,12 +22,6 @@ plot_mvgam_factors = function(object, plot = TRUE){
     stop('argument "object" must be of class "mvgam"')
   }
 
-  # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
-  }
-
   # Check object has latent dynamic factors
   if(!object$use_lv){
     stop('No latent factors used in object')
@@ -62,10 +56,16 @@ plot_mvgam_factors = function(object, plot = TRUE){
 
   # Loop across each lv and calculate probability that the lv was dropped
   lv_estimates <- do.call(rbind, lapply(1:object$n_lv, function(x){
-    preds <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[x]:ends[x]]
+
+    if(object$fit_engine == 'stan'){
+      inds_lv <- seq(x, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2], by = object$n_lv)
+      preds <- MCMCvis::MCMCchains(object$model_output, 'LV')[,inds_lv]
+    } else {
+      preds <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[x]:ends[x]]
+    }
 
     # Keep only the in-sample observations for testing against the null of white noise
-    preds <- preds[,1:(NROW(object$obs_data) / NCOL(object$ytimes))]
+    preds <- preds[,1:(length(object$obs_data$y) / NCOL(object$ytimes))]
 
     cred <- sapply(1:NCOL(preds),
                    function(n) quantile(preds[,n],
@@ -73,7 +73,7 @@ plot_mvgam_factors = function(object, plot = TRUE){
     # If plot = TRUE, plot the LVs
     if(plot){
       preds_last <- preds[1,]
-      ylim <- c(min(cred) - 1, max(cred) + 1)
+      ylim <- range(cred)
       ylab <- paste0('Factor ', x)
       pred_vals <- seq(1:length(preds_last))
       plot(1, type = "n", bty = 'L',
