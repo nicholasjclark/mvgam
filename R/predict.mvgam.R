@@ -45,6 +45,24 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
 
   s_name <- levels(object$obs_data$series)[series]
 
+  # Filter the data so that only observations for the specified series are used
+  pred_inds <- which(newdata$series == s_name)
+
+  if(class(newdata)[1] == 'list'){
+    dat_names <- names(newdata)
+    newdata <- lapply(seq_along(newdata), function(x){
+      if(is.matrix(newdata[[x]])){
+        newdata[[x]][pred_inds,]
+      } else {
+        newdata[[x]][pred_inds]
+      }
+    })
+  } else {
+    newdata <- newdata[pred_inds, ] %>%
+      dplyr::arrange(time)
+  }
+  names(newdata) <- dat_names
+
   suppressWarnings(Xp  <- try(predict(object$mgcv_model,
                                       newdata = newdata,
                                       type = 'lpmatrix'),

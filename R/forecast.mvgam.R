@@ -53,16 +53,6 @@ forecast.mvgam = function(object, data_test, series = 1,
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
   ends <- ends[-1]
 
-  if(object$fit_engine == 'stan'){
-
-    # For stan objects, ypred is stored as a vector in column-major order
-    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
-                                                                    dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
-                                                                    by = NCOL(object$ytimes))]
-  } else {
-    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
-  }
-
   # Add variables to data_test if missing
   s_name <- levels(data_train$series)[series]
   if(!missing(data_test)){
@@ -73,7 +63,7 @@ forecast.mvgam = function(object, data_test, series = 1,
 
     if(class(data_test)[1] == 'list'){
       if(!'time' %in% names(data_test)){
-        stop('data_train does not contain a "time" column')
+        stop('data_test does not contain a "time" column')
       }
 
       if(!'series' %in% names(data_test)){
@@ -82,7 +72,7 @@ forecast.mvgam = function(object, data_test, series = 1,
 
     } else {
       if(!'time' %in% colnames(data_test)){
-        stop('data_train does not contain a "time" column')
+        stop('data_test does not contain a "time" column')
       }
 
       if(!'series' %in% colnames(data_test)){
@@ -391,7 +381,6 @@ forecast.mvgam = function(object, data_test, series = 1,
       # Sample lv loadings
       lv_coefs <- lv_coefs[[series]][samp_index,]
 
-
       # Sample beta coefs
       betas <- betas[samp_index, ]
 
@@ -425,7 +414,8 @@ forecast.mvgam = function(object, data_test, series = 1,
         }
 
         if(family == 'Poisson'){
-          out <- rpois(NROW(series_test), lambda = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)))
+          out <- rpois(NROW(series_test),
+                       lambda = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)))
         }
 
         if(family == 'Tweedie'){

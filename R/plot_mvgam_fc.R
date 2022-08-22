@@ -88,7 +88,7 @@ plot_mvgam_fc = function(object, series = 1, data_test,
 
     if(class(data_test)[1] == 'list'){
       if(!'time' %in% names(data_test)){
-        stop('data_train does not contain a "time" column')
+        stop('data_test does not contain a "time" column')
       }
 
       if(!'series' %in% names(data_test)){
@@ -97,7 +97,7 @@ plot_mvgam_fc = function(object, series = 1, data_test,
 
     } else {
       if(!'time' %in% colnames(data_test)){
-        stop('data_train does not contain a "time" column')
+        stop('data_test does not contain a "time" column')
       }
 
       if(!'series' %in% colnames(data_test)){

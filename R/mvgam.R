@@ -1290,7 +1290,7 @@ mvgam = function(formula,
                               iter_warmup = burnin)
 
         # Convert model files to stan_fit class for consistency
-        stanfit <- rstan::read_stan_csv(fit1$output_files())
+        stanfit <- rstan::read_stan_csv(fit1$output_files(), col_major = TRUE)
         stanfit@sim$samples <- lapply(seq_along(stanfit@sim$samples), function(x){
           samps <- as.list(stanfit@sim$samples[[1]])
           names(samps) <- row.names(rstan::summary(stanfit)$summary)
@@ -1419,15 +1419,19 @@ mvgam = function(formula,
   unlink(fil)
 
   # Get Dunn-Smyth Residual distributions for each series
-  series_resids <- get_mvgam_resids(object = list(
-    model_output = out_gam_mod,
-    fit_engine = fit_engine,
-    family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
-                              family == 'poisson' ~ 'Poisson',
-                              TRUE ~ 'Negative Binomial'),
-    obs_data = data_train,
-    ytimes = ytimes),
-    n_cores = min(c(chains, parallel::detectCores() - 1)))
+  if(prior_simulation){
+    series_resids <- NULL
+  } else {
+    series_resids <- get_mvgam_resids(object = list(
+      model_output = out_gam_mod,
+      fit_engine = fit_engine,
+      family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
+                                family == 'poisson' ~ 'Poisson',
+                                TRUE ~ 'Negative Binomial'),
+      obs_data = data_train,
+      ytimes = ytimes),
+      n_cores = min(c(chains, parallel::detectCores() - 1)))
+  }
 
   # Create a jam object and get smooth penalty names in more interpretable format
   ## Modified sim2jam function; takes simulation output
