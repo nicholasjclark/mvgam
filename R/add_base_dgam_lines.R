@@ -29,7 +29,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
     vector[M] L;
 
     // smoothing parameters
-    vector<lower=0.0005>[n_sp] lambda;
+    vector<lower=0>[n_sp] lambda;
     }
 
     transformed parameters {
@@ -127,7 +127,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
     matrix[n, n_series] trend;
 
     // smoothing parameters
-    vector<lower=0.0005>[n_sp] lambda;
+    vector<lower=0>[n_sp] lambda;
     }
 
     transformed parameters {
