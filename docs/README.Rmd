@@ -103,8 +103,8 @@ lynx_mvgam <- mvgam(data_train = lynx_train,
 ```
 
 Inspect the resulting model file, which is written in the `Stan` probabilistic programming language
-```{r}
-lynx_mvgam$model_file
+```{r, results = 'asis'}
+cat(c("```stan", lynx_mvgam$model_file, "```"), sep = "\n")
 ```
 
 Perform a series of posterior predictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine histograms for posterior predictions (`yhat`) and compare to the histogram of the observations (`y`)

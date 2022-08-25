@@ -21,12 +21,12 @@ A number of case studies have been compiled to highlight how DGAMs can
 be estimated using MCMC sampling. These are hosted currently on `RPubs`
 at the following links:
 
--   [mvgam case study 1: model comparison and data
-    assimilation](https://rpubs.com/NickClark47/mvgam)
--   [mvgam case study 2: multivariate
-    models](https://rpubs.com/NickClark47/mvgam2)
--   [mvgam case study 3: distributed lag
-    models](https://rpubs.com/NickClark47/mvgam3)
+- [mvgam case study 1: model comparison and data
+  assimilation](https://rpubs.com/NickClark47/mvgam)
+- [mvgam case study 2: multivariate
+  models](https://rpubs.com/NickClark47/mvgam2)
+- [mvgam case study 3: distributed lag
+  models](https://rpubs.com/NickClark47/mvgam3)
 
 The package can also be used to generate all necessary data structures,
 initial value functions and modelling code necessary to fit DGAMs using
@@ -34,8 +34,8 @@ initial value functions and modelling code necessary to fit DGAMs using
 the model to better suit their own bespoke research / analysis goals.
 The following resources can be helpful to troubleshoot:
 
--   [Stan Discourse](https://discourse.mc-stan.org/)
--   [JAGS Discourse](https://sourceforge.net/projects/mcmc-jags/)
+- [Stan Discourse](https://discourse.mc-stan.org/)
+- [JAGS Discourse](https://sourceforge.net/projects/mcmc-jags/)
 
 ## Installation
 
@@ -61,21 +61,20 @@ encourage you to cite any packages that you rely on for your research.
 
 When using `mvgam`, please cite the following publication:
 
--   Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive
-    Models (DGAMs) for forecasting discrete ecological time series.
-    *Methods in Ecology and Evolution*. *In Press*
+- Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models
+  (DGAMs) for forecasting discrete ecological time series. *Methods in
+  Ecology and Evolution*. *In Press*
 
 As `mvgam` acts as an interface to `Stan` and `JAGS`, please
 additionally cite whichever software you use for parameter estimation:
 
--   Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B.,
-    Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017).
-    Stan: A probabilistic programming language. *Journal of Statistical
-    Software*. 76(1). 10.18637/jss.v076.i01
--   Plummer, M. (2013). JAGS: A program for analysis of Bayesian
-    graphical models using Gibbs sampling. *Proceedings of the 3rd
-    International Workshop on Distributed Statistical Computing*.
-    124(125.10).
+- Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B.,
+  Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017).
+  Stan: A probabilistic programming language. *Journal of Statistical
+  Software*. 76(1). 10.18637/jss.v076.i01
+- Plummer, M. (2013). JAGS: A program for analysis of Bayesian graphical
+  models using Gibbs sampling. *Proceedings of the 3rd International
+  Workshop on Distributed Statistical Computing*. 124(125.10).
 
 Further, `mvgam` relies on several other `R` packages and, of course, on
 `R` itself. To find out how to cite R and its packages, use the
@@ -98,11 +97,6 @@ well as its estimated autocorrelation function
 
 ``` r
 library(mvgam)
-#> Loading required package: mgcv
-#> Loading required package: nlme
-#> This is mgcv 1.8-33. For overview type 'help("mgcv-package")'.
-#> Loading required package: parallel
-#> Welcome to mvgam. Please cite as: Clark, NJ, and Wells, K. 2022. Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. Methods in Ecology and Evolution IN PRESS
 data(lynx)
 lynx_full = data.frame(year = 1821:1934, 
                        population = as.numeric(lynx))
@@ -191,156 +185,158 @@ lynx_mvgam <- mvgam(data_train = lynx_train,
 #> Chain 2 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 1 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 4 Iteration:  500 / 2000 [ 25%]  (Warmup) 
-#> Chain 3 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
-#> Chain 3 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 2 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 2 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-#> Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
-#> Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 3 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 1 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 1 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 2 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-#> Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 4 finished in 40.6 seconds.
-#> Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 2 finished in 41.0 seconds.
-#> Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 3 finished in 42.6 seconds.
+#> Chain 4 finished in 39.1 seconds.
 #> Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 1 finished in 44.1 seconds.
+#> Chain 1 finished in 40.2 seconds.
+#> Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 2 finished in 40.3 seconds.
+#> Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 3 finished in 41.0 seconds.
 #> 
 #> All 4 chains finished successfully.
-#> Mean chain execution time: 42.1 seconds.
-#> Total execution time: 44.3 seconds.
+#> Mean chain execution time: 40.1 seconds.
+#> Total execution time: 41.2 seconds.
 ```
 
 Inspect the resulting model file, which is written in the `Stan`
 probabilistic programming language
 
 ``` r
-lynx_mvgam$model_file
-#>   [1] ""                                                                                                                     
-#>   [2] "//Stan model code generated by package mvgam"                                                                         
-#>   [3] "data {"                                                                                                               
-#>   [4] "int<lower=0> total_obs; // total number of observations"                                                              
-#>   [5] "int<lower=0> n; // number of timepoints per series"                                                                   
-#>   [6] "int<lower=0> n_sp; // number of smoothing parameters"                                                                 
-#>   [7] "int<lower=0> n_series; // number of series"                                                                           
-#>   [8] "int<lower=0> num_basis; // total number of basis coefficients"                                                        
-#>   [9] "vector[num_basis] zero; // prior locations for basis coefficients"                                                    
-#>  [10] "real p_taus[1]; // prior precisions for parametric coefficients"                                                      
-#>  [11] "real p_coefs[1]; // prior locations for parametric coefficients"                                                      
-#>  [12] "matrix[num_basis, total_obs] X; // transposed mgcv GAM design matrix"                                                 
-#>  [13] "int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)"
-#>  [14] "matrix[17,17] S1; // mgcv smooth penalty matrix S1"                                                                   
-#>  [15] "int<lower=0, upper=1> y_observed[n, n_series]; // indices of missing vs observed"                                     
-#>  [16] "int<lower=-1> y[n, n_series]; // time-ordered observations, with -1 indicating missing"                               
-#>  [17] "}"                                                                                                                    
-#>  [18] ""                                                                                                                     
-#>  [19] "parameters {"                                                                                                         
-#>  [20] "// raw basis coefficients"                                                                                            
-#>  [21] "row_vector[num_basis] b_raw;"                                                                                         
-#>  [22] ""                                                                                                                     
-#>  [23] "// latent trend AR1 terms"                                                                                            
-#>  [24] "vector<lower=-1.5,upper=1.5>[n_series] ar1;"                                                                          
-#>  [25] ""                                                                                                                     
-#>  [26] "// latent trend AR2 terms"                                                                                            
-#>  [27] "vector<lower=-1.5,upper=1.5>[n_series] ar2;"                                                                          
-#>  [28] ""                                                                                                                     
-#>  [29] "// latent trend AR3 terms"                                                                                            
-#>  [30] "vector<lower=-1.5,upper=1.5>[n_series] ar3;"                                                                          
-#>  [31] ""                                                                                                                     
-#>  [32] "// latent trend variance parameters"                                                                                  
-#>  [33] "vector<lower=0.05,upper=5>[n_series] sigma;"                                                                          
-#>  [34] ""                                                                                                                     
-#>  [35] "// latent trends"                                                                                                     
-#>  [36] "matrix[n, n_series] trend;"                                                                                           
-#>  [37] ""                                                                                                                     
-#>  [38] "// smoothing parameters"                                                                                              
-#>  [39] "vector<lower=0.0005>[n_sp] lambda;"                                                                                   
-#>  [40] "}"                                                                                                                    
-#>  [41] ""                                                                                                                     
-#>  [42] "transformed parameters {"                                                                                             
-#>  [43] "// GAM contribution to expectations (log scale)"                                                                      
-#>  [44] "vector[total_obs] eta;"                                                                                               
-#>  [45] ""                                                                                                                     
-#>  [46] "// basis coefficients"                                                                                                
-#>  [47] "row_vector[num_basis] b;"                                                                                             
-#>  [48] ""                                                                                                                     
-#>  [49] "for (i in 1:num_basis) {"                                                                                             
-#>  [50] "b[i] = b_raw[i];"                                                                                                     
-#>  [51] "}"                                                                                                                    
-#>  [52] "eta = to_vector(b * X);"                                                                                              
-#>  [53] "}"                                                                                                                    
-#>  [54] ""                                                                                                                     
-#>  [55] "model {"                                                                                                              
-#>  [56] "// parametric effect priors (regularised for identifiability)"                                                        
-#>  [57] "for (i in 1:1) {"                                                                                                     
-#>  [58] "b_raw[i] ~ normal(p_coefs[i], 1 / p_taus[i]);"                                                                        
-#>  [59] "}"                                                                                                                    
-#>  [60] ""                                                                                                                     
-#>  [61] "// prior for s(season)..."                                                                                            
-#>  [62] "b_raw[2:18] ~ multi_normal_prec(zero[2:18],S1[1:17,1:17] * lambda[1]);"                                               
-#>  [63] ""                                                                                                                     
-#>  [64] "// priors for AR parameters"                                                                                          
-#>  [65] "ar1 ~ normal(0, 0.5);"                                                                                                
-#>  [66] "ar2 ~ normal(0, 0.5);"                                                                                                
-#>  [67] "ar3 ~ normal(0, 0.5);"                                                                                                
-#>  [68] ""                                                                                                                     
-#>  [69] "// priors for smoothing parameters"                                                                                   
-#>  [70] "lambda ~ exponential(0.05);"                                                                                          
-#>  [71] ""                                                                                                                     
-#>  [72] "// priors for latent trend variance parameters"                                                                       
-#>  [73] "sigma ~ exponential(1);"                                                                                              
-#>  [74] ""                                                                                                                     
-#>  [75] "// trend estimates"                                                                                                   
-#>  [76] "for (s in 1:n_series) {"                                                                                              
-#>  [77] "trend[1, s] ~ normal(0, sigma[s]);"                                                                                   
-#>  [78] "}"                                                                                                                    
-#>  [79] ""                                                                                                                     
-#>  [80] "for (s in 1:n_series) {"                                                                                              
-#>  [81] "trend[2, s] ~ normal(trend[1, s] * ar1[s], sigma[s]);"                                                                
-#>  [82] "}"                                                                                                                    
-#>  [83] ""                                                                                                                     
-#>  [84] "for (s in 1:n_series) {"                                                                                              
-#>  [85] "trend[3, s] ~ normal(trend[2, s] * ar1[s] + trend[1, s] * ar2[s], sigma[s]);"                                         
-#>  [86] "}"                                                                                                                    
-#>  [87] ""                                                                                                                     
-#>  [88] "for (i in 4:n) {"                                                                                                     
-#>  [89] "for (s in 1:n_series) {"                                                                                              
-#>  [90] "trend[i, s] ~ normal(ar1[s] * trend[i - 1, s] + ar2[s] * trend[i - 2, s] + ar3[s] * trend[i - 3, s], sigma[s]);"      
-#>  [91] "}"                                                                                                                    
-#>  [92] "}"                                                                                                                    
-#>  [93] ""                                                                                                                     
-#>  [94] "// likelihood functions"                                                                                              
-#>  [95] "for (i in 1:n) {"                                                                                                     
-#>  [96] "for (s in 1:n_series) {"                                                                                              
-#>  [97] "if (y_observed[i, s])"                                                                                                
-#>  [98] "y[i, s] ~ poisson_log(eta[ytimes[i, s]] + trend[i, s]);"                                                              
-#>  [99] "}"                                                                                                                    
-#> [100] "}"                                                                                                                    
-#> [101] "}"                                                                                                                    
-#> [102] ""                                                                                                                     
-#> [103] "generated quantities {"                                                                                               
-#> [104] "vector[n_sp] rho;"                                                                                                    
-#> [105] "vector[n_series] tau;"                                                                                                
-#> [106] "matrix[n, n_series] ypred;"                                                                                           
-#> [107] "rho = log(lambda);"                                                                                                   
-#> [108] "for (s in 1:n_series) {"                                                                                              
-#> [109] "tau[s] = pow(sigma[s], -2.0);"                                                                                        
-#> [110] "}"                                                                                                                    
-#> [111] ""                                                                                                                     
-#> [112] "// posterior predictions"                                                                                             
-#> [113] "for(i in 1:n){"                                                                                                       
-#> [114] "for(s in 1:n_series){"                                                                                                
-#> [115] "ypred[i, s] = poisson_log_rng(eta[ytimes[i, s]] + trend[i, s]);"                                                      
-#> [116] "}"                                                                                                                    
-#> [117] "}"                                                                                                                    
-#> [118] "}"                                                                                                                    
-#> [119] ""
+cat(c("```stan", lynx_mvgam$model_file, "```"), sep = "\n")
+```
+
+``` stan
+
+//Stan model code generated by package mvgam
+data {
+int<lower=0> total_obs; // total number of observations
+int<lower=0> n; // number of timepoints per series
+int<lower=0> n_sp; // number of smoothing parameters
+int<lower=0> n_series; // number of series
+int<lower=0> num_basis; // total number of basis coefficients
+vector[num_basis] zero; // prior locations for basis coefficients
+real p_taus[1]; // prior precisions for parametric coefficients
+real p_coefs[1]; // prior locations for parametric coefficients
+matrix[num_basis, total_obs] X; // transposed mgcv GAM design matrix
+int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)
+matrix[17,17] S1; // mgcv smooth penalty matrix S1
+int<lower=0, upper=1> y_observed[n, n_series]; // indices of missing vs observed
+int<lower=-1> y[n, n_series]; // time-ordered observations, with -1 indicating missing
+}
+
+parameters {
+// raw basis coefficients
+row_vector[num_basis] b_raw;
+
+// latent trend AR1 terms
+vector<lower=-1.5,upper=1.5>[n_series] ar1;
+
+// latent trend AR2 terms
+vector<lower=-1.5,upper=1.5>[n_series] ar2;
+
+// latent trend AR3 terms
+vector<lower=-1.5,upper=1.5>[n_series] ar3;
+
+// latent trend variance parameters
+vector<lower=0.05,upper=5>[n_series] sigma;
+
+// latent trends
+matrix[n, n_series] trend;
+
+// smoothing parameters
+vector<lower=0>[n_sp] lambda;
+}
+
+transformed parameters {
+// GAM contribution to expectations (log scale)
+vector[total_obs] eta;
+
+// basis coefficients
+row_vector[num_basis] b;
+
+for (i in 1:num_basis) {
+b[i] = b_raw[i];
+}
+eta = to_vector(b * X);
+}
+
+model {
+// parametric effect priors (regularised for identifiability)
+for (i in 1:1) {
+b_raw[i] ~ normal(p_coefs[i], 1 / p_taus[i]);
+}
+
+// prior for s(season)...
+b_raw[2:18] ~ multi_normal_prec(zero[2:18],S1[1:17,1:17] * lambda[1]);
+
+// priors for AR parameters
+ar1 ~ normal(0, 0.5);
+ar2 ~ normal(0, 0.5);
+ar3 ~ normal(0, 0.5);
+
+// priors for smoothing parameters
+lambda ~ exponential(0.05);
+
+// priors for latent trend variance parameters
+sigma ~ exponential(1);
+
+// trend estimates
+for (s in 1:n_series) {
+trend[1, s] ~ normal(0, sigma[s]);
+}
+
+for (s in 1:n_series) {
+trend[2, s] ~ normal(trend[1, s] * ar1[s], sigma[s]);
+}
+
+for (s in 1:n_series) {
+trend[3, s] ~ normal(trend[2, s] * ar1[s] + trend[1, s] * ar2[s], sigma[s]);
+}
+
+for (i in 4:n) {
+for (s in 1:n_series) {
+trend[i, s] ~ normal(ar1[s] * trend[i - 1, s] + ar2[s] * trend[i - 2, s] + ar3[s] * trend[i - 3, s], sigma[s]);
+}
+}
+
+// likelihood functions
+for (i in 1:n) {
+for (s in 1:n_series) {
+if (y_observed[i, s])
+y[i, s] ~ poisson_log(eta[ytimes[i, s]] + trend[i, s]);
+}
+}
+}
+
+generated quantities {
+vector[n_sp] rho;
+vector[n_series] tau;
+matrix[n, n_series] ypred;
+rho = log(lambda);
+for (s in 1:n_series) {
+tau[s] = pow(sigma[s], -2.0);
+}
+
+// posterior predictions
+for(i in 1:n){
+for(s in 1:n_series){
+ypred[i, s] = poisson_log_rng(eta[ytimes[i, s]] + trend[i, s]);
+}
+}
+}
 ```
 
 Perform a series of posterior predictive checks to see if the model is
@@ -434,47 +430,42 @@ summary(lynx_mvgam)
 #> Status:
 #> Fitted using Stan
 #> 
-#> GAM smooth term estimated degrees of freedom:
-#>             edf df
-#> s(season) 10159 17
-#> 
 #> GAM coefficient (beta) estimates:
-#>                     2.5%        50%        97.5% Rhat n.eff
-#> (Intercept)   6.79137975  6.8021500  6.813060250 1.00  5835
-#> s(season).1  -1.21310225 -0.6848265  0.007933415 1.01   795
-#> s(season).2  -0.33875902  0.2585940  0.933929175 1.00  1687
-#> s(season).3   0.37890977  1.1085050  1.780403000 1.00  1602
-#> s(season).4   0.79057713  1.7351950  2.449421500 1.01   822
-#> s(season).5   0.95817748  2.0073100  2.763706500 1.01   771
-#> s(season).6   0.26672547  1.1824250  1.923650500 1.00  1035
-#> s(season).7  -0.82938468 -0.0678411  0.696989275 1.00  1627
-#> s(season).8  -1.34704850 -0.6325070  0.225866975 1.00  1413
-#> s(season).9  -1.47981825 -0.7533885  0.315684225 1.00  1023
-#> s(season).10 -1.21779300 -0.4211650  0.658708600 1.00  1173
-#> s(season).11 -0.60858420  0.2570000  1.159796250 1.00  1786
-#> s(season).12  0.08138890  1.1585000  1.979469500 1.01  1150
-#> s(season).13 -0.09381449  1.2803300  2.101127750 1.01   697
-#> s(season).14 -0.33100875  0.9802165  1.796408750 1.01   602
-#> s(season).15 -0.93567278 -0.1239895  0.528814800 1.01   840
-#> s(season).16 -1.41926150 -0.8126590 -0.239660375 1.00  1787
-#> s(season).17 -1.60886300 -1.0628500 -0.398178875 1.00   935
+#>                    2.5%        50%       97.5% Rhat n.eff
+#> (Intercept)   6.7847172  6.8019650  6.81853025 1.00  5995
+#> s(season).1  -1.1931685 -0.6753465  0.06160255 1.00  1127
+#> s(season).2  -0.3503541  0.2563230  0.98173883 1.00  1900
+#> s(season).3   0.3049028  1.0984300  1.79329400 1.00  1746
+#> s(season).4   0.6415440  1.7205300  2.42829650 1.00  1070
+#> s(season).5   0.8288639  1.9804600  2.72707000 1.00  1041
+#> s(season).6   0.1761299  1.1585300  1.91562600 1.00  1293
+#> s(season).7  -0.9246409 -0.0977666  0.71098763 1.00  1700
+#> s(season).8  -1.4012007 -0.6300050  0.25118925 1.00  1487
+#> s(season).9  -1.5040042 -0.7400695  0.36457035 1.01  1151
+#> s(season).10 -1.2027393 -0.3883940  0.68614583 1.00  1311
+#> s(season).11 -0.5867134  0.2584650  1.17237575 1.00  1955
+#> s(season).12  0.0374231  1.1505150  2.00861700 1.00  1159
+#> s(season).13 -0.2163205  1.2619950  2.15339775 1.00   872
+#> s(season).14 -0.4009086  0.9733245  1.83032950 1.01   832
+#> s(season).15 -0.9661038 -0.1300905  0.51815713 1.00  1069
+#> s(season).16 -1.4247428 -0.8007880 -0.21897797 1.00  1910
+#> s(season).17 -1.5603102 -1.0403900 -0.35109880 1.00  1203
 #> 
 #> GAM smoothing parameter (rho) estimates:
-#>               2.5%     50% 97.5% Rhat n.eff
-#> s(season) 3.365781 4.19124 4.922    1  2845
+#>               2.5%      50%    97.5% Rhat n.eff
+#> s(season) 3.354857 4.185815 4.932806    1  2733
 #> 
 #> Latent trend parameter estimates:
-#>                2.5%         50%     97.5% Rhat n.eff
-#> ar1[1]    0.5416637  0.89273550 1.2541355 1.01  1158
-#> ar2[1]   -0.6874001 -0.27628350 0.1291174 1.00  3114
-#> ar3[1]   -0.3266922  0.04769725 0.4027873 1.00  1032
-#> sigma[1]  0.3690128  0.45778400 0.5962831 1.00  2109
+#>                2.5%        50%     97.5% Rhat n.eff
+#> ar1[1]    0.5509472  0.8986910 1.2522383    1  1196
+#> ar2[1]   -0.6851573 -0.2767420 0.1177708    1  2868
+#> ar3[1]   -0.3576823  0.0466283 0.4088621    1  1140
+#> sigma[1]  0.3685893  0.4621530 0.5979138    1  1806
 #> 
 #> [1] "n_eff / iter looks reasonable for all parameters"
 #> [1] "Rhat looks reasonable for all parameters"
 #> [1] "0 of 4000 iterations ended with a divergence (0%)"
-#> [1] "56 of 4000 iterations saturated the maximum tree depth of 11 (1.4%)"
-#> [1] "  Run again with max_treedepth set to a larger value to avoid saturation"
+#> [1] "0 of 4000 iterations saturated the maximum tree depth of 12 (0%)"
 #> [1] "E-FMI indicated no pathological behavior"
 ```
 
@@ -532,7 +523,7 @@ the entire series (testing and training)
 ``` r
 plot(lynx_mvgam, type = 'forecast', data_test = lynx_test)
 #> Out of sample DRPS:
-#> [1] 665.6868
+#> [1] 686.9317
 #> 
 ```
 
@@ -637,28 +628,28 @@ lynx_mvgam_poor <- mvgam(data_train = lynx_train,
 #> Chain 3 Iteration:  500 / 2000 [ 25%]  (Warmup) 
 #> Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+#> Chain 2 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+#> Chain 2 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 1 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 1 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 3 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
 #> Chain 3 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-#> Chain 2 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
-#> Chain 2 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
 #> Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-#> Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-#> Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 2 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+#> Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
 #> Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 4 finished in 7.2 seconds.
-#> Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 1 finished in 7.6 seconds.
+#> Chain 4 finished in 6.0 seconds.
 #> Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 3 finished in 7.8 seconds.
+#> Chain 3 finished in 6.4 seconds.
 #> Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
-#> Chain 2 finished in 8.1 seconds.
+#> Chain 2 finished in 6.6 seconds.
+#> Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
+#> Chain 1 finished in 7.0 seconds.
 #> 
 #> All 4 chains finished successfully.
-#> Mean chain execution time: 7.7 seconds.
-#> Total execution time: 8.3 seconds.
+#> Mean chain execution time: 6.5 seconds.
+#> Total execution time: 7.1 seconds.
 ```
 
 We choose a set of timepoints within the training data to forecast from,
@@ -680,10 +671,10 @@ markedly better (far lower DRPS) for this evaluation timepoint
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   3.128  16.787 113.044 104.322 153.197 245.332
+#>   4.255  16.591 117.410 105.254 153.657 241.936
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   32.43   41.85  312.08  293.78  468.14  686.28
+#>   35.34   42.37  309.70  288.71  453.04  675.05
 ```
 
 Nominal coverages for both models’ 90% prediction intervals
