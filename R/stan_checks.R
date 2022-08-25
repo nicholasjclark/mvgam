@@ -87,18 +87,17 @@ check_n_eff <- function(fit, quiet=FALSE) {
 
   no_warning <- TRUE
   for (n in 1:N) {
-    if (is.nan(fit_summary[,'n_eff'][n])) {
-      if (!quiet) print(sprintf('n_eff for parameter %s is NaN!',
-                                rownames(fit_summary)[n]))
-      no_warning <- FALSE
+    if(is.nan(fit_summary[,'n_eff'][n])){
+      ratio <- 1
     } else {
       ratio <- fit_summary[,'n_eff'][n] / iter
-      if (ratio < 0.001) {
-        if (!quiet) print(sprintf('n_eff / iter for parameter %s is %s!',
-                                  rownames(fit_summary)[n], ratio))
-        no_warning <- FALSE
-      }
     }
+    if (ratio < 0.001) {
+      if (!quiet) print(sprintf('n_eff / iter for parameter %s is %s!',
+                                rownames(fit_summary)[n], ratio))
+      no_warning <- FALSE
+    }
+
   }
   if (no_warning) {
     if (!quiet) print('n_eff / iter looks reasonable for all parameters')
@@ -128,7 +127,10 @@ check_rhat <- function(fit, quiet=FALSE) {
   no_warning <- TRUE
   for (n in 1:N) {
     rhat <- fit_summary[,'Rhat'][n]
-    if (rhat > 1.1 || is.infinite(rhat) || is.nan(rhat)) {
+    if(is.nan(rhat)){
+      rhat <- 1
+    }
+    if (rhat > 1.1 || is.infinite(rhat)) {
       if (!quiet) print(sprintf('Rhat for parameter %s is %s!',
                                 rownames(fit_summary)[n], rhat))
       no_warning <- FALSE
@@ -138,7 +140,7 @@ check_rhat <- function(fit, quiet=FALSE) {
     if (!quiet) print('Rhat looks reasonable for all parameters')
     if (quiet) return(TRUE)
   } else {
-    if (!quiet) print('  Rhat above 1.1 indicates that the chains very likely have not mixed')
+    if (!quiet) print('  Rhat above 1.1 indicates the chains very likely have not mixed')
     if (quiet) return(FALSE)
   }
 }

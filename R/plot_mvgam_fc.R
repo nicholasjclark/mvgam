@@ -158,7 +158,7 @@ plot_mvgam_fc = function(object, series = 1, data_test,
   probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
   cred <- sapply(1:NCOL(preds),
                  function(n) quantile(preds[,n],
-                                      probs = probs))
+                                      probs = probs, na.rm = TRUE))
 
   c_light <- c("#DCBCBC")
   c_light_highlight <- c("#C79999")

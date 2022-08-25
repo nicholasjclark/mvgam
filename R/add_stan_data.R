@@ -11,6 +11,8 @@
 #'overdispersion parameters. Note that this prior acts on the inverse of \code{r}, which is convenient
 #'for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
 #'as the sampled parameter approaches \code{0}
+#' @param lambda_prior \code{character} specifying (in Stan syntax) the prior distribution for smoothing
+#' parameters (Default is exponential(0.05))
 #' @param family \code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'
 #' @param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 #' this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
@@ -20,6 +22,7 @@
 add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                          n_lv,
                          r_prior,
+                         lambda_prior,
                          jags_data, family = 'poisson',
                          upper_bounds){
 
@@ -320,7 +323,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                paste0('vector<lower=0>[',n_sigma_raw,'] sigma_raw', ';\n', collapse = ''),
                '\n',
                '\n// random effect means\n',
-               paste0('vector<lower=0>[',n_sigma_raw,'] mu_raw', ';\n', collapse = ''))
+               paste0('vector[',n_sigma_raw,'] mu_raw', ';\n', collapse = ''))
 
       b_raw_text <- vector()
       min_beta <- vector()
@@ -383,13 +386,24 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
       stan_file <- readLines(textConnection(stan_file), n = -1)
     }
 
+    # Replace smoothing parameter prior if specified
+    if(!missing(lambda_prior)){
+      stan_file[grep('lambda ~ exponential', stan_file,
+                     fixed = TRUE)] <- paste0("lambda ~ ", lambda_prior, ";")
+    }
+
     # Check for shared smoothing parameters and link them accordingly
     if('L' %in% names(jags_data)){
-      stan_file[grep('lambda ~ exponential', stan_file,
-                     fixed = TRUE)] <- "lambda_raw ~ exponential(0.05);"
+      if(!missing(lambda_prior)){
+        stan_file[grep('lambda ~ exponential', stan_file,
+                       fixed = TRUE)] <- paste0("lambda_raw ~ ", lambda_prior, ";")
+      } else {
+        stan_file[grep('lambda ~ exponential', stan_file,
+                       fixed = TRUE)] <- "lambda_raw ~ exponential(0.05);"
+      }
 
-      stan_file[grep("vector<lower=0.0005>[n_sp] lambda;", stan_file,
-                     fixed = TRUE)] <- "vector<lower=0.0005>[n_raw_sp] lambda_raw;"
+      stan_file[grep("vector<lower=0>[n_sp] lambda;", stan_file,
+                     fixed = TRUE)] <- "vector<lower=0>[n_raw_sp] lambda_raw;"
 
       stan_file[grep('// GAM contribution to expectations',
                      stan_file, fixed = TRUE)] <-

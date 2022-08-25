@@ -80,31 +80,50 @@ if(object$family == 'Tweedie'){
   message()
 }
 
-#### Summary table for smooth functions ####
-coef_names <- names(object$mgcv_model$coefficients)
-if(length(object$mgcv_model$smooth) > 0){
-  m <- length(object$mgcv_model$smooth)
-
-  edf_table <- matrix(NA, nrow = m, ncol = 2)
-  for(i in 1:m){
-    start <- object$mgcv_model$smooth[[i]]$first.para
-    stop <- object$mgcv_model$smooth[[i]]$last.para
-    edf_table[i, 1] <- sum(jam$edf[start:stop])
-    edf_table[i, 2] <- sum(object$mgcv_model$smooth[[i]]$df)
-  }
-  dimnames(edf_table) <- list(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
-                              c("edf", "df"))
-
-  message('GAM smooth term estimated degrees of freedom:')
-  printCoefmat(edf_table, digits = 4, signif.stars = T)
-  message()
-}
-
 message("GAM coefficient (beta) estimates:")
+coef_names <- names(object$mgcv_model$coefficients)
 mvgam_coefs <- MCMCvis::MCMCsummary(object$model_output, 'b')[,c(3:7)]
 rownames(mvgam_coefs) <- coef_names
 print(mvgam_coefs)
 message()
+
+smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
+  data.frame(label = object$mgcv_model$smooth[[x]]$label,
+             class = class(object$mgcv_model$smooth[[x]])[1])
+}))
+
+if(any(smooth_labs$class == 'random.effect')){
+  re_smooths <- smooth_labs %>%
+    dplyr::filter(class == 'random.effect') %>%
+    dplyr::pull(label)
+
+  re_sds <- do.call(rbind, lapply(seq_len(length(re_smooths)), function(x){
+    if(x == 1){
+      MCMCvis::MCMCsummary(object$model_output, 'sigma_raw')[,c(3:7)]
+    } else {
+      MCMCvis::MCMCsummary(object$model_output, paste0('sigma_raw', x))[,c(3:7)]
+    }
+
+  }))
+
+  re_mus <- do.call(rbind, lapply(seq_len(length(re_smooths)), function(x){
+    if(x == 1){
+      MCMCvis::MCMCsummary(object$model_output, 'mu_raw')[,c(3:7)]
+    } else {
+      MCMCvis::MCMCsummary(object$model_output, paste0('mu_raw', x))[,c(3:7)]
+    }
+
+  }))
+  rownames(re_sds) <- rownames(re_mus) <- re_smooths
+
+  message("GAM random effect population mean estimates:")
+  print(re_mus)
+  message()
+
+  message("GAM random effect population SD estimates:")
+  print(re_sds)
+  message()
+}
 
 if(any(grep('rho', rownames(MCMCvis::MCMCsummary(object$model_output))))){
   message("GAM smoothing parameter (rho) estimates:")
@@ -122,7 +141,18 @@ if(any(grep('rho', rownames(MCMCvis::MCMCsummary(object$model_output))))){
            number_seq)
   }))
   rownames(rho_coefs) <- rho_names
-  print(rho_coefs)
+
+  # Don't print random effect lambdas as they follow the prior distribution
+  if(any(smooth_labs$class == 'random.effect')){
+    re_smooths <- smooth_labs %>%
+      dplyr::filter(class == 'random.effect') %>%
+      dplyr::pull(label)
+
+  print(rho_coefs[!rho_names %in% re_smooths,])
+
+  } else {
+    print(rho_coefs)
+  }
   message()
 }
 
@@ -235,12 +265,7 @@ if(!object$use_lv){
 }
 
 if(object$fit_engine == 'stan'){
-  if(object$use_lv || object$trend_model == 'GP'){
-    max_treedepth <- 12
-  } else {
-    max_treedepth <- 11
-  }
-  check_all_diagnostics(object$model_output, max_treedepth = max_treedepth)
+  check_all_diagnostics(object$model_output, max_treedepth = object$max_treedepth)
 }
 
 

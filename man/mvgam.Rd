@@ -27,10 +27,13 @@ mvgam(
   r_prior,
   twdis_prior,
   sigma_prior,
+  lambda_prior,
   rho_gp_prior,
   alpha_gp_prior,
   upper_bounds,
   use_stan = FALSE,
+  max_treedepth,
+  adapt_delta,
   jags_path
 )
 }
@@ -122,6 +125,9 @@ overdispersion parameters. Ignored if family is Poisson or Negative Binomial}
 \item{sigma_prior}{\code{character} specifying (in JAGS or Stan syntax) the prior distributions for the independent Gaussian
 variances used for the latent trends (ignored if \code{use_lv == TRUE})}
 
+\item{lambda_prior}{\code{character} specifying (in JAGS or Stan syntax) the prior distribution for smoothing
+parameters (Default is exponential(0.05))}
+
 \item{rho_gp_prior}{\code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
 Process length scale parameters}
 
@@ -140,6 +146,18 @@ not all options that are available in \code{JAGS} can be used, including: no opt
 dynamic factor trends. However, as \code{rstan} can estimate Hilbert base approximate gaussian processes, which
 are much more computationally tractable than full GPs for time series with \verb{>100} observations, estimation
 in \code{rstan} can support latent GP trends while estimation in \code{JAGS} cannot}
+
+\item{max_treedepth}{positive integer placing a cap on the number of simulation steps evaluated during each iteration when
+\code{use_stan == TRUE}. Default is \code{12}. Increasing this value can sometimes help with exploration of complex
+posterior geometries, but it is rarely fruitful to go above a \code{max_treedepth} of \code{14}}
+
+\item{adapt_delta}{positive numeric between \code{0} and \code{1} defining the target average proposal acceptance probability
+during Stan's adaptation period, if \code{use_stan == TRUE}. Default is \code{0.85}. In general you should not need to change adapt_delta
+unless you see a warning message about divergent transitions, in which case you can increase adapt_delta from the default
+to a value closer to \code{1} (e.g. from \code{0.95} to \code{0.99}, or from \code{0.99} to \code{0.999}, etc).
+The step size used by the numerical integrator is a function of \code{adapt_delta} in that increasing
+\code{adapt_delta} will result in a smaller step size and fewer divergences. Increasing \code{adapt_delta} will
+typically result in a slower sampler, but it will always lead to a more robust sampler.}
 
 \item{jags_path}{Optional character vector specifying the path to the location of the \code{JAGS} executable (.exe) to use
 for modelling if \code{use_stan == FALSE}. If missing, the path will be recovered from a call to \code{\link[runjags]{findjags}}}

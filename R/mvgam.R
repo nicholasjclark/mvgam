@@ -71,6 +71,8 @@
 #'overdispersion parameters. Ignored if family is Poisson or Negative Binomial
 #'@param sigma_prior \code{character} specifying (in JAGS or Stan syntax) the prior distributions for the independent Gaussian
 #'variances used for the latent trends (ignored if \code{use_lv == TRUE})
+#'@param lambda_prior \code{character} specifying (in JAGS or Stan syntax) the prior distribution for smoothing
+#'parameters (Default is exponential(0.05))
 #'@param rho_gp_prior \code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
 #'Process length scale parameters
 #'@param alpha_gp_prior \code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
@@ -86,6 +88,16 @@
 #'dynamic factor trends. However, as \code{rstan} can estimate Hilbert base approximate gaussian processes, which
 #'are much more computationally tractable than full GPs for time series with `>100` observations, estimation
 #'in \code{rstan} can support latent GP trends while estimation in \code{JAGS} cannot
+#'@param max_treedepth positive integer placing a cap on the number of simulation steps evaluated during each iteration when
+#'`use_stan == TRUE`. Default is `12`. Increasing this value can sometimes help with exploration of complex
+#'posterior geometries, but it is rarely fruitful to go above a `max_treedepth` of `14`
+#'@param adapt_delta positive numeric between `0` and `1` defining the target average proposal acceptance probability
+#'during Stan's adaptation period, if `use_stan == TRUE`. Default is `0.85`. In general you should not need to change adapt_delta
+#'unless you see a warning message about divergent transitions, in which case you can increase adapt_delta from the default
+#'to a value closer to `1` (e.g. from `0.95` to `0.99`, or from `0.99` to `0.999`, etc).
+#'The step size used by the numerical integrator is a function of `adapt_delta` in that increasing
+#'`adapt_delta` will result in a smaller step size and fewer divergences. Increasing `adapt_delta` will
+#'typically result in a slower sampler, but it will always lead to a more robust sampler.
 #'@param jags_path Optional character vector specifying the path to the location of the `JAGS` executable (.exe) to use
 #'for modelling if `use_stan == FALSE`. If missing, the path will be recovered from a call to \code{\link[runjags]{findjags}}
 #'
@@ -263,10 +275,13 @@ mvgam = function(formula,
                  r_prior,
                  twdis_prior,
                  sigma_prior,
+                 lambda_prior,
                  rho_gp_prior,
                  alpha_gp_prior,
                  upper_bounds,
                  use_stan = FALSE,
+                 max_treedepth,
+                 adapt_delta,
                  jags_path){
 
   # Check arguments
@@ -697,9 +712,13 @@ mvgam = function(formula,
   # Use informative priors based on the fitted mgcv model to speed convergence
   # and eliminate searching over strange parameter spaces
   if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
-    model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(1/sp[i])T(0.0001, )'
+    model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(1/sp[i])'
   } else {
-    model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)T(0.0001, )'
+    model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)'
+  }
+
+  if(!missing(lambda_prior)){
+    model_file[grep('lambda\\[i\\] ~', model_file)] <- paste0(' lambda[i] ~ ', lambda_prior)
   }
 
   # Final tidying of the JAGS model for readability
@@ -714,8 +733,7 @@ mvgam = function(formula,
 
 
   # Covariate dataframe including training and testing observations
-  if(!missing(data_test)){
-    #suppressWarnings(lp_test <- predict(ss_gam, newdata = data_test, type = 'lpmatrix'))
+  if(!missing(data_test) & !prior_simulation){
     suppressWarnings(lp_test  <- try(predict(ss_gam,
                                              newdata = data_test,
                                              type = 'lpmatrix'),
@@ -1015,6 +1033,7 @@ mvgam = function(formula,
                                     use_lv = use_lv,
                                     n_lv = n_lv,
                                     r_prior = r_prior,
+                                    lambda_prior = lambda_prior,
                                     jags_data = ss_jagam$jags.data,
                                     family = family,
                                     upper_bounds = upper_bounds)
@@ -1105,7 +1124,9 @@ mvgam = function(formula,
                                n_lv = n_lv,
                                upper_bounds = upper_bounds,
                                obs_data = data_train,
-                               fit_engine = 'stan'),
+                               fit_engine = 'stan',
+                               max_treedepth = 12,
+                               adapt_delta = 0.85),
                           class = 'mvgam_prefit')
     } else {
 
@@ -1134,7 +1155,9 @@ mvgam = function(formula,
                                n_lv = n_lv,
                                upper_bounds = upper_bounds,
                                obs_data = data_train,
-                               fit_engine = 'jags'),
+                               fit_engine = 'jags',
+                               max_treedepth = NULL,
+                               adapt_delta = NULL),
                           class = 'mvgam_prefit')
     }
 
@@ -1169,6 +1192,7 @@ mvgam = function(formula,
                                     use_lv = use_lv,
                                     n_lv = n_lv,
                                     r_prior = r_prior,
+                                    lambda_prior = lambda_prior,
                                     jags_data = ss_jagam$jags.data,
                                     family = family,
                                     upper_bounds = upper_bounds)
@@ -1263,22 +1287,19 @@ mvgam = function(formula,
           cmd_mod <- cmdstan_model(write_stan_file(stan_objects$stan_file))
         }
 
-        if(trend_model == 'GP'){
-          max_treedepth = 12
-          adapt_delta = 0.9
-        } else {
-          max_treedepth = 11
-          adapt_delta = 0.95
+        if(missing(max_treedepth)){
+          max_treedepth <- 12
         }
-
-        if(use_lv){
-          max_treedepth = 12
-          adapt_delta = 0.95
-        } else {
-          max_treedepth = 11
+        if(missing(adapt_delta)){
+          adapt_delta <- 0.85
         }
 
         # Condition the model using Cmdstan
+        if(prior_simulation){
+          burnin <- 200
+          n_samples <- 400
+        }
+
         fit1 <- cmd_mod$sample(data = stan_objects$model_data,
                               chains = chains,
                               parallel_chains = min(c(chains, parallel::detectCores() - 1)),
@@ -1306,22 +1327,24 @@ mvgam = function(formula,
         options(mc.cores = parallel::detectCores())
 
         # Fit the model in rstan using custom control parameters
-        if(trend_model == 'GP'){
-          stan_control <- list(max_treedepth = 12)
-        } else {
-          stan_control <- list(max_treedepth = 11)
+        if(missing(max_treedepth)){
+          max_treedepth <- 12
         }
-
-        if(use_lv){
-          stan_control <- list(max_treedepth = 12, adapt_delta = 0.95)
-        } else {
-          stan_control <- list(max_treedepth = 11)
+        if(missing(adapt_delta)){
+          adapt_delta <- 0.85
         }
+        stan_control <- list(max_treedepth = max_treedepth,
+                             adapt_delta = adapt_delta)
 
         message("Compiling the Stan program...")
         message()
         if(n_samples <= burnin){
           n_samples <- burnin + n_samples
+        }
+
+        if(prior_simulation){
+          burnin <- 200
+          n_samples <- 600
         }
 
         fit1 <- stan(model_code = stan_objects$stan_file,
@@ -1484,6 +1507,8 @@ mvgam = function(formula,
     model_file <- stan_objects$stan_file
   } else {
     model_file <- trimws(model_file)
+    max_treedepth <- NULL
+    adapt_delta <- NULL
   }
 
   if(return_model_data){
@@ -1507,7 +1532,9 @@ mvgam = function(formula,
                              n_lv = n_lv,
                              upper_bounds = upper_bounds,
                              obs_data = data_train,
-                             fit_engine = fit_engine),
+                             fit_engine = fit_engine,
+                             max_treedepth = max_treedepth,
+                             adapt_delta = adapt_delta),
                         class = 'mvgam')
   } else {
     output <- structure(list(call = formula,
@@ -1528,7 +1555,9 @@ mvgam = function(formula,
                              n_lv = n_lv,
                              upper_bounds = upper_bounds,
                              obs_data = data_train,
-                             fit_engine = fit_engine),
+                             fit_engine = fit_engine,
+                             max_treedepth = max_treedepth,
+                             adapt_delta = adapt_delta),
                         class = 'mvgam')
   }
   }
