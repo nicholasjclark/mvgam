@@ -93,12 +93,11 @@ Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `s
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvgam(data_train = lynx_train,
                data_test = lynx_test,
-               formula = y ~ s(season, bs = 'cc', k = 19),
+               formula = y ~ s(season, bs = 'cc', k = 15),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
                use_stan = TRUE,
-               burnin = 1000,
                chains = 4)
 ```
 
@@ -205,7 +204,6 @@ lynx_mvgam_poor <- mvgam(data_train = lynx_train,
                formula = y ~ s(season, k = 3),
                family = 'poisson',
                trend_model = 'RW',
-               drift = FALSE,
                use_stan = TRUE,
                burnin = 1000,
                chains = 4)

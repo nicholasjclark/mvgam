@@ -461,7 +461,8 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
   # Use as much vectorization as possible for computing predictions
   stan_file[grep('vector[total_obs] eta;', stan_file,
                  fixed = TRUE)] <-
-    paste0('vector[total_obs] eta;\n',
+    paste0('vector[total_obs] eta;\n\n',
+           '// expectations\n',
            'matrix[n, n_series] mus;')
   if(any(grepl('trend[i, s]', stan_file))){
     stan_file <- sub('eta[ytimes[i, s]] + trend[i, s]',

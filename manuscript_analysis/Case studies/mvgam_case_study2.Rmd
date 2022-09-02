@@ -41,12 +41,12 @@ Clearly there are some correlations in the trends for these series. But how does
 
 ![](df.gif)
 
-A challenge with any factor model is the need to determine the number of factors `M`. Setting `M` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `M` too large leads to unnecessary computation. `mvgam` approaches this problem by formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines. Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
+A challenge with any factor model is the need to determine the number of factors `M`. Setting `M` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `M` too large leads to unnecessary computation. `mvgam` approaches this problem by either formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines (if using `JAGS`) or by regularising the factor loadings with a Bayesian LASSO prior (if using `Stan`). Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
 ```{r, message=FALSE, warning=FALSE}
 mod1 <- mvgam(data_train = dat$data_train,
                 data_test = dat$data_test,
                 formula = y ~ s(series, bs = 're') +
-                  s(season, bs = c('cc'), k = 8),
+                  s(season, bs = c('cc'), k = 7),
                 knots = list(season = c(0.5, 12.5)),
                 use_lv = TRUE,
                 n_lv = 2,
@@ -77,7 +77,7 @@ Now we fit the same model but assume that we no nothing about how many factors t
 mod2 <- mvgam(data_train = dat$data_train,
                 data_test = dat$data_test,
                 formula = y ~ s(series, bs = 're') +
-                  s(season, bs = c('cc'), k = 8),
+                  s(season, bs = c('cc'), k = 7),
                 knots = list(season = c(0.5, 12.5)),
                 use_lv = TRUE,
                 n_lv = 6,
@@ -144,7 +144,7 @@ Now we will fit an `mvgam` model with shared seasonality and random intercepts p
 trends_mod1 <- mvgam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
                       formula = y ~ s(series, bs = 're') + 
-                        s(season, k = 8, m = 2, bs = 'cc') - 1,
+                        s(season, k = 7, m = 2, bs = 'cc') - 1,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
                       family = 'poisson',
@@ -157,8 +157,8 @@ Given that these series could potentially be following a hierarchical seasonalit
 ```{r, message=FALSE, warning=FALSE}
 trends_mod2 <- mvgam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
-                      formula = y ~ s(season, k = 8, m = 2, bs = 'cc') +
-                        s(season, series, k = 5, bs = 'fs', m = 1),
+                      formula = y ~ s(season, k = 7, m = 2, bs = 'cc') +
+                        s(season, series, k = 4, bs = 'fs', m = 1),
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'None',
                       family = 'poisson',
@@ -186,16 +186,16 @@ summary(trends_mod1$mgcv_model)
 summary(trends_mod2$mgcv_model)
 ```
 
-Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow a RW process, and we will rely on the exponential penalties to help regularise any un-needed factors by setting `n_lv = 4`
+Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow a RW process, and we will set `n_lv = 3`
 ```{r, message=FALSE, warning=FALSE}
 trends_mod3 <- mvgam(data_train = trends_data$data_train,
                       data_test = trends_data$data_test,
-                      formula = y ~ s(season, k = 8, m = 2, bs = 'cc') +
-                        s(season, series, k = 5, bs = 'fs', m = 1),
+                      formula = y ~ s(season, k = 7, m = 2, bs = 'cc') +
+                        s(season, series, k = 4, bs = 'fs', m = 1),
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'RW',
                       use_lv = TRUE,
-                      n_lv = 4,
+                      n_lv = 3,
                       family = 'poisson',
                       use_stan = TRUE,
                       chains = 4,
@@ -204,8 +204,8 @@ trends_mod3 <- mvgam(data_train = trends_data$data_train,
 
 
 Have a look at the returned `Stan` model file to see how the dynamic factors are incorporated
-```{r}
-trends_mod3$model_file
+```{r, results = 'asis'}
+cat(c("```stan", trends_mod3$model_file, "```"), sep = "\n")
 ```
 
 Inspection of the dynamic factors and their relative contributions indicates that the first factor is by far the most important

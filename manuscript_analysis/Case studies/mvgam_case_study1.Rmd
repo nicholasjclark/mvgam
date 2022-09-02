@@ -238,8 +238,8 @@ head(mod_skeleton$pregam)
 ```
 
 The `Stan` model file is also designed to be as descriptive as possible about the data objects that are required to condition the model
-```{r}
-mod_skeleton$model_file
+```{r, results = 'asis'}
+cat(c("```stan", mod_skeleton$model_file, "```"), sep = "\n")
 ```
 
 Now we will evaluate the forecasts for each of the models. Here we define a function to plot posterior empirical forecast quantiles and calculate the Discrete Rank Probability Score (DRPS, a proper scoring rule for evaluating probabilistic forecast distributions) for each of the out of sample forecasts. The final score for each forecast is the sum of DRPS values at each forecast horizon, with the lower score being the favoured forecast. The function returns a plot of the forecast distribution and also prints the DRPS score
