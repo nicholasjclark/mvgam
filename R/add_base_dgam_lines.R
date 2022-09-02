@@ -20,7 +20,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
 
     parameters {
     // raw basis coefficients
-    row_vector<lower=-30,upper=30>[num_basis] b_raw;
+    row_vector[num_basis] b_raw;
 
     // dynamic factors
     matrix[n, n_lv] LV;
@@ -118,10 +118,10 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
     ##insert data
     parameters {
     // raw basis coefficients
-    row_vector<lower=-30,upper=30>[num_basis] b_raw;
+    row_vector[num_basis] b_raw;
 
     // latent trend variance parameters
-    vector<lower=0.05,upper=5>[n_series] sigma;
+    vector<lower=0>[n_series] sigma;
 
     // latent trends
     matrix[n, n_series] trend;

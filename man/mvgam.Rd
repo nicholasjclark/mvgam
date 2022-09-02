@@ -152,7 +152,7 @@ in \code{rstan} can support latent GP trends while estimation in \code{JAGS} can
 posterior geometries, but it is rarely fruitful to go above a \code{max_treedepth} of \code{14}}
 
 \item{adapt_delta}{positive numeric between \code{0} and \code{1} defining the target average proposal acceptance probability
-during Stan's adaptation period, if \code{use_stan == TRUE}. Default is \code{0.85}. In general you should not need to change adapt_delta
+during Stan's adaptation period, if \code{use_stan == TRUE}. Default is \code{0.8}. In general you should not need to change adapt_delta
 unless you see a warning message about divergent transitions, in which case you can increase adapt_delta from the default
 to a value closer to \code{1} (e.g. from \code{0.95} to \code{0.99}, or from \code{0.99} to \code{0.999}, etc).
 The step size used by the numerical integrator is a function of \code{adapt_delta} in that increasing

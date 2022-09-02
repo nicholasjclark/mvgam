@@ -92,7 +92,7 @@
 #'`use_stan == TRUE`. Default is `12`. Increasing this value can sometimes help with exploration of complex
 #'posterior geometries, but it is rarely fruitful to go above a `max_treedepth` of `14`
 #'@param adapt_delta positive numeric between `0` and `1` defining the target average proposal acceptance probability
-#'during Stan's adaptation period, if `use_stan == TRUE`. Default is `0.85`. In general you should not need to change adapt_delta
+#'during Stan's adaptation period, if `use_stan == TRUE`. Default is `0.8`. In general you should not need to change adapt_delta
 #'unless you see a warning message about divergent transitions, in which case you can increase adapt_delta from the default
 #'to a value closer to `1` (e.g. from `0.95` to `0.99`, or from `0.99` to `0.999`, etc).
 #'The step size used by the numerical integrator is a function of `adapt_delta` in that increasing
@@ -1196,6 +1196,24 @@ mvgam = function(formula,
                                     jags_data = ss_jagam$jags.data,
                                     family = family,
                                     upper_bounds = upper_bounds)
+
+      # Remove data likelihood and posterior predictions if this is a prior sampling run
+      if(prior_simulation){
+        stan_objects$stan_file <- stan_objects$stan_file[-c(grep('// likelihood functions',
+                                                                 stan_objects$stan_file):
+                                                              (grep('// likelihood functions',
+                                                                    stan_objects$stan_file) + 6))]
+
+        # stan_objects$stan_file <- stan_objects$stan_file[-c(grep('matrix[n, n_series] ypred;',
+        #                                                          stan_objects$stan_file,
+        #                                                          fixed = TRUE))]
+        #
+        # stan_objects$stan_file <- stan_objects$stan_file[-c(grep('// posterior predictions',
+        #                                                          stan_objects$stan_file):
+        #                                                       (grep('// posterior predictions',
+        #                                                             stan_objects$stan_file) + 5))]
+      }
+
       model_data <- stan_objects$model_data
       if(use_lv){
         model_data$n_lv <- n_lv
@@ -1282,7 +1300,7 @@ mvgam = function(formula,
 
         if(cmdstanr::cmdstan_version() >= "2.29.0"){
         cmd_mod <- cmdstan_model(write_stan_file(stan_objects$stan_file),
-                                 stanc_options = list('O1', 'canonicalize=deprecations,braces,parentheses'))
+                                 stanc_options = list('Oexperimental', 'canonicalize=deprecations,braces,parentheses'))
         } else {
           cmd_mod <- cmdstan_model(write_stan_file(stan_objects$stan_file))
         }
@@ -1296,19 +1314,28 @@ mvgam = function(formula,
 
         # Condition the model using Cmdstan
         if(prior_simulation){
-          burnin <- 200
-          n_samples <- 400
+          fit1 <- cmd_mod$sample(data = stan_objects$model_data,
+                                 chains = chains,
+                                 parallel_chains = min(c(chains, parallel::detectCores() - 1)),
+                                 refresh = 500,
+                                 init = inits,
+                                 max_treedepth = 12,
+                                 adapt_delta = 0.6,
+                                 iter_sampling = 500,
+                                 iter_warmup = 200,
+                                 show_messages = FALSE,
+                                 diagnostics = NULL)
+        } else {
+          fit1 <- cmd_mod$sample(data = stan_objects$model_data,
+                                 chains = chains,
+                                 parallel_chains = min(c(chains, parallel::detectCores() - 1)),
+                                 refresh = 500,
+                                 init = inits,
+                                 max_treedepth = max_treedepth,
+                                 adapt_delta = adapt_delta,
+                                 iter_sampling = n_samples,
+                                 iter_warmup = burnin)
         }
-
-        fit1 <- cmd_mod$sample(data = stan_objects$model_data,
-                              chains = chains,
-                              parallel_chains = min(c(chains, parallel::detectCores() - 1)),
-                              refresh = 500,
-                              init = inits,
-                              max_treedepth = max_treedepth,
-                              adapt_delta = adapt_delta,
-                              iter_sampling = n_samples,
-                              iter_warmup = burnin)
 
         # Convert model files to stan_fit class for consistency
         stanfit <- rstan::read_stan_csv(fit1$output_files(), col_major = TRUE)
@@ -1333,8 +1360,6 @@ mvgam = function(formula,
         if(missing(adapt_delta)){
           adapt_delta <- 0.85
         }
-        stan_control <- list(max_treedepth = max_treedepth,
-                             adapt_delta = adapt_delta)
 
         message("Compiling the Stan program...")
         message()
@@ -1344,8 +1369,13 @@ mvgam = function(formula,
 
         if(prior_simulation){
           burnin <- 200
-          n_samples <- 600
+          n_samples <- 500
+          adapt_delta <- 0.6
+          max_treedepth <- 12
         }
+
+        stan_control <- list(max_treedepth = max_treedepth,
+                             adapt_delta = adapt_delta)
 
         fit1 <- stan(model_code = stan_objects$stan_file,
                      iter = n_samples,
@@ -1509,6 +1539,10 @@ mvgam = function(formula,
     model_file <- trimws(model_file)
     max_treedepth <- NULL
     adapt_delta <- NULL
+  }
+
+  if(prior_simulation){
+    data_train$y <- orig_y
   }
 
   if(return_model_data){

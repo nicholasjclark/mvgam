@@ -203,14 +203,15 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
   }
 
   # Can't deal with missing values in these diagnostic plots
+  preds[is.nan(preds)] <- NA
   preds <- preds[, !is.na(truths)]
   truths <- truths[!is.na(truths)]
   probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
 
   if(type == 'prop_zero'){
     pred_props <- apply(preds, 1, function(x) length(which(x == 0)) / length(x))
-    lower <- quantile(pred_props, probs = 0.01)
-    upper <- quantile(pred_props, probs = 0.99)
+    lower <- quantile(pred_props, probs = 0.01, na.rm = TRUE)
+    upper <- quantile(pred_props, probs = 0.99, na.rm = TRUE)
 
     if(lower == 0 & upper == 0){
       stop('No predictions covered zero')
@@ -263,7 +264,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
   }
 
   if(type == 'rootogram'){
-    ymax <- floor(max(max(truths), quantile(preds, prob = 0.99)))
+    ymax <- floor(max(max(truths), quantile(preds, prob = 0.99, na.rm = TRUE)))
     ymin <- 0L
     xpos <- ymin:ymax
 
@@ -281,7 +282,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
       }
       tpreds <- do.call(rbind, tpreds)
       tpreds[is.na(tpreds)] <- 0
-      tyquantile <- sqrt(t(apply(tpreds, 2, quantile, probs = probs)))
+      tyquantile <- sqrt(t(apply(tpreds, 2, quantile, probs = probs, na.rm = TRUE)))
       tyexp <- tyquantile[,5]
 
       # Repeat for truths
@@ -298,7 +299,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
       }
       tpreds <- do.call(rbind, tpreds)
       tpreds[is.na(tpreds)] <- 0
-      tyquantile <- sqrt(t(apply(tpreds, 2, quantile, probs = probs)))
+      tyquantile <- sqrt(t(apply(tpreds, 2, quantile, probs = probs, na.rm = TRUE)))
       tyexp <- tyquantile[,5]
       ty <- table(truths)
       ty <- sqrt(as.numeric(ty[match(xpos, rownames(ty))]))
@@ -376,9 +377,9 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
 
   if(type == 'mean'){
     # Plot observed and predicted means
-    pred_means <- apply(preds, 1, mean)
-    lower <- quantile(pred_means, probs = 0.01)
-    upper <- quantile(pred_means, probs = 0.99)
+    pred_means <- apply(preds, 1, mean, na.rm = TRUE)
+    lower <- quantile(pred_means, probs = 0.01, na.rm = TRUE)
+    upper <- quantile(pred_means, probs = 0.99, na.rm = TRUE)
     pred_means <- pred_means[-which(pred_means > upper)]
     if(lower!=0){
       pred_means <- pred_means[-which(pred_means < lower)]
@@ -394,11 +395,12 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
     }
 
     hist(pred_means,
-         xlim = c(min(min(pred_means), min(obs_mean)),
-                  max(max(pred_means), max(obs_mean))),
+         xlim = c(min(min(pred_means, na.rm = TRUE), min(obs_mean, na.rm = TRUE)),
+                  max(max(pred_means, na.rm = TRUE), max(obs_mean, na.rm = TRUE))),
          lwd = 2,
          main = '',
-         breaks = seq(min(pred_means), max(pred_means), length.out = 20),
+         breaks = seq(min(pred_means, na.rm = TRUE),
+                      max(pred_means, na.rm = TRUE), length.out = 20),
          border = "#B97C7C",
          col = "#C79999",
          ylab = ylab,
@@ -427,23 +429,29 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
 
   # Generate a sample sequence and plot
   if(type == 'density'){
-    max_x <- max(max(density(preds[1,])$x),
-                 max(density(truths)$x))
+    max_x <- max(max(density(preds[1,], na.rm = TRUE)$x),
+                 max(density(truths, na.rm = TRUE)$x))
     #min_x <- min(density(preds[1,])$x)
     min_x <- 0
     pred_densities <- do.call(rbind, (lapply(1:NROW(preds), function(x){
-      dens <- density(preds[x,], from = min_x,
-                      to = max_x)
-      dens$y
+      if(length(which(is.na(preds[x,]))) > (length(preds[x,]) - 3)){
+        rep(0, length(density(truths, from = min_x,
+                              to = max_x, na.rm = TRUE)$y))
+      } else {
+        dens <- density(preds[x,], from = min_x,
+                        to = max_x, na.rm = TRUE)
+        dens$y
+      }
+
     })))
 
     cred <- sapply(1:NCOL(pred_densities),
                    function(n) quantile(pred_densities[,n],
-                                        probs = probs))
+                                        probs = probs, na.rm = TRUE))
     true_dens <- density(truths, from = min_x,
-                         to = max_x)
-    ymax <- max(c(max(cred),
-                  max(true_dens$y)))
+                         to = max_x, na.rm = TRUE)
+    ymax <- max(c(max(cred, na.rm = TRUE),
+                  max(true_dens$y, na.rm = TRUE)))
 
     if(missing(ylab)){
       ylab <- paste0('Predictive density for ', levels(data_train$series)[series])
@@ -508,14 +516,14 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
       }
     }
 
-    bin_lims <- range(c(truths, as.vector(preds)))
+    bin_lims <- range(c(truths, as.vector(preds)), na.rm = TRUE)
     #delta <- diff(range(preds)) / n_bins
     breaks <- seq(bin_lims[1], bin_lims[2], length.out = n_bins)
     xlim <- c(0,
-              max(max(density(preds[1,])$x),
-                  max(density(truths)$x)))
-    ylim <- c(0, max(c(max(hist(truths, breaks = breaks, plot = F)$density),
-                       max(hist(preds, breaks = breaks, plot = F)$density))))
+              max(max(density(preds[1,], na.rm = TRUE)$x),
+                  max(density(truths, na.rm = TRUE)$x)))
+    ylim <- c(0, max(c(max(hist(truths, breaks = breaks, plot = F)$density, na.rm = TRUE),
+                       max(hist(preds, breaks = breaks, plot = F)$density, na.rm = TRUE))))
 
     if(missing(xlab)){
       xlab <- paste0('Count')
@@ -568,8 +576,11 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
 
   if(type == 'cdf'){
     ecdf_plotdat = function(vals, x){
-      func <- ecdf(vals)
-      func(x)
+      if(length(which(is.na(vals))) > (length(vals) - 3)){
+      } else {
+        func <- ecdf(vals)
+        func(x)
+      }
     }
 
     plot_x <- seq(min(truths, na.rm = T),
@@ -582,7 +593,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
     probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
     cred <- sapply(1:NCOL(pred_cdfs),
                    function(n) quantile(pred_cdfs[,n],
-                                        probs = probs))
+                                        probs = probs, na.rm = TRUE))
 
     if(missing(ylab)){
       ylab = paste0('Predictive CDF for ', levels(data_train$series)[series])
@@ -595,7 +606,7 @@ ppc.mvgam = function(object, data_test, series = 1, type = 'density',
     plot(1, type = "n", bty = 'L',
          xlab = xlab,
          ylab = ylab,
-         xlim = c(min(plot_x), max(plot_x)),
+         xlim = c(min(plot_x, na.rm = TRUE), max(plot_x, na.rm = TRUE)),
          ylim = c(0, 1),
          ...)
 

@@ -48,8 +48,9 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
   # Filter the data so that only observations for the specified series are used
   pred_inds <- which(newdata$series == s_name)
 
+  dat_names <- names(newdata)
+
   if(class(newdata)[1] == 'list'){
-    dat_names <- names(newdata)
     newdata <- lapply(seq_along(newdata), function(x){
       if(is.matrix(newdata[[x]])){
         newdata[[x]][pred_inds,]
@@ -128,6 +129,9 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
       taus <- NULL
     } else {
       taus <- MCMCvis::MCMCchains(object$model_output, 'tau')
+      # Prior sampling can sometimes result in NaN for tau if sigma
+      # is sampled at zero
+      taus[is.na(taus)] <- 0.001
     }
   }
 

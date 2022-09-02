@@ -97,23 +97,11 @@ if(any(smooth_labs$class == 'random.effect')){
     dplyr::filter(class == 'random.effect') %>%
     dplyr::pull(label)
 
-  re_sds <- do.call(rbind, lapply(seq_len(length(re_smooths)), function(x){
-    if(x == 1){
-      MCMCvis::MCMCsummary(object$model_output, 'sigma_raw')[,c(3:7)]
-    } else {
-      MCMCvis::MCMCsummary(object$model_output, paste0('sigma_raw', x))[,c(3:7)]
-    }
+  re_sds <- MCMCvis::MCMCsummary(object$model_output, 'sigma_raw',
+                           ISB = FALSE)[,c(3:7)]
 
-  }))
-
-  re_mus <- do.call(rbind, lapply(seq_len(length(re_smooths)), function(x){
-    if(x == 1){
-      MCMCvis::MCMCsummary(object$model_output, 'mu_raw')[,c(3:7)]
-    } else {
-      MCMCvis::MCMCsummary(object$model_output, paste0('mu_raw', x))[,c(3:7)]
-    }
-
-  }))
+  re_mus <- MCMCvis::MCMCsummary(object$model_output, 'mu_raw',
+                           ISB = FALSE)[,c(3:7)]
   rownames(re_sds) <- rownames(re_mus) <- re_smooths
 
   message("GAM random effect population mean estimates:")

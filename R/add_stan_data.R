@@ -450,6 +450,90 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
 
   }
 
+  #### Minor text changes to improve efficiency of Stan code ####
+  clean_up <- vector()
+  for(x in 1:length(stan_file)){
+    clean_up[x] <- stan_file[x-1] == "" & stan_file[x] == ""
+  }
+  clean_up[is.na(clean_up)] <- FALSE
+  stan_file <- stan_file[!clean_up]
+
+  # Use as much vectorization as possible for computing predictions
+  stan_file[grep('vector[total_obs] eta;', stan_file,
+                 fixed = TRUE)] <-
+    paste0('vector[total_obs] eta;\n',
+           'matrix[n, n_series] mus;')
+  if(any(grepl('trend[i, s]', stan_file))){
+    stan_file <- sub('eta[ytimes[i, s]] + trend[i, s]',
+                     'mus[i, s]', stan_file, fixed = TRUE)
+
+    stan_file[grep('model {', stan_file, fixed = TRUE) - 2] <-
+      paste0('for(s in 1:n_series){\n',
+             'mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];\n',
+             '}\n',
+             '}')
+
+  } else {
+    stan_file <- sub('eta[ytimes[i, s]]',
+                     'mus[i, s]', stan_file, fixed = TRUE)
+
+    stan_file[grep('model {', stan_file, fixed = TRUE) - 2] <-
+      paste0('for(s in 1:n_series){\n',
+             'mus[1:n, s] = eta[ytimes[1:n, s]];\n',
+             '}\n',
+             '}')
+  }
+
+  stan_file <-
+    stan_file[-(grep('// posterior predictions', stan_file, fixed = TRUE) + 1)]
+  stan_file <-
+    stan_file[-(grep('// posterior predictions', stan_file, fixed = TRUE) + 4)]
+  stan_file[grep('ypred[i, s] =', stan_file, fixed = TRUE)] <-
+    gsub('i, s', '1:n, s', stan_file[grep('ypred[i, s] =', stan_file, fixed = TRUE)])
+  stan_file[grep('matrix[n, n_series] ypred;', stan_file, fixed = TRUE)] <-
+    'array[n, n_series] int ypred;'
+
+  # Remove un-needed loops for transformed beta parameters
+  b_i_indices <- grep('b[i] = ', stan_file, fixed = TRUE)
+  if(length(b_i_indices > 0)){
+    for(x in b_i_indices){
+      i_text <- paste0(as.numeric(sub("for \\(i in ", "",
+                                      sub("\\:.*", "",
+                                          stan_file[x - 1]))),
+                       ':', sub(" ", "",
+                                sub("\\{", "",
+                                    sub("\\)", "",
+                                        sub(".*\\:", "",
+                                            stan_file[x - 1])))))
+      stan_file[x] <-
+        paste0(gsub('[i]', paste0('[', i_text, ']'), stan_file[x], fixed = TRUE))
+    }
+    stan_file <- stan_file[-c(b_i_indices - 1,
+                              b_i_indices + 1)]
+  }
+
+  # Remove un-needed loop for random effect priors
+  b_i_indices <- grep('// prior (non-centred) for', stan_file, fixed = TRUE)
+  if(length(b_i_indices > 0)){
+    for(x in b_i_indices){
+      x = x + 2
+      i_text <- paste0(as.numeric(sub("for \\(i in ", "",
+                                      sub("\\:.*", "",
+                                          stan_file[x - 1]))),
+                       ':', sub(" ", "",
+                                sub("\\{", "",
+                                    sub("\\)", "",
+                                        sub(".*\\:", "",
+                                            stan_file[x - 1])))))
+      stan_file[x] <-
+        paste0(gsub('[i]', paste0('[', i_text, ']'), stan_file[x], fixed = TRUE))
+    }
+    stan_file <- stan_file[-c(b_i_indices + 1,
+                              b_i_indices + 3)]
+  }
+
+  stan_file <- readLines(textConnection(stan_file), n = -1)
+
   unlink('base_gam_stan.txt')
   stan_file <- readLines(textConnection(stan_file), n = -1)
 
