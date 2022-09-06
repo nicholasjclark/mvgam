@@ -13,12 +13,13 @@
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}. Ignored if \code{derivatives = TRUE}
 #'@param xlab label for x axis.
+#'@param ylab label for y axis.
 #'@param ... further \code{\link[graphics]{par}} graphical parameters.
 #'@export
 plot_mvgam_trend = function(object, series = 1, data_test,
                             realisations = FALSE, n_realisations = 15,
                             derivatives = FALSE, hide_xlabels = FALSE,
-                            xlab,
+                            xlab, ylab,
                             ...){
 
   # Check arguments
@@ -127,6 +128,10 @@ plot_mvgam_trend = function(object, series = 1, data_test,
     xlab <- 'Time'
   }
 
+  if(missing(ylab)){
+    ylab <- paste0('Estimated trend for ', levels(data_train$series)[series])
+  }
+
   if(derivatives){
     .pardefault <- par(no.readonly=T)
     par(.pardefault)
@@ -136,7 +141,7 @@ plot_mvgam_trend = function(object, series = 1, data_test,
 
     plot(1, type = "n", bty = 'L',
            xlab = xlab,
-           ylab = paste0('Estimated trend for ', levels(data_train$series)[series]),
+           ylab = ylab,
            xlim = c(0, length(preds_last)),
            ylim = range(cred), ...)
 
@@ -231,14 +236,14 @@ plot_mvgam_trend = function(object, series = 1, data_test,
       plot(1, type = "n", bty = 'L',
            xlab = '',
            xaxt = 'n',
-           ylab = paste0('Estimated trend for ', levels(data_train$series)[series]),
+           ylab = ylab,
            xlim = c(0, length(preds_last)),
            ylim = range(cred))
 
     } else {
       plot(1, type = "n", bty = 'L',
            xlab = xlab,
-           ylab = paste0('Estimated trend for ', levels(data_train$series)[series]),
+           ylab = ylab,
            xlim = c(0, length(preds_last)),
            ylim = range(cred), ...)
     }

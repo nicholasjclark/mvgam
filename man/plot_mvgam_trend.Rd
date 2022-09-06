@@ -13,6 +13,7 @@ plot_mvgam_trend(
   derivatives = FALSE,
   hide_xlabels = FALSE,
   xlab,
+  ylab,
   ...
 )
 }
@@ -38,6 +39,8 @@ estimated 1st derivative for the estimated trend}
 \code{axis} from base \code{R}. Ignored if \code{derivatives = TRUE}}
 
 \item{xlab}{label for x axis.}
+
+\item{ylab}{label for y axis.}
 
 \item{...}{further \code{\link[graphics]{par}} graphical parameters.}
 }

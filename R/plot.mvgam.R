@@ -154,6 +154,7 @@ plot.mvgam = function(object, type = 'smooths',
 
     invisible()
     par(.pardefault)
+    layout(1)
   }
 
 }
