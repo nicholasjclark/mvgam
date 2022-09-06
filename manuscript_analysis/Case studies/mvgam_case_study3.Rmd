@@ -27,14 +27,14 @@ To demonstrate how these models are estimated in `mvgam`, first we load the Port
 library(mvgam)
 library(dplyr)
 portal_dat <- read.csv('https://raw.githubusercontent.com/nicholasjclark/mvgam/
-                       master/NEON_manuscript/Case studies/rodents_data.csv', as.is = T)
+                       master/manuscript_analysis/Case studies/rodents_data.csv', as.is = T)
 ```
 
 ```{r echo=FALSE}
 #devtools::install_github("nicholasjclark/mvgam")
 library(mvgam)
 library(dplyr)
-portal_dat <- read.csv('https://raw.githubusercontent.com/nicholasjclark/mvgam/master/NEON_manuscript/Case studies/rodents_data.csv', as.is = T)
+portal_dat <- read.csv('https://raw.githubusercontent.com/nicholasjclark/mvgam/master/manuscript_analysis/Case studies/rodents_data.csv', as.is = T)
 ```
 
 We'll keep data from the year 2004 onwards to make the model quicker to estimate for this simple example
@@ -109,8 +109,8 @@ data_test <- list(lag = data_all$lag[175:length(data_all$y),],
 
 Now we can fit a Bayesian GAM with distributed lag terms for precipitation and minimum temperature. The distributed lags are set up as tensor product smooth functions (see `help(te)` for an explanation of tensor product smooth constructions in the `mgcv` package) between `lag` and each covariate. We will start simply by assuming our data follow a `Poisson` observation process
 ```{r, message=FALSE, warning=FALSE}
-mod1 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
-                 te(precip, lag, k = c(8, 4)),
+mod1 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
+                 te(precip, lag, k = c(6, 6)),
                 data_train = data_train,
                 data_test = data_test,
                 family = 'poisson',
@@ -132,8 +132,8 @@ plot(mod1, type = 'residuals')
 
 Given the overdispersion present in the data, we will now assume a [`Geometric-Poisson`](https://en.wikipedia.org/wiki/Geometric_Poisson_distribution) observation model, which can be [more flexible than the `Negative binomial` for modelling overdispersed count data](https://www.jstor.org/stable/2533492?origin=crossref&seq=1). In `mvgam` the `Geometric-Poisson` is estimated as a `Tweedie-Poisson` model with the power parameter `p` fixed at `1.5`
 ```{r, message=FALSE, warning=FALSE}
-mod2 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
-                 te(precip, lag, k = c(8, 4)),
+mod2 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
+                 te(precip, lag, k = c(6, 6)),
                 data_train = data_train,
                 data_test = data_test,
                 family = 'tw',
@@ -159,8 +159,8 @@ summary(mod2)
 
 As this is a timeseries and the residual plot hints at some autocorrelation remaining in the short-term lags, lets check if an `AR` latent trend process improves forecasts compared to the no-trend model. An important note here is the choice of prior for the overdispersion parameter `twdis`. This parameter and the latent trend variance can interact strongly, particularly when overdispersion is in the data high. This is because at high values of the dispersion parameter, there is less need for a latent trend to be able to capture any outliers and so the latent trend precision can go up toward infinity, approaching a space of very diffuse likelihood that forces the Gibbs samplers to take on frustratingly small step sizes. Likewise when there is not much need for overdispersion, the dispersion parameter can approach zero and move around in an equally uninformative parameter space. The latent trend operates on the log scale, so really we should not expect autocorrelated jumps in trappings of more than `6-8` from timepoint to timepoint (any larger and the trend will compete strongly with the overdispersion parameter, making it difficult for us to model the inherent overdispersion process and instead assuming it is all autocorrelation). A containment prior on the latent trend `sigma` will help achieve this
 ```{r, message=FALSE, warning=FALSE}
-mod3 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
-                 te(precip, lag, k = c(8, 4)),
+mod3 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
+                 te(precip, lag, k = c(6, 6)),
                 data_train = data_train,
                 data_test = data_test,
                 family = 'tw',
@@ -189,13 +189,12 @@ plot(mod3, type = 'residuals')
 ```
 We can also demonstrate another feature of `mvgam`, which is the ability to use Hamiltonian Monte Carlo for parameter estimation via the software `Stan` (using the `rstan` interface). Note that `rstan` is currently required for this option to work, though support for other `Stan` interfaces will be added in future. Also note that currently there is no support for fitting `Tweedie` responses or dynamic factor models in `Stan`, though again these will be added in future. Because of these current limitations, we will stick with a `Negative Binomial` observation process for the `Stan` version. However there are great advantages when using `Stan`, which includes the option to estimate smooth latent trends via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408). This often makes sense for ecological series, which we expect to change smoothly over time. As expected when compared to the Gibbs sampler in `JAGS`, the `Stan` version converges very nicely
 ```{r, message=FALSE, warning=FALSE}
-mod4 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
-                 te(precip, lag, k = c(8, 4)),
+mod4 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
+                 te(precip, lag, k = c(6, 6)),
                 data_train = data_train,
                 data_test = data_test,
                 family = 'nb',
                 chains = 4,
-                burnin = 1000,
                 trend_model = 'GP',
               use_stan = TRUE)
 summary(mod4)

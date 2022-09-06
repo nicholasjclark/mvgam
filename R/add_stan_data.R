@@ -303,11 +303,13 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                                                     gregexpr("[[:digit:]]+",
                                                              b_raw_string)))))
 
-      n_sigma_raw <- max(as.numeric(unlist(regmatches(grep('sigma_raw', stan_file, value = T),
+      n_sigma_raw <- max(as.numeric(unlist(regmatches(unique(sub(".*(sigma_raw?\\d+).*", "\\1",
+                                                                 grep('sigma_raw', stan_file,
+                                                                      value = T))),
                                                       gregexpr("[[:digit:]]+",
-                                                               grep('sigma_raw',
-                                                                    stan_file, value = T))))))
-
+                                                               unique(sub(".*(sigma_raw?\\d+).*", "\\1",
+                                                                          grep('sigma_raw', stan_file,
+                                                                               value = T))))))))
 
       stan_file <- stan_file[-grep('mu_raw.* ~ ', stan_file)]
       stan_file <- stan_file[-grep('<- mu_raw', stan_file)]

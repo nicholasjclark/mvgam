@@ -645,7 +645,7 @@ mvgam = function(formula,
                                                             'b[i] <- ',
                                                             paste0('mu_raw', i), ' + b_raw[i] * ',
                                                             paste0('sigma_raw', i), '\n  }\n  ',
-                                                            paste0('sigma_raw', i), ' ~ dexp(1)\n',
+                                                            paste0('sigma_raw', i), ' ~ dexp(0.5)\n',
                                                             paste0('mu_raw', i), ' ~ dnorm(0, 1)')
       base_model[grep(re_smooths[i],
                       base_model, fixed = T)] <- paste0('  ## prior (non-centred) for ', re_smooths[i], '...')
@@ -1203,15 +1203,6 @@ mvgam = function(formula,
                                                                  stan_objects$stan_file):
                                                               (grep('// likelihood functions',
                                                                     stan_objects$stan_file) + 6))]
-
-        # stan_objects$stan_file <- stan_objects$stan_file[-c(grep('matrix[n, n_series] ypred;',
-        #                                                          stan_objects$stan_file,
-        #                                                          fixed = TRUE))]
-        #
-        # stan_objects$stan_file <- stan_objects$stan_file[-c(grep('// posterior predictions',
-        #                                                          stan_objects$stan_file):
-        #                                                       (grep('// posterior predictions',
-        #                                                             stan_objects$stan_file) + 5))]
       }
 
       model_data <- stan_objects$model_data
@@ -1300,7 +1291,8 @@ mvgam = function(formula,
 
         if(cmdstanr::cmdstan_version() >= "2.29.0"){
         cmd_mod <- cmdstan_model(write_stan_file(stan_objects$stan_file),
-                                 stanc_options = list('Oexperimental', 'canonicalize=deprecations,braces,parentheses'))
+                                 stanc_options = list('Oexperimental',
+                                                      'canonicalize=deprecations,braces,parentheses'))
         } else {
           cmd_mod <- cmdstan_model(write_stan_file(stan_objects$stan_file))
         }
@@ -1320,8 +1312,8 @@ mvgam = function(formula,
                                  refresh = 500,
                                  init = inits,
                                  max_treedepth = 12,
-                                 adapt_delta = 0.6,
-                                 iter_sampling = 500,
+                                 adapt_delta = 0.8,
+                                 iter_sampling = 600,
                                  iter_warmup = 200,
                                  show_messages = FALSE,
                                  diagnostics = NULL)
@@ -1369,8 +1361,8 @@ mvgam = function(formula,
 
         if(prior_simulation){
           burnin <- 200
-          n_samples <- 500
-          adapt_delta <- 0.6
+          n_samples <- 600
+          adapt_delta <- 0.8
           max_treedepth <- 12
         }
 
@@ -1418,7 +1410,6 @@ mvgam = function(formula,
       inits <- initlist
 
       runjags::runjags.options(silent.jags = TRUE, silent.runjags = TRUE)
-      n.burn <- burnin
 
       # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS
       # will take a while to optimise the samplers, so long adaptation with little 'burnin'
@@ -1429,6 +1420,17 @@ mvgam = function(formula,
       message("Compiling the JAGS program...")
       message()
 
+      if(prior_simulation){
+        n_adapt <- 500
+        n_burn <- 0
+        n_samples <- 1000
+        thin <- 1
+      } else {
+        n_burn <- burnin
+        # Rely on long adaptation to tune samplers appropriately
+        n_adapt <- max(1000, n_burn - 1000)
+      }
+
       if(parallel){
         cl <- parallel::makePSOCKcluster(min(c(chains, parallel::detectCores() - 1)))
         setDefaultCluster(cl)
@@ -1437,9 +1439,8 @@ mvgam = function(formula,
                                      modules = 'glm',
                                      inits = initlist,
                                      n.chains = chains,
-                                     # Rely on long adaptation to tune samplers appropriately
-                                     adapt = max(1000, n.burn - 1000),
-                                     burnin = 1000,
+                                     adapt = n_adapt,
+                                     burnin = n_burn,
                                      sample = n_samples,
                                      jags = jags_path,
                                      thin = thin,
@@ -1455,9 +1456,8 @@ mvgam = function(formula,
                                      modules = 'glm',
                                      inits = initlist,
                                      n.chains = chains,
-                                     # Rely on long adaptation to tune samplers appropriately
-                                     adapt = max(1000, n.burn - 1000),
-                                     burnin = 1000,
+                                     adapt = n_adapt,
+                                     burnin = n_burn,
                                      sample = n_samples,
                                      jags = jags_path,
                                      thin = thin,
