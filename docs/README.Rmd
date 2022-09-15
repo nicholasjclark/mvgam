@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
 *mvgam*
 ================
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others.
+The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others.
 
 ## Resources
 A number of case studies have been compiled to highlight how DGAMs can be estimated using MCMC sampling. These are hosted currently on `RPubs` at the following links:
@@ -38,7 +38,7 @@ When using open source software (or software in general), please make sure to ap
 
 When using `mvgam`, please cite the following publication:
 
-- Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting      discrete ecological time series. *Methods in Ecology and Evolution*. DOI: https://doi.org/10.1111/2041-210X.13974
+- Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. *Methods in Ecology and Evolution*. DOI: https://doi.org/10.1111/2041-210X.13974
 
 As `mvgam` acts as an interface to `Stan` and `JAGS`, please additionally cite whichever software you use for parameter estimation:
 
@@ -89,7 +89,7 @@ Inspect the series in a bit more detail using `mvgam`'s plotting utility
 plot_mvgam_series(data_train = lynx_train)
 ```
 
-Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution. Prior to conditioning the model on observed data, a check of prior smooth function realisations is useful to ensure we are allowing enough flexibility to capture the types of functional behaviours we think are reasonable without allowing outrageous behaviours. First we follow conventional recommendations to set `k` for the smooth term to be large, which would allow maximum flexibility in functional behaviours
+Now we will formulate an `mvgam` model; this model fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the temporal process (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution. But before conditioning the model on observed data, a check of prior smooth function realisations is useful to ensure we are allowing enough flexibility to capture the types of functional behaviours we think are reasonable without allowing outrageous behaviours. First we follow conventional recommendations to set `k` for the smooth term to be large, which would allow maximum flexibility in functional behaviours
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam_prior <- mvgam(data_train = lynx_train,
                data_test = lynx_test,
@@ -105,17 +105,17 @@ Plot a set of realisations from the prior seasonal smooth function
 ```{r, fig.width=5, fig.height=4, fig.align='center'}
 plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
 ```
-These functions are showing the marginal contribution to the seasonal smooth function to the linear predictor (on the `log` scale), so they are clearly allowed to move into ridiculous spaces that we should give *very* little prior plausibility to:
+These functions are showing the marginal contribution of the seasonal smooth function to the linear predictor (on the `log` scale), so they are clearly allowed to move into ridiculous spaces that we should give **very** little prior plausibility to:
 ```{r}
 exp(-25)
 exp(25)
 ```
 
-What happens if we set `k` to a smaller value, resulting in less flexibility?
+Setting `k` to a smaller value results in less flexibility as the number of basis functions that contribute to the functional behaviour is reduced
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam_prior <- mvgam(data_train = lynx_train,
                data_test = lynx_test,
-               formula = y ~ s(season, bs = 'cc', k = 14),
+               formula = y ~ s(season, bs = 'cc', k = 13),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
@@ -128,11 +128,11 @@ Resulting prior realisations look more reasonable given the range of the observa
 plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
 ```
 
-We can now condition the model on observed data in `Stan` using MCMC sampling with the `Cmdstan` interface (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan) and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
+In practice, imparting domain knowledge into prior specifications for smooth functions is challenging, as these behaviours are often the cumulative result of multiple penalty matrices that all have their own separate smoothing parameters. Changing the prior on the smoothing parameters is an option but without running through prior visualisations (and other prior pushforward checks), it will be more difficult to reason about how to set `k` to respect domain knowledge. We can now condition the model on observed data in `Stan` using MCMC sampling with the `Cmdstan` interface (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan) and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvgam(data_train = lynx_train,
                data_test = lynx_test,
-               formula = y ~ s(season, bs = 'cc', k = 14),
+               formula = y ~ s(season, bs = 'cc', k = 13),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
