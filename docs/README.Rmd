@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
 *mvgam*
 ================
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://www.biorxiv.org/content/10.1101/2022.02.22.481550v1) (in press at *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others.
+The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others.
 
 ## Resources
 A number of case studies have been compiled to highlight how DGAMs can be estimated using MCMC sampling. These are hosted currently on `RPubs` at the following links:
@@ -38,7 +38,7 @@ When using open source software (or software in general), please make sure to ap
 
 When using `mvgam`, please cite the following publication:
 
-- Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting      discrete ecological time series. *Methods in Ecology and Evolution*. *In Press*
+- Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting      discrete ecological time series. *Methods in Ecology and Evolution*. DOI: https://doi.org/10.1111/2041-210X.13974
 
 As `mvgam` acts as an interface to `Stan` and `JAGS`, please additionally cite whichever software you use for parameter estimation:
 
@@ -89,11 +89,50 @@ Inspect the series in a bit more detail using `mvgam`'s plotting utility
 plot_mvgam_series(data_train = lynx_train)
 ```
 
-Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution and estimate the model in `Stan` using MCMC sampling with the `Cmdstan` interface (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan) and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
+Now fit an `mvgam` model; it fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the errors (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution. Prior to conditioning the model on observed data, a check of prior smooth function realisations is useful to ensure we are allowing enough flexibility to capture the types of functional behaviours we think are reasonable without allowing outrageous behaviours. First we follow conventional recommendations to set `k` for the smooth term to be large, which would allow maximum flexibility in functional behaviours
+```{r, message=FALSE, warning=FALSE}
+lynx_mvgam_prior <- mvgam(data_train = lynx_train,
+               data_test = lynx_test,
+               formula = y ~ s(season, bs = 'cc', k = 19),
+               knots = list(season = c(0.5, 19.5)),
+               family = 'poisson',
+               trend_model = 'AR3',
+               chains = 1,
+               prior_simulation = TRUE)
+```
+
+Plot a set of realisations from the prior seasonal smooth function
+```{r, fig.width=5, fig.height=4, fig.align='center'}
+plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
+```
+These functions are showing the marginal contribution to the seasonal smooth function to the linear predictor (on the `log` scale), so they are clearly allowed to move into ridiculous spaces that we should give *very* little prior plausibility to:
+```{r}
+exp(-25)
+exp(25)
+```
+
+What happens if we set `k` to a smaller value, resulting in less flexibility?
+```{r, message=FALSE, warning=FALSE}
+lynx_mvgam_prior <- mvgam(data_train = lynx_train,
+               data_test = lynx_test,
+               formula = y ~ s(season, bs = 'cc', k = 14),
+               knots = list(season = c(0.5, 19.5)),
+               family = 'poisson',
+               trend_model = 'AR3',
+               chains = 1,
+               prior_simulation = TRUE)
+```
+
+Resulting prior realisations look more reasonable given the range of the observations, and there is clearly enough flexibility to support a wide range of functional shapes.
+```{r, fig.width=5, fig.height=4, fig.align='center'}
+plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
+```
+
+We can now condition the model on observed data in `Stan` using MCMC sampling with the `Cmdstan` interface (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan) and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvgam(data_train = lynx_train,
                data_test = lynx_test,
-               formula = y ~ s(season, bs = 'cc', k = 15),
+               formula = y ~ s(season, bs = 'cc', k = 14),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
@@ -106,7 +145,7 @@ Inspect the resulting model file, which is written in the `Stan` probabilistic p
 cat(c("```stan", lynx_mvgam$model_file, "```"), sep = "\n")
 ```
 
-Perform a series of posterior predictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine histograms for posterior predictions (`yhat`) and compare to the histogram of the observations (`y`)
+Perform a series of posterior retrodictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine histograms for posterior retrodictions (`yhat`) and compare to the histogram of the observations (`y`)
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 ppc(lynx_mvgam, series = 1, type = 'hist')
 ```
@@ -116,7 +155,7 @@ Now plot the distribution of predicted means compared to the observed mean
 ppc(lynx_mvgam, series = 1, type = 'mean')
 ```
 
-Next examine simulated empirical Cumulative Distribution Functions (CDF) for posterior predictions (`yhat`) and compare to the CDF of the observations (`y`)
+Next examine simulated empirical Cumulative Distribution Functions (CDF) for posterior retrodictions (`yhat`) and compare to the CDF of the observations (`y`)
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 ppc(lynx_mvgam, series = 1, type = 'cdf')
 ```
@@ -131,7 +170,7 @@ Finally look for any biases in predictions by examining a Probability Integral T
 ppc(lynx_mvgam, series = 1, type = 'pit')
 ```
 
-All of these plots indicate the model is well calibrated against the training data, with no apparent pathological behaviors exhibited. Have a look at this model's summary to see what is being estimated (note that longer MCMC runs would probably be needed to increase effective sample sizes)
+All of these plots indicate the model is well calibrated against the training data, with no apparent pathological behaviors exhibited. Have a look at this model's summary to see what is being estimated. Note that no pathological behaviours have been detected and we achieve good effective sample sizes / mixing for all parameters
 ```{r}
 summary(lynx_mvgam)
 ```
@@ -143,7 +182,7 @@ plot_mvgam_trace(lynx_mvgam, 'rho')
 
 and for the latent trend component parameters
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-MCMCvis::MCMCtrace(lynx_mvgam$model_output, c('ar1', 'ar2', 'sigma'), pdf = F, n.eff = T, Rhat = T)
+MCMCvis::MCMCtrace(lynx_mvgam$model_output, c('ar1', 'ar2', 'ar3', 'sigma'), pdf = F, n.eff = T, Rhat = T)
 ```
 
 Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior quantiles of partial residuals (shown as ribbon rectangles in red), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
@@ -151,7 +190,15 @@ Inspect the model's estimated smooth for the 19-year cyclic pattern, which is sh
 plot(lynx_mvgam, type = 'smooths', residuals = T)
 ```
 
-First derivatives of smooth functions can also be plotted to inspect how the slope of the function changes across its length. To plot these we use the more flexible `plot_mvgam_smooth()` function
+It is often also useful to compare prior to posterior function realisations to understand how informative the observed data have been for learning these functional shapes
+```{r, fig.width = 7, fig.height = 4.1, fig.align='center'}
+layout(matrix(1:2, nrow = 2))
+plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
+plot(lynx_mvgam, type = 'smooths', realisations = TRUE)
+layout(1)
+```
+
+First derivatives of smooth functions can be plotted to inspect how the slope of the function changes across its length. To plot these we use the more flexible `plot_mvgam_smooth()` function
 ```{r, fig.width=5, fig.height=6, fig.align='center'}
 plot_mvgam_smooth(lynx_mvgam, 1, 'season', derivatives = T)
 ```
@@ -192,7 +239,7 @@ text(1, 0.8, cex = 1.5, label="Trend component",
      pos = 4, col="#7C0000", family = 'serif')
 ```
 
-Both components contribute to forecast uncertainty, suggesting we would still need some more work to learn about factors driving the dynamics of the system. But we will leave the model as-is for this example. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's residuals, which are posterior medians of Dunn-Smyth randomised quantile residuals so should follow approximate normality. We are primarily looking for a lack of autocorrelation, which would suggest our AR2 model is appropriate for the latent trend
+Both components contribute to forecast uncertainty, suggesting we would still need some more work to learn about factors driving the dynamics of the system. But we will leave the model as-is for this example. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's residuals, which are posterior empirical quantiles of Dunn-Smyth randomised quantile residuals so should follow approximate normality. We are primarily looking for a lack of autocorrelation, which would suggest our AR3 model is appropriate for the latent trend
 ```{r, fig.width=6, fig.height=6, fig.align='center'}
 plot(lynx_mvgam, type = 'residuals')
 ```

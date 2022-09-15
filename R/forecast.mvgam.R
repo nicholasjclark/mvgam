@@ -112,6 +112,8 @@ forecast.mvgam = function(object, data_test, series = 1,
   }
 
   # Extract trend posterior predictions
+  if(object$trend_model != 'None'){
+
   if(object$fit_engine == 'stan'){
     trend_estimates <- MCMCvis::MCMCchains(object$model_output, 'trend')[,seq(series,
                                                                               dim(MCMCvis::MCMCchains(object$model_output,
@@ -141,6 +143,10 @@ forecast.mvgam = function(object, data_test, series = 1,
     trend_estimates <- trend_estimates
   } else {
     trend_estimates <- trend_estimates[,(NCOL(trend_estimates)-2):(NCOL(trend_estimates))]
+  }
+  } else {
+    trend_estimates <- matrix(0, nrow = dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[1],
+                              ncol = 4)
   }
 
   # Generate the linear predictor matrix
@@ -307,6 +313,14 @@ forecast.mvgam = function(object, data_test, series = 1,
     ar1s <- NULL
     ar2s <- NULL
     ar3s <- NULL
+  }
+
+  if(object$trend_model == 'None'){
+    alpha_gps <- NULL
+    rho_gps <- NULL
+    ar1s <- matrix(0, nrow = NROW(betas), ncol = NCOL(object$ytimes))
+    ar2s <- matrix(0, nrow = NROW(betas), ncol = NCOL(object$ytimes))
+    ar3s <- matrix(0, nrow = NROW(betas), ncol = NCOL(object$ytimes))
   }
 
   if(object$trend_model == 'RW'){

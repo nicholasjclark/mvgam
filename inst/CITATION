@@ -6,12 +6,12 @@ citEntry(entry = "Article",
                                    as.person("Konstans Wells")),
          journal      = "Methods in Ecology and Evolution",
          year         = "2022",
-         url          = "IN PRESS",
+         url          = "https://doi.org/10.1111/2041-210X.13974",
 
 
          textVersion  =
            paste("Nicholas J. Clark, Konstans Wells (2022).",
                  "Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series",
                  "Methods in Ecology and Evolution",
-                 "IN PRESS")
+                 "DOI: https://doi.org/10.1111/2041-210X.13974")
 )
