@@ -73,15 +73,20 @@ plot_mvgam_smooth = function(object,
 
   # Get smooth term names
   data_train <- object$obs_data
-  smooth_terms <- unique(gsub("[\\(\\)]", "", regmatches(paste(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
-                                        collapse = ','),
-                                  gregexpr("\\(.*?\\)",
-                                           paste(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
-                                                 collapse = ',')))[[1]]))
+  # smooth_names <- unique(gsub("[\\(\\)]", "", regmatches(paste(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
+  #                                       collapse = ','),
+  #                                 gregexpr("\\(.*?\\)",
+  #                                          paste(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
+  #                                                collapse = ',')))[[1]]))
+  smooth_terms <- unlist(purrr::map(object$mgcv_model$smooth, 'label'))
 
   if(is.character(smooth)){
+    if(!grepl('\\(', smooth)){
+      smooth <- paste0('s(', smooth, ')')
+    }
     if(!smooth %in% smooth_terms){
-      stop(smooth, ' not found in smooth terms of object')
+      stop(smooth, ' not found in smooth terms of object\nAppropriate names are: ',
+           paste(smooth_terms, collapse = ', '))
     }
     smooth_int <- which(smooth_terms == smooth)
   } else {
@@ -104,16 +109,18 @@ plot_mvgam_smooth = function(object,
   }
 
   if(length(unlist(strsplit(smooth, ','))) > 2){
-    stop('Cannot plot smooths of more than 2 dimensions')
+    stop('mvgam cannot yet plot smooths of more than 2 dimensions')
   }
 
   # Be sure that parametric and by variables are included in newdata
-  smooth_terms <- unique(c(smooth_terms, attr(object$mgcv_model$pterms, 'term.labels'),
-                    trimws(strsplit(gsub('\\+', ',', as.character(object$mgcv_model$pred.formula)[2]), ',')[[1]])))
+  smooth_terms <- unique(trimws(strsplit(gsub('\\+', ',',
+                                              as.character(object$mgcv_model$pred.formula)[2]), ',')[[1]]))
 
   # Remove comma separated names as these won't match the column names in data
   smooth_terms[!grepl(',', smooth_terms)] -> smooth_terms
 
+  # Change smooth name to the covariate that needs a sequence of prediction values
+  smooth <- object$mgcv_model$smooth[[smooth_int]]$term
 
   # Predictions and plots for 2-dimensional smooths
   if(length(unlist(strsplit(smooth, ','))) == 2){
@@ -134,9 +141,13 @@ plot_mvgam_smooth = function(object,
                           residuals = residuals,
                           scheme = 2,
                           main = '', too.far = 0,
-                          contour.col = c("black"),
+                          contour.col = 'black',
+                          hcolors = hcl.colors(25,
+                                               palette = 'Reds 2'),
                           lwd = 1,
-                          seWithMean = T ))
+                          seWithMean = TRUE))
+    title(object$mgcv_model$smooth[[smooth_int]]$label,
+          adj = 0)
 
   } else {
 
@@ -227,24 +238,38 @@ plot_mvgam_smooth = function(object,
       Xp[,!grepl(paste0('(', smooth, ')'), colnames(Xp), fixed = T)] <- 0
     }
 
+    # Prediction x-axis values
+    if(class(pred_dat)[1] == 'list'){
+      if(is.matrix(pred_dat[[smooth]])){
+        pred_vals <- as.vector(as.matrix(pred_dat[[smooth]][,1]))
+      } else {
+        pred_vals <- as.vector(as.matrix(pred_dat[[smooth]]))
+      }
+    } else{
+      pred_vals <- as.vector(as.matrix(pred_dat[,smooth]))
+    }
+
+    # If this term has a by variable, need to use mgcv's plotting utilities
+    if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
+
+      # Deal with by variables
+      by <- rep(1,length(pred_vals)); dat <- data.frame(x = pred_vals, by = by)
+      names(dat) <- c(object$mgcv_model$smooth[[smooth_int]]$term,
+                      object$mgcv_model$smooth[[smooth_int]]$by)
+
+      Xp_term <- mgcv::PredictMat(object$mgcv_model$smooth[[smooth_int]], dat)
+      Xp[,object$mgcv_model$smooth[[smooth_int]]$first.para:
+           object$mgcv_model$smooth[[smooth_int]]$last.para] <- Xp_term
+    }
+
     # Extract GAM coefficients
-    #betas <- t(matrix(coef(object$mgcv_model)))
     betas <- MCMCvis::MCMCchains(object$model_output, 'b')
 
-  if(class(pred_dat)[1] == 'list'){
-    if(is.matrix(pred_dat[[smooth]])){
-      pred_vals <- as.vector(as.matrix(pred_dat[[smooth]][,1]))
-    } else {
-      pred_vals <- as.vector(as.matrix(pred_dat[[smooth]]))
+    # Calculate posterior marginal predictions
+    preds <- matrix(NA, nrow = NROW(betas), ncol = NROW(Xp))
+    for(i in 1:NROW(betas)){
+      preds[i,] <- (Xp %*% betas[i, ])
     }
-  } else{
-    pred_vals <- as.vector(as.matrix(pred_dat[,smooth]))
-  }
-
-  preds <- matrix(NA, nrow = NROW(betas), ncol = NROW(Xp))
-  for(i in 1:NROW(betas)){
-    preds[i,] <- (Xp %*% betas[i, ])
-  }
 
   if(residuals){
     # Need to predict from a reduced set that zeroes out all terms apart from the
@@ -258,6 +283,18 @@ plot_mvgam_smooth = function(object,
 
     # Zero out all other columns in Xp2
     Xp2[,!grepl(paste0('(', smooth, ')'), colnames(Xp2), fixed = T)] <- 0
+
+    if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
+      by <- rep(1,length(object$obs_data$series))
+      dat <- data.frame(x = object$obs_data[[object$mgcv_model$smooth[[smooth_int]]$term]],
+                        by = by)
+      names(dat) <- c(object$mgcv_model$smooth[[smooth_int]]$term,
+                      object$mgcv_model$smooth[[smooth_int]]$by)
+
+      Xp_term <- mgcv::PredictMat(object$mgcv_model$smooth[[smooth_int]], dat)
+      Xp2[,object$mgcv_model$smooth[[smooth_int]]$first.para:
+            object$mgcv_model$smooth[[smooth_int]]$last.para] <- Xp_term
+    }
 
     # Find index for the end of training for this series and keep only those training
     # observations for the particular series
@@ -308,16 +345,28 @@ plot_mvgam_smooth = function(object,
            xlim = c(min(pred_vals), max(pred_vals)),
            ylim = c(min(min(partial_resids, min(cred) - sd(preds), na.rm = T)),
                     max(max(partial_resids, max(cred) + sd(preds), na.rm = T))))
-      title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
-            adj = 0)
+
+      if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
+        title(object$mgcv_model$smooth[[smooth_int]]$label,
+              adj = 0)
+      } else {
+        title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+              adj = 0)
+      }
+
     } else {
       plot(1, type = "n", bty = 'L',
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
            ylim = c(min(cred) - sd(preds), max(cred) + sd(preds)))
-      title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
-            adj = 0)
+      if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
+        title(object$mgcv_model$smooth[[smooth_int]]$label,
+              adj = 0)
+      } else {
+        title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+              adj = 0)
+      }
     }
 
     if(realisations){
@@ -498,8 +547,13 @@ plot_mvgam_smooth = function(object,
            xlim = c(min(pred_vals), max(pred_vals)),
            ylim = c(min(min(partial_resids, min(cred) - sd(preds), na.rm = T)),
                     max(max(partial_resids, max(cred) + sd(preds), na.rm = T))))
-      title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
-            adj = 0)
+      if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
+        title(object$mgcv_model$smooth[[smooth_int]]$label,
+              adj = 0)
+      } else {
+        title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+              adj = 0)
+      }
 
       # Get x-axis values and bin if necessary to prevent overplotting
       sorted_x <- sort(unique(round(object$obs_data[[smooth]], 6)))
@@ -585,8 +639,13 @@ plot_mvgam_smooth = function(object,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
            ylim = c(min(cred) - sd(preds), max(cred) + sd(preds)))
-      title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
-            adj = 0)
+      if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
+        title(object$mgcv_model$smooth[[smooth_int]]$label,
+              adj = 0)
+      } else {
+        title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+              adj = 0)
+      }
 
       if(realisations){
         for(i in 1:n_realisations){
@@ -620,9 +679,10 @@ plot_mvgam_smooth = function(object,
 
     # Show observed values of the smooth as a rug
     if(class(object$obs_data)[1] == 'list'){
-      rug((as.vector(as.matrix(pred_dat[[smooth]])))[which(pred_dat[['series']] ==
-                                                             levels(pred_dat[['series']])[series])],
+       rug((as.vector(as.matrix(data_train[[smooth]])))[which(data_train$series ==
+                                                              levels(data_train$series)[series])],
           lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)
+
     } else {
       rug((as.vector(as.matrix(data_train[,smooth])))[which(data_train$series ==
                                                               levels(data_train$series)[series])],

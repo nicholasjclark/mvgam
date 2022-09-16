@@ -114,7 +114,7 @@ plot.mvgam = function(object, type = 'smooths',
     # Check which ones plot_mvgam_smooth can handle (no more than 2 dimensions)
     plottable = function(x){
       length(unlist(strsplit(x, ','))) <= 2 &
-        length(unlist(strsplit(x, ':'))) < 2
+        length(unlist(strsplit(x, ':'))) <= 2
     }
     which_to_plot <- (smooth_labs$smooth_index)[sapply(as.character(smooth_labs$label), plottable)]
     n_smooths <- length(which_to_plot)
@@ -156,5 +156,5 @@ plot.mvgam = function(object, type = 'smooths',
     par(.pardefault)
     layout(1)
   }
-
+layout(1)
 }
