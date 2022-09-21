@@ -16,10 +16,13 @@
 #'factors
 #'@param series \code{integer} specifying which series in the set is to be plotted. This is ignored
 #'if \code{type == 're'}
-#'@param data_test A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in
-#'addition to any other variables included in the linear predictor of \code{formula}. This argument is optional when
-#'plotting out of sample forecast period observations (when \code{type = forecast}) and required when plotting
+#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+#'in addition to any other variables included in the linear predictor of the original \code{formula}.
+#'This argument is optional when plotting out of sample forecast period observations
+#'(when \code{type = forecast}) and required when plotting
 #'uncertainty components (\code{type = uncertainty}).
+#'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
+#'\code{newdata} instead for more seamless integration into `R` workflows
 #'@param ... Additional arguments for each individual plotting function.
 #'@details These plots are useful for getting an overview of the fitted model and its estimated
 #'random effects or smooth functions,
@@ -32,7 +35,7 @@
 #'@export
 plot.mvgam = function(object, type = 'smooths',
                       series = 1, residuals = FALSE,
-                      data_test, ...){
+                      newdata, data_test, ...){
 
   # Argument checks
   type <- match.arg(arg = type, choices = c("residuals", "smooths", "re",
@@ -41,6 +44,10 @@ plot.mvgam = function(object, type = 'smooths',
 
   if(class(object) != 'mvgam'){
     stop('argument "object" must be of class "mvgam"')
+  }
+
+  if(!missing("newdata")){
+    data_test <- newdata
   }
 
   # Other errors and warnings will propagate from individual functions below
@@ -156,5 +163,5 @@ plot.mvgam = function(object, type = 'smooths',
     par(.pardefault)
     layout(1)
   }
-layout(1)
+
 }

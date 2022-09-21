@@ -4,7 +4,7 @@
 \alias{plot_mvgam_resids}
 \title{Residual diagnostics for a fitted mvgam object}
 \usage{
-plot_mvgam_resids(object, series = 1, n_bins = 25, data_test)
+plot_mvgam_resids(object, series = 1, n_bins = 25, newdata, data_test)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
@@ -13,15 +13,18 @@ plot_mvgam_resids(object, series = 1, n_bins = 25, data_test)
 
 \item{n_bins}{\code{integer} specifying the number of bins to use for binning fitted values}
 
-\item{data_test}{Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'y', and 'time'
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'y', and 'time'
 in addition to any other variables included in the linear predictor of \code{formula}. If included, the
-covariate information in \code{data_test} will be used to generate forecasts from the fitted model equations. If
-this same \code{data_test} was originally included in the call to \code{mvgam}, then forecasts have already been
+covariate information in \code{newdata} will be used to generate forecasts from the fitted model equations. If
+this same \code{newdata} was originally included in the call to \code{mvgam}, then forecasts have already been
 produced by the generative model and these will simply be extracted and used to calculate residuals.
-However if no \code{data_test} was supplied to the original model call, an assumption is made that
-the \code{data_test} supplied here comes sequentially after the data supplied as \code{data_train} in
+However if no \code{newdata} was supplied to the original model call, an assumption is made that
+the \code{newdata} supplied here comes sequentially after the data supplied as \code{data} in
 the original model (i.e. we assume there is no time gap between the last
-observation of series 1 in \code{data_train} and the first observation for series 1 in \code{data_test}).}
+observation of series 1 in \code{data_train} and the first observation for series 1 in \code{newdata}).}
+
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
+\code{newdata} instead for more seamless integration into \code{R} workflows}
 }
 \value{
 A series of base \code{R} plots

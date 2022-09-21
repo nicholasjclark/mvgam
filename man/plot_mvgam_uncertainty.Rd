@@ -7,6 +7,7 @@
 plot_mvgam_uncertainty(
   object,
   series = 1,
+  newdata,
   data_test,
   legend_position = "topleft",
   hide_xlabels = FALSE
@@ -17,8 +18,11 @@ plot_mvgam_uncertainty(
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
-\item{data_test}{A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in
+\item{newdata}{A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in
 addition to any other variables included in the linear predictor of \code{formula}}
+
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
+\code{newdata} instead for more seamless integration into \code{R} workflows}
 
 \item{legend_position}{The location may also be specified by setting x to a single keyword from the
 list: "none", "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".

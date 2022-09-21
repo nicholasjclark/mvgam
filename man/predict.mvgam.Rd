@@ -4,7 +4,7 @@
 \alias{predict.mvgam}
 \title{Plot mvgam posterior predictions for a specified series}
 \usage{
-\method{predict}{mvgam}(object, series = 1, newdata, type = "link")
+\method{predict}{mvgam}(object, series = 1, newdata, data_test, type = "link", n_cores = 1)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
@@ -15,9 +15,14 @@
 for prediction, in addition to any other variables included in the linear predictor of \code{formula}. If not supplied,
 predictions are generated for the original observations used for the model fit.}
 
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
+\code{newdata} instead for more seamless integration into \code{R} workflows}
+
 \item{type}{When this has the value \code{link} (default) the linear predictor is calculated on the log link scale.
 When \code{response} is used, the predictions take uncertainty in the observation process into account to return
 predictions on the outcome (discrete) scale.}
+
+\item{n_cores}{\code{integer} specifying number of cores for generating predictions in parallel}
 }
 \value{
 A \code{matrix} of dimension \code{n_samples x new_obs}, where \code{n_samples} is the number of

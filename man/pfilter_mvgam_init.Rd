@@ -6,6 +6,7 @@
 \usage{
 pfilter_mvgam_init(
   object,
+  newdata,
   data_assim,
   n_particles = 1000,
   file_path = "pfilter",
@@ -15,10 +16,13 @@ pfilter_mvgam_init(
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
 
-\item{data_assim}{A \code{dataframe} or \code{list} of test data containing at least one more observation per series
+\item{newdata}{A \code{dataframe} or \code{list} of test data containing at least one more observation per series
 (beyond the last observation seen by the model in \code{object}) to be assimilated by the particle filter.
 Should at least contain 'series' and 'time' for the one-step ahead horizon,
 in addition to any other variables included in the linear predictor of \code{object}}
+
+\item{data_assim}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
+\code{newdata} instead for more seamless integration into \code{R} workflows}
 
 \item{n_particles}{\code{integer} specifying the number of unique particles to generate for tracking the
 latent system state}

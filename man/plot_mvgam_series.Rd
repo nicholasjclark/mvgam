@@ -6,7 +6,9 @@
 \usage{
 plot_mvgam_series(
   object,
+  data,
   data_train,
+  newdata,
   data_test,
   series = 1,
   n_bins,
@@ -17,15 +19,22 @@ plot_mvgam_series(
 \item{object}{Optional \code{list} object returned from \code{mvgam}. Either \code{object} or \code{data_train}
 must be supplied.}
 
-\item{data_train}{Optional \code{dataframe} or \code{list} of training data containing at least 'series' and 'time'.
+\item{data}{Optional \code{dataframe} or \code{list} of training data containing at least 'series' and 'time'.
 Use this argument if training data have been gathered in the correct format for \code{mvgam} modelling
 but no model has yet been fitted.}
 
-\item{data_test}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+\item{data_train}{Deprecated. Still works in place of \code{data} but users are recommended to use
+\code{data} instead for more seamless integration into \code{R} workflows}
+
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
 included, the observed values in the test data are compared to the model's forecast distribution for exploring
-biases in model predictions.
-#'@param series Either a \code{integer} specifying which series in the set is to be plotted or
+biases in model predictions.}
+
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
+\code{newdata} instead for more seamless integration into \code{R} workflows}
+
+\item{series}{Either a \code{integer} specifying which series in the set is to be plotted or
 the string 'all', which plots all series available in the supplied data}
 
 \item{n_bins}{\code{integer} specifying the number of bins to use for binning observed values when plotting

@@ -7,9 +7,11 @@
 plot_mvgam_trend(
   object,
   series = 1,
+  newdata,
   data_test,
   realisations = FALSE,
   n_realisations = 15,
+  n_cores = 1,
   derivatives = FALSE,
   hide_xlabels = FALSE,
   xlab,
@@ -22,8 +24,11 @@ plot_mvgam_trend(
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
-\item{data_test}{Optional \code{dataframe} of test data containing at least 'series', 'season' and 'year'
-forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}}
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+in addition to any other variables included in the linear predictor of the original \code{formula}.}
+
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
+\code{newdata} instead for more seamless integration into \code{R} workflows}
 
 \item{realisations}{\code{logical}. If \code{TRUE}, posterior trend realisations are shown as a spaghetti plot,
 making it easier to visualise the diversity of possible trend paths. If \code{FALSE}, the default,
@@ -31,6 +36,8 @@ empirical quantiles of the posterior distribution are shown}
 
 \item{n_realisations}{\code{integer} specifying the number of posterior realisations to plot, if
 \code{realisations = TRUE}. Ignored otherwise}
+
+\item{n_cores}{\code{integer} specifying number of cores for generating trend forecasts in parallel}
 
 \item{derivatives}{\code{logical}. If \code{TRUE}, an additional plot will be returned to show the
 estimated 1st derivative for the estimated trend}

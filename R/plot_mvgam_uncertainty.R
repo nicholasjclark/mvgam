@@ -1,15 +1,18 @@
 #'Plot mvgam forecast uncertainty contributions for a specified series
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param data_test A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in
+#'@param newdata A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in
 #'addition to any other variables included in the linear predictor of \code{formula}
+#'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
+#'\code{newdata} instead for more seamless integration into `R` workflows
 #'@param legend_position The location may also be specified by setting x to a single keyword from the
 #'list: "none", "bottomright", "bottom", "bottomleft", "left", "topleft", "top", "topright", "right" and "center".
 #'This places the legend on the inside of the plot frame at the given location (if it is not "none").
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
 #'@export
-plot_mvgam_uncertainty = function(object, series = 1, data_test, legend_position = 'topleft',
+plot_mvgam_uncertainty = function(object, series = 1, newdata,
+                                  data_test, legend_position = 'topleft',
                                   hide_xlabels = FALSE){
 
   # Check arguments
@@ -25,6 +28,10 @@ plot_mvgam_uncertainty = function(object, series = 1, data_test, legend_position
       stop('argument "series" must be a positive integer',
            call. = FALSE)
     }
+  }
+
+  if(!missing("newdata")){
+    data_test <- newdata
   }
 
   # Prediction indices for the particular series

@@ -7,7 +7,9 @@
 mvgam(
   formula,
   knots,
+  data,
   data_train,
+  newdata,
   data_test,
   run_model = TRUE,
   prior_simulation = FALSE,
@@ -15,11 +17,11 @@ mvgam(
   family = "poisson",
   use_lv = FALSE,
   n_lv,
-  trend_model = "RW",
+  trend_model = "None",
   drift = FALSE,
   chains = 4,
-  burnin = 1000,
-  n_samples = 1000,
+  burnin = 500,
+  n_samples = 500,
   thin = 1,
   parallel = TRUE,
   phi_prior,
@@ -47,17 +49,23 @@ For most bases the user simply supplies the knots to be used, which must match u
 (note that the number of knots is not always just k). Different terms can use different numbers of knots,
 unless they share a covariate.}
 
-\item{data_train}{A \code{dataframe} or \code{list} containing the model response variable and covariates
+\item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
 'y' (the discrete outcomes; \code{NA}s allowed)
 'series' (character or factor index of the series IDs)
 'time' (numeric index of the time point for each observation).
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
-\item{data_test}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+\item{data_train}{Deprecated. Still works in place of \code{data} but users are recommended to use
+\code{data} instead for more seamless integration into \code{R} workflows}
+
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 in addition to any other variables included in the linear predictor of \code{formula}. If included, the
-observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
+observations in variable \code{y} will be set to \code{NA} when fitting the model so that posterior
 simulations can be obtained}
+
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
+\code{newdata} instead for more seamless integration into \code{R} workflows}
 
 \item{run_model}{\code{logical}. If \code{FALSE}, the model is not fitted but instead the function will
 return the model file and the data / initial values that are needed to fit the model outside of \code{mvgam}}

@@ -6,6 +6,7 @@
 \usage{
 \method{ppc}{mvgam}(
   object,
+  newdata,
   data_test,
   series = 1,
   type = "density",
@@ -19,11 +20,14 @@
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
 
-\item{data_test}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
 included, the observed values in the test data are compared to the model's forecast distribution for exploring
 biases in model predictions.
-Note this is only useful if the same \code{data_test} was also included when fitting the original model.}
+Note this is only useful if the same \code{newdata} was also included when fitting the original model.}
+
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
+\code{newdata} instead for more seamless integration into \code{R} workflows}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 

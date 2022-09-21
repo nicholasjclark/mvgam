@@ -4,7 +4,15 @@
 \alias{plot.mvgam}
 \title{Default mvgam plots}
 \usage{
-\method{plot}{mvgam}(object, type = "smooths", series = 1, residuals = FALSE, data_test, ...)
+\method{plot}{mvgam}(
+  object,
+  type = "smooths",
+  series = 1,
+  residuals = FALSE,
+  newdata,
+  data_test,
+  ...
+)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
@@ -23,10 +31,14 @@ factors}
 \item{series}{\code{integer} specifying which series in the set is to be plotted. This is ignored
 if \code{type == 're'}}
 
-\item{data_test}{A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in
-addition to any other variables included in the linear predictor of \code{formula}. This argument is optional when
-plotting out of sample forecast period observations (when \code{type = forecast}) and required when plotting
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+in addition to any other variables included in the linear predictor of the original \code{formula}.
+This argument is optional when plotting out of sample forecast period observations
+(when \code{type = forecast}) and required when plotting
 uncertainty components (\code{type = uncertainty}).}
+
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
+\code{newdata} instead for more seamless integration into \code{R} workflows}
 
 \item{...}{Additional arguments for each individual plotting function.}
 }

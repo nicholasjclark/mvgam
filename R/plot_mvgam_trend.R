@@ -1,8 +1,10 @@
 #'Plot mvgam latent trend for a specified series
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param data_test Optional \code{dataframe} of test data containing at least 'series', 'season' and 'year'
-#'forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}
+#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+#'in addition to any other variables included in the linear predictor of the original \code{formula}.
+#'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
+#'\code{newdata} instead for more seamless integration into `R` workflows
 #'@param derivatives \code{logical}. If \code{TRUE}, an additional plot will be returned to show the
 #'estimated 1st derivative for the estimated trend
 #'@param realisations \code{logical}. If \code{TRUE}, posterior trend realisations are shown as a spaghetti plot,
@@ -10,14 +12,16 @@
 #'empirical quantiles of the posterior distribution are shown
 #'@param n_realisations \code{integer} specifying the number of posterior realisations to plot, if
 #'\code{realisations = TRUE}. Ignored otherwise
+#'@param n_cores \code{integer} specifying number of cores for generating trend forecasts in parallel
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}. Ignored if \code{derivatives = TRUE}
 #'@param xlab label for x axis.
 #'@param ylab label for y axis.
 #'@param ... further \code{\link[graphics]{par}} graphical parameters.
 #'@export
-plot_mvgam_trend = function(object, series = 1, data_test,
+plot_mvgam_trend = function(object, series = 1, newdata, data_test,
                             realisations = FALSE, n_realisations = 15,
+                            n_cores = 1,
                             derivatives = FALSE, hide_xlabels = FALSE,
                             xlab, ylab,
                             ...){
@@ -40,6 +44,10 @@ plot_mvgam_trend = function(object, series = 1, data_test,
   if(object$trend_model == 'None'){
     stop('no trend was estimated in object',
          call. = FALSE)
+  }
+
+  if(!missing("newdata")){
+    data_test <- newdata
   }
 
   # Prediction indices for the particular series
@@ -103,7 +111,8 @@ plot_mvgam_trend = function(object, series = 1, data_test,
 
     if(dim(preds)[2] != length(all_obs)){
       fc_preds <- forecast(object, series = series, data_test = data_test,
-                                 type = 'trend')
+                                 type = 'trend',
+                           n_cores = n_cores)
       preds <- cbind(preds, fc_preds)
     }
   }

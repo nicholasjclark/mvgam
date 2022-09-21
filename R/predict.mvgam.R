@@ -4,6 +4,9 @@
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time
 #'for prediction, in addition to any other variables included in the linear predictor of \code{formula}. If not supplied,
 #'predictions are generated for the original observations used for the model fit.
+#'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
+#'\code{newdata} instead for more seamless integration into `R` workflows
+#'@param n_cores \code{integer} specifying number of cores for generating predictions in parallel
 #'@param type When this has the value \code{link} (default) the linear predictor is calculated on the log link scale.
 #'When \code{response} is used, the predictions take uncertainty in the observation process into account to return
 #'predictions on the outcome (discrete) scale.
@@ -19,7 +22,8 @@
 #'posterior samples from the fitted object and \code{n_obs} is the number of test observations in \code{newdata}
 #'in which the \code{series} variable matches the supplied \code{series} argument
 #'@export
-predict.mvgam = function(object, series = 1, newdata, type = 'link'){
+predict.mvgam = function(object, series = 1, newdata, data_test, type = 'link',
+                         n_cores = 1){
 
   # Argument checks
   if(class(object) != 'mvgam'){
@@ -36,6 +40,10 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
     }
   }
 
+  if(!missing("data_test")){
+    newdata <- data_test
+  }
+
   type <- match.arg(arg = type, choices = c("link", "response"))
 
   # Generate linear predictor matrix from the mgcv component
@@ -47,7 +55,6 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
 
   # Filter the data so that only observations for the specified series are used
   pred_inds <- which(newdata$series == s_name)
-
   dat_names <- names(newdata)
 
   if(class(newdata)[1] == 'list'){
@@ -64,6 +71,7 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
   }
   names(newdata) <- dat_names
 
+  # Generate the linear predictor matrix
   suppressWarnings(Xp  <- try(predict(object$mgcv_model,
                                       newdata = newdata,
                                       type = 'lpmatrix'),
@@ -71,7 +79,6 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
 
   if(inherits(Xp, 'try-error')){
     testdat <- data.frame(time = newdata$time)
-
     terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients)
                                                                  %in% '(Intercept)')]
     if(length(terms_include) > 0){
@@ -89,7 +96,6 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
                                     type = 'lpmatrix'))
   }
 
-
   # Beta coefficients for GAM component
   betas <- MCMCvis::MCMCchains(object$model_output, 'b')
 
@@ -99,12 +105,17 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
   # Negative binomial size estimate
   if(family == 'Negative Binomial'){
     sizes <- MCMCvis::MCMCchains(object$model_output, 'r')
+  } else {
+    sizes <- NULL
   }
 
   # Tweedie parameters
   if(family == 'Tweedie'){
     twdiss <- MCMCvis::MCMCchains(object$model_output, 'twdis')
     ps <- matrix(1.5, nrow = NROW(betas), ncol = NCOL(object$ytimes))
+  } else {
+    twdiss <- NULL
+    ps <- NULL
   }
 
   # Latent trend precisions and loadings
@@ -133,18 +144,39 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
       # is sampled at zero
       taus[is.na(taus)] <- 0.001
     }
+    lv_coefs <- NULL
   }
 
   if(object$trend_model == 'GP'){
     alpha_gps <- MCMCvis::MCMCchains(object$model_output, 'alpha_gp')
     rho_gps <- MCMCvis::MCMCchains(object$model_output, 'rho_gp')
+  } else {
+    alpha_gps <- NULL
+    rho_gps <- NULL
   }
-
   # Loop across all posterior samples and calculate predictions on the outcome scale
-  predictions <- do.call(rbind, lapply(seq_len(dim(betas)[1]), function(x){
+  use_lv <- object$use_lv
+  cl <- parallel::makePSOCKcluster(n_cores)
+  setDefaultCluster(cl)
+  clusterExport(NULL, c('use_lv',
+                        'taus',
+                        'alpha_gps',
+                        'rho_gps',
+                        'lv_coefs',
+                        'betas',
+                        'sizes',
+                        'twdiss',
+                        'ps',
+                        'newdata',
+                        'Xp'),
+                envir = environment())
 
-    if(object$use_lv){
-      lv_preds <- do.call(cbind, lapply(seq_len(object$n_lv), function(lv){
+  pbapply::pboptions(type = "none")
+
+  predictions <- do.call(rbind, pbapply::pblapply(seq_len(dim(betas)[1]), function(x){
+
+    if(use_lv){
+      lv_preds <- do.call(cbind, lapply(seq_len(n_lv), function(lv){
         rnorm(length(which(newdata$series == s_name)), 0, sqrt(1 / taus[x,lv]))
       }))
 
@@ -276,7 +308,8 @@ predict.mvgam = function(object, series = 1, newdata, type = 'link'){
     }
     out
 
-  }))
+  }, cl = cl))
+  stopCluster(cl)
 
   return(predictions)
 }

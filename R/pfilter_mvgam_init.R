@@ -6,10 +6,12 @@
 #'forecast distribution
 #'
 #'@param object \code{list} object returned from \code{mvgam}
-#'@param data_assim A \code{dataframe} or \code{list} of test data containing at least one more observation per series
+#'@param newdata A \code{dataframe} or \code{list} of test data containing at least one more observation per series
 #'(beyond the last observation seen by the model in \code{object}) to be assimilated by the particle filter.
 #'Should at least contain 'series' and 'time' for the one-step ahead horizon,
 #'in addition to any other variables included in the linear predictor of \code{object}
+#'@param data_assim Deprecated. Still works in place of \code{newdata} but users are recommended to use
+#'\code{newdata} instead for more seamless integration into `R` workflows
 #'@param n_particles \code{integer} specifying the number of unique particles to generate for tracking the
 #'latent system state
 #'@param file_path \code{character} string specifying the file path for saving the initiated particles
@@ -19,6 +21,7 @@
 #'from the original model, to an \code{.rda} object in \code{file_path}
 #'@export
 pfilter_mvgam_init = function(object,
+                              newdata,
                               data_assim,
                               n_particles = 1000,
                               file_path = 'pfilter',
@@ -27,6 +30,10 @@ pfilter_mvgam_init = function(object,
   # Check arguments
   if(class(object) != 'mvgam'){
     stop('argument "object" must be of class "mvgam"')
+  }
+
+  if(!missing("newdata")){
+    data_assim <- newdata
   }
 
 #### 1. Generate linear predictor matrix for the next timepoint and extract last trend estimates

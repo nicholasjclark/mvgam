@@ -13,16 +13,20 @@
 #'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
 #'(note that the number of knots is not always just k). Different terms can use different numbers of knots,
 #'unless they share a covariate.
-#'@param data_train A \code{dataframe} or \code{list} containing the model response variable and covariates
+#'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
 #''y' (the discrete outcomes; \code{NA}s allowed)
 #''series' (character or factor index of the series IDs)
 #''time' (numeric index of the time point for each observation).
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
-#'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+#'@param data_train Deprecated. Still works in place of \code{data} but users are recommended to use
+#'\code{data} instead for more seamless integration into `R` workflows
+#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 #'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
-#'observations in \code{data_test} will be set to \code{NA} when fitting the model so that posterior
+#'observations in variable \code{y} will be set to \code{NA} when fitting the model so that posterior
 #'simulations can be obtained
+#'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
+#'\code{newdata} instead for more seamless integration into `R` workflows
 #'@param run_model \code{logical}. If \code{FALSE}, the model is not fitted but instead the function will
 #'return the model file and the data / initial values that are needed to fit the model outside of \code{mvgam}
 #'@param prior_simulation \code{logical}. If \code{TRUE}, no observations are fed to the model, and instead
@@ -255,7 +259,9 @@
 
 mvgam = function(formula,
                  knots,
+                 data,
                  data_train,
+                 newdata,
                  data_test,
                  run_model = TRUE,
                  prior_simulation = FALSE,
@@ -263,11 +269,11 @@ mvgam = function(formula,
                  family = 'poisson',
                  use_lv = FALSE,
                  n_lv,
-                 trend_model = 'RW',
+                 trend_model = 'None',
                  drift = FALSE,
                  chains = 4,
-                 burnin = 1000,
-                 n_samples = 1000,
+                 burnin = 500,
+                 n_samples = 500,
                  thin = 1,
                  parallel = TRUE,
                  phi_prior,
@@ -287,6 +293,15 @@ mvgam = function(formula,
   # Check arguments
   trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1",
                                                           "AR2", "AR3", "GP"))
+
+  if(!missing("data")){
+    data_train <- data
+  }
+
+  if(!missing("newdata")){
+    data_test <- newdata
+  }
+
   if(class(family) == 'family'){
     family <- family$family
   }
@@ -378,7 +393,7 @@ mvgam = function(formula,
   # Must be able to index by time; it is too dangerous to 'guess' as this could make a huge
     # impact on resulting estimates / inferences
   if(!'time' %in% colnames(data_train)){
-    stop('data_train does not contain a "time" column')
+    stop('data does not contain a "time" column')
   }
     }
 
@@ -391,7 +406,7 @@ mvgam = function(formula,
     }
 
     if(!'time' %in% names(data_train)){
-      stop('data_train does not contain a "time" column')
+      stop('data does not contain a "time" column')
     }
   }
 

@@ -7,6 +7,7 @@
 plot_mvgam_fc(
   object,
   series = 1,
+  newdata,
   data_test,
   realisations = FALSE,
   n_realisations = 15,
@@ -14,6 +15,7 @@ plot_mvgam_fc(
   xlab,
   ylab,
   ylim,
+  n_cores = 1,
   return_forecasts = FALSE,
   ...
 )
@@ -23,16 +25,19 @@ plot_mvgam_fc(
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
-\item{data_test}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
-in addition to any other variables included in the linear predictor of \code{formula}. If included, the
-covariate information in \code{data_test} will be used to generate forecasts from the fitted model equations. If
-this same \code{data_test} was originally included in the call to \code{mvgam}, then forecasts have already been
-produced by the generative model and these will simply be extracted and plotted. However if no \code{data_test} was
-supplied to the original model call, an assumption is made that the \code{data_test} supplied here comes sequentially
-after the data supplied as \code{data_train} in the original model (i.e. we assume there is no time gap between the last
-observation of series 1 in \code{data_train} and the first observation for series 1 in \code{data_test}). If
-\code{data_test} contains observations in column \code{y}, these observations will be used to compute a Discrete Rank
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+in addition to any other variables included in the linear predictor of the original \code{formula}. If included, the
+covariate information in \code{newdata} will be used to generate forecasts from the fitted model equations. If
+this same \code{newdata} was originally included in the call to \code{mvgam}, then forecasts have already been
+produced by the generative model and these will simply be extracted and plotted. However if no \code{newdata} was
+supplied to the original model call, an assumption is made that the \code{newdata} supplied here comes sequentially
+after the data supplied as \code{data} in the original model (i.e. we assume there is no time gap between the last
+observation of series 1 in \code{data} and the first observation for series 1 in \code{newdata}). If
+\code{newdata} contains observations in column \code{y}, these observations will be used to compute a Discrete Rank
 Probability Score for the forecast distribution}
+
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
+\code{newdata} instead for more seamless integration into \code{R} workflows}
 
 \item{realisations}{\code{logical}. If \code{TRUE}, forecast realisations are shown as a spaghetti plot,
 making it easier to visualise the diversity of possible forecasts. If \code{FALSE}, the default,
@@ -49,6 +54,8 @@ empirical quantiles of the forecast distribution are shown}
 \item{ylab}{label for y axis.}
 
 \item{ylim}{Optional \code{vector} of y-axis limits (min, max)}
+
+\item{n_cores}{\code{integer} specifying number of cores for generating forecasts in parallel}
 
 \item{return_forecasts}{\code{logical}. If \code{TRUE}, the function will plot the forecast
 as well as returning the forecast object (as a \code{matrix} of dimension \code{n_samples} x \code{horizon})}

@@ -5,14 +5,18 @@
 #'
 #'@param object Optional \code{list} object returned from \code{mvgam}. Either \code{object} or \code{data_train}
 #'must be supplied.
-#'@param data_train Optional \code{dataframe} or \code{list} of training data containing at least 'series' and 'time'.
+#'@param data Optional \code{dataframe} or \code{list} of training data containing at least 'series' and 'time'.
 #'Use this argument if training data have been gathered in the correct format for \code{mvgam} modelling
 #'but no model has yet been fitted.
-#'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+#'@param data_train Deprecated. Still works in place of \code{data} but users are recommended to use
+#'\code{data} instead for more seamless integration into `R` workflows
+#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 #'for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
 #'included, the observed values in the test data are compared to the model's forecast distribution for exploring
 #'biases in model predictions.
-#'#'@param series Either a \code{integer} specifying which series in the set is to be plotted or
+#'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
+#'\code{newdata} instead for more seamless integration into `R` workflows
+#'@param series Either a \code{integer} specifying which series in the set is to be plotted or
 #'the string 'all', which plots all series available in the supplied data
 #'@param n_bins \code{integer} specifying the number of bins to use for binning observed values when plotting
 #'a the histogram. Default is to use the number of bins returned by a call to `hist` in base `R`
@@ -26,8 +30,13 @@
 #'a set of observed time series plots is returned in which all series are shown on each plot but
 #'only a single focal series is highlighted, with all remaining series shown as faint gray lines.
 #'@export
-plot_mvgam_series = function(object, data_train, data_test,
-                             series = 1, n_bins,
+plot_mvgam_series = function(object,
+                             data,
+                             data_train,
+                             newdata,
+                             data_test,
+                             series = 1,
+                             n_bins,
                              log_scale = FALSE){
 
   # Check arguments
@@ -48,9 +57,18 @@ plot_mvgam_series = function(object, data_train, data_test,
     }
   }
 
+
+  if(!missing("data")){
+    data_train <- data
+  }
+
+  if(!missing("newdata")){
+    data_test <- newdata
+  }
+
   if(!missing(object)){
     if(!missing(data_train)){
-      warning('both "object" and "data_train" were supplied; only using "object"')
+      warning('both "object" and "data" were supplied; only using "object"')
     }
     data_train <- object$obs_data
   }

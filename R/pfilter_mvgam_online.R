@@ -5,11 +5,13 @@
 #'In each iteration, the next observation is assimilated
 #'and particles are weighted by their proposal's multivariate composite likelihood
 #'
-#'@param data_assim A \code{dataframe} or \code{list} of test data containing at least one more observation per series
+#'@param newdata A \code{dataframe} or \code{list} of test data containing at least one more observation per series
 #'(beyond the last observation seen by the model when initialising particles with
 #' \code{\link{pfilter_mvgam_init}} or in previous calls to \code{pfilter_mvgam_online}.
 #'Should at least contain 'series' and 'time' for the one-step ahead horizon,
 #'in addition to any other variables included in the linear predictor of \code{object}
+#'@param data_assim Deprecated. Still works in place of \code{newdata} but users are recommended to use
+#'\code{newdata} instead for more seamless integration into `R` workflows
 #'@param threshold \code{proportional numeric} specifying the Effective Sample Size limit under which
 #'resampling of particles will be triggered (calculated as \code{ESS / n_particles}) if \code{use_resampling == TRUE}.
 #'Should be between \code{0} and \code{1}
@@ -26,12 +28,17 @@
 #'current state estimates for each particle is generated and saved, along with other important information
 #'from the original model, to an \code{.rda} object in \code{file_path}
 #'@export
-pfilter_mvgam_online = function(data_assim,
+pfilter_mvgam_online = function(newdata,
+                                data_assim,
                                 file_path = 'pfilter',
                                 threshold = 0.5,
                                 use_resampling = FALSE,
                                 kernel_lambda = 1,
                                 n_cores = parallel::detectCores() - 1){
+
+  if(!missing("newdata")){
+    data_assim <- newdata
+  }
 
   # Load the particles and key objects for tracking last assimilation dates
   if(file.exists(paste0(file_path, '/particles.rda'))){

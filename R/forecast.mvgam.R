@@ -1,15 +1,18 @@
 #'@title Compute out of sample forecasts for a fitted \code{mvgam} object
 #'@name forecast.mvgam
 #'@param object \code{list} object returned from \code{mvgam}
-#'@param data_test A \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
-#'for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}.
-#'The covariate information in \code{data_test} will be used to generate forecasts from the fitted model equations. If
-#'this same \code{data_test} was originally included in the call to \code{mvgam}, then forecasts have already been
-#'produced by the generative model and these will simply be extracted. However if no \code{data_test} was
-#'supplied to the original model call, an assumption is made that the \code{data_test} supplied here comes sequentially
-#'after the data supplied as \code{data_train} in the original model (i.e. we assume there is no time gap between the last
-#'observation of series 1 in \code{data_train} and the first observation for series 1 in \code{data_test}).
+#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+#'in addition to any other variables included in the linear predictor of the original \code{formula}. If included, the
+#'covariate information in \code{newdata} will be used to generate forecasts from the fitted model equations. If
+#'this same \code{newdata} was originally included in the call to \code{mvgam}, then forecasts have already been
+#'produced by the generative model and these will simply be extracted and plotted. However if no \code{newdata} was
+#'supplied to the original model call, an assumption is made that the \code{newdata} supplied here comes sequentially
+#'after the data supplied as \code{data} in the original model (i.e. we assume there is no time gap between the last
+#'observation of series 1 in \code{data} and the first observation for series 1 in \code{newdata}).
+#'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
+#'\code{newdata} instead for more seamless integration into `R` workflows
 #'@param series \code{integer} specifying which series in the set is to be forecast
+#'@param n_cores \code{integer} specifying number of cores for generating forecasts in parallel
 #'@param type When this has the value \code{link}, the linear predictor is calculated on the log link scale.
 #'When \code{response} is used, the predictions take uncertainty in the observation process into account to return
 #'predictions on the outcome (discrete) scale (default). When \code{trend} is used, only the forecast distribution for the
@@ -26,7 +29,8 @@ forecast <- function(x, what, ...){
 #'@rdname forecast.mvgam
 #'@method forecast mvgam
 #'@export
-forecast.mvgam = function(object, data_test, series = 1,
+forecast.mvgam = function(object, newdata, data_test, series = 1,
+                          n_cores = 1,
                           type = 'response'){
   # Check arguments
   if(class(object) != 'mvgam'){
@@ -41,6 +45,10 @@ forecast.mvgam = function(object, data_test, series = 1,
       stop('argument "series" must be a positive integer',
            call. = FALSE)
     }
+  }
+
+  if(!missing("newdata")){
+    data_test <- newdata
   }
 
   type <- match.arg(arg = type, choices = c("link", "response", "trend"))
@@ -209,12 +217,17 @@ forecast.mvgam = function(object, data_test, series = 1,
   # Negative binomial size estimate
   if(family == 'Negative Binomial'){
     sizes <- MCMCvis::MCMCchains(object$model_output, 'r')
+  } else {
+    sizes <- NULL
   }
 
   # Tweedie parameters
   if(family == 'Tweedie'){
     twdiss <- MCMCvis::MCMCchains(object$model_output, 'twdis')
     ps <- matrix(1.5, nrow = NROW(betas), ncol = NCOL(object$ytimes))
+  } else {
+    twdiss <- NULL
+    ps <- NULL
   }
 
   # Latent trend precisions and loadings
@@ -240,6 +253,7 @@ forecast.mvgam = function(object, data_test, series = 1,
     } else {
       taus <- MCMCvis::MCMCchains(object$model_output, 'tau')
     }
+    lv_coefs <- NULL
   }
 
   # Latent trend estimates
@@ -293,6 +307,8 @@ forecast.mvgam = function(object, data_test, series = 1,
       })
     }
 
+  } else {
+    lvs <- NULL
   }
 
   # Phi estimates for latent trend drift terms
@@ -373,10 +389,35 @@ forecast.mvgam = function(object, data_test, series = 1,
     rho_gps <- NULL
   }
 
-
   # Produce forecasts
-  fc_preds <- do.call(rbind, lapply(seq_len(dim(betas)[1]), function(i){
-    if(object$use_lv){
+  use_lv <- object$use_lv
+  cl <- parallel::makePSOCKcluster(n_cores)
+  setDefaultCluster(cl)
+  clusterExport(NULL, c('use_lv',
+                        'lvs',
+                        'phis',
+                        'ar1s',
+                        'ar2s',
+                        'ar3s',
+                        'taus',
+                        'alpha_gps',
+                        'rho_gps',
+                        'lv_coefs',
+                        'betas',
+                        'sizes',
+                        'twdiss',
+                        'ps',
+                        'series_test',
+                        'trend_estimates',
+                        'sim_ar3',
+                        'sim_gp',
+                        'Xp'),
+                envir = environment())
+
+  pbapply::pboptions(type = "none")
+
+  fc_preds <- do.call(rbind, pbapply::pblapply(seq_len(dim(betas)[1]), function(i){
+    if(use_lv){
       # Sample a last state estimate for the latent variables
       samp_index <- i
       last_lvs <- lapply(seq_along(lvs), function(lv){
@@ -405,17 +446,17 @@ forecast.mvgam = function(object, data_test, series = 1,
 
       if(family == 'Tweedie'){
         twdis <- twdis[samp_index, ]
-        p <- p[samp_index]
+        p <- ps[samp_index]
       }
 
       # Run the latent variables forward h timesteps timestep
       next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
-        sim_ar3(phi[lv], ar1[lv], ar2[lv], ar3[lv], tau[lv], last_lvs[[lv]], NROW(series_test))
+        sim_ar3(phi[lv], ar1[lv], ar2[lv], ar3[lv], tau[lv],
+                last_lvs[[lv]], NROW(series_test))
       }))
 
       # Multiply lv states with loadings to generate each series' forecast trend state
       trends <- as.numeric(next_lvs %*% lv_coefs)
-
 
       if(type == 'trend'){
         out <- trends
@@ -424,21 +465,22 @@ forecast.mvgam = function(object, data_test, series = 1,
         # Calculate predictions
         if(family == 'Negative Binomial'){
           out <- rnbinom(NROW(series_test), size = size[series],
-                         mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)))
+                         mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
+                                    (trends)))
         }
 
         if(family == 'Poisson'){
           out <- rpois(NROW(series_test),
-                       lambda = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)))
+                       lambda = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
+                                      (trends)))
         }
 
         if(family == 'Tweedie'){
-          out <- mgcv::rTweedie(mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)),
+          out <- mgcv::rTweedie(mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
+                                           (trends)),
                                 p = p, phi = twdis[series])
         }
       }
-
-
 
     } else {
 
@@ -490,35 +532,40 @@ forecast.mvgam = function(object, data_test, series = 1,
       } else {
         t <- 1:length(last_trends)
         t_new <- 1:(length(last_trends) + NROW(series_test))
-
-
         Sigma_new <- alpha_gp[series]^2 * exp(- outer(t, t_new, "-")^2 / (2 * rho_gp[series]^2))
         Sigma_star <- alpha_gp[series]^2 * exp(- outer(t_new, t_new, "-")^2 / (2 * rho_gp[series]^2))
         Sigma <- alpha_gp[series]^2 * exp(- outer(t, t, "-")^2 / (2 * rho_gp[series]^2)) +
           diag(1e-4, length(last_trends))
 
-        trends <- as.vector(tail(t(Sigma_new) %*% solve(Sigma, last_trends), NROW(series_test)) +
-          tail(MASS::mvrnorm(1, mu = rep(0, dim(Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new))[2]),
-                             Sigma = Sigma_star -
-                               t(Sigma_new) %*% solve(Sigma, Sigma_new)), NROW(series_test)))
+        trends <- as.vector(tail(t(Sigma_new) %*% solve(Sigma, last_trends),
+                                 NROW(series_test)) +
+                              tail(MASS::mvrnorm(1,
+                                                 mu = rep(0, dim(Sigma_star - t(Sigma_new) %*%
+                                                                   solve(Sigma, Sigma_new))[2]),
+                                                 Sigma = Sigma_star -
+                                                   t(Sigma_new) %*% solve(Sigma, Sigma_new)),
+                                   NROW(series_test)))
       }
 
       if(type == 'trend'){
         out <- trends
       } else {
-
         # Calculate predictions
         if(family == 'Negative Binomial'){
           out <- rnbinom(NROW(series_test), size = size[series],
-                         mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)))
+                         mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
+                                    (trends)))
         }
 
         if(family == 'Poisson'){
-          out <- rpois(NROW(series_test), lambda = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)))
+          out <- rpois(NROW(series_test),
+                       lambda = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
+                                      (trends)))
         }
 
         if(family == 'Tweedie'){
-          out <- mgcv::rTweedie(mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) + (trends)),
+          out <- mgcv::rTweedie(mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
+                                           (trends)),
                                 p = p, phi = twdis[series])
         }
       }
@@ -526,7 +573,8 @@ forecast.mvgam = function(object, data_test, series = 1,
     }
 
     out
-  }))
+  }, cl = cl))
+  stopCluster(cl)
 
   return(fc_preds)
 }

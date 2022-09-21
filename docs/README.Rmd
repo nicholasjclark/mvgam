@@ -86,13 +86,12 @@ lynx_test = lynx_full[51:60, ]
 
 Inspect the series in a bit more detail using `mvgam`'s plotting utility
 ```{r, fig.width=6, fig.height=6, fig.align='center', message=FALSE, warning=FALSE}
-plot_mvgam_series(data_train = lynx_train)
+plot_mvgam_series(data = lynx_train)
 ```
 
 Now we will formulate an `mvgam` model; this model fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the temporal process (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution. But before conditioning the model on observed data, a check of prior smooth function realisations is useful to ensure we are allowing enough flexibility to capture the types of functional behaviours we think are reasonable without allowing outrageous behaviours. First we follow conventional recommendations to set `k` for the smooth term to be large, which would allow maximum flexibility in functional behaviours
 ```{r, message=FALSE, warning=FALSE}
-lynx_mvgam_prior <- mvgam(data_train = lynx_train,
-               data_test = lynx_test,
+lynx_mvgam_prior <- mvgam(data = lynx_train,
                formula = y ~ s(season, bs = 'cc', k = 19),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
@@ -113,8 +112,7 @@ exp(25)
 
 Setting `k` to a smaller value results in less flexibility, as the number of basis functions that contribute to the functional behaviour is reduced
 ```{r, message=FALSE, warning=FALSE}
-lynx_mvgam_prior <- mvgam(data_train = lynx_train,
-               data_test = lynx_test,
+lynx_mvgam_prior <- mvgam(data = lynx_train,
                formula = y ~ s(season, bs = 'cc', k = 13),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
@@ -130,14 +128,13 @@ plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
 
 In practice, imparting domain knowledge into prior specifications for penalised smooth functions is challenging, as these behaviours are often the cumulative result of multiple penalty matrices that all have their own separate smoothing parameters. Changing the prior on the smoothing parameters is another option (`mvgam` uses an expontenial(0.05) prior by default, which tends to regularise functions to be more smooth compared to default approaches used in `mgcv::jagam`), but without running through prior visualisations (and other prior pushforward checks) it will be more difficult to reason about how to set `k` to respect domain knowledge. In general it is highly recommended that users view `mvgam` and related interfaces such as `brms` as tools for building scaffold models that can then be modified to suit the bespoke needs of each particular analysis. But for now, we will proceed by conditioning the model on observed data in `Stan` using MCMC sampling with the `Cmdstan` interface (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan) and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
 ```{r, message=FALSE, warning=FALSE}
-lynx_mvgam <- mvgam(data_train = lynx_train,
-               data_test = lynx_test,
+lynx_mvgam <- mvgam(data = lynx_train,
+               newdata = lynx_test,
                formula = y ~ s(season, bs = 'cc', k = 13),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               use_stan = TRUE,
-               chains = 4)
+               use_stan = TRUE)
 ```
 
 Inspect the resulting model file, which is written in the `Stan` probabilistic programming language
@@ -205,34 +202,34 @@ plot_mvgam_smooth(lynx_mvgam, 1, 'season', derivatives = T)
 
 We can also view the mvgam's posterior retrodictions and predictions for the entire series (testing and training)
 ```{r, fig.width=5, fig.height=4, fig.align='center'}
-plot(lynx_mvgam, type = 'forecast', data_test = lynx_test)
+plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 ```
 
 And the estimated latent trend component, again using the more flexible `plot_mvgam_...()` option to show first derivatives of the estimated trend
 ```{r, fig.width=5, fig.height=6, fig.align='center'}
-plot_mvgam_trend(lynx_mvgam, data_test = lynx_test, derivatives = T)
+plot_mvgam_trend(lynx_mvgam, newdata = lynx_test, derivatives = T)
 ```
 
 We can also re-do the posterior predictive checks, but this time focusing only on the out of sample period. This will give us better insight into how the model is performing and whether it is able to simulate realistic and unbiased future values
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(lynx_mvgam, series = 1, type = 'rootogram', data_test = lynx_test)
+ppc(lynx_mvgam, series = 1, type = 'rootogram', newdata = lynx_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(lynx_mvgam, series = 1, type = 'mean', data_test = lynx_test)
+ppc(lynx_mvgam, series = 1, type = 'mean', newdata = lynx_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(lynx_mvgam, series = 1, type = 'cdf', data_test = lynx_test)
+ppc(lynx_mvgam, series = 1, type = 'cdf', newdata = lynx_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(lynx_mvgam, series = 1, type = 'pit', data_test = lynx_test)
+ppc(lynx_mvgam, series = 1, type = 'pit', newdata = lynx_test)
 ```
 
 A key aspect of ecological forecasting is to understand [how different components of a model contribute to forecast uncertainty](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589). We can estimate relative contributions to forecast uncertainty for the GAM component and the latent trend component using `mvgam`
 ```{r, fig.width=5, fig.height=4, fig.align='center'}
-plot_mvgam_uncertainty(lynx_mvgam, data_test = lynx_test, legend_position = 'none')
+plot_mvgam_uncertainty(lynx_mvgam, newdata = lynx_test, legend_position = 'none')
 text(1, 0.2, cex = 1.5, label="GAM component", 
      pos = 4, col="white", family = 'serif')
 text(1, 0.8, cex = 1.5, label="Trend component", 
@@ -246,13 +243,12 @@ plot(lynx_mvgam, type = 'residuals')
 
 Another useful utility of `mvgam` is the ability to use rolling window forecasts to evaluate competing models that may represent different hypotheses about the series dynamics. Here we will fit a poorly specified model to showcase how this evaluation works. In this model, we ignore the cyclic pattern of seasonality and force it to be fairly non-wiggly. We also use a random walk process for the trend
 ```{r, message=FALSE, warning=FALSE}
-lynx_mvgam_poor <- mvgam(data_train = lynx_train,
-               data_test = lynx_test,
+lynx_mvgam_poor <- mvgam(data = lynx_train,
+               newdata = lynx_test,
                formula = y ~ s(season, k = 3),
                family = 'poisson',
                trend_model = 'RW',
                use_stan = TRUE,
-               burnin = 1000,
                chains = 4)
 ```
 

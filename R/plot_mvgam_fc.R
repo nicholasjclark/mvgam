@@ -1,21 +1,24 @@
 #'Plot mvgam posterior predictions for a specified series
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param data_test Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
-#'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
-#'covariate information in \code{data_test} will be used to generate forecasts from the fitted model equations. If
-#'this same \code{data_test} was originally included in the call to \code{mvgam}, then forecasts have already been
-#'produced by the generative model and these will simply be extracted and plotted. However if no \code{data_test} was
-#'supplied to the original model call, an assumption is made that the \code{data_test} supplied here comes sequentially
-#'after the data supplied as \code{data_train} in the original model (i.e. we assume there is no time gap between the last
-#'observation of series 1 in \code{data_train} and the first observation for series 1 in \code{data_test}). If
-#'\code{data_test} contains observations in column \code{y}, these observations will be used to compute a Discrete Rank
+#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+#'in addition to any other variables included in the linear predictor of the original \code{formula}. If included, the
+#'covariate information in \code{newdata} will be used to generate forecasts from the fitted model equations. If
+#'this same \code{newdata} was originally included in the call to \code{mvgam}, then forecasts have already been
+#'produced by the generative model and these will simply be extracted and plotted. However if no \code{newdata} was
+#'supplied to the original model call, an assumption is made that the \code{newdata} supplied here comes sequentially
+#'after the data supplied as \code{data} in the original model (i.e. we assume there is no time gap between the last
+#'observation of series 1 in \code{data} and the first observation for series 1 in \code{newdata}). If
+#'\code{newdata} contains observations in column \code{y}, these observations will be used to compute a Discrete Rank
 #'Probability Score for the forecast distribution
+#'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
+#'\code{newdata} instead for more seamless integration into `R` workflows
 #'@param realisations \code{logical}. If \code{TRUE}, forecast realisations are shown as a spaghetti plot,
 #'making it easier to visualise the diversity of possible forecasts. If \code{FALSE}, the default,
 #'empirical quantiles of the forecast distribution are shown
 #'@param n_realisations \code{integer} specifying the number of posterior realisations to plot, if
 #'\code{realisations = TRUE}. Ignored otherwise
+#'@param n_cores \code{integer} specifying number of cores for generating forecasts in parallel
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
 #'@param xlab label for x axis.
@@ -30,9 +33,10 @@
 #'to show possible forecast paths.
 #'@return A base \code{R} graphics plot and an optional \code{matrix} of the forecast distribution
 #'@export
-plot_mvgam_fc = function(object, series = 1, data_test,
+plot_mvgam_fc = function(object, series = 1, newdata, data_test,
                          realisations = FALSE, n_realisations = 15,
                          hide_xlabels = FALSE, xlab, ylab, ylim,
+                         n_cores = 1,
                          return_forecasts = FALSE, ...){
 
   # Check arguments
@@ -58,6 +62,10 @@ plot_mvgam_fc = function(object, series = 1, data_test,
       stop('argument "n_realisations" must be a positive integer',
            call. = FALSE)
     }
+  }
+
+  if(!missing("newdata")){
+    data_test <- newdata
   }
 
   # Prediction indices for the particular series
@@ -144,9 +152,11 @@ plot_mvgam_fc = function(object, series = 1, data_test,
   if(dim(preds)[2] != length(all_obs)){
     if(object$trend_model == 'None'){
       fc_preds <- predict.mvgam(object, series = series, newdata = data_test,
-                                type = 'response')
+                                type = 'response',
+                                n_cores = n_cores)
     } else {
-      fc_preds <- forecast.mvgam(object, series = series, data_test = data_test)
+      fc_preds <- forecast.mvgam(object, series = series, data_test = data_test,
+                                 n_cores = n_cores)
     }
     preds <- cbind(preds, fc_preds)
   }

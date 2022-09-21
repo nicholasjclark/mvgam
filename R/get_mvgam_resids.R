@@ -107,7 +107,6 @@ starts <- ends + 1
 starts <- c(1, starts[-c(1, (n_series+1))])
 ends <- ends[-1]
 
-
 # Calculate DS residual distributiosn in parallel
 cl <- parallel::makePSOCKcluster(n_cores)
 setDefaultCluster(cl)
@@ -163,8 +162,8 @@ series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
   }
 
 
-  if(NROW(preds) > 2000){
-    sample_seq <- sample(1:NROW(preds), 2000, F)
+  if(NROW(preds) > 1200){
+    sample_seq <- sample(1:NROW(preds), 1200, F)
   } else {
     sample_seq <- 1:NROW(preds)
   }

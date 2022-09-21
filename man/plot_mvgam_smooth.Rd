@@ -37,14 +37,15 @@ around the smooth function if the function is well estimated}
 Setting this argument too high can make for messy plots that are difficult to interpret, while setting it too
 low will likely mask some potentially useful patterns in the partial residuals. Default is \code{25}}
 
+\item{realisations}{\code{logical}. If \code{TRUE}, posterior realisations are shown as a spaghetti plot,
+making it easier to visualise the diversity of possible functions. If \code{FALSE}, the default,
+empirical quantiles of the posterior distribution are shown}
+
 \item{n_realisations}{\code{integer} specifying the number of posterior realisations to plot, if
 \code{realisations = TRUE}. Ignored otherwise}
 
 \item{derivatives}{\code{logical}. If \code{TRUE}, an additional plot will be returned to show the
-estimated 1st derivative for the specified smooth (Note, this only works for univariate smooths)
-#'@param realisations \code{logical}. If \code{TRUE}, posterior realisations are shown as a spaghetti plot,
-making it easier to visualise the diversity of possible functions. If \code{FALSE}, the default,
-empirical quantiles of the posterior distribution are shown}
+estimated 1st derivative for the specified smooth (Note, this only works for univariate smooths)}
 
 \item{newdata}{Optional \code{dataframe} for predicting the smooth, containing at least 'series'
 in addition to any other variables included in the linear predictor of the original model's \code{formula}.
