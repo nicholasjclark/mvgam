@@ -294,6 +294,10 @@ mvgam = function(formula,
   trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1",
                                                           "AR2", "AR3", "GP"))
 
+  if(missing("data") & missing("data_train")){
+    stop('Argument "data" is missing with no default')
+  }
+
   if(!missing("data")){
     data_train <- data
   }
@@ -1347,7 +1351,7 @@ mvgam = function(formula,
         # Convert model files to stan_fit class for consistency
         stanfit <- rstan::read_stan_csv(fit1$output_files(), col_major = TRUE)
         stanfit@sim$samples <- lapply(seq_along(stanfit@sim$samples), function(x){
-          samps <- as.list(stanfit@sim$samples[[1]])
+          samps <- as.list(stanfit@sim$samples[[x]])
           names(samps) <- row.names(rstan::summary(stanfit)$summary)
           samps
         })
@@ -1414,6 +1418,12 @@ mvgam = function(formula,
       # Set monitor parameters and initial values
       param <- get_monitor_pars(family, smooths_included = smooths_included,
                                 use_lv, trend_model, drift)
+
+      # Add random effect parameters for monitoring
+      if(any(smooth_labs$class == 'random.effect')){
+        param <- c(param, paste0('mu_raw', 1:length(re_smooths)))
+        param <- c(param, paste0('sigma_raw', 1:length(re_smooths)))
+      }
 
       if(!smooths_included){
         inits <- NULL

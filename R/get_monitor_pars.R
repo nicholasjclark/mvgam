@@ -8,7 +8,8 @@
 #' @param trend_model The type of trend model used
 #' @param drift Logical (was a drift term estimated or not)
 #' @return A string of parameters to monitor
-get_monitor_pars = function(family, smooths_included = TRUE, use_lv, trend_model, drift){
+get_monitor_pars = function(family, smooths_included = TRUE,
+                            use_lv, trend_model, drift){
 
   if(smooths_included){
     param <- c('rho', 'b', 'ypred')

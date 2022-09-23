@@ -104,7 +104,7 @@ check_n_eff <- function(fit, quiet=FALSE) {
     if (quiet) return(TRUE)
   }
   else {
-    if (!quiet) cat('*n_eff / iter below 0.001 indicates that the effective sample size has likely been overestimated\n')
+    if (!quiet) cat('*n_eff / iter below 0.001 indicates that effective sample size has likely been overestimated\n')
     if (quiet) return(FALSE)
   }
 }
@@ -126,14 +126,14 @@ check_rhat <- function(fit, quiet=FALSE) {
 
   no_warning <- TRUE
   rhats <- fit_summary[,'Rhat']
-  if(any(rhats > 1.1)) no_warning <- FALSE
+  if(any(rhats > 1.05)) no_warning <- FALSE
   if (no_warning) {
     if (!quiet) cat('Rhat looks reasonable for all parameters\n')
     if (quiet) return(TRUE)
   } else {
     if (!quiet){
-      cat('Rhats above 1.1 found for',
-          length(which(rhats > 1.1)),
+      cat('Rhats above 1.05 found for',
+          length(which(rhats > 1.05)),
           'parameters\n*Diagnose further to investigate why the chains have not mixed\n')
     }
     if (quiet) return(FALSE)

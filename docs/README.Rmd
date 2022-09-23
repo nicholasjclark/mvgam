@@ -172,14 +172,14 @@ All of these plots indicate the model is well calibrated against the training da
 summary(lynx_mvgam)
 ```
 
-The `plot_mvgam_...()` functions offer more flexibility than the generic `S3 plot.mvgam()` functions. For example, we can inpsect traceplots when sampling from a posterior with `MCMC` methods. Here for the `GAM` component (smoothing parameters).
+As with any `MCMC` based software, we can inspect traceplots. Here for the `GAM` component smoothing parameters.
 ```{r, fig.width = 7, fig.height = 4.1, fig.align='center'}
-plot_mvgam_trace(lynx_mvgam, 'rho')
+rstan::stan_trace(lynx_mvgam$model_output, 'rho')
 ```
 
 and for the latent trend component parameters
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-MCMCvis::MCMCtrace(lynx_mvgam$model_output, c('ar1', 'ar2', 'ar3', 'sigma'), pdf = F, n.eff = T, Rhat = T)
+rstan::stan_trace(lynx_mvgam$model_output, c('ar1', 'ar2', 'ar3', 'sigma'))
 ```
 
 Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior quantiles of partial residuals (shown as ribbon rectangles in red), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model

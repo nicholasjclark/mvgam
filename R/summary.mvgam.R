@@ -97,11 +97,22 @@ if(any(smooth_labs$class == 'random.effect')){
     dplyr::filter(class == 'random.effect') %>%
     dplyr::pull(label)
 
-  re_sds <- MCMCvis::MCMCsummary(object$model_output, 'sigma_raw',
-                           ISB = FALSE)[,c(3:7)]
+  if(object$fit_engine == 'jags'){
+    re_sds <- MCMCvis::MCMCsummary(object$model_output,
+                                   paste0('sigma_raw',
+                                          seq_along(re_smooths)))[,c(3:7)]
 
-  re_mus <- MCMCvis::MCMCsummary(object$model_output, 'mu_raw',
-                           ISB = FALSE)[,c(3:7)]
+    re_mus <- MCMCvis::MCMCsummary(object$model_output,
+                                   paste0('mu_raw',
+                                          seq_along(re_smooths)))[,c(3:7)]
+  } else {
+    re_sds <- MCMCvis::MCMCsummary(object$model_output, 'sigma_raw',
+                                   ISB = TRUE)[,c(3:7)]
+
+    re_mus <- MCMCvis::MCMCsummary(object$model_output, 'mu_raw',
+                                   ISB = TRUE)[,c(3:7)]
+  }
+
   rownames(re_sds) <- rownames(re_mus) <- re_smooths
 
   message("GAM random effect population mean estimates:")
@@ -259,6 +270,19 @@ if(object$fit_engine == 'stan'){
   message()
 }
 
+if(object$fit_engine == 'jags'){
+  message('JAGS MCMC diagnostics')
+  rhats <- MCMCvis::MCMCsummary(mod$model_output)[,6]
+  if(any(rhats > 1.05)){
+    cat('Rhats above 1.05 found for',
+        length(which(rhats > 1.05)),
+        'parameters\n*Diagnose further to investigate why the chains have not mixed\n')
+  } else {
+    cat('Rhat looks reasonable for all parameters\n')
+  }
+
+  message()
+}
 
 }
 
