@@ -11,9 +11,6 @@
 #'@return A \code{list} is printed on-screen showing the summaries for the model
 #'@export
 summary.mvgam = function(object){
-  # Grab the sim2jam object, which is needed to
-  # calculate effective degrees of freedom for smooth terms
-  jam = object$jam_model
 
 #### Standard summary of formula and model argumements ####
 message("GAM formula:")
@@ -128,8 +125,8 @@ if(any(grep('rho', rownames(MCMCvis::MCMCsummary(object$model_output))))){
   message("GAM smoothing parameter (rho) estimates:")
   rho_coefs <- MCMCvis::MCMCsummary(object$model_output, 'rho')[,c(3:7)]
 
-  name_starts <- unlist(purrr:::map(jam$smooth, 'first.sp'))
-  name_ends <- unlist(purrr:::map(jam$smooth, 'last.sp'))
+  name_starts <- unlist(purrr::map(object$mgcv_model$smooth, 'first.sp'))
+  name_ends <- unlist(purrr::map(object$mgcv_model$smooth, 'last.sp'))
 
   rho_names <- unlist(lapply(seq(1:length(object$mgcv_model$smooth)), function(i){
 

@@ -471,7 +471,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                      'mus[i, s]', stan_file, fixed = TRUE)
 
     stan_file[grep('model {', stan_file, fixed = TRUE) - 2] <-
-      paste0('for(s in 1:n_series){\n',
+      paste0('\nfor(s in 1:n_series){\n',
              'mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];\n',
              '}\n',
              '}')
@@ -481,7 +481,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                      'mus[i, s]', stan_file, fixed = TRUE)
 
     stan_file[grep('model {', stan_file, fixed = TRUE) - 2] <-
-      paste0('for(s in 1:n_series){\n',
+      paste0('\nfor(s in 1:n_series){\n',
              'mus[1:n, s] = eta[ytimes[1:n, s]];\n',
              '}\n',
              '}')

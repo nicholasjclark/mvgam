@@ -750,7 +750,6 @@ mvgam = function(formula,
 
   model_file_jags <- textConnection(model_file)
 
-
   # Covariate dataframe including training and testing observations
   if(!missing(data_test) & !prior_simulation){
     suppressWarnings(lp_test  <- try(predict(ss_gam,
@@ -1350,9 +1349,10 @@ mvgam = function(formula,
 
         # Convert model files to stan_fit class for consistency
         stanfit <- rstan::read_stan_csv(fit1$output_files(), col_major = TRUE)
+        param_names <- row.names(rstan::summary(stanfit)$summary)
         stanfit@sim$samples <- lapply(seq_along(stanfit@sim$samples), function(x){
           samps <- as.list(stanfit@sim$samples[[x]])
-          names(samps) <- row.names(rstan::summary(stanfit)$summary)
+          names(samps) <- param_names
           samps
         })
 
