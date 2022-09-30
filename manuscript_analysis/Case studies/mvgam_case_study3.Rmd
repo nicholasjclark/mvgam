@@ -26,15 +26,14 @@ To demonstrate how these models are estimated in `mvgam`, first we load the Port
 #devtools::install_github("nicholasjclark/mvgam")
 library(mvgam)
 library(dplyr)
-portal_dat <- read.csv('https://raw.githubusercontent.com/nicholasjclark/mvgam/
-                       master/manuscript_analysis/Case studies/rodents_data.csv', as.is = T)
+portal_dat <- read.csv('https://raw.githubusercontent.com/nicholasjclark/mvgam/master/manuscript_analysis/Case%20studies/rodents_data.csv', as.is = T)
 ```
 
 ```{r echo=FALSE}
 #devtools::install_github("nicholasjclark/mvgam")
 library(mvgam)
 library(dplyr)
-portal_dat <- read.csv('https://raw.githubusercontent.com/nicholasjclark/mvgam/master/manuscript_analysis/Case studies/rodents_data.csv', as.is = T)
+portal_dat <- read.csv('https://raw.githubusercontent.com/nicholasjclark/mvgam/master/manuscript_analysis/Case%20studies/rodents_data.csv', as.is = T)
 ```
 
 We'll keep data from the year 2004 onwards to make the model quicker to estimate for this simple example
@@ -83,8 +82,7 @@ head(data_all$time, 5)
 
 View the raw series. There is a clear seasonal pattern to the data, and there are missing values scattered throughout
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot(ts(data_all$y, frequency = 12), ylab = 'Captures for PP', xlab = '',
-     lwd = 2.5, col = "#8F2727")
+plot_mvgam_series(data = data_all)
 ```
 
 Create training and testing sets; start at observation 7 so that the `NA` values at the beginning of the covariate lag matrices are not included. Currently there is no option for on-the-fly imputation of missing covariate values in `mvgam` models, though this can easily be done in `JAGS` by specifying prior distributions over these missing entries
@@ -111,8 +109,8 @@ Now we can fit a Bayesian GAM with distributed lag terms for precipitation and m
 ```{r, message=FALSE, warning=FALSE}
 mod1 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                  te(precip, lag, k = c(6, 6)),
-                data_train = data_train,
-                data_test = data_test,
+                data = data_train,
+                newdata = data_test,
                 family = 'poisson',
                 chains = 4,
                 burnin = 15000,
@@ -134,8 +132,8 @@ Given the overdispersion present in the data, we will now assume a [`Geometric-P
 ```{r, message=FALSE, warning=FALSE}
 mod2 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                  te(precip, lag, k = c(6, 6)),
-                data_train = data_train,
-                data_test = data_test,
+                data = data_train,
+                newdata = data_test,
                 family = 'tw',
                 chains = 4,
                 burnin = 15000,
@@ -152,19 +150,29 @@ However, the residual plot looks much better for this model
 plot(mod2, type = 'residuals')
 ```
 
-The summary of the model provides useful information on convergence for unobserved parameters. Notice how strongly positive the overdispersion parameter is estimated to be, providing further evidence that this overdispersion is important to capture for these data
+The summary of the model provides useful information on convergence for unobserved parameters. Notice how strongly positive the overdispersion parameter is estimated to be, providing further evidence that this overdispersion is important to capture for these data. However, the Gibbs samplers used by `JAGS` have not come close to converging and we really shouldn't put much faith in our estimates of parameter uncertainty
 ```{r}
 summary(mod2)
 ```
 
-As this is a timeseries and the residual plot hints at some autocorrelation remaining in the short-term lags, lets check if an `AR` latent trend process improves forecasts compared to the no-trend model. An important note here is the choice of prior for the overdispersion parameter `twdis`. This parameter and the latent trend variance can interact strongly, particularly when overdispersion is in the data high. This is because at high values of the dispersion parameter, there is less need for a latent trend to be able to capture any outliers and so the latent trend precision can go up toward infinity, approaching a space of very diffuse likelihood that forces the Gibbs samplers to take on frustratingly small step sizes. Likewise when there is not much need for overdispersion, the dispersion parameter can approach zero and move around in an equally uninformative parameter space. The latent trend operates on the log scale, so really we should not expect autocorrelated jumps in trappings of more than `6-8` from timepoint to timepoint (any larger and the trend will compete strongly with the overdispersion parameter, making it difficult for us to model the inherent overdispersion process and instead assuming it is all autocorrelation). A containment prior on the latent trend `sigma` will help achieve this
+As this is a timeseries and the residual plot hints at some autocorrelation remaining in the short-term lags, lets check if an `AR` latent trend process improves forecasts compared to the no-trend model. An important note here is the choice of prior for the overdispersion parameter `twdis`. This parameter and the latent trend variance can interact strongly, particularly when overdispersion is in the data high. This is because at high values of the dispersion parameter, there is less need for a latent trend to be able to capture any outliers and so the latent trend precision can go up toward infinity, approaching a space of very diffuse likelihood that forces the Gibbs samplers to take on frustratingly small step sizes. Likewise when there is not much need for overdispersion, the dispersion parameter can approach zero and move around in an equally uninformative parameter space. The latent trend operates on the log scale, so really we should not expect autocorrelated jumps in trappings of more than `6-8` from timepoint to timepoint (any larger and the trend will compete strongly with the overdispersion parameter, making it difficult for us to model the inherent overdispersion process and instead assuming it is all autocorrelation). A containment prior on the latent trend `sigma` will help achieve this, but first we need to see the structure of the `priors` argument for making alterations to defaults
+```{r}
+priors <- get_mvgam_priors(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
+                 te(precip, lag, k = c(6, 6)),
+                data = data_train,
+                family = 'tw',
+                trend_model = 'AR3')
+priors
+```
+The 5th row of this `data.frame` contains information on the prior for the latent trend variance component. It is the entry for the `prior` column of this row that needs to be modified before supplying the argument for `priors` to the `mvgam` function:
 ```{r, message=FALSE, warning=FALSE}
+priors$prior[4] <- "dexp(2.5)T(0.15, 2)"
 mod3 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                  te(precip, lag, k = c(6, 6)),
-                data_train = data_train,
-                data_test = data_test,
+                data = data_train,
+                newdata = data_test,
                 family = 'tw',
-                sigma_prior = 'dexp(2.5)T(0.15, 2)',
+                priors = priors,
                 chains = 4,
                 burnin = 15000,
                 trend_model = 'AR3')
@@ -187,12 +195,13 @@ But there is no more evidence of autocorrelation in the residuals
 ```{r, fig.width = 6, fig.height = 5, fig.align='center'}
 plot(mod3, type = 'residuals')
 ```
-We can also demonstrate another feature of `mvgam`, which is the ability to use Hamiltonian Monte Carlo for parameter estimation via the software `Stan` (using the `rstan` interface). Note that `rstan` is currently required for this option to work, though support for other `Stan` interfaces will be added in future. Also note that currently there is no support for fitting `Tweedie` responses or dynamic factor models in `Stan`, though again these will be added in future. Because of these current limitations, we will stick with a `Negative Binomial` observation process for the `Stan` version. However there are great advantages when using `Stan`, which includes the option to estimate smooth latent trends via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408). This often makes sense for ecological series, which we expect to change smoothly over time. As expected when compared to the Gibbs sampler in `JAGS`, the `Stan` version converges very nicely
+
+We can also demonstrate another feature of `mvgam`, which is the ability to use Hamiltonian Monte Carlo for parameter estimation via the software `Stan` (using the `rstan` or `cmdstanr` interfaces). Also note that currently there is no support for fitting `Tweedie` responses in `Stan`. We will therefore stick with a `Negative Binomial` observation process for the `Stan` version. However there are great advantages when using `Stan`, which includes the option to estimate smooth latent trends via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408). This often makes sense for ecological series, which we expect to change smoothly over time. As expected when compared to the Gibbs sampler in `JAGS`, the `Stan` version converges very nicely
 ```{r, message=FALSE, warning=FALSE}
 mod4 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                  te(precip, lag, k = c(6, 6)),
-                data_train = data_train,
-                data_test = data_test,
+                data = data_train,
+                newdata = data_test,
                 family = 'nb',
                 chains = 4,
                 trend_model = 'GP',
@@ -202,7 +211,7 @@ summary(mod4)
 
 As with all other `mvgam` objects, we can create plots of the estimated forecast distribution
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_fc(mod4, series = 1, data_test = data_test, ylim = c(0, 100))
+plot_mvgam_fc(mod4, series = 1, newdata = data_test, ylim = c(0, 100))
 ```
 The trend now evolves smoothly via an infinite dimensional Gaussian Process
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
@@ -211,7 +220,7 @@ plot_mvgam_trend(mod4, series = 1)
 
 Traceplots of smooth penalties indicate good mixing and convergence of the four MCMC chains
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-plot_mvgam_trace(mod4, 'rho')
+rstan::stan_trace(mod4$model_output, pars = 'rho')
 ```
 
 We can also create quick plots of the estimated smooth tensor product interactions for the distributed lag terms, which basically follow `mgcv`'s two-dimensional plotting utility but uses the `mvgam`'s estimated coefficients
@@ -334,7 +343,7 @@ ppc(mod4, series = 1, type = 'cdf')
 
 and predictive checks for the out of sample forecast period (which demonstrates how the model tends to overpredict for the forecast period in this particular example):
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(mod4, data_test = data_test, series = 1, type = 'cdf')
+ppc(mod4, newdata = data_test, series = 1, type = 'cdf')
 ```
 
 Logical next steps for interrogating this model would be to trial different trend types (i.e. random walk), replace the distributed lag function for `precip` with a standard smooth function (that does not include lag interactions, as clearly the model above indicates that these are not supported) and inspect whether different covariates (such as `ndvi` or `maxtemp`) might play a role in modulating catches of `PP`. Finally, once we are satisfied that we have a well-performing model that we can understand and interrogate, we could expand up to a multivariate model by including other species as response variables. This would allow us to capture any possible unobserved dependencies in the catches of multiple co-occurring species in a single unified modelling framework

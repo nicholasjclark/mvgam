@@ -43,8 +43,8 @@ Clearly there are some correlations in the trends for these series. But how does
 
 A challenge with any factor model is the need to determine the number of factors `M`. Setting `M` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `M` too large leads to unnecessary computation. `mvgam` approaches this problem by either formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines (if using `JAGS`) or by regularising the factor loadings with a Bayesian LASSO prior (if using `Stan`). Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
 ```{r, message=FALSE, warning=FALSE}
-mod1 <- mvgam(data_train = dat$data_train,
-                data_test = dat$data_test,
+mod1 <- mvgam(data = dat$data_train,
+                newdata = dat$data_test,
                 formula = y ~ s(series, bs = 're') +
                   s(season, bs = c('cc'), k = 7),
                 knots = list(season = c(0.5, 12.5)),
@@ -54,7 +54,8 @@ mod1 <- mvgam(data_train = dat$data_train,
                 trend_model = 'RW',
                 use_stan = TRUE,
                 chains = 4,
-                burnin = 500)
+                burnin = 300,
+                n_samples = 300)
 ```
 
 Look at a few plots. The estimated smooth function
@@ -74,8 +75,8 @@ plot_mvgam_factors(mod1)
 
 Now we fit the same model but assume that we no nothing about how many factors to use, so we specify the maximum allowed (the total number of series; `6`). Note that this model is computationally more expensive so it will take longer to fit
 ```{r, message=FALSE, warning=FALSE}
-mod2 <- mvgam(data_train = dat$data_train,
-                data_test = dat$data_test,
+mod2 <- mvgam(data = dat$data_train,
+                newdata = dat$data_test,
                 formula = y ~ s(series, bs = 're') +
                   s(season, bs = c('cc'), k = 7),
                 knots = list(season = c(0.5, 12.5)),
@@ -85,7 +86,8 @@ mod2 <- mvgam(data_train = dat$data_train,
                 use_stan = TRUE,
                 trend_model = 'RW',
                 chains = 4,
-                burnin = 500)
+                burnin = 300,
+                n_samples = 300)
 ```
 
 Use the same plots as model 1 to see if this model has also fit the data well
@@ -141,8 +143,8 @@ plot(series, legend.loc = 'topleft')
 
 Now we will fit an `mvgam` model with shared seasonality and random intercepts per series. Our first attempt will ignore any temporal component in the residuals so that we can identidy which GAM predictor combination gives us the best fit, prior to investigating how to deal with any remaining autocorrelation. We assume a Poisson observation model for the response. Also note that any smooths using the random effects basis (`s(series, bs = "re")` below) are automatically re-parameterised to use the [non-centred parameterisation that is necessary to help avoid common posterior degeneracies in hierarchical models](https://betanalpha.github.io/assets/case_studies/hierarchical_modeling.html). This parameterisation tends to work better for most ecological problems where the data for each group / context are not highly informative, but it is still probably worth investigating whether a centred or even a mix of centred / non-centred will give better computational performance. We suppress the global intercept as it is not needed and will lead to identifiability issues when estimating the series-specific random intercepts
 ```{r, message=FALSE, warning=FALSE}
-trends_mod1 <- mvgam(data_train = trends_data$data_train,
-                      data_test = trends_data$data_test,
+trends_mod1 <- mvgam(data = trends_data$data_train,
+                      newdata = trends_data$data_test,
                       formula = y ~ s(series, bs = 're') + 
                         s(season, k = 7, m = 2, bs = 'cc') - 1,
                       knots = list(season = c(0.5, 12.5)),
@@ -150,13 +152,14 @@ trends_mod1 <- mvgam(data_train = trends_data$data_train,
                       family = 'poisson',
                       use_stan = TRUE,
                       chains = 4,
-                      burnin = 1000)
+                      burnin = 300,
+                      n_samples = 300)
 ```
 
 Given that these series could potentially be following a hierarchical seasonality, we will also trial a slghtly more complex model with an extra smoothing term per series that allows its seasonal curve to deviate from the global seasonal smooth. Ignore the warning about repeated smooths, as this is not an issue for estimation.
 ```{r, message=FALSE, warning=FALSE}
-trends_mod2 <- mvgam(data_train = trends_data$data_train,
-                      data_test = trends_data$data_test,
+trends_mod2 <- mvgam(data = trends_data$data_train,
+                      newdata = trends_data$data_test,
                       formula = y ~ s(season, k = 7, m = 2, bs = 'cc') +
                         s(season, series, k = 4, bs = 'fs', m = 1),
                       knots = list(season = c(0.5, 12.5)),
@@ -164,7 +167,8 @@ trends_mod2 <- mvgam(data_train = trends_data$data_train,
                       family = 'poisson',
                       use_stan = TRUE,
                       chains = 4,
-                      burnin = 1000)
+                      burnin = 300,
+                      n_samples = 300)
 ```
 
 How can we compare these models to ensure we choose one that performs well and provides useful inferences? Beyond posterior retrodictive and predictive checks, we can take advantage of the fact that `mvgam` fits an `mgcv` model to provide all the necessary penalty matrices, as well as to identify good initial values for smoothing parameters. Because we did not modify this model by adding a trend component (the only modification is that we estimated series-specific overdispersion parameters), we can still employ the usual `mgcv` model comparison routines
@@ -188,8 +192,8 @@ summary(trends_mod2$mgcv_model)
 
 Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow a RW process, and we will set `n_lv = 3`
 ```{r, message=FALSE, warning=FALSE}
-trends_mod3 <- mvgam(data_train = trends_data$data_train,
-                      data_test = trends_data$data_test,
+trends_mod3 <- mvgam(data = trends_data$data_train,
+                      newdata = trends_data$data_test,
                       formula = y ~ s(season, k = 7, m = 2, bs = 'cc') +
                         s(season, series, k = 4, bs = 'fs', m = 1),
                       knots = list(season = c(0.5, 12.5)),
@@ -199,7 +203,8 @@ trends_mod3 <- mvgam(data_train = trends_data$data_train,
                       family = 'poisson',
                       use_stan = TRUE,
                       chains = 4,
-                      burnin = 1000)
+                      burnin = 300,
+                      n_samples = 300)
 ```
 
 
@@ -254,41 +259,41 @@ ppc(trends_mod3, series = 4, type = 'hist')
 
 Look at traceplots for the smoothing parameters (`rho`)
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_trace(object = trends_mod3, param = 'rho')
+rstan::stan_trace(trends_mod3$model_output, pars = 'rho')
 ```
 
 Plot posterior predictive distributions for the training and testing periods for each series
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_fc(object = trends_mod3, series = 1, data_test = trends_data$data_test)
+plot_mvgam_fc(object = trends_mod3, series = 1, newdata = trends_data$data_test)
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_fc(object = trends_mod3, series = 2, data_test = trends_data$data_test)
+plot_mvgam_fc(object = trends_mod3, series = 2, newdata = trends_data$data_test)
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_fc(object = trends_mod3, series = 3, data_test = trends_data$data_test)
+plot_mvgam_fc(object = trends_mod3, series = 3, newdata = trends_data$data_test)
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_fc(object = trends_mod3, series = 4, data_test = trends_data$data_test)
+plot_mvgam_fc(object = trends_mod3, series = 4, newdata = trends_data$data_test)
 ```
 
 Plot posterior distributions for the latent trend estimates, again for the training and testing periods
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_trend(object = trends_mod3, series = 1, data_test = trends_data$data_test)
+plot_mvgam_trend(object = trends_mod3, series = 1, newdata = trends_data$data_test)
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_trend(object = trends_mod3, series = 2, data_test = trends_data$data_test)
+plot_mvgam_trend(object = trends_mod3, series = 2, newdata = trends_data$data_test)
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_trend(object = trends_mod3, series = 3, data_test = trends_data$data_test)
+plot_mvgam_trend(object = trends_mod3, series = 3, newdata = trends_data$data_test)
 ```
 
 ```{r, fig.width = 6, fig.height = 4, fig.align='center'}
-plot_mvgam_trend(object = trends_mod3, series = 4, data_test = trends_data$data_test)
+plot_mvgam_trend(object = trends_mod3, series = 4, newdata = trends_data$data_test)
 ```
 
 Given that we fit a model with hierarchical seasonality, the seasonal smooths are able to deviate from one another (though they share the same wiggliness and all deviate from a common 'global' seasonal function). Here we use the `newdata` argument to generate predictions for each of the hierarchical smooth functions (note that the intercept is still included in these plots so they do not center on zero)
@@ -360,38 +365,38 @@ plot(stl(ts(as.vector(series$`tick bite`), frequency = 12), 'periodic'))
 
 Forecast period posterior predictive checks suggest that the model still has room for improvement: 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 1, type = 'hist', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 1, type = 'hist', newdata = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 1, type = 'mean', data_test = trends_data$data_test)
-```
-
-
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 2, type = 'hist', data_test = trends_data$data_test)
-```
-
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 2, type = 'mean', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 1, type = 'mean', newdata = trends_data$data_test)
 ```
 
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 3, type = 'hist', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 2, type = 'hist', newdata = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 3, type = 'mean', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 2, type = 'mean', newdata = trends_data$data_test)
 ```
 
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 4, type = 'hist', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 3, type = 'hist', newdata = trends_data$data_test)
 ```
 
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(trends_mod3, series = 4, type = 'mean', data_test = trends_data$data_test)
+ppc(trends_mod3, series = 3, type = 'mean', newdata = trends_data$data_test)
+```
+
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(trends_mod3, series = 4, type = 'hist', newdata = trends_data$data_test)
+```
+
+```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+ppc(trends_mod3, series = 4, type = 'mean', newdata = trends_data$data_test)
 ```
 
 Other next steps could involve devising a more goal-specific set of posterior predictive checks (see [this paper by Gelman et al](https://www.jstor.org/stable/2680852?seq=1#metadata_info_tab_contents) and [relevant works by Betancourt](https://betanalpha.github.io/assets/case_studies/principled_bayesian_workflow.html) for examples) and compare out of sample Discrete Rank Probability Scores for this model and other versions for the latent trends (i.e. AR2, AR3, Random Walk)

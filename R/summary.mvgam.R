@@ -125,8 +125,8 @@ if(any(grep('rho', rownames(MCMCvis::MCMCsummary(object$model_output))))){
   message("GAM smoothing parameter (rho) estimates:")
   rho_coefs <- MCMCvis::MCMCsummary(object$model_output, 'rho')[,c(3:7)]
 
-  name_starts <- unlist(purrr::map(object$mgcv_model$smooth, 'first.sp'))
-  name_ends <- unlist(purrr::map(object$mgcv_model$smooth, 'last.sp'))
+  name_starts <- unlist(purrr::map(object$pregam$smooth, 'first.sp'))
+  name_ends <- unlist(purrr::map(object$pregam$smooth, 'last.sp'))
 
   rho_names <- unlist(lapply(seq(1:length(object$mgcv_model$smooth)), function(i){
 
@@ -269,7 +269,7 @@ if(object$fit_engine == 'stan'){
 
 if(object$fit_engine == 'jags'){
   message('JAGS MCMC diagnostics')
-  rhats <- MCMCvis::MCMCsummary(mod$model_output)[,6]
+  rhats <- MCMCvis::MCMCsummary(object$model_output)[,6]
   if(any(rhats > 1.05)){
     cat('Rhats above 1.05 found for',
         length(which(rhats > 1.05)),

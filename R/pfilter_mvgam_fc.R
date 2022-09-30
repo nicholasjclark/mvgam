@@ -6,8 +6,10 @@
 #'according to their state space dynamics. The forecast is a weighted ensemble, with weights determined by
 #'each particle's proposal likelihood prior to the most recent assimilation step
 #'
-#'@param data_test A \code{dataframe} or \code{list} of test data containing at least 'series' and time',
+#'@param newdata A \code{dataframe} or \code{list} of test data containing at least 'series' and time',
 #'in addition to any other variables included in the linear predictor of \code{formula}
+#'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
+#'\code{newdata} instead for more seamless integration into `R` workflows
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
 #'@param file_path \code{character} string specifying the file path where the particles have been saved
 #'@param plot_legend \code{logical} stating whether to include a legend to highlight which observations
@@ -23,6 +25,7 @@
 #'@export
 pfilter_mvgam_fc = function(file_path = 'pfilter',
                             n_cores = 2,
+                            newdata,
                             data_test,
                             plot_legend = TRUE,
                             legend_position = 'topleft',
@@ -33,6 +36,10 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     load(paste0(file_path, '/particles.rda'))
   } else {
     stop('file_path either does not exist or does not contain a .rda particle list')
+  }
+
+  if(!missing("newdata")){
+    data_test <- newdata
   }
 
   # Extract particle weights and create importance sampling index

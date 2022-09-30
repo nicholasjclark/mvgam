@@ -70,11 +70,20 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
   # If the posterior predictions do not already cover the data_test period, the forecast needs to be
   # generated using the latent trend dynamics; note, this assumes that there is no gap between the training and
   # testing datasets
+
   # Add variables to data_test if missing
   s_name <- levels(data_train$series)[series]
   if(!missing(data_test)){
     if(!'y' %in% names(data_test)){
       data_test$y <- rep(NA, NROW(data_test))
+    }
+
+    if(!'series' %in% names(data_test)){
+      data_test$series <- factor('series1')
+    }
+
+    if(!'time' %in% colnames(data_test)){
+      stop('data_test does not contain a "time" column')
     }
 
     if(class(data_test)[1] == 'list'){
