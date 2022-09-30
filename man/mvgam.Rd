@@ -24,14 +24,7 @@ mvgam(
   n_samples = 500,
   thin = 1,
   parallel = TRUE,
-  phi_prior,
-  ar_prior,
-  r_prior,
-  twdis_prior,
-  sigma_prior,
-  lambda_prior,
-  rho_gp_prior,
-  alpha_gp_prior,
+  priors,
   upper_bounds,
   use_stan = FALSE,
   max_treedepth,
@@ -95,7 +88,7 @@ and the observation process is the only source of error; similarly to what is es
 'AR2' (AR2 model with intercept) or
 'AR3' (AR3 model with intercept) or
 'GP' (Gaussian process with squared exponential kernel; currently under development and
-only available for estimation in stan)}
+only available for estimation in \code{stan})}
 
 \item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
@@ -116,31 +109,9 @@ sampling the posterior distribution}
 generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to use will be
 \code{min(c(chains, parallel::detectCores() - 1))}}
 
-\item{phi_prior}{\code{character} specifying (in JAGS or Stan syntax) the prior distribution for the drift terms/intercepts
-in the latent trends}
-
-\item{ar_prior}{\code{character} specifying (in JAGS or Stan syntax) the prior distribution for the AR terms
-in the latent trends}
-
-\item{r_prior}{\code{character} specifying (in JAGS or Stan syntax) the prior distribution for the Negative Binomial
-overdispersion parameters. Note that this prior acts on the inverse of \code{r}, which is convenient
-for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
-as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tweedie}
-
-\item{twdis_prior}{\code{character} specifying (in JAGS syntax) the prior distribution for the Tweedie
-overdispersion parameters. Ignored if family is Poisson or Negative Binomial}
-
-\item{sigma_prior}{\code{character} specifying (in JAGS or Stan syntax) the prior distributions for the independent Gaussian
-variances used for the latent trends (ignored if \code{use_lv == TRUE})}
-
-\item{lambda_prior}{\code{character} specifying (in JAGS or Stan syntax) the prior distribution for smoothing
-parameters (Default is exponential(0.05))}
-
-\item{rho_gp_prior}{\code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
-Process length scale parameters}
-
-\item{alpha_gp_prior}{\code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
-Process marginal deviation parameters}
+\item{priors}{An optional \code{data.frame} with prior
+definitions (in JAGS or Stan syntax). See \code{\link{get_mvgam_priors}} and
+'Details' for more information on changing default prior distributions}
 
 \item{upper_bounds}{Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
@@ -153,7 +124,7 @@ a call to \code{\link[rstan]{stan}}. Note that this functionality is still in de
 not all options that are available in \code{JAGS} can be used, including: no option for a Tweedie family and no option for
 dynamic factor trends. However, as \code{rstan} can estimate Hilbert base approximate gaussian processes, which
 are much more computationally tractable than full GPs for time series with \verb{>100} observations, estimation
-in \code{rstan} can support latent GP trends while estimation in \code{JAGS} cannot}
+in \code{stan} can support latent GP trends while estimation in \code{JAGS} cannot}
 
 \item{max_treedepth}{positive integer placing a cap on the number of simulation steps evaluated during each iteration when
 \code{use_stan == TRUE}. Default is \code{12}. Increasing this value can sometimes help with exploration of complex
@@ -193,7 +164,7 @@ in a Bayesian framework using Markov Chain Monte Carlo.
 \cr
 \emph{Priors}: A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include any latent
 temporal processes. Prior distributions for most important model parameters can be altered by the user to inspect model
-sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
+sensitivities to given priors (see \code{\link{get_mvgam_priors}} for details). Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 accordingly. However more control over the model specification can be accomplished by first using \code{mvgam} as a
 baseline, then editing the returned model accordingly. The model file can be edited and run outside
 of \code{mvgam} by setting \code{run_model = FALSE} and this is encouraged for complex modelling tasks. Note, no priors are
@@ -210,7 +181,7 @@ principled workflow.
 \cr
 \cr
 \emph{Overdispersion parameters}: When more than one series is included in \code{data_train} and an overdispersed
-exponential family is used, by default the overdispersion parameters (\code{r} for Poisson, \code{twdis} for Tweedie) are
+exponential family is used, by default the overdispersion parameters (\code{r} for Negative Binomial, \code{twdis} for Tweedie) are
 estimated independently for each series. Note that for Tweedie
 models, estimating the power parameter \code{p} alongside the overdispersion parameter
 \code{twdis} and the smooth coefficients is very challenging for noisy data, introducing some difficult posterior geometries.

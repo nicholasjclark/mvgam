@@ -4,14 +4,12 @@
 \alias{add_tweedie_lines}
 \title{Tweedie JAGS modifications}
 \usage{
-add_tweedie_lines(model_file, upper_bounds, twdis_prior)
+add_tweedie_lines(model_file, upper_bounds)
 }
 \arguments{
 \item{model_file}{A template \code{JAGS} model file to be modified}
 
 \item{upper_bounds}{Optional upper bounds for the truncated observation likelihood}
-
-\item{twdis_prior}{Optional alternative prior distribution for the overdispersion parameter}
 }
 \value{
 A modified \code{JAGS} model file

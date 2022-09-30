@@ -4,9 +4,8 @@
 #' @export
 #' @param model_file A template `JAGS` model file to be modified
 #' @param upper_bounds Optional upper bounds for the truncated observation likelihood
-#' @param twdis_prior Optional alternative prior distribution for the overdispersion parameter
 #' @return A modified `JAGS` model file
-add_tweedie_lines = function(model_file, upper_bounds, twdis_prior){
+add_tweedie_lines = function(model_file, upper_bounds){
   rate_begin <- grep('rate\\[i, s\\] <- ', model_file)
   rate_end <- rate_begin + 1
   model_file <- model_file[-c(rate_begin:rate_end)]
@@ -57,9 +56,5 @@ add_tweedie_lines = function(model_file, upper_bounds, twdis_prior){
   model_file[prior_line] <- '}\n\n## Tweedie power and overdispersion parameters\np <- 1.5\nfor (s in 1:n_series) {\n twdis_raw[s] ~ dnorm(0, 2)T(-3.5, 3.5);\n twdis[s] <- exp(twdis_raw[s])\n}'
   model_file <- readLines(textConnection(model_file), n = -1)
 
-  if(!missing(twdis_prior)){
-    twdis_begin <- grep('twdis\\[s\\] ~', model_file)
-    model_file[twdis_begin] <- paste0(' twdis[s] ~ ', twdis_prior)
-  }
-  model_file
+  return(model_file)
 }

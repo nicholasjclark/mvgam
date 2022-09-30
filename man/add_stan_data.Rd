@@ -9,8 +9,6 @@ add_stan_data(
   stan_file,
   use_lv = FALSE,
   n_lv,
-  r_prior,
-  lambda_prior,
   jags_data,
   family = "poisson",
   upper_bounds
@@ -24,14 +22,6 @@ add_stan_data(
 \item{use_lv}{logical}
 
 \item{n_lv}{\code{integer} number of latent dynamic factors (if \code{use_lv = TRUE})}
-
-\item{r_prior}{\code{character} specifying (in Stan syntax) the prior distribution for the Negative Binomial
-overdispersion parameters. Note that this prior acts on the inverse of \code{r}, which is convenient
-for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
-as the sampled parameter approaches \code{0}}
-
-\item{lambda_prior}{\code{character} specifying (in Stan syntax) the prior distribution for smoothing
-parameters (Default is exponential(0.05))}
 
 \item{jags_data}{Prepared mvgam data for JAGS modelling}
 

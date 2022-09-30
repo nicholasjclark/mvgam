@@ -7,12 +7,6 @@
 #' @param use_lv logical
 #' @param n_lv \code{integer} number of latent dynamic factors (if \code{use_lv = TRUE})
 #' @param jags_data Prepared mvgam data for JAGS modelling
-#' @param r_prior \code{character} specifying (in Stan syntax) the prior distribution for the Negative Binomial
-#'overdispersion parameters. Note that this prior acts on the inverse of \code{r}, which is convenient
-#'for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
-#'as the sampled parameter approaches \code{0}
-#' @param lambda_prior \code{character} specifying (in Stan syntax) the prior distribution for smoothing
-#' parameters (Default is exponential(0.05))
 #' @param family \code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'
 #' @param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 #' this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
@@ -21,8 +15,6 @@
 #' @return A `list` containing the updated Stan model and model data
 add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                          n_lv,
-                         r_prior,
-                         lambda_prior,
                          jags_data, family = 'poisson',
                          upper_bounds){
 
@@ -45,14 +37,9 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
     stan_file[grep('// raw basis', stan_file) + 2] <-
   '\n// negative binomial overdispersion\nvector<lower=0>[n_series] r_inv;\n'
 
-    if(missing(r_prior)){
-      stan_file[grep('// priors for smoothing', stan_file) + 2] <-
-        '\n// priors for overdispersion parameters\nr_inv ~ normal(0, 10);\n'
-    } else {
       stan_file[grep('// priors for smoothing', stan_file) + 2] <-
         paste0('\n// priors for overdispersion parameters\n',
         'r_inv ~ ', r_prior, ';\n')
-    }
 
 
       to_negbin <- gsub('poisson_log', 'neg_binomial_2',
@@ -388,21 +375,10 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
       stan_file <- readLines(textConnection(stan_file), n = -1)
     }
 
-    # Replace smoothing parameter prior if specified
-    if(!missing(lambda_prior)){
-      stan_file[grep('lambda ~ exponential', stan_file,
-                     fixed = TRUE)] <- paste0("lambda ~ ", lambda_prior, ";")
-    }
-
     # Check for shared smoothing parameters and link them accordingly
     if('L' %in% names(jags_data)){
-      if(!missing(lambda_prior)){
-        stan_file[grep('lambda ~ exponential', stan_file,
-                       fixed = TRUE)] <- paste0("lambda_raw ~ ", lambda_prior, ";")
-      } else {
-        stan_file[grep('lambda ~ exponential', stan_file,
+      stan_file[grep('lambda ~ exponential', stan_file,
                        fixed = TRUE)] <- "lambda_raw ~ exponential(0.05);"
-      }
 
       stan_file[grep("vector<lower=0>[n_sp] lambda;", stan_file,
                      fixed = TRUE)] <- "vector<lower=0>[n_raw_sp] lambda_raw;"

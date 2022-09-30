@@ -49,7 +49,7 @@
 #''AR2' (AR2 model with intercept) or
 #''AR3' (AR3 model with intercept) or
 #''GP' (Gaussian process with squared exponential kernel; currently under development and
-#'only available for estimation in stan)
+#'only available for estimation in \code{stan})
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 #'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 #'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
@@ -63,24 +63,9 @@
 #'@param parallel \code{logical} specifying whether multiple cores should be used for
 #'generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to use will be
 #'\code{min(c(chains, parallel::detectCores() - 1))}
-#'@param phi_prior \code{character} specifying (in JAGS or Stan syntax) the prior distribution for the drift terms/intercepts
-#'in the latent trends
-#'@param ar_prior \code{character} specifying (in JAGS or Stan syntax) the prior distribution for the AR terms
-#'in the latent trends
-#'@param r_prior \code{character} specifying (in JAGS or Stan syntax) the prior distribution for the Negative Binomial
-#'overdispersion parameters. Note that this prior acts on the inverse of \code{r}, which is convenient
-#'for inducing a complexity-penalising prior model whereby the observation process reduces to a Poisson
-#'as the sampled parameter approaches \code{0}. Ignored if family is Poisson or Tweedie
-#'@param twdis_prior \code{character} specifying (in JAGS syntax) the prior distribution for the Tweedie
-#'overdispersion parameters. Ignored if family is Poisson or Negative Binomial
-#'@param sigma_prior \code{character} specifying (in JAGS or Stan syntax) the prior distributions for the independent Gaussian
-#'variances used for the latent trends (ignored if \code{use_lv == TRUE})
-#'@param lambda_prior \code{character} specifying (in JAGS or Stan syntax) the prior distribution for smoothing
-#'parameters (Default is exponential(0.05))
-#'@param rho_gp_prior \code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
-#'Process length scale parameters
-#'@param alpha_gp_prior \code{character} specifying (in Stan syntax) the prior distributions for the latent Gaussian
-#'Process marginal deviation parameters
+#'@param priors An optional \code{data.frame} with prior
+#'definitions (in JAGS or Stan syntax). See \code{\link{get_mvgam_priors}} and
+#''Details' for more information on changing default prior distributions
 #'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 #'this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
@@ -91,7 +76,7 @@
 #'not all options that are available in \code{JAGS} can be used, including: no option for a Tweedie family and no option for
 #'dynamic factor trends. However, as \code{rstan} can estimate Hilbert base approximate gaussian processes, which
 #'are much more computationally tractable than full GPs for time series with `>100` observations, estimation
-#'in \code{rstan} can support latent GP trends while estimation in \code{JAGS} cannot
+#'in \code{stan} can support latent GP trends while estimation in \code{JAGS} cannot
 #'@param max_treedepth positive integer placing a cap on the number of simulation steps evaluated during each iteration when
 #'`use_stan == TRUE`. Default is `12`. Increasing this value can sometimes help with exploration of complex
 #'posterior geometries, but it is rarely fruitful to go above a `max_treedepth` of `14`
@@ -115,7 +100,7 @@
 #'\cr
 #'*Priors*: A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include any latent
 #'temporal processes. Prior distributions for most important model parameters can be altered by the user to inspect model
-#'sensitivities to given priors. Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
+#'sensitivities to given priors (see \code{\link{get_mvgam_priors}} for details). Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 #'accordingly. However more control over the model specification can be accomplished by first using `mvgam` as a
 #'baseline, then editing the returned model accordingly. The model file can be edited and run outside
 #'of `mvgam` by setting \code{run_model = FALSE} and this is encouraged for complex modelling tasks. Note, no priors are
@@ -132,7 +117,7 @@
 #'\cr
 #'\cr
 #'*Overdispersion parameters*: When more than one series is included in \code{data_train} and an overdispersed
-#'exponential family is used, by default the overdispersion parameters (`r` for Poisson, `twdis` for Tweedie) are
+#'exponential family is used, by default the overdispersion parameters (`r` for Negative Binomial, `twdis` for Tweedie) are
 #'estimated independently for each series. Note that for Tweedie
 #'models, estimating the power parameter `p` alongside the overdispersion parameter
 #'`twdis` and the smooth coefficients is very challenging for noisy data, introducing some difficult posterior geometries.
@@ -276,14 +261,7 @@ mvgam = function(formula,
                  n_samples = 500,
                  thin = 1,
                  parallel = TRUE,
-                 phi_prior,
-                 ar_prior,
-                 r_prior,
-                 twdis_prior,
-                 sigma_prior,
-                 lambda_prior,
-                 rho_gp_prior,
-                 alpha_gp_prior,
+                 priors,
                  upper_bounds,
                  use_stan = FALSE,
                  max_treedepth,
@@ -344,6 +322,11 @@ mvgam = function(formula,
   if(!use_stan & trend_model == 'GP'){
     warning('gaussian process trends not yet supported for JAGS; reverting to Stan')
     use_stan <- TRUE
+  }
+
+  if(trend_model == 'GP' & use_lv){
+    warning('dynamic factor gaussian process trends not yet supported; changing use_lv to FALSE')
+    use_lv <- FALSE
   }
 
   if(use_stan & family == 'tw'){
@@ -531,7 +514,6 @@ mvgam = function(formula,
     # it from the model and data structures later
     data_train$fakery <- rnorm(length(data_train$y))
     form_fake <- update(formula, ~ . + s(fakery))
-
     fakery_names <- names(mgcv::gam(form_fake,
                               data = data_train,
                               family = poisson(),
@@ -557,12 +539,11 @@ mvgam = function(formula,
                               sp.prior = 'gamma',
                               diagonalize = F)
     }
-
     data_train$fakery <- NULL
   } else {
     smooths_included <- TRUE
 
-    # If smooth terms included, use the original formula
+  # If smooth terms included, use the original formula
   if(!missing(knots)){
     ss_jagam <- mgcv::jagam(formula,
                             data = data_train,
@@ -688,25 +669,9 @@ mvgam = function(formula,
       sep = "\n")
   model_file <- trimws(readLines(fil, n = -1))
 
-  # Update prior distributions
-  if(!missing(phi_prior)){
-    model_file[grep('phi\\[s\\] ~', model_file)] <- paste0(' phi[s] ~ ', phi_prior)
-  }
-
-  if(!missing(ar_prior)){
-    model_file[grep('ar1\\[s\\] ~', model_file)] <- paste0(' ar1[s] ~ ', ar_prior)
-    model_file[grep('ar2\\[s\\] ~', model_file)] <- paste0(' ar2[s] ~ ', ar_prior)
-    model_file[grep('ar3\\[s\\] ~', model_file)] <- paste0(' ar3[s] ~ ', ar_prior)
-  }
-
-  if(!missing(sigma_prior)){
-    model_file[grep('sigma\\[s\\] ~', model_file)] <- paste0(' sigma[s] ~ ', sigma_prior)
-  }
-
   # Modify observation distribution lines
   if(family == 'tw'){
-    model_file <- add_tweedie_lines(model_file, upper_bounds = upper_bounds,
-                                    twdis_prior = twdis_prior)
+    model_file <- add_tweedie_lines(model_file, upper_bounds = upper_bounds)
 
   } else if(family == 'poisson'){
     model_file <- add_poisson_lines(model_file, upper_bounds = upper_bounds)
@@ -715,10 +680,6 @@ mvgam = function(formula,
     if(missing(upper_bounds)){
       model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dnegbin(rate[i, s], r[s])'
       model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dnegbin(rate[i, s], r[s])'
-    }
-
-    if(!missing(r_prior)){
-      model_file[grep('r_raw\\[s\\] ~', model_file)] <- paste0('r_raw[s] ~ ', r_prior)
     }
   }
 
@@ -734,10 +695,6 @@ mvgam = function(formula,
     model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(1/sp[i])'
   } else {
     model_file[grep('lambda\\[i\\] ~', model_file)] <- '   lambda[i] ~ dexp(0.05)'
-  }
-
-  if(!missing(lambda_prior)){
-    model_file[grep('lambda\\[i\\] ~', model_file)] <- paste0(' lambda[i] ~ ', lambda_prior)
   }
 
   # Final tidying of the JAGS model for readability
@@ -770,7 +727,6 @@ mvgam = function(formula,
         }
         colnames(testdat) <- newnames
       }
-
       suppressWarnings(lp_test  <- predict(ss_gam,
                                            newdata = testdat,
                                            type = 'lpmatrix'))
@@ -1034,11 +990,6 @@ mvgam = function(formula,
 
       # Add necessary trend structure
       base_stan_model <- add_trend_lines(model_file = base_stan_model,
-                                         ar_prior = ar_prior,
-                                         phi_prior = phi_prior,
-                                         sigma_prior = sigma_prior,
-                                         rho_gp_prior = rho_gp_prior,
-                                         alpha_gp_prior = alpha_gp_prior,
                                          use_lv = use_lv,
                                          stan = TRUE,
                                          trend_model = trend_model,
@@ -1050,8 +1001,6 @@ mvgam = function(formula,
                                     stan_file = base_stan_model,
                                     use_lv = use_lv,
                                     n_lv = n_lv,
-                                    r_prior = r_prior,
-                                    lambda_prior = lambda_prior,
                                     jags_data = ss_jagam$jags.data,
                                     family = family,
                                     upper_bounds = upper_bounds)
@@ -1125,6 +1074,11 @@ mvgam = function(formula,
         }
       }
 
+      if(!missing(priors)){
+        stan_objects$stan_file <- update_priors(stan_objects$stan_file,
+                                                priors)
+      }
+
       output <- structure(list(call = formula,
                                family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
                                                          family == 'poisson' ~ 'Poisson',
@@ -1156,6 +1110,11 @@ mvgam = function(formula,
       initlist <- replicate(chains, inits,
                             simplify = FALSE)
       inits <- initlist
+
+      if(!missing(priors)){
+        model_file <- update_priors(model_file, priors)
+      }
+
       output <- structure(list(call = formula,
                                family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
                                                          family == 'poisson' ~ 'Poisson',
@@ -1194,11 +1153,6 @@ mvgam = function(formula,
       # Add necessary trend structure
       base_stan_model <- add_trend_lines(model_file = base_stan_model,
                                          stan = TRUE,
-                                         ar_prior = ar_prior,
-                                         phi_prior = phi_prior,
-                                         sigma_prior = sigma_prior,
-                                         rho_gp_prior = rho_gp_prior,
-                                         alpha_gp_prior = alpha_gp_prior,
                                          trend_model = trend_model,
                                          use_lv = use_lv,
                                          drift = drift)
@@ -1209,8 +1163,6 @@ mvgam = function(formula,
                                     stan_file = base_stan_model,
                                     use_lv = use_lv,
                                     n_lv = n_lv,
-                                    r_prior = r_prior,
-                                    lambda_prior = lambda_prior,
                                     jags_data = ss_jagam$jags.data,
                                     family = family,
                                     upper_bounds = upper_bounds)
@@ -1291,6 +1243,10 @@ mvgam = function(formula,
           }
 
         }
+      }
+
+      if(!missing(priors)){
+        stan_objects$stan_file <- update_priors(stan_objects$stan_file, priors)
       }
 
       # Check if cmdstan is accessible; if not, use rstan
@@ -1412,6 +1368,11 @@ mvgam = function(formula,
 
     if(!use_stan){
       require(runjags)
+
+      if(!missing(priors)){
+        model_file <- update_priors(model_file, priors)
+      }
+
       fit_engine <- 'jags'
       model_data <- ss_jagam$jags.data
 
