@@ -17,7 +17,6 @@
 #'that respect the temporal dynamics of estimated latent trends.
 #'@return A \code{matrix} of dimension \code{n_samples x new_obs}, where \code{n_samples} is the number of
 #'posterior samples from the fitted object and \code{n_obs} is the number of test observations in \code{newdata}
-#'in which the \code{series} variable matches the supplied \code{series} argument
 #'@export
 predict.mvgam = function(object, newdata, data_test, type = 'link',
                          n_cores = 1){

@@ -151,11 +151,27 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
 
   if(dim(preds)[2] != length(all_obs)){
     if(object$trend_model == 'None'){
-      fc_preds <- predict.mvgam(object, series = series, newdata = data_test,
+
+      if(class(object$obs_data)[1] == 'list'){
+        series_obs <- which(data_test$series == !!(levels(object$obs_data$series)[series]))
+        series_test <- lapply(data_assim, function(x){
+          if(is.matrix(x)){
+            matrix(x[series_obs,], ncol = NCOL(x))
+          } else {
+            x[series_obs]
+          }
+
+        })
+      } else {
+        series_test = data_test %>%
+          dplyr::filter(series == !!(levels(object$obs_data$series)[series]))
+      }
+
+      fc_preds <- predict.mvgam(object, newdata = series_test,
                                 type = 'response',
                                 n_cores = n_cores)
     } else {
-      fc_preds <- forecast.mvgam(object, series = series, data_test = data_test,
+      fc_preds <- forecast.mvgam(object, data_test = data_test,
                                  n_cores = n_cores)
     }
     preds <- cbind(preds, fc_preds)

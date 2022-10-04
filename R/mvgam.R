@@ -1016,7 +1016,7 @@ mvgam = function(formula,
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
                    r_inv = runif(NCOL(model_data$ytimes), 1, 50),
-                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+                   lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
@@ -1031,7 +1031,7 @@ mvgam = function(formula,
               list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
                    r_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    sigma = runif(model_data$n_series, 0.075, 1),
-                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+                   lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
@@ -1049,7 +1049,7 @@ mvgam = function(formula,
           if(smooths_included){
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
-                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+                   lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
@@ -1062,7 +1062,7 @@ mvgam = function(formula,
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
                    sigma = runif(model_data$n_series, 0.075, 1),
-                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+                   lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
@@ -1187,7 +1187,7 @@ mvgam = function(formula,
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
                    r_inv = runif(NCOL(model_data$ytimes), 1, 50),
-                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+                   lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
@@ -1202,7 +1202,7 @@ mvgam = function(formula,
               list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
                    r_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    sigma = runif(model_data$n_series, 0.075, 1),
-                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+                   lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
@@ -1220,7 +1220,7 @@ mvgam = function(formula,
           if(smooths_included){
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
-                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+                   lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
@@ -1233,7 +1233,7 @@ mvgam = function(formula,
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
                    sigma = runif(model_data$n_series, 0.075, 1),
-                   lambda = runif(stan_objects$model_data$n_sp, 5, 25))
+                   lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {

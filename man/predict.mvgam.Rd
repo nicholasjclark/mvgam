@@ -25,7 +25,6 @@ predictions on the outcome (discrete) scale.}
 \value{
 A \code{matrix} of dimension \code{n_samples x new_obs}, where \code{n_samples} is the number of
 posterior samples from the fitted object and \code{n_obs} is the number of test observations in \code{newdata}
-in which the \code{series} variable matches the supplied \code{series} argument
 }
 \description{
 Predict from the GAM component of an mvgam model

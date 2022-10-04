@@ -73,11 +73,6 @@ plot_mvgam_smooth = function(object,
 
   # Get smooth term names
   data_train <- object$obs_data
-  # smooth_names <- unique(gsub("[\\(\\)]", "", regmatches(paste(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
-  #                                       collapse = ','),
-  #                                 gregexpr("\\(.*?\\)",
-  #                                          paste(unlist(purrr::map(object$mgcv_model$smooth, 'label')),
-  #                                                collapse = ',')))[[1]]))
   smooth_terms <- unlist(purrr::map(object$mgcv_model$smooth, 'label'))
 
   if(is.character(smooth)){
