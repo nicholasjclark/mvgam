@@ -178,7 +178,14 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
   c_dark_highlight <- c("#7C0000")
 
   if(missing(ylim)){
-    ylim <- c(min(cred), max(cred) + 2)
+    ytrain <- data_train %>%
+      dplyr::filter(series == s_name) %>%
+      dplyr::select(time, y) %>%
+      dplyr::distinct() %>%
+      dplyr::arrange(time) %>%
+      dplyr::pull(y)
+    ylim <- c(min(cred, min(ytrain, na.rm = TRUE)),
+              max(cred, max(ytrain, na.rm = TRUE)) + 2)
   }
 
   if(missing(ylab)){
