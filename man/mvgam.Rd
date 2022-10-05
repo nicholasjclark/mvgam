@@ -299,27 +299,62 @@ plot(mod1, type = 'smooths', realisations = TRUE)
 
 # Example showing how to incorporate an offset; simulate some count data
 # with different means per series
-dat <- sim_mvgam(mu_obs = c(4, 8, 12))
+set.seed(100)
+dat <- sim_mvgam(trend_rel = 0, mu_obs = c(4, 8, 8), seasonality = 'hierarchical')
 
-# Add a fake offset term to the training and testing sets where each series
-# has a different 'baseline' magnitude for the offset
-dat$data_train$offset <- rnorm(NROW(dat$data_train)) +
-                          0.25 * as.numeric(dat$data_train$series)
-dat$data_test$offset <- rnorm(NROW(dat$data_test)) +
-                         0.25 * as.numeric(dat$data_test$series)
+# Add offset terms to the training and testing data
+dat$data_train$offset <- 0.5 * as.numeric(dat$data_train$series)
+dat$data_test$offset <- 0.5 * as.numeric(dat$data_test$series)
 
-# Fit the model; note that an offset will only be useful if it is
-# included in the formula (see help("gam") for more information)
-mod1 <- mvgam(y ~ offset(offset) + s(season, bs = 'cc'),
+# Fit a model that includes the offset in the linear predictor as well as
+# hierarchical seasonal smooths
+mod1 <- mvgam(formula = y ~ offset(offset) +
+         s(season, bs = 'cc')  +
+         s(season, by = series, m = 1, k = 5),
          data = dat$data_train,
-         trend_model = 'RW')
+         trend_model = 'None',
+         use_stan = TRUE)
 
-# Plot forecasts for series 1, incorporating the offset
-plot(mod1, 'forecast', newdata = dat$data_test)
+# Inspect the model file to see the modification to the linear predictor
+# (eta)
+mod1$model_file
 
-# Changing the offset results in different predictions
+# Forecasts for the first two series will differ in magnitude
+layout(matrix(1:2, ncol = 2))
+plot(mod1, type = 'forecast', series = 1, newdata = dat$data_test,
+     ylim = c(0, 70))
+plot(mod1, type = 'forecast', series = 2, newdata = dat$data_test,
+     ylim = c(0, 70))
+layout(1)
+
+# Changing the offset for the testing data should lead to changes in
+# the forecast
 dat$data_test$offset <- dat$data_test$offset - 2
 plot(mod1, 'forecast', newdata = dat$data_test)
+
+# Relative Risks can be computed by fixing the offset to the same value
+# for each series
+dat$data_test$offset <- rep(1, NROW(dat$data_test))
+preds_rr <- predict(mod1, type = 'link', newdata = dat$data_test)
+series1_inds <- which(dat$data_test$series == 'series_1')
+series2_inds <- which(dat$data_test$series == 'series_2')
+
+# Relative Risks are now more comparable among series
+layout(matrix(1:2, ncol = 2))
+plot(preds_rr[1, series1_inds], type = 'l', col = 'grey75',
+     ylim = range(preds_rr),
+     ylab = 'Series1 Relative Risk', xlab = 'Time')
+for(i in 2:50){
+ lines(preds_rr[i, series1_inds], col = 'grey75')
+}
+
+plot(preds_rr[1, series2_inds], type = 'l', col = 'darkred',
+     ylim = range(preds_rr),
+     ylab = 'Series2 Relative Risk', xlab = 'Time')
+for(i in 2:50){
+ lines(preds_rr[i, series2_inds], col = 'darkred')
+ }
+layout(1)
 }
 }
 \seealso{
