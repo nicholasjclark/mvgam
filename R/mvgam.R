@@ -631,15 +631,25 @@ mvgam = function(formula,
       dplyr::pull(label)
 
     for(i in 1:length(re_smooths)){
+
+      # If there are multiple smooths with this label, find out where the random effect
+      # smooth sits
+      smooth_labs %>%
+        dplyr::filter(label == re_smooths[i]) %>%
+        dplyr::mutate(smooth_number = dplyr::row_number()) %>%
+        dplyr::filter(class == 'random.effect') %>%
+        dplyr::pull(smooth_number) -> smooth_number
+
       in_parenth <- regmatches(base_model[grep(re_smooths[i],
-                                               base_model, fixed = T) + 1],
-                               gregexpr( "(?<=\\().+?(?=\\))", base_model[grep(re_smooths[i],
-                                                                               base_model, fixed = T) + 1],
+                                               base_model, fixed = T)[smooth_number] + 1],
+                               gregexpr( "(?<=\\().+?(?=\\))",
+                                         base_model[grep(re_smooths[i],
+                                                         base_model, fixed = T)[smooth_number] + 1],
                                          perl = T))[[1]][1]
       n_terms <- as.numeric(sub(".*:", "", in_parenth))
       n_start <- as.numeric(strsplit(sub(".*\\(", "", in_parenth), ':')[[1]][1])
       base_model[grep(re_smooths[i],
-                      base_model, fixed = T) + 1] <- paste0('  for (i in ', n_start, ':',
+                      base_model, fixed = T)[smooth_number] + 1] <- paste0('  for (i in ', n_start, ':',
                                                             n_terms,
                                                             ') {\n   b_raw[i] ~ dnorm(0, 1)\n',
                                                             'b[i] <- ',
@@ -648,7 +658,7 @@ mvgam = function(formula,
                                                             paste0('sigma_raw', i), ' ~ dexp(0.5)\n',
                                                             paste0('mu_raw', i), ' ~ dnorm(0, 1)')
       base_model[grep(re_smooths[i],
-                      base_model, fixed = T)] <- paste0('  ## prior (non-centred) for ', re_smooths[i], '...')
+                      base_model, fixed = T)[smooth_number]] <- paste0('  ## prior (non-centred) for ', re_smooths[i], '...')
     }
 
   }
