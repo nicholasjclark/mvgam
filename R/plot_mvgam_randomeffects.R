@@ -56,7 +56,7 @@ if(any(smooth_labs$class == 'random.effect')){
     (smooth_labs %>%
       dplyr::mutate(smooth_num = dplyr::row_number()) %>%
       dplyr::filter(class == 'random.effect') %>%
-      dplyr::pull(smooth_num))[i] <- smooth_number
+      dplyr::pull(smooth_num))[i] -> smooth_number
 
     betas_keep <- object$mgcv_model$smooth[[smooth_number]]$first.para:
       object$mgcv_model$smooth[[smooth_number]]$last.para
