@@ -31,6 +31,7 @@ smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), functi
 # Check if any smooths were bs = "re"; if not, return an error
 if(any(smooth_labs$class == 'random.effect')){
   re_smooths <- smooth_labs %>%
+    dplyr::mutate(smooth_num = dplyr::row_number()) %>%
     dplyr::filter(class == 'random.effect') %>%
     dplyr::pull(label)
 
@@ -52,9 +53,13 @@ if(any(smooth_labs$class == 'random.effect')){
 
   for(i in 1:length(re_smooths)){
     # Find out which betas correspond to the associated random effect estimates
-    betas_keep <- grepl(paste0(re_smooths[i]),
-                        colnames(predict(object$mgcv_model, type = 'lpmatrix')),
-                        fixed = T)
+    (smooth_labs %>%
+      dplyr::mutate(smooth_num = dplyr::row_number()) %>%
+      dplyr::filter(class == 'random.effect') %>%
+      dplyr::pull(smooth_num))[i] <- smooth_number
+
+    betas_keep <- object$mgcv_model$smooth[[smooth_number]]$first.para:
+      object$mgcv_model$smooth[[smooth_number]]$last.para
     betas <- MCMCvis::MCMCchains(object$model_output, 'b')[ ,betas_keep]
 
     # Plot the random effect estimates
