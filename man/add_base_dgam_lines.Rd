@@ -4,12 +4,14 @@
 \alias{add_base_dgam_lines}
 \title{Dynamic GAM model file additions}
 \usage{
-add_base_dgam_lines(use_lv, stan = FALSE)
+add_base_dgam_lines(use_lv, stan = FALSE, offset = FALSE)
 }
 \arguments{
 \item{use_lv}{Logical (use latent variables or not?)}
 
 \item{stan}{Logical (convert existing model to a Stan model?)}
+
+\item{offset}{Logical (include an offset in the linear predictor?)}
 }
 \value{
 A character string to add to the mgcv jagam model file

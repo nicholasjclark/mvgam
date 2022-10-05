@@ -4,8 +4,9 @@
 #' @export
 #' @param use_lv Logical (use latent variables or not?)
 #' @param stan Logical (convert existing model to a Stan model?)
+#' @param offset Logical (include an offset in the linear predictor?)
 #' @return A character string to add to the mgcv jagam model file
-add_base_dgam_lines = function(use_lv, stan = FALSE){
+add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
 
   if(stan){
     if(use_lv){
@@ -315,8 +316,8 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
                }
 
                ## GAM-specific priors")
-               } else {
-                 add <- c("
+    } else {
+      add <- c("
                           #### Begin model ####
                           model {
 
@@ -385,8 +386,8 @@ add_base_dgam_lines = function(use_lv, stan = FALSE){
 
                           ## GAM-specific priors")
 
-                          }
-               }
+    }
+  }
 
   return(add)
     }

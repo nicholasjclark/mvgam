@@ -168,20 +168,23 @@ pfilter_mvgam_smooth = function(particles,
                                       size = particles[[x]]$size[series],
                                       mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
                                                    particles[[x]]$betas)) +
-                                                 (trend_states[series]))))
+                                                 (trend_states[series]) +
+                                                 attr(Xp, 'model.offset'))))
       }
 
       if(particles[[x]]$family == 'Poisson'){
         series_weight <- (dpois(next_assim$y[series],
                                       lambda = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
                                                    particles[[x]]$betas)) +
-                                                 (trend_states[series]))))
+                                                 (trend_states[series]) +
+                                                   attr(Xp, 'model.offset'))))
       }
 
       if(particles[[x]]$family == 'Tweedie'){
         series_weight <- exp(mgcv::ldTweedie(y = next_assim$y[series],
                                                  mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
-                                                              particles[[x]]$betas)) + (trend_states[series])),
+                                                              particles[[x]]$betas)) + (trend_states[series]) +
+                                                            attr(Xp, 'model.offset')),
                                                  p = particles[[x]]$p,
                                                  phi = particles[[x]]$twdis[series],
                                                  all.derivs = F)[,1])

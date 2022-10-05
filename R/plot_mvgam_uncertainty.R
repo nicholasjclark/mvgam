@@ -149,13 +149,15 @@ plot_mvgam_uncertainty = function(object, series = 1, newdata,
   }
   fullpreds <- matrix(NA, nrow = n_samples, ncol = ncols)
   for(i in 1:n_samples){
-    fullpreds[i,] <- Xp %*% betas[i,] + trend[i,]
+    fullpreds[i,] <- Xp %*% betas[i,] + trend[i,] +
+      attr(Xp, 'model.offset')
   }
 
   # GAM only predictions
   gampreds <- matrix(NA, nrow = n_samples, ncol = ncols)
   for(i in 1:n_samples){
-    gampreds[i,] <- Xp %*% betas[i,]
+    gampreds[i,] <- Xp %*% betas[i,] +
+      attr(Xp, 'model.offset')
   }
 
   # GAM uncertainty contributions at each forecast horizon

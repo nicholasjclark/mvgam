@@ -466,18 +466,21 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
         if(family == 'Negative Binomial'){
           out <- rnbinom(NROW(series_test), size = size[series],
                          mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-                                    (trends)))
+                                    (trends) +
+                                    attr(Xp, 'model.offset')))
         }
 
         if(family == 'Poisson'){
           out <- rpois(NROW(series_test),
                        lambda = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-                                      (trends)))
+                                      (trends) +
+                                      attr(Xp, 'model.offset')))
         }
 
         if(family == 'Tweedie'){
           out <- mgcv::rTweedie(mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-                                           (trends)),
+                                           (trends) +
+                                           attr(Xp, 'model.offset')),
                                 p = p, phi = twdis[series])
         }
       }
@@ -554,18 +557,21 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
         if(family == 'Negative Binomial'){
           out <- rnbinom(NROW(series_test), size = size[series],
                          mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-                                    (trends)))
+                                    (trends) +
+                                    attr(Xp, 'model.offset')))
         }
 
         if(family == 'Poisson'){
           out <- rpois(NROW(series_test),
                        lambda = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-                                      (trends)))
+                                      (trends) +
+                                      attr(Xp, 'model.offset')))
         }
 
         if(family == 'Tweedie'){
           out <- mgcv::rTweedie(mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-                                           (trends)),
+                                           (trends) +
+                                           attr(Xp, 'model.offset')),
                                 p = p, phi = twdis[series])
         }
       }

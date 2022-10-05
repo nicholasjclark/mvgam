@@ -7,9 +7,9 @@
 add_trend_lines(model_file, stan = FALSE, use_lv, trend_model, drift)
 }
 \arguments{
-\item{model_file}{A template \code{JAGS} model file to be modified}
+\item{model_file}{A template \code{JAGS} or \code{Stan} model file to be modified}
 
-\item{stan}{Logical (convert existing model to a Stan model?)}
+\item{stan}{Logical (convert existing \code{JAGS} model to a \code{Stan} model?)}
 
 \item{use_lv}{Logical (use latent variable trends or not)}
 

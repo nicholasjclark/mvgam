@@ -296,6 +296,30 @@ plot(mod1, type = 'smooths', residuals = TRUE)
 
 # Plot posterior realisations for the smooth
 plot(mod1, type = 'smooths', realisations = TRUE)
+
+# Example showing how to incorporate an offset; simulate some count data
+# with different means per series
+dat <- sim_mvgam(mu_obs = c(4, 8, 12))
+
+# Add a fake offset term to the training and testing sets where each series
+# has a different 'baseline' magnitude for the offset
+dat$data_train$offset <- rnorm(NROW(dat$data_train)) +
+                          0.25 * as.numeric(dat$data_train$series)
+dat$data_test$offset <- rnorm(NROW(dat$data_test)) +
+                         0.25 * as.numeric(dat$data_test$series)
+
+# Fit the model; note that an offset will only be useful if it is
+# included in the formula (see help("gam") for more information)
+mod1 <- mvgam(y ~ offset(offset) + s(season, bs = 'cc'),
+         data = dat$data_train,
+         trend_model = 'RW')
+
+# Plot forecasts for series 1, incorporating the offset
+plot(mod1, 'forecast', newdata = dat$data_test)
+
+# Changing the offset results in different predictions
+dat$data_test$offset <- dat$data_test$offset - 2
+plot(mod1, 'forecast', newdata = dat$data_test)
 }
 }
 \seealso{

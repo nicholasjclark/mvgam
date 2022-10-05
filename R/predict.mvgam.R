@@ -111,14 +111,16 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
             out <- rnbinom(n = length(newdata$series),
                            size = sizes[x, series_ind[x]],
                            mu = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
-                                        betas[x,]))))
+                                        betas[x,])) +
+                                      attr(Xp, 'model.offset')))
         }
 
         if(family == 'Tweedie'){
             out <- rpois(n = length(newdata$series),
                          lambda = mgcv::rTweedie(
                            mu = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
-                                        betas[x,]))),
+                                        betas[x,])) +
+                                      attr(Xp, 'model.offset')),
                            p = ps[x, series_ind[x]],
                            phi = twdiss[x, series_ind[x]]))
 
@@ -127,7 +129,8 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
         if(family == 'Poisson'){
             out <- rpois(n = length(newdata$series),
                          lambda = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
-                                          betas[x,]))))
+                                          betas[x,])) +
+                                        attr(Xp, 'model.offset')))
         }
       }
 

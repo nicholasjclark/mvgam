@@ -150,6 +150,13 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
     lambda_links <- NULL
   }
 
+  # Offset information
+  if(grep('eta <- X %*% b + offset', jags_file, fixed = TRUE)){
+    offset_line <- paste0('vector[total_obs] offset; // offset vector\n')
+  } else {
+    offset_line <- NULL
+  }
+
   # Search for any non-contiguous indices that sometimes are used by mgcv
   if(any(grep('in c\\(', jags_file))){
     add_idxs <- TRUE
@@ -190,6 +197,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                                                'int<lower=0> num_basis; // total number of basis coefficients\n',
                                                p_terms,
                                                zero_data,
+                                               offset_line,
                                                'matrix[num_basis, total_obs] X; // transposed mgcv GAM design matrix\n',
                                                'int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)\n',
                                                paste0(smooth_penalty_data, collapse = '\n'), '\n',
@@ -211,6 +219,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                                                'int<lower=0> n_series; // number of series\n',
                                                'int<lower=0> num_basis; // total number of basis coefficients\n',
                                                zero_data,
+                                               offset_line,
                                                p_terms,
                                                'matrix[num_basis, total_obs] X; // transposed mgcv GAM design matrix\n',
                                                'int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)\n',

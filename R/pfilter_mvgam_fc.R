@@ -209,7 +209,8 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                         mu = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
                                                       ncol = NCOL(Xp)) %*%
                                               particles[[x]]$betas)) +
-                                   (trend_preds)),
+                                   (trend_preds) +
+                                   attr(Xp, 'model.offset')),
                         size = particles[[x]]$size[series])
 
 
@@ -220,7 +221,8 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                         lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
                                                           ncol = NCOL(Xp)) %*%
                                               particles[[x]]$betas)) +
-                                   (trend_preds)))
+                                   (trend_preds) +
+                                     attr(Xp, 'model.offset')))
         }
 
         if(particles[[x]]$family == 'Tweedie'){
@@ -229,7 +231,8 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                           mu = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
                                                         ncol = NCOL(Xp)) %*%
                                                   particles[[x]]$betas)) +
-                                       (trend_preds)),
+                                       (trend_preds) +
+                                     attr(Xp, 'model.offset')),
                           p = particles[[x]]$p,
                           phi = particles[[x]]$twdis))
         }
@@ -259,7 +262,8 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
             fc <-  rnbinom(fc_horizon,
                            mu = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
                                                          ncol = NCOL(Xp)) %*%
-                                                 particles[[x]]$betas)) + (trend_preds)),
+                                                 particles[[x]]$betas)) + (trend_preds) +
+                                      attr(Xp, 'model.offset')),
                            size = particles[[x]]$size[series])
           }
 
@@ -267,14 +271,16 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
             fc <-  rpois(fc_horizon,
                            lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
                                                              ncol = NCOL(Xp)) %*%
-                                                 particles[[x]]$betas)) + (trend_preds)))
+                                                 particles[[x]]$betas)) + (trend_preds) +
+                                          attr(Xp, 'model.offset')))
           }
 
           if(particles[[x]]$family == 'Tweedie'){
             fc <-  rpois(fc_horizon,
                          lambda = mgcv::rTweedie(mu = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
                                                                                ncol = NCOL(Xp)) %*%
-                                                                       particles[[x]]$betas)) + (trend_preds)),
+                                                                       particles[[x]]$betas)) + (trend_preds) +
+                                                            attr(Xp, 'model.offset')),
                                                  p = particles[[x]]$p,
                                                  phi = particles[[x]]$twdis))
           }

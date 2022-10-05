@@ -2,8 +2,8 @@
 #'
 #'
 #' @export
-#' @param model_file A template `JAGS` model file to be modified
-#' @param stan Logical (convert existing model to a Stan model?)
+#' @param model_file A template `JAGS` or `Stan` model file to be modified
+#' @param stan Logical (convert existing `JAGS` model to a `Stan` model?)
 #' @param use_lv Logical (use latent variable trends or not)
 #' @param trend_model The type of trend model to be added to the model file
 #' @param drift Logical (add drift or not)
