@@ -177,7 +177,8 @@ parameterisation; but use \code{normal} for normal densities in \code{Stan}, wit
 a non-centred parameterisation is automatically employed to avoid degeneracies that are common in hierarchical models.
 Note however that centred versions may perform better for series that are particularly informative, so as with any
 foray into Bayesian modelling, it is worth building an understanding of the model's assumptions and limitations by following a
-principled workflow.
+principled workflow. Also note that models are parameterised using \code{drop.unused.levels = FALSE} in \code{\link[mcgv]{jagam}}
+to ensure predictions can be made for all levels of the supplied factor variable
 \cr
 \cr
 \emph{Overdispersion parameters}: When more than one series is included in \code{data_train} and an overdispersed

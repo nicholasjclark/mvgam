@@ -44,11 +44,10 @@ if(length(pterms) > 0){
 
   for(i in 1:length(pterms)){
     # Find out which beta corresponds to the associated parametric term
-    betas_keep <- grepl(paste0(pterms[i]),
+    betas_keep <- grepl(paste0('^(?=.*',pterms[i], ')(?!.*s\\()'),
                         colnames(predict(object$mgcv_model, type = 'lpmatrix')),
-                        fixed = T)
+                        perl = TRUE)
     betas <- MCMCvis::MCMCchains(object$model_output, 'b')[ ,betas_keep]
-    beta_creds <- quantile(betas, probs = probs)
 
     # Generate linear predictor matrix from fitted mgcv model
     Xp <- predict(object$mgcv_model, newdata = object$obs_data, type = 'lpmatrix')
@@ -64,8 +63,44 @@ if(length(pterms) > 0){
                                dplyr::pull(pterms[i]))
     }
 
-    pred_vals <- seq(min(pred_vals_orig), max(pred_vals_orig), length.out = 500)
-    cred <- as.matrix(beta_creds) %*% pred_vals
+    if(class(object$obs_data[[pterms[i]]]) == 'factor'){
+
+      # Use a simple Boxplot for factor terms for now
+      beta_creds <- apply(betas, 2, function(x)
+        quantile(x, probs = c(0, 0.05, 0.5, 0.95, 1)))
+      colnames(beta_creds) <-
+      substr(names(coef(object$mgcv_model))[grepl(paste0('^(?=.*',
+                                                         pterms[i], ')(?!.*s\\()'),
+                                                  colnames(predict(object$mgcv_model, type = 'lpmatrix')),
+                                                  perl = TRUE)], nchar(pterms[i]) + 1, 1000000L)
+
+      bp <- boxplot(beta_creds, range=0, plot=FALSE)
+      bxp(bp, whisklty=0, staplelty=0,
+          boxfill = c_light, boxcol = c_light, medcol = c_dark,
+          frame.plot = FALSE, ylab = paste0('Partial effect'))
+
+      bp$stats <- apply(betas, 2, function(x)
+        quantile(x, probs = c(0, 0.3, 0.5, 0.7, 1)))
+      bxp(bp, whisklty=0, staplelty=0, add=TRUE, frame.plot = FALSE,
+          boxcol = c_light_highlight, medcol = c_dark, boxfill = c_light_highlight)
+
+      bp$stats <- apply(betas, 2, function(x)
+        quantile(x, probs = c(0, 0.2, 0.5, 0.8, 1)))
+      bxp(bp, whisklty=0, staplelty=0, add=TRUE, frame.plot = FALSE,
+          boxcol = c_mid, medcol = c_dark, boxfill = c_mid)
+
+      bp$stats <- apply(betas, 2, function(x)
+        quantile(x, probs = c(0, 0.4, 0.5, 0.6, 1)))
+      bxp(bp, whisklty=0, staplelty=0, add=TRUE, frame.plot = FALSE,
+          boxcol = c_mid_highlight, medcol = c_dark, boxfill = c_mid_highlight)
+
+      box(bty = 'L', lwd = 2)
+      title(pterms[i], adj = 0)
+
+    } else {
+      beta_creds <- quantile(betas, probs = probs)
+      pred_vals <- seq(min(pred_vals_orig), max(pred_vals_orig), length.out = 500)
+      cred <- as.matrix(beta_creds) %*% pred_vals
 
     # Plot
     plot(1, type = "n", bty = 'L',
@@ -88,6 +123,7 @@ if(length(pterms) > 0){
     box(bty = 'L', lwd = 2)
 
   }
+}
 
   invisible()
   par(.pardefault)

@@ -89,7 +89,6 @@
 #'typically result in a slower sampler, but it will always lead to a more robust sampler.
 #'@param jags_path Optional character vector specifying the path to the location of the `JAGS` executable (.exe) to use
 #'for modelling if `use_stan == FALSE`. If missing, the path will be recovered from a call to \code{\link[runjags]{findjags}}
-#'
 #'@details Dynamic GAMs are useful when we wish to predict future values from time series that show temporal dependence
 #'but we do not want to rely on extrapolating from a smooth term (which can sometimes lead to unpredictable and unrealistic behaviours).
 #'In addition, smooths can often try to wiggle excessively to capture any autocorrelation that is present in a time series,
@@ -113,7 +112,8 @@
 #'a non-centred parameterisation is automatically employed to avoid degeneracies that are common in hierarchical models.
 #'Note however that centred versions may perform better for series that are particularly informative, so as with any
 #'foray into Bayesian modelling, it is worth building an understanding of the model's assumptions and limitations by following a
-#'principled workflow.
+#'principled workflow. Also note that models are parameterised using `drop.unused.levels = FALSE` in \code{\link[mcgv]{jagam}}
+#'to ensure predictions can be made for all levels of the supplied factor variable
 #'\cr
 #'\cr
 #'*Overdispersion parameters*: When more than one series is included in \code{data_train} and an overdispersed
@@ -441,28 +441,28 @@ mvgam = function(formula,
                             data = data_train,
                             method = "REML",
                             family = nb(),
-                            drop.unused.levels = FALSE,
                             knots = knots,
                             control = list(nthreads = min(4, parallel::detectCores()-1),
-                                           maxit = 50))
+                                           maxit = 50),
+                            drop.unused.levels = FALSE)
       } else if(family == 'poisson'){
         ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
                             method = "REML",
                             family = poisson(),
-                            drop.unused.levels = FALSE,
                             knots = knots,
                             control = list(nthreads = min(4, parallel::detectCores()-1),
-                                           maxit = 50))
+                                           maxit = 50),
+                            drop.unused.levels = FALSE)
       } else {
         ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
                             method = "REML",
                             family = tw(),
-                            drop.unused.levels = FALSE,
                             knots = knots,
                             control = list(nthreads = min(4, parallel::detectCores()-1),
-                                           maxit = 50))
+                                           maxit = 50),
+                            drop.unused.levels = FALSE)
       }
 
     } else {
@@ -471,25 +471,25 @@ mvgam = function(formula,
                             data = data_train,
                             method = "REML",
                             family = nb(),
-                            drop.unused.levels = FALSE,
                             control = list(nthreads = min(4, parallel::detectCores()-1),
-                                           maxit = 50))
+                                           maxit = 50),
+                            drop.unused.levels = FALSE)
       } else if(family == 'poisson'){
         ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
                             method = "REML",
                             family = poisson(),
-                            drop.unused.levels = FALSE,
                             control = list(nthreads = min(4, parallel::detectCores()-1),
-                                           maxit = 50))
+                                           maxit = 50),
+                            drop.unused.levels = FALSE)
       } else {
         ss_gam <- mgcv::gam(formula(formula),
                             data = data_train,
                             method = "REML",
                             family = tw(),
-                            drop.unused.levels = FALSE,
                             control = list(nthreads = min(4, parallel::detectCores()-1),
-                                           maxit = 50))
+                                           maxit = 50),
+                            drop.unused.levels = FALSE)
       }
 
     }
@@ -499,9 +499,9 @@ mvgam = function(formula,
   suppressWarnings(data_train$y[which(is.na(data_train$y))] <- round(predict(gam(y ~ time, data = data_train,
                                                                 method = "REML",
                                                                 family = poisson(),
-                                                                drop.unused.levels = FALSE,
                                                                 control = list(nthreads = parallel::detectCores()-1,
-                                                                               maxit = 50)),
+                                                                               maxit = 50),
+                                                                drop.unused.levels = FALSE),
                                                                 newdata = data.frame(time = data_train$time),
                                                                 type = 'response'),
                                                     0)[which(is.na(data_train$y))])
@@ -525,19 +525,19 @@ mvgam = function(formula,
       ss_jagam <- mgcv::jagam(form_fake,
                               data = data_train,
                               family = poisson(),
-                              drop.unused.levels = FALSE,
                               file = 'base_gam.txt',
                               sp.prior = 'gamma',
                               diagonalize = F,
-                              knots = knots)
+                              knots = knots,
+                              drop.unused.levels = FALSE)
     } else {
       ss_jagam <- mgcv::jagam(form_fake,
                               data = data_train,
                               family = poisson(),
-                              drop.unused.levels = FALSE,
                               file = 'base_gam.txt',
                               sp.prior = 'gamma',
-                              diagonalize = F)
+                              diagonalize = F,
+                              drop.unused.levels = FALSE)
     }
     data_train$fakery <- NULL
   } else {
@@ -548,19 +548,19 @@ mvgam = function(formula,
     ss_jagam <- mgcv::jagam(formula,
                             data = data_train,
                             family = poisson(),
-                            drop.unused.levels = FALSE,
                             file = 'base_gam.txt',
                             sp.prior = 'gamma',
                             diagonalize = F,
-                            knots = knots)
+                            knots = knots,
+                            drop.unused.levels = FALSE)
   } else {
     ss_jagam <- mgcv::jagam(formula,
                             data = data_train,
                             family = poisson(),
-                            drop.unused.levels = FALSE,
                             file = 'base_gam.txt',
                             sp.prior = 'gamma',
-                            diagonalize = F)
+                            diagonalize = F,
+                            drop.unused.levels = FALSE)
   }
   }
 
