@@ -104,7 +104,7 @@ test_priors <- get_mvgam_priors(y ~ s(series, bs = 're') +
                                 family = 'nb',
                                 data = dat$data_train,
                                 trend_model = 'AR2')
-                                test_priors
+test_priors
 
 # Make a few changes; first, change the population mean for the series-level
 # random intercepts

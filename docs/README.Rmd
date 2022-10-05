@@ -15,7 +15,10 @@ knitr::opts_chunk$set(
 *mvgam*
 ================
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others.
+The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others. 
+
+## Disclaimer
+Please note that `mvgam` is under very active development, and it is likely that certain functionality will change on a regular basis. As such, please take caution when implementing the package for automated routines.
 
 ## Resources
 A number of case studies have been compiled to highlight how DGAMs can be estimated using MCMC sampling. These are hosted currently on `RPubs` at the following links:
@@ -126,7 +129,20 @@ Resulting prior realisations look more reasonable given the range of the observa
 plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
 ```
 
-In practice, imparting domain knowledge into prior specifications for penalised smooth functions is challenging, as these behaviours are often the cumulative result of multiple penalty matrices that all have their own separate smoothing parameters. Changing the prior on the smoothing parameters is another option (`mvgam` uses an expontenial(0.05) prior by default, which tends to regularise functions to be more smooth compared to default approaches used in `mgcv::jagam`), but without running through prior visualisations (and other prior pushforward checks) it will be more difficult to reason about how to set `k` to respect domain knowledge. In general it is highly recommended that users view `mvgam` and related interfaces such as `brms` as tools for building scaffold models that can then be modified to suit the bespoke needs of each particular analysis. But for now, we will proceed by conditioning the model on observed data in `Stan` using MCMC sampling with the `Cmdstan` interface (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan) and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
+In practice, imparting domain knowledge into prior specifications for penalised smooth functions is challenging, as these behaviours are often the cumulative result of multiple penalty matrices that all have their own separate smoothing parameters. Changing the prior on the smoothing parameters is another option (`mvgam` uses an expontenial(0.05) prior by default, which tends to regularise functions to be more smooth compared to default approaches used in `mgcv::jagam`), but without running through prior visualisations (and other prior pushforward checks) it will be more difficult to reason about how to set `k` to respect domain knowledge. In general it is highly recommended that users view `mvgam` and related interfaces such as `brms` as tools for building scaffold models that can then be modified to suit the bespoke needs of each particular analysis. 
+
+Users can also check what the default prior distributions are for given model formulations, which can be helpful to understand how the model can be modified but also to see any restrictions on what can be changed within the `mvgam` framework.
+
+```{r}
+test_priors <- get_mvgam_priors(y ~ s(season, bs = 'cc', k = 13),
+                                family = 'poisson',
+                                data = lynx_train,
+                                trend_model = 'AR3',
+                                use_stan = TRUE)
+test_priors
+```
+
+Any of the above priors can be changed by modifying the `prior` column and supplying the resulting `data.frame` to the `priors` argument in `mvgam()`. But for now, we will proceed with the defaults by conditioning the model on observed data in `Stan` using MCMC sampling with the `Cmdstan` interface (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan) and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvgam(data = lynx_train,
                newdata = lynx_test,

@@ -7,6 +7,7 @@
 pfilter_mvgam_fc(
   file_path = "pfilter",
   n_cores = 2,
+  newdata,
   data_test,
   plot_legend = TRUE,
   legend_position = "topleft",
@@ -19,8 +20,11 @@ pfilter_mvgam_fc(
 
 \item{n_cores}{\code{integer} specifying number of cores for generating particle forecasts in parallel}
 
-\item{data_test}{A \code{dataframe} or \code{list} of test data containing at least 'series' and time',
+\item{newdata}{A \code{dataframe} or \code{list} of test data containing at least 'series' and time',
 in addition to any other variables included in the linear predictor of \code{formula}}
+
+\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
+\code{newdata} instead for more seamless integration into \code{R} workflows}
 
 \item{plot_legend}{\code{logical} stating whether to include a legend to highlight which observations
 were used for calibration and which were assimilated by the particle filter}
