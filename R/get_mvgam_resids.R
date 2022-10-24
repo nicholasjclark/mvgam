@@ -9,7 +9,18 @@
 #'@return A \code{list} of residual distributions
 get_mvgam_resids = function(object, n_cores = 1){
 
+  # Check arguments
+  if(sign(n_cores) != 1){
+    stop('argument "n_cores" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_cores%%1 != 0){
+      stop('argument "n_cores" must be a positive integer',
+           call. = FALSE)
+    }
+  }
 
+# Extract necessary model elements
 preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')
 n_series <- NCOL(object$ytimes)
 obs_series <- object$obs_data$series
@@ -17,6 +28,10 @@ series_levels <- levels(obs_series)
 family <- object$family
 obs_data <- object$obs_dat
 fit_engine <- object$fit_engine
+
+# Create sequences of posterior draws for calculating residual distributions
+sample_seq <- 1:NROW(preds)
+draw_seq <- sample(sample_seq, length(sample_seq), replace = FALSE)
 
 if(family == 'Negative Binomial'){
   rs <- MCMCvis::MCMCchains(object$model_output, 'r')
@@ -26,7 +41,7 @@ if(family == 'Negative Binomial'){
 
 # Functions for calculating randomised quantile (Dunn-Smyth) residuals
 ds_resids_nb = function(truth, fitted, draw, size){
-  dsres_out <- matrix(NA, length(truth), 1)
+  dsres_out <- vector(length = length(truth))
   for(i in 1:length(truth)){
     if(is.na(truth[i])){
       a <- pnbinom(as.vector(draw[i]) - 1, mu = fitted[i], size = size)
@@ -43,15 +58,14 @@ ds_resids_nb = function(truth, fitted, draw, size){
     if(u >=1){
       u <- runif(n = 1, min = 0.99, max = 0.9999999)
     }
-    dsres_out[i, ] <- qnorm(u)
+    dsres_out[i] <- qnorm(u)
   }
-  resids <- dsres_out[,1]
-  resids[is.infinite(resids)] <- NaN
-  resids
+  dsres_out[is.infinite(dsres_out)] <- NaN
+  dsres_out
 }
 
 ds_resids_pois = function(truth, fitted, draw){
-  dsres_out <- matrix(NA, length(truth), 1)
+  dsres_out <- vector(length = length(truth))
   for(i in 1:length(truth)){
     if(is.na(truth[i])){
       a <- ppois(as.vector(draw[i]) - 1, lambda = fitted[i])
@@ -68,15 +82,14 @@ ds_resids_pois = function(truth, fitted, draw){
     if(u >=1){
       u <- runif(n = 1, min = 0.99, max = 0.9999999)
     }
-    dsres_out[i, ] <- qnorm(u)
+    dsres_out[i] <- qnorm(u)
   }
-  resids <- dsres_out[,1]
-  resids[is.infinite(resids)] <- NaN
-  resids
+  dsres_out[is.infinite(dsres_out)] <- NaN
+  dsres_out
 }
 
 ds_resids_tw = function(truth, fitted, draw){
-  dsres_out <- matrix(NA, length(truth), 1)
+  dsres_out <- vector(length = length(truth))
   for(i in 1:length(truth)){
     if(is.na(truth[i])){
       a <- ppois(as.vector(draw[i]) - 1, lambda = fitted[i])
@@ -93,11 +106,10 @@ ds_resids_tw = function(truth, fitted, draw){
     if(u >=1){
       u <- runif(n = 1, min = 0.99, max = 0.9999999)
     }
-    dsres_out[i, ] <- qnorm(u)
+    dsres_out[i] <- qnorm(u)
   }
-  resids <- dsres_out[,1]
-  resids[is.infinite(resids)] <- NaN
-  resids
+  dsres_out[is.infinite(dsres_out)] <- NaN
+  dsres_out
 }
 
 # Pull out starting and ending indices for each series in the object
@@ -107,12 +119,14 @@ starts <- ends + 1
 starts <- c(1, starts[-c(1, (n_series+1))])
 ends <- ends[-1]
 
-# Calculate DS residual distributiosn in parallel
+# Calculate DS residual distributions in parallel
 cl <- parallel::makePSOCKcluster(n_cores)
 setDefaultCluster(cl)
 clusterExport(NULL, c('ds_resids_nb',
                       'ds_resids_pois',
                       'ds_resids_tw',
+                      'sample_seq',
+                      'draw_seq',
                       'n_series',
                       'obs_series',
                       'series_levels',
@@ -161,18 +175,11 @@ series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
                          dplyr::pull(y))
   }
 
-
-  if(NROW(preds) > 1200){
-    sample_seq <- sample(1:NROW(preds), 1200, F)
-  } else {
-    sample_seq <- 1:NROW(preds)
-  }
-
   if(family == 'Poisson'){
    resids <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_pois(truth = truth,
                                       fitted = preds[x, ],
-                                      draw = preds[x, ]))
+                                      draw = preds[draw_seq[x], ]))
     }))
   }
 
@@ -181,7 +188,7 @@ series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
     resids <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_nb(truth = truth,
                                     fitted = preds[x, ],
-                                    draw = preds[x, ],
+                                    draw = preds[draw_seq[x], ],
                                     size = size[x]))
     }))
   }
@@ -190,7 +197,7 @@ series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
     resids <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_tw(truth = truth,
                                     fitted = preds[x, ],
-                                    draw = preds[x, ]))
+                                    draw = preds[draw_seq[x], ]))
     }))
   }
 
