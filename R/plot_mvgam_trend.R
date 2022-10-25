@@ -244,7 +244,7 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
     }
     box(bty = 'L', lwd = 2)
 
-    abline(h = 0, lty = 'dashed', col = 'grey70', lwd = 2)
+    abline(h = 0, lty = 'dashed', lwd = 2)
 
     invisible()
     par(.pardefault)

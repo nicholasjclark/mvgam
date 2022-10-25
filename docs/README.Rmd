@@ -18,7 +18,7 @@ knitr::opts_chunk$set(
 The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others. 
 
 ## Disclaimer
-Please note that `mvgam` is under very active development, and it is likely that certain functionality will change on a regular basis. As such, please take caution when implementing the package for automated routines.
+Please note that the `mvgam` package is under very active development, and it is likely that certain functionality will change on a regular basis. As such, please take caution when implementing the package for automated routines.
 
 ## Resources
 A number of case studies have been compiled to highlight how DGAMs can be estimated using MCMC sampling. These are hosted currently on `RPubs` at the following links:

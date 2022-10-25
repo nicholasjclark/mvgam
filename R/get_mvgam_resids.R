@@ -199,12 +199,6 @@ series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
                                     fitted = as.vector(preds),
                                     draw = as.vector(preds[draw_seq,])),
                      nrow = NROW(preds))
-
-   # resids <- do.call(rbind, lapply(sample_seq, function(x){
-   #    suppressWarnings(ds_resids_pois(truth = truth,
-   #                                    fitted = preds[x, ],
-   #                                    draw = preds[draw_seq[x], ]))
-   #  }))
   }
 
   if(family == 'Negative Binomial'){
@@ -216,13 +210,6 @@ series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
                                     draw = as.vector(preds[draw_seq,]),
                                   size = as.vector(size_mat)),
                      nrow = NROW(preds))
-
-    # resids <- do.call(rbind, lapply(sample_seq, function(x){
-    #   suppressWarnings(ds_resids_nb(truth = truth,
-    #                                 fitted = preds[x, ],
-    #                                 draw = preds[draw_seq[x], ],
-    #                                 size = size[x]))
-    # }))
   }
 
   if(family == 'Tweedie'){
@@ -230,11 +217,6 @@ series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
                                     fitted = as.vector(preds),
                                     draw = as.vector(preds[draw_seq,])),
                      nrow = NROW(preds))
-    # resids <- do.call(rbind, lapply(sample_seq, function(x){
-    #   suppressWarnings(ds_resids_tw(truth = truth,
-    #                                 fitted = preds[x, ],
-    #                                 draw = preds[draw_seq[x], ]))
-    # }))
   }
 
 resids

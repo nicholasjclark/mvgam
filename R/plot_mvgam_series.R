@@ -40,8 +40,10 @@ plot_mvgam_series = function(object,
                              log_scale = FALSE){
 
   # Check arguments
-  if(class(object) != 'mvgam'){
-    stop('argument "object" must be of class "mvgam"')
+  if(!missing(object)){
+    if(class(object) != 'mvgam'){
+      stop('argument "object" must be of class "mvgam"')
+    }
   }
 
   if(is.character(series)){

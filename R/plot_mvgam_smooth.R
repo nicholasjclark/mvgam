@@ -529,7 +529,7 @@ plot_mvgam_smooth = function(object,
     }
     box(bty = 'L', lwd = 2)
 
-    abline(h = 0, lty = 'dashed', col = 'grey70', lwd = 2)
+    abline(h = 0, lty = 'dashed', lwd = 2)
 
     invisible()
     par(.pardefault)
