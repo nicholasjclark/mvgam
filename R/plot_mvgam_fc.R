@@ -308,7 +308,8 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
       score <- sum((indicator - Fy(ysum))^2)
 
       # Is value within empirical interval?
-      interval <- quantile(fc, probs = c((1-interval_width)/2, (interval_width + (1-interval_width)/2)))
+      interval <- quantile(fc, probs = c((1-interval_width)/2, (interval_width + (1-interval_width)/2)),
+                           na.rm = TRUE)
       in_interval <- ifelse(truth <= interval[2] & truth >= interval[1], 1, 0)
       return(c(score, in_interval))
     }

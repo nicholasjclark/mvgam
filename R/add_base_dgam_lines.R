@@ -199,7 +199,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                ## mean expectations
                for (i in 1:n) {
                for (s in 1:n_series) {
-               mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
+               mus[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
                }
                }
 
@@ -295,8 +295,8 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                for (i in 1:n) {
                for (s in 1:n_series) {
                y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
-               rate[i, s] <- ifelse((r[s] / (r[s] + mu[i, s])) < min_eps, min_eps,
-               (r[s] / (r[s] + mu[i, s])))
+               rate[i, s] <- ifelse((r[s] / (r[s] + mus[i, s])) < min_eps, min_eps,
+               (r[s] / (r[s] + mus[i, s])))
                }
                }
 
@@ -327,7 +327,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                           ## mean expectations
                           for (i in 1:n) {
                           for (s in 1:n_series) {
-                          mu[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
+                          mus[i, s] <- exp(eta[ytimes[i, s]] + trend[i, s])
                           }
                           }
 
@@ -364,8 +364,8 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                           for (i in 1:n) {
                           for (s in 1:n_series) {
                           y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
-                          rate[i, s] <- ifelse((r[s] / (r[s] + mu[i, s])) < min_eps, min_eps,
-                          (r[s] / (r[s] + mu[i, s])))
+                          rate[i, s] <- ifelse((r[s] / (r[s] + mus[i, s])) < min_eps, min_eps,
+                          (r[s] / (r[s] + mus[i, s])))
                           }
                           }
 

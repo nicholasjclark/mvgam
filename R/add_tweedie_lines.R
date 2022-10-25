@@ -27,7 +27,7 @@ add_tweedie_lines = function(model_file, upper_bounds){
   model_file[grep('linpred\\[i, s\\] ~', model_file)] <- '  linpred[i, s] ~ dgamma(shape[i, s, y_ind[i, s]], rate[i, s])\n  twlambda[i, s] <-'
   model_file <- readLines(textConnection(model_file), n = -1)
 
-  model_file[grep('twlambda\\[i, s\\] <-', model_file)] <- '  twlambda[i, s] <- pow(mu[i, s], 2 - p) / (twdis[s] * (2 - p))\n  N_pois[i, s] ~'
+  model_file[grep('twlambda\\[i, s\\] <-', model_file)] <- '  twlambda[i, s] <- pow(mus[i, s], 2 - p) / (twdis[s] * (2 - p))\n  N_pois[i, s] ~'
   model_file <- readLines(textConnection(model_file), n = -1)
 
   model_file[grep('N_pois\\[i, s\\] ~', model_file)] <- '  N_pois[i, s] ~ dpois(twlambda[i, s])T(1,)\n  shape[i, s, 1] <-'
@@ -39,10 +39,10 @@ add_tweedie_lines = function(model_file, upper_bounds){
   model_file[grep('shape\\[i, s, 2\\] <-', model_file)] <- '  shape[i, s, 2] <- 1\n  rate[i, s] <-'
   model_file <- readLines(textConnection(model_file), n = -1)
 
-  model_file[grep('rate\\[i, s\\] <-', model_file)] <- '  rate[i, s] <- 1 / (twdis[s] * (p - 1) * pow(mu[i, s], p - 1))\n  pois_draw[i, s] ~'
+  model_file[grep('rate\\[i, s\\] <-', model_file)] <- '  rate[i, s] <- 1 / (twdis[s] * (p - 1) * pow(mus[i, s], p - 1))\n  pois_draw[i, s] ~'
   model_file <- readLines(textConnection(model_file), n = -1)
 
-  model_file[grep('pois_draw\\[i, s\\] ~', model_file)] <- '  pois_draw[i, s] ~ dpois(mu[i, s])\n  is_zero[i, s] <-'
+  model_file[grep('pois_draw\\[i, s\\] ~', model_file)] <- '  pois_draw[i, s] ~ dpois(mus[i, s])\n  is_zero[i, s] <-'
   model_file <- readLines(textConnection(model_file), n = -1)
 
   model_file[grep('is_zero\\[i, s\\] <-', model_file)] <- '  is_zero[i, s] <- equals(pois_draw[i, s], 0)\n  y_ind[i, s] <-'

@@ -460,6 +460,9 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
 
       if(type == 'trend'){
         out <- trends
+      } else if(type == 'link'){
+        out <- as.vector(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
+          (trends) + attr(Xp, 'model.offset'))
         } else {
 
         # Calculate predictions
@@ -552,6 +555,9 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
 
       if(type == 'trend'){
         out <- trends
+      } else if(type == 'link'){
+          out <- as.vector(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
+            (trends) + attr(Xp, 'model.offset'))
       } else {
         # Calculate predictions
         if(family == 'Negative Binomial'){

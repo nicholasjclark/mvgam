@@ -23,7 +23,7 @@
 #'Note, all plots use posterior medians of fitted values / residuals, so uncertainty is not represented.
 #'@return A series of base \code{R} plots
 #'@export
-plot_mvgam_resids = function(object, series = 1, n_bins = 25,
+plot_mvgam_resids = function(object, series = 1, n_bins = 20,
                              newdata, data_test){
 
   # Check arguments
@@ -101,24 +101,22 @@ if(missing(data_test)){
 
   if(object$fit_engine == 'stan'){
 
-    # For stan objects, ypred is stored as a vector in column-major order
-    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
-                                                                    dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
-                                                                    by = NCOL(object$ytimes))][, 1:obs_length]
+    # For stan objects, mus is logged and stored as a vector in column-major order
+    preds <- exp(MCMCvis::MCMCchains(object$model_output, 'mus')[,seq(series,
+                                                                    dim(MCMCvis::MCMCchains(object$model_output, 'mus'))[2],
+                                                                    by = NCOL(object$ytimes))][, 1:obs_length])
   } else {
-    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]][, 1:obs_length]
+    preds <- MCMCvis::MCMCchains(object$model_output, 'mus')[,starts[series]:ends[series]][, 1:obs_length]
   }
 
 } else {
 
   if(object$fit_engine == 'stan'){
-
-    # For stan objects, ypred is stored as a vector in column-major order
-    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
-                                                                    dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
-                                                                    by = NCOL(object$ytimes))]
+    preds <- exp(MCMCvis::MCMCchains(object$model_output, 'mus')[,seq(series,
+                                                                    dim(MCMCvis::MCMCchains(object$model_output, 'mus'))[2],
+                                                                    by = NCOL(object$ytimes))])
   } else {
-    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+    preds <- MCMCvis::MCMCchains(object$model_output, 'mus')[,starts[series]:ends[series]]
   }
 
   # Add variables to data_test if missing
@@ -183,7 +181,9 @@ if(missing(data_test)){
     }
 
     if(dim(preds)[2] != length(all_obs)){
-      fc_preds <- forecast.mvgam(object, series = series, data_test = data_test)
+      fc_preds <- exp(mvgam:::forecast.mvgam(object, series = series,
+                                             data_test = data_test,
+                                 type = 'link'))
       preds <- cbind(preds, fc_preds)
     }
 
@@ -193,80 +193,85 @@ if(missing(data_test)){
 
     # Functions for calculating randomised quantile (Dunn-Smyth) residuals
     ds_resids_nb = function(truth, fitted, draw, size){
-      dsres_out <- matrix(NA, length(truth), 1)
-      for(i in 1:length(truth)){
-        if(is.na(truth[i])){
-          a <- pnbinom(as.vector(draw[i]) - 1, mu = fitted[i], size = size)
-          b <- pnbinom(as.vector(draw[i]), mu = fitted[i], size = size)
-        } else {
-          a <- pnbinom(as.vector(truth[i]) - 1, mu = fitted[i], size = size)
-          b <- pnbinom(as.vector(truth[i]), mu = fitted[i], size = size)
-        }
+      na_obs <- is.na(truth)
+      a_obs <- pnbinom(as.vector(truth[!na_obs]) - 1,
+                       mu = fitted[!na_obs], size = size)
+      b_obs <- pnbinom(as.vector(truth[!na_obs]),
+                       mu = fitted[!na_obs], size = size)
+      u_obs <- runif(n = length(draw[!na_obs]),
+                     min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
-        u <- runif(n = 1, min = a, max = b)
-        if(u <= 0){
-          u <- runif(n = 1, min = 0.0000001, max = 0.01)
-        }
-        if(u >=1){
-          u <- runif(n = 1, min = 0.99, max = 0.9999999)
-        }
-        dsres_out[i, ] <- qnorm(u)
+      if(any(is.na(truth))){
+        a_na <- pnbinom(as.vector(draw[na_obs]) - 1,
+                        mu = fitted[na_obs], size = size)
+        b_na <- pnbinom(as.vector(draw[na_obs]),
+                        mu = fitted[na_obs], size = size)
+        u_na <- runif(n = length(draw[na_obs]),
+                      min = pmin(a_na, b_na), max = pmax(a_na, b_na))
+        u <- vector(length = length(truth))
+        u[na_obs] <- u_na
+        u[!na_obs] <- u_obs
+      } else {
+        u <- u_obs
       }
-      resids <- dsres_out[,1]
-      resids[is.infinite(resids)] <- NaN
-      resids
+      dsres_out <- qnorm(u)
+      dsres_out[is.infinite(dsres_out)] <- NaN
+      dsres_out
     }
 
     ds_resids_pois = function(truth, fitted, draw){
-      dsres_out <- matrix(NA, length(truth), 1)
-      for(i in 1:length(truth)){
-        if(is.na(truth[i])){
-          a <- ppois(as.vector(draw[i]) - 1, lambda = fitted[i])
-          b <- ppois(as.vector(draw[i]), lambda = fitted[i])
-        } else {
-          a <- ppois(as.vector(truth[i]) - 1, lambda = fitted[i])
-          b <- ppois(as.vector(truth[i]), lambda = fitted[i])
-        }
+      na_obs <- is.na(truth)
+      a_obs <- ppois(as.vector(truth[!na_obs]) - 1,
+                     lambda = fitted[!na_obs])
+      b_obs <- ppois(as.vector(truth[!na_obs]),
+                     lambda = fitted[!na_obs])
+      u_obs <- runif(n = length(draw[!na_obs]),
+                     min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
-        u <- runif(n = 1, min = a, max = b)
-        if(u <= 0){
-          u <- runif(n = 1, min = 0.0000001, max = 0.01)
-        }
-        if(u >=1){
-          u <- runif(n = 1, min = 0.99, max = 0.9999999)
-        }
-        dsres_out[i, ] <- qnorm(u)
+      if(any(is.na(truth))){
+        a_na <- ppois(as.vector(draw[na_obs]) - 1,
+                      lambda = fitted[na_obs])
+        b_na <- ppois(as.vector(draw[na_obs]),
+                      lambda = fitted[na_obs])
+        u_na <- runif(n = length(draw[na_obs]),
+                      min = pmin(a_na, b_na), max = pmax(a_na, b_na))
+        u <- vector(length = length(truth))
+        u[na_obs] <- u_na
+        u[!na_obs] <- u_obs
+      } else {
+        u <- u_obs
       }
-      resids <- dsres_out[,1]
-      resids[is.infinite(resids)] <- NaN
-      resids
+      dsres_out <- qnorm(u)
+      dsres_out[is.infinite(dsres_out)] <- NaN
+      dsres_out
     }
 
     ds_resids_tw = function(truth, fitted, draw){
-      dsres_out <- matrix(NA, length(truth), 1)
-      for(i in 1:length(truth)){
-        if(is.na(truth[i])){
-          a <- ppois(as.vector(draw[i]) - 1, lambda = fitted[i])
-          b <- ppois(as.vector(draw[i]), lambda = fitted[i])
-        } else {
-          a <- ppois(as.vector(truth[i]) - 1, lambda = fitted[i])
-          b <- ppois(as.vector(truth[i]), lambda = fitted[i])
-        }
+      na_obs <- is.na(truth)
+      a_obs <- ppois(as.vector(truth[!na_obs]) - 1,
+                     lambda = fitted[!na_obs])
+      b_obs <- ppois(as.vector(truth[!na_obs]),
+                     lambda = fitted[!na_obs])
+      u_obs <- runif(n = length(draw[!na_obs]),
+                     min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
-        u <- runif(n = 1, min = a, max = b)
-        if(u <= 0){
-          u <- runif(n = 1, min = 0.0000001, max = 0.01)
-        }
-        if(u >=1){
-          u <- runif(n = 1, min = 0.99, max = 0.9999999)
-        }
-        dsres_out[i, ] <- qnorm(u)
+      if(any(is.na(truth))){
+        a_na <- ppois(as.vector(draw[na_obs]) - 1,
+                      lambda = fitted[na_obs])
+        b_na <- ppois(as.vector(draw[na_obs]),
+                      lambda = fitted[na_obs])
+        u_na <- runif(n = length(draw[na_obs]),
+                      min = pmin(a_na, b_na), max = pmax(a_na, b_na))
+        u <- vector(length = length(truth))
+        u[na_obs] <- u_na
+        u[!na_obs] <- u_obs
+      } else {
+        u <- u_obs
       }
-      resids <- dsres_out[,1]
-      resids[is.infinite(resids)] <- NaN
-      resids
+      dsres_out <- qnorm(u)
+      dsres_out[is.infinite(dsres_out)] <- NaN
+      dsres_out
     }
-
    n_obs <- length(truth)
 
    if(NROW(preds) > 2000){
@@ -276,7 +281,7 @@ if(missing(data_test)){
    }
 
    if(object$family == 'Poisson'){
-     resids <- do.call(rbind, lapply(sample_seq, function(x){
+     series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
        suppressWarnings(ds_resids_pois(truth = truth,
                                        fitted = preds[x, ],
                                        draw = preds[x, ]))
@@ -285,7 +290,7 @@ if(missing(data_test)){
 
    if(object$family == 'Negative Binomial'){
      size <- MCMCvis::MCMCchains(object$model_output, 'r')[,series]
-     resids <- do.call(rbind, lapply(sample_seq, function(x){
+     series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
        suppressWarnings(ds_resids_nb(truth = truth,
                                      fitted = preds[x, ],
                                      draw = preds[x, ],
@@ -294,7 +299,7 @@ if(missing(data_test)){
    }
 
    if(object$family == 'Tweedie'){
-     resids <- do.call(rbind, lapply(sample_seq, function(x){
+     series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
        suppressWarnings(ds_resids_tw(truth = truth,
                                      fitted = preds[x, ],
                                      draw = preds[x, ]))
@@ -303,7 +308,7 @@ if(missing(data_test)){
   }
 }
 
-median_preds <- apply(preds, 2, function(x) quantile(x, 0.5))
+median_preds <- apply(preds, 2, function(x) quantile(x, 0.5, na.rm = TRUE))
 
 # Graphical parameters
 layout(matrix(1:4, ncol = 2, nrow = 2, byrow = TRUE))
@@ -319,16 +324,17 @@ if(length(sorted_x) > n_fitted_bins){
   resid_probs <- do.call(rbind, lapply(2:n_fitted_bins, function(i){
     quantile(as.vector(series_residuals[,which(round(median_preds, 6) <= sorted_x[i] &
                                                round(median_preds, 6) > sorted_x[i-1])]),
-             probs = probs)
+             probs = probs, na.rm = TRUE)
   }))
   resid_probs <- rbind(quantile(as.vector(series_residuals[,which(round(median_preds, 6) == sorted_x[1])]),
-                                probs = probs),
+                                probs = probs,
+                                na.rm = TRUE),
                        resid_probs)
 
 } else {
   resid_probs <- do.call(rbind, lapply(sorted_x, function(i){
     quantile(as.vector(series_residuals[,which(round(median_preds, 6) == i)]),
-             probs = probs)
+             probs = probs, na.rm = TRUE)
   }))
 }
 
@@ -343,8 +349,8 @@ x <- sapply(1:length(idx),
                 repped_x[k] - min(diff(sorted_x))/2)
 
 # Plot
-plot(median_preds[1:length(object$resids[[series]])],
-     object$resids[[series]],
+plot(median_preds[1:length(series_residuals)],
+     series_residuals,
      bty = 'L',
      xlab = 'Fitted values',
      ylab = 'DS residuals',
@@ -391,7 +397,7 @@ abline(h = 0, col = 'black', lwd = 2.5, lty = 'dashed')
 coords <- qqnorm(series_residuals[1,], plot.it = F)
 resid_coords_y <- matrix(NA, nrow = NROW(series_residuals), ncol = length(coords$y))
 for(i in 1:NROW(series_residuals)){
-  norm_coords <- qqnorm(series_residuals[i,], plot.it = F)
+  norm_coords <- qqnorm(series_residuals[i,], plot.it = FALSE)
   coords_y <- norm_coords$y
   coords_y[abs(coords_y) > 3.75] <- NA
   resid_coords_y[i,] <- coords_y[order(norm_coords$x)]
@@ -400,7 +406,7 @@ for(i in 1:NROW(series_residuals)){
 cred <- sapply(1:NCOL(resid_coords_y),
                function(n) quantile(resid_coords_y[,n],
                                     probs = probs,
-                                    na.rm = T))
+                                    na.rm = TRUE))
 pred_vals <- coords$x[order(coords$x)]
 pred_vals <- pred_vals[complete.cases(cred[1,])]
 plot(x = pred_vals,

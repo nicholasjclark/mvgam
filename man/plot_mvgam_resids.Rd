@@ -4,7 +4,7 @@
 \alias{plot_mvgam_resids}
 \title{Residual diagnostics for a fitted mvgam object}
 \usage{
-plot_mvgam_resids(object, series = 1, n_bins = 25, newdata, data_test)
+plot_mvgam_resids(object, series = 1, n_bins = 20, newdata, data_test)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}

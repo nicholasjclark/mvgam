@@ -12,9 +12,9 @@ get_monitor_pars = function(family, smooths_included = TRUE,
                             use_lv, trend_model, drift){
 
   if(smooths_included){
-    param <- c('rho', 'b', 'ypred')
+    param <- c('rho', 'b', 'ypred', 'mus')
   } else {
-    param <- c('b', 'ypred')
+    param <- c('b', 'ypred', 'mus')
   }
 
   if(family == 'nb'){

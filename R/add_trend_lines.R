@@ -476,7 +476,7 @@ add_trend_lines = function(model_file, stan = FALSE,
   } else {
     # Modify the JAGS model
     if(trend_model == 'None'){
-      model_file[grep('mu\\[i, s\\] <- exp', model_file)] <- 'mu[i, s] <- exp(eta[ytimes[i, s]])'
+      model_file[grep('mus\\[i, s\\] <- exp', model_file)] <- 'mus[i, s] <- exp(eta[ytimes[i, s]])'
       model_file <- model_file[-c(grep('## trend estimates', model_file):
                                     (grep('## trend estimates', model_file) + 27))]
     }

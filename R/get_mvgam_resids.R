@@ -20,8 +20,14 @@ get_mvgam_resids = function(object, n_cores = 1){
     }
   }
 
-# Extract necessary model elements
-preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')
+# Extract necessary model elements; for Stan models, expectations are
+# stored on the link scale (log)
+if(object$fit_engine == 'stan'){
+  preds <- exp(MCMCvis::MCMCchains(object$model_output, 'mus'))
+} else {
+  preds <- MCMCvis::MCMCchains(object$model_output, 'mus')
+}
+
 n_series <- NCOL(object$ytimes)
 obs_series <- object$obs_data$series
 series_levels <- levels(obs_series)
@@ -41,73 +47,82 @@ if(family == 'Negative Binomial'){
 
 # Functions for calculating randomised quantile (Dunn-Smyth) residuals
 ds_resids_nb = function(truth, fitted, draw, size){
-  dsres_out <- vector(length = length(truth))
-  for(i in 1:length(truth)){
-    if(is.na(truth[i])){
-      a <- pnbinom(as.vector(draw[i]) - 1, mu = fitted[i], size = size)
-      b <- pnbinom(as.vector(draw[i]), mu = fitted[i], size = size)
-    } else {
-      a <- pnbinom(as.vector(truth[i]) - 1, mu = fitted[i], size = size)
-      b <- pnbinom(as.vector(truth[i]), mu = fitted[i], size = size)
-    }
+  na_obs <- is.na(truth)
+  a_obs <- pnbinom(as.vector(truth[!na_obs]) - 1,
+                                   mu = fitted[!na_obs], size = size)
+  b_obs <- pnbinom(as.vector(truth[!na_obs]),
+                                   mu = fitted[!na_obs], size = size)
+  u_obs <- runif(n = length(draw[!na_obs]),
+                 min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
-    u <- runif(n = 1, min = a, max = b)
-    if(u <= 0){
-      u <- runif(n = 1, min = 0.0000001, max = 0.01)
-    }
-    if(u >=1){
-      u <- runif(n = 1, min = 0.99, max = 0.9999999)
-    }
-    dsres_out[i] <- qnorm(u)
+  if(any(is.na(truth))){
+    a_na <- pnbinom(as.vector(draw[na_obs]) - 1,
+                                    mu = fitted[na_obs], size = size)
+    b_na <- pnbinom(as.vector(draw[na_obs]),
+                                    mu = fitted[na_obs], size = size)
+    u_na <- runif(n = length(draw[na_obs]),
+                  min = pmin(a_na, b_na), max = pmax(a_na, b_na))
+    u <- vector(length = length(truth))
+    u[na_obs] <- u_na
+    u[!na_obs] <- u_obs
+  } else {
+    u <- u_obs
   }
+  dsres_out <- qnorm(u)
   dsres_out[is.infinite(dsres_out)] <- NaN
   dsres_out
 }
 
 ds_resids_pois = function(truth, fitted, draw){
-  dsres_out <- vector(length = length(truth))
-  for(i in 1:length(truth)){
-    if(is.na(truth[i])){
-      a <- ppois(as.vector(draw[i]) - 1, lambda = fitted[i])
-      b <- ppois(as.vector(draw[i]), lambda = fitted[i])
-    } else {
-      a <- ppois(as.vector(truth[i]) - 1, lambda = fitted[i])
-      b <- ppois(as.vector(truth[i]), lambda = fitted[i])
-    }
+  na_obs <- is.na(truth)
+  a_obs <- ppois(as.vector(truth[!na_obs]) - 1,
+                                   lambda = fitted[!na_obs])
+  b_obs <- ppois(as.vector(truth[!na_obs]),
+                                   lambda = fitted[!na_obs])
+  u_obs <- runif(n = length(draw[!na_obs]),
+                 min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
-    u <- runif(n = 1, min = a, max = b)
-    if(u <= 0){
-      u <- runif(n = 1, min = 0.0000001, max = 0.01)
-    }
-    if(u >=1){
-      u <- runif(n = 1, min = 0.99, max = 0.9999999)
-    }
-    dsres_out[i] <- qnorm(u)
+  if(any(is.na(truth))){
+    a_na <- ppois(as.vector(draw[na_obs]) - 1,
+                                    lambda = fitted[na_obs])
+    b_na <- ppois(as.vector(draw[na_obs]),
+                                    lambda = fitted[na_obs])
+    u_na <- runif(n = length(draw[na_obs]),
+                  min = pmin(a_na, b_na), max = pmax(a_na, b_na))
+    u <- vector(length = length(truth))
+    u[na_obs] <- u_na
+    u[!na_obs] <- u_obs
+  } else {
+    u <- u_obs
   }
+  dsres_out <- qnorm(u)
   dsres_out[is.infinite(dsres_out)] <- NaN
   dsres_out
 }
 
 ds_resids_tw = function(truth, fitted, draw){
-  dsres_out <- vector(length = length(truth))
-  for(i in 1:length(truth)){
-    if(is.na(truth[i])){
-      a <- ppois(as.vector(draw[i]) - 1, lambda = fitted[i])
-      b <- ppois(as.vector(draw[i]), lambda = fitted[i])
-    } else {
-      a <- ppois(as.vector(truth[i]) - 1, lambda = fitted[i])
-      b <- ppois(as.vector(truth[i]), lambda = fitted[i])
-    }
+  na_obs <- is.na(truth)
+  a_obs <- ppois(as.vector(truth[!na_obs]) - 1,
+                                 lambda = fitted[!na_obs])
+  b_obs <- ppois(as.vector(truth[!na_obs]),
+                                 lambda = fitted[!na_obs])
+  u_obs <- runif(n = length(draw[!na_obs]),
+                 min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
-    u <- runif(n = 1, min = a, max = b)
-    if(u <= 0){
-      u <- runif(n = 1, min = 0.0000001, max = 0.01)
-    }
-    if(u >=1){
-      u <- runif(n = 1, min = 0.99, max = 0.9999999)
-    }
-    dsres_out[i] <- qnorm(u)
+  if(any(is.na(truth))){
+    a_na <- ppois(as.vector(draw[na_obs]) - 1,
+                                  lambda = fitted[na_obs])
+    b_na <- ppois(as.vector(draw[na_obs]),
+                                  lambda = fitted[na_obs])
+    u_na <- runif(n = length(draw[na_obs]),
+                  min = pmin(a_na, b_na), max = pmax(a_na, b_na))
+    u <- vector(length = length(truth))
+    u[na_obs] <- u_na
+    u[!na_obs] <- u_obs
+  } else {
+    u <- u_obs
   }
+  dsres_out <- qnorm(u)
   dsres_out[is.infinite(dsres_out)] <- NaN
   dsres_out
 }
@@ -175,30 +190,51 @@ series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
                          dplyr::pull(y))
   }
 
+  truth_mat <- matrix(rep(truth, NROW(preds)),
+                      nrow = NROW(preds),
+                      byrow = TRUE)
+
   if(family == 'Poisson'){
-   resids <- do.call(rbind, lapply(sample_seq, function(x){
-      suppressWarnings(ds_resids_pois(truth = truth,
-                                      fitted = preds[x, ],
-                                      draw = preds[draw_seq[x], ]))
-    }))
+    resids <- matrix(ds_resids_pois(truth = as.vector(truth_mat),
+                                    fitted = as.vector(preds),
+                                    draw = as.vector(preds[draw_seq,])),
+                     nrow = NROW(preds))
+
+   # resids <- do.call(rbind, lapply(sample_seq, function(x){
+   #    suppressWarnings(ds_resids_pois(truth = truth,
+   #                                    fitted = preds[x, ],
+   #                                    draw = preds[draw_seq[x], ]))
+   #  }))
   }
 
   if(family == 'Negative Binomial'){
     size <- rs[,series]
-    resids <- do.call(rbind, lapply(sample_seq, function(x){
-      suppressWarnings(ds_resids_nb(truth = truth,
-                                    fitted = preds[x, ],
-                                    draw = preds[draw_seq[x], ],
-                                    size = size[x]))
-    }))
+    size_mat <- matrix(rep(size, NCOL(preds)),
+                       ncol = NCOL(preds))
+    resids <- matrix(ds_resids_nb(truth = as.vector(truth_mat),
+                                    fitted = as.vector(preds),
+                                    draw = as.vector(preds[draw_seq,]),
+                                  size = as.vector(size_mat)),
+                     nrow = NROW(preds))
+
+    # resids <- do.call(rbind, lapply(sample_seq, function(x){
+    #   suppressWarnings(ds_resids_nb(truth = truth,
+    #                                 fitted = preds[x, ],
+    #                                 draw = preds[draw_seq[x], ],
+    #                                 size = size[x]))
+    # }))
   }
 
   if(family == 'Tweedie'){
-    resids <- do.call(rbind, lapply(sample_seq, function(x){
-      suppressWarnings(ds_resids_tw(truth = truth,
-                                    fitted = preds[x, ],
-                                    draw = preds[draw_seq[x], ]))
-    }))
+    resids <- matrix(ds_resids_tw(truth = as.vector(truth_mat),
+                                    fitted = as.vector(preds),
+                                    draw = as.vector(preds[draw_seq,])),
+                     nrow = NROW(preds))
+    # resids <- do.call(rbind, lapply(sample_seq, function(x){
+    #   suppressWarnings(ds_resids_tw(truth = truth,
+    #                                 fitted = preds[x, ],
+    #                                 draw = preds[draw_seq[x], ]))
+    # }))
   }
 
 resids

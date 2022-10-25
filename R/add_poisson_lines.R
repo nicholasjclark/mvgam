@@ -16,12 +16,12 @@ add_poisson_lines = function(model_file, upper_bounds){
   model_file <- model_file[-c(rate_begin:rate_end)]
 
   if(missing(upper_bounds)){
-    model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mu[i, s])'
-    model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mu[i, s])'
+    model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mus[i, s])'
+    model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mus[i, s])'
 
   } else {
-    model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
-    model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mu[i, s])T(, upper_bound[s])'
+    model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dpois(mus[i, s])T(, upper_bound[s])'
+    model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dpois(mus[i, s])T(, upper_bound[s])'
   }
 
   model_file
