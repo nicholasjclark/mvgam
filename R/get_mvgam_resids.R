@@ -190,6 +190,11 @@ series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
                          dplyr::pull(y))
   }
 
+  # Keep only the predictions that match the observation period
+  # (not the out of sample predictions, if any were computed in the model)
+  preds <- preds[,1:length(truth)]
+
+  # Create a truth matrix for vectorised residual computation
   truth_mat <- matrix(rep(truth, NROW(preds)),
                       nrow = NROW(preds),
                       byrow = TRUE)
