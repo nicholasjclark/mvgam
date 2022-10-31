@@ -10,6 +10,7 @@ plot_mvgam_series(
   data_train,
   newdata,
   data_test,
+  lines = TRUE,
   series = 1,
   n_bins,
   log_scale = FALSE
@@ -33,6 +34,9 @@ biases in model predictions.}
 
 \item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
 \code{newdata} instead for more seamless integration into \code{R} workflows}
+
+\item{lines}{Logical. If \code{TRUE}, line plots are used for visualising time series. If
+\code{FALSE}, points are used.}
 
 \item{series}{Either a \code{integer} specifying which series in the set is to be plotted or
 the string 'all', which plots all series available in the supplied data}

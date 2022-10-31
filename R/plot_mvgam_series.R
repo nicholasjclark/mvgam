@@ -16,6 +16,8 @@
 #'biases in model predictions.
 #'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
 #'\code{newdata} instead for more seamless integration into `R` workflows
+#'@param lines Logical. If \code{TRUE}, line plots are used for visualising time series. If
+#'\code{FALSE}, points are used.
 #'@param series Either a \code{integer} specifying which series in the set is to be plotted or
 #'the string 'all', which plots all series available in the supplied data
 #'@param n_bins \code{integer} specifying the number of bins to use for binning observed values when plotting
@@ -35,6 +37,7 @@ plot_mvgam_series = function(object,
                              data_train,
                              newdata,
                              data_test,
+                             lines = TRUE,
                              series = 1,
                              n_bins,
                              log_scale = FALSE){
@@ -148,13 +151,26 @@ plot_mvgam_series = function(object,
       title(s_name, line = 0)
 
       if(n_plots > 1){
-        for(x in 1:n_plots){
-          lines(all_ys[[x]], lwd = 1.85, col = 'grey85')
+        if(lines){
+          for(x in 1:n_plots){
+            lines(all_ys[[x]], lwd = 1.85, col = 'grey85')
+          }
+        } else {
+          for(x in 1:n_plots){
+            points(all_ys[[x]], col = 'grey85', pch = 16)
+          }
         }
+
       }
 
-      lines(x = 1:length(truth), y = truth, lwd = 3, col = "white")
-      lines(x = 1:length(truth), y = truth, lwd = 2.5, col = "#8F2727")
+      if(lines){
+        lines(x = 1:length(truth), y = truth, lwd = 3, col = "white")
+        lines(x = 1:length(truth), y = truth, lwd = 2.5, col = "#8F2727")
+      } else {
+        points(x = 1:length(truth), y = truth, cex = 1.2, col = "white", pch = 16)
+        points(x = 1:length(truth), y = truth, cex = 0.9, col = "#8F2727", pch = 16)
+      }
+
       box(bty = 'L', lwd = 2)
 
     }
@@ -189,8 +205,16 @@ plot_mvgam_series = function(object,
            xlim = c(0, length(c(truth, test))))
       title('Time series', line = 0)
 
-      lines(x = 1:length(truth), y = truth, lwd = 2, col = "#8F2727")
-      lines(x = (length(truth)+1):length(c(truth, test)), y = test, lwd = 2, col = "black")
+      if(lines){
+        lines(x = 1:length(truth), y = truth, lwd = 2, col = "#8F2727")
+        lines(x = (length(truth)+1):length(c(truth, test)),
+              y = test, lwd = 2, col = "black")
+      } else {
+        points(x = 1:length(truth), y = truth, pch = 16, col = "#8F2727")
+        points(x = (length(truth)+1):length(c(truth, test)),
+               y = test, pch = 16, col = "black")
+      }
+
       abline(v = length(truth)+1, col = '#FFFFFF60', lwd = 2.85)
       abline(v = length(truth)+1, col = 'black', lwd = 2.5, lty = 'dashed')
       box(bty = 'L', lwd = 2)
@@ -251,7 +275,12 @@ plot_mvgam_series = function(object,
            xlim = c(0, length(c(truth))))
       title('Time series', line = 0)
 
-      lines(x = 1:length(truth), y = truth, lwd = 2, col = "#8F2727")
+      if(lines){
+        lines(x = 1:length(truth), y = truth, lwd = 2, col = "#8F2727")
+      } else {
+        points(x = 1:length(truth), y = truth, pch = 16, col = "#8F2727")
+      }
+
       box(bty = 'L', lwd = 2)
 
       if(missing(n_bins)){

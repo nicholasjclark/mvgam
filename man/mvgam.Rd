@@ -24,6 +24,7 @@ mvgam(
   n_samples = 500,
   thin = 1,
   parallel = TRUE,
+  threads = 1,
   priors,
   upper_bounds,
   use_stan = FALSE,
@@ -108,6 +109,11 @@ sampling the posterior distribution}
 \item{parallel}{\code{logical} specifying whether multiple cores should be used for
 generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to use will be
 \code{min(c(chains, parallel::detectCores() - 1))}}
+
+\item{threads}{\code{integer} Experimental option to use multithreading for within-chain
+parallelisation in \code{Stan}. We recommend its use only if you are experienced with
+\code{Stan}'s \code{reduce_sum} function and have a slow running model that cannot be sped
+up by any other means}
 
 \item{priors}{An optional \code{data.frame} with prior
 definitions (in JAGS or Stan syntax). See \code{\link{get_mvgam_priors}} and
