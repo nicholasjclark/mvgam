@@ -1116,6 +1116,8 @@ mvgam = function(formula,
                    '}\n}')
         }
       }
+
+      model_file <- readLines(textConnection(model_file), n = -1)
     }
 
     lik_line <- grep('// likelihood functions',
