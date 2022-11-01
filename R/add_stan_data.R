@@ -519,12 +519,13 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                               b_i_indices + 3)]
   }
 
+  # Replace any normal(0, 1) with std_normal() for faster computation
   stan_file <- readLines(textConnection(stan_file), n = -1)
-
-  unlink('base_gam_stan.txt')
-  stan_file <- readLines(textConnection(stan_file), n = -1)
+  stan_file <- gsub('normal(0, 1)', 'std_normal()', stan_file, fixed = TRUE)
 
   # Final tidying of the Stan model for readability
+  unlink('base_gam_stan.txt')
+  stan_file <- readLines(textConnection(stan_file), n = -1)
   clean_up <- vector()
   for(x in 1:length(stan_file)){
     clean_up[x] <- stan_file[x-1] == "" & stan_file[x] == ""
