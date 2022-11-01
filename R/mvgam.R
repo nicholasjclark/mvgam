@@ -1151,7 +1151,7 @@ mvgam = function(formula,
                                        'target += reduce_sum(partial_sum,\n',
                                        'flat_mus,\n',
                                        'grainsize,\n',
-                                       'flat_ys\n',
+                                       'flat_ys,\n',
                                        'flat_rs);\n}\n')
       } else {
         model_file[lik_line] <- paste0('// likelihood functions\n',
