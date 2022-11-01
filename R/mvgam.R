@@ -1161,7 +1161,7 @@ mvgam = function(formula,
       }
 
       if(any(grepl('functions {', model_file, fixed = TRUE))){
-        model_file[grep('functions {', model_file)] <-
+        model_file[grep('functions {', model_file, fixed = TRUE)] <-
           paste0('functions {\n',
                  'vector rep_each(vector x, int K) {\n',
                  'int N = rows(x);\n',
