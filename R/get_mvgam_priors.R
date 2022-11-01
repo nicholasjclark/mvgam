@@ -294,7 +294,7 @@ get_mvgam_priors = function(formula,
                                                collapse = ', '),
                                          paste(re_smooths, 'pop sd',
                                                collapse = ', ')),
-                          prior = c('mu_raw ~ normal(0, 1);',
+                          prior = c('mu_raw ~ std_normal();',
                                     'sigma_raw ~ exponential(0.5);'))
 
       # Add example change that users could implement to put different priors
