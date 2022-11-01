@@ -311,7 +311,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
       stan_file <- stan_file[-grep('sigma_raw.* ~ ', stan_file)]
       stan_file[grep('model \\{', stan_file)] <-
         paste0('model {\n// prior for random effect population variances\nsigma_raw ~ exponential(0.5);\n\n',
-               '// prior for random effect population means\nmu_raw ~ normal(0, 1);\n')
+               '// prior for random effect population means\nmu_raw ~ std_normal();\n')
 
       stan_file[grep('parameters \\{', stan_file)[1] + 2] <-
         paste0(stan_file[grep('parameters \\{', stan_file)[1] + 2],
