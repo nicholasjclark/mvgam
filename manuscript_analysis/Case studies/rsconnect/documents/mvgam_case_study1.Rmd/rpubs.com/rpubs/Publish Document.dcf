@@ -6,6 +6,6 @@ server: rpubs.com
 hostUrl: rpubs.com
 appId: https://api.rpubs.com/api/v1/document/949541/2ff60f7d573e416282d4c8ba93051852
 bundleId: https://api.rpubs.com/api/v1/document/949541/2ff60f7d573e416282d4c8ba93051852
-url: http://rpubs.com/NickClark47/949541/edit
-when: 1664512560.72123
-lastSyncTime: 1664512560.72124
+url: http://rpubs.com/NickClark47/949541
+when: 1667353468.56511
+lastSyncTime: 1667353468.56512

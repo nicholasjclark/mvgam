@@ -397,10 +397,14 @@ abline(h = 0, col = 'black', lwd = 2.5, lty = 'dashed')
 coords <- qqnorm(series_residuals[1,], plot.it = F)
 resid_coords_y <- matrix(NA, nrow = NROW(series_residuals), ncol = length(coords$y))
 for(i in 1:NROW(series_residuals)){
-  norm_coords <- qqnorm(series_residuals[i,], plot.it = FALSE)
-  coords_y <- norm_coords$y
-  coords_y[abs(coords_y) > 3.75] <- NA
-  resid_coords_y[i,] <- coords_y[order(norm_coords$x)]
+  if(all(is.na(series_residuals[i,]))){
+    resid_coords_y[i,] <- rep(NA, length(coords$y))
+  } else {
+    norm_coords <- qqnorm(series_residuals[i,], plot.it = FALSE)
+    coords_y <- norm_coords$y
+    coords_y[abs(coords_y) > 3.75] <- NA
+    resid_coords_y[i,] <- coords_y[order(norm_coords$x)]
+  }
 }
 
 cred <- sapply(1:NCOL(resid_coords_y),

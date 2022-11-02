@@ -190,7 +190,7 @@ summary(trends_mod1$mgcv_model)
 summary(trends_mod2$mgcv_model)
 ```
 
-Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow a RW process, and we will set `n_lv = 3`
+Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow a RW process, and we will set `n_lv = 2`
 ```{r, message=FALSE, warning=FALSE}
 trends_mod3 <- mvgam(data = trends_data$data_train,
                       newdata = trends_data$data_test,
@@ -199,7 +199,7 @@ trends_mod3 <- mvgam(data = trends_data$data_train,
                       knots = list(season = c(0.5, 12.5)),
                       trend_model = 'RW',
                       use_lv = TRUE,
-                      n_lv = 3,
+                      n_lv = 2,
                       family = 'poisson',
                       use_stan = TRUE,
                       chains = 4,

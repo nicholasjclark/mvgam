@@ -53,7 +53,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
       }
     } else {
       if(any(grepl('functions {', model_file, fixed = TRUE))){
-        model_file[grep('Stan model code', model_file)] <-
+        model_file[grep('functions {', model_file, fixed = TRUE)] <-
           paste0('functions {\n',
                  'real partial_log_lik_lpmf(int[] seq, int start, int end,\n',
                  'data int[] Y, vector mu, real[] phi) {\n',
@@ -172,7 +172,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
   model_data$obs_ind <- which(as.vector(model_data$y_observed) == 1)
   model_data$flat_ys <- as.vector(model_data$y)[which(as.vector(model_data$y_observed) == 1)]
   model_data$X <- t(model_data$X)
-  model_data$flat_xs <- model_data$X[as.vector(model_data$ytimes)[model_data$obs_ind],]
+  model_data$flat_xs <- as.matrix(model_data$X[as.vector(model_data$ytimes)[model_data$obs_ind],])
 
   # Add a grainsize integer
   if(threads > 1){
@@ -222,10 +222,22 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
                                   model_file, fixed = TRUE):
                                (grep('// GAM contribution to expectations (log scale)',
                                      model_file, fixed = TRUE) + 5))]
-  model_file <- model_file[-(grep('eta = to_vector(b * X);',
-                                  model_file, fixed = TRUE):
-                               (grep('eta = to_vector(b * X);',
-                                     model_file, fixed = TRUE) + 4))]
+
+  if(trend_model == 'GP'){
+    model_file <- model_file[-(grep('eta = to_vector(b * X);',
+                                    model_file, fixed = TRUE))]
+    model_file <- model_file[-((grep('mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];',
+                                    model_file, fixed = TRUE) - 1):
+                               (grep('mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];',
+                                     model_file, fixed = TRUE) + 1))]
+
+  } else {
+    model_file <- model_file[-(grep('eta = to_vector(b * X);',
+                                    model_file, fixed = TRUE):
+                                 (grep('eta = to_vector(b * X);',
+                                       model_file, fixed = TRUE) + 4))]
+  }
+
   model_file <- model_file[-((grep('// posterior predictions',
                                    model_file, fixed = TRUE) + 1):
                                (grep('// posterior predictions',

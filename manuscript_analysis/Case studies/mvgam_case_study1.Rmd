@@ -1119,8 +1119,3 @@ Both components contribute to forecast uncertainty, with the trend component con
 ```{r, fig.width=6, fig.height=6, fig.align='center'}
 plot_mvgam_resids(lynx_mvgam, n_bins = 25)
 ```
-
-This same plot can also be produced for out of sample residuals if a set of test data is supplied (note that the function will assume that the test data come immediately sequential to the training data, there are no formal checks of this so it is up to the user to ensure this holds)
-```{r, fig.width=6, fig.height=6, fig.align='center'}
-plot_mvgam_resids(lynx_mvgam, n_bins = 25, newdata = lynx_test)
-```

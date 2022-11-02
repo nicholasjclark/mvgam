@@ -1,0 +1,18 @@
+model {
+  eta <- X %*% b ## linear predictor
+  for (i in 1:n) { mu[i] <-  exp(eta[i]) } ## expected response
+  for (i in 1:n) { y[i] ~ dpois(mu[i]) } ## response 
+  ## Parametric effect priors CHECK tau=1/30^2 is appropriate!
+  for (i in 1:1) { b[i] ~ dnorm(0,0.0011) }
+  ## prior for te(mintemp,lag)... 
+  K1 <- S1[1:35,1:35] * lambda[1]  + S1[1:35,36:70] * lambda[2] + S1[1:35,71:105] * lambda[3]
+  b[2:36] ~ dmnorm(zero[2:36],K1) 
+  ## prior for te(precip,lag)... 
+  K2 <- S2[1:30,1:30] * lambda[4]  + S2[1:30,31:60] * lambda[5] + S2[1:30,61:90] * lambda[6]
+  b[37:66] ~ dmnorm(zero[37:66],K2) 
+  ## smoothing parameter priors CHECK...
+  for (i in 1:6) {
+    lambda[i] ~ dgamma(.05,.005)
+    rho[i] <- log(lambda[i])
+  }
+}
