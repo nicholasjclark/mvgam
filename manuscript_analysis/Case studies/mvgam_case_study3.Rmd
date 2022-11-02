@@ -254,7 +254,7 @@ plot(1, type = "n",
 # value for centring the plot
 newdata$mintemp <- matrix(0, ncol = ncol(newdata$mintemp),
                          nrow = nrow(newdata$mintemp))
-preds <- predict(mod4, series = 1, newdata = newdata, type = 'link')
+preds <- predict(mod4, newdata = newdata, type = 'link')
 offset <- mean(preds)
 
 for(i in 1:6){
@@ -267,7 +267,7 @@ for(i in 1:6){
                              length.out = length(newdata$year))
 
   # Predict on the link scale and shift by the offset so that values are roughly centred at zero
-  preds <- predict(mod4, series = 1, newdata = newdata, type = 'link') - offset
+  preds <- predict(mod4, newdata = newdata, type = 'link') - offset
 
   # Calculate empirical prediction quantiles
   probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
@@ -301,7 +301,7 @@ newdata$mintemp <- matrix(0, ncol = ncol(newdata$mintemp),
                          nrow = nrow(newdata$mintemp))
 newdata$precip <- matrix(0, ncol = ncol(newdata$precip),
                          nrow = nrow(newdata$precip))
-preds <- predict(mod4, series = 1, newdata = newdata, type = 'link')
+preds <- predict(mod4, newdata = newdata, type = 'link')
 offset <- mean(preds)
 plot(1, type = "n",
      xlab = 'Precipitation',
@@ -315,7 +315,7 @@ for(i in 1:6){
   newdata$precip[,i] <- seq(min(data_train$precip),
                              max(data_train$precip),
                              length.out = length(newdata$year))
-  preds <- predict(mod4, series = 1, newdata = newdata, type = 'link') - offset
+  preds <- predict(mod4, newdata = newdata, type = 'link') - offset
   probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
   cred <- sapply(1:NCOL(preds),
                  function(n) quantile(preds[,n],
