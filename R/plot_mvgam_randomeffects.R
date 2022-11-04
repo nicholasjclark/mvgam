@@ -134,6 +134,6 @@ if(any(smooth_labs$class == 'random.effect')){
   layout(1)
 
 } else {
-  stop('No random effect smooths (bs = "re") in model formula')
+  message('No random effect smooths (bs = "re") in model formula')
 }
 }

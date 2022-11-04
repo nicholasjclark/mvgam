@@ -150,11 +150,13 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
 
 
   if(dim(preds)[2] != length(all_obs)){
+    s_name <- levels(object$obs_data$series)[series]
+
     if(object$trend_model == 'None'){
 
       if(class(object$obs_data)[1] == 'list'){
-        series_obs <- which(data_test$series == !!(levels(object$obs_data$series)[series]))
-        series_test <- lapply(data_assim, function(x){
+        series_obs <- which(data_test$series == s_name)
+        series_test <- lapply(data_test, function(x){
           if(is.matrix(x)){
             matrix(x[series_obs,], ncol = NCOL(x))
           } else {
@@ -164,7 +166,7 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
         })
       } else {
         series_test = data_test %>%
-          dplyr::filter(series == !!(levels(object$obs_data$series)[series]))
+          dplyr::filter(series == s_name)
       }
 
       fc_preds <- predict.mvgam(object, newdata = series_test,

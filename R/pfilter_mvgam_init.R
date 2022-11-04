@@ -125,15 +125,16 @@ if(object$use_lv){
       inds_lv <- seq(lv, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2], by = n_lv)
       lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,inds_lv]
       # Need to only use estimates from the training period
+      s_name <- levels(object$obs_data$series)[1]
       if(class(object$obs_data)[1] == 'list'){
         end_train <- data.frame(y = object$obs_data$y,
                                 series = object$obs_data$series,
                                 time = object$obs_data$time) %>%
-          dplyr::filter(series == !!(levels(object$obs_data$series)[1])) %>%
+          dplyr::filter(series == s_name) %>%
           NROW()
       } else {
         end_train <- object$obs_data %>%
-          dplyr::filter(series == !!(levels(data_train$series)[1])) %>%
+          dplyr::filter(series == s_name) %>%
           NROW()
       }
 
@@ -151,8 +152,9 @@ if(object$use_lv){
       lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[lv]:ends[lv]]
 
       # Need to only use estimates from the training period
+      s_name <- levels(object$obs_data$series)[1]
       end_train <- data.frame(series = object$obs_data$series) %>%
-        dplyr::filter(series == !!(levels(data_train$series)[1])) %>%
+        dplyr::filter(series == s_name) %>%
         NROW()
       lv_estimates <- lv_estimates[,1:end_train]
       lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
@@ -178,8 +180,9 @@ if(object$use_lv){
     }
 
     # Need to only use estimates from the training period
+    s_name <- levels(object$obs_data$series)[1]
     end_train <- data.frame(series = object$obs_data$series) %>%
-      dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
+      dplyr::filter(series == s_name) %>%
       NROW()
     trend_estimates <- trend_estimates[,1:end_train]
 

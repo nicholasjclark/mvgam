@@ -72,6 +72,7 @@ plot_mvgam_smooth = function(object,
   }
 
   # Get smooth term names
+  s_name <- levels(object$obs_data$series)[series]
   data_train <- object$obs_data
   smooth_terms <- unlist(purrr::map(object$mgcv_model$smooth, 'label'))
 
@@ -150,8 +151,8 @@ plot_mvgam_smooth = function(object,
     if(missing(newdata) && class(object$obs_data)[1] != 'list'){
       data_train %>%
         dplyr::select(c(series, smooth_terms)) %>%
-        dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-        dplyr::mutate(series = !!(levels(data_train$series)[series])) -> pred_dat
+        dplyr::filter(series == s_name) %>%
+        dplyr::mutate(series = s_name) -> pred_dat
 
       # Use a larger sample size when estimating derivatives so they can be better approximated
       if(derivatives){
@@ -297,7 +298,7 @@ plot_mvgam_smooth = function(object,
       end_train <- length(which(object$obs_data[['series']] == (levels(data_train$series)[series])))
     } else {
       end_train <- object$obs_data %>%
-        dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
+        dplyr::filter(series == s_name) %>%
         NROW()
     }
 
