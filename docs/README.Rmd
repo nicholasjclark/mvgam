@@ -154,8 +154,8 @@ lynx_mvgam <- mvgam(data = lynx_train,
 ```
 
 Inspect the resulting model file, which is written in the `Stan` probabilistic programming language
-```{r, results = 'asis'}
-cat(c("```stan", lynx_mvgam$model_file, "```"), sep = "\n")
+```{r}
+code(lynx_mvgam)
 ```
 
 Perform a series of posterior retrodictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine histograms for posterior retrodictions (`yhat`) and compare to the histogram of the observations (`y`)

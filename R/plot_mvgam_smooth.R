@@ -108,6 +108,16 @@ plot_mvgam_smooth = function(object,
     stop('mvgam cannot yet plot smooths of more than 2 dimensions')
   }
 
+  # Check that this is not a random effect smooth
+  smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
+    data.frame(label = object$mgcv_model$smooth[[x]]$label,
+               class = class(object$mgcv_model$smooth[[x]])[1])
+  }))
+
+  if(smooth_labs$class[smooth_int] == 'random.effect'){
+    stop('use function "plot_mvgam_randomeffects" to plot "re" bases')
+  }
+
   # Be sure that parametric and by variables are included in newdata
   smooth_terms <- unique(trimws(strsplit(gsub('\\+', ',',
                                               as.character(object$mgcv_model$pred.formula)[2]), ',')[[1]]))

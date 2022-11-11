@@ -33,7 +33,7 @@
 #'@author Nicholas J Clark
 #'@return A base R plot or set of plots
 #'@export
-plot.mvgam = function(object, type = 'smooths',
+plot.mvgam = function(object, type = 'residuals',
                       series = 1, residuals = FALSE,
                       newdata, data_test, ...){
 
@@ -117,6 +117,10 @@ plot.mvgam = function(object, type = 'smooths',
       dplyr::filter(class != 'random.effect') %>%
       dplyr::filter(class != 'mrf.smooth') %>%
       dplyr::filter(mgcv_plottable) -> smooth_labs
+
+    if(length(smooth_labs$label) == 0){
+      stop("No terms to plot - nothing for plot.mvgam() to do.")
+    }
 
     # Check which ones plot_mvgam_smooth can handle (no more than 2 dimensions)
     plottable = function(x){

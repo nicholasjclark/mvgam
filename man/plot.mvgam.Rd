@@ -6,7 +6,7 @@
 \usage{
 \method{plot}{mvgam}(
   object,
-  type = "smooths",
+  type = "residuals",
   series = 1,
   residuals = FALSE,
   newdata,
