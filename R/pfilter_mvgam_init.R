@@ -507,7 +507,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
 
         tail(t(Sigma_new) %*% solve(Sigma, last_trends[[trend]]), 1) +
           tail(MASS::mvrnorm(1, mu = rep(0, length(t_new)),
-                             Sigma = Sigma_star), 1)
+                             Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), 1)
       }))
     }
 

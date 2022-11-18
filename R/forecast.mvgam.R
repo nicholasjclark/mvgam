@@ -532,7 +532,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
                                  NROW(series_test)) +
                               tail(MASS::mvrnorm(1,
                                                  mu = rep(0, length(t_new)),
-                                                 Sigma = Sigma_star),
+                                                 Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)),
                                    NROW(series_test)))
       }
 

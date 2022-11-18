@@ -124,7 +124,7 @@ pfilter_mvgam_smooth = function(particles,
 
           tail(t(Sigma_new) %*% solve(Sigma, particles[[x]]$trend_states[[series]]), 1) +
             tail(MASS::mvrnorm(1, mu = rep(0, length(t_new)),
-                               Sigma = Sigma_star), 1)
+                               Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), 1)
 
         }))
       } else {
