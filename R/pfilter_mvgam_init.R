@@ -499,15 +499,15 @@ particles <- pbapply::pblapply(sample_seq, function(x){
         t <- 1:length(last_trends[[trend]])
         t_new <- 1:(length(last_trends[[trend]]) + 1)
 
-
-        Sigma_new <- alpha_gp[trend]^2 * exp(- outer(t, t_new, "-")^2 / (2 * rho_gp[trend]^2))
-        Sigma_star <- alpha_gp[trend]^2 * exp(- outer(t_new, t_new, "-")^2 / (2 * rho_gp[trend]^2))
-        Sigma <- alpha_gp[trend]^2 * exp(- outer(t, t, "-")^2 / (2 * rho_gp[trend]^2)) +
-          diag(1e-4, length(last_trends[[trend]]))
+        Sigma_new <- alpha_gp[trend]^2 * exp(-0.5 * ((outer(t, t_new, "-") / rho_gp[trend]) ^ 2))
+        Sigma_star <- alpha_gp[trend]^2 * exp(-0.5 * ((outer(t_new, t_new, "-") / rho_gp[trend]) ^ 2)) +
+          diag(1e-4, length(t_new))
+        Sigma <- alpha_gp[trend]^2 * exp(-0.5 * ((outer(t, t, "-") / rho_gp[trend]) ^ 2)) +
+          diag(1e-4, length(t))
 
         tail(t(Sigma_new) %*% solve(Sigma, last_trends[[trend]]), 1) +
-          tail(MASS::mvrnorm(1, mu = rep(0, dim(Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new))[2]),
-                             Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), 1)
+          tail(MASS::mvrnorm(1, mu = rep(0, length(t_new)),
+                             Sigma = Sigma_star), 1)
       }))
     }
 

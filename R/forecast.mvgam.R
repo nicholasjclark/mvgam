@@ -104,21 +104,6 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
     states[-c(1:3)]
   }
 
-  # Function to simulate trends ahead using squared exponential GP
-  sim_gp = function(alpha_gp, rho_gp, state, h){
-    t <- 1:length(state)
-    t_new <- 1:(length(state) + h)
-
-    Sigma_new <- alpha_gp^2 * exp(- outer(t, t_new, "-")^2 / (2 * rho_gp^2))
-    Sigma_star <- alpha_gp^2 * exp(- outer(t_new, t_new, "-")^2 / (2 * rho_gp^2))
-    Sigma <- alpha_gp^2 * exp(- outer(t, t, "-")^2 / (2 * rho_gp^2)) +
-      diag(1e-4, length(state))
-
-    tail(t(Sigma_new) %*% solve(Sigma, state), h) +
-      tail(MASS::mvrnorm(1, mu = rep(0, dim(Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new))[2]),
-                         Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), h)
-  }
-
   # Extract trend posterior predictions
   if(object$trend_model != 'None'){
 
@@ -410,7 +395,6 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
                         'series_test',
                         'trend_estimates',
                         'sim_ar3',
-                        'sim_gp',
                         'Xp'),
                 envir = environment())
 
@@ -538,18 +522,17 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
       } else {
         t <- 1:length(last_trends)
         t_new <- 1:(length(last_trends) + NROW(series_test))
-        Sigma_new <- alpha_gp[series]^2 * exp(- outer(t, t_new, "-")^2 / (2 * rho_gp[series]^2))
-        Sigma_star <- alpha_gp[series]^2 * exp(- outer(t_new, t_new, "-")^2 / (2 * rho_gp[series]^2))
-        Sigma <- alpha_gp[series]^2 * exp(- outer(t, t, "-")^2 / (2 * rho_gp[series]^2)) +
-          diag(1e-4, length(last_trends))
+        Sigma_new <- alpha_gp[series]^2 * exp(-0.5 * ((outer(t, t_new, "-") / rho_gp[series]) ^ 2))
+        Sigma_star <- alpha_gp[series]^2 * exp(-0.5 * ((outer(t_new, t_new, "-") / rho_gp[series]) ^ 2)) +
+          diag(1e-4, length(t_new))
+        Sigma <- alpha_gp[series]^2 * exp(-0.5 * ((outer(t, t, "-") / rho_gp[series]) ^ 2)) +
+          diag(1e-4, length(t))
 
         trends <- as.vector(tail(t(Sigma_new) %*% solve(Sigma, last_trends),
                                  NROW(series_test)) +
                               tail(MASS::mvrnorm(1,
-                                                 mu = rep(0, dim(Sigma_star - t(Sigma_new) %*%
-                                                                   solve(Sigma, Sigma_new))[2]),
-                                                 Sigma = Sigma_star -
-                                                   t(Sigma_new) %*% solve(Sigma, Sigma_new)),
+                                                 mu = rep(0, length(t_new)),
+                                                 Sigma = Sigma_star),
                                    NROW(series_test)))
       }
 

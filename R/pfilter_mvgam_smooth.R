@@ -113,20 +113,18 @@ pfilter_mvgam_smooth = function(particles,
       if(particles[[x]]$trend_model == 'GP'){
         trend_states <- unlist(lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
 
-          t <- 1:length(particles[[x]]$trend_states[[series]])
-          t_new <- 1:(length(particles[[x]]$trend_states[[series]])+1)
-
           Sigma_new <- particles[[x]]$alpha_gp[series]^2 *
-            exp(- outer(t, t_new, "-")^2 / (2 * particles[[x]]$rho_gp[series]^2))
+            exp(-0.5 * ((outer(t, t_new, "-") / particles[[x]]$rho_gp[series]) ^ 2))
           Sigma_star <- particles[[x]]$alpha_gp[series]^2 *
-            exp(- outer(t_new, t_new, "-")^2 / (2 * particles[[x]]$rho_gp[series]^2))
+            exp(-0.5 * ((outer(t_new, t_new, "-") / particles[[x]]$rho_gp[series]) ^ 2)) +
+            diag(1e-4, length(t_new))
           Sigma <- particles[[x]]$alpha_gp[series]^2 *
-            exp(- outer(t, t, "-")^2 / (2 * particles[[x]]$rho_gp[series]^2)) +
-            diag(1e-4, length(particles[[x]]$trend_states[[series]]))
+            exp(-0.5 * ((outer(t, t, "-") / particles[[x]]$rho_gp[series]) ^ 2)) +
+            diag(1e-4, length(t))
 
           tail(t(Sigma_new) %*% solve(Sigma, particles[[x]]$trend_states[[series]]), 1) +
-            tail(MASS::mvrnorm(1, mu = rep(0, dim(Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new))[2]),
-                               Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), 1)
+            tail(MASS::mvrnorm(1, mu = rep(0, length(t_new)),
+                               Sigma = Sigma_star), 1)
 
         }))
       } else {
