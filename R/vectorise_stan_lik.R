@@ -159,6 +159,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
                'return y;\n',
                '}\n}')
     }
+    model_file <- readLines(textConnection(model_file), n = -1)
   }
 
   # Gather the number of nonmissing observations
@@ -311,7 +312,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
       model_file <- model_file[-c(remainder_line:(remainder_line + 2))]
       model_file[remainder_line] <-
         paste0('for(j in 1:n_lv){\n',
-               'LV[2:n, j] ~ normal(ar1[j] * LV[2:(n - 1), j], 0.1);\n',
+               'LV[2:n, j] ~ normal(ar1[j] * LV[1:(n - 1), j], 0.1);\n',
                '}')
       model_file = readLines(textConnection(model_file), n = -1)
     } else {
@@ -326,7 +327,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
       model_file <- model_file[-c(remainder_line:(remainder_line + 2))]
       model_file[remainder_line] <-
         paste0('for(s in 1:n_series){\n',
-               'trend[2:n, s] ~ normal(ar1[s] * trend[2:(n - 1), s], sigma[s]);\n',
+               'trend[2:n, s] ~ normal(ar1[s] * trend[1:(n - 1), s], sigma[s]);\n',
                '}')
       model_file = readLines(textConnection(model_file), n = -1)
     }

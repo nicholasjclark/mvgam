@@ -179,7 +179,7 @@ mod3 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
 summary(mod3)
 ```
 
-A pairs plot of the logged versions of the latent trend precision and the overdispersion parameter suggest there is no strange behaviour in the joint posterior
+A pairs plot of the logged versions of the latent trend precision and the overdispersion parameter can give insight into whether there is still any strange behaviour or problematic parameter spaces that we must think more deeply about
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 plot(log(MCMCvis::MCMCchains(mod3$model_output, 'twdis')),
      log(MCMCvis::MCMCchains(mod3$model_output, 'tau')),
@@ -191,12 +191,12 @@ Our rootogram has not improved much with the addition of the latent trend
 ppc(mod3, type = 'rootogram')
 ```
 
-But there is no more evidence of autocorrelation in the residuals
+But the residual distributions look better
 ```{r, fig.width = 6, fig.height = 5, fig.align='center'}
 plot(mod3, type = 'residuals')
 ```
 
-We can also demonstrate another feature of `mvgam`, which is the ability to use Hamiltonian Monte Carlo for parameter estimation via the software `Stan` (using the `rstan` or `cmdstanr` interfaces). Also note that currently there is no support for fitting `Tweedie` responses in `Stan`. We will therefore stick with a `Negative Binomial` observation process for the `Stan` version. However there are great advantages when using `Stan`, which includes the option to estimate smooth latent trends via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408). This often makes sense for ecological series, which we expect to change smoothly over time. As expected when compared to the Gibbs sampler in `JAGS`, the `Stan` version converges very nicely
+We can also demonstrate another feature of `mvgam`, which is the ability to use Hamiltonian Monte Carlo for parameter estimation via the software `Stan` (using the `rstan` or `cmdstanr` interfaces). Also note that currently there is no support for fitting `Tweedie` responses in `Stan`. We will therefore stick with a `Negative Binomial` observation process for the `Stan` version. However there are great advantages when using `Stan`, which includes the option to estimate smooth latent trends via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408). This often makes sense for ecological series, which we expect to change smoothly over time. As expected when compared to the inferior Gibbs samplers in `JAGS`, the `Stan` version converges very nicely
 ```{r, message=FALSE, warning=FALSE}
 mod4 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                  te(precip, lag, k = c(6, 6)),

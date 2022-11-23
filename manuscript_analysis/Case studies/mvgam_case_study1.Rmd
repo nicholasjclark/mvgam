@@ -715,11 +715,6 @@ plot_fc_horizon(gam_sims = MCMCvis::MCMCchains(m_mvgam$model_output,
 
 The dynamic GAM is difficult to beat for this example. But what other utilities does the `mvgam` package make available? We can also re-do the posterior predictive checks, but this time focusing only on the out of sample period. This will give us better insight into how the model is performing and whether it is able to simulate realistic and unbiased future values
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
-ppc(m_mvgam, series = 1, type = 'hist', newdata = data_test,
-               legend_position = 'topright', n_bins = 200)
-```
-
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 ppc(m_mvgam, series = 1, type = 'mean', newdata = data_test)
 ```
 
