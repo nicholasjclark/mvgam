@@ -38,7 +38,7 @@ sim_mvgam = function(T = 100,
                      n_series = 3,
                      seasonality = 'shared',
                      use_lv = FALSE,
-                     n_lv = 2,
+                     n_lv = 1,
                      trend_model = 'RW',
                      drift = FALSE,
                      trend_rel = 0.2,
@@ -55,6 +55,12 @@ sim_mvgam = function(T = 100,
 
   if(missing(trend_rel)){
     trend_rel <- 0.2
+  }
+
+  if(n_lv == 1){
+    use_lv <- FALSE
+  } else {
+    use_lv <- TRUE
   }
 
   if(use_lv){
@@ -151,39 +157,19 @@ sim_mvgam = function(T = 100,
 
     # Function to simulate from a latent GP with squared exponential covariance
     sim_exp_gp = function(N = 50, alpha = 1, rho = 2){
-
+      # Return evenly spaced draws from a GP with
       # Squared exponential kernel function
-      exp_kernel <- function(x, y, alpha = 1, rho = 1) {
-        alpha^2 * exp(- (x - y)^2 / (2 * rho^2))
-      }
-
-      # Generate covariance matrix for points in sequence `x`
-      cov_matrix <- function(x, kernel_fn, ...) {
-        outer(x, x, function(a, b) kernel_fn(a, b, ...))
-      }
-
-      # Draw from kernel function
-      draw_samples <- function(x, kernel_fn, ...) {
-        K <- cov_matrix(x, kernel_fn, ...)
-        MASS::mvrnorm(1, mu = rep(0, times = length(x)), Sigma = K)
-      }
-
-      # Return evenly spaced draws
-      gp_true <- draw_samples(x = seq(0, N, length.out = N * 10),
-                              kernel_fn = exp_kernel,
-                              alpha = alpha,
-                              rho = rho)
-
-      gp_true[seq(1, length(gp_true), 10)]
+      x <- 1:N
+      Sigma <- alpha ^ 2 * exp(-0.5 * ((outer(x, x, "-") / rho) ^ 2))
+      MASS::mvrnorm(1, mu = rep(0, length(x)), Sigma = Sigma)
     }
 
     # Sample alpha and rho parameters
-    trend_alphas <- runif(n_lv, 0.75, 1.2)
-    trend_rhos <- runif(n_lv, 6, 12)
+    trend_alphas <- runif(n_lv, 0.75, 1.25)
+    trend_rhos <- runif(n_lv, 3, 8)
 
     # Generate latent GP trends
     trends <- do.call(cbind, lapply(seq_len(n_lv), function(lv){
-      set.seed(runif(1, 1, 100))
       sim_exp_gp(N = T, alpha = trend_alphas[lv], rho = trend_rhos[lv])
     }))
 
@@ -279,10 +265,31 @@ sim_mvgam = function(T = 100,
     dplyr::group_by(series) %>%
     dplyr::arrange(time)
 
-  list(data_train = data.frame(data_train),
-       data_test = data.frame(data_test),
-       true_corrs = cov2cor(cov(obs_trends)),
-       true_trends = obs_trends,
-       global_seasonality = glob_season)
+  if(trend_model == 'GP'){
+    out <-   list(data_train = data.frame(data_train),
+                  data_test = data.frame(data_test),
+                  true_corrs = cov2cor(cov(obs_trends)),
+                  true_trends = obs_trends,
+                  global_seasonality = glob_season,
+                  gp_params = list(alpha = trend_alphas,
+                                   rho = trend_rhos))
+  } else if(!use_lv & trend_model != 'GP'){
+    out <-   list(data_train = data.frame(data_train),
+                  data_test = data.frame(data_test),
+                  true_corrs = cov2cor(cov(obs_trends)),
+                  true_trends = obs_trends,
+                  global_seasonality = glob_season,
+                  trend_params = list(ar1 = ar1s,
+                                      ar2 = ar2s,
+                                      ar3 = ar3s))
+  } else {
+    out <-   list(data_train = data.frame(data_train),
+                  data_test = data.frame(data_test),
+                  true_corrs = cov2cor(cov(obs_trends)),
+                  true_trends = obs_trends,
+                  global_seasonality = glob_season)
+  }
+
+return(out)
 
 }
