@@ -1249,6 +1249,17 @@ mvgam = function(formula,
     if(use_stan){
       fit_engine <- 'stan'
       use_cmdstan <- FALSE
+
+      # Set monitor parameters
+      param <- get_monitor_pars(family = family,
+                                use_lv = use_lv,
+                                trend_model = trend_model,
+                                smooths_included = smooths_included,
+                                drift = drift)
+      if(any(smooth_labs$class == 'random.effect')){
+        param <- c(param, 'mu_raw', 'sigma_raw')
+      }
+
       # Import the base Stan model file
       modification <- add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
       unlink('base_gam_stan.txt')
@@ -1436,15 +1447,19 @@ mvgam = function(formula,
         }
 
         # Convert model files to stan_fit class for consistency
-        stanfit <- rstan::read_stan_csv(fit1$output_files(), col_major = TRUE)
-        param_names <- row.names(rstan::summary(stanfit)$summary)
-        stanfit@sim$samples <- lapply(seq_along(stanfit@sim$samples), function(x){
-          samps <- as.list(stanfit@sim$samples[[x]])
-          names(samps) <- param_names
-          samps
-        })
+        out_gam_mod <- read_csv_as_stanfit(fit1$output_files(),
+                                   variables = param)
+        out_gam_mod <- repair_stanfit(out_gam_mod)
 
-        out_gam_mod <- stanfit
+        # stanfit <- rstan::read_stan_csv(fit1$output_files(), col_major = TRUE)
+        # param_names <- row.names(rstan::summary(stanfit)$summary)
+        # stanfit@sim$samples <- lapply(seq_along(stanfit@sim$samples), function(x){
+        #   samps <- as.list(stanfit@sim$samples[[x]])
+        #   names(samps) <- param_names
+        #   samps
+        # })
+        #
+        # out_gam_mod <- stanfit
 
       } else {
         require(rstan)
@@ -1486,11 +1501,7 @@ mvgam = function(formula,
                      verbose = FALSE,
                      thin = thin,
                      control = stan_control,
-                     pars = get_monitor_pars(family = family,
-                                             smooths_included = smooths_included,
-                                             use_lv = use_lv,
-                                             trend_model = trend_model,
-                                             drift = drift),
+                     pars = param,
                      refresh = 500)
 
         out_gam_mod <- fit1

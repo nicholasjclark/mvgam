@@ -9,7 +9,7 @@ sim_mvgam(
   n_series = 3,
   seasonality = "shared",
   use_lv = FALSE,
-  n_lv = 2,
+  n_lv = 1,
   trend_model = "RW",
   drift = FALSE,
   trend_rel = 0.2,
