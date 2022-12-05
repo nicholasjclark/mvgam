@@ -12,7 +12,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     if(use_lv){
       add <- "
     ##insert data
-    transformed data{
+    transformed data {
     // Number of non-zero lower triangular factor loadings
     // Ensures identifiability of the model - no rotation of factors
     int<lower=1> M;
@@ -75,10 +75,10 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     ##insert smooths
 
     // priors for smoothing parameters
-    lambda ~ exponential(0.05);
+    lambda ~ normal(30, 25);
 
     // priors for dynamic factor loading coefficients
-    L ~ double_exponential(0, 1);
+    L ~ std_normal();
 
     // dynamic factor estimates
     for (j in 1:n_lv) {
@@ -145,10 +145,10 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     ##insert smooths
 
     // priors for smoothing parameters
-    lambda ~ exponential(0.05);
+    lambda ~ normal(30, 25);
 
     // priors for latent trend variance parameters
-    sigma ~ exponential(1);
+    sigma ~ exponential(2);
 
     // trend estimates
     for (s in 1:n_series) {
@@ -357,7 +357,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                           ar2[s] ~ dnorm(0, 10)
                           ar3[s] ~ dnorm(0, 10)
                           tau[s] <- pow(sigma[s], -2)
-                          sigma[s] ~ dexp(1)T(0.075, 5)
+                          sigma[s] ~ dexp(2)T(0.075, 5)
                           }
 
                           ## likelihood functions

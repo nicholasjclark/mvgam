@@ -82,7 +82,7 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
       data_test$series <- factor('series1')
     }
 
-    if(!'time' %in% colnames(data_test)){
+    if(!'time' %in% names(data_test)){
       stop('data_test does not contain a "time" column')
     }
 

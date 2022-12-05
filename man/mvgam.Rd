@@ -21,7 +21,7 @@ mvgam(
   drift = FALSE,
   chains = 4,
   burnin = 500,
-  n_samples = 500,
+  samples = 500,
   thin = 1,
   parallel = TRUE,
   threads = 1,
@@ -98,10 +98,10 @@ predictor (which it is by default when calling \code{\link[mcgv]{jagam}}). There
 
 \item{chains}{\code{integer} specifying the number of parallel chains for the model}
 
-\item{burnin}{\code{integer} specifying the number of iterations of the Markov chain to run during
-adaptive mode to tune sampling algorithms}
+\item{burnin}{\code{integer} specifying the number of warmup iterations of the Markov chain to run
+to tune sampling algorithms}
 
-\item{n_samples}{\code{integer} specifying the number of iterations of the Markov chain to run for
+\item{samples}{\code{integer} specifying the number of post-warmup iterations of the Markov chain to run for
 sampling the posterior distribution}
 
 \item{thin}{Thinning interval for monitors}
@@ -268,7 +268,7 @@ cmd_mod$print()
 fit <- cmd_mod$sample(data = model_data,
                      chains = 4,
                      parallel_chains = 4,
-                     refresh = 500,
+                     refresh = 100,
                      init = mod1$inits)
 
 # Now fit the model using mvgam with the Stan backend

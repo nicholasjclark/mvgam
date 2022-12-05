@@ -240,7 +240,7 @@ add_trend_lines = function(model_file, stan = FALSE,
 
 
           model_file[grep('model \\{', model_file) + 2] <-
-            paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nphi ~ normal(0, 0.5);\n')
+            paste0('\n// priors for AR parameters\nar1 ~ std_normal();\nphi ~ std_normal();\n')
 
       } else {
         if(use_lv){
@@ -251,7 +251,7 @@ add_trend_lines = function(model_file, stan = FALSE,
             paste0('LV[2:n, j] ~ normal(ar1[j] * LV[1:(n - 1), j], 0.1);')
 
           model_file[grep('model \\{', model_file) + 2] <-
-            paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\n')
+            paste0('\n// priors for AR parameters\nar1 ~ std_normal();\n')
 
         } else {
           model_file[grep('// raw basis', model_file) + 1] <-
@@ -261,7 +261,7 @@ add_trend_lines = function(model_file, stan = FALSE,
             paste0('trend[2:n, s] ~ normal(ar1[s] * trend[1:(n - 1), s], sigma[s]);')
 
           model_file[grep('model \\{', model_file) + 2] <-
-            paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\n')
+            paste0('\n// priors for AR parameters\nar1 ~ std_normal();\n')
         }
       }
 
@@ -311,7 +311,7 @@ add_trend_lines = function(model_file, stan = FALSE,
 
 
           model_file[grep('model \\{', model_file) + 2] <-
-            paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\nphi ~ normal(0, 0.5);\n')
+            paste0('\n// priors for AR parameters\nar1 ~ std_normal();\nar2 ~ std_normal();\nphi ~ std_normal();\n')
 
       } else {
         if(use_lv){
@@ -349,7 +349,7 @@ add_trend_lines = function(model_file, stan = FALSE,
         }
 
         model_file[grep('model \\{', model_file) + 2] <-
-          paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\n')
+          paste0('\n// priors for AR parameters\nar1 ~ std_normal();\nar2 ~ std_normal();\n')
       }
 
       model_file <- readLines(textConnection(model_file), n = -1)
@@ -409,13 +409,8 @@ add_trend_lines = function(model_file, stan = FALSE,
         }
 
         model_file[grep('model \\{', model_file) + 2] <-
-          paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\nar3 ~ normal(0, 0.5);\n',
-                 'phi ~ normal(0, 0.5);\n')
-
-
-          model_file[grep('model \\{', model_file) + 2] <-
-            paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\nar3 ~ normal(0, 0.5);\n',
-            'phi ~ normal(0, 0.5);\n')
+          paste0('\n// priors for AR parameters\nar1 ~ std_normal();\nar2 ~ std_normal();\nar3 ~ std_normal();\n',
+                 'phi ~ std_normal();\n')
 
 
       } else {
@@ -466,7 +461,7 @@ add_trend_lines = function(model_file, stan = FALSE,
         }
 
         model_file[grep('model \\{', model_file) + 2] <-
-          paste0('\n// priors for AR parameters\nar1 ~ normal(0, 0.5);\nar2 ~ normal(0, 0.5);\nar3 ~ normal(0, 0.5);\n')
+          paste0('\n// priors for AR parameters\nar1 ~ std_normal();\nar2 ~ std_normal();\nar3 ~ std_normal();\n')
       }
 
       model_file <- readLines(textConnection(model_file), n = -1)

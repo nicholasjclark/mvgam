@@ -255,7 +255,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
       # smoothing parameters when we use the non-centred parameterisation)
       stan_file <- stan_file[-grep('// priors for smoothing parameters', stan_file,
                                    fixed = TRUE)]
-      stan_file <- stan_file[-grep('lambda ~ exponential', stan_file,
+      stan_file <- stan_file[-grep('lambda ~ normal', stan_file,
                                    fixed = TRUE)]
       stan_file <- stan_file[-grep('vector[n_sp] rho', stan_file,
                                    fixed = TRUE)]
@@ -385,8 +385,8 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
 
     # Check for shared smoothing parameters and link them accordingly
     if('L' %in% names(jags_data)){
-      stan_file[grep('lambda ~ exponential', stan_file,
-                       fixed = TRUE)] <- "lambda_raw ~ exponential(0.05);"
+      stan_file[grep('lambda ~ normal', stan_file,
+                       fixed = TRUE)] <- "lambda_raw ~ normal(30, 25);"
 
       stan_file[grep("vector<lower=0>[n_sp] lambda;", stan_file,
                      fixed = TRUE)] <- "vector<lower=0>[n_raw_sp] lambda_raw;"
@@ -406,7 +406,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
     ## No smooths included
     stan_file <- stan_file[-grep('// priors for smoothing parameters', stan_file,
                                  fixed = TRUE)]
-    stan_file <- stan_file[-grep('lambda ~ exponential', stan_file,
+    stan_file <- stan_file[-grep('lambda ~ normal', stan_file,
                                  fixed = TRUE)]
     stan_file <- stan_file[-grep('vector[n_sp] rho', stan_file,
                                  fixed = TRUE)]

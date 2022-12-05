@@ -55,9 +55,9 @@
 #'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
 #'predictor (which it is by default when calling \code{\link[mcgv]{jagam}}). Therefore this defaults to \code{FALSE}
 #'@param chains \code{integer} specifying the number of parallel chains for the model
-#'@param burnin \code{integer} specifying the number of iterations of the Markov chain to run during
-#'adaptive mode to tune sampling algorithms
-#'@param n_samples \code{integer} specifying the number of iterations of the Markov chain to run for
+#'@param burnin \code{integer} specifying the number of warmup iterations of the Markov chain to run
+#'to tune sampling algorithms
+#'@param samples \code{integer} specifying the number of post-warmup iterations of the Markov chain to run for
 #'sampling the posterior distribution
 #'@param thin Thinning interval for monitors
 #'@param parallel \code{logical} specifying whether multiple cores should be used for
@@ -209,7 +209,7 @@
 #' fit <- cmd_mod$sample(data = model_data,
 #'                      chains = 4,
 #'                      parallel_chains = 4,
-#'                      refresh = 500,
+#'                      refresh = 100,
 #'                      init = mod1$inits)
 #'
 #' # Now fit the model using mvgam with the Stan backend
@@ -321,7 +321,7 @@ mvgam = function(formula,
                  drift = FALSE,
                  chains = 4,
                  burnin = 500,
-                 n_samples = 500,
+                 samples = 500,
                  thin = 1,
                  parallel = TRUE,
                  threads = 1,
@@ -1111,13 +1111,13 @@ mvgam = function(formula,
         if(trend_model %in% c('None', 'GP')){
           if(smooths_included){
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    r_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    r_inv = runif(NCOL(model_data$ytimes), 1, 50))
             }
           }
@@ -1125,14 +1125,14 @@ mvgam = function(formula,
         } else {
           if(smooths_included){
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    r_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    sigma = runif(model_data$n_series, 0.075, 1),
                    lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    r_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    sigma = runif(model_data$n_series, 0.075, 1))
             }
@@ -1145,25 +1145,25 @@ mvgam = function(formula,
         if(trend_model %in% c('None', 'GP')){
           if(smooths_included){
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2))
+              list(b_raw = runif(model_data$num_basis, -2, 2))
             }
           }
 
         } else {
           if(smooths_included){
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    sigma = runif(model_data$n_series, 0.075, 1),
                    lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    sigma = runif(model_data$n_series, 0.075, 1))
             }
           }
@@ -1302,13 +1302,13 @@ mvgam = function(formula,
         if(trend_model %in% c('None', 'GP')){
           if(smooths_included){
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    r_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    r_inv = runif(NCOL(model_data$ytimes), 1, 50))
             }
           }
@@ -1316,14 +1316,14 @@ mvgam = function(formula,
         } else {
           if(smooths_included){
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    r_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    sigma = runif(model_data$n_series, 0.075, 1),
                    lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    r_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    sigma = runif(model_data$n_series, 0.075, 1))
             }
@@ -1336,25 +1336,25 @@ mvgam = function(formula,
         if(trend_model %in% c('None', 'GP')){
           if(smooths_included){
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2))
+              list(b_raw = runif(model_data$num_basis, -2, 2))
             }
           }
 
         } else {
           if(smooths_included){
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    sigma = runif(model_data$n_series, 0.075, 1),
                    lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -0.2, 0.2),
+              list(b_raw = runif(model_data$num_basis, -2, 2),
                    sigma = runif(model_data$n_series, 0.075, 1))
             }
           }
@@ -1425,7 +1425,7 @@ mvgam = function(formula,
                                  chains = chains,
                                  parallel_chains = min(c(chains, parallel::detectCores() - 1)),
                                  threads_per_chain = threads,
-                                 refresh = 500,
+                                 refresh = 100,
                                  init = inits,
                                  max_treedepth = 12,
                                  adapt_delta = 0.8,
@@ -1438,11 +1438,11 @@ mvgam = function(formula,
                                  chains = chains,
                                  parallel_chains = min(c(chains, parallel::detectCores() - 1)),
                                  threads_per_chain = threads,
-                                 refresh = 500,
+                                 refresh = 100,
                                  init = inits,
                                  max_treedepth = max_treedepth,
                                  adapt_delta = adapt_delta,
-                                 iter_sampling = n_samples,
+                                 iter_sampling = samples,
                                  iter_warmup = burnin)
         }
 
@@ -1477,13 +1477,13 @@ mvgam = function(formula,
 
         message("Compiling the Stan program...")
         message()
-        if(n_samples <= burnin){
-          n_samples <- burnin + n_samples
+        if(samples <= burnin){
+          samples <- burnin + samples
         }
 
         if(prior_simulation){
           burnin <- 200
-          n_samples <- 600
+          samples <- 600
           adapt_delta <- 0.8
           max_treedepth <- 12
         }
@@ -1492,7 +1492,7 @@ mvgam = function(formula,
                              adapt_delta = adapt_delta)
 
         fit1 <- stan(model_code = vectorised$model_file,
-                     iter = n_samples,
+                     iter = samples,
                      warmup = burnin,
                      chains = chains,
                      data = model_data,
@@ -1502,7 +1502,7 @@ mvgam = function(formula,
                      thin = thin,
                      control = stan_control,
                      pars = param,
-                     refresh = 500)
+                     refresh = 100)
 
         out_gam_mod <- fit1
       }
@@ -1552,7 +1552,7 @@ mvgam = function(formula,
       if(prior_simulation){
         n_adapt <- 500
         n_burn <- 0
-        n_samples <- 1000
+        samples <- 1000
         thin <- 1
       } else {
         n_burn <- burnin
@@ -1570,7 +1570,7 @@ mvgam = function(formula,
                                      n.chains = chains,
                                      adapt = n_adapt,
                                      burnin = n_burn,
-                                     sample = n_samples,
+                                     sample = samples,
                                      jags = jags_path,
                                      thin = thin,
                                      method = "rjparallel",
@@ -1587,7 +1587,7 @@ mvgam = function(formula,
                                      n.chains = chains,
                                      adapt = n_adapt,
                                      burnin = n_burn,
-                                     sample = n_samples,
+                                     sample = samples,
                                      jags = jags_path,
                                      thin = thin,
                                      method = "rjags",

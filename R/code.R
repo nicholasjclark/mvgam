@@ -21,6 +21,12 @@ code = function(object){
       func_start <- NULL
     }
 
+    if(any(grepl('transformed data {', model_file, fixed = TRUE))){
+      transdat_start <- grep('transformed data {', model_file, fixed = TRUE)
+    } else {
+      transdat_start <- NULL
+    }
+
     func_end <- grep('data {', model_file, fixed = TRUE)
     func_lines <- c(func_end, func_end - 1)
     data_end <- grep('parameters {', model_file, fixed = TRUE)[1]
@@ -34,7 +40,8 @@ code = function(object){
     final <- length(model_file)
 
     cat(unlist(lapply(seq_along(model_file), function(x){
-      if(x %in% c(1, func_start, func_lines, data_lines, param_lines,
+      if(x %in% c(1, func_start, func_lines, transdat_start,
+                  data_lines, param_lines,
                   tparam_lines, mod_lines, final)){
         model_file[x]
       } else {
