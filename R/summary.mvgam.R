@@ -121,7 +121,7 @@ if(any(smooth_labs$class == 'random.effect')){
   message()
 }
 
-if(any(grep('rho', rownames(MCMCvis::MCMCsummary(object$model_output))))){
+if(any(!is.na(object$sp_names))){
   message("GAM smoothing parameter (rho) estimates:")
   rho_coefs <- MCMCvis::MCMCsummary(object$model_output, 'rho')[,c(3:7)]
 

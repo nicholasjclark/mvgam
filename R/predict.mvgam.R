@@ -109,7 +109,7 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
       if(type == 'response'){
         if(family == 'Negative Binomial'){
             out <- rnbinom(n = length(newdata$series),
-                           size = sizes[x, series_ind[x]],
+                           size = sizes[x, series_ind],
                            mu = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                                         betas[x,])) +
                                       attr(Xp, 'model.offset')))
@@ -121,8 +121,8 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
                            mu = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                                         betas[x,])) +
                                       attr(Xp, 'model.offset')),
-                           p = ps[x, series_ind[x]],
-                           phi = twdiss[x, series_ind[x]]))
+                           p = ps[x, series_ind],
+                           phi = twdiss[x, series_ind]))
 
         }
 
