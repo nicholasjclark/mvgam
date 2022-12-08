@@ -55,7 +55,7 @@ mod1 <- mvgam(data = dat$data_train,
                 use_stan = TRUE,
                 chains = 4,
                 burnin = 300,
-                n_samples = 300)
+                samples = 400)
 ```
 
 Look at a few plots. The estimated smooth function
@@ -87,7 +87,7 @@ mod2 <- mvgam(data = dat$data_train,
                 trend_model = 'RW',
                 chains = 4,
                 burnin = 300,
-                n_samples = 300)
+                samples = 400)
 ```
 
 Use the same plots as model 1 to see if this model has also fit the data well
@@ -153,7 +153,7 @@ trends_mod1 <- mvgam(data = trends_data$data_train,
                       use_stan = TRUE,
                       chains = 4,
                       burnin = 300,
-                      n_samples = 300)
+                      samples = 400)
 ```
 
 Given that these series could potentially be following a hierarchical seasonality, we will also trial a slghtly more complex model with an extra smoothing term per series that allows its seasonal curve to deviate from the global seasonal smooth. Ignore the warning about repeated smooths, as this is not an issue for estimation.
@@ -168,7 +168,7 @@ trends_mod2 <- mvgam(data = trends_data$data_train,
                       use_stan = TRUE,
                       chains = 4,
                       burnin = 300,
-                      n_samples = 300)
+                      samples = 400)
 ```
 
 How can we compare these models to ensure we choose one that performs well and provides useful inferences? Beyond posterior retrodictive and predictive checks, we can take advantage of the fact that `mvgam` fits an `mgcv` model to provide all the necessary penalty matrices, as well as to identify good initial values for smoothing parameters. Because we did not modify this model by adding a trend component (the only modification is that we estimated series-specific overdispersion parameters), we can still employ the usual `mgcv` model comparison routines
@@ -190,21 +190,21 @@ summary(trends_mod1$mgcv_model)
 summary(trends_mod2$mgcv_model)
 ```
 
-Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow a RW process, and we will set `n_lv = 2`
+Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow a squared exponential Gaussian Process, and we will set `n_lv = 2`
 ```{r, message=FALSE, warning=FALSE}
 trends_mod3 <- mvgam(data = trends_data$data_train,
                       newdata = trends_data$data_test,
                       formula = y ~ s(season, k = 7, m = 2, bs = 'cc') +
                         s(season, series, k = 4, bs = 'fs', m = 1),
                       knots = list(season = c(0.5, 12.5)),
-                      trend_model = 'RW',
+                      trend_model = 'GP',
                       use_lv = TRUE,
                       n_lv = 2,
                       family = 'poisson',
                       use_stan = TRUE,
                       chains = 4,
                       burnin = 300,
-                      n_samples = 300)
+                      samples = 400)
 ```
 
 

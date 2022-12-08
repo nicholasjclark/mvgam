@@ -50,35 +50,6 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                       prob = weights)
   fc_samples <- sample(index, min(10000, length(weights)), T)
 
-  # Function to simulate trends / latent factors ahead using ar3 model
-  sim_ar3 = function(phi, ar1, ar2, ar3, tau, state, h){
-    states <- rep(NA, length = h + 3)
-    states[1] <- state[1]
-    states[2] <- state[2]
-    states[3] <- state[3]
-    for (t in 4:(h + 3)) {
-      states[t] <- rnorm(1, phi + ar1*states[t - 1] +
-                           ar2*states[t - 2] +
-                           ar3*states[t - 3], sqrt(1 / tau))
-    }
-    states[-c(1:3)]
-  }
-
-  # Function to simulate trends ahead using squared exponential GP
-  sim_gp = function(alpha_gp, rho_gp, state, h){
-    t <- 1:length(state)
-    t_new <- 1:(length(state) + h)
-
-    Sigma_new <- alpha_gp^2 * exp(- outer(t, t_new, "-")^2 / (2 * rho_gp^2))
-    Sigma_star <- alpha_gp^2 * exp(- outer(t_new, t_new, "-")^2 / (2 * rho_gp^2))
-    Sigma <- alpha_gp^2 * exp(- outer(t, t, "-")^2 / (2 * rho_gp^2)) +
-      diag(1e-4, length(state))
-
-    tail(t(Sigma_new) %*% solve(Sigma, state), h) +
-      tail(MASS::mvrnorm(1, mu = rep(0, dim(Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new))[2]),
-                         Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), h)
-  }
-
   if(missing(ylim)){
     ylim <- c(NA, NA)
   }
@@ -179,7 +150,6 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   setDefaultCluster(cl)
   clusterExport(NULL, c('particles',
                         'Xp',
-                        'sim_ar3',
                         'series_test',
                         'fc_horizon',
                         'n_series'),
@@ -190,7 +160,6 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     use_lv <- particles[[x]]$use_lv
 
     if(use_lv){
-
       # Run the latent variables forward fc_horizon timesteps
       lv_preds <- do.call(rbind, lapply(seq_len(particles[[x]]$n_lv), function(lv){
         sim_ar3(phi = particles[[x]]$phi[lv],
@@ -198,44 +167,45 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                 ar2 = particles[[x]]$ar2[lv],
                 ar3 = particles[[x]]$ar3[lv],
                 tau = particles[[x]]$tau[lv],
-                state = particles[[x]]$lv_states[[lv]],
+                last_trends = particles[[x]]$lv_states[[lv]],
                 h = fc_horizon)
       }))
       series_fcs <- lapply(seq_len(n_series), function(series){
         trend_preds <- as.numeric(t(lv_preds) %*% particles[[x]]$lv_coefs[series,])
 
+        # Generate predictions
+        Xpmat <- cbind(Xp[which(as.numeric(series_test$series) == series),], trend_preds)
+        attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
         if(particles[[x]]$family == 'Negative Binomial'){
-          fc <- rnbinom(fc_horizon,
-                        mu = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
-                                                      ncol = NCOL(Xp)) %*%
-                                              particles[[x]]$betas)) +
-                                   (trend_preds) +
-                                   attr(Xp, 'model.offset')),
-                        size = particles[[x]]$size[series])
-
-
+          out <- mvgam:::mvgam_predict(family = 'Negative Binomial',
+                                       Xp = Xpmat,
+                                       type = 'response',
+                                       betas = c(particles[[x]]$betas, 1),
+                                       size = particles[[x]]$size[series],
+                                       p = NULL,
+                                       twdis = NULL)
         }
 
         if(particles[[x]]$family == 'Poisson'){
-          fc <- rpois(fc_horizon,
-                        lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
-                                                          ncol = NCOL(Xp)) %*%
-                                              particles[[x]]$betas)) +
-                                   (trend_preds) +
-                                     attr(Xp, 'model.offset')))
+          out <- mvgam:::mvgam_predict(family = 'Poisson',
+                                       Xp = Xpmat,
+                                       type = 'response',
+                                       betas = c(particles[[x]]$betas, 1),
+                                       size = NULL,
+                                       p = NULL,
+                                       twdis = NULL)
         }
 
         if(particles[[x]]$family == 'Tweedie'){
-          fc <- rpois(fc_horizon,
-                        lambda = mgcv::rTweedie(
-                          mu = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
-                                                        ncol = NCOL(Xp)) %*%
-                                                  particles[[x]]$betas)) +
-                                       (trend_preds) +
-                                     attr(Xp, 'model.offset')),
-                          p = particles[[x]]$p,
-                          phi = particles[[x]]$twdis))
+          out <- mvgam:::mvgam_predict(family = 'Tweedie',
+                                       Xp = Xpmat,
+                                       type = 'response',
+                                       betas = c(particles[[x]]$betas, 1),
+                                       size = NULL,
+                                       p = particles[[x]]$p,
+                                       twdis = particles[[x]]$twdis)
         }
+
         fc
       })
 
@@ -245,47 +215,52 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
         if(particles[[x]]$trend_model == 'GP'){
           trend_preds <- sim_gp(alpha_gp = particles[[x]]$alpha_gp[series],
                                 rho_gp = particles[[x]]$rho_gp[series],
-                                state = particles[[x]]$trend_states[[series]],
+                                last_trends = particles[[x]]$trend_states[[series]],
                                 h = fc_horizon)
-          #plot(c(particles[[1]]$trend_states[[series]], trend_preds), type = 'l')
         } else {
           trend_preds <- sim_ar3(phi = particles[[x]]$phi[series],
                                  ar1 = particles[[x]]$ar1[series],
                                  ar2 = particles[[x]]$ar2[series],
                                  ar3 = particles[[x]]$ar3[series],
                                  tau = particles[[x]]$tau[series],
-                                 state = particles[[x]]$trend_states[[series]],
+                                 last_trends = particles[[x]]$trend_states[[series]],
                                  h = fc_horizon)
         }
 
-          if(particles[[x]]$family == 'Negative Binomial'){
-            fc <-  rnbinom(fc_horizon,
-                           mu = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
-                                                         ncol = NCOL(Xp)) %*%
-                                                 particles[[x]]$betas)) + (trend_preds) +
-                                      attr(Xp, 'model.offset')),
-                           size = particles[[x]]$size[series])
-          }
+        # Generate predictions
+        Xpmat <- cbind(Xp[which(as.numeric(series_test$series) == series),], trend_preds)
+        attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
+        if(particles[[x]]$family == 'Negative Binomial'){
+          out <- mvgam:::mvgam_predict(family = 'Negative Binomial',
+                                       Xp = Xpmat,
+                                       type = 'response',
+                                       betas = c(particles[[x]]$betas, 1),
+                                       size = particles[[x]]$size[series],
+                                       p = NULL,
+                                       twdis = NULL)
+        }
 
-          if(particles[[x]]$family == 'Poisson'){
-            fc <-  rpois(fc_horizon,
-                           lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
-                                                             ncol = NCOL(Xp)) %*%
-                                                 particles[[x]]$betas)) + (trend_preds) +
-                                          attr(Xp, 'model.offset')))
-          }
+        if(particles[[x]]$family == 'Poisson'){
+          out <- mvgam:::mvgam_predict(family = 'Poisson',
+                                       Xp = Xpmat,
+                                       type = 'response',
+                                       betas = c(particles[[x]]$betas, 1),
+                                       size = NULL,
+                                       p = NULL,
+                                       twdis = NULL)
+        }
 
-          if(particles[[x]]$family == 'Tweedie'){
-            fc <-  rpois(fc_horizon,
-                         lambda = mgcv::rTweedie(mu = exp(as.vector((as.matrix(Xp[which(as.numeric(series_test$series) == series),],
-                                                                               ncol = NCOL(Xp)) %*%
-                                                                       particles[[x]]$betas)) + (trend_preds) +
-                                                            attr(Xp, 'model.offset')),
-                                                 p = particles[[x]]$p,
-                                                 phi = particles[[x]]$twdis))
-          }
+        if(particles[[x]]$family == 'Tweedie'){
+          out <- mvgam:::mvgam_predict(family = 'Tweedie',
+                                       Xp = Xpmat,
+                                       type = 'response',
+                                       betas = c(particles[[x]]$betas, 1),
+                                       size = NULL,
+                                       p = particles[[x]]$p,
+                                       twdis = particles[[x]]$twdis)
+        }
 
-          fc
+        out
       })
     }
 

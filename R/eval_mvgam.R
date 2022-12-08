@@ -125,9 +125,9 @@ eval_mvgam = function(object,
 
 
   # Linear predictor matrix for the evaluation observations
-  Xp <- as.data.frame(predict(object$mgcv_model,
+  Xp <- predict(object$mgcv_model,
                        newdata = data_assim,
-                       type = 'lpmatrix'))
+                       type = 'lpmatrix')
 
   # Extract trend / latent variable estimates at the correct timepoint
   if(object$use_lv){
@@ -323,35 +323,6 @@ eval_mvgam = function(object,
   upper_bounds <- object$upper_bounds
   trend_model <- object$trend_model
 
-  # Function to simulate trends / latent factors ahead using ar3 model
-  sim_ar3 = function(phi, ar1, ar2, ar3, tau, state, h){
-    states <- rep(NA, length = h + 3)
-    states[1] <- state[1]
-    states[2] <- state[2]
-    states[3] <- state[3]
-    for (t in 4:(h + 3)) {
-      states[t] <- rnorm(1, phi + ar1*states[t - 1] +
-                           ar2*states[t - 2] +
-                           ar3*states[t - 3], sqrt(1 / tau))
-    }
-    states[-c(1:3)]
-  }
-
-  # Function to simulate trends ahead using squared exponential GP
-  sim_gp = function(alpha_gp, rho_gp, state, h){
-    t <- 1:length(state)
-    t_new <- 1:(length(state) + h)
-
-    Sigma_new <- alpha_gp^2 * exp(- outer(t, t_new, "-")^2 / (2 * rho_gp^2))
-    Sigma_star <- alpha_gp^2 * exp(- outer(t_new, t_new, "-")^2 / (2 * rho_gp^2))
-    Sigma <- alpha_gp^2 * exp(- outer(t, t, "-")^2 / (2 * rho_gp^2)) +
-      diag(1e-4, length(state))
-
-    tail(t(Sigma_new) %*% solve(Sigma, state), h) +
-      tail(MASS::mvrnorm(1, mu = rep(0, dim(Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new))[2]),
-                         Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), h)
-  }
-
   # Run particles forward in time to generate their forecasts
   if(n_cores > 1){
 
@@ -379,47 +350,44 @@ eval_mvgam = function(object,
                         'p',
                         'twdis',
                         'n_series',
-                        'upper_bounds',
-                        'sim_ar3',
-                        'sim_gp'),
+                        'upper_bounds'),
                 envir = environment())
 
   pbapply::pboptions(type = "none")
   particle_fcs <- pbapply::pblapply(sample_seq, function(x){
 
+    samp_index <- x
+
+    # Sample drift and AR parameters
+    phi <- phis[samp_index, ]
+    ar1 <- ar1s[samp_index, ]
+    ar2 <- ar2s[samp_index, ]
+    ar3 <- ar3s[samp_index, ]
+
+    alpha_gp <- alpha_gps[samp_index, ]
+    rho_gp <- rho_gps[samp_index, ]
+
+    # Sample lv precision
+    tau <- taus[samp_index,]
+
+    # Sample beta coefs
+    betas <- betas[samp_index, ]
+
+    # Family-specific parameters
+    size <- sizes[samp_index, ]
+    twdis <- twdis[samp_index, ]
+    p <- p[samp_index]
+
     if(use_lv){
       # Sample a last state estimate for the latent variables
-      samp_index <- x
       last_lvs <- lapply(seq_along(lvs), function(lv){
         lvs[[lv]][samp_index, ]
       })
-
-      # Sample drift and AR parameters
-      phi <- phis[samp_index, ]
-      ar1 <- ar1s[samp_index, ]
-      ar2 <- ar2s[samp_index, ]
-      ar3 <- ar3s[samp_index, ]
-
-      # Sample lv precision
-      tau <- taus[samp_index,]
 
       # Sample lv loadings
       lv_coefs <- do.call(rbind, lapply(seq_len(n_series), function(series){
         lv_coefs[[series]][samp_index,]
       }))
-
-      # Sample beta coefs
-      betas <- betas[samp_index, ]
-
-      # Family-specific parameters
-      if(family == 'Negative Binomial'){
-        size <- sizes[samp_index, ]
-      }
-
-      if(family == 'Tweedie'){
-        twdis <- twdis[samp_index, ]
-        p <- p[samp_index]
-      }
 
       # Run the latent variables forward fc_horizon timesteps
       lv_preds <- do.call(rbind, lapply(seq_len(n_lv), function(lv){
@@ -428,83 +396,37 @@ eval_mvgam = function(object,
                 ar2 = ar2[lv],
                 ar3 = ar3[lv],
                 tau = tau[lv],
-                state = last_lvs[[lv]],
+                last_trends = last_lvs[[lv]],
                 h = fc_horizon)
       }))
 
       series_fcs <- lapply(seq_len(n_series), function(series){
         trend_preds <- as.numeric(t(lv_preds) %*% lv_coefs[series,])
 
-        if(family == 'Negative Binomial'){
-          fc <- rnbinom(fc_horizon,
-                                 mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
-                                                            ncol = NCOL(Xp)) %*%
-                                                       betas)) + (trend_preds)),
-                                 size = size[series])
-        }
+        Xpmat <- cbind(Xp[which(as.numeric(data_assim$series) == series),], trend_preds)
+        attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
-        if(family == 'Poisson'){
-          fc <- rpois(fc_horizon,
-                        lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
-                                                       ncol = NCOL(Xp)) %*%
-                                              betas)) + (trend_preds)))
-        }
-
-        if(family == 'Tweedie'){
-          fc <- rpois(fc_horizon,
-                      lambda = mgcv::rTweedie(
-                        mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
-                                                   ncol = NCOL(Xp)) %*%
-                                              betas)) + (trend_preds)),
-                        p = p,
-                        phi = twdis[series]))
-        }
-
-        fc
+        mvgam_predict(family = family,
+                      Xp = Xpmat,
+                      type = 'response',
+                      betas = c(betas, 1),
+                      size = size[series],
+                      p = p,
+                      twdis = twdis[series])
       })
 
     } else {
-      # Run the trends forward fc_horizon timesteps
-      # Sample index for the particle
-      samp_index <- x
-
-      # Sample beta coefs
-      betas <- betas[samp_index, ]
 
       # Sample last state estimates for the trends
       last_trends <- lapply(seq_along(trends), function(trend){
         trends[[trend]][samp_index, ]
       })
 
-      if(trend_model == 'GP'){
-        alpha_gp <- alpha_gps[samp_index, ]
-        rho_gp <- rho_gps[samp_index, ]
-      } else {
-        # Sample AR parameters
-        phi <- phis[samp_index, ]
-        ar1 <- ar1s[samp_index, ]
-        ar2 <- ar2s[samp_index, ]
-        ar3 <- ar3s[samp_index, ]
-
-        # Sample trend precisions
-        tau <- taus[samp_index,]
-      }
-
-      # Family-specific parameters
-      if(family == 'Negative Binomial'){
-        size <- sizes[samp_index, ]
-      }
-
-      if(family == 'Tweedie'){
-        twdis <- twdis[samp_index, ]
-        p <- p[samp_index]
-      }
-
       series_fcs <- lapply(seq_len(n_series), function(series){
         if(trend_model == 'GP'){
           trend_preds <- sim_gp(alpha_gp = alpha_gp[series],
                                  rho_gp = rho_gp[series],
-                                 state = last_trends[[series]],
+                                 last_trends = last_trends[[series]],
                                  h = fc_horizon)
         } else {
           trend_preds <- sim_ar3(phi = phi[series],
@@ -512,36 +434,20 @@ eval_mvgam = function(object,
                                  ar2 = ar2[series],
                                  ar3 = ar3[series],
                                  tau = tau[series],
-                                 state = last_trends[[series]],
+                                 last_trends = last_trends[[series]],
                                  h = fc_horizon)
         }
 
-        if(family == 'Negative Binomial'){
-          fc <-  rnbinom(fc_horizon,
-                         mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
-                                                    ncol = NCOL(Xp)) %*%
-                                               betas)) + (trend_preds)),
-                         size = size[series])
-        }
+        Xpmat <- cbind(Xp[which(as.numeric(data_assim$series) == series),], trend_preds)
+        attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
-        if(family == 'Poisson'){
-          fc <-  rpois(fc_horizon,
-                         lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
-                                                        ncol = NCOL(Xp)) %*%
-                                               betas)) + (trend_preds)))
-        }
-
-        if(family == 'Tweedie'){
-          fc <-  rpois(fc_horizon,
-                       lambda = mgcv::rTweedie(
-                         mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
-                                                    ncol = NCOL(Xp)) %*%
-                                               betas)) + (trend_preds)),
-                         p = p,
-                         phi = twdis[series]))
-        }
-
-        fc
+        mvgam_predict(family = family,
+                              Xp = Xpmat,
+                              type = 'response',
+                              betas = c(betas, 1),
+                              size = size[series],
+                              p = p,
+                              twdis = twdis[series])
       })
     }
 
@@ -552,39 +458,38 @@ eval_mvgam = function(object,
   } else {
     particle_fcs <- lapply(sample_seq, function(x){
 
+      # Sample a last state estimate for the latent variables
+      samp_index <- x
+
+      # Sample drift and AR parameters
+      phi <- phis[samp_index, ]
+      ar1 <- ar1s[samp_index, ]
+      ar2 <- ar2s[samp_index, ]
+      ar3 <- ar3s[samp_index, ]
+
+      alpha_gp <- alpha_gps[samp_index, ]
+      rho_gp <- rho_gps[samp_index, ]
+
+      # Sample lv precision
+      tau <- taus[samp_index,]
+
+      # Sample beta coefs
+      betas <- betas[samp_index, ]
+
+      # Family-specific parameters
+      size <- sizes[samp_index, ]
+      twdis <- twdis[samp_index, ]
+      p <- p[samp_index]
+
       if(use_lv){
-        # Sample a last state estimate for the latent variables
-        samp_index <- x
         last_lvs <- lapply(seq_along(lvs), function(lv){
           lvs[[lv]][samp_index, ]
         })
-
-        # Sample drift and AR parameters
-        phi <- phis[samp_index, ]
-        ar1 <- ar1s[samp_index, ]
-        ar2 <- ar2s[samp_index, ]
-        ar3 <- ar3s[samp_index, ]
-
-        # Sample lv precision
-        tau <- taus[samp_index,]
 
         # Sample lv loadings
         lv_coefs <- do.call(rbind, lapply(seq_len(n_series), function(series){
           lv_coefs[[series]][samp_index,]
         }))
-
-        # Sample beta coefs
-        betas <- betas[samp_index, ]
-
-        # Family-specific parameters
-        if(family == 'Negative Binomial'){
-          size <- sizes[samp_index, ]
-        }
-
-        if(family == 'Tweedie'){
-          twdis <- twdis[samp_index, ]
-          p <- p[samp_index]
-        }
 
         # Run the latent variables forward fc_horizon timesteps
         lv_preds <- do.call(rbind, lapply(seq_len(n_lv), function(lv){
@@ -593,83 +498,36 @@ eval_mvgam = function(object,
                   ar2 = ar2[lv],
                   ar3 = ar3[lv],
                   tau = tau[lv],
-                  state = last_lvs[[lv]],
+                  last_trends = last_lvs[[lv]],
                   h = fc_horizon)
         }))
 
         series_fcs <- lapply(seq_len(n_series), function(series){
           trend_preds <- as.numeric(t(lv_preds) %*% lv_coefs[series,])
+          Xpmat <- cbind(Xp[which(as.numeric(data_assim$series) == series),], trend_preds)
+          attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
-          if(family == 'Negative Binomial'){
-            fc <- rnbinom(fc_horizon,
-                          mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
-                                                     ncol = NCOL(Xp)) %*%
-                                                betas)) + (trend_preds)),
-                          size = size[series])
-          }
-
-          if(family == 'Poisson'){
-            fc <- rpois(fc_horizon,
-                        lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
-                                                       ncol = NCOL(Xp)) %*%
-                                                  betas)) + (trend_preds)))
-          }
-
-          if(family == 'Tweedie'){
-            fc <- rpois(fc_horizon,
-                        lambda = mgcv::rTweedie(
-                          mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
-                                                     ncol = NCOL(Xp)) %*%
-                                                betas)) + (trend_preds)),
-                          p = p,
-                          phi = twdis[series]))
-          }
-
-          fc
+          mvgam_predict(family = family,
+                        Xp = Xpmat,
+                        type = 'response',
+                        betas = c(betas, 1),
+                        size = size[series],
+                        p = p,
+                        twdis = twdis[series])
         })
 
       } else {
-        # Run the trends forward fc_horizon timesteps
-        # Sample index for the particle
-        samp_index <- x
-
-        # Sample beta coefs
-        betas <- betas[samp_index, ]
 
         # Sample last state estimates for the trends
         last_trends <- lapply(seq_along(trends), function(trend){
           trends[[trend]][samp_index, ]
         })
 
-        if(trend_model == 'GP'){
-          alpha_gp <- alpha_gps[samp_index, ]
-          rho_gp <- rho_gps[samp_index, ]
-        } else {
-          # Sample AR parameters
-          phi <- phis[samp_index, ]
-          ar1 <- ar1s[samp_index, ]
-          ar2 <- ar2s[samp_index, ]
-          ar3 <- ar3s[samp_index, ]
-
-          # Sample trend precisions
-          tau <- taus[samp_index,]
-        }
-
-        # Family-specific parameters
-        if(family == 'Negative Binomial'){
-          size <- sizes[samp_index, ]
-        }
-
-        if(family == 'Tweedie'){
-          twdis <- twdis[samp_index, ]
-          p <- p[samp_index]
-        }
-
         series_fcs <- lapply(seq_len(n_series), function(series){
           if(trend_model == 'GP'){
             trend_preds <- sim_gp(alpha_gp = alpha_gp[series],
                                   rho_gp = rho_gp[series],
-                                  state = last_trends[[series]],
+                                  last_trends = last_trends[[series]],
                                   h = fc_horizon)
           } else {
             trend_preds <- sim_ar3(phi = phi[series],
@@ -677,36 +535,20 @@ eval_mvgam = function(object,
                                    ar2 = ar2[series],
                                    ar3 = ar3[series],
                                    tau = tau[series],
-                                   state = last_trends[[series]],
+                                   last_trends = last_trends[[series]],
                                    h = fc_horizon)
           }
 
-          if(family == 'Negative Binomial'){
-            fc <-  rnbinom(fc_horizon,
-                           mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
-                                                      ncol = NCOL(Xp)) %*%
-                                                 betas)) + (trend_preds)),
-                           size = size[series])
-          }
+          Xpmat <- cbind(Xp[which(as.numeric(data_assim$series) == series),], trend_preds)
+          attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
-          if(family == 'Poisson'){
-            fc <-  rpois(fc_horizon,
-                         lambda = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
-                                                        ncol = NCOL(Xp)) %*%
-                                                   betas)) + (trend_preds)))
-          }
-
-          if(family == 'Tweedie'){
-            fc <-  rpois(fc_horizon,
-                         lambda = mgcv::rTweedie(
-                           mu = exp(as.vector((as.matrix(Xp[which(as.numeric(data_assim$series) == series),],
-                                                      ncol = NCOL(Xp)) %*%
-                                                 betas)) + (trend_preds)),
-                           p = p,
-                           phi = twdis[series]))
-          }
-
-          fc
+          mvgam_predict(family = family,
+                        Xp = Xpmat,
+                        type = 'response',
+                        betas = c(betas, 1),
+                        size = size[series],
+                        p = p,
+                        twdis = twdis[series])
         })
       }
 

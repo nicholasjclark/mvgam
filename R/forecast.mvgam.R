@@ -90,20 +90,6 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
 
   }
 
-  # Function to simulate trends / latent factors ahead using ar3 model
-  sim_ar3 = function(phi, ar1, ar2, ar3, tau, state, h){
-    states <- rep(NA, length = h + 3)
-    states[1] <- state[1]
-    states[2] <- state[2]
-    states[3] <- state[3]
-    for (t in 4:(h + 3)) {
-      states[t] <- rnorm(1, phi + ar1*states[t - 1] +
-                           ar2*states[t - 2] +
-                           ar3*states[t - 3], sqrt(1 / tau))
-    }
-    states[-c(1:3)]
-  }
-
   # Extract trend posterior predictions
   if(object$trend_model != 'None'){
 
@@ -217,7 +203,11 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
 
   # Latent trend precisions and loadings
   if(object$use_lv){
-    taus <- MCMCvis::MCMCchains(object$model_output, 'penalty')
+    if(object$trend_model %in% c('GP')){
+      taus <- NULL
+    } else {
+      taus <- MCMCvis::MCMCchains(object$model_output, 'penalty')
+    }
 
     n_series <- NCOL(object$ytimes)
     n_lv <- object$n_lv
@@ -233,7 +223,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
 
     })
   } else {
-    if(object$trend_model %in% c('GP', 'None')){
+    if(object$trend_model %in% c('None')){
       taus <- NULL
     } else {
       taus <- MCMCvis::MCMCchains(object$model_output, 'tau')
@@ -261,8 +251,13 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
             NROW()
         }
 
-        lv_estimates <- lv_estimates[,1:end_train]
-        lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
+        if(object$trend_model == 'GP'){
+          lv_estimates <- lv_estimates[,1:end_train]
+        } else {
+          lv_estimates <- lv_estimates[,1:end_train]
+          lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
+        }
+        lv_estimates
       })
     } else {
       ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2],
@@ -394,121 +389,75 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
                         'ps',
                         'series_test',
                         'trend_estimates',
-                        'sim_ar3',
                         'Xp'),
                 envir = environment())
 
   pbapply::pboptions(type = "none")
 
   fc_preds <- do.call(rbind, pbapply::pblapply(seq_len(dim(betas)[1]), function(i){
-    if(use_lv){
-      # Sample a last state estimate for the latent variables
-      samp_index <- i
-      last_lvs <- lapply(seq_along(lvs), function(lv){
-        lvs[[lv]][samp_index, ]
-      })
+    # Sample index
+    samp_index <- i
 
-      # Sample drift and AR parameters
+    # Sample beta coefs
+    betas <- betas[samp_index, ]
+
+    # Sample last state estimates for the trends
+    last_trends <- trend_estimates[i,]
+
+    if(is.null(alpha_gps)){
+      # Sample AR parameters
       phi <- phis[samp_index, ]
       ar1 <- ar1s[samp_index, ]
       ar2 <- ar2s[samp_index, ]
       ar3 <- ar3s[samp_index, ]
+      alpha_gp <- rho_gp <- 0
 
-      # Sample lv precision
+      # Sample trend precisions
       tau <- taus[samp_index,]
+
+    } else {
+      phi <- ar1 <- ar2 <- ar3 <- tau <- 0
+      alpha_gp <- alpha_gps[samp_index, ]
+      rho_gp <- rho_gps[samp_index, ]
+    }
+
+    # Family-specific parameters
+    size <- sizes[samp_index, ]
+    twdis <- twdiss[samp_index, ]
+    p <- ps[samp_index]
+
+    if(use_lv){
+      # Sample a last state estimate for the latent variables
+      last_lvs <- lapply(seq_along(lvs), function(lv){
+        lvs[[lv]][samp_index, ]
+      })
 
       # Sample lv loadings
       lv_coefs <- lv_coefs[[series]][samp_index,]
 
-      # Sample beta coefs
-      betas <- betas[samp_index, ]
-
-      # Family-specific parameters
-      if(family == 'Negative Binomial'){
-        size <- sizes[samp_index, ]
+      if(is.null(alpha_gps)){
+        next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
+          sim_ar3(phi = phi[lv],
+                  ar1 = ar1[lv],
+                  ar2 = ar2[lv],
+                  ar3 = ar3[lv],
+                  tau = tau[lv],
+                  last_trends = last_lvs[[lv]],
+                  h = NROW(series_test))
+        }))
+      } else {
+        next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
+          sim_gp(alpha_gp = alpha_gp[lv],
+                 rho_gp = rho_gp[lv],
+                 last_trends = last_lvs[[lv]],
+                 h = NROW(series_test))
+        }))
       }
-
-      if(family == 'Tweedie'){
-        twdis <- twdis[samp_index, ]
-        p <- ps[samp_index]
-      }
-
-      # Run the latent variables forward h timesteps timestep
-      next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
-        sim_ar3(phi[lv], ar1[lv], ar2[lv], ar3[lv], tau[lv],
-                last_lvs[[lv]], NROW(series_test))
-      }))
 
       # Multiply lv states with loadings to generate each series' forecast trend state
       trends <- as.numeric(next_lvs %*% lv_coefs)
 
-      if(type == 'trend'){
-        out <- trends
-      } else if(type == 'link'){
-        out <- as.vector(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-          (trends) + attr(Xp, 'model.offset'))
-        } else {
-
-        # Calculate predictions
-        if(family == 'Negative Binomial'){
-          out <- rnbinom(NROW(series_test), size = size[series],
-                         mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-                                    (trends) +
-                                    attr(Xp, 'model.offset')))
-        }
-
-        if(family == 'Poisson'){
-          out <- rpois(NROW(series_test),
-                       lambda = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-                                      (trends) +
-                                      attr(Xp, 'model.offset')))
-        }
-
-        if(family == 'Tweedie'){
-          out <- mgcv::rTweedie(mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-                                           (trends) +
-                                           attr(Xp, 'model.offset')),
-                                p = p, phi = twdis[series])
-        }
-      }
-
     } else {
-
-      # Sample index
-      samp_index <- i
-
-      # Sample beta coefs
-      betas <- betas[samp_index, ]
-
-      # Sample last state estimates for the trends
-      last_trends <- trend_estimates[i,]
-
-      if(is.null(alpha_gps)){
-        # Sample AR parameters
-        phi <- phis[samp_index, ]
-        ar1 <- ar1s[samp_index, ]
-        ar2 <- ar2s[samp_index, ]
-        ar3 <- ar3s[samp_index, ]
-        alpha_gp <- rho_gp <- 0
-
-        # Sample trend precisions
-        tau <- taus[samp_index,]
-      } else {
-        phi <- ar1 <- ar2 <- ar3 <- tau <- 0
-        alpha_gp <- alpha_gps[samp_index, ]
-        rho_gp <- rho_gps[samp_index, ]
-      }
-
-      # Family-specific parameters
-      if(family == 'Negative Binomial'){
-        size <- sizes[samp_index, ]
-      }
-
-      if(family == 'Tweedie'){
-        twdis <- twdis[samp_index, ]
-        p <- p[samp_index]
-      }
-
       # Run the trends forward
       if(is.null(alpha_gps)){
         trends <- sim_ar3(phi = phi[series],
@@ -517,54 +466,29 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
                           ar3 = ar3[series],
                           tau = tau[series],
                           h = NROW(series_test),
-                          state = last_trends)
+                          last_trends = last_trends)
 
       } else {
-        t <- 1:length(last_trends)
-        t_new <- 1:(length(last_trends) + NROW(series_test))
-        Sigma_new <- alpha_gp[series]^2 * exp(-0.5 * ((outer(t, t_new, "-") / rho_gp[series]) ^ 2))
-        Sigma_star <- alpha_gp[series]^2 * exp(-0.5 * ((outer(t_new, t_new, "-") / rho_gp[series]) ^ 2)) +
-          diag(1e-4, length(t_new))
-        Sigma <- alpha_gp[series]^2 * exp(-0.5 * ((outer(t, t, "-") / rho_gp[series]) ^ 2)) +
-          diag(1e-4, length(t))
-
-        trends <- as.vector(tail(t(Sigma_new) %*% solve(Sigma, last_trends),
-                                 NROW(series_test)) +
-                              tail(MASS::mvrnorm(1,
-                                                 mu = rep(0, length(t_new)),
-                                                 Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)),
-                                   NROW(series_test)))
+        trends <- sim_gp(last_trends = last_trends,
+                         h = NROW(series_test),
+                         rho_gp = rho_gp[series],
+                         alpha_gp = alpha_gp[series])
       }
+    }
 
-      if(type == 'trend'){
-        out <- trends
-      } else if(type == 'link'){
-          out <- as.vector(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-            (trends) + attr(Xp, 'model.offset'))
-      } else {
-        # Calculate predictions
-        if(family == 'Negative Binomial'){
-          out <- rnbinom(NROW(series_test), size = size[series],
-                         mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-                                    (trends) +
-                                    attr(Xp, 'model.offset')))
-        }
-
-        if(family == 'Poisson'){
-          out <- rpois(NROW(series_test),
-                       lambda = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-                                      (trends) +
-                                      attr(Xp, 'model.offset')))
-        }
-
-        if(family == 'Tweedie'){
-          out <- mgcv::rTweedie(mu = exp(((as.matrix(Xp, ncol = NCOL(Xp)) %*% betas)) +
-                                           (trends) +
-                                           attr(Xp, 'model.offset')),
-                                p = p, phi = twdis[series])
-        }
-      }
-
+    # Return predictions
+    if(type == 'trend'){
+      out <- trends
+    } else {
+      Xpmat <- cbind(Xp, trends)
+      attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
+      out <- mvgam:::mvgam_predict(family = family,
+                           Xp = Xpmat,
+                           type = type,
+                           betas = c(betas, 1),
+                           size = size[series],
+                           p = p,
+                           twdis = twdis[series])
     }
 
     out

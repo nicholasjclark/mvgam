@@ -388,10 +388,10 @@ mvgam = function(formula,
     use_stan <- TRUE
   }
 
-  if(trend_model == 'GP' & use_lv){
-    warning('dynamic factor gaussian process trends not yet supported; changing use_lv to FALSE')
-    use_lv <- FALSE
-  }
+  # if(trend_model == 'GP' & use_lv){
+  #   warning('dynamic factor gaussian process trends not yet supported; changing use_lv to FALSE')
+  #   use_lv <- FALSE
+  # }
 
   if(use_stan & family == 'tw'){
     warning('Tweedie family not yet supported for stan; reverting to JAGS')
@@ -1394,12 +1394,12 @@ mvgam = function(formula,
         if(cmdstanr::cmdstan_version() >= "2.29.0"){
           if(threads > 1){
             cmd_mod <- cmdstan_model(write_stan_file(vectorised$model_file),
-                                     stanc_options = list('Oexperimental',
+                                     stanc_options = list('O1',
                                                           'canonicalize=deprecations,braces,parentheses'),
                                      cpp_options = list(stan_threads = TRUE))
           } else {
             cmd_mod <- cmdstan_model(write_stan_file(vectorised$model_file),
-                                     stanc_options = list('Oexperimental',
+                                     stanc_options = list('O1',
                                                           'canonicalize=deprecations,braces,parentheses'))
           }
 

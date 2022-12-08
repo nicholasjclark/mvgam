@@ -44,6 +44,12 @@ get_monitor_pars = function(family, smooths_included = TRUE,
       param <- c(param, 'trend', 'ar1', 'ar2', 'ar3',
                  'LV', 'penalty', 'lv_coefs')
     }
+
+    if(trend_model == 'GP'){
+      param <- c(param, 'trend', 'alpha_gp', 'rho_gp',
+                 'LV', 'lv_coefs')
+    }
+
   }
 
   if(!use_lv){

@@ -163,6 +163,12 @@ if(object$use_lv){
       }
     }
 
+    if(object$trend_model == 'GP'){
+      message("Latent trend marginal deviation (alpha) and length scale (rho) estimates:")
+      print(MCMCvis::MCMCsummary(object$model_output, c('alpha_gp', 'rho_gp'))[,c(3:7)])
+      message()
+    }
+
     if(object$trend_model == 'AR1'){
       if(object$drift){
         message("Latent trend drift (phi) and parameter estimates:")

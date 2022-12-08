@@ -359,56 +359,80 @@ pbapply::pboptions(type = "none")
 
 particles <- pbapply::pblapply(sample_seq, function(x){
 
-  if(use_lv){
-  # Sample a last state estimate for the latent variables
   samp_index <- x
+
+  if(is.null(alpha_gps)){
+    # Sample AR parameters
+    phi <- phis[samp_index, ]
+    ar1 <- ar1s[samp_index, ]
+    ar2 <- ar2s[samp_index, ]
+    ar3 <- ar3s[samp_index, ]
+    alpha_gp <- rho_gp <- 0
+
+    # Sample trend precisions
+    tau <- taus[samp_index,]
+  } else {
+    phi <- ar1 <- ar2 <- ar3 <- tau <- 0
+    alpha_gp <- alpha_gps[samp_index, ]
+    rho_gp <- rho_gps[samp_index, ]
+  }
+
+  # Sample beta coefs
+  betas <- betas[samp_index, ]
+
+  # Family-specific parameters
+  size <- sizes[samp_index, ]
+  twdis <- twdis[samp_index, ]
+  p <- p[samp_index]
+
+  if(use_lv){
+
+    # Sample a last state estimate for the latent variables
   last_lvs <- lapply(seq_along(lvs), function(lv){
     lvs[[lv]][samp_index, ]
   })
-
-  # Sample drift and AR parameters
-  phi <- phis[samp_index, ]
-  ar1 <- ar1s[samp_index, ]
-  ar2 <- ar2s[samp_index, ]
-  ar3 <- ar3s[samp_index, ]
-
-  # Sample lv precision
-  tau <- taus[samp_index,]
 
   # Sample lv loadings
   lv_coefs <- do.call(rbind, lapply(seq_len(n_series), function(series){
     lv_coefs[[series]][samp_index,]
   }))
 
-  # Sample beta coefs
-  betas <- betas[samp_index, ]
-
-  # Family-specific parameters
-  if(family == 'Negative Binomial'){
-    size <- sizes[samp_index, ]
-  }
-
-  if(family == 'Tweedie'){
-    twdis <- twdis[samp_index, ]
-    p <- p[samp_index]
-  }
-
   # Run the latent variables forward one timestep
-  next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
-    rnorm(1, phi[lv] + ar1[lv] * last_lvs[[lv]][3] +
-            ar2[lv] * last_lvs[[lv]][2] +
-            ar3[lv] * last_lvs[[lv]][1], sqrt(1 / tau[lv]))
-  }))
+  if(is.null(alpha_gps)){
+    next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
+      sim_ar3(h = 1,
+              phi = phi[lv],
+              ar1 = ar1[lv],
+              ar2 = ar2[lv],
+              ar3 = ar3[lv],
+              tau = tau[lv],
+              last_trends = last_lvs[[lv]][1:3])
+    }))
+  } else {
+    next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
+      sim_gp(last_trends = last_lvs[[lv]],
+             h = 1,
+             alpha_gp = alpha_gp[lv],
+             rho_gp = rho_gp[lv])
+    }))
+  }
 
   # Multiply lv states with loadings to generate each series' forecast trend state
   trends <- as.numeric(next_lvs %*% t(lv_coefs))
 
-  # Include previous two states for each lv
-  next_lvs <- lapply(seq_along(lvs), function(lv){
-    as.vector(c(as.numeric(last_lvs[[lv]][2]),
-                as.numeric(last_lvs[[lv]][3]),
-                next_lvs[lv]))
-  })
+  # Include previous states for each lv
+  if(is.null(alpha_gps)){
+    next_lvs <- lapply(seq_along(lvs), function(lv){
+      as.vector(c(as.numeric(last_lvs[[lv]][2]),
+                  as.numeric(last_lvs[[lv]][3]),
+                  next_lvs[lv]))
+    })
+  } else {
+    next_lvs <- lapply(seq_along(lvs), function(lv){
+      as.vector(c(as.numeric(last_lvs[[lv]]),
+                  next_lvs[lv]))
+    })
+  }
   names(next_lvs) <- paste0('lv', seq(1:length(lvs)))
 
   # Calculate weight for the particle in the form of a composite likelihood
@@ -450,64 +474,28 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     n_lv = NULL
     lv_coefs = NULL
 
-    # Sample index for the particle
-    samp_index <- x
-
-    # Sample beta coefs
-    betas <- betas[samp_index, ]
-
     # Sample last state estimates for the trends
     last_trends <- lapply(seq_along(trends), function(trend){
       trends[[trend]][samp_index, ]
     })
 
-    if(is.null(alpha_gps)){
-      # Sample AR parameters
-      phi <- phis[samp_index, ]
-      ar1 <- ar1s[samp_index, ]
-      ar2 <- ar2s[samp_index, ]
-      ar3 <- ar3s[samp_index, ]
-      alpha_gp <- rho_gp <- 0
-
-      # Sample trend precisions
-      tau <- taus[samp_index,]
-    } else {
-      phi <- ar1 <- ar2 <- ar3 <- tau <- 0
-      alpha_gp <- alpha_gps[samp_index, ]
-      rho_gp <- rho_gps[samp_index, ]
-    }
-
-    # Family-specific parameters
-    if(family == 'Negative Binomial'){
-      size <- sizes[samp_index, ]
-    }
-
-    if(family == 'Tweedie'){
-      twdis <- twdis[samp_index, ]
-      p <- p[samp_index]
-    }
-
     # Run the trends forward one timestep
     if(is.null(alpha_gps)){
       trends <- do.call(cbind, lapply(seq_along(trends), function(trend){
-        rnorm(1, phi[trend] + ar1[trend] * last_trends[[trend]][3] +
-                ar2[trend] * last_trends[[trend]][2] +
-                ar3[trend] * last_trends[[trend]][1], sqrt(1 / tau[trend]))
+        sim_ar3(h = 1,
+                phi = phi[trend],
+                ar1 = ar1[trend],
+                ar2 = ar2[trend],
+                ar3 = ar3[trend],
+                tau = tau[trend],
+                last_trends = last_trends[[trend]][1:3])
       }))
     } else {
       trends <- do.call(cbind, lapply(seq_along(trends), function(trend){
-        t <- 1:length(last_trends[[trend]])
-        t_new <- 1:(length(last_trends[[trend]]) + 1)
-
-        Sigma_new <- alpha_gp[trend]^2 * exp(-0.5 * ((outer(t, t_new, "-") / rho_gp[trend]) ^ 2))
-        Sigma_star <- alpha_gp[trend]^2 * exp(-0.5 * ((outer(t_new, t_new, "-") / rho_gp[trend]) ^ 2)) +
-          diag(1e-4, length(t_new))
-        Sigma <- alpha_gp[trend]^2 * exp(-0.5 * ((outer(t, t, "-") / rho_gp[trend]) ^ 2)) +
-          diag(1e-4, length(t))
-
-        tail(t(Sigma_new) %*% solve(Sigma, last_trends[[trend]]), 1) +
-          tail(MASS::mvrnorm(1, mu = rep(0, length(t_new)),
-                             Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), 1)
+        sim_gp(last_trends = last_trends[[trend]],
+               h = 1,
+               alpha_gp = alpha_gp[trend],
+               rho_gp = rho_gp[trend])
       }))
     }
 
@@ -544,10 +532,17 @@ particles <- pbapply::pblapply(sample_seq, function(x){
 
     weight <- prod(liks, na.rm = T)
 
-    # Include previous two states for each trend
-    trends <- lapply(seq_len(n_series), function(trend){
-      as.vector(c(last_trends[[trend]][2], last_trends[[trend]][3], trends[trend]))
-    })
+    # Include previous states for each trend
+    if(is.null(alpha_gps)){
+      trends <- lapply(seq_len(n_series), function(trend){
+        as.vector(c(last_trends[[trend]][2], last_trends[[trend]][3], trends[trend]))
+      })
+    } else {
+      trends <- lapply(seq_len(n_series), function(trend){
+        as.vector(c(last_trends[[trend]], trends[trend]))
+      })
+    }
+
     names(trends) <- paste0('series', seq_len(n_series))
 }
 

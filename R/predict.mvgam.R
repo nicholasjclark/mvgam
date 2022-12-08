@@ -87,7 +87,7 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
   # Determine which series each observation belongs to
   series_ind <- as.numeric(newdata$series)
 
-  # Loop across all posterior samples and calculate predictions on the outcome scale
+  # Loop across all posterior samples and calculate predictions
   cl <- parallel::makePSOCKcluster(n_cores)
   setDefaultCluster(cl)
   clusterExport(NULL, c('betas',
@@ -101,41 +101,13 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
 
   pbapply::pboptions(type = "none")
   predictions <- do.call(rbind, pbapply::pblapply(seq_len(dim(betas)[1]), function(x){
-      if(type == 'link'){
-          out <- as.vector(((matrix(Xp, ncol = NCOL(Xp)) %*%
-                               betas[x,])))
-      }
-
-      if(type == 'response'){
-        if(family == 'Negative Binomial'){
-            out <- rnbinom(n = length(newdata$series),
-                           size = sizes[x, series_ind],
-                           mu = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
-                                        betas[x,])) +
-                                      attr(Xp, 'model.offset')))
-        }
-
-        if(family == 'Tweedie'){
-            out <- rpois(n = length(newdata$series),
-                         lambda = mgcv::rTweedie(
-                           mu = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
-                                        betas[x,])) +
-                                      attr(Xp, 'model.offset')),
-                           p = ps[x, series_ind],
-                           phi = twdiss[x, series_ind]))
-
-        }
-
-        if(family == 'Poisson'){
-            out <- rpois(n = length(newdata$series),
-                         lambda = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
-                                          betas[x,])) +
-                                        attr(Xp, 'model.offset')))
-        }
-      }
-
-    out
-
+    mvgam_predict(family = family,
+                  Xp = Xp,
+                  type = type,
+                  betas = betas[x,],
+                  size = sizes[x, series_ind],
+                  p = ps[x, series_ind],
+                  twdis = twdiss[x, series_ind])
   }, cl = cl))
   stopCluster(cl)
 

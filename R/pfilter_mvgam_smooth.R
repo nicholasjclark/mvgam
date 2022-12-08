@@ -89,11 +89,13 @@ pfilter_mvgam_smooth = function(particles,
 
       # Run the latent variables forward one timestep
       lv_states <- unlist(lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
-        rnorm(1, particles[[x]]$phi[lv] +
-                particles[[x]]$ar1[lv] * particles[[x]]$lv_states[[lv]][3] +
-                particles[[x]]$ar2[lv] * particles[[x]]$lv_states[[lv]][2] +
-                particles[[x]]$ar3[lv] * particles[[x]]$lv_states[[lv]][1],
-              sqrt(1 / particles[[x]]$tau[lv]))
+        sim_ar3(h = 1,
+                last_trends = particles[[x]]$lv_states[[lv]][1:3],
+                phi = 0,
+                ar1 = particles[[x]]$ar1[lv],
+                ar2 = particles[[x]]$ar2[lv],
+                ar3 = particles[[x]]$ar3[lv],
+                tau = particles[[x]]$tau[lv])
       }))
 
       # Multiply lv states with loadings to generate each series' forecast trend state
@@ -113,27 +115,20 @@ pfilter_mvgam_smooth = function(particles,
       if(particles[[x]]$trend_model == 'GP'){
         trend_states <- unlist(lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
 
-          Sigma_new <- particles[[x]]$alpha_gp[series]^2 *
-            exp(-0.5 * ((outer(t, t_new, "-") / particles[[x]]$rho_gp[series]) ^ 2))
-          Sigma_star <- particles[[x]]$alpha_gp[series]^2 *
-            exp(-0.5 * ((outer(t_new, t_new, "-") / particles[[x]]$rho_gp[series]) ^ 2)) +
-            diag(1e-4, length(t_new))
-          Sigma <- particles[[x]]$alpha_gp[series]^2 *
-            exp(-0.5 * ((outer(t, t, "-") / particles[[x]]$rho_gp[series]) ^ 2)) +
-            diag(1e-4, length(t))
-
-          tail(t(Sigma_new) %*% solve(Sigma, particles[[x]]$trend_states[[series]]), 1) +
-            tail(MASS::mvrnorm(1, mu = rep(0, length(t_new)),
-                               Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)), 1)
-
+          sim_gp(alpha_gp = particles[[x]]$alpha_gp[series],
+                 rho_gp = particles[[x]]$rho_gp[series],
+                 h = 1,
+                 last_trends = particles[[x]]$trend_states[[series]])
         }))
       } else {
         trend_states <- unlist(lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
-          rnorm(1, particles[[x]]$phi[series] +
-                  particles[[x]]$ar1[series] * particles[[x]]$trend_states[[series]][3] +
-                  particles[[x]]$ar2[series] * particles[[x]]$trend_states[[series]][2] +
-                  particles[[x]]$ar3[series] * particles[[x]]$trend_states[[series]][1],
-                sqrt(1 / particles[[x]]$tau[series]))
+          sim_ar3(h = 1,
+                  last_trends = particles[[x]]$trend_states[[series]][1:3],
+                  phi = particles[[x]]$phi[series],
+                  ar1 = particles[[x]]$ar1[series],
+                  ar2 = particles[[x]]$ar2[series],
+                  ar3 = particles[[x]]$ar3[series],
+                  tau = particles[[x]]$tau[series])
         }))
       }
 

@@ -89,7 +89,6 @@ check_n_eff <- function(fit, quiet=FALSE, fit_summary) {
   if(any(grep('LV', rownames(fit_summary)))){
     fit_summary <- fit_summary[-grep('LV', rownames(fit_summary)), ]
     fit_summary <- fit_summary[-grep('lv_coefs', rownames(fit_summary)), ]
-    fit_summary <- fit_summary[-grep('penalty', rownames(fit_summary)), ]
   }
   N <- dim(fit_summary)[[1]]
 
@@ -125,7 +124,6 @@ check_rhat <- function(fit, quiet=FALSE, fit_summary) {
   if(any(grep('LV', rownames(fit_summary)))){
     fit_summary <- fit_summary[-grep('LV', rownames(fit_summary)), ]
     fit_summary <- fit_summary[-grep('lv_coefs', rownames(fit_summary)), ]
-    fit_summary <- fit_summary[-grep('penalty', rownames(fit_summary)), ]
   }
   N <- dim(fit_summary)[[1]]
 
