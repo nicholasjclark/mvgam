@@ -48,7 +48,7 @@
 #''AR1' (AR1 model with intercept),
 #''AR2' (AR2 model with intercept) or
 #''AR3' (AR3 model with intercept) or
-#''GP' (Gaussian process with squared exponential kernel; currently under development and
+#''GP' (Gaussian Process with squared exponential kernel;
 #'only available for estimation in \code{stan})
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 #'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
@@ -76,11 +76,11 @@
 #'truncation entirely (i.e. there is no upper bound for each series)
 #'@param use_stan Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
 #'the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if `cmdstanr` is not available,
-#'a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
-#'not all options that are available in \code{JAGS} can be used, including: no option for a Tweedie family and no option for
-#'dynamic factor trends. However, as \code{rstan} can estimate Hilbert base approximate gaussian processes, which
+#'a call to \code{\link[rstan]{stan}}. Note that
+#'not all options that are available in `JAGS` can be used, including no option for a Tweedie family.
+#'However, as `Stan` can estimate Hilbert base approximate gaussian processes, which
 #'are much more computationally tractable than full GPs for time series with `>100` observations, estimation
-#'in \code{stan} can support latent GP trends while estimation in \code{JAGS} cannot
+#'in `Stan` can support latent GP trends while estimation in \code{JAGS} cannot
 #'@param max_treedepth positive integer placing a cap on the number of simulation steps evaluated during each iteration when
 #'`use_stan == TRUE`. Default is `12`. Increasing this value can sometimes help with exploration of complex
 #'posterior geometries, but it is rarely fruitful to go above a `max_treedepth` of `14`

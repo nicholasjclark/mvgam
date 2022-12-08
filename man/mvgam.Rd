@@ -88,7 +88,7 @@ and the observation process is the only source of error; similarly to what is es
 'AR1' (AR1 model with intercept),
 'AR2' (AR2 model with intercept) or
 'AR3' (AR3 model with intercept) or
-'GP' (Gaussian process with squared exponential kernel; currently under development and
+'GP' (Gaussian Process with squared exponential kernel;
 only available for estimation in \code{stan})}
 
 \item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
@@ -126,11 +126,11 @@ truncation entirely (i.e. there is no upper bound for each series)}
 
 \item{use_stan}{Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
 the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if \code{cmdstanr} is not available,
-a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
-not all options that are available in \code{JAGS} can be used, including: no option for a Tweedie family and no option for
-dynamic factor trends. However, as \code{rstan} can estimate Hilbert base approximate gaussian processes, which
+a call to \code{\link[rstan]{stan}}. Note that
+not all options that are available in \code{JAGS} can be used, including no option for a Tweedie family.
+However, as \code{Stan} can estimate Hilbert base approximate gaussian processes, which
 are much more computationally tractable than full GPs for time series with \verb{>100} observations, estimation
-in \code{stan} can support latent GP trends while estimation in \code{JAGS} cannot}
+in \code{Stan} can support latent GP trends while estimation in \code{JAGS} cannot}
 
 \item{max_treedepth}{positive integer placing a cap on the number of simulation steps evaluated during each iteration when
 \code{use_stan == TRUE}. Default is \code{12}. Increasing this value can sometimes help with exploration of complex
