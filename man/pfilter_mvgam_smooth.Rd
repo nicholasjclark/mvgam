@@ -8,10 +8,10 @@ pfilter_mvgam_smooth(
   particles,
   mgcv_model,
   next_assim,
-  threshold = 0.5,
+  threshold = 0.25,
   n_cores = parallel::detectCores() - 1,
   use_resampling = FALSE,
-  kernel_lambda = 1
+  kernel_lambda = 0.5
 )
 }
 \arguments{
@@ -41,9 +41,7 @@ will be no loss of diversity, especially if successive resampling take place. De
 \code{FALSE}}
 
 \item{kernel_lambda}{\code{proportional numeric} specifying the strength of smoothing to use when
-pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}. Note
-however that kernel smoothing is not currently supported for Gaussian Process trend models. For these models,
-it is still preferable to use resampling with a reasonable \code{threshold} value (i.e. \code{0.5})}
+pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}}
 
 \item{file_path}{\code{character} string specifying the file path for locating the particles}
 }

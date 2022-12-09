@@ -26,9 +26,7 @@
 #'will be no loss of diversity, especially if successive resampling take place. Default for this option is therefore
 #'\code{FALSE}
 #'@param kernel_lambda \code{proportional numeric} specifying the strength of smoothing to use when
-#'pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}. Note
-#'however that kernel smoothing is not currently supported for Gaussian Process trend models. For these models,
-#'it is still preferable to use resampling with a reasonable \code{threshold} value (i.e. \code{0.5})
+#'pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}
 #'@param file_path \code{character} string specifying the file path for locating the particles
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
 #'@return A \code{list} object of \code{length = n_particles} containing information on parameters and
@@ -37,10 +35,17 @@
 pfilter_mvgam_smooth = function(particles,
                                 mgcv_model,
                                 next_assim,
-                                threshold = 0.5,
+                                threshold = 0.25,
                                 n_cores = parallel::detectCores() - 1,
                                 use_resampling = FALSE,
-                                kernel_lambda = 1){
+                                kernel_lambda = 0.5){
+
+  # GP models smooth towards the entire state history, so they are more likely
+  # to 'overreact' to changing conditions than are AR or RW trend models. Set the
+  # kernel_lambda to be lower as a result
+  if(particles[[1]]$trend_model == 'GP'){
+    kernel_lambda <- 0.5 * kernel_lambda
+  }
 
   # Linear predictor matrix for the next observation
   suppressWarnings(Xp  <- try(predict(mgcv_model,
@@ -88,32 +93,51 @@ pfilter_mvgam_smooth = function(particles,
     if(use_lv){
 
       # Run the latent variables forward one timestep
-      lv_states <- unlist(lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
-        sim_ar3(h = 1,
-                last_trends = particles[[x]]$lv_states[[lv]][1:3],
-                phi = 0,
-                ar1 = particles[[x]]$ar1[lv],
-                ar2 = particles[[x]]$ar2[lv],
-                ar3 = particles[[x]]$ar3[lv],
-                tau = particles[[x]]$tau[lv])
-      }))
+      if(particles[[x]]$trend_model == 'GP'){
+        lv_states <- unlist(lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
+          sim_gp(h = 1,
+                 last_trends = particles[[x]]$lv_states[[lv]],
+                 alpha_gp = particles[[x]]$alpha_gp[lv],
+                 rho_gp = particles[[x]]$rho_gp[lv])
+        }))
+      } else {
+        lv_states <- unlist(lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
+          sim_ar3(h = 1,
+                  last_trends = particles[[x]]$lv_states[[lv]][1:3],
+                  phi = 0,
+                  ar1 = particles[[x]]$ar1[lv],
+                  ar2 = particles[[x]]$ar2[lv],
+                  ar3 = particles[[x]]$ar3[lv],
+                  tau = particles[[x]]$tau[lv])
+        }))
+      }
 
       # Multiply lv states with loadings to generate each series' forecast trend state
-      trend_states <- as.numeric(lv_states %*% t(particles[[x]]$lv_coefs))
+      next_trend <- as.numeric(lv_states %*% t(particles[[x]]$lv_coefs))
 
-      # Include previous two states for each lv
-      next_lvs <- lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
-        as.vector(c(particles[[x]]$lv_states[[lv]][2],
-                    particles[[x]]$lv_states[[lv]][3],
-                    lv_states[lv]))
-      })
-      names(next_lvs) <- paste0('lv', seq(1:length(lv_states)))
-      next_trends <- NULL
+      # Include previous states for each lv
+      if(particles[[x]]$trend_model == 'GP'){
+        lv_states <- lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
+          as.vector(c(tail(particles[[x]]$lv_states[[lv]],
+                           length(particles[[x]]$lv_states[[lv]]) - 1),
+                      lv_states[lv]))
+
+        })
+      } else {
+        lv_states <- lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
+          as.vector(c(particles[[x]]$lv_states[[lv]][2],
+                      particles[[x]]$lv_states[[lv]][3],
+                      lv_states[lv]))
+        })
+      }
+
+      names(lv_states) <- paste0('lv', seq(1:length(lv_states)))
+      trend_states <- NULL
 
     } else {
       # Run the trends forward one timestep
       if(particles[[x]]$trend_model == 'GP'){
-        trend_states <- unlist(lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
+        next_trend <- unlist(lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
 
           sim_gp(alpha_gp = particles[[x]]$alpha_gp[series],
                  rho_gp = particles[[x]]$rho_gp[series],
@@ -121,7 +145,7 @@ pfilter_mvgam_smooth = function(particles,
                  last_trends = particles[[x]]$trend_states[[series]])
         }))
       } else {
-        trend_states <- unlist(lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
+        next_trend <- unlist(lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
           sim_ar3(h = 1,
                   last_trends = particles[[x]]$trend_states[[series]][1:3],
                   phi = particles[[x]]$phi[series],
@@ -134,21 +158,21 @@ pfilter_mvgam_smooth = function(particles,
 
       # Include necessary previous states for each trend
       if(particles[[x]]$trend_model == 'GP'){
-        next_trends <- lapply(seq_len(n_series), function(trend){
-          as.vector(c(particles[[x]]$trend_states[[trend]],
-                      trend_states[trend]))
+        trend_states <- lapply(seq_len(n_series), function(trend){
+          as.vector(c(tail(particles[[x]]$trend_states[[trend]],
+                           length(particles[[x]]$trend_states[[trend]]) - 1),
+                      next_trend[trend]))
         })
       } else {
-        next_trends <- lapply(seq_len(n_series), function(trend){
+        trend_states <- lapply(seq_len(n_series), function(trend){
           as.vector(c(particles[[x]]$trend_states[[trend]][2],
                       particles[[x]]$trend_states[[trend]][3],
-                      trend_states[trend]))
+                      next_trend[trend]))
         })
       }
 
-      names(next_trends) <- paste0('series', seq_len(n_series))
-      next_lvs <- NULL
-
+      names(trend_states) <- paste0('series', seq_len(n_series))
+      lv_states <- NULL
     }
 
    particle_liks <- unlist(lapply(seq_len(n_series), function(series){
@@ -161,7 +185,7 @@ pfilter_mvgam_smooth = function(particles,
                                       size = particles[[x]]$size[series],
                                       mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
                                                    particles[[x]]$betas)) +
-                                                 (trend_states[series]) +
+                                                 (next_trend[series]) +
                                                  attr(Xp, 'model.offset'))))
       }
 
@@ -169,14 +193,14 @@ pfilter_mvgam_smooth = function(particles,
         series_weight <- (dpois(next_assim$y[series],
                                       lambda = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
                                                    particles[[x]]$betas)) +
-                                                 (trend_states[series]) +
+                                                     (next_trend[series]) +
                                                    attr(Xp, 'model.offset'))))
       }
 
       if(particles[[x]]$family == 'Tweedie'){
         series_weight <- exp(mgcv::ldTweedie(y = next_assim$y[series],
                                                  mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
-                                                              particles[[x]]$betas)) + (trend_states[series]) +
+                                                              particles[[x]]$betas)) + (next_trend[series]) +
                                                             attr(Xp, 'model.offset')),
                                                  p = particles[[x]]$p,
                                                  phi = particles[[x]]$twdis[series],
@@ -188,159 +212,56 @@ pfilter_mvgam_smooth = function(particles,
   }))
    particle_weight <- prod(particle_liks, na.rm = T)
 
-   if(use_lv){
-     trend_states <- NULL
-   }
-
    # Update particle weight using a condensation algorithm
    weight <- particle_weight * particles[[x]]$weight
 
-   if(particles[[x]]$family == 'Negative Binomial'){
-     if(particles[[x]]$trend_model == 'GP'){
-       output <- list(use_lv = use_lv,
-                      n_lv = particles[[x]]$n_lv,
-                      family = particles[[x]]$family,
-                      trend_model = particles[[x]]$trend_model,
-                      lv_states = next_lvs,
-                      lv_coefs = particles[[x]]$lv_coefs,
-                      betas = particles[[x]]$betas,
-                      size = particles[[x]]$size,
-                      alpha_gp = particles[[x]]$alpha_gp,
-                      rho_gp = particles[[x]]$rho_gp,
-                      trend_states = next_trends,
-                      weight = particle_weight,
-                      liks = particle_liks,
-                      upper_bounds = particles[[x]]$upper_bounds,
-                      last_assim = unique(next_assim$time))
-     } else {
-       output <- list(use_lv = use_lv,
-                      n_lv = particles[[x]]$n_lv,
-                      family = particles[[x]]$family,
-                      trend_model = particles[[x]]$trend_model,
-                      lv_states = next_lvs,
-                      lv_coefs = particles[[x]]$lv_coefs,
-                      betas = particles[[x]]$betas,
-                      size = particles[[x]]$size,
-                      tau = particles[[x]]$tau,
-                      phi = particles[[x]]$phi,
-                      ar1 = particles[[x]]$ar1,
-                      ar2 = particles[[x]]$ar2,
-                      ar3 = particles[[x]]$ar3,
-                      trend_states = next_trends,
-                      weight = particle_weight,
-                      liks = particle_liks,
-                      upper_bounds = particles[[x]]$upper_bounds,
-                      last_assim = unique(next_assim$time))
-     }
-
-   }
-
-   if(particles[[x]]$family == 'Poisson'){
-     if(particles[[x]]$trend_model == 'GP'){
-       output <- list(use_lv = use_lv,
-                      n_lv = particles[[x]]$n_lv,
-                      family = particles[[x]]$family,
-                      trend_model = particles[[x]]$trend_model,
-                      lv_states = next_lvs,
-                      lv_coefs = particles[[x]]$lv_coefs,
-                      alpha_gp = particles[[x]]$alpha_gp,
-                      rho_gp = particles[[x]]$rho_gp,
-                      betas = particles[[x]]$betas,
-                      trend_states = next_trends,
-                      weight = particle_weight,
-                      liks = particle_liks,
-                      upper_bounds = particles[[x]]$upper_bounds,
-                      last_assim = unique(next_assim$time))
-     } else {
-       output <- list(use_lv = use_lv,
-                      n_lv = particles[[x]]$n_lv,
-                      family = particles[[x]]$family,
-                      trend_model = particles[[x]]$trend_model,
-                      lv_states = next_lvs,
-                      lv_coefs = particles[[x]]$lv_coefs,
-                      betas = particles[[x]]$betas,
-                      tau = particles[[x]]$tau,
-                      phi = particles[[x]]$phi,
-                      ar1 = particles[[x]]$ar1,
-                      ar2 = particles[[x]]$ar2,
-                      ar3 = particles[[x]]$ar3,
-                      trend_states = next_trends,
-                      weight = particle_weight,
-                      liks = particle_liks,
-                      upper_bounds = particles[[x]]$upper_bounds,
-                      last_assim = unique(next_assim$time))
-     }
-
-   }
-
-   if(particles[[x]]$family == 'Tweedie'){
-     if(particles[[x]]$trend_model == 'GP'){
-       output <- list(use_lv = use_lv,
-                      n_lv = particles[[x]]$n_lv,
-                      family = particles[[x]]$family,
-                      trend_model = particles[[x]]$trend_model,
-                      lv_states = next_lvs,
-                      lv_coefs = particles[[x]]$lv_coefs,
-                      betas = particles[[x]]$betas,
-                      alpha_gp = particles[[x]]$alpha_gp,
-                      rho_gp = particles[[x]]$rho_gp,
-                      p = particles[[x]]$p,
-                      twdis = particles[[x]]$twdis,
-                      trend_states = next_trends,
-                      weight = particle_weight,
-                      liks = particle_liks,
-                      upper_bounds = particles[[x]]$upper_bounds,
-                      last_assim = unique(next_assim$time))
-     } else {
-       output <- list(use_lv = use_lv,
-                      n_lv = particles[[x]]$n_lv,
-                      family = particles[[x]]$family,
-                      trend_model = particles[[x]]$trend_model,
-                      lv_states = next_lvs,
-                      lv_coefs = particles[[x]]$lv_coefs,
-                      betas = particles[[x]]$betas,
-                      p = particles[[x]]$p,
-                      twdis = particles[[x]]$twdis,
-                      tau = particles[[x]]$tau,
-                      phi = particles[[x]]$phi,
-                      ar1 = particles[[x]]$ar1,
-                      ar2 = particles[[x]]$ar2,
-                      ar3 = particles[[x]]$ar3,
-                      trend_states = next_trends,
-                      weight = particle_weight,
-                      liks = particle_liks,
-                      upper_bounds = particles[[x]]$upper_bounds,
-                      last_assim = unique(next_assim$time))
-     }
-
-   }
-
-   output
+   list(use_lv = use_lv,
+        n_lv = particles[[x]]$n_lv,
+        family = particles[[x]]$family,
+        trend_model = particles[[x]]$trend_model,
+        lv_states = lv_states,
+        lv_coefs = particles[[x]]$lv_coefs,
+        betas = particles[[x]]$betas,
+        phi = as.numeric(particles[[x]]$phi),
+        ar1 = as.numeric(particles[[x]]$ar1),
+        ar2 = as.numeric(particles[[x]]$ar2),
+        ar3 = as.numeric(particles[[x]]$ar3),
+        tau = as.numeric(particles[[x]]$tau),
+        size = particles[[x]]$size,
+        p = particles[[x]]$p,
+        twdis = particles[[x]]$twdis,
+        alpha_gp = particles[[x]]$alpha_gp,
+        rho_gp = particles[[x]]$rho_gp,
+        trend_states = trend_states,
+        weight = particle_weight,
+        liks = particle_liks,
+        upper_bounds = particles[[x]]$upper_bounds,
+        last_assim = unique(next_assim$time))
 
   }, cl = cl)
   stopCluster(cl)
 
-  n_series <- length(particles[[1]]$trend_states)
-  if(n_series > 1){
-  lik_weights <- do.call(rbind, lapply(seq_along(particles), function(x){
-    particles[[x]]$liks
-  }))
-
-  series_sds <- apply(lik_weights, 2, function(x) sd(x))
-  if(all(series_sds == 0)){
-    # Do nothing if all series have equal weights due to resampling or all NAs in
-    # last observation
-  } else {
-    # Else update weights using ranking information
-    lik_weights <- apply(apply(lik_weights[, !series_sds  == 0 ], 2, rank), 1, prod)
-    lik_weights <- lik_weights / max(lik_weights)
-
-    particles <- lapply(seq_along(particles), function(x){
-      particles[[x]]$weight <- lik_weights[x] * particles[[x]]$weight
-      particles[[x]]
-    })
-  }
-  }
+  # n_series <- length(particles[[1]]$trend_states)
+  # if(n_series > 1){
+  # lik_weights <- do.call(rbind, lapply(seq_along(particles), function(x){
+  #   particles[[x]]$liks
+  # }))
+  #
+  # series_sds <- apply(lik_weights, 2, function(x) sd(x))
+  # if(all(series_sds == 0)){
+  #   # Do nothing if all series have equal weights due to resampling or all NAs in
+  #   # last observation
+  # } else {
+  #   # Else update weights using ranking information
+  #   lik_weights <- apply(apply(lik_weights[, !series_sds  == 0 ], 2, rank), 1, prod)
+  #   lik_weights <- lik_weights / max(lik_weights)
+  #
+  #   particles <- lapply(seq_along(particles), function(x){
+  #     particles[[x]]$weight <- lik_weights[x] * particles[[x]]$weight
+  #     particles[[x]]
+  #   })
+  # }
+  # }
 
   weights <- (unlist(lapply(seq_along(particles), function(x){
     tail(particles[[x]]$weight, 1)})))
@@ -353,7 +274,8 @@ pfilter_mvgam_smooth = function(particles,
                   replace = T)
 
   # Functions for Pareto smoothing of remaining importance weights
-  # (from loo package: https://github.com/stan-dev/loo/tree/master/R)
+  # (All credit for these functions go to the maintainers and developers
+  # of the loo package: https://github.com/stan-dev/loo/tree/master/R)
   nlist <- function(...) {
     m <- match.call()
     out <- list(...)
@@ -528,7 +450,7 @@ pfilter_mvgam_smooth = function(particles,
 
   }
 
-  if(length(unique(index)) > 100 & particles[[1]]$trend_model != 'GP'){
+  if(length(unique(index)) > 100){
     use_smoothing <- TRUE
     cat('Smoothing particles ...\n\n')
 
@@ -601,6 +523,8 @@ pfilter_mvgam_smooth = function(particles,
 
     # No major changes when smoothing not in effect as all weights are very similar
     if(!use_smoothing){
+
+      evolve <- 0
 
       if(use_lv){
         lv_evolve <- particles[[x]]$lv_states
@@ -683,133 +607,31 @@ pfilter_mvgam_smooth = function(particles,
       betas <- particles[[x]]$betas
     }
 
-    if(particles[[x]]$family == 'Negative Binomial'){
-      if(particles[[x]]$trend_model == 'GP'){
-        output <-     list(use_lv = use_lv,
-                           n_lv = particles[[x]]$n_lv,
-                           family = 'Negative Binomial',
-                           trend_model = particles[[x]]$trend_model,
-                           lv_states = lv_evolve,
-                           lv_coefs = lv_coefs_evolve,
-                           betas = betas,
-                           size = particles[[x]]$size,
-                           alpha_gp = particles[[x]]$alpha_gp,
-                           rho_gp = particles[[x]]$rho_gp,
-                           trend_states = trend_evolve,
-                           weight = particle_weight,
-                           upper_bounds = particles[[x]]$upper_bounds,
-                           last_assim = particles[[x]]$last_assim)
-      } else {
-        output <-     list(use_lv = use_lv,
-                           n_lv = particles[[x]]$n_lv,
-                           family = 'Negative Binomial',
-                           trend_model = particles[[x]]$trend_model,
-                           lv_states = lv_evolve,
-                           lv_coefs = lv_coefs_evolve,
-                           betas = betas,
-                           size = particles[[x]]$size,
-                           tau = if(use_resampling){
-                             particles[[x]]$tau
-                           } else {
-                             pmin(100, particles[[x]]$tau + runif(length(particles[[x]]$tau), 0, evolve))
-                           },
-                           phi = particles[[x]]$phi,
-                           ar1 = particles[[x]]$ar1,
-                           ar2 = particles[[x]]$ar2,
-                           ar3 = particles[[x]]$ar3,
-                           trend_states = trend_evolve,
-                           weight = particle_weight,
-                           upper_bounds = particles[[x]]$upper_bounds,
-                           last_assim = particles[[x]]$last_assim)
-      }
-
-    }
-
-    if(particles[[x]]$family == 'Poisson'){
-      if(particles[[x]]$trend_model == 'GP'){
-        output <-     list(use_lv = use_lv,
-                           n_lv = particles[[x]]$n_lv,
-                           family = 'Poisson',
-                           trend_model = particles[[x]]$trend_model,
-                           lv_states = lv_evolve,
-                           lv_coefs = lv_coefs_evolve,
-                           betas = betas,
-                           alpha_gp = particles[[x]]$alpha_gp,
-                           rho_gp = particles[[x]]$rho_gp,
-                           trend_states = trend_evolve,
-                           weight = particle_weight,
-                           upper_bounds = particles[[x]]$upper_bounds,
-                           last_assim = particles[[x]]$last_assim)
-      } else {
-        output <-     list(use_lv = use_lv,
-                           n_lv = particles[[x]]$n_lv,
-                           family = 'Poisson',
-                           trend_model = particles[[x]]$trend_model,
-                           lv_states = lv_evolve,
-                           lv_coefs = lv_coefs_evolve,
-                           betas = betas,
-                           tau = if(use_resampling){
-                             particles[[x]]$tau
-                           } else {
-                             pmin(100, particles[[x]]$tau + runif(length(particles[[x]]$tau), 0, evolve))
-                           },
-                           phi = particles[[x]]$phi,
-                           ar1 = particles[[x]]$ar1,
-                           ar2 = particles[[x]]$ar2,
-                           ar3 = particles[[x]]$ar3,
-                           trend_states = trend_evolve,
-                           weight = particle_weight,
-                           upper_bounds = particles[[x]]$upper_bounds,
-                           last_assim = particles[[x]]$last_assim)
-      }
-
-    }
-
-    if(particles[[x]]$family == 'Tweedie'){
-      if(particles[[x]]$trend_model == 'GP'){
-        output <-     list(use_lv = use_lv,
-                           n_lv = particles[[x]]$n_lv,
-                           family = 'Tweedie',
-                           trend_model = particles[[x]]$trend_model,
-                           lv_states = lv_evolve,
-                           lv_coefs = lv_coefs_evolve,
-                           p = particles[[x]]$p,
-                           twdis = particles[[x]]$twdis,
-                           betas = betas,
-                           alpha_gp = particles[[x]]$alpha_gp,
-                           rho_gp = particles[[x]]$rho_gp,
-                           trend_states = trend_evolve,
-                           weight = particle_weight,
-                           upper_bounds = particles[[x]]$upper_bounds,
-                           last_assim = particles[[x]]$last_assim)
-      } else {
-        output <-     list(use_lv = use_lv,
-                           n_lv = particles[[x]]$n_lv,
-                           family = 'Tweedie',
-                           trend_model = particles[[x]]$trend_model,
-                           lv_states = lv_evolve,
-                           lv_coefs = lv_coefs_evolve,
-                           p = particles[[x]]$p,
-                           twdis = particles[[x]]$twdis,
-                           betas = betas,
-                           tau = if(use_resampling){
-                             particles[[x]]$tau
-                           } else {
-                             pmin(100, particles[[x]]$tau + runif(length(particles[[x]]$tau), 0, evolve))
-                           },
-                           phi = particles[[x]]$phi,
-                           ar1 = particles[[x]]$ar1,
-                           ar2 = particles[[x]]$ar2,
-                           ar3 = particles[[x]]$ar3,
-                           trend_states = trend_evolve,
-                           weight = particle_weight,
-                           upper_bounds = particles[[x]]$upper_bounds,
-                           last_assim = particles[[x]]$last_assim)
-      }
-
-    }
-
-    output
+    list(use_lv = use_lv,
+         n_lv = particles[[x]]$n_lv,
+         family = particles[[x]]$family,
+         trend_model = particles[[x]]$trend_model,
+         lv_states = lv_evolve,
+         lv_coefs = lv_coefs_evolve,
+         betas = betas,
+         size = particles[[x]]$size,
+         tau = if(use_resampling){
+           particles[[x]]$tau
+         } else {
+           pmin(100, particles[[x]]$tau + runif(length(particles[[x]]$tau), 0, evolve))
+         },
+         phi = particles[[x]]$phi,
+         ar1 = particles[[x]]$ar1,
+         ar2 = particles[[x]]$ar2,
+         ar3 = particles[[x]]$ar3,
+         p = particles[[x]]$p,
+         twdis = particles[[x]]$twdis,
+         alpha_gp = particles[[x]]$alpha_gp,
+         rho_gp = particles[[x]]$rho_gp,
+         trend_states = trend_evolve,
+         weight = particle_weight,
+         upper_bounds = particles[[x]]$upper_bounds,
+         last_assim = particles[[x]]$last_assim)
 
   }, cl = cl)
   stopCluster(cl)

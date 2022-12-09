@@ -43,9 +43,9 @@ Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series 
 the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if \code{cmdstanr} is not available,
 a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
 not all options that are available in \code{JAGS} can be used, including: no option for a Tweedie family and no option for
-dynamic factor trends. However, as \code{stan} can estimate Hilbert base approximate gaussian processes, which
+dynamic factor trends. However, as \code{Stan} can estimate Hilbert base approximate Gaussian Processes, which
 are much more computationally tractable than full GPs for time series with \verb{>100} observations, estimation
-in \code{rstan} can support latent GP trends while estimation in \code{JAGS} cannot}
+in \code{Stan} can support latent GP trends while estimation in \code{JAGS} cannot}
 
 \item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
 'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
@@ -54,8 +54,8 @@ and the observation process is the only source of error; similarly to what is es
 'AR1' (AR1 model with intercept),
 'AR2' (AR2 model with intercept) or
 'AR3' (AR3 model with intercept) or
-'GP' (Gaussian process with squared exponential kernel; currently under development and
-only available for estimation in \code{stan})}
+'GP' (Gaussian Process with squared exponential kernel;
+only available for estimation in \code{Stan})}
 
 \item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,

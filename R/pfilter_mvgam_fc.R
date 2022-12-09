@@ -161,52 +161,38 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
 
     if(use_lv){
       # Run the latent variables forward fc_horizon timesteps
-      lv_preds <- do.call(rbind, lapply(seq_len(particles[[x]]$n_lv), function(lv){
-        sim_ar3(phi = particles[[x]]$phi[lv],
-                ar1 = particles[[x]]$ar1[lv],
-                ar2 = particles[[x]]$ar2[lv],
-                ar3 = particles[[x]]$ar3[lv],
-                tau = particles[[x]]$tau[lv],
-                last_trends = particles[[x]]$lv_states[[lv]],
-                h = fc_horizon)
-      }))
+      if(particles[[x]]$trend_model == 'GP'){
+        lv_preds <- do.call(rbind, lapply(seq_len(particles[[x]]$n_lv), function(lv){
+          sim_gp(alpha_gp = particles[[x]]$alpha_gp[lv],
+                 rho_gp = particles[[x]]$rho_gp[lv],
+                 last_trends = particles[[x]]$lv_states[[lv]],
+                 h = fc_horizon)
+        }))
+      } else {
+        lv_preds <- do.call(rbind, lapply(seq_len(particles[[x]]$n_lv), function(lv){
+          sim_ar3(phi = particles[[x]]$phi[lv],
+                  ar1 = particles[[x]]$ar1[lv],
+                  ar2 = particles[[x]]$ar2[lv],
+                  ar3 = particles[[x]]$ar3[lv],
+                  tau = particles[[x]]$tau[lv],
+                  last_trends = particles[[x]]$lv_states[[lv]],
+                  h = fc_horizon)
+        }))
+      }
+
+      # Generate predictions on the response scale
       series_fcs <- lapply(seq_len(n_series), function(series){
         trend_preds <- as.numeric(t(lv_preds) %*% particles[[x]]$lv_coefs[series,])
-
-        # Generate predictions
         Xpmat <- cbind(Xp[which(as.numeric(series_test$series) == series),], trend_preds)
         attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
-        if(particles[[x]]$family == 'Negative Binomial'){
-          out <- mvgam:::mvgam_predict(family = 'Negative Binomial',
-                                       Xp = Xpmat,
-                                       type = 'response',
-                                       betas = c(particles[[x]]$betas, 1),
-                                       size = particles[[x]]$size[series],
-                                       p = NULL,
-                                       twdis = NULL)
-        }
+        mvgam:::mvgam_predict(family = particles[[x]]$family,
+                              Xp = Xpmat,
+                              type = 'response',
+                              betas = c(particles[[x]]$betas, 1),
+                              size = particles[[x]]$size[series],
+                              p = particles[[x]]$p[series],
+                              twdis = particles[[x]]$twdis[series])
 
-        if(particles[[x]]$family == 'Poisson'){
-          out <- mvgam:::mvgam_predict(family = 'Poisson',
-                                       Xp = Xpmat,
-                                       type = 'response',
-                                       betas = c(particles[[x]]$betas, 1),
-                                       size = NULL,
-                                       p = NULL,
-                                       twdis = NULL)
-        }
-
-        if(particles[[x]]$family == 'Tweedie'){
-          out <- mvgam:::mvgam_predict(family = 'Tweedie',
-                                       Xp = Xpmat,
-                                       type = 'response',
-                                       betas = c(particles[[x]]$betas, 1),
-                                       size = NULL,
-                                       p = particles[[x]]$p,
-                                       twdis = particles[[x]]$twdis)
-        }
-
-        fc
       })
 
     } else {
@@ -227,43 +213,18 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                                  h = fc_horizon)
         }
 
-        # Generate predictions
+        # Generate predictions on the response scale
         Xpmat <- cbind(Xp[which(as.numeric(series_test$series) == series),], trend_preds)
         attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
-        if(particles[[x]]$family == 'Negative Binomial'){
-          out <- mvgam:::mvgam_predict(family = 'Negative Binomial',
-                                       Xp = Xpmat,
-                                       type = 'response',
-                                       betas = c(particles[[x]]$betas, 1),
-                                       size = particles[[x]]$size[series],
-                                       p = NULL,
-                                       twdis = NULL)
-        }
-
-        if(particles[[x]]$family == 'Poisson'){
-          out <- mvgam:::mvgam_predict(family = 'Poisson',
-                                       Xp = Xpmat,
-                                       type = 'response',
-                                       betas = c(particles[[x]]$betas, 1),
-                                       size = NULL,
-                                       p = NULL,
-                                       twdis = NULL)
-        }
-
-        if(particles[[x]]$family == 'Tweedie'){
-          out <- mvgam:::mvgam_predict(family = 'Tweedie',
-                                       Xp = Xpmat,
-                                       type = 'response',
-                                       betas = c(particles[[x]]$betas, 1),
-                                       size = NULL,
-                                       p = particles[[x]]$p,
-                                       twdis = particles[[x]]$twdis)
-        }
-
-        out
+        mvgam:::mvgam_predict(family = particles[[x]]$family,
+                              Xp = Xpmat,
+                              type = 'response',
+                              betas = c(particles[[x]]$betas, 1),
+                              size = particles[[x]]$size[series],
+                              p = particles[[x]]$p[series],
+                              twdis = particles[[x]]$twdis[series])
       })
     }
-
     series_fcs
   }, cl = cl)
   stopCluster(cl)

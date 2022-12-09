@@ -27,8 +27,8 @@
 #''AR1' (AR1 model with intercept),
 #''AR2' (AR2 model with intercept) or
 #''AR3' (AR3 model with intercept) or
-#''GP' (Gaussian process with squared exponential kernel; currently under development and
-#'only available for estimation in \code{stan})
+#''GP' (Gaussian Process with squared exponential kernel;
+#'only available for estimation in \code{Stan})
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 #'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 #'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
@@ -37,9 +37,9 @@
 #'the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if `cmdstanr` is not available,
 #'a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
 #'not all options that are available in \code{JAGS} can be used, including: no option for a Tweedie family and no option for
-#'dynamic factor trends. However, as \code{stan} can estimate Hilbert base approximate gaussian processes, which
+#'dynamic factor trends. However, as \code{Stan} can estimate Hilbert base approximate Gaussian Processes, which
 #'are much more computationally tractable than full GPs for time series with `>100` observations, estimation
-#'in \code{rstan} can support latent GP trends while estimation in \code{JAGS} cannot
+#'in \code{Stan} can support latent GP trends while estimation in \code{JAGS} cannot
 #'@details Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and
 #'altered. To make alterations, change the contents of the `prior` column and supplying this
 #'\code{data.frame} to the `mvgam` function using the argument `priors`
@@ -136,11 +136,6 @@ get_mvgam_priors = function(formula,
   if(!use_stan & trend_model == 'GP'){
     warning('gaussian process trends not yet supported for JAGS; reverting to Stan')
     use_stan <- TRUE
-  }
-
-  if(trend_model == 'GP' & use_lv){
-    warning('dynamic factor gaussian process trends not yet supported; changing use_lv to FALSE')
-    use_lv <- FALSE
   }
 
   if(use_stan & family == 'tw'){
@@ -389,7 +384,8 @@ get_mvgam_priors = function(formula,
   if(trend_model == 'GP'){
     trend_df <- data.frame(param_name = c('alpha_gp<lower=0>',
                                           'rho_gp<lower=0>'),
-                           param_length = length(unique(data_train$series)),
+                           param_length = ifelse(use_lv, n_lv,
+                                                 length(unique(data_train$series))),
                            param_info = c('trend amplitude',
                                           'trend length scale'),
                            prior = c('alpha_gp ~ normal(0, 0.5);',

@@ -138,8 +138,14 @@ if(object$use_lv){
           NROW()
       }
 
-      lv_estimates <- lv_estimates[,1:end_train]
-      lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
+      if(object$trend_model == 'GP'){
+        lv_estimates <- lv_estimates[,1:end_train]
+      } else {
+        lv_estimates <- lv_estimates[,1:end_train]
+        lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
+      }
+
+      lv_estimates
     })
 
   } else {
@@ -161,7 +167,12 @@ if(object$use_lv){
     })
   }
 
-  taus <- MCMCvis::MCMCchains(object$model_output, 'penalty')
+  if(object$trend_model == 'GP'){
+    taus <- NULL
+  } else {
+    taus <- MCMCvis::MCMCchains(object$model_output, 'penalty')
+  }
+
   trends <- NULL
 } else {
   ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'trend'))[2],
@@ -216,7 +227,6 @@ if(object$use_lv){
       lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
       as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
     }
-
   })
 
 } else {
@@ -399,7 +409,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
 
   # Run the latent variables forward one timestep
   if(is.null(alpha_gps)){
-    next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
+    lv_states <- do.call(cbind, lapply(seq_along(lvs), function(lv){
       sim_ar3(h = 1,
               phi = phi[lv],
               ar1 = ar1[lv],
@@ -409,7 +419,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
               last_trends = last_lvs[[lv]][1:3])
     }))
   } else {
-    next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
+    lv_states <- do.call(cbind, lapply(seq_along(lvs), function(lv){
       sim_gp(last_trends = last_lvs[[lv]],
              h = 1,
              alpha_gp = alpha_gp[lv],
@@ -418,22 +428,22 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   }
 
   # Multiply lv states with loadings to generate each series' forecast trend state
-  trends <- as.numeric(next_lvs %*% t(lv_coefs))
+  trend_states <- as.numeric(lv_states %*% t(lv_coefs))
 
   # Include previous states for each lv
   if(is.null(alpha_gps)){
-    next_lvs <- lapply(seq_along(lvs), function(lv){
+    lv_states <- lapply(seq_along(lvs), function(lv){
       as.vector(c(as.numeric(last_lvs[[lv]][2]),
                   as.numeric(last_lvs[[lv]][3]),
-                  next_lvs[lv]))
+                  lv_states[lv]))
     })
   } else {
-    next_lvs <- lapply(seq_along(lvs), function(lv){
+    lv_states <- lapply(seq_along(lvs), function(lv){
       as.vector(c(as.numeric(last_lvs[[lv]]),
-                  next_lvs[lv]))
+                  lv_states[lv]))
     })
   }
-  names(next_lvs) <- paste0('lv', seq(1:length(lvs)))
+  names(lv_states) <- paste0('lv', seq(1:length(lvs)))
 
   # Calculate weight for the particle in the form of a composite likelihood
   liks <- unlist(lapply(seq_len(n_series), function(series){
@@ -444,19 +454,19 @@ particles <- pbapply::pblapply(sample_seq, function(x){
       if(family == 'Negative Binomial'){
         weight <- (dnbinom(truth[series], size = size[series],
                                mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                          (trends[series]))))
+                                          (trend_states[series]))))
       }
 
       if(family == 'Poisson'){
         weight <- (dpois(truth[series],
                                lambda = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                          (trends[series]))))
+                                          (trend_states[series]))))
       }
 
       if(family == 'Tweedie'){
         weight <- exp(mgcv::ldTweedie(y = truth[series],
                                        mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                            (trends[series])),
+                                            (trend_states[series])),
                                        p = p,
                                        phi = twdis[series],
                                        all.derivs = F)[,1])
@@ -470,7 +480,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   trends <- NULL
 
   } else {
-    next_lvs = NULL
+    lv_states = NULL
     n_lv = NULL
     lv_coefs = NULL
 
@@ -534,140 +544,41 @@ particles <- pbapply::pblapply(sample_seq, function(x){
 
     # Include previous states for each trend
     if(is.null(alpha_gps)){
-      trends <- lapply(seq_len(n_series), function(trend){
+      trend_states <- lapply(seq_len(n_series), function(trend){
         as.vector(c(last_trends[[trend]][2], last_trends[[trend]][3], trends[trend]))
       })
     } else {
-      trends <- lapply(seq_len(n_series), function(trend){
+      trend_states <- lapply(seq_len(n_series), function(trend){
         as.vector(c(last_trends[[trend]], trends[trend]))
       })
     }
 
-    names(trends) <- paste0('series', seq_len(n_series))
+    names(trend_states) <- paste0('series', seq_len(n_series))
 }
 
   # Store important particle-specific information for later filtering
-  if(family == 'Poisson'){
-    if(trend_model == 'GP'){
-      output <- list(use_lv = use_lv,
-                     n_lv = n_lv,
-                     family = family,
-                     trend_model = trend_model,
-                     lv_states = next_lvs,
-                     lv_coefs = lv_coefs,
-                     betas = as.numeric(betas),
-                     alpha_gp = as.numeric(alpha_gp),
-                     rho_gp = as.numeric(rho_gp),
-                     trend_states = lapply(last_trends, unname),
-                     weight = weight,
-                     liks = liks,
-                     upper_bounds = upper_bounds,
-                     last_assim = last_assim)
-    } else {
-      output <- list(use_lv = use_lv,
-                     n_lv = n_lv,
-                     family = family,
-                     trend_model = trend_model,
-                     lv_states = next_lvs,
-                     lv_coefs = lv_coefs,
-                     betas = as.numeric(betas),
-                     tau = as.numeric(tau),
-                     phi = as.numeric(phi),
-                     ar1 = as.numeric(ar1),
-                     ar2 = as.numeric(ar2),
-                     ar3 = as.numeric(ar3),
-                     trend_states = trends,
-                     weight = weight,
-                     liks = liks,
-                     upper_bounds = upper_bounds,
-                     last_assim = last_assim)
-    }
-
-  }
-
-  if(family == 'Negative Binomial'){
-    if(trend_model == 'GP'){
-      output <- list(use_lv = use_lv,
-                     n_lv = n_lv,
-                     family = family,
-                     trend_model = trend_model,
-                     lv_states = next_lvs,
-                     lv_coefs = lv_coefs,
-                     betas = as.numeric(betas),
-                     size = as.numeric(size),
-                     alpha_gp = as.numeric(alpha_gp),
-                     rho_gp = as.numeric(rho_gp),
-                     trend_states = lapply(last_trends, unname),
-                     weight = weight,
-                     liks = liks,
-                     upper_bounds = upper_bounds,
-                     last_assim = last_assim)
-    } else {
-      output <- list(use_lv = use_lv,
-                     n_lv = n_lv,
-                     family = family,
-                     trend_model = trend_model,
-                     lv_states = next_lvs,
-                     lv_coefs = lv_coefs,
-                     betas = as.numeric(betas),
-                     size = as.numeric(size),
-                     tau = as.numeric(tau),
-                     phi = as.numeric(phi),
-                     ar1 = as.numeric(ar1),
-                     ar2 = as.numeric(ar2),
-                     ar3 = as.numeric(ar3),
-                     trend_states = trends,
-                     weight = weight,
-                     liks = liks,
-                     upper_bounds = upper_bounds,
-                     last_assim = last_assim)
-    }
-
-  }
-
-  if(family == 'Tweedie'){
-    if(trend_model == 'GP'){
-      output <- list(use_lv = use_lv,
-                     n_lv = n_lv,
-                     family = family,
-                     trend_model = trend_model,
-                     lv_states = next_lvs,
-                     lv_coefs = lv_coefs,
-                     betas = as.numeric(betas),
-                     p = as.numeric(p),
-                     twdis = as.numeric(twdis),
-                     alpha_gp = as.numeric(alpha_gp),
-                     rho_gp = as.numeric(rho_gp),
-                     trend_states = lapply(last_trends, unname),
-                     weight = weight,
-                     liks = liks,
-                     upper_bounds = upper_bounds,
-                     last_assim = last_assim)
-    } else {
-      output <- list(use_lv = use_lv,
-                     n_lv = n_lv,
-                     family = family,
-                     trend_model = trend_model,
-                     lv_states = next_lvs,
-                     lv_coefs = lv_coefs,
-                     betas = as.numeric(betas),
-                     p = as.numeric(p),
-                     twdis = as.numeric(twdis),
-                     tau = as.numeric(tau),
-                     phi = as.numeric(phi),
-                     ar1 = as.numeric(ar1),
-                     ar2 = as.numeric(ar2),
-                     ar3 = as.numeric(ar3),
-                     trend_states = trends,
-                     weight = weight,
-                     liks = liks,
-                     upper_bounds = upper_bounds,
-                     last_assim = last_assim)
-    }
-
-  }
-
-  output
+  list(use_lv = use_lv,
+       n_lv = n_lv,
+       family = family,
+       trend_model = trend_model,
+       lv_states = lv_states,
+       lv_coefs = lv_coefs,
+       betas = as.numeric(betas),
+       phi = as.numeric(phi),
+       ar1 = as.numeric(ar1),
+       ar2 = as.numeric(ar2),
+       ar3 = as.numeric(ar3),
+       tau = as.numeric(tau),
+       alpha_gp = as.numeric(alpha_gp),
+       rho_gp = as.numeric(rho_gp),
+       size = as.numeric(size),
+       p = as.numeric(p),
+       twdis = as.numeric(twdis),
+       trend_states = lapply(trend_states, unname),
+       weight = weight,
+       liks = liks,
+       upper_bounds = upper_bounds,
+       last_assim = last_assim)
 
 }, cl = cl)
 stopCluster(cl)

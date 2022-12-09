@@ -91,7 +91,8 @@ add_trend_lines = function(model_file, stan = FALSE,
                    'vector<lower=0>[n_lv] alpha_gp;\n',
                    'vector<lower=0>[n_lv] rho_gp;\n\n',
                    '// gp coefficient weights\n',
-                   'matrix[num_gp_basis, n_lv] b_gp;\n')
+                   'matrix[num_gp_basis, n_lv] b_gp;\n',
+                   '// smoothing parameters\n')
 
           model_file[grep('vector[total_obs] eta;', model_file, fixed = TRUE) + 1] <-
             paste0('\n// gp spectral densities\n',

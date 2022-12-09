@@ -10,7 +10,7 @@ pfilter_mvgam_online(
   file_path = "pfilter",
   threshold = 0.5,
   use_resampling = FALSE,
-  kernel_lambda = 1,
+  kernel_lambda = 0.25,
   n_cores = parallel::detectCores() - 1
 )
 }
@@ -35,9 +35,7 @@ the specified \code{threshold}. Default for this option is \code{FALSE}, relying
 to maintain particle diversity}
 
 \item{kernel_lambda}{\code{proportional numeric} specifying the strength of kernel smoothing to use when
-pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}. Note
-however that kernel smoothing is not currently supported for Gaussian Process trend models. For these models,
-it is still preferable to use resampling with a reasonable \code{threshold} value (i.e. \code{0.5})}
+pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}}
 
 \item{n_cores}{\code{integer} specifying number of cores for generating particle forecasts in parallel}
 }
