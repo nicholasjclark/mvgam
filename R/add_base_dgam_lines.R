@@ -24,7 +24,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     row_vector[num_basis] b_raw;
 
     // dynamic factors
-    matrix[n, n_lv] LV;
+    matrix[n, n_lv] LV_raw;
 
     // dynamic factor lower triangle loading coefficients
     vector[M] L;
@@ -39,7 +39,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
 
     // trends and dynamic factor loading matrix
     matrix[n, n_series] trend;
-    matrix[n_series, n_lv] lv_coefs;
+    matrix[n_series, n_lv] lv_coefs_raw;
 
     // basis coefficients
     row_vector[num_basis] b;
@@ -47,7 +47,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     // constraints allow identifiability of loadings
     for (i in 1:(n_lv - 1)) {
     for (j in (i + 1):(n_lv)){
-    lv_coefs[i, j] = 0;
+    lv_coefs_raw[i, j] = 0;
     }
     }
     {
@@ -56,7 +56,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     for (j in 1:n_lv) {
       for (i in j:n_series) {
         index = index + 1;
-        lv_coefs[i, j] = L[index];
+        lv_coefs_raw[i, j] = L[index];
       }
     }
     }
@@ -64,7 +64,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     // derived latent trends
     for (i in 1:n){;
     for (s in 1:n_series){
-    trend[i, s] = dot_product(lv_coefs[s,], LV[i,]);
+    trend[i, s] = dot_product(lv_coefs_raw[s,], LV_raw[i,]);
     }
     }
 
@@ -82,11 +82,11 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
 
     // dynamic factor estimates
     for (j in 1:n_lv) {
-    LV[1, j] ~ normal(0, 0.1);
+    LV_raw[1, j] ~ normal(0, 0.5);
     }
 
     for (j in 1:n_lv) {
-    LV[2:n, j] ~ normal(LV[1:(n - 1), j], 0.1);
+    LV_raw[2:n, j] ~ normal(LV_raw[1:(n - 1), j], 0.5);
     }
 
     // likelihood functions
@@ -99,11 +99,24 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     }
 
     generated quantities {
+    matrix[n, n_lv] LV;
+    matrix[n_series, n_lv] lv_coefs;
     vector[n_sp] rho;
     vector[n_lv] penalty;
     matrix[n, n_series] ypred;
     rho = log(lambda);
-    penalty = rep_vector(100.0, n_lv);
+    penalty = rep_vector(4.0, n_lv);
+
+    // Sign correct factor loadings and factors
+    for(j in 1:n_lv){
+    if(lv_coefs_raw[j, j] < 0){
+      lv_coefs[,j] = -1 * lv_coefs_raw[,j];
+      LV[,j] = -1 * LV_raw[,j];
+    } else {
+      lv_coefs[,j] = lv_coefs_raw[,j];
+      LV[,j] = LV_raw[,j];
+    }
+    }
 
     // posterior predictions
     for(i in 1:n){
@@ -206,21 +219,21 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                ## latent factors evolve as time series with penalised precisions;
                ## the penalty terms force any un-needed factors to evolve as flat lines
                for (j in 1:n_lv) {
-               LV[1, j] ~ dnorm(0, penalty[j])
+               LV_raw[1, j] ~ dnorm(0, penalty[j])
                }
 
                for (j in 1:n_lv) {
-               LV[2, j] ~ dnorm(phi[j] + ar1[j]*LV[1, j], penalty[j])
+               LV_raw[2, j] ~ dnorm(phi[j] + ar1[j]*LV_raw[1, j], penalty[j])
                }
 
                for (j in 1:n_lv) {
-               LV[3, j] ~ dnorm(phi[j] + ar1[j]*LV[2, j] + ar2[j]*LV[1, j], penalty[j])
+               LV_raw[3, j] ~ dnorm(phi[j] + ar1[j]*LV_raw[2, j] + ar2[j]*LV_raw[1, j], penalty[j])
                }
 
                for (i in 4:n) {
                for (j in 1:n_lv) {
-               LV[i, j] ~ dnorm(phi[j] + ar1[j]*LV[i - 1, j] +
-               ar2[j]*LV[i - 2, j] + ar3[j]*LV[i - 3, j], penalty[j])
+               LV_raw[i, j] ~ dnorm(phi[j] + ar1[j]*LV_raw[i - 1, j] +
+               ar2[j]*LV_raw[i - 2, j] + ar3[j]*LV_raw[i - 3, j], penalty[j])
                }
                }
 
@@ -261,34 +274,45 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                ## upper triangle of loading matrix set to zero
                for (j in 1:(n_lv - 1)) {
                for (j2 in (j + 1):n_lv) {
-               lv_coefs[j, j2] <- 0
+               lv_coefs_raw[j, j2] <- 0
                }
                }
 
                ## positive constraints on loading diagonals
                for (j in 1:n_lv) {
-               lv_coefs[j, j] ~ dnorm(0, 1)T(0, 1);
+               lv_coefs_raw[j, j] ~ dnorm(0, 1)T(0, 1);
                }
 
                ## lower diagonal free
                for (j in 2:n_lv) {
                for (j2 in 1:(j - 1)) {
-               lv_coefs[j, j2] ~ dnorm(0, 1)T(-1, 1);
+               lv_coefs_raw[j, j2] ~ dnorm(0, 1)T(-1, 1);
                }
                }
 
                ## other elements also free
                for (j in (n_lv + 1):n_series) {
                for (j2 in 1:n_lv) {
-               lv_coefs[j, j2] ~ dnorm(0, 1)T(-1, 1);
+               lv_coefs_raw[j, j2] ~ dnorm(0, 1)T(-1, 1);
                }
                }
 
                ## trend evolution depends on latent factors
                for (i in 1:n) {
                for (s in 1:n_series) {
-               trend[i, s] <- inprod(lv_coefs[s,], LV[i,])
+               trend[i, s] <- inprod(lv_coefs_raw[s,], LV_raw[i,])
                }
+               }
+
+               # sign-correct factor loadings and coefficients
+               for (j in 1:n_lv){
+                if(lv_coefs[j,j] < 0){
+                 lv_coefs[,j] <- -1 * lv_coefs_raw[,j]
+                 LV[,j] <- -1 * LV_raw[,j]
+                } else {
+                 lv_coefs[,j] <- lv_coefs_raw[,j]
+                 LV[,j] <- LV_raw[,j]
+                }
                }
 
                ## likelihood functions
