@@ -16,7 +16,7 @@ library(knitr)
 opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
 ```
 
-In this example we will examine multivariate forecasting models using `mvgam`, which fits dynamic GAMs (DGAMs) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `M` can be difficult. The approach used by `mvgam` when sampling with `JAGS` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated in an exponentially increasing manner (following Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291), we hope that we can guard against specifying too large a `M`. Note that when sampling with `Stan`, we capitalise on the superior sampling and exploration of Hamiltonian Monte Carlo to choose the number of factors by placing independent normal priors on factor standard deviations. Begin by simulating `6` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `100` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Poisson distributions
+In this example we will examine multivariate forecasting models using `mvgam`, which fits dynamic GAMs (DGAMs) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `M` can be difficult. The approach used by `mvgam` when sampling with `JAGS` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated in an exponentially increasing manner (following Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291), we hope that we can guard against specifying too large a `M`. Note that when sampling with `Stan`, we capitalise on the superior sampling and exploration of Hamiltonian Monte Carlo to choose the number of factors. Begin by simulating `6` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `100` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Poisson distributions
 ```{r}
 set.seed(1111)
 library(mvgam)
@@ -41,12 +41,12 @@ Clearly there are some correlations in the trends for these series. But how does
 
 ![](df.gif)
 
-A challenge with any factor model is the need to determine the number of factors `M`. Setting `M` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `M` too large leads to unnecessary computation. `mvgam` approaches this problem by either formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines (if using `JAGS`) or by regularising the factor loadings with a Bayesian LASSO prior (if using `Stan`). Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
+A challenge with any factor model is the need to determine the number of factors `M`. Setting `M` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `M` too large leads to unnecessary computation. `mvgam` approaches this problem by either formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines (if using `JAGS`) or by regularising the factor loadings (if using `Stan`). Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
 ```{r, message=FALSE, warning=FALSE}
 mod1 <- mvgam(data = dat$data_train,
                 newdata = dat$data_test,
                 formula = y ~ s(series, bs = 're') +
-                  s(season, bs = c('cc'), k = 7),
+                  s(season, bs = c('cc'), k = 7) - 1,
                 knots = list(season = c(0.5, 12.5)),
                 use_lv = TRUE,
                 n_lv = 2,
@@ -78,7 +78,7 @@ Now we fit the same model but assume that we no nothing about how many factors t
 mod2 <- mvgam(data = dat$data_train,
                 newdata = dat$data_test,
                 formula = y ~ s(series, bs = 're') +
-                  s(season, bs = c('cc'), k = 7),
+                  s(season, bs = c('cc'), k = 7) - 1,
                 knots = list(season = c(0.5, 12.5)),
                 use_lv = TRUE,
                 n_lv = 6,
@@ -104,7 +104,7 @@ Examining the factor contributions gives us some insight into whether we set `n_
 plot_mvgam_factors(mod2)
 ```
 
-The very weak contributions by some of the factors are a result of the penalisation, which will become more important as the dimensionality of the data grows. Now onto an empirical example. Here we will access monthly search volume data from `Google Trends`, focusing on relative importances of search terms related to tick paralysis in Queensland, Australia
+The very weak contributions by some of the factors are a result of the loading regularisation, which will become more important as the dimensionality of the data grows. Now onto an empirical example. Here we will access monthly search volume data from `Google Trends`, focusing on relative importances of search terms related to tick paralysis in Queensland, Australia
 ```{r message=FALSE, warning = FALSE}
 library(tidyr)
 if(!require(gtrendsR)){

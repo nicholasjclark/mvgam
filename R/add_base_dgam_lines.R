@@ -328,8 +328,8 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                ## where the likelihood reduces to a 'base' model (Poisson) unless
                ## the data support overdispersion
                for (s in 1:n_series) {
-               r[s] <- 1 / r_raw[s]
-               r_raw[s] ~ dnorm(0, 0.1)T(0, )
+               r[s] <- 1 / r_inv[s]
+               r_inv[s] ~ dexp(5)
                }
 
                ## posterior predictions
@@ -397,8 +397,8 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                           ## where the likelihood reduces to a 'base' model (Poisson) unless
                           ## the data support overdispersion
                           for (s in 1:n_series) {
-                          r[s] <- 1 / r_raw[s]
-                          r_raw[s] ~ dnorm(0, 0.1)T(0, )
+                          r[s] <- 1 / r_inv[s]
+                          r_inv[s] ~ dexp(5)
                           }
 
                           ## posterior predictions

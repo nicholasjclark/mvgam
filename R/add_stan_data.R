@@ -39,7 +39,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
 
       stan_file[grep('// priors for smoothing', stan_file) + 2] <-
         paste0('\n// priors for overdispersion parameters\n',
-        'r_inv ~ normal(0, 10);\n')
+        'r_inv ~ exponential(5);\n')
 
       to_negbin <- gsub('poisson_log', 'neg_binomial_2',
            stan_file[grep('y[i, s] ~ poisson', stan_file, fixed = T)])
