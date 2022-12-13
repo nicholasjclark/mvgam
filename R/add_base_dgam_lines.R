@@ -82,11 +82,11 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
 
     // dynamic factor estimates
     for (j in 1:n_lv) {
-    LV[1, j] ~ normal(0, 0.1);
+    LV[1, j] ~ normal(0, 0.5);
     }
 
     for (j in 1:n_lv) {
-    LV[2:n, j] ~ normal(LV[1:(n - 1), j], 0.1);
+    LV[2:n, j] ~ normal(LV[1:(n - 1), j], 0.5);
     }
 
     // likelihood functions
@@ -103,7 +103,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     vector[n_lv] penalty;
     matrix[n, n_series] ypred;
     rho = log(lambda);
-    penalty = rep_vector(100.0, n_lv);
+    penalty = rep_vector(4.0, n_lv);
 
     // posterior predictions
     for(i in 1:n){
