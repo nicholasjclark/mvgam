@@ -122,7 +122,7 @@ add_trend_lines = function(model_file, stan = FALSE,
           model_file[grep('vector[n_lv] penalty;', model_file,
                           fixed = TRUE)] <-
             'vector[n_lv] alpha_gp;'
-          model_file[grep('penalty = rep_vector(100.0, n_lv);', model_file,
+          model_file[grep('penalty = rep_vector(4.0, n_lv);', model_file,
                                             fixed = TRUE)] <-
             'alpha_gp = rep_vector(0.5, n_lv);'
 
