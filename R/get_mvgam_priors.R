@@ -203,7 +203,7 @@ get_mvgam_priors = function(formula,
                         family = nb(),
                         drop.unused.levels = FALSE,
                         control = list(nthreads = min(4, parallel::detectCores()-1),
-                                       maxit = 50))
+                                       maxit = 30))
   } else if(family == 'poisson'){
     ss_gam <- mgcv::gam(formula(formula),
                         data = data_train,
@@ -211,7 +211,7 @@ get_mvgam_priors = function(formula,
                         family = poisson(),
                         drop.unused.levels = FALSE,
                         control = list(nthreads = min(4, parallel::detectCores()-1),
-                                       maxit = 50))
+                                       maxit = 30))
   } else {
     ss_gam <- mgcv::gam(formula(formula),
                         data = data_train,
@@ -219,7 +219,7 @@ get_mvgam_priors = function(formula,
                         family = tw(),
                         drop.unused.levels = FALSE,
                         control = list(nthreads = min(4, parallel::detectCores()-1),
-                                       maxit = 50))
+                                       maxit = 30))
   }
 
 

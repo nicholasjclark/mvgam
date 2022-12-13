@@ -104,8 +104,8 @@ plot_mvgam_smooth = function(object,
     smooth <- smooth_terms[smooth]
   }
 
-  if(length(unlist(strsplit(smooth, ','))) > 2){
-    stop('mvgam cannot yet plot smooths of more than 2 dimensions')
+  if(length(unlist(strsplit(smooth, ','))) > 3){
+    stop('mvgam cannot yet plot smooths of more than 3 dimensions')
   }
 
   # Check that this is not a random effect smooth
@@ -128,8 +128,8 @@ plot_mvgam_smooth = function(object,
   # Change smooth name to the covariate that needs a sequence of prediction values
   smooth <- object$mgcv_model$smooth[[smooth_int]]$term
 
-  # Predictions and plots for 2-dimensional smooths
-  if(length(unlist(strsplit(smooth, ','))) == 2){
+  # Predictions and plots for multi-dimensional smooths
+  if(length(unlist(strsplit(smooth, ','))) >= 2){
 
     # Use default mgcv plotting for bivariate smooths as it is quicker
     # Extract median beta params for smooths and their covariances
