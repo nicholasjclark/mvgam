@@ -111,10 +111,10 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     for(j in 1:n_lv){
     if(lv_coefs_raw[j, j] < 0){
       lv_coefs[,j] = -1 * lv_coefs_raw[,j];
-      LV[j,] = -1 * LV_raw[j,];
+      LV[,j] = -1 * LV_raw[,j];
     } else {
       lv_coefs[,j] = lv_coefs_raw[,j];
-      LV[j,] = LV_raw[j,];
+      LV[,j] = LV_raw[,j];
     }
     }
 
@@ -308,10 +308,10 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                for (j in 1:n_lv){
                 if(lv_coefs[j,j] < 0){
                  lv_coefs[,j] <- -1 * lv_coefs_raw[,j]
-                 LV[j,] <- -1 * LV_raw[j,]
+                 LV[,j] <- -1 * LV_raw[,j]
                 } else {
                  lv_coefs[,j] <- lv_coefs_raw[,j]
-                 LV[j,] <- LV_raw[j,]
+                 LV[,j] <- LV_raw[,j]
                 }
                }
 
