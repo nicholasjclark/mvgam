@@ -88,7 +88,6 @@ add_trend_lines = function(model_file, stan = FALSE,
 
           model_file[grep('// dynamic factor lower triangle', model_file)+3] <-
             paste0('// gp parameters\n',
-                   'vector<lower=0>[n_lv] alpha_gp;\n',
                    'vector<lower=0>[n_lv] rho_gp;\n\n',
                    '// gp coefficient weights\n',
                    'matrix[num_gp_basis, n_lv] b_gp;\n',
@@ -104,26 +103,25 @@ add_trend_lines = function(model_file, stan = FALSE,
             paste0('\n// gp LV estimates',
                    '\nfor (m in 1:num_gp_basis){\n',
                    'for (s in 1:n_lv){\n',
-                   'diag_SPD[m, s] = sqrt(spd_SE(alpha_gp[s], rho_gp[s], sqrt(lambda_gp(boundary, m))));\n',
+                   'diag_SPD[m, s] = sqrt(spd_SE(0.1, rho_gp[s], sqrt(lambda_gp(boundary, m))));\n',
                    '}\n}\n',
                    'SPD_beta = diag_SPD .* b_gp;\n',
                    'LV = gp_phi * SPD_beta;\n}\n')
 
           rho_line <- 'rho_gp ~ inv_gamma(4, 24);\n'
-          alpha_line <- 'alpha_gp ~ normal(0, 0.5);\n'
 
           model_file[grep('// priors for dynamic factor loading', model_file)-1] <-
             paste0('\n// priors for gp parameters\n',
                    'for (s in 1:n_lv){\n',
                    'b_gp[1:num_gp_basis, s] ~ normal(0, 1);\n',
                    '}\n',
-                   alpha_line,
                    rho_line)
 
           model_file <- readLines(textConnection(model_file), n = -1)
 
-          model_file <- model_file[-c(grep('penalty = rep_vector(100.0, n_lv);', model_file,
-                                            fixed = TRUE))]
+          model_file[grep('penalty = rep_vector(100.0, n_lv);', model_file,
+                                            fixed = TRUE)] <-
+            'alpha_gp = rep_vector(0.1, n_lv);'
 
           model_file <- model_file[-c((grep('// derived latent trends', model_file)):
                                         (grep('// derived latent trends', model_file) + 5))]

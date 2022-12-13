@@ -382,25 +382,37 @@ get_mvgam_priors = function(formula,
   }
 
   if(trend_model == 'GP'){
-    trend_df <- data.frame(param_name = c('alpha_gp<lower=0>',
-                                          'rho_gp<lower=0>'),
-                           param_length = ifelse(use_lv, n_lv,
-                                                 length(unique(data_train$series))),
-                           param_info = c('trend amplitude',
-                                          'trend length scale'),
-                           prior = c('alpha_gp ~ normal(0, 0.5);',
-                                     'rho_gp ~ inv_gamma(4, 24);'),
-                           example_change = c(paste0(
-                             'alpha_gp ~ normal(',
-                             round(runif(min = -1, max = 1, n = 1), 2),
-                             ', ',
-                             round(runif(min = 0.1, max = 1, n = 1), 2),
-                             ');'
-                           ),
-                           paste0('rho_gp ~ exponential(',
-                                  round(runif(min = 0.01, max = 1, n = 1), 2),
-                                  ');'
-                           )))
+    if(use_lv){
+      trend_df <- data.frame(param_name = c('rho_gp<lower=0>'),
+                             param_length = length(unique(data_train$series)),
+                             param_info = c('trend length scale'),
+                             prior = c('rho_gp ~ inv_gamma(4, 24);'),
+                             example_change =
+                               paste0('rho_gp ~ exponential(',
+                                      round(runif(min = 0.01, max = 1, n = 1), 2),
+                                      ');'
+                               ))
+    } else {
+      trend_df <- data.frame(param_name = c('alpha_gp<lower=0>',
+                                            'rho_gp<lower=0>'),
+                             param_length = length(unique(data_train$series)),
+                             param_info = c('trend amplitude',
+                                            'trend length scale'),
+                             prior = c('alpha_gp ~ normal(0, 0.5);',
+                                       'rho_gp ~ inv_gamma(4, 24);'),
+                             example_change = c(paste0(
+                               'alpha_gp ~ normal(',
+                               round(runif(min = -1, max = 1, n = 1), 2),
+                               ', ',
+                               round(runif(min = 0.1, max = 1, n = 1), 2),
+                               ');'
+                             ),
+                             paste0('rho_gp ~ exponential(',
+                                    round(runif(min = 0.01, max = 1, n = 1), 2),
+                                    ');'
+                             )))
+    }
+
   }
 
   if(trend_model == 'RW'){
