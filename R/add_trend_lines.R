@@ -54,16 +54,20 @@ add_trend_lines = function(model_file, stan = FALSE,
           model_file[grep('transformed data {', model_file, fixed = TRUE)] <-
             paste0('transformed data {\n',
                    'vector<lower=1>[n] times;\n',
+                   'vector[n] times_cent;\n',
+                   'real mean_times;\n',
                    'real<lower=0> boundary;\n',
                    'int<lower=1> num_gp_basis;\n',
-                   'num_gp_basis = max(40, n);\n',
+                   'num_gp_basis = min(20, n);\n',
                    'matrix[n, num_gp_basis] gp_phi;\n\n',
                    'for (t in 1:n){\n',
                    'times[t] = t;\n',
                    '}\n\n',
-                   'boundary = (5.0/4) * max(times);\n',
+                   'mean_times = mean(times);\n',
+                   'times_cent = times - mean_times;\n',
+                   'boundary = (5.0/4) * (max(times_cent) - min(times_cent));\n',
                    'for (m in 1:num_gp_basis){\n',
-                   'gp_phi[,m] = phi_SE(boundary, m, times);\n',
+                   'gp_phi[,m] = phi_SE(boundary, m, times_cent);\n',
                    '}\n')
 
           model_file[grep('##insert data', model_file)-1] <-
@@ -103,12 +107,12 @@ add_trend_lines = function(model_file, stan = FALSE,
             paste0('\n// gp LV estimates',
                    '\nfor (m in 1:num_gp_basis){\n',
                    'for (s in 1:n_lv){\n',
-                   'diag_SPD[m, s] = sqrt(spd_SE(0.5, rho_gp[s], sqrt(lambda_gp(boundary, m))));\n',
+                   'diag_SPD[m, s] = sqrt(spd_SE(0.25, rho_gp[s], sqrt(lambda_gp(boundary, m))));\n',
                    '}\n}\n',
                    'SPD_beta = diag_SPD .* b_gp;\n',
                    'LV_raw = gp_phi * SPD_beta;\n}\n')
 
-          rho_line <- 'rho_gp ~ inv_gamma(4, 24);\n'
+          rho_line <- 'rho_gp ~ inv_gamma(1.499007, 5.670433);\n'
 
           model_file[grep('// priors for dynamic factor loading', model_file)-1] <-
             paste0('\n// priors for gp parameters\n',
@@ -122,7 +126,7 @@ add_trend_lines = function(model_file, stan = FALSE,
           model_file[grep('vector[n_lv] penalty;', model_file,
                           fixed = TRUE)] <-
             'vector[n_lv] alpha_gp;'
-          model_file[grep('penalty = rep_vector(4.0, n_lv);', model_file,
+          model_file[grep('penalty = rep_vector(100.0, n_lv);', model_file,
                                             fixed = TRUE)] <-
             'alpha_gp = rep_vector(0.5, n_lv);'
 
@@ -158,16 +162,20 @@ add_trend_lines = function(model_file, stan = FALSE,
           model_file[grep('##insert data', model_file)+1] <-
             paste0('transformed data {\n',
                    'vector<lower=1>[n] times;\n',
+                   'vector[n] times_cent;\n',
+                   'real mean_times;\n',
                    'real<lower=0> boundary;\n',
                    'int<lower=1> num_gp_basis;\n',
-                   'num_gp_basis = max(40, n);\n',
+                   'num_gp_basis = min(20, n);\n',
                    'matrix[n, num_gp_basis] gp_phi;\n\n',
                    'for (t in 1:n){\n',
                    'times[t] = t;\n',
                    '}\n\n',
-                   'boundary = (5.0/4) * max(times);\n',
+                   'mean_times = mean(times);\n',
+                   'times_cent = times - mean_times;\n',
+                   'boundary = (5.0/4) * (max(times_cent) - min(times_cent));\n',
                    'for (m in 1:num_gp_basis){\n',
-                   'gp_phi[,m] = phi_SE(boundary, m, times);\n',
+                   'gp_phi[,m] = phi_SE(boundary, m, times_cent);\n',
                    '}\n}\n\n',
                    'parameters {')
 
@@ -214,7 +222,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    'SPD_beta = diag_SPD .* b_gp;\n',
                    'trend = gp_phi * SPD_beta;\n}\n')
 
-          rho_line <- 'rho_gp ~ inv_gamma(4, 24);\n'
+          rho_line <- 'rho_gp ~ inv_gamma(1.499007, 5.670433);\n'
           alpha_line <- 'alpha_gp ~ normal(0, 0.5);\n'
 
           model_file[grep('// likelihood functions', model_file)-1] <-
@@ -274,8 +282,8 @@ add_trend_lines = function(model_file, stan = FALSE,
         model_file[grep('// priors for smoothing parameters', model_file)+2] <-
           paste0('\n// priors for gp parameters\n',
                  'to_vector(gp_std) ~ normal(0, 1);\n',
-                 'alpha_gp ~ exponential(4);\n',
-                 'rho_gp ~ inv_gamma(4.6, 22.1);\n')
+                 'alpha_gp ~ normal(0, 0.5);\n',
+                 'rho_gp ~ inv_gamma(1.499007, 5.670433);\n')
 
         model_file <- readLines(textConnection(model_file), n = -1)
       }
@@ -287,10 +295,10 @@ add_trend_lines = function(model_file, stan = FALSE,
           model_file[grep('// raw basis', model_file) + 1] <-
             paste0('row_vector[num_basis] b_raw;\n\n// latent factor drift terms\nvector[n_lv] phi;\n')
           model_file[grep('LV_raw[1, j] ~ ', model_file, fixed = T)] <-
-            "LV_raw[1, j] ~ normal(phi[j], 0.5);"
+            "LV_raw[1, j] ~ normal(phi[j], 0.1);"
 
           model_file[grep('// dynamic factor estimates', model_file) + 6] <-
-            paste0('LV_raw[2:n, j] ~ normal(phi[j] + LV_raw[1:(n - 1), j], 0.5);')
+            paste0('LV_raw[2:n, j] ~ normal(phi[j] + LV_raw[1:(n - 1), j], 0.1);')
 
         } else {
           model_file[grep('// raw basis', model_file) + 1] <-
@@ -304,7 +312,7 @@ add_trend_lines = function(model_file, stan = FALSE,
 
 
           model_file[grep('model \\{', model_file) + 2] <-
-            paste0('\n// priors for trend parameters\nphi ~ normal(0, 0.5);\n')
+            paste0('\n// priors for trend parameters\nphi ~ normal(0, 0.1);\n')
 
 
         model_file <- readLines(textConnection(model_file), n = -1)
@@ -320,10 +328,10 @@ add_trend_lines = function(model_file, stan = FALSE,
                    '// latent factor drift terms\nvector[n_lv] phi;')
 
           model_file[grep('LV_raw[1, j] ~ ', model_file, fixed = T)] <-
-            "LV_raw[1, j] ~ normal(phi[j], 0.5);"
+            "LV_raw[1, j] ~ normal(phi[j], 0.1);"
 
           model_file[grep('// dynamic factor estimates', model_file) + 6] <-
-            paste0('LV_raw[2:n, j] ~ normal(phi[j] + ar1[j] * LV_raw[1:(n - 1), j], 0.5);')
+            paste0('LV_raw[2:n, j] ~ normal(phi[j] + ar1[j] * LV_raw[1:(n - 1), j], 0.1);')
 
         } else {
           model_file[grep('// raw basis', model_file) + 1] <-
@@ -347,7 +355,7 @@ add_trend_lines = function(model_file, stan = FALSE,
             paste0('row_vector[num_basis] b_raw;\n\n// latent factor AR1 terms\nvector<lower=-1.5,upper=1.5>[n_lv] ar1;')
 
           model_file[grep('// dynamic factor estimates', model_file) + 6] <-
-            paste0('LV_raw[2:n, j] ~ normal(ar1[j] * LV_raw[1:(n - 1), j], 0.5);')
+            paste0('LV_raw[2:n, j] ~ normal(ar1[j] * LV_raw[1:(n - 1), j], 0.1);')
 
           model_file[grep('model \\{', model_file) + 2] <-
             paste0('\n// priors for AR parameters\nar1 ~ std_normal();\n')
@@ -377,16 +385,16 @@ add_trend_lines = function(model_file, stan = FALSE,
                    '// latent factor drift terms\nvector[n_lv] phi;')
 
           model_file[grep('LV_raw[1, j] ~ ', model_file, fixed = T)] <-
-            "LV_raw[1, j] ~ normal(phi[j], 0.5);"
+            "LV_raw[1, j] ~ normal(phi[j], 0.1);"
 
           model_file <- model_file[-(grep('// dynamic factor estimates', model_file) + 5:7)]
           model_file[grep('// dynamic factor estimates', model_file) + 5] <-
             paste0('for (j in 1:n_lv) {\n',
-                   'LV_raw[2, j] ~ normal(phi[j] + LV_raw[1, j] * ar1[j], 0.5);\n',
+                   'LV_raw[2, j] ~ normal(phi[j] + LV_raw[1, j] * ar1[j], 0.1);\n',
                    '}\n\n',
                    'for (i in 3:n) {\n',
                    'for (j in 1:n_lv) {\n',
-                   'LV_raw[i, j] ~ normal(phi[j] + ar1[j] * LV_raw[i - 1, j] + ar2[j] * LV_raw[i - 2, j], 0.5);\n',
+                   'LV_raw[i, j] ~ normal(phi[j] + ar1[j] * LV_raw[i - 1, j] + ar2[j] * LV_raw[i - 2, j], 0.1);\n',
                    '}\n}\n')
         } else {
           model_file[grep('// raw basis', model_file) + 1] <-
@@ -418,16 +426,16 @@ add_trend_lines = function(model_file, stan = FALSE,
             paste0('row_vector[num_basis] b_raw;\n\n// latent factor AR1 terms\nvector<lower=-1.5,upper=1.5>[n_lv] ar1;\n\n',
                    '// latent factor AR2 terms\nvector<lower=-1.5,upper=1.5>[n_lv] ar2;')
           model_file[grep('// dynamic factor estimates', model_file) + 2] <-
-            paste0('LV_raw[1, j] ~ normal(0, 0.5);')
+            paste0('LV_raw[1, j] ~ normal(0, 0.1);')
 
           model_file <- model_file[-(grep('// dynamic factor estimates', model_file) + 5:7)]
           model_file[grep('// dynamic factor estimates', model_file) + 5] <-
             paste0('for (j in 1:n_lv) {\n',
-                   'LV_raw[2, j] ~ normal(LV_raw[1, j] * ar1[j], 0.5);\n',
+                   'LV_raw[2, j] ~ normal(LV_raw[1, j] * ar1[j], 0.1);\n',
                    '}\n\n',
                    'for (i in 3:n) {\n',
                    'for (j in 1:n_lv) {\n',
-                   'LV_raw[i, j] ~ normal(ar1[j] * LV_raw[i - 1, j] + ar2[j] * LV_raw[i - 2, j], 0.5);\n',
+                   'LV_raw[i, j] ~ normal(ar1[j] * LV_raw[i - 1, j] + ar2[j] * LV_raw[i - 2, j], 0.1);\n',
                    '}\n}\n')
         } else {
           model_file[grep('// raw basis', model_file) + 1] <-
@@ -465,21 +473,21 @@ add_trend_lines = function(model_file, stan = FALSE,
                    '// latent factor drift terms\nvector[n_lv] phi;')
 
           model_file[grep('LV_raw[1, s] ~ ', model_file, fixed = T)] <-
-            "LV_raw[1, s] ~ normal(phi[s], 0.5);"
+            "LV_raw[1, s] ~ normal(phi[s], 0.1);"
 
           model_file <- model_file[-(grep('// dynamic factor estimates', model_file) + 5:7)]
           model_file[grep('// dynamic factor estimates', model_file) + 5] <-
             paste0('for (j in 1:n_lv) {\n',
-                   'LV_raw[2, j] ~ normal(phi[j] + LV_raw[1, j] * ar1[j], 0.5);\n',
+                   'LV_raw[2, j] ~ normal(phi[j] + LV_raw[1, j] * ar1[j], 0.1);\n',
                    '}\n\n',
 
                    'for (j in 1:n_lv) {\n',
-                   'LV_raw[3, j] ~ normal(phi[j] + LV_raw[2, j] * ar1[j] + LV_raw[1, j] * ar2[j], 0.5);\n',
+                   'LV_raw[3, j] ~ normal(phi[j] + LV_raw[2, j] * ar1[j] + LV_raw[1, j] * ar2[j], 0.1);\n',
                    '}\n\n',
 
                    'for (i in 4:n) {\n',
                    'for (j in 1:n_lv) {\n',
-                   'LV_raw[i, j] ~ normal(phi[j] + ar1[j] * LV_raw[i - 1, j] + ar2[j] * LV_raw[i - 2, j] + ar3[j] * LV_raw[i - 3, j], 0.5);\n',
+                   'LV_raw[i, j] ~ normal(phi[j] + ar1[j] * LV_raw[i - 1, j] + ar2[j] * LV_raw[i - 2, j] + ar3[j] * LV_raw[i - 3, j], 0.1);\n',
                    '}\n}\n')
         } else {
           model_file[grep('// raw basis', model_file) + 1] <-
@@ -519,21 +527,21 @@ add_trend_lines = function(model_file, stan = FALSE,
                    '// latent factor AR2 terms\nvector<lower=-1.5,upper=1.5>[n_lv] ar2;\n\n',
                    '// latent factor AR3 terms\nvector<lower=-1.5,upper=1.5>[n_lv] ar3;')
           model_file[grep('// dynamic factor estimates', model_file) + 2] <-
-            paste0('LV_raw[1, j] ~ normal(0, 0.5);')
+            paste0('LV_raw[1, j] ~ normal(0, 0.1);')
 
           model_file <- model_file[-(grep('// dynamic factor estimates', model_file) + 5:7)]
           model_file[grep('// dynamic factor estimates', model_file) + 5] <-
             paste0('for (j in 1:n_lv) {\n',
-                   'LV_raw[2, j] ~ normal(LV_raw[1, j] * ar1[j], 0.5);\n',
+                   'LV_raw[2, j] ~ normal(LV_raw[1, j] * ar1[j], 0.1);\n',
                    '}\n\n',
 
                    'for (j in 1:n_lv) {\n',
-                   'LV_raw[3, j] ~ normal(LV_raw[2, j] * ar1[j] + LV_raw[1, j] * ar2[j], 0.5);\n',
+                   'LV_raw[3, j] ~ normal(LV_raw[2, j] * ar1[j] + LV_raw[1, j] * ar2[j], 0.1);\n',
                    '}\n\n',
 
                    'for (i in 4:n) {\n',
                    'for (j in 1:n_lv) {\n',
-                   'LV_raw[i, j] ~ normal(ar1[j] * LV_raw[i - 1, j] + ar2[j] * LV_raw[i - 2, j] + ar3[j] * LV_raw[i - 3, j], 0.5);\n',
+                   'LV_raw[i, j] ~ normal(ar1[j] * LV_raw[i - 1, j] + ar2[j] * LV_raw[i - 2, j] + ar3[j] * LV_raw[i - 3, j], 0.1);\n',
                    '}\n}\n')
         } else {
           model_file[grep('// raw basis', model_file) + 1] <-

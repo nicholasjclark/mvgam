@@ -22,7 +22,7 @@ set.seed(1111)
 library(mvgam)
 dat <- sim_mvgam(T = 100, n_series = 6, n_lv = 2,
                  family = 'poisson',
-                 mu_obs = runif(8, 4, 6),
+                 mu_obs = runif(6, 4, 8),
                  trend_rel = 0.6, train_prop = 0.85)
 ```
 
@@ -41,7 +41,7 @@ Clearly there are some correlations in the trends for these series. But how does
 
 ![](df.gif)
 
-A challenge with any factor model is the need to determine the number of factors `M`. Setting `M` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `M` too large leads to unnecessary computation. `mvgam` approaches this problem by either formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines (if using `JAGS`) or by regularising the factor loadings (if using `Stan`). Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors
+A challenge with any factor model is the need to determine the number of factors `M`. Setting `M` too small prevents temporal dependencies from being adequately modelled, leading to poor convergence and difficulty estimating smooth parameters. By contrast, setting `M` too large leads to unnecessary computation. `mvgam` approaches this problem by either formulating a prior distribution that enforces exponentially increasing penalties on the factor variances to allow any un-needed factors to evolve as flat lines (if using `JAGS`) or by regularising the factor loadings (if using `Stan`). Now let's fit a well-specified model for our simulated series in which we estimate random intercepts, a shared seasonal cyclic smooth and `2` latent dynamic factors. Note that when using `Stan`, which is heavily recommended for complex models such as this, the dynamic factor variances are fixed to allow the loading coefficients to control the magnitudes of the induced trends. This is necessary to ensure identifiability
 ```{r, message=FALSE, warning=FALSE}
 mod1 <- mvgam(data = dat$data_train,
                 newdata = dat$data_test,
@@ -190,7 +190,7 @@ summary(trends_mod1$mgcv_model)
 summary(trends_mod2$mgcv_model)
 ```
 
-Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow a squared exponential Gaussian Process, and we will set `n_lv = 2`
+Model 2 seems to fit better so far, suggesting that hierarchical seasonality gives better performance for these series. But a problem with both of the above models is that their forecast uncertainties will not increase into the future, which is not how time series forecasts should behave. Here we fit Model 2 again but specifying a time series model for the latent trends. We assume the dynamic trends can be represented using latent factors that each follow a squared exponential Gaussian Process (GP), and we will set `n_lv = 2`. Note that `mvgam` uses a [Hilbert space approximate Gaussian Process](https://arxiv.org/abs/2004.11408) for computational efficiency, with the number of basis functions $m$ set to `min(25, n_timepoints)`
 ```{r, message=FALSE, warning=FALSE}
 trends_mod3 <- mvgam(data = trends_data$data_train,
                       newdata = trends_data$data_test,
@@ -208,19 +208,61 @@ trends_mod3 <- mvgam(data = trends_data$data_train,
 ```
 
 
-Have a look at the returned `Stan` model file to see how the dynamic factors are incorporated
+Have a look at the returned `Stan` model file to see how the GP factors are incorporated
 ```{r, results = 'asis'}
 cat(c("```stan", trends_mod3$model_file, "```"), sep = "\n")
 ```
 
-Inspection of the dynamic factors and their relative contributions indicates that the first factor is by far the most important
-```{r}
-plot_mvgam_factors(trends_mod3)
-```
-
-Model 3 (with the dynamic trend) should provide far superior forecasts than relying only on the estimated smooths. Inspect the model summary
+There is a clear problem with this model, as we `Stan`'s dynamic HMC algorightm has encountered a large number of divergent transitions
 ```{r}
 summary(trends_mod3)
+```
+
+Our experience is that there are fundamental degeneracies in latent dynamic factor models, particularly occurring due to the inherent weak identifiability of GP length scale parameters `rho` (which is magnified when trying to estimate latent GPs in a factor model). A pairs plot of the loading coefficients against the estimated GP length scale parameters helps to reveal the problem:
+```{r, fig.width = 7, fig.height = 7, fig.align='center', message=FALSE, warning=FALSE}
+pairs(trends_mod3$model_output, pars = c('lv_coefs','rho_gp'))
+```
+
+There are some nasty funnel shapes in this plot, primarily occurring when some of the loadings go to `0` and the length scales approach small values, suggesting that the latent length scales are completely unidentifiable in this space. The default prior for length scales in `mvgam` is an informative inverse Gamma, following [principled prior recommendations by Michael Betancourt](https://betanalpha.github.io/assets/case_studies/gaussian_processes.html). But defaults should always be critiqued, and in our experience it is far more efficient to decide on an appropriate level of smoothness that we wish to induce in the latent GPs for a given problem and to then use a stronger prior. For these series, we may expect that any changes in online search behaviour could reflect environmental / biological processes that extend over a number of months, indicating that length scales of `4-8` would be more in line with domain expertise. We can use a suitable prior for the length scales to help pull values away from very small or very large length scales that go against our prior expectations
+```{r, message=FALSE, warning=FALSE}
+priors <- get_mvgam_priors(data = trends_data$data_train,
+                           formula = y ~ s(season, k = 7, m = 2, bs = 'cc') +
+                             s(season, series, k = 4, bs = 'fs', m = 1),
+                           trend_model = 'GP',
+                           use_lv = TRUE,
+                           n_lv = 2,
+                           family = 'poisson',
+                           use_stan = TRUE)
+priors$prior[2] <- 'rho_gp ~ normal(6, 1);'
+trends_mod3 <- mvgam(data = trends_data$data_train,
+                     newdata = trends_data$data_test,
+                     formula = y ~ s(season, k = 7, m = 2, bs = 'cc') +
+                       s(season, series, k = 4, bs = 'fs', m = 1),
+                     knots = list(season = c(0.5, 12.5)),
+                     trend_model = 'GP',
+                     use_lv = TRUE,
+                     n_lv = 2,
+                     family = 'poisson',
+                     use_stan = TRUE,
+                     chains = 4,
+                     burnin = 300,
+                     samples = 400,
+                     priors = priors)
+```
+
+This model fits efficiently and should provide far superior forecasts than relying only on the estimated smooths. Inspect the model summary
+```{r}
+summary(trends_mod3)
+```
+
+The pairs plot now looks much better
+```{r, fig.width = 7, fig.height = 7, fig.align='center',message=FALSE, warning=FALSE}
+pairs(trends_mod3$model_output, pars = c('lv_coefs','rho_gp'))
+```
+
+Inspection of the dynamic factors and their relative contributions indicates that both factors are contributing the the series' latent trends
+```{r}
+plot_mvgam_factors(trends_mod3)
 ```
 
 Look at Dunn-Smyth residuals for some series from this preferred model to ensure that our dynamic factor process has captured most of the temporal dependencies in the observations
@@ -240,7 +282,7 @@ plot_mvgam_resids(trends_mod3, series = 3)
 plot_mvgam_resids(trends_mod3, series = 4)
 ```
 
-Perform posterior predictive checks to see if the model is able to simulate data that looks realistic and unbiased by examining simulated kernel densities for posterior predictions (`yhat`) compared to the density of the observations (`y`). This will be particularly useful for examining whether the Negative Binomial observation model is able to produce realistic looking simulations for each individual series.
+Perform posterior predictive checks to see if the model is able to simulate data that looks realistic and unbiased by examining simulated kernel densities for posterior predictions (`yhat`) compared to the density of the observations (`y`). This will be particularly useful for examining whether the Poisson observation model is able to produce realistic looking simulations for each individual series.
 ```{r, fig.width = 5, fig.height = 4, fig.align='center'}
 ppc(trends_mod3, series = 1, type = 'hist')
 ```
@@ -399,5 +441,5 @@ ppc(trends_mod3, series = 4, type = 'hist', newdata = trends_data$data_test)
 ppc(trends_mod3, series = 4, type = 'mean', newdata = trends_data$data_test)
 ```
 
-Other next steps could involve devising a more goal-specific set of posterior predictive checks (see [this paper by Gelman et al](https://www.jstor.org/stable/2680852?seq=1#metadata_info_tab_contents) and [relevant works by Betancourt](https://betanalpha.github.io/assets/case_studies/principled_bayesian_workflow.html) for examples) and compare out of sample Discrete Rank Probability Scores for this model and other versions for the latent trends (i.e. AR2, AR3, Random Walk)
+Other next steps could involve devising a more goal-specific set of posterior predictive checks (see [this paper by Gelman et al](https://www.jstor.org/stable/2680852?seq=1#metadata_info_tab_contents) and [relevant works by Betancourt](https://betanalpha.github.io/assets/case_studies/principled_bayesian_workflow.html) for examples) and compare out of sample Discrete Rank Probability Scores for this model and other versions for the observations (Negative Binomial) and latent trends (i.e. AR1, Random Walk)
 

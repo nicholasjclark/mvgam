@@ -78,15 +78,15 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     lambda ~ normal(30, 25);
 
     // priors for dynamic factor loading coefficients
-    L ~ std_normal();
+    L ~ student_t(5, 0, 1);
 
     // dynamic factor estimates
     for (j in 1:n_lv) {
-    LV_raw[1, j] ~ normal(0, 0.5);
+    LV_raw[1, j] ~ normal(0, 0.1);
     }
 
     for (j in 1:n_lv) {
-    LV_raw[2:n, j] ~ normal(LV_raw[1:(n - 1), j], 0.5);
+    LV_raw[2:n, j] ~ normal(LV_raw[1:(n - 1), j], 0.1);
     }
 
     // likelihood functions
@@ -105,7 +105,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     vector[n_lv] penalty;
     matrix[n, n_series] ypred;
     rho = log(lambda);
-    penalty = rep_vector(4.0, n_lv);
+    penalty = rep_vector(100.0, n_lv);
 
     // Sign correct factor loadings and factors
     for(j in 1:n_lv){

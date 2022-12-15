@@ -25,8 +25,16 @@ update_priors = function(model_file,
   for(i in 1:NROW(priors)){
     if(!any(grepl(paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][1]), '~'),
          model_file, fixed = TRUE))){
-      warning('no match found in model_file for parameter: ',
-              trimws(strsplit(priors$prior[i], "[~]")[[1]][1]))
+
+      if(grepl('num_gp_basis', priors$prior[i])){
+        model_file[grep('num_gp_basis = min(20, n);', model_file, fixed = TRUE)] <-
+          priors$prior[i]
+
+      } else {
+        warning('no match found in model_file for parameter: ',
+                trimws(strsplit(priors$prior[i], "[~]")[[1]][1]))
+      }
+
     } else {
       model_file[grep(paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][1]), '~'),
                       model_file, fixed = TRUE)] <-

@@ -266,18 +266,18 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
   # Vectorise trend models
   if(trend_model == 'RW'){
     if(any(grepl('// dynamic factor estimates', model_file, fixed = TRUE))){
-      init_trend_line <- grep('LV_raw[1, j] ~ normal(0, 0.5)',
+      init_trend_line <- grep('LV_raw[1, j] ~ normal(0, 0.1)',
                               model_file, fixed = TRUE) - 1
       model_file <- model_file[-c(init_trend_line:(init_trend_line + 2))]
       model_file[init_trend_line] <-
-        'LV_raw[1, 1:n_lv] ~ normal(0, 0.5);'
+        'LV_raw[1, 1:n_lv] ~ normal(0, 0.1);'
 
-      remainder_line <- grep('LV_raw[2:n, j] ~ normal(LV_raw[1:(n - 1), j], 0.5)',
+      remainder_line <- grep('LV_raw[2:n, j] ~ normal(LV_raw[1:(n - 1), j], 0.1)',
                              model_file, fixed = TRUE) - 1
       model_file <- model_file[-c(remainder_line:(remainder_line + 2))]
       model_file[remainder_line] <-
         paste0('for(j in 1:n_lv){\n',
-               'LV_raw[2:n, j] ~ normal(LV_raw[1:(n - 1), j], 0.5);\n',
+               'LV_raw[2:n, j] ~ normal(LV_raw[1:(n - 1), j], 0.1);\n',
                '}')
       model_file = readLines(textConnection(model_file), n = -1)
     } else {
@@ -301,18 +301,18 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
 
   if(trend_model == 'AR1'){
     if(any(grepl('// dynamic factor estimates', model_file, fixed = TRUE))){
-      init_trend_line <- grep('LV_raw[1, j] ~ normal(0, 0.5)',
+      init_trend_line <- grep('LV_raw[1, j] ~ normal(0, 0.1)',
                               model_file, fixed = TRUE) - 1
       model_file <- model_file[-c(init_trend_line:(init_trend_line + 2))]
       model_file[init_trend_line] <-
-        'LV_raw[1, 1:n_lv] ~ normal(0, 0.5);'
+        'LV_raw[1, 1:n_lv] ~ normal(0, 0.1);'
 
-      remainder_line <- grep('LV_raw[2:n, j] ~ normal(ar1[j] * LV_raw[1:(n - 1), j], 0.5)',
+      remainder_line <- grep('LV_raw[2:n, j] ~ normal(ar1[j] * LV_raw[1:(n - 1), j], 0.1)',
                              model_file, fixed = TRUE) - 1
       model_file <- model_file[-c(remainder_line:(remainder_line + 2))]
       model_file[remainder_line] <-
         paste0('for(j in 1:n_lv){\n',
-               'LV_raw[2:n, j] ~ normal(ar1[j] * LV_raw[1:(n - 1), j], 0.5);\n',
+               'LV_raw[2:n, j] ~ normal(ar1[j] * LV_raw[1:(n - 1), j], 0.1);\n',
                '}')
       model_file = readLines(textConnection(model_file), n = -1)
     } else {
@@ -336,24 +336,24 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
 
   if(trend_model == 'AR2'){
     if(any(grepl('// dynamic factor estimates', model_file, fixed = TRUE))){
-      init_trend_line <- grep('LV_raw[1, j] ~ normal(0, 0.5)',
+      init_trend_line <- grep('LV_raw[1, j] ~ normal(0, 0.1)',
                               model_file, fixed = TRUE) - 1
       model_file <- model_file[-c(init_trend_line:(init_trend_line + 2))]
       model_file[init_trend_line] <-
-        'LV_raw[1, 1:n_lv] ~ normal(0, 0.5);'
+        'LV_raw[1, 1:n_lv] ~ normal(0, 0.1);'
 
-      second_line <- grep('LV_raw[2, j] ~ normal(LV_raw[1, j] * ar1[j], 0.5)',
+      second_line <- grep('LV_raw[2, j] ~ normal(LV_raw[1, j] * ar1[j], 0.1)',
                           model_file, fixed = TRUE) - 1
       model_file <- model_file[-c(second_line:(second_line + 2))]
       model_file[second_line] <-
-        'LV_raw[2, 1:n_lv] ~ normal(LV_raw[1, 1:n_lv] * ar1, 0.5);'
+        'LV_raw[2, 1:n_lv] ~ normal(LV_raw[1, 1:n_lv] * ar1, 0.1);'
 
       remainder_line <- grep('LV_raw[i, j] ~ normal(ar1[j] * LV_raw[i - 1, j] + ar2[j] * LV_raw[i - 2, j]',
                              model_file, fixed = TRUE) - 2
       model_file <- model_file[-c(remainder_line:(remainder_line + 3))]
       model_file[remainder_line] <-
         paste0('for(j in 1:n_lv){\n',
-               'LV_raw[3:n, j] ~ normal(ar1[j] * LV_raw[2:(n - 1), j] + ar2[j] * LV_raw[1:(n - 2), j], 0.5);\n',
+               'LV_raw[3:n, j] ~ normal(ar1[j] * LV_raw[2:(n - 1), j] + ar2[j] * LV_raw[1:(n - 2), j], 0.1);\n',
                '}')
       model_file = readLines(textConnection(model_file), n = -1)
     } else {
@@ -382,30 +382,30 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
 
   if(trend_model == 'AR3'){
     if(any(grepl('// dynamic factor estimates', model_file, fixed = TRUE))){
-      init_trend_line <- grep('LV_raw[1, j] ~ normal(0, 0.5)',
+      init_trend_line <- grep('LV_raw[1, j] ~ normal(0, 0.1)',
                               model_file, fixed = TRUE) - 1
       model_file <- model_file[-c(init_trend_line:(init_trend_line + 2))]
       model_file[init_trend_line] <-
-        'LV_raw[1, 1:n_lv] ~ normal(0, 0.5);'
+        'LV_raw[1, 1:n_lv] ~ normal(0, 0.1);'
 
-      second_line <- grep('LV_raw[2, j] ~ normal(LV_raw[1, j] * ar1[j], 0.5)',
+      second_line <- grep('LV_raw[2, j] ~ normal(LV_raw[1, j] * ar1[j], 0.1)',
                           model_file, fixed = TRUE) - 1
       model_file <- model_file[-c(second_line:(second_line + 2))]
       model_file[second_line] <-
-        'LV_raw[2, 1:n_lv] ~ normal(LV_raw[1, 1:n_lv] * ar1, 0.5);'
+        'LV_raw[2, 1:n_lv] ~ normal(LV_raw[1, 1:n_lv] * ar1, 0.1);'
 
       third_line <- grep('LV_raw[3, j] ~ normal(LV_raw[2, j] * ar1[j] + LV_raw[1, j] * ar2[j]',
                          model_file, fixed = TRUE) - 1
       model_file <- model_file[-c(third_line:(third_line + 2))]
       model_file[third_line] <-
-        'LV_raw[3, 1:n_lv] ~ normal(LV_raw[2, 1:n_lv] * ar1 + LV_raw[1, 1:n_lv] * ar2, 0.5);'
+        'LV_raw[3, 1:n_lv] ~ normal(LV_raw[2, 1:n_lv] * ar1 + LV_raw[1, 1:n_lv] * ar2, 0.1);'
 
       remainder_line <- grep('LV_raw[i, j] ~ normal(ar1[j] * LV_raw[i - 1, j] + ar2[j] * LV_raw[i - 2, j] + ar3[j] * LV_raw[i - 3, j]',
                              model_file, fixed = TRUE) - 2
       model_file <- model_file[-c(remainder_line:(remainder_line + 3))]
       model_file[remainder_line] <-
         paste0('for(j in 1:n_lv){\n',
-               'LV_raw[4:n, j] ~ normal(ar1[j] * LV_raw[3:(n - 1), j] + ar2[j] * LV_raw[2:(n - 2), j] + ar3[j] * LV_raw[1:(n - 3), j], 0.5);\n',
+               'LV_raw[4:n, j] ~ normal(ar1[j] * LV_raw[3:(n - 1), j] + ar2[j] * LV_raw[2:(n - 2), j] + ar3[j] * LV_raw[1:(n - 3), j], 0.1);\n',
                '}')
       model_file = readLines(textConnection(model_file), n = -1)
     } else {

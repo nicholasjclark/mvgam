@@ -386,7 +386,7 @@ get_mvgam_priors = function(formula,
       trend_df <- data.frame(param_name = c('rho_gp<lower=0>'),
                              param_length = length(unique(data_train$series)),
                              param_info = c('trend length scale'),
-                             prior = c('rho_gp ~ inv_gamma(4, 24);'),
+                             prior = c('rho_gp ~ inv_gamma(1.499007, 5.670433);'),
                              example_change =
                                paste0('rho_gp ~ exponential(',
                                       round(runif(min = 0.01, max = 1, n = 1), 2),
@@ -399,7 +399,7 @@ get_mvgam_priors = function(formula,
                              param_info = c('trend amplitude',
                                             'trend length scale'),
                              prior = c('alpha_gp ~ normal(0, 0.5);',
-                                       'rho_gp ~ inv_gamma(4, 24);'),
+                                       'rho_gp ~ inv_gamma(1.499007, 5.670433);'),
                              example_change = c(paste0(
                                'alpha_gp ~ normal(',
                                round(runif(min = -1, max = 1, n = 1), 2),
@@ -413,6 +413,12 @@ get_mvgam_priors = function(formula,
                              )))
     }
 
+    trend_df <- rbind(trend_df,
+                      data.frame(param_name = c('num_gp_basis<lower=1>'),
+                                 param_length = 1,
+                                 param_info = c('basis dimension for approximate GP'),
+                                 prior = c('num_gp_basis = min(20, n);'),
+                                 example_change = 'num_gp_basis = 12;'))
   }
 
   if(trend_model == 'RW'){
@@ -639,6 +645,15 @@ get_mvgam_priors = function(formula,
   if(use_lv){
     trend_df %>%
       dplyr::filter(!grepl('sigma', param_name)) -> trend_df
+
+    if(use_stan){
+      trend_df <- rbind(trend_df,
+                        data.frame(param_name = c('L'),
+                                   param_length = n_lv * length(unique(data_train$series)),
+                                   param_info = c('factor loadings'),
+                                   prior = c('L ~ student_t(5, 0, 1);'),
+                                   example_change = 'L ~ std_normal();'))
+    }
   }
 
   # Extract drift parameter information
