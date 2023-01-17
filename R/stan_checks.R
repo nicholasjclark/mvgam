@@ -32,7 +32,7 @@ check_treedepth <- function(fit, max_depth = 10, quiet=FALSE,
     sampler_params <- rstan::get_sampler_params(fit, inc_warmup=FALSE)
   }
   treedepths <- do.call(rbind, sampler_params)[,'treedepth__']
-  n = length(treedepths[sapply(treedepths, function(x) x == max_depth)])
+  n = length(treedepths[sapply(treedepths, function(x) x >= max_depth)])
   N = length(treedepths)
 
   if (!quiet)

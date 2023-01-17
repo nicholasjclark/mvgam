@@ -621,7 +621,7 @@ mvgam = function(formula,
                             family = poisson(),
                             file = 'base_gam.txt',
                             sp.prior = 'gamma',
-                            diagonalize = F,
+                            diagonalize = FALSE,
                             knots = knots,
                             drop.unused.levels = FALSE)
   } else {
@@ -630,7 +630,7 @@ mvgam = function(formula,
                             family = poisson(),
                             file = 'base_gam.txt',
                             sp.prior = 'gamma',
-                            diagonalize = F,
+                            diagonalize = FALSE,
                             drop.unused.levels = FALSE)
   }
   }
