@@ -402,19 +402,21 @@ pfilter_mvgam_smooth = function(particles,
     norm_weights <- weights / sum(weights)
     ess <- length(weights)
     next_update_seq <- seq(1:length(weights))
-    re_weight = F
-  } else{
+    re_weight <- FALSE
+    use_resampling <- FALSE
+  } else {
     # Else calculate normalised weights and effective sample size; resample if ESS falls below
-    # threshold
+    # threshold and if the user has specified to use_resampling
     norm_weights <- weights / sum(weights)
     ess <- 1 / sum(norm_weights^2)
     cat('Effective sample size is', ess, '...\n\n')
     if(ess - (length(norm_weights) * threshold) < 0){
       next_update_seq <- index
-      re_weight = T
-    } else{
+      re_weight <- TRUE
+    } else {
       next_update_seq <- seq(1:length(weights))
       re_weight <- F
+      use_resampling <- FALSE
     }
   }
 
