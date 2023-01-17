@@ -561,7 +561,7 @@ pfilter_mvgam_smooth = function(particles,
 
           # Put latent variable states back in list format
           if(particles[[x]]$trend_model == 'GP'){
-            trend_begins <- seq(1,
+            lv_begins <- seq(1,
                                 length(lv_evolve),
                                 by = length(lv_evolve) / length(particles[[x]]$lv_states))
             lv_ends <- (lv_begins - 1) +
