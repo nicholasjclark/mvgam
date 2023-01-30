@@ -147,9 +147,6 @@ get_mvgam_priors = function(formula,
   if(class(data_train)[1] != 'list'){
     if(!'series' %in% colnames(data_train)){
       data_train$series <- factor('series1')
-      if(!missing(data_test)){
-        data_test$series <- factor('series1')
-      }
     }
 
     # Must be able to index by time; it is too dangerous to 'guess' as this could make a huge
@@ -162,9 +159,6 @@ get_mvgam_priors = function(formula,
   if(class(data_train)[1] == 'list'){
     if(!'series' %in% names(data_train)){
       data_train$series <- factor('series1')
-      if(!missing(data_test)){
-        data_test$series <- factor('series1')
-      }
     }
 
     if(!'time' %in% names(data_train)){
