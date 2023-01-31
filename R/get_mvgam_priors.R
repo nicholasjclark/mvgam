@@ -694,7 +694,7 @@ get_mvgam_priors = function(formula,
       nb_df <- data.frame(param_name = c('r_inv<lower=0>'),
                           param_length = length(unique(data_train$series)),
                           param_info = c('inverse of NB dispsersion'),
-                          prior = c('r_inv ~ exponential(5);'),
+                          prior = c('r_inv ~ student_t(3, 0, 0.1);'),
                           example_change = c(
                             paste0(
                               'r_inv ~ normal(',
@@ -706,7 +706,7 @@ get_mvgam_priors = function(formula,
     } else {
       nb_df <- data.frame(param_name = c('r_inv<lower=0>'),
                           param_length = length(unique(data_train$series)),
-                          param_info = c('inverse of NB dispsersion (for each series s)'),
+                          param_info = c('inverse of NB dispsersion'),
                           prior = c('r_inv[s] ~ dexp(5)'),
                           example_change = c(
                             paste0(
