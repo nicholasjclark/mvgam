@@ -75,7 +75,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     ##insert smooths
 
     // priors for smoothing parameters
-    lambda ~ normal(30, 25);
+    lambda ~ normal(10, 25);
 
     // priors for dynamic factor loading coefficients
     L ~ student_t(5, 0, 1);
@@ -158,7 +158,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     ##insert smooths
 
     // priors for smoothing parameters
-    lambda ~ normal(30, 25);
+    lambda ~ normal(10, 25);
 
     // priors for latent trend variance parameters
     sigma ~ exponential(2);
