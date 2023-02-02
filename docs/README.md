@@ -210,9 +210,9 @@ exp(25)
 #> [1] 72004899337
 ```
 
-Setting `k` to a smaller value results in less flexibility, as the
-number of basis functions that contribute to the functional behaviour is
-reduced
+Setting `k` to a smaller value results in less flexibility. This is
+because number of basis functions that contribute to functional
+behaviour is reduced
 
 ``` r
 lynx_mvgam_prior <- mvgam(data = lynx_train,
@@ -238,15 +238,14 @@ In practice, imparting domain knowledge into prior specifications for
 penalised smooth functions is challenging, as these behaviours are often
 the cumulative result of multiple penalty matrices that all have their
 own separate smoothing parameters. Changing the prior on the smoothing
-parameters is another option (`mvgam` uses an expontenial(0.05) prior by
-default, which tends to regularise functions to be more smooth compared
-to default approaches used in `mgcv::jagam`), but without running
-through prior visualisations (and other prior pushforward checks) it
-will be more difficult to reason about how to set `k` to respect domain
-knowledge. In general it is highly recommended that users view `mvgam`
-and related interfaces such as `brms` as tools for building scaffold
-models that can then be modified to suit the bespoke needs of each
-particular analysis.
+parameters is another option (`mvgam` uses a half-normal prior by
+default, which regularises functions more than the default approach used
+in `mgcv::jagam`). But without running through prior visualisations (and
+other prior pushforward checks) it will be more difficult to reason
+about how to set `k` to respect domain knowledge. In general it is
+highly recommended that users view `mvgam` and related interfaces such
+as `brms` as tools for building scaffold models that can then be
+modified to suit the bespoke needs of each particular analysis.
 
 Users can also check what the default prior distributions are for given
 model formulations, which can be helpful to understand how the model can
@@ -266,12 +265,12 @@ test_priors
 #> 3             ar2            1       trend AR2 coefficient
 #> 4             ar3            1       trend AR3 coefficient
 #> 5  sigma<lower=0>            1                    trend sd
-#>                      prior             example_change
-#> 1 lambda ~ normal(30, 25); lambda ~ exponential(0.3);
-#> 2      ar1 ~ std_normal();  ar1 ~ normal(0.37, 0.87);
-#> 3      ar2 ~ std_normal(); ar2 ~ normal(-0.82, 0.27);
-#> 4      ar3 ~ std_normal();  ar3 ~ normal(0.97, 0.61);
-#> 5  sigma ~ exponential(2);  sigma ~ exponential(0.2);
+#>                      prior              example_change
+#> 1 lambda ~ normal(10, 25); lambda ~ exponential(0.44);
+#> 2      ar1 ~ std_normal();   ar1 ~ normal(0.74, 0.69);
+#> 3      ar2 ~ std_normal();  ar2 ~ normal(-0.72, 0.67);
+#> 4      ar3 ~ std_normal();  ar3 ~ normal(-0.95, 0.58);
+#> 5  sigma ~ exponential(2);  sigma ~ exponential(0.61);
 ```
 
 Any of the above priors can be changed by modifying the `prior` column
@@ -296,18 +295,18 @@ lynx_mvgam <- mvgam(data = lynx_train,
 #> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) 
+#> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) 
-#> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) 
-#> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) 
 #> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) 
 #> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) 
 #> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) 
 #> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
 #> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) 
@@ -315,39 +314,39 @@ lynx_mvgam <- mvgam(data = lynx_train,
 #> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
-#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
-#> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 1 finished in 28.8 seconds.
-#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 2 finished in 29.1 seconds.
-#> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 3 finished in 30.8 seconds.
+#> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
 #> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 4 finished in 31.0 seconds.
+#> Chain 4 finished in 27.2 seconds.
+#> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 1 finished in 27.8 seconds.
+#> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 2 finished in 29.7 seconds.
+#> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 3 finished in 32.9 seconds.
 #> 
 #> All 4 chains finished successfully.
-#> Mean chain execution time: 29.9 seconds.
-#> Total execution time: 31.1 seconds.
+#> Mean chain execution time: 29.4 seconds.
+#> Total execution time: 33.1 seconds.
 ```
 
 Inspect the resulting model file, which is written in the `Stan`
@@ -406,7 +405,7 @@ code(lynx_mvgam)
 #>   ar2 ~ std_normal();
 #>   ar3 ~ std_normal();
 #>   // priors for smoothing parameters
-#>   lambda ~ normal(30, 25);
+#>   lambda ~ normal(10, 25);
 #>   // priors for latent trend variance parameters
 #>   sigma ~ exponential(2);
 #>   // trend estimates
@@ -534,29 +533,29 @@ summary(lynx_mvgam)
 #> 
 #> GAM coefficient (beta) estimates:
 #>                     2.5%         50%       97.5% Rhat n.eff
-#> (Intercept)   6.78541000  6.80245000  6.81934250 1.00  2895
-#> s(season).1  -0.69692460 -0.02578655  0.68242590 1.00   580
-#> s(season).2  -0.28957055  0.76766950  1.69201150 1.00   439
-#> s(season).3  -0.07380332  1.23107000  2.49815300 1.00   302
-#> s(season).4  -0.16529207  0.85563050  1.84014000 1.01   429
-#> s(season).5  -1.00199550 -0.10635450  0.94034142 1.00   605
-#> s(season).6  -1.25099925 -0.15398350  1.01651325 1.00   378
-#> s(season).7  -0.84734528  0.06650895  1.06230275 1.00   807
-#> s(season).8  -0.81848345  0.43404800  1.72909725 1.00   379
-#> s(season).9  -1.07909575  0.18552600  1.63107575 1.00   303
-#> s(season).10 -1.20772075 -0.44831350  0.36664073 1.00   570
-#> s(season).11 -1.40203500 -0.70417750 -0.02591648 1.00   500
+#> (Intercept)   6.78622925  6.80284000  6.81971525 1.00  2954
+#> s(season).1  -0.70189283 -0.06643845  0.64795272 1.00   555
+#> s(season).2  -0.13819993  0.88419000  1.72630625 1.00   454
+#> s(season).3   0.03359026  1.49937500  2.47096650 1.01   303
+#> s(season).4  -0.18263240  0.94060150  1.83040775 1.00   423
+#> s(season).5  -1.02051775 -0.20418750  0.84304357 1.00   768
+#> s(season).6  -1.29720200 -0.26998950  0.92029145 1.00   490
+#> s(season).7  -0.90886932  0.04388085  1.08335675 1.00   805
+#> s(season).8  -0.65375133  0.63847050  1.79173700 1.01   383
+#> s(season).9  -0.91979588  0.39405100  1.81660050 1.02   293
+#> s(season).10 -1.14342125 -0.40510000  0.43525210 1.01   425
+#> s(season).11 -1.43774475 -0.79867400 -0.04751575 1.01   442
 #> 
 #> GAM smoothing parameter (rho) estimates:
-#>               2.5%     50%    97.5% Rhat n.eff
-#> s(season) 2.460111 3.71372 4.436271    1   449
+#>               2.5%      50%    97.5% Rhat n.eff
+#> s(season) 2.184247 3.425735 4.260052 1.01   595
 #> 
 #> Latent trend parameter estimates:
 #>                2.5%        50%      97.5% Rhat n.eff
-#> ar1[1]    0.7538482  1.1113100 1.41423600    1   553
-#> ar2[1]   -0.8203844 -0.4001880 0.01523698    1  1677
-#> ar3[1]   -0.4624678 -0.1197100 0.28110120    1   466
-#> sigma[1]  0.3948633  0.4914385 0.62077455    1   833
+#> ar1[1]    0.6881609  1.0930550 1.41938075 1.01   546
+#> ar2[1]   -0.8005516 -0.3992045 0.05412937 1.00  1437
+#> ar3[1]   -0.4362733 -0.0849841 0.35749932 1.01   475
+#> sigma[1]  0.3947913  0.4826080 0.60305090 1.00   984
 #> 
 #> Stan MCMC diagnostics
 #> n_eff / iter looks reasonable for all parameters
@@ -640,7 +639,7 @@ the entire series (testing and training)
 ``` r
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 #> Out of sample DRPS:
-#> [1] 977.5718
+#> [1] 900.1327
 #> 
 ```
 
@@ -737,58 +736,58 @@ lynx_mvgam_poor <- mvgam(data = lynx_train,
 #> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) 
-#> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) 
-#> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) 
-#> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
-#> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) 
-#> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) 
-#> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) 
-#> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
-#> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) 
-#> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
-#> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
-#> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) 
-#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
-#> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
-#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
-#> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) 
-#> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) 
-#> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) 
 #> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
-#> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 1 finished in 3.6 seconds.
-#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 2 finished in 4.0 seconds.
-#> Chain 4 finished in 3.9 seconds.
+#> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
 #> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 3 finished in 4.2 seconds.
+#> Chain 3 finished in 3.2 seconds.
+#> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 2 finished in 3.5 seconds.
+#> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 4 finished in 3.5 seconds.
+#> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 1 finished in 3.9 seconds.
 #> 
 #> All 4 chains finished successfully.
-#> Mean chain execution time: 3.9 seconds.
-#> Total execution time: 4.4 seconds.
+#> Mean chain execution time: 3.5 seconds.
+#> Total execution time: 4.0 seconds.
 ```
 
 We choose a set of timepoints within the training data to forecast from,
@@ -810,10 +809,10 @@ markedly better (far lower DRPS) for this evaluation timepoint
 ``` r
 summary(mod1_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   37.29   69.97  144.51  143.95  188.94  301.62
+#>   31.55   62.07  145.93  140.14  198.06  286.16
 summary(mod2_eval$series1$drps)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   33.03   38.07  318.23  288.99  458.97  668.89
+#>   34.64   38.52  312.06  290.39  464.81  676.97
 ```
 
 Nominal coverages for both models’ 90% prediction intervals

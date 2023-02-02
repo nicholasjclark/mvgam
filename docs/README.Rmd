@@ -113,7 +113,7 @@ exp(-25)
 exp(25)
 ```
 
-Setting `k` to a smaller value results in less flexibility, as the number of basis functions that contribute to the functional behaviour is reduced
+Setting `k` to a smaller value results in less flexibility. This is because number of basis functions that contribute to functional behaviour is reduced
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam_prior <- mvgam(data = lynx_train,
                formula = y ~ s(season, bs = 'cc', k = 13),
@@ -129,7 +129,7 @@ Resulting prior realisations look more reasonable given the range of the observa
 plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
 ```
 
-In practice, imparting domain knowledge into prior specifications for penalised smooth functions is challenging, as these behaviours are often the cumulative result of multiple penalty matrices that all have their own separate smoothing parameters. Changing the prior on the smoothing parameters is another option (`mvgam` uses an expontenial(0.05) prior by default, which tends to regularise functions to be more smooth compared to default approaches used in `mgcv::jagam`), but without running through prior visualisations (and other prior pushforward checks) it will be more difficult to reason about how to set `k` to respect domain knowledge. In general it is highly recommended that users view `mvgam` and related interfaces such as `brms` as tools for building scaffold models that can then be modified to suit the bespoke needs of each particular analysis. 
+In practice, imparting domain knowledge into prior specifications for penalised smooth functions is challenging, as these behaviours are often the cumulative result of multiple penalty matrices that all have their own separate smoothing parameters. Changing the prior on the smoothing parameters is another option (`mvgam` uses a half-normal prior by default, which regularises functions more than the default approach used in `mgcv::jagam`). But without running through prior visualisations (and other prior pushforward checks) it will be more difficult to reason about how to set `k` to respect domain knowledge. In general it is highly recommended that users view `mvgam` and related interfaces such as `brms` as tools for building scaffold models that can then be modified to suit the bespoke needs of each particular analysis. 
 
 Users can also check what the default prior distributions are for given model formulations, which can be helpful to understand how the model can be modified but also to see any restrictions on what can be changed within the `mvgam` framework.
 

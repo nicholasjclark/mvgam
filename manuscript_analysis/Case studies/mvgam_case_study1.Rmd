@@ -16,19 +16,19 @@ library(knitr)
 opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
 ```
 
-Generalized Additive Models (GAMs) are incredibly flexible tools that have found particular application in the analysis of time series. In ecology, a host of recent papers and workshops (i.e. the [2018 Ecological Society of America workshop on GAMs](https://noamross.github.io/mgcv-esa-2018/) that was hosted by Eric Pedersen, David L. Miller, Gavin Simpson, and Noam Ross) have drawn special attention to the wide range of applications that GAMs have for addressing complex ecological analyses. Given the many ways that GAMs can model temporal data, it is tempting to extrapolate from the smooth functions estimated by a GAM to produce out of sample forecasts. Here we will inspect the behaviours of smoothing splines when extrapolating to data outside the range of the training data to examine whether this can be useful in practice. 
+Generalized Additive Models (GAMs) are flexible tools that have found particular application in analysis of time series. In ecology, a host of recent papers and workshops (i.e. the [2018 Ecological Society of America workshop on GAMs](https://noamross.github.io/mgcv-esa-2018/) hosted by Eric Pedersen, David L. Miller, Gavin Simpson, and Noam Ross) have drawn attention to the power of GAMs for addressing complex ecological analyses. Given the many ways that GAMs can model temporal data, it is tempting to extrapolate from their smooth functions to produce out of sample forecasts. Here we will inspect the behaviours of smoothing splines when extrapolating outside the training data to examine whether this can be useful in practice. 
 
 We will work in the `mvgam` package, which fits Dynamic GAMs (DGAMs) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a discrete response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Assuming $\boldsymbol{y}$ is drawn from an exponential distribution (such as Poisson or Negative Binomial) with a log link function, the linear predictor for a Dynamic GAM is written as:
 
 $$log(\tilde{\boldsymbol{y}}_{t})={\boldsymbol{B}}_0+\sum\limits_{i=1}^I\boldsymbol{s}_{i,t}\boldsymbol{x}_{i,t}+\boldsymbol{z}_{t}\,,$$
-Here $\boldsymbol{B}_{0}$ is the unknown intercept, the $\boldsymbol{s}$'s are unknown smooth functions of the covariates ($\boldsymbol{x}$'s) and $\boldsymbol{z}$ is a dynamic latent trend component. Each smooth function $\boldsymbol{s}_{i}$ is composed of basis expansions whose coefficients, which must be estimated, control the shape of the functional relationship between $\boldsymbol{x}_{i}$ and $log(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity, with a larger set of basis functions allowing greater flexibility. Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson, Negative Binomial, Tweedie-Poisson) that accommodate common ecological features such as zero-inflation or overdispersion, and that they can be formulated to include hierarchical smoothing for multivariate responses. For the dynamic component, in its most basic form we assume a random walk with drift:
+Here $\boldsymbol{B}_{0}$ is the unknown intercept, the $\boldsymbol{s}$'s are unknown smooth functions of covariates ($\boldsymbol{x}$'s) and $\boldsymbol{z}$ is a dynamic latent trend. Each smooth function $\boldsymbol{s}_{i}$ is composed of basis expansions whose coefficients, which must be estimated, control the functional relationship between $\boldsymbol{x}_{i}$ and $log(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity. A larger set of basis functions allows greater flexibility. Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson, Negative Binomial, Tweedie-Poisson) that accommodate common ecological features such as zero-inflation or overdispersion, and that they can be formulated to include hierarchical smoothing for multivariate responses. For the dynamic component, in its most basic form we assume a random walk with drift:
 
 $$\boldsymbol{z}_{t}=\phi+\boldsymbol{z}_{t-1}+\boldsymbol{e}_{t}\,,$$
 where $\phi$ is an optional drift parameter (if the latent trend is assumed to not be stationary) and $\boldsymbol{e}$ is drawn from a zero-centred Gaussian distribution. This model is easily modified to include autoregressive terms, which `mvgam` accomodates up to `order = 3`.
 
 **Why DGAMs?**    
   
-Dynamic GAMs are useful when we wish to predict future values from time series that show temporal dependence and we want to avoid extrapolating from a smooth (which, as you’ll see below, can sometimes lead to unpredictable and unrealistic behaviours). In addition, smooths can often try to wiggle excessively to capture any autocorrelation that is present in a time series, which exacerbates the problem of forecasting ahead. Here we use an exaggerated example to show how a smooth tries to wiggle excessively, leading to overfitting by lessening the smoothing penalty $\lambda$. 
+Dynamic GAMs are useful when we wish to predict future values from time series that show temporal dependence and we want to avoid extrapolating a smooth (which, as you’ll see below, can sometimes lead to unpredictable and unrealistic behaviours). In addition, smooths can often try to wiggle excessively to capture autocorrelation in a time series, which exacerbates the problem of forecasting ahead. Here we use an exaggerated example to show how a smooth tries to wiggle excessively, leading to overfitting by lessening the smoothing penalty $\lambda$. 
 ```{r, fig.width = 6, fig.height = 5.5, fig.align='center'}
 # Fit a model to the mcycle dataset in the MASS package, fixing the smoothing parameter at an abnormally large value
 par(mfrow = c(2, 2),
@@ -64,7 +64,7 @@ plot(m4, scheme = 1, residuals = TRUE, pch= 16,
      shade.col = scales::alpha("#B97C7C", 0.6))
 ```
 
-Notice how wiggly the function becomes in the last plot when $\lambda$ is very small, indicating that the function is overfitting to the in-sample training data. Incidentally, this behaviour mirrors what `mgcv`’s `gam.check` function will often tell you to do if you are trying to model an autocorrelated time series with a smooth function, as the function will need to have a very high degree of flexibility in order to model both the true function and the autocorrelation
+Notice how wiggly the function becomes in the last plot when $\lambda$ is very small, indicating that the function is overfitting to the in-sample training data. Incidentally, this behaviour mirrors what `mgcv`’s `gam.check` function will often tell you to do if you are trying to model an autocorrelated time series with a smooth function. This is because the function will need a high degree of flexibility to model both the true function and the autocorrelation
 
 **Simulation example**  
    
@@ -105,7 +105,7 @@ head(data_train)
 head(data_test)
 ```
 
-As a first pass at modelling this series, we will fit a GAM with parametric effects of lags 1, 2, and 3 and a smooth function of the fake covariate. We set `k = 3` for the smooth function as we don't want the model to overfit the noise created by this fake covariate, our primary interest is to estimate the AR parameters and the overdispersion parameter of the Negative Binomial observation process
+As a first pass at modelling this series, we will fit a GAM with parametric effects of lags 1, 2, and 3. Our primary interest is to estimate the AR parameters and the overdispersion parameter of the Negative Binomial observation process
 ```{r, message=FALSE, warning=FALSE}
 m_mgcv <- gam(y ~ lag1 + lag2 + lag3,
               data = data_train,
@@ -117,12 +117,12 @@ We can view the summary of the `mgcv` model to see that the posterior estimates 
 summary(m_mgcv)
 ```
 
-Forecasting from this model requires us to write a custom function that can recursively update the design matrix (by filling in the values for the dynamic `lag(y)` covariates) at each successive one-step ahead prediction. Here we define a function to iteratively propagate a forecast forward according to the AR3 observation model. Note that we have used an argument to allow the lags to be fed into the model on the log scale, this will make more sense in a moment as we inspect the forecasts of the model
+Forecasting from this model requires a function to recursively update the design matrix (by filling in the values for the dynamic `lag(y)` covariates) at each successive one-step ahead prediction. Here we define a function to iteratively propagate a forecast forward according to the AR3 observation model. Note that we have used an argument to allow the lags to be fed into the model on the log scale, this will make more sense in a moment as we inspect the forecasts of the model
 
 <details>
 <summary>Click for definition of `recurse_ar3`</summary>
 ```{r}
-recurse_ar3 = function(model, lagged_vals, h, log_lags = F){
+recurse_ar3 = function(model, coef_sim, lagged_vals, h, log_lags = F){
   # Initiate state vector
   states <- rep(NA, length = h + 3)
   # Last three values of the conditional expectations begin the state vector
@@ -174,6 +174,7 @@ coef_sim <- MASS::mvrnorm(1000, mu = m_mgcv$coefficients, Sigma = m_mgcv$Vp)
 gam_sims <- matrix(NA, nrow = 1000, ncol = 10)
 for(i in 1:1000){
   gam_sims[i,] <- recurse_ar3(m_mgcv,
+                              coef_sim,
                               lagged_vals = c(data_test$lag1[1],
                                               data_test$lag2[1],
                                               data_test$lag3[1]),
@@ -221,7 +222,7 @@ mod_skeleton$inits
 head(mod_skeleton$pregam)
 ```
 
-The same steps above can be used to generate `Stan` data and modelling files, with all options available apart from the use of a Tweedie-Poisson distribution:
+The same steps above can be used to generate `Stan` data and modelling files:
 ```{r}
 mod_skeleton <- mvgam(y ~ 1,
                  data = data_train,
@@ -437,6 +438,7 @@ coef_sim <- MASS::mvrnorm(1000, mu = m_mgcv$coefficients, Sigma = m_mgcv$Vp)
 gam_sims <- matrix(NA, nrow = 1000, ncol = 10)
 for(i in 1:1000){
   gam_sims[i,] <- recurse_ar3(m_mgcv,
+                              coef_sim,
                               lagged_vals = c(data_test$lag1[1],
                                               data_test$lag2[1],
                                               data_test$lag3[1]),
@@ -560,7 +562,7 @@ summary(m_mgcv)
 plot(m_mgcv, pages=1, shade = TRUE)
 ```
 
-The `AR1` term is estimated to be highly important, while the smooth functions of `time` and of `whiting landings` are regularized toward flat lines. But how does the model forecast? Draw posterior coefficients and generate the iterative `mgcv` forecast
+The `AR1` term is estimated as important, while the smooth functions of `time` and of `whiting landings` are regularized to flat lines. But how does the model forecast? Draw posterior coefficients and generate the iterative `mgcv` forecast
 ```{r}
 coef_sim <- gam.mh(m_mgcv)$bs
 
@@ -568,6 +570,7 @@ coef_sim <- gam.mh(m_mgcv)$bs
 gam_sims <- matrix(NA, nrow = 1000, ncol = 9)
 for(i in 1:1000){
   gam_sims[i,] <- recurse_ar3(m_mgcv,
+                              coef_sim,
                               lagged_vals = c(data_test$lag1[1],
                                               data_test$lag2[1],
                                               data_test$lag3[1]),
@@ -659,6 +662,7 @@ coef_sim <- gam.mh(m_mgcv)$bs
 gam_sims <- matrix(NA, nrow = 1000, ncol = 9)
 for(i in 1:1000){
   gam_sims[i,] <- recurse_ar3(m_mgcv,
+                              coef_sim,
                               lagged_vals = c(data_test$lag1[1],
                                               data_test$lag2[1],
                                               data_test$lag3[1]),
@@ -694,6 +698,7 @@ coef_sim <- gam.mh(m_mgcv)$bs
 gam_sims <- matrix(NA, nrow = 1000, ncol = 9)
 for(i in 1:1000){
   gam_sims[i,] <- recurse_ar3(m_mgcv,
+                              coef_sim,
                               lagged_vals = c(data_test$lag1[1],
                                               data_test$lag2[1],
                                               data_test$lag3[1]),
@@ -875,7 +880,7 @@ Now we define a function to perform forecast simulations from the nonlinear lag 
 <details>
 <summary>Click for definition of `recurse_nonlin`</summary>
 ```{r}
-recurse_nonlin = function(model, lagged_vals, h){
+recurse_nonlin = function(model, coef_sim, lagged_vals, h){
   # Initiate state vector
   states <- rep(NA, length = h + 2)
   # Last two values of the conditional expectations begin the state vector
@@ -911,6 +916,7 @@ Create the GAM's forecast distribution by generating `1000` simulated forecast p
 gam_sims <- matrix(NA, nrow = 1000, ncol = 10)
 for(i in 1:1000){
   gam_sims[i,] <- recurse_nonlin(lynx_mgcv,
+                                 coef_sim,
                                  lagged_vals = c(lynx_test$lag1[1],
                                                  lynx_test$lag2[1]),
                                  h = 10)
@@ -993,6 +999,7 @@ coef_sim <- gam.mh(lynx_mgcv2)$bs
 gam_sims <- matrix(NA, nrow = 1000, ncol = 10)
 for(i in 1:1000){
   gam_sims[i,] <- recurse_nonlin(lynx_mgcv2,
+                                 coef_sim,
                                  lagged_vals = c(lynx_test$lag1[1],
                                                  lynx_test$lag2[1]),
                                  h = 10)

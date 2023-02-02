@@ -287,9 +287,6 @@ plot_mvgam_smooth = function(object,
       stop('Partial residual plots not available when using newdata')
     }
 
-    # Zero out all other columns in Xp2
-    Xp2[,!grepl(paste0('(', smooth, ')'), colnames(Xp2), fixed = T)] <- 0
-
     if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
       by <- rep(1,length(object$obs_data$series))
       dat <- data.frame(x = object$obs_data[[object$mgcv_model$smooth[[smooth_int]]$term]],
@@ -314,12 +311,15 @@ plot_mvgam_smooth = function(object,
 
     Xp2 <- Xp2[object$ytimes[,series][1:end_train], ]
 
-    # Calculate residuals from full prediction set
-    all_resids <- object$resids[[series]][1:end_train]
+    # # Zero out all other columns in Xp2
+    Xp2[,!grepl(paste0('(', smooth, ')'), colnames(Xp), fixed = T)] <- 0
 
-    partial_resids <- matrix(NA, nrow = nrow(betas), ncol = length(all_resids))
+    # Calculate residuals from full prediction set
+    all_resids <- object$resids[[series]][,1:end_train]
+
+    partial_resids <- matrix(NA, nrow = nrow(betas), ncol = NCOL(all_resids))
     for(i in 1:NROW(betas)){
-      partial_resids[i,] <- (Xp2 %*% betas[i, ]) + all_resids
+      partial_resids[i,] <- (Xp2 %*% betas[i, ]) + all_resids[i,]
     }
   }
 
@@ -349,8 +349,8 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(min(partial_resids, min(cred) - sd(preds), na.rm = T)),
-                    max(max(partial_resids, max(cred) + sd(preds), na.rm = T))))
+           ylim = c(min(min(partial_resids, min(cred) - 0.8 * sd(preds), na.rm = T)),
+                    max(max(partial_resids, max(cred) + 0.8 * sd(preds), na.rm = T))))
 
       if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
         title(object$mgcv_model$smooth[[smooth_int]]$label,
@@ -365,7 +365,8 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(cred) - sd(preds), max(cred) + sd(preds)))
+           ylim = c(min(cred) - 0.8 * sd(preds),
+                    max(cred) + 0.8 * sd(preds)))
       if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
         title(object$mgcv_model$smooth[[smooth_int]]$label,
               adj = 0)
@@ -551,8 +552,8 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(min(partial_resids, min(cred) - sd(preds), na.rm = T)),
-                    max(max(partial_resids, max(cred) + sd(preds), na.rm = T))))
+           ylim = c(min(min(partial_resids, min(cred) - 0.8 * sd(preds), na.rm = T)),
+                    max(max(partial_resids, max(cred) + 0.8 * sd(preds), na.rm = T))))
       if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
         title(object$mgcv_model$smooth[[smooth_int]]$label,
               adj = 0)
@@ -644,7 +645,8 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(cred) - sd(preds), max(cred) + sd(preds)))
+           ylim = c(min(cred) - 0.8 * sd(preds),
+                    max(cred) + 0.8 * sd(preds)))
       if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
         title(object$mgcv_model$smooth[[smooth_int]]$label,
               adj = 0)

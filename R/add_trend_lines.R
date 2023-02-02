@@ -128,7 +128,7 @@ add_trend_lines = function(model_file, stan = FALSE,
             'vector[n_lv] alpha_gp;'
           model_file[grep('penalty = rep_vector(100.0, n_lv);', model_file,
                                             fixed = TRUE)] <-
-            'alpha_gp = rep_vector(0.5, n_lv);'
+            'alpha_gp = rep_vector(0.25, n_lv);'
 
           model_file <- model_file[-c((grep('// derived latent trends', model_file)):
                                         (grep('// derived latent trends', model_file) + 5))]
