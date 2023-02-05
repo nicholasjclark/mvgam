@@ -32,7 +32,7 @@ n_series <- NCOL(object$ytimes)
 obs_series <- object$obs_data$series
 series_levels <- levels(obs_series)
 family <- object$family
-obs_data <- object$obs_dat
+obs_data <- object$obs_data
 fit_engine <- object$fit_engine
 
 # Create sequences of posterior draws for calculating residual distributions
@@ -56,12 +56,12 @@ ds_resids_nb = function(truth, fitted, draw, size){
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
-    a_na <- pnbinom(as.vector(draw[na_obs]) - 1,
-                                    mu = fitted[na_obs], size = size)
-    b_na <- pnbinom(as.vector(draw[na_obs]),
-                                    mu = fitted[na_obs], size = size)
+    # a_na <- pnbinom(as.vector(draw[na_obs]) - 1,
+    #                                 mu = fitted[na_obs], size = size)
+    # b_na <- pnbinom(as.vector(draw[na_obs]),
+    #                                 mu = fitted[na_obs], size = size)
     u_na <- runif(n = length(draw[na_obs]),
-                  min = pmin(a_na, b_na), max = pmax(a_na, b_na))
+                  min = 0, max = 1)
     u <- vector(length = length(truth))
     u[na_obs] <- u_na
     u[!na_obs] <- u_obs
@@ -83,12 +83,12 @@ ds_resids_pois = function(truth, fitted, draw){
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
-    a_na <- ppois(as.vector(draw[na_obs]) - 1,
-                                    lambda = fitted[na_obs])
-    b_na <- ppois(as.vector(draw[na_obs]),
-                                    lambda = fitted[na_obs])
+    # a_na <- ppois(as.vector(draw[na_obs]) - 1,
+    #                                 lambda = fitted[na_obs])
+    # b_na <- ppois(as.vector(draw[na_obs]),
+    #                                 lambda = fitted[na_obs])
     u_na <- runif(n = length(draw[na_obs]),
-                  min = pmin(a_na, b_na), max = pmax(a_na, b_na))
+                  min = 0, max = 1)
     u <- vector(length = length(truth))
     u[na_obs] <- u_na
     u[!na_obs] <- u_obs
@@ -110,12 +110,12 @@ ds_resids_tw = function(truth, fitted, draw){
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
-    a_na <- ppois(as.vector(draw[na_obs]) - 1,
-                                  lambda = fitted[na_obs])
-    b_na <- ppois(as.vector(draw[na_obs]),
-                                  lambda = fitted[na_obs])
+    # a_na <- ppois(as.vector(draw[na_obs]) - 1,
+    #                               lambda = fitted[na_obs])
+    # b_na <- ppois(as.vector(draw[na_obs]),
+    #                               lambda = fitted[na_obs])
     u_na <- runif(n = length(draw[na_obs]),
-                  min = pmin(a_na, b_na), max = pmax(a_na, b_na))
+                  min = 0, max = 1)
     u <- vector(length = length(truth))
     u[na_obs] <- u_na
     u[!na_obs] <- u_obs
@@ -177,18 +177,15 @@ series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
     preds <- preds[,starts[series]:ends[series]]
   }
 
-  if(class(obs_data)[1] == 'list'){
-    obj_dat <- data.frame(y = obs_data$y,
-                          series = factor(obs_series,
-                                          levels = series_levels))
-    truth <- as.vector(obj_dat %>%
-                         dplyr::filter(series == !!(series_levels[series])) %>%
-                         dplyr::pull(y))
-  } else {
-    truth <- as.vector(obs_data %>%
-                         dplyr::filter(series == !!(series_levels[series])) %>%
-                         dplyr::pull(y))
-  }
+  s_name <- levels(obs_data$series)[series]
+  truth <- data.frame(time = obs_data$time,
+                      series = obs_data$series,
+                      y = obs_data$y) %>%
+    dplyr::filter(series == s_name) %>%
+    dplyr::select(time, y) %>%
+    dplyr::distinct() %>%
+    dplyr::arrange(time) %>%
+    dplyr::pull(y)
 
   # Keep only the predictions that match the observation period
   # (not the out of sample predictions, if any were computed in the model)
