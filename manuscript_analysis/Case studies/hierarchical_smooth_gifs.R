@@ -54,7 +54,7 @@ dev.off()
 # A rather long-winded script for producing animations of partially pooled smooths
 library(mvgam)
 library(dplyr)
-portal_dat <- read.csv('https://raw.githubusercontent.com/nicholasjclark/mvgam/master/NEON_manuscript/Case studies/rodents_data.csv', as.is = T)
+portal_dat <- read.csv('rodents_data.csv', as.is = T)
 portal_dat %>%
   dplyr::filter(year >= 2004) %>%
   dplyr::group_by(year, month) %>%
@@ -85,13 +85,12 @@ data_test <- list(lag = data_all$lag[175:length(data_all$y),],
                   year = data_all$year[175:length(data_all$y)],
                   precip = data_all$precip[175:length(data_all$y),],
                   mintemp = data_all$mintemp[175:length(data_all$y),])
-test <- mvjagam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
+data_train$time <- 1:length(data_train$y)
+test <- mvgam(formula =  y ~ te(mintemp, lag, k = c(8, 4)) +
                   te(precip, lag, k = c(8, 4)),
                 data_train = data_train,
-                data_test = data_test,
-                family = 'poisson',
                 chains = 4,
-                burnin = 12000,
+                burnin = 1000,
                 trend_model = 'AR1')
 newdata <- data_test
 newdata$year <- rep(0, length(newdata$year))
@@ -105,7 +104,7 @@ cols <- rev(viridis::plasma(10)[3:8])
 # value for centring the plot
 newdata$mintemp <- matrix(0, ncol = ncol(newdata$mintemp),
                           nrow = nrow(newdata$mintemp))
-preds <- predict_mvgam(test, series = 1, newdata = newdata, type = 'link')
+preds <- predict(test, newdata = newdata, type = 'link')
 offset <- mean(preds)
 
 # Set up prediction objects
@@ -125,7 +124,7 @@ for(i in 1:6){
                              length.out = length(newdata$year))
 
   # Predict on the link scale and shift by the offset so that values are roughly centred at zero
-  preds <- predict_mvgam(test, series = 1, newdata = newdata, type = 'link') - offset
+  preds <- predict(test, newdata = newdata, type = 'link') - offset
 
   # Calculate empirical prediction quantiles
   probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
@@ -140,9 +139,9 @@ for(i in 1:6){
 
   # Generate some noisy points and fit a loess smooth
   ran_points[,i] <- rnorm(length(cred[5,]), mean = cred[5,],
-                          sd = runif(length(cred[5,]), 0.25, 0.4))
+                          sd = runif(length(cred[5,]), 0.3, 0.45))
   loess_preds[,i] <- predict(loess(ran_points[,i] ~ pred_vals,
-                                   span = 0.5))
+                                   span = 0.45))
 }
 
 n_cuts <- 15
@@ -151,19 +150,27 @@ starts = starts[-length(starts)]
 ends = c(starts - 1, length(pred_vals))
 ends = ends[-1]
 
+
 saveGIF({
+  par(mar = c(0.4, 0.4, 0.1, 0.1))
   plot_seq <- seq(1, 6)
   for(i in plot_seq){
 
     for(x in 1:5){
       plot(1, type = "n",
-           xlab = 'Covariate',
-           ylab = 'Independent response functions',
+           bty = 'l',
+           xlab = '',
+           xaxt = 'n',
+           yaxt = 'n',
+           ylab = '',
            xlim = c(min(data_train$mintemp), max(data_train$mintemp)),
            ylim = c(-1.6, 1.6))
 
       if(i > 1){
         for(k in 1:(i - 1)){
+          lines(pred_vals, loess_preds[,k],
+                col = 'white',
+                lwd = 3.5)
           lines(pred_vals, loess_preds[,k],
                 col = scales::alpha(cols[k], 0.2),
                 lwd = 3)
@@ -174,19 +181,26 @@ saveGIF({
              y = ran_points[,i],
              col = scales::alpha(cols[i], 0.8),
              pch = 16, cex = 0.9)
-      abline(h = 0, lty = 'dashed')
-      mtext('Functions wiggle indepentently with no pooling')
+      abline(h = 0, lwd = 3, col = 'white')
+      abline(h = 0, lwd = 2.5)
+      box(bty = 'l', lwd = 2)
     }
 
     for(j in 1:(n_cuts-1)){
     plot(1, type = "n",
-         xlab = 'Covariate',
-         ylab = 'Independent response functions',
+         bty = 'l',
+         xlab = '',
+         xaxt = 'n',
+         yaxt = 'n',
+         ylab = '',
          xlim = c(min(data_train$mintemp), max(data_train$mintemp)),
          ylim = c(-1.6, 1.6))
 
       if(i > 1){
         for(k in 1:(i - 1)){
+          lines(pred_vals, loess_preds[,k],
+                col = 'white',
+                lwd = 3.5)
           lines(pred_vals, loess_preds[,k],
                 col = scales::alpha(cols[k], 0.2),
                 lwd = 3)
@@ -198,21 +212,30 @@ saveGIF({
            col = scales::alpha(cols[i], 0.8),
            pch = 16, cex = 0.9)
     lines(pred_vals[1:ends[j]], loess_preds[,i][1:ends[j]],
+          col = 'white',
+          lwd = 3.5)
+    lines(pred_vals[1:ends[j]], loess_preds[,i][1:ends[j]],
           col = scales::alpha(cols[i], 0.8),
           lwd = 3)
-    abline(h = 0, lty = 'dashed')
-    mtext('Functions wiggle indepentently with no pooling')
+    abline(h = 0, lwd = 3, col = 'white')
+    abline(h = 0, lwd = 2.5)
+    box(bty = 'l', lwd = 2)
     }
 
     for(x in 1:5){
       plot(1, type = "n",
-           xlab = 'Covariate',
-           ylab = 'Independent response functions',
+           xlab = '',
+           xaxt = 'n',
+           yaxt = 'n',
+           ylab = '',
+           bty = 'l',
            xlim = c(min(data_train$mintemp), max(data_train$mintemp)),
            ylim = c(-1.6, 1.6))
 
       if(i > 1){
         for(k in 1:(i - 1)){
+          lines(pred_vals, loess_preds[,k],
+                lwd = 3.5, col = 'white')
           lines(pred_vals, loess_preds[,k],
                 col = scales::alpha(cols[k], 0.2),
                 lwd = 3)
@@ -224,50 +247,65 @@ saveGIF({
              col = scales::alpha(cols[i], 0.8),
              pch = 16, cex = 0.9)
       lines(pred_vals, loess_preds[,i],
+            col = 'white',
+            lwd = 3.5)
+      lines(pred_vals, loess_preds[,i],
             col = scales::alpha(cols[i], 0.8),
             lwd = 3)
-      abline(h = 0, lty = 'dashed')
-      mtext('Functions wiggle indepentently with no pooling')
+      abline(h = 0, lwd = 3, col = 'white')
+      abline(h = 0, lwd = 2.5)
+      box(bty = 'l', lwd = 2)
     }
 
   }
 
   for(x in 1:20){
     plot(1, type = "n",
-         xlab = 'Covariate',
-         ylab = 'Independent response functions',
+         xlab = '',
+         xaxt = 'n',
+         yaxt = 'n',
+         ylab = '',
+         bty = 'l',
          xlim = c(min(data_train$mintemp), max(data_train$mintemp)),
          ylim = c(-1.6, 1.6))
 
     for(k in 1:6){
       lines(pred_vals, loess_preds[,k],
+            col = 'white',
+            lwd = 3.5)
+      lines(pred_vals, loess_preds[,k],
             col = scales::alpha(cols[k], 0.2),
             lwd = 3)
     }
-    abline(h = 0, lty = 'dashed')
-    mtext('Functions wiggle indepentently with no pooling')
+    abline(h = 0, lwd = 3, col = 'white')
+    abline(h = 0, lwd = 2.5)
+    box(bty = 'l', lwd = 2)
   }
 }, movie.name = 'hierarchical1.gif', interval = 0.1,
-   ani.width = 720, ani.height = 680, ani.res = 150)
+   ani.width = 1100, ani.height = 600, ani.res = 300)
 
 
 
 saveGIF({
+  par(mar = c(0.4, 0.4, 0.1, 0.1))
   plot_seq <- seq(1, 6)
   for(i in plot_seq){
 
     for(x in 1:5){
       plot(1, type = "n",
-           xlab = 'Covariate',
-           ylab = 'Partially pooled functions (60% CI)',
+           xlab = '',
+           xaxt = 'n',
+           yaxt = 'n',
+           ylab = '',
+           bty = 'l',
            xlim = c(min(data_train$mintemp), max(data_train$mintemp)),
            ylim = c(-1.6, 1.6))
 
       if(i > 1){
         for(k in 1:(i - 1)){
-          polygon(c(pred_vals, rev(pred_vals)), c(pred_upper[,k], rev(pred_lower[,k])),
-                  col = scales::alpha(cols[k], 0.2),
-                  border = scales::alpha(cols[k], 0.2))
+          lines(pred_vals, pred_med[,k],
+                col = 'white',
+                lwd = 3.5)
           lines(pred_vals, pred_med[,k],
                 col = scales::alpha(cols[k], 0.3),
                 lwd = 3)
@@ -278,32 +316,35 @@ saveGIF({
              y = ran_points[,i],
              col = scales::alpha(cols[i], 0.8),
              pch = 16, cex = 0.9)
-      abline(h = 0, lty = 'dashed')
-      mtext('Function shape and wiggliness partially pooled')
+      abline(h = 0, lwd = 3, col = 'white')
+      abline(h = 0, lwd = 2.5)
+      box(bty = 'l', lwd = 2)
     }
 
     for(j in 1:(n_cuts-1)){
       plot(1, type = "n",
-           xlab = 'Covariate',
-           ylab = 'Partially pooled functions (60% CI)',
+           xlab = '',
+           xaxt = 'n',
+           yaxt = 'n',
+           ylab = '',
+           bty = 'l',
            xlim = c(min(data_train$mintemp), max(data_train$mintemp)),
            ylim = c(-1.6, 1.6))
 
       if(i > 1){
         for(k in 1:(i - 1)){
-          polygon(c(pred_vals, rev(pred_vals)), c(pred_upper[,k], rev(pred_lower[,k])),
-                  col = scales::alpha(cols[k], 0.2),
-                  border = scales::alpha(cols[k], 0.2))
+          lines(pred_vals, pred_med[,k],
+                col = 'white',
+                lwd = 3.5)
           lines(pred_vals, pred_med[,k],
                 col = scales::alpha(cols[k], 0.3),
                 lwd = 3)
         }
       }
 
-      polygon(c(pred_vals[1:ends[j]], rev(pred_vals[1:ends[j]])),
-              c(pred_upper[,i][1:ends[j]], rev(pred_lower[,i][1:ends[j]])),
-              col = scales::alpha(cols[i], 0.5),
-              border = scales::alpha(cols[i], 0.5))
+      lines(pred_vals[1:ends[j]], pred_med[,i][1:ends[j]],
+            col = 'white',
+            lwd = 3.5)
       lines(pred_vals[1:ends[j]], pred_med[,i][1:ends[j]],
             col = scales::alpha(cols[i], 0.6),
             lwd = 3)
@@ -311,32 +352,35 @@ saveGIF({
              y = ran_points[,i],
              col = scales::alpha(cols[i], 0.8),
              pch = 16, cex = 0.9)
-      abline(h = 0, lty = 'dashed')
-      mtext('Function shape and wiggliness partially pooled')
+      abline(h = 0, lwd = 3, col = 'white')
+      abline(h = 0, lwd = 2.5)
+      box(bty = 'l', lwd = 2)
     }
 
     for(x in 1:5){
       plot(1, type = "n",
-           xlab = 'Covariate',
-           ylab = 'Partially pooled functions (60% CI)',
+           xlab = '',
+           xaxt = 'n',
+           yaxt = 'n',
+           ylab = '',
+           bty = 'l',
            xlim = c(min(data_train$mintemp), max(data_train$mintemp)),
            ylim = c(-1.6, 1.6))
 
       if(i > 1){
         for(k in 1:(i - 1)){
-          polygon(c(pred_vals, rev(pred_vals)), c(pred_upper[,k], rev(pred_lower[,k])),
-                  col = scales::alpha(cols[k], 0.2),
-                  border = scales::alpha(cols[k], 0.2))
+          lines(pred_vals, pred_med[,k],
+                col = 'white',
+                lwd = 3.5)
           lines(pred_vals, pred_med[,k],
                 col = scales::alpha(cols[k], 0.3),
                 lwd = 3)
         }
       }
 
-      polygon(c(pred_vals, rev(pred_vals)),
-              c(pred_upper[,i], rev(pred_lower[,i])),
-              col = scales::alpha(cols[i], 0.5),
-              border = scales::alpha(cols[i], 0.5))
+      lines(pred_vals, pred_med[,i],
+            col = 'white',
+            lwd = 3.5)
       lines(pred_vals, pred_med[,i],
             col = scales::alpha(cols[i], 0.6),
             lwd = 3)
@@ -344,32 +388,37 @@ saveGIF({
              y = ran_points[,i],
              col = scales::alpha(cols[i], 0.8),
              pch = 16, cex = 0.9)
-      abline(h = 0, lty = 'dashed')
-      mtext('Function shape and wiggliness partially pooled')
+      abline(h = 0, lwd = 3, col = 'white')
+      abline(h = 0, lwd = 2.5)
+      box(bty = 'l', lwd = 2)
     }
 
   }
 
   for(x in 1:20){
     plot(1, type = "n",
-         xlab = 'Covariate',
-         ylab = 'Partially pooled functions (60% CI)',
+         xlab = '',
+         xaxt = 'n',
+         yaxt = 'n',
+         ylab = '',
+         bty = 'l',
          xlim = c(min(data_train$mintemp), max(data_train$mintemp)),
          ylim = c(-1.6, 1.6))
 
     for(k in 1:6){
-      polygon(c(pred_vals, rev(pred_vals)), c(pred_upper[,k], rev(pred_lower[,k])),
-              col = scales::alpha(cols[k], 0.2),
-              border = scales::alpha(cols[k], 0.2))
+      lines(pred_vals, pred_med[,k],
+            col = 'white',
+            lwd = 3.5)
       lines(pred_vals, pred_med[,k],
             col = scales::alpha(cols[k], 0.3),
             lwd = 3)
     }
-    abline(h = 0, lty = 'dashed')
-    mtext('Function shape and wiggliness partially pooled')
+    abline(h = 0, lwd = 3, col = 'white')
+    abline(h = 0, lwd = 2.5)
+    box(bty = 'l', lwd = 2)
   }
 }, movie.name = 'hierarchical2.gif', interval = 0.1,
-ani.width = 720, ani.height = 680, ani.res = 150)
+ani.width = 1100, ani.height = 600, ani.res = 300)
 
 
 
