@@ -10,9 +10,9 @@ knitr::opts_chunk$set(
   comment = "#>",
   fig.path = "README-",
   dev = "png",
-  dpi = 150,
+  dpi = 160,
   fig.asp = 0.8,
-  fig.width = 5,
+  fig.width = 6,
   out.width = "60%",
   fig.align = "center"
 )
