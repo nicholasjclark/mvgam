@@ -72,13 +72,15 @@ lynx_full = data.frame(year = 1821:1934,
 plot(lynx_full$population, type = 'l', ylab = 'Lynx trappings',
      xlab = 'Time', bty = 'l', lwd = 2)
 box(bty = 'l', lwd  = 2)
-acf(lynx_full$population, main = '', bty = 'l', lwd = 2)
+acf(lynx_full$population, main = '', bty = 'l', lwd = 2,
+    ci.col = 'darkred')
 box(bty = 'l', lwd  = 2)
 ```
 
 Along with serial autocorrelation, there is a clear ~19-year cyclic pattern to the data. Create a `season` term that can be used to model this effect and give a better representation of the data generating process than we would likely get with a linear model
 ```{r}
-plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'))
+plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'),
+     lwd = 2, col.range = 'darkred')
 lynx_full$season <- (lynx_full$year %%19) + 1
 ```
 
@@ -96,7 +98,7 @@ lynx_test = lynx_full[51:60, ]
 ```
 
 Inspect the series in a bit more detail using `mvgam`'s plotting utility
-```{r, message=FALSE, warning=FALSE, fig.width=6, fig.height=6, dpi=150}
+```{r, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=6.5, dpi=160}
 plot_mvgam_series(data = lynx_train)
 ```
 
@@ -261,7 +263,7 @@ text(1, 0.8, cex = 1.5, label="Trend component",
 ```
 
 Both components contribute to forecast uncertainty, suggesting we would still need some more work to learn about factors driving the dynamics of the system. But we will leave the model as-is for this example. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's residuals, which are posterior empirical quantiles of Dunn-Smyth randomised quantile residuals so should follow approximate normality. We are primarily looking for a lack of autocorrelation, which would suggest our AR3 model is appropriate for the latent trend
-```{r, fig.width=6, fig.height=6, dpi=150}
+```{r, fig.width=6.5, fig.height=6.5, dpi=160}
 plot(lynx_mvgam, type = 'residuals')
 ```
 
