@@ -83,7 +83,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
 
   if(family == 'Poisson'){
     if(threads > 1){
-      model_file[lik_line] <- paste0('// likelihood functions\n',
+      model_file[lik_line] <- paste0('{\n// likelihood functions\n',
                                      'vector[n_nonmissing] flat_trends;\n',
                                      'flat_trends = (to_vector(trend))[obs_ind];\n',
                                      'target += reduce_sum(partial_log_lik_lpmf, seq,\n',
@@ -92,19 +92,20 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
                                      'append_col(flat_xs, flat_trends),\n',
                                      'append_row(b, 1.0),\n',
                                      ifelse(offset, 'offset[obs_ind]);\n}\n',
-                                            '0.0);\n}\n'))
+                                            '0.0);\n}\n}\n'))
     } else {
-      model_file[lik_line] <- paste0('// likelihood functions\n',
+      model_file[lik_line] <- paste0('{\n// likelihood functions\n',
                                      'vector[n_nonmissing] flat_trends;\n',
                                      'flat_trends = (to_vector(trend))[obs_ind];\n',
                                      'flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends),\n',
-                                     ifelse(offset,'offset[obs_ind],', '0.0,'), 'append_row(b, 1.0));\n}\n')
+                                     ifelse(offset,'offset[obs_ind],', '0.0,'),
+                                     'append_row(b, 1.0));\n}\n}\n')
     }
 
   }
   if(family == 'Negative Binomial'){
     if(threads > 1){
-      model_file[lik_line] <- paste0('// likelihood functions\n',
+      model_file[lik_line] <- paste0('{\n// likelihood functions\n',
                                      'vector[n_nonmissing] flat_trends;\n',
                                      'real flat_rs[n_nonmissing];\n',
                                      'flat_trends = (to_vector(trend))[obs_ind];\n',
@@ -114,9 +115,9 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
                                      'flat_ys,\n',
                                      ifelse(offset,'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)) + offset[obs_ind],\n',
                                             'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)),\n'),
-                                     'flat_rs);\n}\n')
+                                     'flat_rs);\n}\n}\n')
     } else {
-      model_file[lik_line] <- paste0('// likelihood functions\n',
+      model_file[lik_line] <- paste0('{\n// likelihood functions\n',
                                      'vector[n_nonmissing] flat_trends;\n',
                                      'real flat_rs[n_nonmissing];\n',
                                      'flat_trends = (to_vector(trend))[obs_ind];\n',
@@ -124,7 +125,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
                                      'flat_ys ~ neg_binomial_2(\n',
                                      ifelse(offset,'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)) + offset[obs_ind],\n',
                                             'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)),\n'),
-                                     'inv(flat_rs));\n}\n')
+                                     'inv(flat_rs));\n}\n}\n')
     }
 
     if(any(grepl('functions {', model_file, fixed = TRUE))){

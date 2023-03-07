@@ -53,8 +53,9 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
       stan_file[grep('y[i, s] ~ neg_binomial', stan_file, fixed = T)] <-
         add_exp_cl
 
-      stan_file[grep('// posterior predictions', stan_file, fixed = T) - 1] <-
-        paste0('matrix[n, n_series] r_vec;\n',
+      stan_file[grep('matrix[n, n_series] ypred;', stan_file, fixed = T)] <-
+        paste0('matrix[n, n_series] ypred;\n',
+               'matrix[n, n_series] r_vec;\n',
                'vector[n_series] r;\n',
                'r = inv(r_inv);\n',
                'for (s in 1:n_series) {\n',
