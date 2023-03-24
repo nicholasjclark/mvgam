@@ -387,11 +387,6 @@ mvgam = function(formula,
     use_stan <- TRUE
   }
 
-  # if(trend_model == 'GP' & use_lv){
-  #   warning('dynamic factor gaussian process trends not yet supported; changing use_lv to FALSE')
-  #   use_lv <- FALSE
-  # }
-
   if(use_stan & family == 'tw'){
     warning('Tweedie family not yet supported for stan; reverting to JAGS')
     use_stan <- FALSE
@@ -508,68 +503,76 @@ mvgam = function(formula,
   # these in so that initial values to maintain the true size of the training dataset
   orig_y <- data_train$y
 
-    if(!missing(knots)){
+  # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
+  # when simulating from the Bayesian model later on;
+  ss_gam <- mvgam_setup(formula = formula,
+                        family = family,
+                        data = data_train,
+                        drop.unused.levels = FALSE,
+                        maxit = 30)
 
-      # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
-      # when simulating from the Bayesian model later on; we don't need convergence, just enough
-      # iterations to get a sensible set of priors for any parametric coefficients
-      if(family == 'nb'){
-        ss_gam <- mgcv::gam(formula(formula),
-                            data = data_train,
-                            method = "REML",
-                            family = nb(),
-                            knots = knots,
-                            control = list(nthreads = min(4, parallel::detectCores()-1),
-                                           maxit = 50),
-                            drop.unused.levels = FALSE)
-      } else if(family == 'poisson'){
-        ss_gam <- mgcv::gam(formula(formula),
-                            data = data_train,
-                            method = "REML",
-                            family = poisson(),
-                            knots = knots,
-                            control = list(nthreads = min(4, parallel::detectCores()-1),
-                                           maxit = 50),
-                            drop.unused.levels = FALSE)
-      } else {
-        ss_gam <- mgcv::gam(formula(formula),
-                            data = data_train,
-                            method = "REML",
-                            family = tw(),
-                            knots = knots,
-                            control = list(nthreads = min(4, parallel::detectCores()-1),
-                                           maxit = 50),
-                            drop.unused.levels = FALSE)
-      }
-
-    } else {
-      if(family == 'nb'){
-        ss_gam <- mgcv::gam(formula(formula),
-                            data = data_train,
-                            method = "REML",
-                            family = nb(),
-                            control = list(nthreads = min(4, parallel::detectCores()-1),
-                                           maxit = 50),
-                            drop.unused.levels = FALSE)
-      } else if(family == 'poisson'){
-        ss_gam <- mgcv::gam(formula(formula),
-                            data = data_train,
-                            method = "REML",
-                            family = poisson(),
-                            control = list(nthreads = min(4, parallel::detectCores()-1),
-                                           maxit = 50),
-                            drop.unused.levels = FALSE)
-      } else {
-        ss_gam <- mgcv::gam(formula(formula),
-                            data = data_train,
-                            method = "REML",
-                            family = tw(),
-                            control = list(nthreads = min(4, parallel::detectCores()-1),
-                                           maxit = 50),
-                            drop.unused.levels = FALSE)
-      }
-
-    }
+    # if(!missing(knots)){
+    #
+    #   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
+    #   # when simulating from the Bayesian model later on; we don't need convergence, just enough
+    #   # iterations to get a sensible set of priors for any parametric coefficients
+    #   if(family == 'nb'){
+    #     ss_gam <- mgcv::gam(formula(formula),
+    #                         data = data_train,
+    #                         method = "REML",
+    #                         family = nb(),
+    #                         knots = knots,
+    #                         control = list(nthreads = min(4, parallel::detectCores()-1),
+    #                                        maxit = 50),
+    #                         drop.unused.levels = FALSE)
+    #   } else if(family == 'poisson'){
+    #     ss_gam <- mgcv::gam(formula(formula),
+    #                         data = data_train,
+    #                         method = "REML",
+    #                         family = poisson(),
+    #                         knots = knots,
+    #                         control = list(nthreads = min(4, parallel::detectCores()-1),
+    #                                        maxit = 50),
+    #                         drop.unused.levels = FALSE)
+    #   } else {
+    #     ss_gam <- mgcv::gam(formula(formula),
+    #                         data = data_train,
+    #                         method = "REML",
+    #                         family = tw(),
+    #                         knots = knots,
+    #                         control = list(nthreads = min(4, parallel::detectCores()-1),
+    #                                        maxit = 50),
+    #                         drop.unused.levels = FALSE)
+    #   }
+    #
+    # } else {
+    #   if(family == 'nb'){
+    #     ss_gam <- mgcv::gam(formula(formula),
+    #                         data = data_train,
+    #                         method = "REML",
+    #                         family = nb(),
+    #                         control = list(nthreads = min(4, parallel::detectCores()-1),
+    #                                        maxit = 50),
+    #                         drop.unused.levels = FALSE)
+    #   } else if(family == 'poisson'){
+    #     ss_gam <- mgcv::gam(formula(formula),
+    #                         data = data_train,
+    #                         method = "REML",
+    #                         family = poisson(),
+    #                         control = list(nthreads = min(4, parallel::detectCores()-1),
+    #                                        maxit = 50),
+    #                         drop.unused.levels = FALSE)
+    #   } else {
+    #     ss_gam <- mgcv::gam(formula(formula),
+    #                         data = data_train,
+    #                         method = "REML",
+    #                         family = tw(),
+    #                         control = list(nthreads = min(4, parallel::detectCores()-1),
+    #                                        maxit = 50),
+    #                         drop.unused.levels = FALSE)
+    #   }
+    #
+    # }
 
   # Fill in missing observations in data_train so the size of the dataset is correct when
   # building the JAGS model
@@ -685,9 +688,12 @@ mvgam = function(formula,
       t(mu + L%*%matrix(rnorm(m*n),m,n))
     }
 
+    # Use the initialised GAM's estimates for parametric effects, but widen them
+    # substantially to allow for better exploration of possible alternative model
+    # configurations
     beta_sims <- rmvn(1000, coef(ss_gam), ss_gam$Vp)
     ss_jagam$jags.data$p_taus <- apply(as.matrix(beta_sims[,1:n_terms]),
-                                       2, function(x) 0.7 / sd(x))
+                                       2, function(x) 1 / (sd(x) ^ 2)) * 0.25
 
     base_model[grep('Parametric effect priors',
                       base_model) + 1] <- paste0('  for (i in 1:',

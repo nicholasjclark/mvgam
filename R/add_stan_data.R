@@ -380,7 +380,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                ':', as.numeric(substr(sub(".*\\:", "",
                                           stan_file[grep('// parametric effect', stan_file) + 1]),
                                       1, 1)),
-               ') {\nb_raw[i] ~ normal(p_coefs[i], 1 / p_taus[i]);\n}')
+               ') {\nb_raw[i] ~ normal(p_coefs[i], sqrt(1 / p_taus[i]));\n}')
       stan_file <- readLines(textConnection(stan_file), n = -1)
     }
 
@@ -431,7 +431,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                ':', as.numeric(substr(sub(".*\\:", "",
                                           jags_file[grep('## parametric effect', jags_file) + 1]),
                                       1, 1)),
-               ') {\nb_raw[i] ~ normal(p_coefs[i], 1 / p_taus[i]);\n}\n')
+               ') {\nb_raw[i] ~ normal(p_coefs[i], sqrt(1 / p_taus[i]));\n}\n')
       stan_file <- readLines(textConnection(stan_file), n = -1)
     }
 
