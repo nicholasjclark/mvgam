@@ -42,6 +42,11 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     data_test <- newdata
   }
 
+  # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
+  if(terms(formula(mod_call))[[2]] != 'y'){
+    data_test$y <- data_test[[terms(formula(mod_call))[[2]]]]
+  }
+
   # Extract particle weights and create importance sampling index
   weights <- (unlist(lapply(seq_along(particles), function(x){
     tail(particles[[x]]$weight, 1)})))

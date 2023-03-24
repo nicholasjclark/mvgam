@@ -16,6 +16,8 @@
 #'biases in model predictions.
 #'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
 #'\code{newdata} instead for more seamless integration into `R` workflows
+#'@param y Character. What is the name of the outcome variable in the supplied data? Defaults to
+#'\code{'y'}
 #'@param lines Logical. If \code{TRUE}, line plots are used for visualising time series. If
 #'\code{FALSE}, points are used.
 #'@param series Either a \code{integer} specifying which series in the set is to be plotted or
@@ -37,6 +39,7 @@ plot_mvgam_series = function(object,
                              data_train,
                              newdata,
                              data_test,
+                             y = 'y',
                              lines = TRUE,
                              series = 1,
                              n_bins,
@@ -69,17 +72,31 @@ plot_mvgam_series = function(object,
 
   if(!missing("data")){
     data_train <- data
+    if(!y %in% names(data_train)){
+      stop(paste0('variable "', y, '" not found in data'),
+           call. = FALSE)
+    } else {
+      data_train$y <- data_train[[y]]
+    }
   }
 
   if(!missing("newdata")){
     data_test <- newdata
+    if(!y %in% names(data_test)){
+      stop(paste0('variable "', y, '" not found in newdata'),
+           call. = FALSE)
+    } else {
+      data_test$y <- data_test[[y]]
+    }
   }
+
 
   if(!missing(object)){
     if(!missing(data_train)){
       warning('both "object" and "data" were supplied; only using "object"')
     }
     data_train <- object$obs_data
+    y <- terms(formula(object$call))[[2]]
   }
 
   if(series == 'all'){
@@ -138,9 +155,9 @@ plot_mvgam_series = function(object,
 
       if(log_scale){
         truth <- log(truth + 1)
-        ylab <- 'log(Y + 1)'
+        ylab <- paste0('log(', y,' + 1)')
       } else {
-        ylab <- 'Y'
+        ylab <- paste0(y)
       }
 
       plot(1, type = "n", bty = 'L',
@@ -187,6 +204,13 @@ plot_mvgam_series = function(object,
       dplyr::arrange(time) %>%
       dplyr::pull(y)
 
+    if(log_scale){
+      truth <- log(truth + 1)
+      ylab <- paste0('log(', y,' + 1)')
+    } else {
+      ylab <- paste0(y)
+    }
+
     layout(matrix(1:4, nrow = 2, byrow = TRUE))
     if(!missing(data_test)){
       test <- data.frame(y = data_test$y,
@@ -200,7 +224,7 @@ plot_mvgam_series = function(object,
 
       plot(1, type = "n", bty = 'L',
            xlab = 'Time',
-           ylab = 'Y',
+           ylab = ylab,
            ylim = range(c(truth, test), na.rm = TRUE),
            xlim = c(0, length(c(truth, test))))
       title('Time series', line = 0)
@@ -230,7 +254,8 @@ plot_mvgam_series = function(object,
            breaks = n_bins,
            col = "#C79999",
            ylab = 'Density',
-           xlab = 'Count', main = '')
+           xlab = paste0('Count of ', y),
+           main = '')
       title('Histogram', line = 0)
 
       acf(c(truth, test),
@@ -255,7 +280,7 @@ plot_mvgam_series = function(object,
       plot_x <- seq(min(c(truth, test), na.rm = T),
                     max(c(truth, test), na.rm = T))
       plot(1, type = "n", bty = 'L',
-           xlab = 'Count',
+           xlab = paste0('Count of ', y),
            ylab = 'Empirical CDF',
            xlim = c(min(plot_x), max(plot_x)),
            ylim = c(0, 1))
@@ -270,7 +295,7 @@ plot_mvgam_series = function(object,
     } else {
       plot(1, type = "n", bty = 'L',
            xlab = 'Time',
-           ylab = 'Y',
+           ylab = ylab,
            ylim = range(c(truth), na.rm = TRUE),
            xlim = c(0, length(c(truth))))
       title('Time series', line = 0)
@@ -294,7 +319,8 @@ plot_mvgam_series = function(object,
            breaks = n_bins,
            col = "#C79999",
            ylab = 'Density',
-           xlab = 'Count', main = '')
+           xlab = paste0('Count of ', y),
+           main = '')
       title('Histogram', line = 0)
 
 
@@ -321,7 +347,7 @@ plot_mvgam_series = function(object,
       plot_x <- seq(min(truth, na.rm = T),
                     max(truth, na.rm = T))
       plot(1, type = "n", bty = 'L',
-           xlab = 'Count',
+           xlab = paste0('Count of ', y),
            ylab = 'Empirical CDF',
            xlim = c(min(plot_x), max(plot_x)),
            ylim = c(0, 1))

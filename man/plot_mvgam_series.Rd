@@ -10,6 +10,7 @@ plot_mvgam_series(
   data_train,
   newdata,
   data_test,
+  y = "y",
   lines = TRUE,
   series = 1,
   n_bins,
@@ -34,6 +35,9 @@ biases in model predictions.}
 
 \item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
 \code{newdata} instead for more seamless integration into \code{R} workflows}
+
+\item{y}{Character. What is the name of the outcome variable in the supplied data? Defaults to
+\code{'y'}}
 
 \item{lines}{Logical. If \code{TRUE}, line plots are used for visualising time series. If
 \code{FALSE}, points are used.}

@@ -46,6 +46,11 @@ pfilter_mvgam_online = function(newdata,
   }
 
   # Get next observations in line to be assimilated
+  # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
+  if(terms(formula(mod_call))[[2]] != 'y'){
+    data_assim$y <- data_assim[[terms(formula(mod_call))[[2]]]]
+  }
+
   if(class(data_assim)[1] == 'list'){
 
     if(!'series' %in% names(data_assim)){
@@ -192,7 +197,8 @@ pfilter_mvgam_online = function(newdata,
       cat('Saving particles to', paste0(file_path, '/particles.rda'), '\n',
           'ESS =',  new_ess, '\n')
       save(particles, mgcv_model, obs_data, last_assim,
-           ess = ess, file = paste0(file_path, '/particles.rda'))
+           mod_call,
+           ess, file = paste0(file_path, '/particles.rda'))
 
     }
 }

@@ -36,6 +36,12 @@ pfilter_mvgam_init = function(object,
     data_assim <- newdata
   }
 
+  # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
+  mod_call <- object$call
+  if(terms(formula(mod_call))[[2]] != 'y'){
+    data_assim$y <- data_assim[[terms(formula(mod_call))[[2]]]]
+  }
+
 #### 1. Generate linear predictor matrix for the next timepoint and extract last trend estimates
 # (NOTE, all series must have observations for the next timepoint, even if they are NAs!!!!) ####
 data_train <- object$obs_data
@@ -645,6 +651,7 @@ dir.create(file_path, recursive = T, showWarnings = F)
 cat('Saving particles to', paste0(file_path, '/particles.rda'), '\n',
     'ESS =',  ess, '\n')
 save(particles, mgcv_model, obs_data, last_assim,
+     mod_call,
      ess = ess, file = paste0(file_path, '/particles.rda'))
 }
 

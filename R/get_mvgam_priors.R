@@ -182,10 +182,14 @@ get_mvgam_priors = function(formula,
     warning('No point in latent variables if trend model is None; changing use_lv to FALSE')
   }
 
-  # Ensure outcome is labelled 'y'
+  # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
   form_terms <- terms(formula(formula))
   if(terms(formula(formula))[[2]] != 'y'){
-    stop('Outcome variable must be named "y"')
+    if('y' %in% names(data_train)){
+      stop('variable "y" found in data but not used as outcome. mvgam uses the name "y" when modeling so this variable should be re-named',
+           call. = FALSE)
+    }
+    data_train$y <- data_train[[terms(formula(formula))[[2]]]]
   }
 
   # Use a small fit from mgcv to extract relevant information on smooths included

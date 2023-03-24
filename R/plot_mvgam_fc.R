@@ -66,6 +66,11 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
 
   if(!missing("newdata")){
     data_test <- newdata
+
+    # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
+    if(terms(formula(object$call))[[2]] != 'y'){
+      data_test$y <- data_test[[terms(formula(object$call))[[2]]]]
+    }
   }
 
   # Prediction indices for the particular series
@@ -89,6 +94,11 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
   # Add variables to data_test if missing
   s_name <- levels(data_train$series)[series]
   if(!missing(data_test)){
+
+    # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
+    if(terms(formula(object$call))[[2]] != 'y'){
+      data_test$y <- data_test[[terms(formula(object$call))[[2]]]]
+    }
 
     if(!'y' %in% names(data_test)){
       data_test$y <- rep(NA, NROW(data_test))

@@ -51,6 +51,11 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
     data_test <- newdata
   }
 
+  # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
+  if(terms(formula(object$call))[[2]] != 'y'){
+    data_test$y <- data_test[[terms(formula(object$call))[[2]]]]
+  }
+
   type <- match.arg(arg = type, choices = c("link", "response", "trend"))
 
   # Prediction indices for the particular series

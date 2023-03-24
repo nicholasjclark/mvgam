@@ -84,9 +84,8 @@ plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'),
 lynx_full$season <- (lynx_full$year %%19) + 1
 ```
 
-For `mvgam` models, the response needs to be labelled `y` and we also need an indicator of the series name as a `factor` variable (if the column `series` is missing, this will be added automatically by assuming that all observations are from a single time series). Finally, a `time` column is needed to index time
+For `mvgam` models, we need an indicator of the series name as a `factor` variable (if the column `series` is missing, this will be added automatically by assuming that all observations are from a single time series). Finally, a `time` column is needed to index time
 ```{r}
-lynx_full$y <- lynx_full$population
 lynx_full$time <- 1:NROW(lynx_full)
 lynx_full$series <- factor('series1')
 ```
@@ -99,13 +98,13 @@ lynx_test = lynx_full[51:60, ]
 
 Inspect the series in a bit more detail using `mvgam`'s plotting utility
 ```{r, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=6.5, dpi=160}
-plot_mvgam_series(data = lynx_train)
+plot_mvgam_series(data = lynx_train, y = 'population')
 ```
 
 Now we will formulate an `mvgam` model; this model fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the temporal process (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution. But before conditioning the model on observed data, a check of prior smooth function realisations is useful to ensure we are allowing enough flexibility to capture the types of functional behaviours we think are reasonable without allowing outrageous behaviours. First we follow conventional recommendations to set `k` for the smooth term to be large, which would allow maximum flexibility in functional behaviours
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam_prior <- mvgam(data = lynx_train,
-               formula = y ~ s(season, bs = 'cc', k = 19),
+               formula = population ~ s(season, bs = 'cc', k = 19),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
@@ -126,7 +125,7 @@ exp(25)
 Setting `k` to a smaller value results in less flexibility. This is because number of basis functions that contribute to functional behaviour is reduced
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam_prior <- mvgam(data = lynx_train,
-               formula = y ~ s(season, bs = 'cc', k = 13),
+               formula = population ~ s(season, bs = 'cc', k = 13),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
@@ -144,7 +143,7 @@ In practice, imparting domain knowledge into prior specifications for penalised 
 Users can also check what the default prior distributions are for given model formulations, which can be helpful to understand how the model can be modified but also to see any restrictions on what can be changed within the `mvgam` framework.
 
 ```{r}
-test_priors <- get_mvgam_priors(y ~ s(season, bs = 'cc', k = 13),
+test_priors <- get_mvgam_priors(population ~ s(season, bs = 'cc', k = 13),
                                 family = 'poisson',
                                 data = lynx_train,
                                 trend_model = 'AR3',
@@ -156,7 +155,7 @@ Any of the above priors can be changed by modifying the `prior` column and suppl
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvgam(data = lynx_train,
                newdata = lynx_test,
-               formula = y ~ s(season, bs = 'cc', k = 13),
+               formula = population ~ s(season, bs = 'cc', k = 13),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
@@ -210,7 +209,7 @@ rstan::stan_trace(lynx_mvgam$model_output, c('ar1', 'ar2', 'ar3', 'sigma'))
 
 Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior quantiles of partial residuals (shown as ribbon rectangles in red), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
 ```{r, fig.width=5, fig.height=4, fig.align='center', dpi=150}
-plot(lynx_mvgam, type = 'smooths', residuals = T)
+plot(lynx_mvgam, type = 'smooths', residuals = TRUE)
 ```
 
 It is often also useful to compare prior to posterior function realisations to understand how informative the observed data have been for learning these functional shapes
@@ -223,7 +222,7 @@ layout(1)
 
 First derivatives of smooth functions can be plotted to inspect how the slope of the function changes across its length. To plot these we use the more flexible `plot_mvgam_smooth()` function
 ```{r}
-plot_mvgam_smooth(lynx_mvgam, 1, 'season', derivatives = T)
+plot_mvgam_smooth(lynx_mvgam, 1, 'season', derivatives = TRUE)
 ```
 
 We can also view the mvgam's posterior retrodictions and predictions for the entire series (testing and training)
@@ -233,7 +232,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 
 And the estimated latent trend component, again using the more flexible `plot_mvgam_...()` option to show first derivatives of the estimated trend
 ```{r}
-plot_mvgam_trend(lynx_mvgam, newdata = lynx_test, derivatives = T)
+plot_mvgam_trend(lynx_mvgam, newdata = lynx_test, derivatives = TRUE)
 ```
 
 We can also re-do the posterior predictive checks, but this time focusing only on the out of sample period. This will give us better insight into how the model is performing and whether it is able to simulate realistic and unbiased future values
@@ -271,7 +270,7 @@ Another useful utility of `mvgam` is the ability to use rolling window forecasts
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam_poor <- mvgam(data = lynx_train,
                newdata = lynx_test,
-               formula = y ~ s(season, k = 3),
+               formula = population ~ s(season, k = 3),
                family = 'poisson',
                trend_model = 'RW',
                use_stan = TRUE,

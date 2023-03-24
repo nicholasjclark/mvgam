@@ -15,7 +15,6 @@
 #'unless they share a covariate.
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
-#''y' (the discrete outcomes; \code{NA}s allowed)
 #''series' (character or factor index of the series IDs)
 #''time' (numeric index of the time point for each observation).
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
@@ -485,10 +484,17 @@ mvgam = function(formula,
     warning('No point in latent variables if trend model is None; changing use_lv to FALSE')
   }
 
-  # Ensure outcome is labelled 'y'
+  # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
   form_terms <- terms(formula(formula))
   if(terms(formula(formula))[[2]] != 'y'){
-    stop('Outcome variable must be named "y"')
+    if('y' %in% names(data_train)){
+      stop('variable "y" found in data but not used as outcome. mvgam uses the name "y" when modeling so this variable should be re-named',
+           call. = FALSE)
+    }
+    data_train$y <- data_train[[terms(formula(formula))[[2]]]]
+    if(!missing(data_test)){
+      data_test$y <- data_test[[terms(formula(formula))[[2]]]]
+    }
   }
 
   # Check if there is an offset variable included

@@ -45,7 +45,6 @@ unless they share a covariate.}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
-'y' (the discrete outcomes; \code{NA}s allowed)
 'series' (character or factor index of the series IDs)
 'time' (numeric index of the time point for each observation).
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
