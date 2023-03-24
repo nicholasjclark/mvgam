@@ -2,10 +2,10 @@
 title: 'mvgam case study 2: multivariate models'
 author: "Nicholas Clark (n.clark@uq.edu.au)"
 output:
-  html_document:
-    df_print: paged
   pdf_document:
     highlight: zenburn
+  html_document:
+    df_print: paged
   word_document: default
 urlcolor: blue
 ---
@@ -13,10 +13,17 @@ urlcolor: blue
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(knitr)
-opts_chunk$set(tidy.opts=list(width.cutoff=40),tidy=TRUE)
+opts_chunk$set(tidy.opts=list(width.cutoff=40),
+               tidy=TRUE,
+  dev = "png",
+  dpi = 160,
+  fig.asp = 0.8,
+  fig.width = 6,
+  out.width = "60%",
+  fig.align = "center")
 ```
 
-In this example we will examine multivariate forecasting models using `mvgam`, which fits dynamic GAMs (DGAMs) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `M` can be difficult. The approach used by `mvgam` when sampling with `JAGS` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated in an exponentially increasing manner (following Welty, Leah J., et al. Bayesian distributed lag models: estimating effects of particulate matter air pollution on daily mortality Biometrics 65.1 (2009): 282-291), we hope that we can guard against specifying too large a `M`. Note that when sampling with `Stan`, we capitalise on the superior sampling and exploration of Hamiltonian Monte Carlo to choose the number of factors. Begin by simulating `6` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `100` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Poisson distributions
+In this example we will examine multivariate forecasting models using `mvgam`, which fits dynamic GAMs (DGAMs; Clark & Wells, 2022) using MCMC sampling (note that either `JAGS` or `Stan` is required; installation links are found [here](https://sourceforge.net/projects/mcmc-jags/files/) and [here](https://mc-stan.org/users/interfaces/rstan)). First a simulation experiment to determine whether `mvgam`'s inclusion of complexity penalisation works by reducing the number of un-needed dynamic factors. In any factor model, choosing the appropriate number of factors `M` can be difficult. The approach used by `mvgam` when sampling with `JAGS` is to estimate a penalty for each factor that squeezes the factor's variance toward zero, effectively forcing the factor to evolve as a flat white noise process. By allowing each factor's penalty to be estimated in an exponentially increasing manner (following Welty et al 2009), we hope that we can guard against specifying too large a `M`. Note that when sampling with `Stan`, we capitalise on the superior sampling and exploration of Hamiltonian Monte Carlo to choose the number of factors. Begin by simulating `6` series that evolve with a shared seasonal pattern and that depend on `2` latent random walk factors. Each series is `100` time steps long, with a seasonal frequency of `12`. We give the trend moderate importance by setting `trend_rel = 0.6` and we allow each series' observation process to be drawn from slightly different Poisson distributions
 ```{r}
 set.seed(1111)
 library(mvgam)
@@ -27,7 +34,7 @@ dat <- sim_mvgam(T = 100, n_series = 6, n_lv = 2,
 ```
 
 Have a look at the series
-```{r, fig.width = 6, fig.height = 7, fig.align='center'}
+```{r}
 par(mfrow = c(3,2))
 for(i in 1:6){
   plot(dat$data_train$y[which(as.numeric(dat$data_train$series) == i)], type = 'l',
@@ -59,12 +66,12 @@ mod1 <- mvgam(data = dat$data_train,
 ```
 
 Look at a few plots. The estimated smooth function
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot_mvgam_smooth(object = mod1, series = 1, smooth = 'season')
 ```
 
 And the true seasonal function in the simulation
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot(dat$global_seasonality[1:12], type = 'l', bty = 'L', ylab = 'True function', xlab = 'season')
 ```
 
@@ -91,11 +98,11 @@ mod2 <- mvgam(data = dat$data_train,
 ```
 
 Use the same plots as model 1 to see if this model has also fit the data well
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot_mvgam_smooth(object = mod2, series = 1, smooth = 'season')
 ```
 
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot(dat$global_seasonality[1:12], type = 'l', bty = 'L', ylab = 'True function', xlab = 'season')
 ```
 
@@ -137,7 +144,7 @@ trends_data <- series_to_mvgam(series, freq = 12, train_prop = 0.9)
 ```
 
 Plot the series to see how similar their seasonal shapes are over time
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot(series, legend.loc = 'topleft')
 ```
 
@@ -219,7 +226,7 @@ summary(trends_mod3)
 ```
 
 Our experience is that there are fundamental degeneracies in latent dynamic factor models, particularly occurring due to the inherent weak identifiability of GP length scale parameters `rho` (which is magnified when trying to estimate latent GPs in a factor model). A pairs plot of the loading coefficients against the estimated GP length scale parameters helps to reveal the problem:
-```{r, fig.width = 7, fig.height = 7, fig.align='center', message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE}
 pairs(trends_mod3$model_output, pars = c('lv_coefs','rho_gp'))
 ```
 
@@ -256,7 +263,7 @@ summary(trends_mod3)
 ```
 
 The pairs plot now looks much better
-```{r, fig.width = 7, fig.height = 7, fig.align='center',message=FALSE, warning=FALSE}
+```{r,message=FALSE, warning=FALSE}
 pairs(trends_mod3$model_output, pars = c('lv_coefs','rho_gp'))
 ```
 
@@ -266,80 +273,80 @@ plot_mvgam_factors(trends_mod3)
 ```
 
 Look at Dunn-Smyth residuals for some series from this preferred model to ensure that our dynamic factor process has captured most of the temporal dependencies in the observations
-```{r, fig.width = 7, fig.height = 7, fig.align='center'}
+```{r}
 plot_mvgam_resids(trends_mod3, series = 1)
 ```
 
-```{r, fig.width = 7, fig.height = 7, fig.align='center'}
+```{r}
 plot_mvgam_resids(trends_mod3, series = 2)
 ```
 
-```{r, fig.width = 7, fig.height = 7, fig.align='center'}
+```{r}
 plot_mvgam_resids(trends_mod3, series = 3)
 ```
 
-```{r, fig.width = 7, fig.height = 7, fig.align='center'}
+```{r}
 plot_mvgam_resids(trends_mod3, series = 4)
 ```
 
 Perform posterior predictive checks to see if the model is able to simulate data that looks realistic and unbiased by examining simulated kernel densities for posterior predictions (`yhat`) compared to the density of the observations (`y`). This will be particularly useful for examining whether the Poisson observation model is able to produce realistic looking simulations for each individual series.
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r}
 ppc(trends_mod3, series = 1, type = 'hist')
 ```
 
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r}
 ppc(trends_mod3, series = 2, type = 'hist')
 ```
 
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r}
 ppc(trends_mod3, series = 3, type = 'hist')
 ```
 
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r}
 ppc(trends_mod3, series = 4, type = 'hist')
 ```
 
 Look at traceplots for the smoothing parameters (`rho`)
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 rstan::stan_trace(trends_mod3$model_output, pars = 'rho')
 ```
 
 Plot posterior predictive distributions for the training and testing periods for each series
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot_mvgam_fc(object = trends_mod3, series = 1, newdata = trends_data$data_test)
 ```
 
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot_mvgam_fc(object = trends_mod3, series = 2, newdata = trends_data$data_test)
 ```
 
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot_mvgam_fc(object = trends_mod3, series = 3, newdata = trends_data$data_test)
 ```
 
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot_mvgam_fc(object = trends_mod3, series = 4, newdata = trends_data$data_test)
 ```
 
 Plot posterior distributions for the latent trend estimates, again for the training and testing periods
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot_mvgam_trend(object = trends_mod3, series = 1, newdata = trends_data$data_test)
 ```
 
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot_mvgam_trend(object = trends_mod3, series = 2, newdata = trends_data$data_test)
 ```
 
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot_mvgam_trend(object = trends_mod3, series = 3, newdata = trends_data$data_test)
 ```
 
-```{r, fig.width = 6, fig.height = 4, fig.align='center'}
+```{r}
 plot_mvgam_trend(object = trends_mod3, series = 4, newdata = trends_data$data_test)
 ```
 
 Given that we fit a model with hierarchical seasonality, the seasonal smooths are able to deviate from one another (though they share the same wiggliness and all deviate from a common 'global' seasonal function). Here we use the `newdata` argument to generate predictions for each of the hierarchical smooth functions (note that the intercept is still included in these plots so they do not center on zero)
-```{r, fig.width = 4, fig.height = 3, fig.align='center'}
+```{r}
 newdat <- data.frame(season = seq(1, 12, length.out = 100),
                      series = levels(trends_data$data_train$series)[1])
   
@@ -348,7 +355,7 @@ plot_mvgam_smooth(object = trends_mod3, series = 1,
                   newdata = newdat)
 ```
 
-```{r, fig.width = 4, fig.height = 3, fig.align='center'}
+```{r}
 newdat <- data.frame(season = seq(1, 12, length.out = 100),
                      series = levels(trends_data$data_train$series)[2])
   
@@ -357,7 +364,7 @@ plot_mvgam_smooth(object = trends_mod3, series = 2,
                   newdata = newdat)
 ```
 
-```{r, fig.width = 4, fig.height = 3, fig.align='center'}
+```{r}
 newdat <- data.frame(season = seq(1, 12, length.out = 100),
                      series = levels(trends_data$data_train$series)[3])
   
@@ -366,7 +373,7 @@ plot_mvgam_smooth(object = trends_mod3, series = 3,
                   newdata = newdat)
 ```
 
-```{r, fig.width = 4, fig.height = 3, fig.align='center'}
+```{r}
 newdat <- data.frame(season = seq(1, 12, length.out = 100),
                      series = levels(trends_data$data_train$series)[4])
   
@@ -380,7 +387,7 @@ Plot posterior mean estimates of latent trend correlations. These correlations a
 correlations <- lv_correlations(object = trends_mod3)
 ```
 
-```{r, fig.align='center', fig.width=6, fig.height=4, message=FALSE}
+```{r, message=FALSE}
 library(ggplot2)
 mean_correlations <- correlations$mean_correlations
 mean_correlations[upper.tri(mean_correlations)] <- NA
@@ -398,7 +405,7 @@ ggplot(mean_correlations %>%
 ```
 
 There is certainly some evidence of positive trend correlations for a few of these search terms, which is not surprising given how similar some of them are and how closely linked they should be to interest about tick paralysis in Queensland. Plot some STL decompositions of these series to see if these trends are noticeable in the data
-```{r, fig.align='center', fig.width=6, fig.height=4, message=FALSE}
+```{rmessage=FALSE}
 plot(stl(ts(as.vector(series$`tick paralysis`), frequency = 12), 'periodic'))
 plot(stl(ts(as.vector(series$`paralysis tick dog`), frequency = 12), 'periodic'))
 plot(stl(ts(as.vector(series$`dog tick`), frequency = 12), 'periodic'))
@@ -406,40 +413,44 @@ plot(stl(ts(as.vector(series$`tick bite`), frequency = 12), 'periodic'))
 ```
 
 Forecast period posterior predictive checks suggest that the model still has room for improvement: 
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r}
 ppc(trends_mod3, series = 1, type = 'hist', newdata = trends_data$data_test)
 ```
 
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r}
 ppc(trends_mod3, series = 1, type = 'mean', newdata = trends_data$data_test)
 ```
 
 
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r}
 ppc(trends_mod3, series = 2, type = 'hist', newdata = trends_data$data_test)
 ```
 
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r}
 ppc(trends_mod3, series = 2, type = 'mean', newdata = trends_data$data_test)
 ```
 
 
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r}
 ppc(trends_mod3, series = 3, type = 'hist', newdata = trends_data$data_test)
 ```
 
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r}
 ppc(trends_mod3, series = 3, type = 'mean', newdata = trends_data$data_test)
 ```
 
 
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r}
 ppc(trends_mod3, series = 4, type = 'hist', newdata = trends_data$data_test)
 ```
 
-```{r, fig.width = 5, fig.height = 4, fig.align='center'}
+```{r}
 ppc(trends_mod3, series = 4, type = 'mean', newdata = trends_data$data_test)
 ```
 
 Other next steps could involve devising a more goal-specific set of posterior predictive checks (see [this paper by Gelman et al](https://www.jstor.org/stable/2680852?seq=1#metadata_info_tab_contents) and [relevant works by Betancourt](https://betanalpha.github.io/assets/case_studies/principled_bayesian_workflow.html) for examples) and compare out of sample Discrete Rank Probability Scores for this model and other versions for the observations (Negative Binomial) and latent trends (i.e. AR1, Random Walk)
 
+**References**  
+Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. *Methods in Ecology and Evolution*. DOI: https://doi.org/10.1111/2041-210X.13974
+  
+Welty, L.J., et al. (2009). Bayesian distributed lag models: estimating effects of particulate matter air pollution on daily mortality *Biometrics* 65.1: 282-291
