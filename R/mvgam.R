@@ -347,10 +347,30 @@ mvgam = function(formula,
     data_test <- newdata
   }
 
-  if(class(family) == 'family'){
+  # Process family argument
+  if(any(class(family) == 'family')){
     family <- family$family
+    if(family == 'negative binomial'){
+      family <- 'nb'
+    }
+    if(family == 'Beta regression'){
+      family <- 'beta'
+    }
+    if(grepl('Tweedie', family)){
+      family <- 'tw'
+    }
+    if(family == 'gaussian'){
+      family <- 'normal'
+    }
+    if(family == 'Gamma'){
+      family <- 'gamma'
+    }
   }
-  family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
+
+  family <- match.arg(arg = family, choices = c("nb", "poisson",
+                                                "tw", "beta",
+                                                "normal", "lognormal",
+                                                "student", "gamma"))
 
   if(sign(chains) != 1){
     stop('argument "chains" must be a positive integer',
@@ -511,82 +531,11 @@ mvgam = function(formula,
                         drop.unused.levels = FALSE,
                         maxit = 30)
 
-    # if(!missing(knots)){
-    #
-    #   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
-    #   # when simulating from the Bayesian model later on; we don't need convergence, just enough
-    #   # iterations to get a sensible set of priors for any parametric coefficients
-    #   if(family == 'nb'){
-    #     ss_gam <- mgcv::gam(formula(formula),
-    #                         data = data_train,
-    #                         method = "REML",
-    #                         family = nb(),
-    #                         knots = knots,
-    #                         control = list(nthreads = min(4, parallel::detectCores()-1),
-    #                                        maxit = 50),
-    #                         drop.unused.levels = FALSE)
-    #   } else if(family == 'poisson'){
-    #     ss_gam <- mgcv::gam(formula(formula),
-    #                         data = data_train,
-    #                         method = "REML",
-    #                         family = poisson(),
-    #                         knots = knots,
-    #                         control = list(nthreads = min(4, parallel::detectCores()-1),
-    #                                        maxit = 50),
-    #                         drop.unused.levels = FALSE)
-    #   } else {
-    #     ss_gam <- mgcv::gam(formula(formula),
-    #                         data = data_train,
-    #                         method = "REML",
-    #                         family = tw(),
-    #                         knots = knots,
-    #                         control = list(nthreads = min(4, parallel::detectCores()-1),
-    #                                        maxit = 50),
-    #                         drop.unused.levels = FALSE)
-    #   }
-    #
-    # } else {
-    #   if(family == 'nb'){
-    #     ss_gam <- mgcv::gam(formula(formula),
-    #                         data = data_train,
-    #                         method = "REML",
-    #                         family = nb(),
-    #                         control = list(nthreads = min(4, parallel::detectCores()-1),
-    #                                        maxit = 50),
-    #                         drop.unused.levels = FALSE)
-    #   } else if(family == 'poisson'){
-    #     ss_gam <- mgcv::gam(formula(formula),
-    #                         data = data_train,
-    #                         method = "REML",
-    #                         family = poisson(),
-    #                         control = list(nthreads = min(4, parallel::detectCores()-1),
-    #                                        maxit = 50),
-    #                         drop.unused.levels = FALSE)
-    #   } else {
-    #     ss_gam <- mgcv::gam(formula(formula),
-    #                         data = data_train,
-    #                         method = "REML",
-    #                         family = tw(),
-    #                         control = list(nthreads = min(4, parallel::detectCores()-1),
-    #                                        maxit = 50),
-    #                         drop.unused.levels = FALSE)
-    #   }
-    #
-    # }
-
   # Fill in missing observations in data_train so the size of the dataset is correct when
   # building the JAGS model
-  suppressWarnings(data_train$y[which(is.na(data_train$y))] <- round(predict(gam(y ~ time, data = data_train,
-                                                                method = "REML",
-                                                                family = poisson(),
-                                                                control = list(nthreads = parallel::detectCores()-1,
-                                                                               maxit = 50),
-                                                                drop.unused.levels = FALSE),
-                                                                newdata = data.frame(time = data_train$time),
-                                                                type = 'response'),
-                                                    0)[which(is.na(data_train$y))])
+  suppressWarnings(data_train$y[which(is.na(data_train$y))] <- 0)
 
-  # Make jags file and appropriate data structures; note this has to use Poisson but the
+  # Make JAGS file and appropriate data structures; note this has to use Poisson but the
   # resulting JAGS file will be modified to accommodate the specified response distribution accordingly
   if(length(ss_gam$smooth) == 0){
     smooths_included <- FALSE
@@ -672,7 +621,7 @@ mvgam = function(formula,
   lines_remove <- c(1:grep('## response', base_model))
   base_model <- base_model[-lines_remove]
 
-  # Any parametric effects in the gam (particularly the intercept) need to get more sensible priors to ensure they
+  # Any parametric effects in the gam (particularly the intercept) need sensible priors to ensure they
   # do not directly compete with the latent trends
   if(any(grepl('Parametric effect priors', base_model))){
 
@@ -751,8 +700,10 @@ mvgam = function(formula,
 
   # Remove the fakery lines if they were added
   if(!smooths_included){
-    base_model <- base_model[-c(grep('## prior for s(fakery)', trimws(base_model), fixed = TRUE):
-                                  (grep('## prior for s(fakery)', trimws(base_model), fixed = TRUE) + 7))]
+    base_model <- base_model[-c(grep('## prior for s(fakery)',
+                                     trimws(base_model), fixed = TRUE):
+                                  (grep('## prior for s(fakery)',
+                                        trimws(base_model), fixed = TRUE) + 7))]
   }
 
   # Add replacement lines for priors, trends and the linear predictor
@@ -771,8 +722,8 @@ mvgam = function(formula,
 
   } else {
     if(missing(upper_bounds)){
-      model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dnegbin(rate[i, s], r[s])'
-      model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dnegbin(rate[i, s], r[s])'
+      model_file[grep('y\\[i, s\\] ~', model_file)] <- '  y[i, s] ~ dnegbin(rate[i, s], phi[s])'
+      model_file[grep('ypred\\[i, s\\] ~', model_file)] <- '  ypred[i, s] ~ dnegbin(rate[i, s], phi[s])'
     }
   }
 
@@ -819,7 +770,8 @@ mvgam = function(formula,
     if(inherits(lp_test, 'try-error')){
       testdat <- data.frame(time = data_test$time)
 
-      terms_include <- names(ss_gam$coefficients)[which(!names(ss_gam$coefficients) %in% '(Intercept)')]
+      terms_include <- names(ss_gam$coefficients)[which(!names(ss_gam$coefficients)
+                                                        %in% '(Intercept)')]
       if(length(terms_include) > 0){
         newnames <- vector()
         newnames[1] <- 'time'
@@ -1124,13 +1076,13 @@ mvgam = function(formula,
           if(smooths_included){
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -2, 2),
-                   r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -2, 2),
-                   r_inv = runif(NCOL(model_data$ytimes), 1, 50))
+                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50))
             }
           }
 
@@ -1138,14 +1090,14 @@ mvgam = function(formula,
           if(smooths_included){
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -2, 2),
-                   r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    sigma = runif(model_data$n_series, 0.075, 1),
                    lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -2, 2),
-                   r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    sigma = runif(model_data$n_series, 0.075, 1))
             }
           }
@@ -1315,13 +1267,13 @@ mvgam = function(formula,
           if(smooths_included){
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -2, 2),
-                   r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -2, 2),
-                   r_inv = runif(NCOL(model_data$ytimes), 1, 50))
+                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50))
             }
           }
 
@@ -1329,14 +1281,14 @@ mvgam = function(formula,
           if(smooths_included){
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -2, 2),
-                   r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    sigma = runif(model_data$n_series, 0.075, 1),
                    lambda = runif(model_data$n_sp, 5, 25))
             }
           } else {
             inits <- function() {
               list(b_raw = runif(model_data$num_basis, -2, 2),
-                   r_inv = runif(NCOL(model_data$ytimes), 1, 50),
+                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50),
                    sigma = runif(model_data$n_series, 0.075, 1))
             }
           }

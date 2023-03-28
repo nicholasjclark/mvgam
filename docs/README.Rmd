@@ -125,7 +125,7 @@ exp(25)
 Setting `k` to a smaller value results in less flexibility. This is because number of basis functions that contribute to functional behaviour is reduced
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam_prior <- mvgam(data = lynx_train,
-               formula = population ~ s(season, bs = 'cc', k = 13),
+               formula = population ~ s(season, bs = 'cc', k = 12),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
@@ -143,7 +143,7 @@ In practice, imparting domain knowledge into prior specifications for penalised 
 Users can also check what the default prior distributions are for given model formulations, which can be helpful to understand how the model can be modified but also to see any restrictions on what can be changed within the `mvgam` framework.
 
 ```{r}
-test_priors <- get_mvgam_priors(population ~ s(season, bs = 'cc', k = 13),
+test_priors <- get_mvgam_priors(population ~ s(season, bs = 'cc', k = 12),
                                 family = 'poisson',
                                 data = lynx_train,
                                 trend_model = 'AR3',
@@ -155,7 +155,7 @@ Any of the above priors can be changed by modifying the `prior` column and suppl
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvgam(data = lynx_train,
                newdata = lynx_test,
-               formula = population ~ s(season, bs = 'cc', k = 13),
+               formula = population ~ s(season, bs = 'cc', k = 12),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',

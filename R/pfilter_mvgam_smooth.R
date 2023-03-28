@@ -104,7 +104,7 @@ pfilter_mvgam_smooth = function(particles,
         lv_states <- unlist(lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
           sim_ar3(h = 1,
                   last_trends = particles[[x]]$lv_states[[lv]][1:3],
-                  phi = 0,
+                  drift = 0,
                   ar1 = particles[[x]]$ar1[lv],
                   ar2 = particles[[x]]$ar2[lv],
                   ar3 = particles[[x]]$ar3[lv],
@@ -148,7 +148,7 @@ pfilter_mvgam_smooth = function(particles,
         next_trend <- unlist(lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
           sim_ar3(h = 1,
                   last_trends = particles[[x]]$trend_states[[series]][1:3],
-                  phi = particles[[x]]$phi[series],
+                  drift = particles[[x]]$drift[series],
                   ar1 = particles[[x]]$ar1[series],
                   ar2 = particles[[x]]$ar2[series],
                   ar3 = particles[[x]]$ar3[series],
@@ -180,32 +180,47 @@ pfilter_mvgam_smooth = function(particles,
     if(is.na(next_assim$y[series])){
       series_weight <- 1
     } else {
-      if(particles[[x]]$family == 'Negative Binomial'){
-        series_weight <- (dnbinom(next_assim$y[series],
-                                      size = particles[[x]]$size[series],
-                                      mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
-                                                   particles[[x]]$betas)) +
-                                                 (next_trend[series]) +
-                                                 attr(Xp, 'model.offset'))))
-      }
 
-      if(particles[[x]]$family == 'Poisson'){
-        series_weight <- (dpois(next_assim$y[series],
-                                      lambda = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
-                                                   particles[[x]]$betas)) +
-                                                     (next_trend[series]) +
-                                                   attr(Xp, 'model.offset'))))
-      }
+      # Series-specific linear predictor matrix
+      Xpmat <- t(rbind(as.matrix(Xp[which(as.numeric(next_assim$series) == series),]),
+                       next_trend[series]))
+      attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
-      if(particles[[x]]$family == 'Tweedie'){
-        series_weight <- exp(mgcv::ldTweedie(y = next_assim$y[series],
-                                                 mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
-                                                              particles[[x]]$betas)) + (next_trend[series]) +
-                                                            attr(Xp, 'model.offset')),
-                                                 p = particles[[x]]$p,
-                                                 phi = particles[[x]]$twdis[series],
-                                                 all.derivs = F)[,1])
-      }
+      # Likelihood
+      series_weight <- mvgam:::mvgam_predict(family = particles[[x]]$family,
+                                             family_pars = particles[[x]]$family_pars,
+                                             truth = next_assim$y[series],
+                                             Xp = Xpmat,
+                                             betas = c(particles[[x]]$betas, 1),
+                                             density = TRUE)
+
+
+      # if(particles[[x]]$family == 'Negative Binomial'){
+      #   series_weight <- (dnbinom(next_assim$y[series],
+      #                                 size = particles[[x]]$size[series],
+      #                                 mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
+      #                                              particles[[x]]$betas)) +
+      #                                            (next_trend[series]) +
+      #                                            attr(Xp, 'model.offset'))))
+      # }
+      #
+      # if(particles[[x]]$family == 'Poisson'){
+      #   series_weight <- (dpois(next_assim$y[series],
+      #                                 lambda = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
+      #                                              particles[[x]]$betas)) +
+      #                                                (next_trend[series]) +
+      #                                              attr(Xp, 'model.offset'))))
+      # }
+      #
+      # if(particles[[x]]$family == 'Tweedie'){
+      #   series_weight <- exp(mgcv::ldTweedie(y = next_assim$y[series],
+      #                                            mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
+      #                                                         particles[[x]]$betas)) + (next_trend[series]) +
+      #                                                       attr(Xp, 'model.offset')),
+      #                                            p = particles[[x]]$p,
+      #                                            drift = particles[[x]]$twdis[series],
+      #                                            all.derivs = F)[,1])
+      # }
 
     }
     series_weight
@@ -222,14 +237,12 @@ pfilter_mvgam_smooth = function(particles,
         lv_states = lv_states,
         lv_coefs = particles[[x]]$lv_coefs,
         betas = particles[[x]]$betas,
-        phi = as.numeric(particles[[x]]$phi),
+        drift = as.numeric(particles[[x]]$drift),
         ar1 = as.numeric(particles[[x]]$ar1),
         ar2 = as.numeric(particles[[x]]$ar2),
         ar3 = as.numeric(particles[[x]]$ar3),
         tau = as.numeric(particles[[x]]$tau),
-        size = particles[[x]]$size,
-        p = particles[[x]]$p,
-        twdis = particles[[x]]$twdis,
+        family_pars = particles[[x]]$family_pars,
         alpha_gp = particles[[x]]$alpha_gp,
         rho_gp = particles[[x]]$rho_gp,
         trend_states = trend_states,
@@ -240,28 +253,6 @@ pfilter_mvgam_smooth = function(particles,
 
   }, cl = cl)
   stopCluster(cl)
-
-  # n_series <- length(particles[[1]]$trend_states)
-  # if(n_series > 1){
-  # lik_weights <- do.call(rbind, lapply(seq_along(particles), function(x){
-  #   particles[[x]]$liks
-  # }))
-  #
-  # series_sds <- apply(lik_weights, 2, function(x) sd(x))
-  # if(all(series_sds == 0)){
-  #   # Do nothing if all series have equal weights due to resampling or all NAs in
-  #   # last observation
-  # } else {
-  #   # Else update weights using ranking information
-  #   lik_weights <- apply(apply(lik_weights[, !series_sds  == 0 ], 2, rank), 1, prod)
-  #   lik_weights <- lik_weights / max(lik_weights)
-  #
-  #   particles <- lapply(seq_along(particles), function(x){
-  #     particles[[x]]$weight <- lik_weights[x] * particles[[x]]$weight
-  #     particles[[x]]
-  #   })
-  # }
-  # }
 
   weights <- (unlist(lapply(seq_along(particles), function(x){
     tail(particles[[x]]$weight, 1)})))
@@ -624,20 +615,18 @@ pfilter_mvgam_smooth = function(particles,
          lv_states = lv_evolve,
          lv_coefs = lv_coefs_evolve,
          betas = betas,
-         size = particles[[x]]$size,
          tau = if(use_resampling){
            particles[[x]]$tau
          } else {
            pmin(100, particles[[x]]$tau + runif(length(particles[[x]]$tau), 0, evolve))
          },
-         phi = particles[[x]]$phi,
+         drift = particles[[x]]$drift,
          ar1 = particles[[x]]$ar1,
          ar2 = particles[[x]]$ar2,
          ar3 = particles[[x]]$ar3,
-         p = particles[[x]]$p,
-         twdis = particles[[x]]$twdis,
          alpha_gp = particles[[x]]$alpha_gp,
          rho_gp = particles[[x]]$rho_gp,
+         family_pars = particles[[x]]$family_pars,
          trend_states = trend_evolve,
          weight = particle_weight,
          upper_bounds = particles[[x]]$upper_bounds,

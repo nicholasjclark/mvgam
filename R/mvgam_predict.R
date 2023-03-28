@@ -5,20 +5,31 @@
 #' @param type When this has the value \code{link} (default) the linear predictor is calculated on the log link scale.
 #' When \code{response} is used, the predictions take uncertainty in the observation process into account to return
 #' predictions on the outcome scale
-#' @param ... Additional arguments for each specific observation process (i.e.
+#' @param family_pars Additional arguments for each specific observation process (i.e.
 #' overdispersion parameter if `family == "nb"`)
+#' @param density logical. Rather than calculating a prediction, evaluate the likelihood.
+#' Use this option when particle filtering
+#' @param truth Observation to use for evaluating the likelihood (if `density == TRUE`)
 #' @details A generic prediction function that will make it easier to add new
 #' response distributions in future
 #' @noRd
 #'
 #'
-mvgam_predict = function(Xp, family, betas, type = 'link', ...){
+mvgam_predict = function(Xp, family, betas,
+                         type = 'link',
+                         family_pars,
+                         density = FALSE,
+                         truth = NULL){
 
   # Poisson observations
   if(family == 'Poisson'){
     if(type ==  'link'){
       out <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                           betas) + attr(Xp, 'model.offset'))
+      if(density){
+        out <- dpois(truth, lambda = exp(out))
+      }
+
     } else {
       out <- rpois(n = NROW(Xp),
                    lambda = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
@@ -27,33 +38,50 @@ mvgam_predict = function(Xp, family, betas, type = 'link', ...){
     }
   }
 
-  # Negative Binomial observations (requires argument 'size')
+  # Negative Binomial observations (requires argument 'phi')
   if(family == 'Negative Binomial'){
     if(type ==  'link'){
       out <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                           betas) + attr(Xp, 'model.offset'))
+
+      if(density){
+        out <- dnbinom(truth, mu = exp(out),
+                       size = family_pars$phi)
+      }
+
     } else {
       out <- rnbinom(n = NROW(Xp),
                      mu = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                                   betas)) +
                                 attr(Xp, 'model.offset')),
-                     size = list(...)$size)
+                     size = family_pars$phi)
     }
   }
 
-  # Tweedie observations (requires arguments 'p' and 'twdis')
+  # Tweedie observations (requires argument 'phi')
   if(family == 'Tweedie'){
     if(type ==  'link'){
       out <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                           betas) + attr(Xp, 'model.offset'))
+
+      if(density){
+        out <- exp(mgcv::ldTweedie(y = truth,
+                                   mu = exp(out),
+                                   # Power parameter is fixed
+                                   p = 1.5,
+                                   phi = family_pars$phi,
+                                   all.derivs = F)[,1])
+      }
+
     } else {
       out <- rpois(n = NROW(Xp),
                    lambda = mgcv::rTweedie(
                      mu = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                                   betas)) +
                                 attr(Xp, 'model.offset')),
-                     p = list(...)$p,
-                     phi = list(...)$twdis))
+                     # Power parameter is fixed
+                     p = 1.5,
+                     phi = family_pars$phi))
     }
   }
 
@@ -90,7 +118,7 @@ sim_gp = function(last_trends, h, rho_gp, alpha_gp){
 #' Generic AR3  simulation function
 #' @param last_trends Vector of trend estimates leading up to the current timepoint
 #' @param h \code{integer} specifying the forecast horizon
-#' @param phi drift parameter
+#' @param drift drift parameter
 #' @param ar1 AR1 parameter
 #' @param ar2 AR2 parameter
 #' @param ar3 AR3 parameter
@@ -98,13 +126,13 @@ sim_gp = function(last_trends, h, rho_gp, alpha_gp){
 #' @noRd
 #'
 #'
-sim_ar3 = function(phi, ar1, ar2, ar3, tau, last_trends, h){
+sim_ar3 = function(drift, ar1, ar2, ar3, tau, last_trends, h){
   states <- rep(NA, length = h + 3)
   states[1] <- last_trends[1]
   states[2] <- last_trends[2]
   states[3] <- last_trends[3]
   for (t in 4:(h + 3)) {
-    states[t] <- rnorm(1, phi + ar1*states[t - 1] +
+    states[t] <- rnorm(1, drift + ar1*states[t - 1] +
                          ar2*states[t - 2] +
                          ar3*states[t - 3], sqrt(1 / tau))
   }

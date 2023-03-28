@@ -107,25 +107,25 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
     if(threads > 1){
       model_file[lik_line] <- paste0('{\n// likelihood functions\n',
                                      'vector[n_nonmissing] flat_trends;\n',
-                                     'real flat_rs[n_nonmissing];\n',
+                                     'real flat_phis[n_nonmissing];\n',
                                      'flat_trends = (to_vector(trend))[obs_ind];\n',
-                                     'flat_rs = to_array_1d(rep_each(r_inv, n)[obs_ind]);\n',
+                                     'flat_phis = to_array_1d(rep_each(phi_inv, n)[obs_ind]);\n',
                                      'target += reduce_sum(partial_log_lik_lpmf, seq,\n',
                                      'grainsize,\n',
                                      'flat_ys,\n',
                                      ifelse(offset,'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)) + offset[obs_ind],\n',
                                             'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)),\n'),
-                                     'flat_rs);\n}\n}\n')
+                                     'flat_phis);\n}\n}\n')
     } else {
       model_file[lik_line] <- paste0('{\n// likelihood functions\n',
                                      'vector[n_nonmissing] flat_trends;\n',
-                                     'real flat_rs[n_nonmissing];\n',
+                                     'real flat_phis[n_nonmissing];\n',
                                      'flat_trends = (to_vector(trend))[obs_ind];\n',
-                                     'flat_rs = to_array_1d(rep_each(r_inv, n)[obs_ind]);\n',
+                                     'flat_phis = to_array_1d(rep_each(phi_inv, n)[obs_ind]);\n',
                                      'flat_ys ~ neg_binomial_2(\n',
                                      ifelse(offset,'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)) + offset[obs_ind],\n',
                                             'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)),\n'),
-                                     'inv(flat_rs));\n}\n}\n')
+                                     'inv(flat_phis));\n}\n}\n')
     }
 
     if(any(grepl('functions {', model_file, fixed = TRUE))){
@@ -260,7 +260,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'Poisson',
                                                                 'eta = X * b;\n'),
                                                          'for(s in 1:n_series){ \n',
                                                          'mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];\n',
-                                                         'ypred[1:n, s] = neg_binomial_2_rng(exp(mus[1:n, s]), r_vec[1:n, s]);\n',
+                                                         'ypred[1:n, s] = neg_binomial_2_rng(exp(mus[1:n, s]), phi_vec[1:n, s]);\n',
                                                          '}')
   }
 

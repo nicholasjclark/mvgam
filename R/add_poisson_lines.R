@@ -7,7 +7,7 @@
 #' @return A modified `JAGS` model file
 add_poisson_lines = function(model_file, upper_bounds){
 
-  odis_begin <- grep('r\\[s\\] <- ', model_file) - 4
+  odis_begin <- grep('phi\\[s\\] <- ', model_file) - 4
   odis_end <- odis_begin + 7
   model_file <- model_file[-c(odis_begin:odis_end)]
 

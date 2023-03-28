@@ -2,7 +2,7 @@
 #'
 #'
 #' @export
-#' @param family \code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'
+#' @param family \code{character}
 #' @param smooths_included Logical. Are smooth terms included in the model formula?
 #' @param use_lv Logical (use latent variable trends or not)
 #' @param trend_model The type of trend model used
@@ -11,19 +11,18 @@
 get_monitor_pars = function(family, smooths_included = TRUE,
                             use_lv, trend_model, drift){
 
+  family <- match.arg(arg = family, choices = c("nb", "poisson",
+                                                "tw", "beta",
+                                                "normal", "lognormal",
+                                                "student", "gamma"))
+
   if(smooths_included){
     param <- c('rho', 'b', 'ypred', 'mus')
   } else {
     param <- c('b', 'ypred', 'mus')
   }
 
-  if(family == 'nb'){
-    param <- c(param, 'r')
-  }
-
-  if(family == 'tw'){
-    param <- c(param, 'twdis')
-  }
+  param <- c(param, family_par_names(family_to_fullname(family)))
 
   if(use_lv){
     if(trend_model == 'RW'){
@@ -77,7 +76,7 @@ get_monitor_pars = function(family, smooths_included = TRUE,
 
   if(trend_model != 'None'){
     if(drift){
-      param <- c(param, 'phi')
+      param <- c(param, 'drift')
     }
   }
   param

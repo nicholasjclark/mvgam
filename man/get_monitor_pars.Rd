@@ -7,7 +7,7 @@
 get_monitor_pars(family, smooths_included = TRUE, use_lv, trend_model, drift)
 }
 \arguments{
-\item{family}{\code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'}
+\item{family}{\code{character}}
 
 \item{smooths_included}{Logical. Are smooth terms included in the model formula?}
 

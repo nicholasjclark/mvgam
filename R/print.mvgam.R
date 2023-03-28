@@ -25,7 +25,7 @@ cat(paste0(object$family, '\n'))
 message()
 
 message("Link function:")
-cat(paste0('log', '\n'))
+cat(paste0(family_links(object$family), '\n'))
 message()
 
 message("Trend model:")
@@ -58,25 +58,25 @@ message()
 
 if(object$fit_engine == 'jags'){
   message('Status:')
-  cat('Fitted using runjags::run.jags()', '\n')
+  cat('Fitted using JAGS', '\n')
   message()
 }
 
 if(object$fit_engine == 'stan'){
   message('Status:')
-  cat('Fitted using rstan::stan()', '\n')
+  cat('Fitted using Stan', '\n')
   message()
 }
 
 if(object$family == 'Negative Binomial'){
   message("Dispersion parameter estimates:")
-  print(MCMCvis::MCMCsummary(object$model_output, 'r')[,c(3:7)])
+  print(MCMCvis::MCMCsummary(object$model_output, 'phi')[,c(3:7)])
   message()
 }
 
 if(object$family == 'Tweedie'){
   message("Dispersion parameter estimates:")
-  print(MCMCvis::MCMCsummary(object$model_output, 'twdis')[,c(3:7)])
+  print(MCMCvis::MCMCsummary(object$model_output, 'phi')[,c(3:7)])
   message()
 }
 
@@ -99,7 +99,7 @@ print.mvgam_prefit = function(object){
   message()
 
   message("Link function:")
-  cat(paste0('log', '\n'))
+  cat(paste0(family_links(object$family), '\n'))
   message()
 
   message("Trend model:")

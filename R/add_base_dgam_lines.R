@@ -223,23 +223,23 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                }
 
                for (j in 1:n_lv) {
-               LV_raw[2, j] ~ dnorm(phi[j] + ar1[j]*LV_raw[1, j], penalty[j])
+               LV_raw[2, j] ~ dnorm(drift[j] + ar1[j]*LV_raw[1, j], penalty[j])
                }
 
                for (j in 1:n_lv) {
-               LV_raw[3, j] ~ dnorm(phi[j] + ar1[j]*LV_raw[2, j] + ar2[j]*LV_raw[1, j], penalty[j])
+               LV_raw[3, j] ~ dnorm(drift[j] + ar1[j]*LV_raw[2, j] + ar2[j]*LV_raw[1, j], penalty[j])
                }
 
                for (i in 4:n) {
                for (j in 1:n_lv) {
-               LV_raw[i, j] ~ dnorm(phi[j] + ar1[j]*LV_raw[i - 1, j] +
+               LV_raw[i, j] ~ dnorm(drift[j] + ar1[j]*LV_raw[i - 1, j] +
                ar2[j]*LV_raw[i - 2, j] + ar3[j]*LV_raw[i - 3, j], penalty[j])
                }
                }
 
                ## AR components
                for (s in 1:n_lv) {
-               phi[s] ~ dnorm(0, 10)
+               drift[s] ~ dnorm(0, 10)
                ar1[s] ~ dnorm(0, 10)
                ar2[s] ~ dnorm(0, 10)
                ar3[s] ~ dnorm(0, 10)
@@ -318,9 +318,9 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                ## likelihood functions
                for (i in 1:n) {
                for (s in 1:n_series) {
-               y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
-               rate[i, s] <- ifelse((r[s] / (r[s] + mus[i, s])) < min_eps, min_eps,
-               (r[s] / (r[s] + mus[i, s])))
+               y[i, s] ~ dnegbin(rate[i, s], phi[s])T(, upper_bound[s]);
+               rate[i, s] <- ifelse((phi[s] / (phi[s] + mus[i, s])) < min_eps, min_eps,
+               (phi[s] / (phi[s] + mus[i, s])))
                }
                }
 
@@ -328,14 +328,14 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                ## where the likelihood reduces to a 'base' model (Poisson) unless
                ## the data support overdispersion
                for (s in 1:n_series) {
-               r[s] <- 1 / r_inv[s]
-               r_inv[s] ~ dexp(5)
+               phi[s] <- 1 / phi_inv[s]
+               phi_inv[s] ~ dexp(5)
                }
 
                ## posterior predictions
                for (i in 1:n) {
                for (s in 1:n_series) {
-               ypred[i, s] ~ dnegbin(rate[i, s], r)T(, upper_bound[s])
+               ypred[i, s] ~ dnegbin(rate[i, s], phi[s])T(, upper_bound[s])
                }
                }
 
@@ -361,22 +361,22 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                           }
 
                           for (s in 1:n_series) {
-                          trend[2, s] ~ dnorm(phi[s] + ar1[s]*trend[1, s], tau[s])
+                          trend[2, s] ~ dnorm(drift[s] + ar1[s]*trend[1, s], tau[s])
                           }
 
                           for (s in 1:n_series) {
-                          trend[3, s] ~ dnorm(phi[s] + ar1[s]*trend[2, s] + ar2[s]*trend[1, s], tau[s])
+                          trend[3, s] ~ dnorm(drift[s] + ar1[s]*trend[2, s] + ar2[s]*trend[1, s], tau[s])
                           }
 
                           for (i in 4:n) {
                           for (s in 1:n_series){
-                          trend[i, s] ~ dnorm(phi[s] + ar1[s]*trend[i - 1, s] + ar2[s]*trend[i - 2, s] + ar3[s]*trend[i - 3, s], tau[s])
+                          trend[i, s] ~ dnorm(drift[s] + ar1[s]*trend[i - 1, s] + ar2[s]*trend[i - 2, s] + ar3[s]*trend[i - 3, s], tau[s])
                           }
                           }
 
                           ## AR components
                           for (s in 1:n_series){
-                          phi[s] ~ dnorm(0, 10)
+                          drift[s] ~ dnorm(0, 10)
                           ar1[s] ~ dnorm(0, 10)
                           ar2[s] ~ dnorm(0, 10)
                           ar3[s] ~ dnorm(0, 10)
@@ -387,9 +387,9 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                           ## likelihood functions
                           for (i in 1:n) {
                           for (s in 1:n_series) {
-                          y[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s]);
-                          rate[i, s] <- ifelse((r[s] / (r[s] + mus[i, s])) < min_eps, min_eps,
-                          (r[s] / (r[s] + mus[i, s])))
+                          y[i, s] ~ dnegbin(rate[i, s], phi[s])T(, upper_bound[s]);
+                          rate[i, s] <- ifelse((phi[s] / (phi[s] + mus[i, s])) < min_eps, min_eps,
+                          (phi[s] / (phi[s] + mus[i, s])))
                           }
                           }
 
@@ -397,14 +397,14 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                           ## where the likelihood reduces to a 'base' model (Poisson) unless
                           ## the data support overdispersion
                           for (s in 1:n_series) {
-                          r[s] <- 1 / r_inv[s]
-                          r_inv[s] ~ dexp(5)
+                          phi[s] <- 1 / phi_inv[s]
+                          phi_inv[s] ~ dexp(5)
                           }
 
                           ## posterior predictions
                           for (i in 1:n) {
                           for (s in 1:n_series) {
-                          ypred[i, s] ~ dnegbin(rate[i, s], r[s])T(, upper_bound[s])
+                          ypred[i, s] ~ dnegbin(rate[i, s], phi[s])T(, upper_bound[s])
                           }
                           }
 

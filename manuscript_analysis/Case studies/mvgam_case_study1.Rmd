@@ -2,10 +2,10 @@
 title: 'mvgam case study 1: model comparison and data assimilation'
 author: "Nicholas Clark (n.clark@uq.edu.au)"
 output:
-  pdf_document:
-    highlight: zenburn
   html_document:
     df_print: paged
+  pdf_document:
+    highlight: zenburn
   word_document: default
 urlcolor: blue
 ---
@@ -372,7 +372,7 @@ In fact the the autocorrelated observation model is overestimating the amount of
 data. This can partially explain the exponentially growing uncertainties in the mgcv forecast The truth for the ovderdispersion parameter is `10`. This is likely driven by the autoregressive model's high sensitivity to the noisy observation process. Observations in ecology very often display properties of overdispersion, and this results in observation 'outliers' that can have large leverage on resulting parameter estimates for autoregressive models. The noisy observation process is not a problem for latent trend models such as those estimated by `mvgam`, as the observation model is estimated separately from the temporal process (as is the norm for state-space models)
 ```{r}
 m_mgcv$family$getTheta(TRUE)
-quantile(MCMCvis::MCMCchains(m_mvgam$model_output, 'r'), c(0.1, 0.5, 0.9))
+quantile(MCMCvis::MCMCchains(m_mvgam$model_output, 'phi'), c(0.1, 0.5, 0.9))
 ```
 Looking at estimates for the full trend and forecast distributions shows how the `mvgam` model is clearly doing a decent job of tracking the latent state up to the end of the training period while also giving reasonable estimates for the overdispersion in the data
 ```{r}
@@ -842,9 +842,8 @@ lynx_full = dplyr::mutate(lynx_full,
                    lag6 = dplyr::lag(popl,6, default = mean_pop_l))
 ```
 
-For `mvgam` models, the response needs to be labelled `y` and we also need an indicator of the series name as a `factor` variable
+For `mvgam` models, we need an indicator of the series name as a `factor` variable
 ```{r}
-lynx_full$y <- lynx_full$population
 lynx_full$series <- factor('series1')
 ```
 
@@ -1044,10 +1043,10 @@ This forecast is highly overconfident, with very unrealistic uncertainty interva
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvgam(data = lynx_train,
                newdata = lynx_test,
-               formula = y ~ s(season, bs = 'cc', k = 19),
+               formula = population ~ s(season, bs = 'cc', k = 15),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
-               trend_model = 'AR1',
+               trend_model = 'AR2',
                use_stan = TRUE,
                chains = 4)
 ```

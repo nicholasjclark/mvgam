@@ -190,21 +190,9 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
   # Family of model
   family <- object$family
 
-  # Negative binomial size estimate
-  if(family == 'Negative Binomial'){
-    sizes <- MCMCvis::MCMCchains(object$model_output, 'r')
-  } else {
-    sizes <- NULL
-  }
-
-  # Tweedie parameters
-  if(family == 'Tweedie'){
-    twdiss <- MCMCvis::MCMCchains(object$model_output, 'twdis')
-    ps <- matrix(1.5, nrow = NROW(betas), ncol = NCOL(object$ytimes))
-  } else {
-    twdiss <- NULL
-    ps <- NULL
-  }
+  # Family-specific parameters
+  pars <- mvgam:::extract_family_pars(family = family,
+                                      object = object)
 
   # Latent trend precisions and loadings
   if(object$use_lv){
@@ -228,7 +216,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
 
     })
   } else {
-    if(object$trend_model %in% c('None')){
+    if(object$trend_model %in% c('GP','None')){
       taus <- NULL
     } else {
       taus <- MCMCvis::MCMCchains(object$model_output, 'tau')
@@ -296,14 +284,14 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
     lvs <- NULL
   }
 
-  # Phi estimates for latent trend drift terms
+  # Estimates for latent trend drift terms
   if(object$drift){
-    phis <- MCMCvis::MCMCchains(object$model_output, 'phi')
+    drifts <- MCMCvis::MCMCchains(object$model_output, 'drift')
   } else {
     if(object$use_lv){
-      phis <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+      drifts <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
     } else {
-      phis <- matrix(0, nrow = NROW(betas), ncol = NCOL(object$ytimes))
+      drifts <- matrix(0, nrow = NROW(betas), ncol = NCOL(object$ytimes))
     }
   }
 
@@ -380,18 +368,17 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
   setDefaultCluster(cl)
   clusterExport(NULL, c('use_lv',
                         'lvs',
-                        'phis',
+                        'drifts',
                         'ar1s',
                         'ar2s',
                         'ar3s',
                         'taus',
                         'alpha_gps',
                         'rho_gps',
+                        'pars',
                         'lv_coefs',
                         'betas',
-                        'sizes',
-                        'twdiss',
-                        'ps',
+                        'series',
                         'series_test',
                         'trend_estimates',
                         'Xp'),
@@ -411,7 +398,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
 
     if(is.null(alpha_gps)){
       # Sample AR parameters
-      phi <- phis[samp_index, ]
+      drift <- drifts[samp_index, ]
       ar1 <- ar1s[samp_index, ]
       ar2 <- ar2s[samp_index, ]
       ar3 <- ar3s[samp_index, ]
@@ -421,15 +408,20 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
       tau <- taus[samp_index,]
 
     } else {
-      phi <- ar1 <- ar2 <- ar3 <- tau <- 0
+      drift <- ar1 <- ar2 <- ar3 <- tau <- 0
       alpha_gp <- alpha_gps[samp_index, ]
       rho_gp <- rho_gps[samp_index, ]
     }
 
     # Family-specific parameters
-    size <- sizes[samp_index, ]
-    twdis <- twdiss[samp_index, ]
-    p <- ps[samp_index]
+    par_extracts <- lapply(seq_along(pars), function(x){
+      if(is.matrix(pars[[x]])){
+        pars[[x]][samp_index, series]
+      } else {
+        pars[[x]][samp_index]
+      }
+    })
+    names(par_extracts) <- names(pars)
 
     if(use_lv){
       # Sample a last state estimate for the latent variables
@@ -442,7 +434,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
 
       if(is.null(alpha_gps)){
         next_lvs <- do.call(cbind, lapply(seq_along(lvs), function(lv){
-          sim_ar3(phi = phi[lv],
+          sim_ar3(drift = drift[lv],
                   ar1 = ar1[lv],
                   ar2 = ar2[lv],
                   ar3 = ar3[lv],
@@ -465,7 +457,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
     } else {
       # Run the trends forward
       if(is.null(alpha_gps)){
-        trends <- sim_ar3(phi = phi[series],
+        trends <- sim_ar3(drift = drift[series],
                           ar1 = ar1[series],
                           ar2 = ar2[series],
                           ar3 = ar3[series],
@@ -491,9 +483,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
                            Xp = Xpmat,
                            type = type,
                            betas = c(betas, 1),
-                           size = size[series],
-                           p = p,
-                           twdis = twdis[series])
+                           family_pars = par_extracts)
     }
 
     out

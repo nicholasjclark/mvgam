@@ -68,21 +68,9 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
   # Family of model
   family <- object$family
 
-  # Negative binomial size estimate
-  if(family == 'Negative Binomial'){
-    sizes <- MCMCvis::MCMCchains(object$model_output, 'r')
-  } else {
-    sizes <- NULL
-  }
-
-  # Tweedie parameters
-  if(family == 'Tweedie'){
-    twdiss <- MCMCvis::MCMCchains(object$model_output, 'twdis')
-    ps <- matrix(1.5, nrow = NROW(betas), ncol = NCOL(object$ytimes))
-  } else {
-    twdiss <- NULL
-    ps <- NULL
-  }
+  # Family-specific parameters
+  pars <- mvgam:::extract_family_pars(family = family,
+                                      object = object)
 
   # Determine which series each observation belongs to
   series_ind <- as.numeric(newdata$series)
@@ -91,9 +79,7 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
   cl <- parallel::makePSOCKcluster(n_cores)
   setDefaultCluster(cl)
   clusterExport(NULL, c('betas',
-                        'sizes',
-                        'twdiss',
-                        'ps',
+                        'pars',
                         'newdata',
                         'Xp',
                         'series_ind'),
@@ -101,13 +87,20 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
 
   pbapply::pboptions(type = "none")
   predictions <- do.call(rbind, pbapply::pblapply(seq_len(dim(betas)[1]), function(x){
-    mvgam_predict(family = family,
+    # Family-specific parameters
+    par_extracts <- lapply(seq_along(pars), function(j){
+      if(is.matrix(pars[[j]])){
+        pars[[j]][x,series_ind[x]]
+      } else {
+        pars[[j]][x]
+      }
+    })
+    names(par_extracts) <- names(pars)
+    mvgam:::mvgam_predict(family = family,
                   Xp = Xp,
                   type = type,
                   betas = betas[x,],
-                  size = sizes[x, series_ind],
-                  p = ps[x, series_ind],
-                  twdis = twdiss[x, series_ind])
+                  family_pars = par_extracts)
   }, cl = cl))
   stopCluster(cl)
 

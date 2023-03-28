@@ -35,16 +35,16 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
 
   if(family == 'nb'){
     stan_file[grep('// raw basis', stan_file) + 2] <-
-  '\n// negative binomial overdispersion\nvector<lower=0>[n_series] r_inv;\n'
+  '\n// negative binomial overdispersion\nvector<lower=0>[n_series] phi_inv;\n'
 
       stan_file[grep('// priors for smoothing', stan_file) + 2] <-
         paste0('\n// priors for overdispersion parameters\n',
-        'r_inv ~ student_t(3, 0, 0.1);\n')
+        'phi_inv ~ student_t(3, 0, 0.1);\n')
 
       to_negbin <- gsub('poisson_log', 'neg_binomial_2',
            stan_file[grep('y[i, s] ~ poisson', stan_file, fixed = T)])
       stan_file[grep('y[i, s] ~ poisson', stan_file, fixed = T)] <-
-      gsub(');', ', inv(r_inv[s]));', to_negbin)
+      gsub(');', ', inv(phi_inv[s]));', to_negbin)
 
       add_exp_open <- gsub('\\(eta', '(exp(eta',
                       stan_file[grep('y[i, s] ~ neg_binomial', stan_file, fixed = T)])
@@ -55,16 +55,16 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
 
       stan_file[grep('matrix[n, n_series] ypred;', stan_file, fixed = T)] <-
         paste0('matrix[n, n_series] ypred;\n',
-               'matrix[n, n_series] r_vec;\n',
-               'vector[n_series] r;\n',
-               'r = inv(r_inv);\n',
+               'matrix[n, n_series] phi_vec;\n',
+               'vector[n_series] phi;\n',
+               'phi = inv(phi_inv);\n',
                'for (s in 1:n_series) {\n',
-               'r_vec[1:n,s] = rep_vector(r[s], n);\n}\n')
+               'phi_vec[1:n,s] = rep_vector(phi[s], n);\n}\n')
 
       to_negbin <- gsub('poisson_log_rng', 'neg_binomial_2_rng',
                         stan_file[grep('ypred[i, s] = poisson_log_rng', stan_file, fixed = T)])
       stan_file[grep('ypred[i, s] = poisson_log_rng', stan_file, fixed = T)] <-
-        gsub(');', ', r_vec[i, s]);', to_negbin)
+        gsub(');', ', phi_vec[i, s]);', to_negbin)
 
       add_exp_open <- gsub('\\(eta', '(exp(eta',
                            stan_file[grep('ypred[i, s] = neg_binomial', stan_file, fixed = T)])

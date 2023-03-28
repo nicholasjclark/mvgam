@@ -692,29 +692,29 @@ get_mvgam_priors = function(formula,
     drift_df <- NULL
   }
 
-  # Extract information for family-specific overdispsersion parameters
+  # Extract information for family-specific overdispersion parameters
   if(family == 'nb'){
     if(use_stan){
-      nb_df <- data.frame(param_name = c('r_inv<lower=0>'),
+      nb_df <- data.frame(param_name = c('phi_inv<lower=0>'),
                           param_length = length(unique(data_train$series)),
                           param_info = c('inverse of NB dispsersion'),
-                          prior = c('r_inv ~ student_t(3, 0, 0.1);'),
+                          prior = c('phi_inv ~ student_t(3, 0, 0.1);'),
                           example_change = c(
                             paste0(
-                              'r_inv ~ normal(',
+                              'phi_inv ~ normal(',
                               round(runif(min = -1, max = 1, n = 1), 2),
                               ', ',
                               round(runif(min = 0.1, max = 1, n = 1), 2),
                               ');'
                             )))
     } else {
-      nb_df <- data.frame(param_name = c('r_inv<lower=0>'),
+      nb_df <- data.frame(param_name = c('phi_inv<lower=0>'),
                           param_length = length(unique(data_train$series)),
                           param_info = c('inverse of NB dispsersion'),
-                          prior = c('r_inv[s] ~ dexp(5)'),
+                          prior = c('phi_inv[s] ~ dexp(5)'),
                           example_change = c(
                             paste0(
-                              'r_inv[s] ~ dnorm(',
+                              'phi_inv[s] ~ dnorm(',
                               round(runif(min = -1, max = 1, n = 1), 2),
                               ', ',
                               round(runif(min = 0.1, max = 1, n = 1), 2),
@@ -727,13 +727,13 @@ get_mvgam_priors = function(formula,
   }
 
   if(family == 'tw'){
-    tw_df <- data.frame(param_name = c('twdis_raw'),
+    tw_df <- data.frame(param_name = c('phi_raw'),
                         param_length = length(unique(data_train$series)),
                         param_info = c('log of Tweedie dispsersion (for each series s)'),
-                        prior = c('twdis_raw[s] ~ dnorm(0, 2)T(-3.5, 3.5)'),
+                        prior = c('phi_raw[s] ~ dnorm(0, 2)T(-3.5, 3.5)'),
                         example_change = c(
                           paste0(
-                            'twdis_raw[s] ~ dnorm(',
+                            'phi_raw[s] ~ dnorm(',
                             round(runif(min = -1, max = 1, n = 1), 2),
                             ', ',
                             round(runif(min = 0.5, max = 5, n = 1), 2),

@@ -242,14 +242,14 @@ if(object$use_lv){
 # Beta coefficients for GAM component
 betas <- MCMCvis::MCMCchains(object$model_output, 'b')
 
-# Phi estimates for latent trend drift terms
+# drift estimates for latent trend drift terms
 if(object$drift){
-  phis <- MCMCvis::MCMCchains(object$model_output, 'phi')
+  drifts <- MCMCvis::MCMCchains(object$model_output, 'drift')
 } else {
   if(object$use_lv){
-    phis <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+    drifts <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
   } else {
-    phis <- matrix(0, nrow = NROW(betas), ncol = n_series)
+    drifts <- matrix(0, nrow = NROW(betas), ncol = n_series)
   }
 }
 
@@ -314,26 +314,15 @@ if(object$trend_model == 'AR3'){
 
 
 # Family-specific parameters
-if(object$family == 'Negative Binomial'){
-  sizes <- MCMCvis::MCMCchains(object$model_output, 'r')
-} else {
-  sizes <- NULL
-}
-
-if(object$family == 'Tweedie'){
-  twdis <- MCMCvis::MCMCchains(object$model_output, 'twdis')
-  p <- matrix(1.5, nrow = NROW(betas), ncol = n_series)
-} else {
-  twdis <- p <- NULL
-}
-
 family <- object$family
+pars <- mvgam:::extract_family_pars(family = family,
+                                    object = object)
 
 # Generate sample sequence for n_particles
-if(n_particles < dim(phis)[1]){
-  sample_seq <- sample(seq_len(dim(phis)[1]), size = n_particles, replace = F)
+if(n_particles < dim(drifts)[1]){
+  sample_seq <- sample(seq_len(dim(drifts)[1]), size = n_particles, replace = F)
 } else {
-  sample_seq <- sample(seq_len(dim(phis)[1]), size = n_particles, replace = T)
+  sample_seq <- sample(seq_len(dim(drifts)[1]), size = n_particles, replace = T)
 }
 
 #### 2. Generate particles and calculate their proposal weights ####
@@ -353,7 +342,7 @@ clusterExport(NULL, c('use_lv',
                       'truth',
                       'last_assim',
                       'taus',
-                      'phis',
+                      'drifts',
                       'ar1s',
                       'ar2s',
                       'ar3s',
@@ -363,9 +352,7 @@ clusterExport(NULL, c('use_lv',
                       'lv_coefs',
                       'trends',
                       'family',
-                      'sizes',
-                      'twdis',
-                      'p',
+                      'pars',
                       'n_series',
                       'n_particles',
                       'upper_bounds'),
@@ -379,7 +366,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
 
   if(is.null(alpha_gps)){
     # Sample AR parameters
-    phi <- phis[samp_index, ]
+    drift <- drifts[samp_index, ]
     ar1 <- ar1s[samp_index, ]
     ar2 <- ar2s[samp_index, ]
     ar3 <- ar3s[samp_index, ]
@@ -388,18 +375,13 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     # Sample trend precisions
     tau <- taus[samp_index,]
   } else {
-    phi <- ar1 <- ar2 <- ar3 <- tau <- 0
+    drift <- ar1 <- ar2 <- ar3 <- tau <- 0
     alpha_gp <- alpha_gps[samp_index, ]
     rho_gp <- rho_gps[samp_index, ]
   }
 
   # Sample beta coefs
   betas <- betas[samp_index, ]
-
-  # Family-specific parameters
-  size <- sizes[samp_index, ]
-  twdis <- twdis[samp_index, ]
-  p <- p[samp_index]
 
   if(use_lv){
 
@@ -417,7 +399,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   if(is.null(alpha_gps)){
     lv_states <- do.call(cbind, lapply(seq_along(lvs), function(lv){
       sim_ar3(h = 1,
-              phi = phi[lv],
+              drift = drift[lv],
               ar1 = ar1[lv],
               ar2 = ar2[lv],
               ar3 = ar3[lv],
@@ -457,26 +439,29 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     if(is.na(truth[series])){
       weight <- 1
     } else {
-      if(family == 'Negative Binomial'){
-        weight <- (dnbinom(truth[series], size = size[series],
-                               mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                          (trend_states[series]))))
-      }
 
-      if(family == 'Poisson'){
-        weight <- (dpois(truth[series],
-                               lambda = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                          (trend_states[series]))))
-      }
+      # Family-specific parameters
+      par_extracts <- lapply(seq_along(pars), function(x){
+        if(is.matrix(pars[[x]])){
+          pars[[x]][samp_index, series]
+        } else {
+          pars[[x]][samp_index]
+        }
+      })
+      names(par_extracts) <- names(pars)
 
-      if(family == 'Tweedie'){
-        weight <- exp(mgcv::ldTweedie(y = truth[series],
-                                       mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                            (trend_states[series])),
-                                       p = p,
-                                       phi = twdis[series],
-                                       all.derivs = F)[,1])
-      }
+      # Series-specific linear predictor matrix
+      Xpmat <- t(rbind(as.matrix(Xp[which(as.numeric(series_test$series) == series),]),
+                     trend_states[series]))
+      attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
+
+      # Likelihood
+      weight <- mvgam:::mvgam_predict(family = family,
+                                      family_pars = par_extracts,
+                                      truth = truth[series],
+                                      Xp = Xpmat,
+                                      betas = c(betas, 1),
+                                      density = TRUE)
 
     }
     weight
@@ -499,7 +484,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     if(is.null(alpha_gps)){
       trends <- do.call(cbind, lapply(seq_along(trends), function(trend){
         sim_ar3(h = 1,
-                phi = phi[trend],
+                drift = drift[trend],
                 ar1 = ar1[trend],
                 ar2 = ar2[trend],
                 ar3 = ar3[trend],
@@ -521,26 +506,29 @@ particles <- pbapply::pblapply(sample_seq, function(x){
       if(is.na(truth[series])){
         weight <- 1
       } else {
-        if(family == 'Negative Binomial'){
-          weight <- (dnbinom(truth[series], size = size[series],
-                             mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                        (trends[series]))))
-        }
 
-        if(family == 'Poisson'){
-          weight <- (dpois(truth[series],
-                               lambda = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                              (trends[series]))))
-        }
+        # Family-specific parameters
+        par_extracts <- lapply(seq_along(pars), function(x){
+          if(is.matrix(pars[[x]])){
+            pars[[x]][samp_index, series]
+          } else {
+            pars[[x]][samp_index]
+          }
+        })
+        names(par_extracts) <- names(pars)
 
-        if(family == 'Tweedie'){
-          weight <- exp(mgcv::ldTweedie(y = truth[series],
-                                            mu = exp(((Xp[which(as.numeric(series_test$series) == series),] %*% betas)) +
-                                                       (trends[series])),
-                                            p = p,
-                                            phi = twdis[series],
-                                            all.derivs = F)[,1])
-        }
+        # Series-specific linear predictor matrix
+        Xpmat <- t(rbind(as.matrix(Xp[which(as.numeric(series_test$series) == series),]),
+                       trends[series]))
+        attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
+
+        # Likelihood
+        weight <- mvgam:::mvgam_predict(family = family,
+                                        family_pars = par_extracts,
+                                        truth = truth[series],
+                                        Xp = Xpmat,
+                                        betas = c(betas, 1),
+                                        density = TRUE)
 
       }
       weight
@@ -562,6 +550,16 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     names(trend_states) <- paste0('series', seq_len(n_series))
 }
 
+  # Family-specific parameters
+  family_pars <- lapply(seq_along(pars), function(x){
+    if(is.matrix(pars[[x]])){
+      pars[[x]][samp_index, ]
+    } else {
+      pars[[x]][samp_index]
+    }
+  })
+  names(family_pars) <- names(pars)
+
   # Store important particle-specific information for later filtering
   list(use_lv = use_lv,
        n_lv = n_lv,
@@ -570,16 +568,14 @@ particles <- pbapply::pblapply(sample_seq, function(x){
        lv_states = lv_states,
        lv_coefs = lv_coefs,
        betas = as.numeric(betas),
-       phi = as.numeric(phi),
+       drift = as.numeric(drift),
        ar1 = as.numeric(ar1),
        ar2 = as.numeric(ar2),
        ar3 = as.numeric(ar3),
        tau = as.numeric(tau),
        alpha_gp = as.numeric(alpha_gp),
        rho_gp = as.numeric(rho_gp),
-       size = as.numeric(size),
-       p = as.numeric(p),
-       twdis = as.numeric(twdis),
+       family_pars = family_pars,
        trend_states = lapply(trend_states, unname),
        weight = weight,
        liks = liks,

@@ -175,7 +175,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
         }))
       } else {
         lv_preds <- do.call(rbind, lapply(seq_len(particles[[x]]$n_lv), function(lv){
-          sim_ar3(phi = particles[[x]]$phi[lv],
+          sim_ar3(drift = particles[[x]]$drift[lv],
                   ar1 = particles[[x]]$ar1[lv],
                   ar2 = particles[[x]]$ar2[lv],
                   ar3 = particles[[x]]$ar3[lv],
@@ -190,13 +190,18 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
         trend_preds <- as.numeric(t(lv_preds) %*% particles[[x]]$lv_coefs[series,])
         Xpmat <- cbind(Xp[which(as.numeric(series_test$series) == series),], trend_preds)
         attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
+
+        # Family-specific parameters
+        par_extracts <- lapply(seq_along(particles[[x]]$family_pars), function(j){
+          particles[[x]]$family_pars[[j]][series]
+        })
+        names(par_extracts) <- names(particles[[x]]$family_pars)
+
         mvgam:::mvgam_predict(family = particles[[x]]$family,
                               Xp = Xpmat,
                               type = 'response',
                               betas = c(particles[[x]]$betas, 1),
-                              size = particles[[x]]$size[series],
-                              p = particles[[x]]$p[series],
-                              twdis = particles[[x]]$twdis[series])
+                              family_pars = par_extracts)
 
       })
 
@@ -209,7 +214,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                                 last_trends = particles[[x]]$trend_states[[series]],
                                 h = fc_horizon)
         } else {
-          trend_preds <- sim_ar3(phi = particles[[x]]$phi[series],
+          trend_preds <- sim_ar3(drift = particles[[x]]$drift[series],
                                  ar1 = particles[[x]]$ar1[series],
                                  ar2 = particles[[x]]$ar2[series],
                                  ar3 = particles[[x]]$ar3[series],
@@ -221,13 +226,18 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
         # Generate predictions on the response scale
         Xpmat <- cbind(Xp[which(as.numeric(series_test$series) == series),], trend_preds)
         attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
+
+        # Family-specific parameters
+        par_extracts <- lapply(seq_along(particles[[x]]$family_pars), function(j){
+          particles[[x]]$family_pars[[j]][series]
+        })
+        names(par_extracts) <- names(particles[[x]]$family_pars)
+
         mvgam:::mvgam_predict(family = particles[[x]]$family,
                               Xp = Xpmat,
                               type = 'response',
                               betas = c(particles[[x]]$betas, 1),
-                              size = particles[[x]]$size[series],
-                              p = particles[[x]]$p[series],
-                              twdis = particles[[x]]$twdis[series])
+                              family_pars = par_extracts)
       })
     }
     series_fcs

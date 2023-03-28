@@ -11,12 +11,11 @@ mvgam_setup <- function(formula,
                         maxit = 40) {
 
   # Check family will work in mgcv
-  if (is.character(family))
-    family <- eval(parse(text = family))
-  if (is.function(family))
-    family <- family()
-  if (is.null(family$family))
-    stop("family not recognized")
+  family <- fullname_to_family(family)
+
+  family <- match.arg(arg = family, choices = c("nb", "poisson",
+                                                "Tweedie(p = 1.5)", "betar",
+                                                "gaussian","Gamma"))
 
   # Initialise the GAM for a few iterations to get all necessary structures for
   # generating predictions; also provides information to regularize parametric

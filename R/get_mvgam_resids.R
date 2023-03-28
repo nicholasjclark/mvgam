@@ -40,9 +40,9 @@ sample_seq <- 1:NROW(preds)
 draw_seq <- sample(sample_seq, length(sample_seq), replace = FALSE)
 
 if(family == 'Negative Binomial'){
-  rs <- MCMCvis::MCMCchains(object$model_output, 'r')
+  phis <- MCMCvis::MCMCchains(object$model_output, 'phi')
 } else {
-  rs <- NULL
+  phis <- NULL
 }
 
 # Functions for calculating randomised quantile (Dunn-Smyth) residuals
@@ -146,7 +146,7 @@ clusterExport(NULL, c('ds_resids_nb',
                       'obs_series',
                       'series_levels',
                       'family',
-                      'rs',
+                      'phis',
                       'preds',
                       'ends',
                       'starts',
@@ -204,7 +204,7 @@ series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
   }
 
   if(family == 'Negative Binomial'){
-    size <- rs[,series]
+    size <- phis[,series]
     size_mat <- matrix(rep(size, NCOL(preds)),
                        ncol = NCOL(preds))
     resids <- matrix(ds_resids_nb(truth = as.vector(truth_mat),

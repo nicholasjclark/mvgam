@@ -2,10 +2,10 @@
 title: 'mvgam case study 3: distributed lag models'
 author: "Nicholas Clark (n.clark@uq.edu.au)"
 output:
-  pdf_document:
-    highlight: zenburn
   html_document:
     df_print: paged
+  pdf_document:
+    highlight: zenburn
   word_document: default
 urlcolor: blue
 ---
@@ -112,7 +112,7 @@ data_test <- list(lag = data_all$lag[175:length(data_all$y),],
                   mintemp = data_all$mintemp[175:length(data_all$y),])
 ```
 
-Now we can fit a Bayesian GAM with distributed lag terms for precipitation and minimum temperature. The distributed lags are set up as tensor product smooth functions (see `help(te)` for an explanation of tensor product smooth constructions in the `mgcv` package) between `lag` and each covariate. We will start simply by assuming our data follow a `Poisson` observation process
+Now we can fit a Bayesian GAM with distributed lag terms for precipitation and minimum temperature. The distributed lags are set up as tensor product smooth functions (see `help(te)` for an explanation of tensor product smooth constructions in the `mgcv` package) between `lag` and each covariate. We will start simply by assuming our data follow a `Poisson` observation process. Note that the Gibbs samplers used by `JAGS` are not efficient at exploring high-dimensional posteriors, so we cannot expect reasonable performance without running the chains for many iterations. For this example, I only use a burnin of `5000`
 ```{r, message=FALSE, warning=FALSE}
 mod1 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                  te(precip, lag, k = c(6, 6)),
@@ -120,7 +120,7 @@ mod1 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                 newdata = data_test,
                 family = 'poisson',
                 chains = 4,
-                burnin = 15000,
+                burnin = 5000,
                 trend_model = 'None')
 ```
 
@@ -143,7 +143,7 @@ mod2 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                 newdata = data_test,
                 family = 'tw',
                 chains = 4,
-                burnin = 15000,
+                burnin = 5000,
                 trend_model = 'None')
 ```
 
@@ -181,16 +181,16 @@ mod3 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                 family = 'tw',
                 priors = priors,
                 chains = 4,
-                burnin = 15000,
+                burnin = 5000,
                 trend_model = 'AR3')
 summary(mod3)
 ```
 
 A pairs plot of the logged versions of the latent trend precision and the overdispersion parameter can give insight into whether there is still any strange behaviour or problematic parameter spaces that we must think more deeply about
 ```{r}
-plot(log(MCMCvis::MCMCchains(mod3$model_output, 'twdis')),
+plot(log(MCMCvis::MCMCchains(mod3$model_output, 'phi')),
      log(MCMCvis::MCMCchains(mod3$model_output, 'tau')),
-     ylab = 'log(tau)', xlab = 'log(twdis)', pch = 16, col = "#8F272740")
+     ylab = 'log(tau)', xlab = 'log(phi)', pch = 16, col = "#8F272740")
 ```
 
 Our rootogram has not improved much with the addition of the latent trend

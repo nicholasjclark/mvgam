@@ -136,7 +136,13 @@ eval_mvgam = function(object,
       lvs <- lapply(seq_len(n_lv), function(lv){
         inds_lv <- seq(lv, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2], by = n_lv)
         lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,inds_lv]
-        lv_estimates[,(eval_timepoint - 2):eval_timepoint]
+
+        if(trend_model == 'GP'){
+          lv_estimates
+        } else {
+          lv_estimates[,(eval_timepoint - 2):eval_timepoint]
+        }
+
       })
     } else {
       ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2],
@@ -225,14 +231,14 @@ eval_mvgam = function(object,
   # Beta coefficients for GAM component
   betas <- MCMCvis::MCMCchains(object$model_output, 'b')
 
-  # Phi estimates for latent trend drift terms
+  # drift estimates for latent trend drift terms
   if(object$drift){
-    phis <- MCMCvis::MCMCchains(object$model_output, 'phi')
+    drifts <- MCMCvis::MCMCchains(object$model_output, 'drift')
   } else {
     if(object$use_lv){
-      phis <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
+      drifts <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
     } else {
-      phis <- matrix(0, nrow = NROW(betas), ncol = n_series)
+      drifts <- matrix(0, nrow = NROW(betas), ncol = n_series)
     }
   }
 
@@ -295,26 +301,15 @@ eval_mvgam = function(object,
   }
 
   # Family-specific parameters
-  if(object$family == 'Negative Binomial'){
-    sizes <- MCMCvis::MCMCchains(object$model_output, 'r')
-  } else {
-    sizes <- NULL
-  }
-
-  if(object$family == 'Tweedie'){
-    twdis <- MCMCvis::MCMCchains(object$model_output, 'twdis')
-    p <- matrix(1.5, nrow = NROW(betas), ncol = n_series)
-  } else {
-    twdis <- p <- NULL
-  }
-
   family <- object$family
+  pars <- mvgam:::extract_family_pars(family = family,
+                                      object = object)
 
   # Generate sample sequence for n_samples
-  if(n_samples < dim(phis)[1]){
-    sample_seq <- sample(seq_len(dim(phis)[1]), size = n_samples, replace = F)
+  if(n_samples < dim(drifts)[1]){
+    sample_seq <- sample(seq_len(dim(drifts)[1]), size = n_samples, replace = F)
   } else {
-    sample_seq <- sample(seq_len(dim(phis)[1]), size = n_samples, replace = T)
+    sample_seq <- sample(seq_len(dim(drifts)[1]), size = n_samples, replace = T)
   }
 
 
@@ -336,7 +331,7 @@ eval_mvgam = function(object,
                         'Xp',
                         'betas',
                         'taus',
-                        'phis',
+                        'drifts',
                         'ar1s',
                         'ar2s',
                         'ar3s',
@@ -346,9 +341,7 @@ eval_mvgam = function(object,
                         'lvs',
                         'lv_coefs',
                         'trends',
-                        'sizes',
-                        'p',
-                        'twdis',
+                        'pars',
                         'n_series',
                         'upper_bounds'),
                 envir = environment())
@@ -359,7 +352,7 @@ eval_mvgam = function(object,
     samp_index <- x
 
     # Sample drift and AR parameters
-    phi <- phis[samp_index, ]
+    drift <- drifts[samp_index, ]
     ar1 <- ar1s[samp_index, ]
     ar2 <- ar2s[samp_index, ]
     ar3 <- ar3s[samp_index, ]
@@ -373,11 +366,6 @@ eval_mvgam = function(object,
     # Sample beta coefs
     betas <- betas[samp_index, ]
 
-    # Family-specific parameters
-    size <- sizes[samp_index, ]
-    twdis <- twdis[samp_index, ]
-    p <- p[samp_index]
-
     if(use_lv){
       # Sample a last state estimate for the latent variables
       last_lvs <- lapply(seq_along(lvs), function(lv){
@@ -390,15 +378,24 @@ eval_mvgam = function(object,
       }))
 
       # Run the latent variables forward fc_horizon timesteps
-      lv_preds <- do.call(rbind, lapply(seq_len(n_lv), function(lv){
-        sim_ar3(phi = phi[lv],
-                ar1 = ar1[lv],
-                ar2 = ar2[lv],
-                ar3 = ar3[lv],
-                tau = tau[lv],
-                last_trends = last_lvs[[lv]],
-                h = fc_horizon)
-      }))
+      if(trend_model == 'GP'){
+        lv_preds <- do.call(rbind, lapply(seq_len(n_lv), function(lv){
+          sim_gp(alpha_gp = alpha_gp[lv],
+                 rho_gp = rho_gp[lv],
+                 last_trends = last_lvs[[lv]],
+                 h = fc_horizon)
+        }))
+      } else {
+        lv_preds <- do.call(rbind, lapply(seq_len(n_lv), function(lv){
+          sim_ar3(drift = drift[lv],
+                  ar1 = ar1[lv],
+                  ar2 = ar2[lv],
+                  ar3 = ar3[lv],
+                  tau = tau[lv],
+                  last_trends = last_lvs[[lv]],
+                  h = fc_horizon)
+        }))
+      }
 
       series_fcs <- lapply(seq_len(n_series), function(series){
         trend_preds <- as.numeric(t(lv_preds) %*% lv_coefs[series,])
@@ -406,13 +403,21 @@ eval_mvgam = function(object,
         Xpmat <- cbind(Xp[which(as.numeric(data_assim$series) == series),], trend_preds)
         attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
-        mvgam_predict(family = family,
-                      Xp = Xpmat,
-                      type = 'response',
-                      betas = c(betas, 1),
-                      size = size[series],
-                      p = p,
-                      twdis = twdis[series])
+        # Family-specific parameters
+        par_extracts <- lapply(seq_along(pars), function(x){
+          if(is.matrix(pars[[x]])){
+            pars[[x]][samp_index, series]
+          } else {
+            pars[[x]][samp_index]
+          }
+        })
+        names(par_extracts) <- names(pars)
+
+        mvgam:::mvgam_predict(family = family,
+                              Xp = Xpmat,
+                              type = 'response',
+                              betas = c(betas, 1),
+                              family_pars = par_extracts)
       })
 
     } else {
@@ -429,7 +434,7 @@ eval_mvgam = function(object,
                                  last_trends = last_trends[[series]],
                                  h = fc_horizon)
         } else {
-          trend_preds <- sim_ar3(phi = phi[series],
+          trend_preds <- sim_ar3(drift = drift[series],
                                  ar1 = ar1[series],
                                  ar2 = ar2[series],
                                  ar3 = ar3[series],
@@ -441,13 +446,21 @@ eval_mvgam = function(object,
         Xpmat <- cbind(Xp[which(as.numeric(data_assim$series) == series),], trend_preds)
         attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
-        mvgam_predict(family = family,
+        # Family-specific parameters
+        par_extracts <- lapply(seq_along(pars), function(x){
+          if(is.matrix(pars[[x]])){
+            pars[[x]][samp_index, series]
+          } else {
+            pars[[x]][samp_index]
+          }
+        })
+        names(par_extracts) <- names(pars)
+
+        mvgam:::mvgam_predict(family = family,
                               Xp = Xpmat,
                               type = 'response',
                               betas = c(betas, 1),
-                              size = size[series],
-                              p = p,
-                              twdis = twdis[series])
+                              family_pars = par_extracts)
       })
     }
 
@@ -462,7 +475,7 @@ eval_mvgam = function(object,
       samp_index <- x
 
       # Sample drift and AR parameters
-      phi <- phis[samp_index, ]
+      drift <- drifts[samp_index, ]
       ar1 <- ar1s[samp_index, ]
       ar2 <- ar2s[samp_index, ]
       ar3 <- ar3s[samp_index, ]
@@ -476,11 +489,6 @@ eval_mvgam = function(object,
       # Sample beta coefs
       betas <- betas[samp_index, ]
 
-      # Family-specific parameters
-      size <- sizes[samp_index, ]
-      twdis <- twdis[samp_index, ]
-      p <- p[samp_index]
-
       if(use_lv){
         last_lvs <- lapply(seq_along(lvs), function(lv){
           lvs[[lv]][samp_index, ]
@@ -493,7 +501,7 @@ eval_mvgam = function(object,
 
         # Run the latent variables forward fc_horizon timesteps
         lv_preds <- do.call(rbind, lapply(seq_len(n_lv), function(lv){
-          sim_ar3(phi = phi[lv],
+          sim_ar3(drift = drift[lv],
                   ar1 = ar1[lv],
                   ar2 = ar2[lv],
                   ar3 = ar3[lv],
@@ -507,13 +515,21 @@ eval_mvgam = function(object,
           Xpmat <- cbind(Xp[which(as.numeric(data_assim$series) == series),], trend_preds)
           attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
-          mvgam_predict(family = family,
-                        Xp = Xpmat,
-                        type = 'response',
-                        betas = c(betas, 1),
-                        size = size[series],
-                        p = p,
-                        twdis = twdis[series])
+          # Family-specific parameters
+          par_extracts <- lapply(seq_along(pars), function(x){
+            if(is.matrix(pars[[x]])){
+              pars[[x]][samp_index, series]
+            } else {
+              pars[[x]][samp_index]
+            }
+          })
+          names(par_extracts) <- names(pars)
+
+          mvgam:::mvgam_predict(family = family,
+                                Xp = Xpmat,
+                                type = 'response',
+                                betas = c(betas, 1),
+                                family_pars = par_extracts)
         })
 
       } else {
@@ -530,7 +546,7 @@ eval_mvgam = function(object,
                                   last_trends = last_trends[[series]],
                                   h = fc_horizon)
           } else {
-            trend_preds <- sim_ar3(phi = phi[series],
+            trend_preds <- sim_ar3(drift = drift[series],
                                    ar1 = ar1[series],
                                    ar2 = ar2[series],
                                    ar3 = ar3[series],
@@ -542,13 +558,21 @@ eval_mvgam = function(object,
           Xpmat <- cbind(Xp[which(as.numeric(data_assim$series) == series),], trend_preds)
           attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
-          mvgam_predict(family = family,
-                        Xp = Xpmat,
-                        type = 'response',
-                        betas = c(betas, 1),
-                        size = size[series],
-                        p = p,
-                        twdis = twdis[series])
+          # Family-specific parameters
+          par_extracts <- lapply(seq_along(pars), function(x){
+            if(is.matrix(pars[[x]])){
+              pars[[x]][samp_index, series]
+            } else {
+              pars[[x]][samp_index]
+            }
+          })
+          names(par_extracts) <- names(pars)
+
+          mvgam:::mvgam_predict(family = family,
+                                Xp = Xpmat,
+                                type = 'response',
+                                betas = c(betas, 1),
+                                family_pars = par_extracts)
         })
       }
 
