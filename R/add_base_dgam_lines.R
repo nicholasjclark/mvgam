@@ -1,7 +1,7 @@
 #' Dynamic GAM model file additions
 #'
 #'
-#' @export
+#' @noRd
 #' @param use_lv Logical (use latent variables or not?)
 #' @param stan Logical (convert existing model to a Stan model?)
 #' @param offset Logical (include an offset in the linear predictor?)

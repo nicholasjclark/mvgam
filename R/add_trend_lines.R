@@ -1,7 +1,7 @@
 #' Latent trend model file modifications
 #'
 #'
-#' @export
+#' @noRd
 #' @param model_file A template `JAGS` or `Stan` model file to be modified
 #' @param stan Logical (convert existing `JAGS` model to a `Stan` model?)
 #' @param use_lv Logical (use latent variable trends or not)

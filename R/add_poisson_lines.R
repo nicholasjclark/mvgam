@@ -1,7 +1,7 @@
 #' Poisson JAGS modifications
 #'
 #'
-#' @export
+#' @noRd
 #' @param model_file A template `JAGS` model file to be modified
 #' @param upper_bounds Optional upper bounds for the truncated observation likelihood
 #' @return A modified `JAGS` model file

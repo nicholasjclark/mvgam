@@ -1,6 +1,8 @@
-# Helper functions for converting cmdstanr objects to stanfit
-# All functions were directly copied from brms and so all credit must
-# go to the brms development team
+#' Helper functions for converting cmdstanr objects to stanfit.
+#' All functions were directly copied from `brms` and so all credit must
+#' go to the `brms` development team
+#' @noRd
+#'
 repair_variable_names <- function(x) {
   x <- sub("\\.", "[", x)
   x <- gsub("\\.", ",", x)

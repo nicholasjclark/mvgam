@@ -76,10 +76,8 @@
 #'@param use_stan Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
 #'the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if `cmdstanr` is not available,
 #'a call to \code{\link[rstan]{stan}}. Note that
-#'not all options that are available in `JAGS` can be used, including no option for a Tweedie family.
-#'However, as `Stan` can estimate Hilbert base approximate gaussian processes, which
-#'are much more computationally tractable than full GPs for time series with `>100` observations, estimation
-#'in `Stan` can support latent GP trends while estimation in \code{JAGS} cannot
+#'there are many more options when using `Stan` vs `JAGS` (the only "advantage" of `JAGS` is the ability
+#'to use a Tweedie family).
 #'@param max_treedepth positive integer placing a cap on the number of simulation steps evaluated during each iteration when
 #'`use_stan == TRUE`. Default is `12`. Increasing this value can sometimes help with exploration of complex
 #'posterior geometries, but it is rarely fruitful to go above a `max_treedepth` of `14`
@@ -141,17 +139,16 @@
 #'draws from the model's posterior distribution
 #'\cr
 #'\cr
-#'*Using Stan*: A useful feature of `mvgam` is the ability to use Hamiltonian Monte Carlo for parameter estimation
-#'via the software `Stan` (using either the `cmdstanr` or `rstan` interface). Note that the `rstan` library is
-#'currently required for this option to work, even if using `cmdstanr` as the backend. This is because `rstan`'s functions
-#'are needed to arrange the posterior samples into the correct format for all of \code{mvgam}'s other functions to work.
-#'Also note that currently there is no support for
-#'fitting `Tweedie` responses in `Stan`.
-#'However there are great advantages when using `Stan`, which includes the option to estimate smooth latent trends
+#'*Using Stan*: A feature of `mvgam` is the ability to use Hamiltonian Monte Carlo for parameter estimation
+#'via the software `Stan` (using either the `cmdstanr` or `rstan` interface).
+#'There are great advantages when using `Stan`, which includes the option to estimate smooth latent trends
 #'via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408). This often makes sense for
 #'ecological series, which we expect to change smoothly. In `mvgam`, latent squared exponential GP trends are approximated using
 #'by default \code{40} basis functions, which saves computational costs compared to fitting full GPs while adequately estimating
-#'GP \code{alpha} and \code{rho} parameters
+#'GP \code{alpha} and \code{rho} parameters. Because of the many advantages of `Stan` over `JAGS`, further development
+#'of the package will only be applied to `Stan`. This includes the planned addition of more response distributions,
+#'plans to handle zero-inflation, and plans to incorporate a greater variety of trend models. Users are strongly encouraged
+#'to opt for `Stan` over `JAGS` in any workflows
 #'@author Nicholas J Clark
 #'
 #'@seealso \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
@@ -326,7 +323,7 @@ mvgam = function(formula,
                  threads = 1,
                  priors,
                  upper_bounds,
-                 use_stan = FALSE,
+                 use_stan = TRUE,
                  max_treedepth,
                  adapt_delta,
                  jags_path){
@@ -394,28 +391,33 @@ mvgam = function(formula,
 
   # If Stan is to be used, make sure it is installed
   if(use_stan & run_model){
-    if(!require(rstan)){
-      warning('rstan library is required but not found; setting run_model = FALSE')
-      run_model <- FALSE
+    if(!requireNamespace('rstan', quietly = TRUE)){
+      warning('rstan library not found; checking for cmdstanr library')
+
+      if(!requireNamespace('cmdstanr', quietly = TRUE)){
+        warning('cmdstanr library not found; setting run_model = FALSE')
+        run_model <- FALSE
+      }
     }
-  }
+
+    }
 
   # JAGS cannot support latent GP trends as there is no easy way to use Hilbert base
   # approximation to reduce the computational demands
   if(!use_stan & trend_model == 'GP'){
-    warning('gaussian process trends not yet supported for JAGS; reverting to Stan')
+    warning('gaussian process trends not supported for JAGS; reverting to Stan')
     use_stan <- TRUE
   }
 
   if(use_stan & family == 'tw'){
-    warning('Tweedie family not yet supported for stan; reverting to JAGS')
+    warning('Tweedie family not supported for stan; reverting to JAGS')
     use_stan <- FALSE
   }
 
   # If the model is to be run in JAGS, make sure the JAGS software can be located
   if(!use_stan){
     if(run_model){
-      if(!require(runjags)){
+      if(!requireNamespace('runjags', quietly = TRUE)){
         warning('runjags library is required but not found; setting run_model = FALSE')
         run_model <- FALSE
       }
@@ -425,6 +427,7 @@ mvgam = function(formula,
   if(!use_stan){
     if(run_model){
       if(missing(jags_path)){
+        require(runjags)
         jags_path <- runjags::findjags()
       }
 
@@ -1248,14 +1251,6 @@ mvgam = function(formula,
                                     family = family,
                                     upper_bounds = upper_bounds)
 
-      # Remove data likelihood and posterior predictions if this is a prior sampling run
-      if(prior_simulation){
-        stan_objects$stan_file <- stan_objects$stan_file[-c(grep('// likelihood functions',
-                                                                 stan_objects$stan_file):
-                                                              (grep('// likelihood functions',
-                                                                    stan_objects$stan_file) + 6))]
-      }
-
       model_data <- stan_objects$model_data
       if(use_lv){
         model_data$n_lv <- n_lv
@@ -1339,6 +1334,17 @@ mvgam = function(formula,
                                   threads = threads,
                                   trend_model = trend_model,
                                   offset = offset)
+
+      # Remove data likelihood if this is a prior sampling run
+      if(prior_simulation){
+        vectorised$model_file <- vectorised$model_file[-c((grep('// likelihood functions',
+                                                                 vectorised$model_file,
+                                                                 fixed = TRUE) - 1):
+                                                              (grep('generated quantities {',
+                                                                    vectorised$model_file,
+                                                                    fixed = TRUE) - 4))]
+      }
+
       model_data <- vectorised$model_data
 
       # Check if cmdstan is accessible; if not, use rstan
@@ -1393,7 +1399,7 @@ mvgam = function(formula,
                                  init = inits,
                                  max_treedepth = 12,
                                  adapt_delta = 0.8,
-                                 iter_sampling = 600,
+                                 iter_sampling = samples,
                                  iter_warmup = 200,
                                  show_messages = FALSE,
                                  diagnostics = NULL)
@@ -1414,16 +1420,6 @@ mvgam = function(formula,
         out_gam_mod <- read_csv_as_stanfit(fit1$output_files(),
                                    variables = param)
         out_gam_mod <- repair_stanfit(out_gam_mod)
-
-        # stanfit <- rstan::read_stan_csv(fit1$output_files(), col_major = TRUE)
-        # param_names <- row.names(rstan::summary(stanfit)$summary)
-        # stanfit@sim$samples <- lapply(seq_along(stanfit@sim$samples), function(x){
-        #   samps <- as.list(stanfit@sim$samples[[x]])
-        #   names(samps) <- param_names
-        #   samps
-        # })
-        #
-        # out_gam_mod <- stanfit
 
       } else {
         require(rstan)

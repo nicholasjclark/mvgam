@@ -1,7 +1,7 @@
 #' Add remaining data, model and parameter blocks to a Stan model
 #'
 #'
-#' @export
+#' @noRd
 #' @param jags_file Prepared JAGS mvgam model file
 #' @param stan_file Incomplete Stan model file to be edited
 #' @param use_lv logical

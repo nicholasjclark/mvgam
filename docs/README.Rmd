@@ -40,7 +40,7 @@ The package can also be used to generate all necessary data structures, initial 
   
 ## Installation
 Install the development version from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`. Note that to actually condition models with MCMC sampling, either the `JAGS` software must be installed (along with the `R` packages `rjags` and `runjags`) or the `Stan` software must be installed (along with the package `rstan` and, optionally, the `cmdstanr` package). These are not  listed as dependencies of `mvgam` to ensure that installation is less difficult. If users wish to fit the models using `mvgam`, please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/) or for `Stan` and `rstan` [here](https://mc-stan.org/users/interfaces/rstan)).
+`devtools::install_github("nicholasjclark/mvgam")`. Note that to actually condition models with MCMC sampling, either the `JAGS` software must be installed (along with the `R` packages `rjags` and `runjags`) or the `Stan` software must be installed (along with either `rstan` and/or `cmdstanr`). These are not listed as dependencies of `mvgam` to ensure that installation is less difficult. If users wish to fit the models using `mvgam`, please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/), for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan), or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/).
 
 ## Citing mvgam and related software
 When using open source software (or software in general), please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work, so we highly encourage you to cite any packages that you rely on for your research.
@@ -102,13 +102,23 @@ plot_mvgam_series(data = lynx_train, y = 'population')
 ```
 
 Now we will formulate an `mvgam` model; this model fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the temporal process (in this case an `AR3` process), rather than relying on smoothing splines that do not incorporate a concept of the future. We assume the outcome follows a Poisson distribution. But before conditioning the model on observed data, a check of prior smooth function realisations is useful to ensure we are allowing enough flexibility to capture the types of functional behaviours we think are reasonable without allowing outrageous behaviours. First we follow conventional recommendations to set `k` for the smooth term to be large, which would allow maximum flexibility in functional behaviours
-```{r, message=FALSE, warning=FALSE}
+```{r, eval=FALSE}
 lynx_mvgam_prior <- mvgam(data = lynx_train,
                formula = population ~ s(season, bs = 'cc', k = 19),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               chains = 1,
+               chains = 2,
+               prior_simulation = TRUE)
+```
+
+```{r, include=FALSE}
+lynx_mvgam_prior <- mvgam(data = lynx_train,
+               formula = population ~ s(season, bs = 'cc', k = 19),
+               knots = list(season = c(0.5, 19.5)),
+               family = 'poisson',
+               trend_model = 'AR3',
+               chains = 2,
                prior_simulation = TRUE)
 ```
 
@@ -118,18 +128,28 @@ plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
 ```
 These functions are showing the marginal contribution of the seasonal smooth function to the linear predictor (on the log scale), and they are clearly allowed to move into ridiculous spaces that we should give very little prior plausibility to:
 ```{r}
-exp(-25)
-exp(25)
+exp(-17)
+exp(17)
 ```
 
 Setting `k` to a smaller value results in less flexibility. This is because number of basis functions that contribute to functional behaviour is reduced
-```{r, message=FALSE, warning=FALSE}
+```{r, include = FALSE}
 lynx_mvgam_prior <- mvgam(data = lynx_train,
                formula = population ~ s(season, bs = 'cc', k = 12),
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               chains = 1,
+               chains = 2,
+               prior_simulation = TRUE)
+```
+
+```{r, eval = FALSE}
+lynx_mvgam_prior <- mvgam(data = lynx_train,
+               formula = population ~ s(season, bs = 'cc', k = 12),
+               knots = list(season = c(0.5, 19.5)),
+               family = 'poisson',
+               trend_model = 'AR3',
+               chains = 2,
                prior_simulation = TRUE)
 ```
 
@@ -198,6 +218,7 @@ summary(lynx_mvgam)
 ```
 
 As with any `MCMC` based software, we can inspect traceplots. Here for the `GAM` component smoothing parameters.
+There is no requirement for `rstan` to be installed as a dependency, but we can still use it if available to examine traceplots
 ```{r}
 rstan::stan_trace(lynx_mvgam$model_output, 'rho')
 ```

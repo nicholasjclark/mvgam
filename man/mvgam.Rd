@@ -27,7 +27,7 @@ mvgam(
   threads = 1,
   priors,
   upper_bounds,
-  use_stan = FALSE,
+  use_stan = TRUE,
   max_treedepth,
   adapt_delta,
   jags_path
@@ -126,10 +126,8 @@ truncation entirely (i.e. there is no upper bound for each series)}
 \item{use_stan}{Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
 the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if \code{cmdstanr} is not available,
 a call to \code{\link[rstan]{stan}}. Note that
-not all options that are available in \code{JAGS} can be used, including no option for a Tweedie family.
-However, as \code{Stan} can estimate Hilbert base approximate gaussian processes, which
-are much more computationally tractable than full GPs for time series with \verb{>100} observations, estimation
-in \code{Stan} can support latent GP trends while estimation in \code{JAGS} cannot}
+there are many more options when using \code{Stan} vs \code{JAGS} (the only "advantage" of \code{JAGS} is the ability
+to use a Tweedie family).}
 
 \item{max_treedepth}{positive integer placing a cap on the number of simulation steps evaluated during each iteration when
 \code{use_stan == TRUE}. Default is \code{12}. Increasing this value can sometimes help with exploration of complex
@@ -208,7 +206,7 @@ autocorrelation will be evident. When a particular observation is missing, the r
 draws from the model's posterior distribution
 \cr
 \cr
-\emph{Using Stan}: A useful feature of \code{mvgam} is the ability to use Hamiltonian Monte Carlo for parameter estimation
+\emph{Using Stan}: A feature of \code{mvgam} is the ability to use Hamiltonian Monte Carlo for parameter estimation
 via the software \code{Stan} (using either the \code{cmdstanr} or \code{rstan} interface). Note that the \code{rstan} library is
 currently required for this option to work, even if using \code{cmdstanr} as the backend. This is because \code{rstan}'s functions
 are needed to arrange the posterior samples into the correct format for all of \code{mvgam}'s other functions to work.
@@ -218,7 +216,10 @@ However there are great advantages when using \code{Stan}, which includes the op
 via \href{https://arxiv.org/abs/2004.11408}{Hilbert space approximate Gaussian Processes}. This often makes sense for
 ecological series, which we expect to change smoothly. In \code{mvgam}, latent squared exponential GP trends are approximated using
 by default \code{40} basis functions, which saves computational costs compared to fitting full GPs while adequately estimating
-GP \code{alpha} and \code{rho} parameters
+GP \code{alpha} and \code{rho} parameters. Because of the many advantages of \code{Stan} over \code{JAGS}, further development
+of the package will only be applied to \code{Stan}. This includes the planned addition of more response distributions,
+plans to handle zero-inflation, and plans to incorporate a greater variety of trend models. Users are strongly encouraged
+to opt for \code{Stan} over \code{JAGS} in any workflows
 }
 \examples{
 \donttest{

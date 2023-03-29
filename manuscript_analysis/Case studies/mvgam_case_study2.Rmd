@@ -2,10 +2,10 @@
 title: 'mvgam case study 2: multivariate models'
 author: "Nicholas Clark (n.clark@uq.edu.au)"
 output:
-  pdf_document:
-    highlight: zenburn
   html_document:
     df_print: paged
+  pdf_document:
+    highlight: zenburn
   word_document: default
 urlcolor: blue
 ---

@@ -1,7 +1,7 @@
 #' Vectorise a stan model's likelihood for quicker computation
 #'
 #'
-#' @export
+#' @noRd
 #' @param model_file Stan model file to be edited
 #' @param model_data Prepared mvgam data for Stan modelling
 #' @param family \code{character}. Must be either 'Negative Binomial' or 'Poisson'
