@@ -238,8 +238,10 @@ plot(lynx_mvgam, type = 'smooths', residuals = TRUE)
 It is often also useful to compare prior to posterior function realisations to understand how informative the observed data have been for learning these functional shapes
 ```{r}
 layout(matrix(1:2, nrow = 2))
-plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
-plot(lynx_mvgam, type = 'smooths', realisations = TRUE)
+plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE,
+     n_realisations = 30)
+plot(lynx_mvgam, type = 'smooths', realisations = TRUE,
+     n_realisations = 30)
 layout(1)
 ```
 
@@ -289,36 +291,23 @@ Both components contribute to forecast uncertainty, suggesting we would still ne
 plot(lynx_mvgam, type = 'residuals')
 ```
 
-Another useful utility of `mvgam` is the ability to use rolling window forecasts to evaluate competing models that may represent different hypotheses about the series dynamics. Here we will fit a poorly specified model to showcase how this evaluation works. In this model, we ignore the cyclic pattern of seasonality and force it to be fairly non-wiggly. We also use a random walk process for the trend
+Another useful utility of `mvgam` is the ability to use rolling window forecasts to evaluate competing models that may represent different hypotheses about the series dynamics. Here we will fit a poorly specified model to showcase how this evaluation works. In this model, we ignore the cyclic pattern of seasonality. We also use a random walk process for the trend
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam_poor <- mvgam(data = lynx_train,
                newdata = lynx_test,
-               formula = population ~ s(season, k = 3),
+               formula = population ~ 1,
                family = 'poisson',
                trend_model = 'RW',
                use_stan = TRUE,
                chains = 4)
 ```
 
-We choose a set of timepoints within the training data to forecast from, allowing us to simulate a situation where the model's parameters had already been estimated but we have only observed data up to the evaluation timepoint and would like to generate forecasts from the latent trends. Here we use year 10 as our last observation and forecast ahead for the next 10 years.
+We choose a set of timepoints within the training data to forecast from, allowing us to simulate a situation where the model's parameters had already been estimated but we have only observed data up to the evaluation timepoint and would like to generate forecasts from the latent trends. Here we simulate scenarios where we forecast ahead for the next 10 years. The `compare_mvgams` function automates this process by rolling along a set of timepoints for each model, ensuring a more in-depth evaluation of each competing model at the same set of timepoints. 
 ```{r}
-mod1_eval <- eval_mvgam(lynx_mvgam, eval_timepoint = 10, fc_horizon = 10)
-mod2_eval <- eval_mvgam(lynx_mvgam_poor, eval_timepoint = 10, fc_horizon = 10)
+compare_mvgams(lynx_mvgam, lynx_mvgam_poor, fc_horizon = 10)
 ```
 
-Summary statistics of the two models' out of sample Discrete Rank Probability Score (DRPS) indicate that the well-specified model performs markedly better (far lower DRPS) for this evaluation timepoint
-```{r}
-summary(mod1_eval$series1$score)
-summary(mod2_eval$series1$score)
-```
-
-Nominal coverages for both models' 90% prediction intervals
-```{r}
-mean(mod1_eval$series1$in_interval)
-mean(mod2_eval$series1$in_interval)
-```
-
-The `compare_mvgams` function automates this process by rolling along a set of timepoints for each model, ensuring a more in-depth evaluation of each competing model at the same set of timepoints. There are many more extended uses for `mvgam` models, including the ability to fit dynamic factor processes for analysing and forecasting sets of multivariate time series
+Summary statistics of the two models' out of sample Discrete Rank Probability Score (DRPS) indicate that the well-specified model performs markedly better (lower DRPS) across most out of sample horizons. There are many more extended uses for `mvgam` models, including the ability to fit dynamic factor processes for analysing and forecasting sets of multivariate time series
 
 ## Extended observation families
 `mvgam` was originally designed to analyse and forecast non-negative integer-valued data (counts). These data are traditionally challenging to analyse with existing time-series analysis packages. But further development of `mvgam` has resulted in support for a growing number of observation families that extend to other types of data. Currently, the package can handle data for the following families:  

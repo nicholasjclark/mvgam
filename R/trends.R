@@ -141,7 +141,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
   if(length(pars_to_extract) > 0){
     out <- vector(mode = 'list')
     for(i in 1:length(pars_to_extract)){
-      out[[i]] <- MCMCvis::MCMCchains(object$model_output,
+      out[[i]] <- mcmc_chains(object$model_output,
                                       params = pars_to_extract[i])
     }
     names(out) <- pars_to_extract
@@ -155,7 +155,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
     if(object$trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
       # Just due to legacy reasons from working in JAGS, the simulation
       # functions use precision (tau) rather than SD (sigma)
-      out$tau <- MCMCvis::MCMCchains(object$model_output, 'penalty')
+      out$tau <- mcmc_chains(object$model_output, 'penalty')
       out$penalty <- NULL
     }
 
@@ -165,10 +165,10 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
       if(object$fit_engine == 'stan'){
         coef_start <- min(which(sort(rep(1:n_series, n_lv)) == series))
         coef_end <- coef_start + n_lv - 1
-        as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,coef_start:coef_end])
+        as.matrix(mcmc_chains(object$model_output, 'lv_coefs')[,coef_start:coef_end])
       } else {
         lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
-        as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
+        as.matrix(mcmc_chains(object$model_output, 'lv_coefs')[,lv_indices])
       }
 
     })
@@ -262,12 +262,12 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
       if(object$trend_model != 'None'){
         out$last_trends <- lapply(seq_along(levels(object$obs_data$series)), function(series){
           if(object$fit_engine == 'stan'){
-            trend_estimates <- MCMCvis::MCMCchains(object$model_output, 'trend')[,seq(series,
-                                                                                      dim(MCMCvis::MCMCchains(object$model_output,
+            trend_estimates <- mcmc_chains(object$model_output, 'trend')[,seq(series,
+                                                                                      dim(mcmc_chains(object$model_output,
                                                                                                               'trend'))[2],
                                                                                       by = NCOL(object$ytimes))]
           } else {
-            trend_estimates <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
+            trend_estimates <- mcmc_chains(object$model_output, 'trend')[,starts[series]:ends[series]]
           }
 
           # Need to only use estimates from the training period

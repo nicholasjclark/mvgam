@@ -193,7 +193,6 @@ eval_mvgam = function(object,
     setDefaultCluster(cl)
     clusterExport(NULL, c('use_lv',
                           'family',
-                          'n_lv',
                           'fc_horizon',
                           'data_assim',
                           'Xp',
