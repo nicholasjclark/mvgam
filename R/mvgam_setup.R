@@ -3,19 +3,12 @@
 #' @noRd
 #'
 mvgam_setup <- function(formula,
-                        family = gaussian,
+                        family = gaussian(),
                         data = list(),
                         na.action,
                         knots = NULL,
                         drop.unused.levels = FALSE,
                         maxit = 40) {
-
-  # Check family will work in mgcv
-  family <- fullname_to_family(family)
-
-  family <- match.arg(arg = family, choices = c("nb", "poisson",
-                                                "Tweedie(p = 1.5)", "betar",
-                                                "gaussian","Gamma"))
 
   # Initialise the GAM for a few iterations to get all necessary structures for
   # generating predictions; also provides information to regularize parametric

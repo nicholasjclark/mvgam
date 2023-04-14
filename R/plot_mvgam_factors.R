@@ -28,7 +28,7 @@ plot_mvgam_factors = function(object, plot = TRUE){
   }
 
   # Get indices of LV estimates
-  ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2],
+  ends <- seq(0, dim(mcmc_chains(object$model_output, 'LV'))[2],
               length.out = object$n_lv + 1)
   starts <- ends + 1
   starts <- c(1, starts[-c(1, object$n_lv + 1)])
@@ -58,10 +58,10 @@ plot_mvgam_factors = function(object, plot = TRUE){
   lv_estimates <- do.call(rbind, lapply(1:object$n_lv, function(x){
 
     if(object$fit_engine == 'stan'){
-      inds_lv <- seq(x, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2], by = object$n_lv)
-      preds <- MCMCvis::MCMCchains(object$model_output, 'LV')[,inds_lv]
+      inds_lv <- seq(x, dim(mcmc_chains(object$model_output, 'LV'))[2], by = object$n_lv)
+      preds <- mcmc_chains(object$model_output, 'LV')[,inds_lv]
     } else {
-      preds <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[x]:ends[x]]
+      preds <- mcmc_chains(object$model_output, 'LV')[,starts[x]:ends[x]]
     }
 
     # Keep only the in-sample observations for testing against the null of white noise

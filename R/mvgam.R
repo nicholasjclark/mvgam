@@ -35,7 +35,8 @@
 #'This will be helpful if users wish to modify the model file to add
 #'other stochastic elements that are not currently avaiable in \code{mvgam}. Default is \code{FALSE} to reduce
 #'the size of the returned object, unless \code{run_model == FALSE}
-#'@param family \code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'
+#'@param family \code{family} specifying the exponential observation family for the series. Currently supported
+#'families are: `nb()`, `poisson()`, `tweedie()`, `gaussian()`, `betar()`, `lognormal()`, `student_t()` and `Gamma()`
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
@@ -65,7 +66,7 @@
 #'@param threads \code{integer} Experimental option to use multithreading for within-chain
 #'parallelisation in \code{Stan}. We recommend its use only if you are experienced with
 #'\code{Stan}'s `reduce_sum` function and have a slow running model that cannot be sped
-#'up by any other means
+#'up by any other means. Only available when using \code{Cmdstan} as the backend
 #'@param priors An optional \code{data.frame} with prior
 #'definitions (in JAGS or Stan syntax). See \code{\link{get_mvgam_priors}} and
 #''Details' for more information on changing default prior distributions
@@ -139,16 +140,17 @@
 #'draws from the model's posterior distribution
 #'\cr
 #'\cr
-#'*Using Stan*: A feature of `mvgam` is the ability to use Hamiltonian Monte Carlo for parameter estimation
+#'*Using Stan*: `mvgam` is primarily designed to use Hamiltonian Monte Carlo for parameter estimation
 #'via the software `Stan` (using either the `cmdstanr` or `rstan` interface).
-#'There are great advantages when using `Stan`, which includes the option to estimate smooth latent trends
-#'via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408). This often makes sense for
-#'ecological series, which we expect to change smoothly. In `mvgam`, latent squared exponential GP trends are approximated using
-#'by default \code{40} basis functions, which saves computational costs compared to fitting full GPs while adequately estimating
-#'GP \code{alpha} and \code{rho} parameters. Because of the many advantages of `Stan` over `JAGS`, further development
-#'of the package will only be applied to `Stan`. This includes the planned addition of more response distributions,
-#'plans to handle zero-inflation, and plans to incorporate a greater variety of trend models. Users are strongly encouraged
-#'to opt for `Stan` over `JAGS` in any workflows
+#'There are great advantages when using `Stan` over Gibbs / Metropolis Hastings samplers, which includes the option
+#'to estimate smooth latent trends via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408).
+#'This often makes sense for ecological series, which we expect to change smoothly. In `mvgam`, latent squared
+#'exponential GP trends are approximated using by default \code{40} basis functions, which saves computational
+#'costs compared to fitting full GPs while adequately estimating
+#'GP \code{alpha} and \code{rho} parameters. Because of the many advantages of `Stan` over `JAGS`,
+#'*further development of the package will only be applied to `Stan`*. This includes the planned addition
+#'of more response distributions, plans to handle zero-inflation, and plans to incorporate a greater
+#'variety of trend models. Users are strongly encouraged to opt for `Stan` over `JAGS` in any proceeding workflows
 #'@author Nicholas J Clark
 #'
 #'@seealso \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
@@ -329,9 +331,6 @@ mvgam = function(formula,
                  jags_path){
 
   # Check arguments
-  trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1",
-                                                          "AR2", "AR3", "GP"))
-
   if(missing("data") & missing("data_train")){
     stop('Argument "data" is missing with no default')
   }
@@ -344,30 +343,25 @@ mvgam = function(formula,
     data_test <- newdata
   }
 
-  # Process family argument
-  if(any(class(family) == 'family')){
-    family <- family$family
-    if(family == 'negative binomial'){
-      family <- 'nb'
-    }
-    if(family == 'Beta regression'){
-      family <- 'beta'
-    }
-    if(grepl('Tweedie', family)){
-      family <- 'tw'
-    }
-    if(family == 'gaussian'){
-      family <- 'normal'
-    }
-    if(family == 'Gamma'){
-      family <- 'gamma'
-    }
+  if(chains%%1 != 0){
+    stop('Argument "chains" must be a positive integer',
+         .call = FALSE)
   }
 
-  family <- match.arg(arg = family, choices = c("nb", "poisson",
-                                                "tw", "beta",
-                                                "normal", "lognormal",
-                                                "student", "gamma"))
+  # Validate the family argument
+  family <- evaluate_family(family)
+  family_char <- match.arg(arg = family$family,
+                           choices = c('negative binomial',
+                                       "poisson",
+                                       "tweedie",
+                                       "beta",
+                                       "gaussian",
+                                       "lognormal",
+                                       "student",
+                                       "Gamma"))
+
+  # Validate the trend argument
+  trend_model <- evaluate_trend_model(trend_model)
 
   if(sign(chains) != 1){
     stop('argument "chains" must be a positive integer',
@@ -409,7 +403,7 @@ mvgam = function(formula,
     use_stan <- TRUE
   }
 
-  if(use_stan & family == 'tw'){
+  if(use_stan & family_char == 'tweedie'){
     warning('Tweedie family not supported for stan; reverting to JAGS')
     use_stan <- FALSE
   }
@@ -529,7 +523,7 @@ mvgam = function(formula,
   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the Bayesian model later on;
   ss_gam <- mvgam_setup(formula = formula,
-                        family = family,
+                        family = family_to_mgcvfam(family),
                         data = data_train,
                         drop.unused.levels = FALSE,
                         maxit = 30)
@@ -548,7 +542,7 @@ mvgam = function(formula,
     form_fake <- update(formula, ~ . + s(fakery))
     fakery_names <- names(mgcv::gam(form_fake,
                               data = data_train,
-                              family = poisson(),
+                              family = family_to_mgcvfam(family),
                               drop.unused.levels = FALSE,
                               control = list(nthreads = min(4, parallel::detectCores()-1),
                                              maxit = 1))$coefficients)
@@ -556,7 +550,7 @@ mvgam = function(formula,
     if(!missing(knots)){
       ss_jagam <- mgcv::jagam(form_fake,
                               data = data_train,
-                              family = poisson(),
+                              family = family_to_jagamfam(family_char),
                               file = 'base_gam.txt',
                               sp.prior = 'gamma',
                               diagonalize = F,
@@ -565,7 +559,7 @@ mvgam = function(formula,
     } else {
       ss_jagam <- mgcv::jagam(form_fake,
                               data = data_train,
-                              family = poisson(),
+                              family = family_to_jagamfam(family_char),
                               file = 'base_gam.txt',
                               sp.prior = 'gamma',
                               diagonalize = F,
@@ -579,7 +573,7 @@ mvgam = function(formula,
   if(!missing(knots)){
     ss_jagam <- mgcv::jagam(formula,
                             data = data_train,
-                            family = poisson(),
+                            family = family_to_jagamfam(family_char),
                             file = 'base_gam.txt',
                             sp.prior = 'gamma',
                             diagonalize = FALSE,
@@ -588,7 +582,7 @@ mvgam = function(formula,
   } else {
     ss_jagam <- mgcv::jagam(formula,
                             data = data_train,
-                            family = poisson(),
+                            family = family_to_jagamfam(family_char),
                             file = 'base_gam.txt',
                             sp.prior = 'gamma',
                             diagonalize = FALSE,
@@ -623,6 +617,15 @@ mvgam = function(formula,
   # Remove lines from the linear predictor section
   lines_remove <- c(1:grep('## response', base_model))
   base_model <- base_model[-lines_remove]
+
+  if(any(grepl('scale <- 1/tau', base_model, fixed = TRUE))){
+    base_model <- base_model[-grep('scale <- 1/tau', base_model, fixed = TRUE)]
+  }
+
+  if(any(grepl('tau ~ dgamma(.05,.005)', base_model, fixed = TRUE))){
+    base_model <- base_model[-grep('tau ~ dgamma(.05,.005)',
+                                   base_model, fixed = TRUE)]
+  }
 
   # Any parametric effects in the gam (particularly the intercept) need sensible priors to ensure they
   # do not directly compete with the latent trends
@@ -717,10 +720,10 @@ mvgam = function(formula,
   model_file <- trimws(readLines(fil, n = -1))
 
   # Modify observation distribution lines
-  if(family == 'tw'){
+  if(family_char == 'tweedie'){
     model_file <- add_tweedie_lines(model_file, upper_bounds = upper_bounds)
 
-  } else if(family == 'poisson'){
+  } else if(family_char == 'poisson'){
     model_file <- add_poisson_lines(model_file, upper_bounds = upper_bounds)
 
   } else {
@@ -906,7 +909,7 @@ mvgam = function(formula,
   }
 
   # Machine epsilon for minimum allowable non-zero rate
-  if(family == 'nb'){
+  if(family_char == 'negative binomial'){
     ss_jagam$jags.data$min_eps <- .Machine$double.eps
   }
 
@@ -998,7 +1001,7 @@ mvgam = function(formula,
   }
 
   # Add in additional data structure information for the model file heading
-  if(family == 'nb'){
+  if(family_char == 'negative binomial'){
     min_eps <- paste0('min_eps; .Machine$double.eps (smallest floating-point number x such that 1 + x != 1)\n')
   } else {
     min_eps <- NULL
@@ -1040,6 +1043,24 @@ mvgam = function(formula,
                   '\n',
                   model_file)
 
+  # Get names of smoothing parameters
+  if(smooths_included){
+    name_starts <- unlist(purrr:::map(ss_jagam$pregam$smooth, 'first.sp'))
+    name_ends <- unlist(purrr:::map(ss_jagam$pregam$smooth, 'last.sp'))
+
+    rho_names <- unlist(lapply(seq(1:length(ss_gam$smooth)), function(i){
+
+      number_seq <- seq(1:(1 + name_ends[i] - name_starts[i]))
+      number_seq[1] <- ''
+
+      paste0(rep(ss_gam$smooth[[i]]$label,
+                 length(number_seq)),
+             number_seq)
+    }))
+  } else {
+    rho_names <- NA
+  }
+
   if(!run_model){
     # Return only the model file and all data / inits needed to run the model
     # outside of mvgam
@@ -1066,7 +1087,7 @@ mvgam = function(formula,
                                     use_lv = use_lv,
                                     n_lv = n_lv,
                                     jags_data = ss_jagam$jags.data,
-                                    family = family,
+                                    family = family_char,
                                     upper_bounds = upper_bounds)
 
       if(use_lv){
@@ -1074,96 +1095,32 @@ mvgam = function(formula,
       }
 
       # Sensible inits needed for the betas, sigmas and overdispersion parameters
-      if(family == 'nb'){
-        if(trend_model %in% c('None', 'GP')){
-          if(smooths_included){
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50),
-                   lambda = runif(model_data$n_sp, 5, 25))
-            }
-          } else {
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50))
-            }
-          }
-
-        } else {
-          if(smooths_included){
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50),
-                   sigma = runif(model_data$n_series, 0.075, 1),
-                   lambda = runif(model_data$n_sp, 5, 25))
-            }
-          } else {
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50),
-                   sigma = runif(model_data$n_series, 0.075, 1))
-            }
-          }
-
-        }
-      }
-
-      if(family == 'poisson'){
-        if(trend_model %in% c('None', 'GP')){
-          if(smooths_included){
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   lambda = runif(model_data$n_sp, 5, 25))
-            }
-          } else {
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2))
-            }
-          }
-
-        } else {
-          if(smooths_included){
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   sigma = runif(model_data$n_series, 0.075, 1),
-                   lambda = runif(model_data$n_sp, 5, 25))
-            }
-          } else {
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   sigma = runif(model_data$n_series, 0.075, 1))
-            }
-          }
-
-        }
-      }
-
-      if(!missing(priors)){
-        stan_objects$stan_file <- update_priors(stan_objects$stan_file,
-                                                priors)
-      }
+      inits <- family_inits(family = family_char,
+                            trend_model,
+                            smooths_included, model_data)
 
       vectorised <- vectorise_stan_lik(model_file = stan_objects$stan_file,
                                   model_data = stan_objects$model_data,
-                                  family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
-                                                            family == 'poisson' ~ 'Poisson',
-                                                            TRUE ~ 'Negative Binomial'),
+                                  family = family_char,
                                   threads = threads,
                                   trend_model = trend_model,
                                   offset = offset)
 
+      if(!missing(priors)){
+        vectorised$model_file <- update_priors(vectorised$model_file,
+                                                priors)
+      }
+
+
       output <- structure(list(call = formula,
-                               family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
-                                                         family == 'poisson' ~ 'Poisson',
-                                                         TRUE ~ 'Negative Binomial'),
+                               family = family_char,
                                trend_model = trend_model,
                                drift = drift,
-                               pregam = ss_jagam$pregam,
                                model_file = vectorised$model_file,
                                model_data = vectorised$model_data,
                                inits = inits,
                                mgcv_model = ss_gam,
-                               sp_names = names(ss_jagam$pregam$lsp0),
+                               sp_names = rho_names,
                                ytimes = ytimes,
                                use_lv = use_lv,
                                n_lv = n_lv,
@@ -1189,17 +1146,14 @@ mvgam = function(formula,
       }
 
       output <- structure(list(call = formula,
-                               family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
-                                                         family == 'poisson' ~ 'Poisson',
-                                                         TRUE ~ 'Negative Binomial'),
+                               family = family_char,
                                trend_model = trend_model,
                                drift = drift,
-                               pregam = ss_jagam$pregam,
                                model_file = trimws(model_file),
                                model_data = ss_jagam$jags.data,
                                inits = inits,
                                mgcv_model = ss_gam,
-                               sp_names = names(ss_jagam$pregam$lsp0),
+                               sp_names = rho_names,
                                ytimes = ytimes,
                                use_lv = use_lv,
                                n_lv = n_lv,
@@ -1218,7 +1172,7 @@ mvgam = function(formula,
       use_cmdstan <- FALSE
 
       # Set monitor parameters
-      param <- get_monitor_pars(family = family,
+      param <- get_monitor_pars(family = family_char,
                                 use_lv = use_lv,
                                 trend_model = trend_model,
                                 smooths_included = smooths_included,
@@ -1248,7 +1202,7 @@ mvgam = function(formula,
                                     use_lv = use_lv,
                                     n_lv = n_lv,
                                     jags_data = ss_jagam$jags.data,
-                                    family = family,
+                                    family = family_char,
                                     upper_bounds = upper_bounds)
 
       model_data <- stan_objects$model_data
@@ -1257,83 +1211,22 @@ mvgam = function(formula,
       }
 
       # Sensible inits needed for the betas, sigmas and overdispersion parameters
-      if(family == 'nb'){
-        if(trend_model %in% c('None', 'GP')){
-          if(smooths_included){
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50),
-                   lambda = runif(model_data$n_sp, 5, 25))
-            }
-          } else {
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50))
-            }
-          }
+      inits <- family_inits(family = family_char, trend_model,
+                            smooths_included, model_data)
 
-        } else {
-          if(smooths_included){
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50),
-                   sigma = runif(model_data$n_series, 0.075, 1),
-                   lambda = runif(model_data$n_sp, 5, 25))
-            }
-          } else {
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   phi_inv = runif(NCOL(model_data$ytimes), 1, 50),
-                   sigma = runif(model_data$n_series, 0.075, 1))
-            }
-          }
-
-        }
-      }
-
-      if(family == 'poisson'){
-        if(trend_model %in% c('None', 'GP')){
-          if(smooths_included){
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   lambda = runif(model_data$n_sp, 5, 25))
-            }
-          } else {
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2))
-            }
-          }
-
-        } else {
-          if(smooths_included){
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   sigma = runif(model_data$n_series, 0.075, 1),
-                   lambda = runif(model_data$n_sp, 5, 25))
-            }
-          } else {
-            inits <- function() {
-              list(b_raw = runif(model_data$num_basis, -2, 2),
-                   sigma = runif(model_data$n_series, 0.075, 1))
-            }
-          }
-
-        }
-      }
-
-      if(!missing(priors)){
-        stan_objects$stan_file <- update_priors(stan_objects$stan_file, priors)
-      }
 
       # Vectorise likelihoods
       vectorised <- vectorise_stan_lik(model_file = stan_objects$stan_file,
-                                  model_data = stan_objects$model_data,
-                                  family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
-                                                            family == 'poisson' ~ 'Poisson',
-                                                            TRUE ~ 'Negative Binomial'),
-                                  threads = threads,
-                                  trend_model = trend_model,
-                                  offset = offset)
+                                       model_data = stan_objects$model_data,
+                                       family = family_char,
+                                       threads = threads,
+                                       trend_model = trend_model,
+                                       offset = offset)
+
+      if(!missing(priors)){
+        vectorised$model_file <- update_priors(vectorised$model_file, priors)
+      }
+
 
       # Remove data likelihood if this is a prior sampling run
       if(prior_simulation){
@@ -1394,7 +1287,7 @@ mvgam = function(formula,
           fit1 <- cmd_mod$sample(data = model_data,
                                  chains = chains,
                                  parallel_chains = min(c(chains, parallel::detectCores() - 1)),
-                                 threads_per_chain = threads,
+                                 threads_per_chain = if(threads > 1){ threads } else { NULL },
                                  refresh = 100,
                                  init = inits,
                                  max_treedepth = 12,
@@ -1407,7 +1300,7 @@ mvgam = function(formula,
           fit1 <- cmd_mod$sample(data = model_data,
                                  chains = chains,
                                  parallel_chains = min(c(chains, parallel::detectCores() - 1)),
-                                 threads_per_chain = threads,
+                                 threads_per_chain = if(threads > 1){ threads } else { NULL },
                                  refresh = 100,
                                  init = inits,
                                  max_treedepth = max_treedepth,
@@ -1480,7 +1373,8 @@ mvgam = function(formula,
       model_data <- ss_jagam$jags.data
 
       # Set monitor parameters and initial values
-      param <- get_monitor_pars(family, smooths_included = smooths_included,
+      param <- get_monitor_pars(family_char,
+                                smooths_included = smooths_included,
                                 use_lv, trend_model, drift)
 
       # Add random effect parameters for monitoring
@@ -1567,59 +1461,10 @@ mvgam = function(formula,
     series_resids <- get_mvgam_resids(object = list(
       model_output = out_gam_mod,
       fit_engine = fit_engine,
-      family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
-                                family == 'poisson' ~ 'Poisson',
-                                TRUE ~ 'Negative Binomial'),
+      family = family_char,
       obs_data = data_train,
       ytimes = ytimes),
       n_cores = min(c(chains, parallel::detectCores() - 1)))
-  }
-
-  # Create a jam object and get smooth penalty names in more interpretable format
-  ## Modified sim2jam function; takes simulation output
-  ## and a pregam object from jagam, and attempts to create a fake gam object suitable
-  ## for calculating estimated degrees of freedom
-  if(!smooths_included){
-    ss_jagam$pregam$X <- ss_jagam$jags.data$X
-  }
-
-  create_jam <- function(out_gam_mod, pregam) {
-
-    b <- t(MCMCvis::MCMCchains(out_gam_mod, 'b'))
-    pregam$Vp <- cov(t(b))
-    pregam$coefficients <- rowMeans(b)
-    pregam$sig2 <- 1
-
-    # Compute estimated degrees of freedom
-    eta <- pregam$X %*% pregam$coefficients
-    mu <- pregam$family$linkinv(eta)
-    w <- as.numeric(pregam$w * pregam$family$mu.eta(eta)^2 / pregam$family$variance(mu))
-    XWX <- t(pregam$X) %*% (w*pregam$X)
-
-    pregam$edf <- rowSums(pregam$Vp*t(XWX)) / pregam$sig2
-    class(pregam) <- "jam"
-    pregam
-  }
-
-  suppressWarnings(jam <- create_jam(out_gam_mod, ss_jagam$pregam))
-  if(smooths_included){
-    jam$sp <- exp(colMeans(MCMCvis::MCMCchains(out_gam_mod, 'rho')))
-
-    name_starts <- unlist(purrr:::map(jam$smooth, 'first.sp'))
-    name_ends <- unlist(purrr:::map(jam$smooth, 'last.sp'))
-
-    rho_names <- unlist(lapply(seq(1:length(ss_gam$smooth)), function(i){
-
-      number_seq <- seq(1:(1 + name_ends[i] - name_starts[i]))
-      number_seq[1] <- ''
-
-      paste0(rep(ss_gam$smooth[[i]]$label,
-                 length(number_seq)),
-             number_seq)
-    }))
-  } else {
-    jam$sp <- NULL
-    rho_names <- NA
   }
 
   if(use_stan){
@@ -1634,21 +1479,35 @@ mvgam = function(formula,
     data_train$y <- orig_y
   }
 
+  # Add Bayesian coefficients to the mgcv model to help with plotting of
+  # smooths that aren't yet supported by mvgam plotting functions
+  # Extract median beta params for smooths and their covariances
+  # so that uncertainty from mgcv plots is reasonably accurate
+  if(run_model){
+    # Use the empirical covariance matrix from the fitted coefficients
+    V <- cov(mcmc_chains(out_gam_mod, 'b'))
+    ss_gam$Ve <- V
+    ss_gam$Vp <- V
+    ss_gam$Vc <- V
+
+    # Add the posterior median coefficients
+    p <- mcmc_summary(out_gam_mod, 'b')[,c(4)]
+    coef_names <- names(ss_gam$coefficients)
+    names(p) <- coef_names
+    ss_gam$coefficients <- p
+  }
+
   if(return_model_data){
     output <- structure(list(call = formula,
-                             family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
-                                                       family == 'poisson' ~ 'Poisson',
-                                                       TRUE ~ 'Negative Binomial'),
+                             family = family_char,
                              trend_model = trend_model,
                              drift = drift,
-                             pregam = ss_jagam$pregam,
                              model_output = out_gam_mod,
                              model_file = model_file,
                              sp_names = rho_names,
                              model_data = model_data,
                              inits = inits,
                              mgcv_model = ss_gam,
-                             jam_model = jam,
                              ytimes = ytimes,
                              resids = series_resids,
                              use_lv = use_lv,
@@ -1661,17 +1520,13 @@ mvgam = function(formula,
                         class = 'mvgam')
   } else {
     output <- structure(list(call = formula,
-                             family = dplyr::case_when(family == 'tw' ~ 'Tweedie',
-                                                       family == 'poisson' ~ 'Poisson',
-                                                       TRUE ~ 'Negative Binomial'),
+                             family = family_char,
                              trend_model = trend_model,
                              drift = drift,
-                             pregam = ss_jagam$pregam,
                              model_output = out_gam_mod,
                              model_file = model_file,
                              sp_names = rho_names,
                              mgcv_model = ss_gam,
-                             jam_model = jam,
                              ytimes = ytimes,
                              resids = series_resids,
                              use_lv = use_lv,

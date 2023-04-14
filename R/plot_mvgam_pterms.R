@@ -47,7 +47,7 @@ if(length(pterms) > 0){
     betas_keep <- grepl(paste0('^(?=.*',pterms[i], ')(?!.*s\\()'),
                         colnames(predict(object$mgcv_model, type = 'lpmatrix')),
                         perl = TRUE)
-    betas <- MCMCvis::MCMCchains(object$model_output, 'b')[ ,betas_keep]
+    betas <- mcmc_chains(object$model_output, 'b')[ ,betas_keep]
 
     # Generate linear predictor matrix from fitted mgcv model
     Xp <- predict(object$mgcv_model, newdata = object$obs_data, type = 'lpmatrix')

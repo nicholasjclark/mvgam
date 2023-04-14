@@ -7,7 +7,7 @@
 #' @param use_lv logical
 #' @param n_lv \code{integer} number of latent dynamic factors (if \code{use_lv = TRUE})
 #' @param jags_data Prepared mvgam data for JAGS modelling
-#' @param family \code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'
+#' @param family \code{character}.
 #' @param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 #' this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 #' is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
@@ -33,7 +33,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
     }
   }
 
-  if(family == 'nb'){
+  if(family == 'negative binomial'){
     stan_file[grep('// raw basis', stan_file) + 2] <-
   '\n// negative binomial overdispersion\nvector<lower=0>[n_series] phi_inv;\n'
 

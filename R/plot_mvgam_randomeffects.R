@@ -60,7 +60,7 @@ if(any(smooth_labs$class == 'random.effect')){
 
     betas_keep <- object$mgcv_model$smooth[[smooth_number]]$first.para:
       object$mgcv_model$smooth[[smooth_number]]$last.para
-    betas <- MCMCvis::MCMCchains(object$model_output, 'b')[ ,betas_keep]
+    betas <- mcmc_chains(object$model_output, 'b')[ ,betas_keep]
 
     # Plot the random effect estimates
     beta_creds <- sapply(1:NCOL(betas),

@@ -69,19 +69,73 @@ plot_mvgam_series = function(object,
     }
   }
 
-
+  # Check variables in data / data_train
   if(!missing("data")){
     data_train <- data
-    if(!y %in% names(data_train)){
-      stop(paste0('variable "', y, '" not found in data'),
-           call. = FALSE)
-    } else {
-      data_train$y <- data_train[[y]]
+
+  }
+
+  if(!missing(data_train)){
+    # Add series factor variable if missing
+    if(class(data_train)[1] != 'list'){
+      if(!'series' %in% colnames(data_train)){
+        data_train$series <- factor('series1')
+      }
+
+      # Must be able to index by time; it is too dangerous to 'guess' as this could make a huge
+      # impact on resulting estimates / inferences
+      if(!'time' %in% colnames(data_train)){
+        stop('data does not contain a "time" column')
+      }
+    }
+
+    if(class(data_train)[1] == 'list'){
+      if(!'series' %in% names(data_train)){
+        data_train$series <- factor('series1')
+      }
+
+      if(!'time' %in% names(data_train)){
+        stop('data does not contain a "time" column')
+      }
     }
   }
 
-  if(!missing("newdata")){
+  if(!y %in% names(data_train)){
+    stop(paste0('variable "', y, '" not found in data'),
+         call. = FALSE)
+  } else {
+    data_train$y <- data_train[[y]]
+  }
+
+# Check variables in newdata / data_test
+  if(!missing(newdata)){
     data_test <- newdata
+  }
+
+  if(!missing(data_test)){
+    # Add series factor variable if missing
+    if(class(data_test)[1] != 'list'){
+      if(!'series' %in% colnames(data_test)){
+        data_test$series <- factor('series1')
+      }
+
+      # Must be able to index by time; it is too dangerous to 'guess' as this could make a huge
+      # impact on resulting estimates / inferences
+      if(!'time' %in% colnames(data_test)){
+        stop('newdata does not contain a "time" column')
+      }
+    }
+
+    if(class(data_test)[1] == 'list'){
+      if(!'series' %in% names(data_test)){
+        data_test$series <- factor('series1')
+      }
+
+      if(!'time' %in% names(data_test)){
+        stop('newdata does not contain a "time" column')
+      }
+    }
+
     if(!y %in% names(data_test)){
       stop(paste0('variable "', y, '" not found in newdata'),
            call. = FALSE)
@@ -90,7 +144,7 @@ plot_mvgam_series = function(object,
     }
   }
 
-
+# Choose models over data if both supplied
   if(!missing(object)){
     if(!missing(data_train)){
       warning('both "object" and "data" were supplied; only using "object"')
@@ -254,7 +308,7 @@ plot_mvgam_series = function(object,
            breaks = n_bins,
            col = "#C79999",
            ylab = 'Density',
-           xlab = paste0('Count of ', y),
+           xlab = paste0(y),
            main = '')
       title('Histogram', line = 0)
 
@@ -277,10 +331,12 @@ plot_mvgam_series = function(object,
         func(x)
       }
 
-      plot_x <- seq(min(c(truth, test), na.rm = T),
-                    max(c(truth, test), na.rm = T))
+      plot_x <- seq(from = min(c(truth, test), na.rm = T),
+                    to = max(c(truth, test), na.rm = T),
+                    length.out = 100)
+
       plot(1, type = "n", bty = 'L',
-           xlab = paste0('Count of ', y),
+           xlab = paste0(y),
            ylab = 'Empirical CDF',
            xlim = c(min(plot_x), max(plot_x)),
            ylim = c(0, 1))
@@ -319,7 +375,7 @@ plot_mvgam_series = function(object,
            breaks = n_bins,
            col = "#C79999",
            ylab = 'Density',
-           xlab = paste0('Count of ', y),
+           xlab = paste0(y),
            main = '')
       title('Histogram', line = 0)
 
@@ -344,10 +400,11 @@ plot_mvgam_series = function(object,
         func(x)
       }
 
-      plot_x <- seq(min(truth, na.rm = T),
-                    max(truth, na.rm = T))
+      plot_x <- seq(from = min(truth, na.rm = T),
+                    to = max(truth, na.rm = T),
+                    length.out = 100)
       plot(1, type = "n", bty = 'L',
-           xlab = paste0('Count of ', y),
+           xlab = paste0(y),
            ylab = 'Empirical CDF',
            xlim = c(min(plot_x), max(plot_x)),
            ylim = c(0, 1))

@@ -66,7 +66,7 @@ c_dark_highlight <- c("#7C0000")
 
 # Prediction indices for the particular series
 data_train <- object$obs_data
-ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
             length.out = NCOL(object$ytimes) + 1)
 starts <- ends + 1
 starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
@@ -101,22 +101,24 @@ if(missing(data_test)){
 
   if(object$fit_engine == 'stan'){
 
-    # For stan objects, mus is logged and stored as a vector in column-major order
-    preds <- exp(MCMCvis::MCMCchains(object$model_output, 'mus')[,seq(series,
-                                                                    dim(MCMCvis::MCMCchains(object$model_output, 'mus'))[2],
+    # For stan objects, mus is stored as a vector in column-major order
+    linkfun <- mvgam:::family_invlinks(object$family)
+    preds <- linkfun(mcmc_chains(object$model_output, 'mus')[,seq(series,
+                                                                    dim(mcmc_chains(object$model_output, 'mus'))[2],
                                                                     by = NCOL(object$ytimes))][, 1:obs_length])
   } else {
-    preds <- MCMCvis::MCMCchains(object$model_output, 'mus')[,starts[series]:ends[series]][, 1:obs_length]
+    preds <- mcmc_chains(object$model_output, 'mus')[,starts[series]:ends[series]][, 1:obs_length]
   }
 
 } else {
 
   if(object$fit_engine == 'stan'){
-    preds <- exp(MCMCvis::MCMCchains(object$model_output, 'mus')[,seq(series,
-                                                                    dim(MCMCvis::MCMCchains(object$model_output, 'mus'))[2],
+    linkfun <- family_invlinks(object$family)
+    preds <- linkfun(mcmc_chains(object$model_output, 'mus')[,seq(series,
+                                                                    dim(mcmc_chains(object$model_output, 'mus'))[2],
                                                                     by = NCOL(object$ytimes))])
   } else {
-    preds <- MCMCvis::MCMCchains(object$model_output, 'mus')[,starts[series]:ends[series]]
+    preds <- mcmc_chains(object$model_output, 'mus')[,starts[series]:ends[series]]
   }
 
   # Add variables to data_test if missing
@@ -181,7 +183,8 @@ if(missing(data_test)){
     }
 
     if(dim(preds)[2] != length(all_obs)){
-      fc_preds <- exp(mvgam:::forecast.mvgam(object, series = series,
+      linkfun <- family_invlinks(object$family)
+      fc_preds <- linkfun(mvgam:::forecast.mvgam(object, series = series,
                                              data_test = data_test,
                                  type = 'link'))
       preds <- cbind(preds, fc_preds)
@@ -190,89 +193,7 @@ if(missing(data_test)){
     # Calculate out of sample residuals
     preds <- preds[,tail(1:dim(preds)[2], length(data_test$time))]
     truth <- data_test$y
-
-    # Functions for calculating randomised quantile (Dunn-Smyth) residuals
-    ds_resids_nb = function(truth, fitted, draw, size){
-      na_obs <- is.na(truth)
-      a_obs <- pnbinom(as.vector(truth[!na_obs]) - 1,
-                       mu = fitted[!na_obs], size = size)
-      b_obs <- pnbinom(as.vector(truth[!na_obs]),
-                       mu = fitted[!na_obs], size = size)
-      u_obs <- runif(n = length(draw[!na_obs]),
-                     min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
-
-      if(any(is.na(truth))){
-        a_na <- pnbinom(as.vector(draw[na_obs]) - 1,
-                        mu = fitted[na_obs], size = size)
-        b_na <- pnbinom(as.vector(draw[na_obs]),
-                        mu = fitted[na_obs], size = size)
-        u_na <- runif(n = length(draw[na_obs]),
-                      min = pmin(a_na, b_na), max = pmax(a_na, b_na))
-        u <- vector(length = length(truth))
-        u[na_obs] <- u_na
-        u[!na_obs] <- u_obs
-      } else {
-        u <- u_obs
-      }
-      dsres_out <- qnorm(u)
-      dsres_out[is.infinite(dsres_out)] <- NaN
-      dsres_out
-    }
-
-    ds_resids_pois = function(truth, fitted, draw){
-      na_obs <- is.na(truth)
-      a_obs <- ppois(as.vector(truth[!na_obs]) - 1,
-                     lambda = fitted[!na_obs])
-      b_obs <- ppois(as.vector(truth[!na_obs]),
-                     lambda = fitted[!na_obs])
-      u_obs <- runif(n = length(draw[!na_obs]),
-                     min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
-
-      if(any(is.na(truth))){
-        a_na <- ppois(as.vector(draw[na_obs]) - 1,
-                      lambda = fitted[na_obs])
-        b_na <- ppois(as.vector(draw[na_obs]),
-                      lambda = fitted[na_obs])
-        u_na <- runif(n = length(draw[na_obs]),
-                      min = pmin(a_na, b_na), max = pmax(a_na, b_na))
-        u <- vector(length = length(truth))
-        u[na_obs] <- u_na
-        u[!na_obs] <- u_obs
-      } else {
-        u <- u_obs
-      }
-      dsres_out <- qnorm(u)
-      dsres_out[is.infinite(dsres_out)] <- NaN
-      dsres_out
-    }
-
-    ds_resids_tw = function(truth, fitted, draw){
-      na_obs <- is.na(truth)
-      a_obs <- ppois(as.vector(truth[!na_obs]) - 1,
-                     lambda = fitted[!na_obs])
-      b_obs <- ppois(as.vector(truth[!na_obs]),
-                     lambda = fitted[!na_obs])
-      u_obs <- runif(n = length(draw[!na_obs]),
-                     min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
-
-      if(any(is.na(truth))){
-        a_na <- ppois(as.vector(draw[na_obs]) - 1,
-                      lambda = fitted[na_obs])
-        b_na <- ppois(as.vector(draw[na_obs]),
-                      lambda = fitted[na_obs])
-        u_na <- runif(n = length(draw[na_obs]),
-                      min = pmin(a_na, b_na), max = pmax(a_na, b_na))
-        u <- vector(length = length(truth))
-        u[na_obs] <- u_na
-        u[!na_obs] <- u_obs
-      } else {
-        u <- u_obs
-      }
-      dsres_out <- qnorm(u)
-      dsres_out[is.infinite(dsres_out)] <- NaN
-      dsres_out
-    }
-   n_obs <- length(truth)
+    n_obs <- length(truth)
 
    if(NROW(preds) > 2000){
      sample_seq <- sample(1:NROW(preds), 2000, F)
@@ -280,31 +201,13 @@ if(missing(data_test)){
      sample_seq <- 1:NROW(preds)
    }
 
-   if(object$family == 'Poisson'){
-     series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
-       suppressWarnings(ds_resids_pois(truth = truth,
-                                       fitted = preds[x, ],
-                                       draw = preds[x, ]))
-     }))
-   }
+    series_residuals <- get_forecast_resids(object = object,
+                                            series = series,
+                                            truth = truth,
+                                            preds = preds,
+                                            family = object$family,
+                                            sample_seq = sample_seq)
 
-   if(object$family == 'Negative Binomial'){
-     size <- MCMCvis::MCMCchains(object$model_output, 'r')[,series]
-     series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
-       suppressWarnings(ds_resids_nb(truth = truth,
-                                     fitted = preds[x, ],
-                                     draw = preds[x, ],
-                                     size = size[x]))
-     }))
-   }
-
-   if(object$family == 'Tweedie'){
-     series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
-       suppressWarnings(ds_resids_tw(truth = truth,
-                                     fitted = preds[x, ],
-                                     draw = preds[x, ]))
-     }))
-  }
   }
 }
 

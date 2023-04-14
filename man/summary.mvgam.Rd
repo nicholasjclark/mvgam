@@ -2,24 +2,40 @@
 % Please edit documentation in R/summary.mvgam.R
 \name{summary.mvgam}
 \alias{summary.mvgam}
+\alias{summary.mvgam_prefit}
+\alias{coef.mvgam}
 \title{Summary for a fitted mvgam object}
 \usage{
 \method{summary}{mvgam}(object)
+
+\method{summary}{mvgam_prefit}(object)
+
+\method{coef}{mvgam}(object, summarise = TRUE)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
+
+\item{summarise}{\code{logical}. Summaries of coefficients will be returned
+if \code{TRUE}. Otherwise the full posterior distribution will be returned}
 }
 \value{
-A \code{list} is printed on-screen showing the summaries for the model
+For \code{summary.mvgam} and \code{summary.mvgam_prefit}, Aa\code{list} is printed
+on-screen showing the summaries for the model
+
+For \code{coef.mvgam}, either a \code{matrix} of posterior coefficient distributions
+(if \code{summarise == FALSE} or \code{data.frame} of coefficient summaries)
 }
 \description{
-This function takes a fitted \code{mvgam} object and prints various useful summaries from it
+These functions take a fitted \code{mvgam} object and return various useful summaries
 }
 \details{
-A brief summary of the model's call is printed, along with posterior intervals for
+\code{summary.mvgam} and \code{summary.mvgam_prefit} return brief summaries of the model's call is printed, along with posterior intervals for
 some of the key parameters in the model. Note that some smooths have extra penalties on the null space,
 so summaries for the \code{rho} parameters may include more penalty terms than the number of smooths in
 the original model formula.
+
+\code{coef.mvgam} returns either summaries or full posterior estimates for \code{GAM} component
+coefficients
 }
 \author{
 Nicholas J Clark

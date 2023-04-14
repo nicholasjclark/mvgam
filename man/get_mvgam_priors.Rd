@@ -11,7 +11,7 @@ get_mvgam_priors(
   family = "poisson",
   use_lv = FALSE,
   n_lv,
-  use_stan = FALSE,
+  use_stan = TRUE,
   trend_model = "None",
   drift = FALSE
 )

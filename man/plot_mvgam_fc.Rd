@@ -17,6 +17,7 @@ plot_mvgam_fc(
   ylim,
   n_cores = 1,
   return_forecasts = FALSE,
+  return_score = FALSE,
   ...
 )
 }
@@ -60,10 +61,17 @@ empirical quantiles of the forecast distribution are shown}
 \item{return_forecasts}{\code{logical}. If \code{TRUE}, the function will plot the forecast
 as well as returning the forecast object (as a \code{matrix} of dimension \code{n_samples} x \code{horizon})}
 
+\item{return_score}{\code{logical}. If \code{TRUE} and out of sample test data is provided as
+\code{newdata}, a probabilistic score will be calculated and returned. The score used will depend on the
+observation family from the fitted model. Discrete families (\code{poisson}, \code{negative binomial})
+use the Discrete Rank Probability Score. Other families use the Continuous Rank Probability Score. The value
+returned is the \code{sum} of all scores within the out of sample forecast horizon}
+
 \item{...}{further \code{\link[graphics]{par}} graphical parameters.}
 }
 \value{
-A base \code{R} graphics plot and an optional \code{matrix} of the forecast distribution
+A base \code{R} graphics plot and an optional \code{list} containing the forecast distribution
+and the out of sample probabilistic forecast score
 }
 \description{
 Plot mvgam posterior predictions for a specified series

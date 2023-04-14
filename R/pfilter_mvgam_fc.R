@@ -166,28 +166,15 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
 
     if(use_lv){
       # Run the latent variables forward fc_horizon timesteps
-      if(particles[[x]]$trend_model == 'GP'){
-        lv_preds <- do.call(rbind, lapply(seq_len(particles[[x]]$n_lv), function(lv){
-          sim_gp(alpha_gp = particles[[x]]$alpha_gp[lv],
-                 rho_gp = particles[[x]]$rho_gp[lv],
-                 last_trends = particles[[x]]$lv_states[[lv]],
-                 h = fc_horizon)
-        }))
-      } else {
-        lv_preds <- do.call(rbind, lapply(seq_len(particles[[x]]$n_lv), function(lv){
-          sim_ar3(drift = particles[[x]]$drift[lv],
-                  ar1 = particles[[x]]$ar1[lv],
-                  ar2 = particles[[x]]$ar2[lv],
-                  ar3 = particles[[x]]$ar3[lv],
-                  tau = particles[[x]]$tau[lv],
-                  last_trends = particles[[x]]$lv_states[[lv]],
-                  h = fc_horizon)
-        }))
-      }
+      lv_preds <- mvgam:::forecast_trend(trend_model = particles[[x]]$trend_model,
+                                    use_lv = TRUE,
+                                    trend_pars = particles[[x]]$trend_pars,
+                                    h = fc_horizon)
 
       # Generate predictions on the response scale
       series_fcs <- lapply(seq_len(n_series), function(series){
-        trend_preds <- as.numeric(t(lv_preds) %*% particles[[x]]$lv_coefs[series,])
+        trend_preds <- as.numeric(lv_preds %*%
+                                    particles[[x]]$trend_pars$lv_coefs[[series]])
         Xpmat <- cbind(Xp[which(as.numeric(series_test$series) == series),], trend_preds)
         attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
@@ -207,24 +194,36 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
 
     } else {
       # Run the trends forward fc_horizon timesteps
+      trend_preds <- lapply(seq_along(particles[[x]]$trend_pars$last_trends),
+                                    function(series){
+
+                                      # Series-specific trend parameters
+                                      trend_extracts <- lapply(seq_along(particles[[x]]$trend_pars), function(j){
+
+                                        if(names(particles[[x]]$trend_pars)[j] == 'last_trends'){
+                                          out <- particles[[x]]$trend_pars[[j]][[series]]
+                                        } else {
+                                          out <- particles[[x]]$trend_pars[[j]]
+                                        }
+                                        out
+
+                                      })
+                                      names(trend_extracts) <- names(particles[[x]]$trend_pars)
+
+                                      # Propagate the series-specific trends forward
+                                      out <- mvgam:::forecast_trend(trend_model = particles[[x]]$trend_model,
+                                                                    use_lv = FALSE,
+                                                                    trend_pars = trend_extracts,
+                                                                    h = fc_horizon)
+                                      out
+                                    })
+
+
       series_fcs <- lapply(seq_len(n_series), function(series){
-        if(particles[[x]]$trend_model == 'GP'){
-          trend_preds <- sim_gp(alpha_gp = particles[[x]]$alpha_gp[series],
-                                rho_gp = particles[[x]]$rho_gp[series],
-                                last_trends = particles[[x]]$trend_states[[series]],
-                                h = fc_horizon)
-        } else {
-          trend_preds <- sim_ar3(drift = particles[[x]]$drift[series],
-                                 ar1 = particles[[x]]$ar1[series],
-                                 ar2 = particles[[x]]$ar2[series],
-                                 ar3 = particles[[x]]$ar3[series],
-                                 tau = particles[[x]]$tau[series],
-                                 last_trends = particles[[x]]$trend_states[[series]],
-                                 h = fc_horizon)
-        }
 
         # Generate predictions on the response scale
-        Xpmat <- cbind(Xp[which(as.numeric(series_test$series) == series),], trend_preds)
+        Xpmat <- cbind(Xp[which(as.numeric(series_test$series) == series),],
+                       trend_preds[[series]])
         attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
         # Family-specific parameters
@@ -264,24 +263,29 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
     all_obs <- obs_data$y[which(as.numeric(obs_data$series) == series)]
     assimilated <- obs_data$assimilated[which(as.numeric(obs_data$series) == series)]
     preds_last <- c(all_obs, preds[1,])
-    int <- apply(preds,
-                  2, function(x) quantile(x, probs = c(0.025, 0.5, 0.975)))
-    if(!is.null(particles[[1]]$upper_bounds)){
-      upper_lim <- min(c(particles[[1]]$upper_bounds[series],
-                         (max(c(all_obs, int[3,]), na.rm = T) + 4)))
-    } else {
-      upper_lim <- max(c(all_obs, int[3,]), na.rm = T) + 4
-    }
-
-    if(is.na(ylim[1])){
-      ylim <- c(0, upper_lim)
-    }
 
     # Plot quantiles of the forecast distribution
     probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
     cred <- sapply(1:NCOL(preds),
                    function(n) quantile(preds[,n],
                                         probs = probs))
+
+    if(!is.null(particles[[1]]$upper_bounds)){
+      upper_lim <- min(c(particles[[1]]$upper_bounds[series],
+                         (max(c(all_obs, cred), na.rm = T))))
+    } else {
+      upper_lim <- max(c(all_obs, cred), na.rm = T)
+    }
+    lower_lim <- min(c(all_obs, cred), na.rm = T)
+
+    if(is.na(ylim[1])){
+      ylim <- c(lower_lim, upper_lim)
+    }
+
+    # Overwrite limits to [0,1] for beta
+    if(particles[[1]]$family == 'beta'){
+      ylim <- c(0, 1)
+    }
 
     c_light <- c("#DCBCBC")
     c_light_highlight <- c("#C79999")

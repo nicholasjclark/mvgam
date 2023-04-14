@@ -88,91 +88,82 @@ pfilter_mvgam_smooth = function(particles,
 
   pbapply::pboptions(type = "none")
   particles <- pbapply::pblapply(seq_along(particles), function(x){
-    n_series <- length(particles[[x]]$trend_states)
+    n_series <- length(particles[[x]]$n_series)
 
     if(use_lv){
 
       # Run the latent variables forward one timestep
-      if(particles[[x]]$trend_model == 'GP'){
-        lv_states <- unlist(lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
-          sim_gp(h = 1,
-                 last_trends = particles[[x]]$lv_states[[lv]],
-                 alpha_gp = particles[[x]]$alpha_gp[lv],
-                 rho_gp = particles[[x]]$rho_gp[lv])
-        }))
+      lvs <- mvgam:::forecast_trend(trend_model = particles[[x]]$trend_model,
+                                       use_lv = TRUE,
+                                       trend_pars = particles[[x]]$trend_pars,
+                                       h = 1)
+
+      # Include previous states for each lv
+      if(particles[[x]]$trend_model != 'GP'){
+        particles[[x]]$trend_pars$last_lvs <- lapply(seq_along(particles[[x]]$trend_pars$last_lvs),
+                                              function(x){
+                                                c(particles[[x]]$trend_pars$last_lvs[[x]][2],
+                                                  particles[[x]]$trend_pars$last_lvs[[x]][3],
+                                                  lvs[x])
+                                              })
       } else {
-        lv_states <- unlist(lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
-          sim_ar3(h = 1,
-                  last_trends = particles[[x]]$lv_states[[lv]][1:3],
-                  drift = 0,
-                  ar1 = particles[[x]]$ar1[lv],
-                  ar2 = particles[[x]]$ar2[lv],
-                  ar3 = particles[[x]]$ar3[lv],
-                  tau = particles[[x]]$tau[lv])
-        }))
+        particles[[x]]$trend_pars$last_lvs <- lapply(seq_along(particles[[x]]$trend_pars$last_lvs),
+                                              function(x){
+                                                c(particles[[x]]$trend_pars[[x]],
+                                                  lvs[x])
+                                              })
       }
 
       # Multiply lv states with loadings to generate each series' forecast trend state
-      next_trend <- as.numeric(lv_states %*% t(particles[[x]]$lv_coefs))
+      trend_states <- as.numeric(lvs %*% t(do.call(rbind, particles[[x]]$trend_pars$lv_coefs)))
 
-      # Include previous states for each lv
-      if(particles[[x]]$trend_model == 'GP'){
-        lv_states <- lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
-          as.vector(c(tail(particles[[x]]$lv_states[[lv]],
-                           length(particles[[x]]$lv_states[[lv]]) - 1),
-                      lv_states[lv]))
-
-        })
-      } else {
-        lv_states <- lapply(seq_len(length(particles[[x]]$lv_states)), function(lv){
-          as.vector(c(particles[[x]]$lv_states[[lv]][2],
-                      particles[[x]]$lv_states[[lv]][3],
-                      lv_states[lv]))
-        })
-      }
-
-      names(lv_states) <- paste0('lv', seq(1:length(lv_states)))
-      trend_states <- NULL
+      names(particles[[x]]$trend_pars$last_lvs) <- paste0('lv',
+                                                          seq_along(particles[[x]]$trend_pars$last_lvs))
 
     } else {
-      # Run the trends forward one timestep
-      if(particles[[x]]$trend_model == 'GP'){
-        next_trend <- unlist(lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
 
-          sim_gp(alpha_gp = particles[[x]]$alpha_gp[series],
-                 rho_gp = particles[[x]]$rho_gp[series],
-                 h = 1,
-                 last_trends = particles[[x]]$trend_states[[series]])
-        }))
-      } else {
-        next_trend <- unlist(lapply(seq_len(length(particles[[x]]$trend_states)), function(series){
-          sim_ar3(h = 1,
-                  last_trends = particles[[x]]$trend_states[[series]][1:3],
-                  drift = particles[[x]]$drift[series],
-                  ar1 = particles[[x]]$ar1[series],
-                  ar2 = particles[[x]]$ar2[series],
-                  ar3 = particles[[x]]$ar3[series],
-                  tau = particles[[x]]$tau[series])
-        }))
-      }
+      # Loop across series and produce the next trend estimate
+      trend_states <- unlist(lapply(seq_along(particles[[x]]$trend_pars$last_trends),
+                                             function(series){
+
+        # Series-specific trend parameters
+        trend_extracts <- lapply(seq_along(particles[[x]]$trend_pars), function(j){
+
+          if(names(particles[[x]]$trend_pars)[j] == 'last_trends'){
+            out <- particles[[x]]$trend_pars[[j]][[series]]
+          } else {
+            out <- particles[[x]]$trend_pars[[j]]
+          }
+          out
+
+        })
+        names(trend_extracts) <- names(particles[[x]]$trend_pars)
+
+        # Propagate the series-specific trends forward
+        out <- mvgam:::forecast_trend(trend_model = particles[[x]]$trend_model,
+                                        use_lv = FALSE,
+                                        trend_pars = trend_extracts,
+                                        h = 1)
+        out
+      }))
 
       # Include necessary previous states for each trend
-      if(particles[[x]]$trend_model == 'GP'){
-        trend_states <- lapply(seq_len(n_series), function(trend){
-          as.vector(c(tail(particles[[x]]$trend_states[[trend]],
-                           length(particles[[x]]$trend_states[[trend]]) - 1),
-                      next_trend[trend]))
-        })
+      if(particles[[x]]$trend_model != 'GP'){
+        particles[[x]]$trend_pars$last_trends <- unname(lapply(seq_along(particles[[x]]$trend_pars$last_trends),
+                                                        function(x){
+                                                          unname(c(particles[[x]]$trend_pars$last_trends[[x]][2],
+                                                                   particles[[x]]$trend_pars$last_trends[[x]][3],
+                                                                   trend_states[x]))
+                                                        }))
       } else {
-        trend_states <- lapply(seq_len(n_series), function(trend){
-          as.vector(c(particles[[x]]$trend_states[[trend]][2],
-                      particles[[x]]$trend_states[[trend]][3],
-                      next_trend[trend]))
-        })
+        particles[[x]]$trend_pars$last_trends <- unname(lapply(seq_along(particles[[x]]$trend_pars$last_trends),
+                                                        function(x){
+                                                          unname(c(particles[[x]]$trend_pars$last_trends[[x]],
+                                                                   trend_states[x]))
+                                                        }))
       }
 
-      names(trend_states) <- paste0('series', seq_len(n_series))
-      lv_states <- NULL
+      names(particles[[x]]$trend_pars$last_trends) <- paste0('series', seq_len(n_series))
     }
 
    particle_liks <- unlist(lapply(seq_len(n_series), function(series){
@@ -183,44 +174,29 @@ pfilter_mvgam_smooth = function(particles,
 
       # Series-specific linear predictor matrix
       Xpmat <- t(rbind(as.matrix(Xp[which(as.numeric(next_assim$series) == series),]),
-                       next_trend[series]))
+                       trend_states[series]))
       attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
+
+      # Series-specific family parameters
+      # Family-specific parameters
+      family_extracts <- lapply(seq_along(particles[[x]]$family_pars), function(j){
+        if(is.matrix(particles[[x]]$family_pars[[j]])){
+          particles[[x]]$family_pars[[j]][, series]
+        } else if(length(particles[[x]]$family_pars[[j]]) == particles[[x]]$n_series){
+          particles[[x]]$family_pars[[j]][series]
+        } else {
+          particles[[x]]$family_pars[[j]]
+        }
+      })
+      names(family_extracts) <- names(particles[[x]]$family_pars)
 
       # Likelihood
       series_weight <- mvgam:::mvgam_predict(family = particles[[x]]$family,
-                                             family_pars = particles[[x]]$family_pars,
+                                             family_pars = family_extracts,
                                              truth = next_assim$y[series],
                                              Xp = Xpmat,
                                              betas = c(particles[[x]]$betas, 1),
                                              density = TRUE)
-
-
-      # if(particles[[x]]$family == 'Negative Binomial'){
-      #   series_weight <- (dnbinom(next_assim$y[series],
-      #                                 size = particles[[x]]$size[series],
-      #                                 mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
-      #                                              particles[[x]]$betas)) +
-      #                                            (next_trend[series]) +
-      #                                            attr(Xp, 'model.offset'))))
-      # }
-      #
-      # if(particles[[x]]$family == 'Poisson'){
-      #   series_weight <- (dpois(next_assim$y[series],
-      #                                 lambda = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
-      #                                              particles[[x]]$betas)) +
-      #                                                (next_trend[series]) +
-      #                                              attr(Xp, 'model.offset'))))
-      # }
-      #
-      # if(particles[[x]]$family == 'Tweedie'){
-      #   series_weight <- exp(mgcv::ldTweedie(y = next_assim$y[series],
-      #                                            mu = exp(((Xp[which(as.numeric(next_assim$series) == series),] %*%
-      #                                                         particles[[x]]$betas)) + (next_trend[series]) +
-      #                                                       attr(Xp, 'model.offset')),
-      #                                            p = particles[[x]]$p,
-      #                                            drift = particles[[x]]$twdis[series],
-      #                                            all.derivs = F)[,1])
-      # }
 
     }
     series_weight
@@ -230,22 +206,13 @@ pfilter_mvgam_smooth = function(particles,
    # Update particle weight using a condensation algorithm
    weight <- particle_weight * particles[[x]]$weight
 
-   list(use_lv = use_lv,
-        n_lv = particles[[x]]$n_lv,
+   list(n_series = particles[[x]]$n_series,
+        use_lv = use_lv,
         family = particles[[x]]$family,
         trend_model = particles[[x]]$trend_model,
-        lv_states = lv_states,
-        lv_coefs = particles[[x]]$lv_coefs,
         betas = particles[[x]]$betas,
-        drift = as.numeric(particles[[x]]$drift),
-        ar1 = as.numeric(particles[[x]]$ar1),
-        ar2 = as.numeric(particles[[x]]$ar2),
-        ar3 = as.numeric(particles[[x]]$ar3),
-        tau = as.numeric(particles[[x]]$tau),
         family_pars = particles[[x]]$family_pars,
-        alpha_gp = particles[[x]]$alpha_gp,
-        rho_gp = particles[[x]]$rho_gp,
-        trend_states = trend_states,
+        trend_pars = particles[[x]]$trend_pars,
         weight = particle_weight,
         liks = particle_liks,
         upper_bounds = particles[[x]]$upper_bounds,
@@ -450,11 +417,11 @@ pfilter_mvgam_smooth = function(particles,
     if(use_lv){
       # Extract draws from high-likelihood state spaces for kernel smoothing
       best_lv <- do.call(rbind, lapply(index, function(j){
-        unlist(particles[[j]]$lv_states)
+        unlist(particles[[j]]$trend_pars$last_lvs)
         }))
 
       best_lv_coefs <- lapply(index, function(j){
-        particles[[j]]$lv_coefs
+        do.call(rbind, particles[[j]]$trend_pars$lv_coefs)
       })
       best_lv_coefs <- do.call(rbind, lapply(seq_along(best_lv_coefs), function(x){
         as.vector(best_lv_coefs[[x]])
@@ -468,7 +435,7 @@ pfilter_mvgam_smooth = function(particles,
 
     } else {
       best_trend <- do.call(rbind, lapply(index, function(j){
-        unlist(particles[[j]]$trend_states)
+        unlist(particles[[j]]$trend_pars$last_trends)
       }))
 
       trend_draws <- apply(best_trend, 2, imp_samp)
@@ -518,20 +485,7 @@ pfilter_mvgam_smooth = function(particles,
     if(!use_smoothing){
 
       evolve <- 0
-
-      if(use_lv){
-        lv_evolve <- particles[[x]]$lv_states
-        lv_coefs_evolve <- particles[[x]]$lv_coefs
-        particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
-        trend_evolve <- NULL
-
-      } else {
-        trend_evolve <- particles[[x]]$trend_states
-        lv_evolve <- NULL
-        lv_coefs_evolve <- NULL
-        particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
-
-      }
+      particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
 
     } else {
 
@@ -549,49 +503,65 @@ pfilter_mvgam_smooth = function(particles,
           particle_weight <- ifelse(re_weight, 1, tail(particles[[x]]$weight, 1))
 
           # Smooth latent variable states
-          lv_evolve <- unlist(particles[[x]]$lv_states) +
-            evolve*(lv_draws[x,] - unlist(particles[[x]]$lv_states))
+          lv_evolve <- unlist(particles[[x]]$trend_pars$last_lvs) +
+            evolve*(lv_draws[x,] - unlist(particles[[x]]$trend_pars$last_lvs))
 
           # Put latent variable states back in list format
           if(particles[[x]]$trend_model == 'GP'){
             lv_begins <- seq(1,
                                 length(lv_evolve),
-                                by = length(lv_evolve) / length(particles[[x]]$lv_states))
+                                by = length(lv_evolve) / length(particles[[x]]$trend_pars$last_lvs))
             lv_ends <- (lv_begins - 1) +
-              (length(lv_evolve) / length(particles[[x]]$lv_states))
+              (length(lv_evolve) / length(particles[[x]]$trend_pars$last_lvs))
           } else {
             lv_begins <- seq(1, length(lv_evolve), by = 3)
             lv_ends <- lv_begins + 2
           }
 
-          lv_evolve <- lapply(seq_along(particles[[x]]$lv_states), function(lv){
+          particles[[x]]$trend_pars$last_lvs <- lapply(seq_along(
+            particles[[x]]$trend_pars$last_lvs), function(lv){
             lv_evolve[lv_begins[lv]:lv_ends[lv]]
           })
 
           # Smooth latent variable loadings
-          lv_coefs_evolve <- as.vector(particles[[x]]$lv_coefs) +
-            evolve*(lv_coef_draws[x,] - particles[[x]]$lv_coefs)
+          lv_coefs_evolve <- matrix(as.vector(do.call(rbind,
+                                                      particles[[x]]$trend_pars$lv_coefs)) +
+            evolve*(lv_coef_draws[x,] - as.vector(do.call(rbind, particles[[x]]$trend_pars$lv_coefs))),
+            nrow = length(particles[[x]]$trend_pars$lv_coefs))
 
-          trend_evolve <- NULL
+          # Ensure upper triangle stays at zero to respect initial constraints
+          n_lv <- NCOL(lv_coefs_evolve)
+          for (i in 1:(n_lv - 1)) {
+            for (j in (i + 1):(n_lv)){
+              lv_coefs_evolve[i, j] = 0;
+            }
+          }
+
+          # Put back into list format
+          particles[[x]]$trend_pars$lv_coefs <- lapply(seq_along(particles[[x]]$trend_pars$lv_coefs),
+                                                       function(x){
+                                                         lv_coefs_evolve[x,]
+                                                       })
 
         } else {
           # Smooth trend states
-          trend_evolve <- unlist(particles[[x]]$trend_states) +
-            evolve*(trend_draws[x,] - unlist(particles[[x]]$trend_states))
+          trend_evolve <- unlist(particles[[x]]$trend_pars$last_trends) +
+            evolve*(trend_draws[x,] - unlist(particles[[x]]$trend_pars$last_trends))
 
           # Put trend states back in list format
           if(particles[[x]]$trend_model == 'GP'){
             trend_begins <- seq(1,
                                 length(trend_evolve),
-                                by = length(trend_evolve) / length(particles[[x]]$trend_states))
+                                by = length(trend_evolve) / length(particles[[x]]$trend_pars$last_trends))
             trend_ends <- (trend_begins - 1) +
-              (length(trend_evolve) / length(particles[[x]]$trend_states))
+              (length(trend_evolve) / length(particles[[x]]$trend_pars$last_trends))
           } else {
             trend_begins <- seq(1, length(trend_evolve), by = 3)
             trend_ends <- trend_begins + 2
           }
 
-          trend_evolve <- lapply(seq_along(particles[[x]]$trend_states), function(trend){
+          particles[[x]]$trend_pars$last_trends <- lapply(seq_along(particles[[x]]$trend_pars$last_trends),
+                                                          function(trend){
             trend_evolve[trend_begins[trend]:trend_ends[trend]]
           })
 
@@ -609,25 +579,13 @@ pfilter_mvgam_smooth = function(particles,
     }
 
     list(use_lv = use_lv,
-         n_lv = particles[[x]]$n_lv,
+         n_series = particles[[x]]$n_series,
          family = particles[[x]]$family,
          trend_model = particles[[x]]$trend_model,
-         lv_states = lv_evolve,
-         lv_coefs = lv_coefs_evolve,
          betas = betas,
-         tau = if(use_resampling){
-           particles[[x]]$tau
-         } else {
-           pmin(100, particles[[x]]$tau + runif(length(particles[[x]]$tau), 0, evolve))
-         },
-         drift = particles[[x]]$drift,
-         ar1 = particles[[x]]$ar1,
-         ar2 = particles[[x]]$ar2,
-         ar3 = particles[[x]]$ar3,
-         alpha_gp = particles[[x]]$alpha_gp,
-         rho_gp = particles[[x]]$rho_gp,
          family_pars = particles[[x]]$family_pars,
-         trend_states = trend_evolve,
+         trend_pars = particles[[x]]$trend_pars,
+         liks = particles[[x]]$liks,
          weight = particle_weight,
          upper_bounds = particles[[x]]$upper_bounds,
          last_assim = particles[[x]]$last_assim)

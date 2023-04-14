@@ -21,14 +21,25 @@
 #'@param drift \code{logical}, simulate a drift term for each trend
 #'@param trend_rel \code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}
 #'@param freq \code{integer}. The seasonal frequency of the series
-#'@param family \code{character} specifying the exponential observation family for the series. Must be either
-#''nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'
-#'@param phi_obs \code{vector} of dispersion parameters for the series (i.e. `size` for Negative Binomial or
-#'`phi` for Tweedie; ignored for Poisson). If \code{length(phi_obs) < n_series}, the first element of `phi_obs` will
-#'be replicated `n_series` times
-#'@param mu_obs \code{vector} of location parameters for the series. If \code{length(mu_obs) < n_series}, the first element of `mu_obs` will
-#'be replicated `n_series` times
-#'@param prop_missing \code{numeric} stating proportion of observations that are missing
+#'@param family \code{family} specifying the exponential observation family for the series. Currently supported
+#'families are: `nb()`, `poisson()`, `tweedie()`, `gaussian()`, `betar()`, `lognormal()`, `student_t()` and `Gamma()`
+#'@param phi \code{vector} of dispersion parameters for the series (i.e. `size` for Negative Binomial or
+#'`phi` for Tweedie or Beta). If \code{length(phi) < n_series}, the first element of `phi` will
+#'be replicated `n_series` times. Defaults to \code{5} for Negative Binomial and Tweedie; \code{10} for
+#'Beta
+#'@param shape \code{vector} of shape parameters for the series (i.e. `shape` for Gamma)
+#'If \code{length(shape) < n_series}, the first element of `shape` will
+#'be replicated `n_series` times. Defaults to \code{10}
+#'@param sigma \code{vector} of scale parameters for the series (i.e. `sd` for Normal or Student-T,
+#'`log(sd)` for LogNormal). If \code{length(sigma) < n_series}, the first element of `sigma` will
+#'be replicated `n_series` times. Defaults to \code{0.5} for Normal and Student-T; \code{0.2} for Lognormal
+#'@param nu \code{vector} of degrees of freedom parameters for the series (i.e. `nu` for Student-T)
+#'If \code{length(nu) < n_series}, the first element of `nu` will
+#'be replicated `n_series` times. Defaults to \code{3}
+#'@param mu \code{vector} of location parameters for the series. If \code{length(mu) < n_series}, the first element of `mu` will
+#'be replicated `n_series` times. Defaults to small random values between `-0.5` and `0.5` on the link scale
+#'@param prop_missing \code{numeric} stating proportion of observations that are missing. Should be between
+#'\code{0} and \code{0.8}, inclusive
 #'@param train_prop \code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}
 #'@return A \code{list} object containing outputs needed for \code{\link{mvgam}}, including 'data_train' and 'data_test',
 #'as well as some additional information about the simulated seasonality and trend dependencies
@@ -43,18 +54,55 @@ sim_mvgam = function(T = 100,
                      drift = FALSE,
                      trend_rel = 0.2,
                      freq = 12,
-                     family = 'poisson',
-                     phi_obs,
-                     mu_obs = 4,
+                     family = poisson(),
+                     phi,
+                     shape,
+                     sigma,
+                     nu,
+                     mu,
                      prop_missing = 0,
                      train_prop = 0.85){
 
-  # Check arguments
-  family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
-  trend_model <- match.arg(arg = trend_model, choices = c("RW", "GP", 'AR1', 'AR2', 'AR3'))
+  # Validate the family argument
+  family <- evaluate_family(family)
+  family_char <- match.arg(arg = family$family,
+                           choices = c('negative binomial',
+                                       "poisson",
+                                       "tweedie",
+                                       "beta",
+                                       "gaussian",
+                                       "lognormal",
+                                       "student",
+                                       "Gamma"))
+
+  # Validate the trend arguments
+  trend_model <- evaluate_trend_model(trend_model)
 
   if(missing(trend_rel)){
     trend_rel <- 0.2
+  }
+
+  if(trend_rel < 0 || trend_rel > 1){
+    stop('Argument "trend_rel" must be a proportion ranging from 0 to 1, inclusive',
+         call. = FALSE)
+  }
+
+  # Check n_series
+  if(n_series%%1 != 0){
+    stop('Argument "n_series" must be a positive integer',
+         call. = FALSE)
+  }
+
+  # Check prop_missing
+  if(prop_missing < 0 || prop_missing > 0.8){
+    stop('Argument "prop_missing" must be a proportion ranging from 0 to 0.8, inclusive',
+         call. = FALSE)
+  }
+
+  # Check n_lv
+  if(n_lv%%1 != 0){
+    stop('Argument "n_lv" must be a positive integer',
+         call. = FALSE)
   }
 
   if(n_lv == 1){
@@ -65,37 +113,98 @@ sim_mvgam = function(T = 100,
 
   if(use_lv){
     if(n_lv > n_series){
-      warning('n_lv cannot be greater than n_series; changing n_lv to match n_series')
+      warning('Argument "n_lv" cannot be greater than n_series; changing n_lv to match n_series')
       n_lv <- n_series
     }
   } else {
     n_lv <- n_series
   }
 
+  # Check seasonality
   if(!seasonality %in% c('shared', 'hierarchical')){
     stop('seasonality must be either shared or hierarchical')
   }
 
-  if(missing(phi_obs)){
-    phi_obs <- rep(1, n_series)
+  # Check family-specific parameters
+  if(missing(phi)){
+    if(family_char == 'beta'){
+      phi <- rep(10, n_series)
+    } else {
+      phi <- rep(5, n_series)
+    }
   }
 
-  if(missing(mu_obs)){
-    mu_obs <- sample(seq(2, 6), n_series, T)
+  if(any(phi <= 0)){
+    stop('Argument "phi" must be a non-negative real number',
+         call. = FALSE)
   }
 
+  if(missing(shape)){
+    shape <- rep(1, n_series)
+  }
+
+  if(any(shape <= 0)){
+    stop('Argument "shape" must be a non-negative real number',
+         call. = FALSE)
+  }
+
+  if(missing(sigma)){
+    if(family_char == 'lognormal'){
+      sigma <- rep(0.2, n_series)
+    } else {
+      sigma <- rep(0.5, n_series)
+    }
+  }
+
+  if(any(sigma <= 0)){
+    stop('Argument "sigma" must be a non-negative real number',
+         call. = FALSE)
+  }
+
+  if(missing(nu)){
+    nu <- rep(3, n_series)
+  }
+
+  if(any(nu <= 0)){
+    stop('Argument "nu" must be a non-negative real number',
+         call. = FALSE)
+  }
+
+  if(missing(mu)){
+    mu <- sample(seq(-0.5, 0.5), n_series, T)
+  }
+
+  if(length(phi) < n_series){
+    phi <- rep(phi[1], n_series)
+  }
+
+  if(length(shape) < n_series){
+    shape <- rep(shape[1], n_series)
+  }
+
+  if(length(sigma) < n_series){
+    sigma <- rep(sigma[1], n_series)
+  }
+
+  if(length(nu) < n_series){
+    nu <- rep(nu[1], n_series)
+  }
+
+  if(length(mu) < n_series){
+    mu <- rep(mu[1], n_series)
+  }
+
+  # Check data splitting
   if(missing(train_prop)){
     train_prop <- 0.75
   }
 
-  if(length(phi_obs) < n_series){
-    phi_obs <- rep(phi_obs[1], n_series)
+  if(train_prop < 0.2 || train_prop > 1){
+    stop('Argument "train_prop" must be a proportion ranging from 0.2 to 1, inclusive',
+         call. = FALSE)
   }
 
-  if(length(mu_obs) < n_series){
-    mu_obs <- rep(mu_obs[1], n_series)
-  }
-
+  # Set trend parameters
   if(trend_model == 'RW'){
     ar1s <- rep(1, n_lv)
     ar2s <- rep(0, n_lv)
@@ -128,41 +237,19 @@ sim_mvgam = function(T = 100,
       trend_alphas <- rep(0, n_lv)
     }
 
-    # Function to simulate trends ahead using ar3 model
-    sim_ar3 = function(phi, ar1, ar2, ar3, T){
-      states <- rep(NA, length = T + 3)
-      inits <- cumsum(rnorm(3, 0, 0.1))
-      states[1] <- inits[1]
-      states[2] <- inits[2]
-      states[3] <- inits[3]
-      for (t in 4:(T + 3)) {
-        states[t] <- rnorm(1, phi + ar1*states[t - 1] +
-                             ar2*states[t - 2] +
-                             ar3*states[t - 3], 1)
-      }
-      states[-c(1:3)]
-    }
-
     # Simulate latent trends
     trends <- do.call(cbind, lapply(seq_len(n_lv), function(x){
-      sim_ar3(phi = trend_alphas[x],
+      sim_ar3(drift = trend_alphas[x],
               ar1 = ar1s[x],
               ar2 = ar2s[x],
               ar3 = ar3s[x],
-              T = T)
+              tau = 1,
+              last_trends = rnorm(3),
+              h = T)
     }))
   }
 
   if(trend_model == 'GP'){
-
-    # Function to simulate from a latent GP with squared exponential covariance
-    sim_exp_gp = function(N = 50, alpha = 1, rho = 2){
-      # Return evenly spaced draws from a GP with
-      # Squared exponential kernel function
-      x <- 1:N
-      Sigma <- alpha ^ 2 * exp(-0.5 * ((outer(x, x, "-") / rho) ^ 2))
-      MASS::mvrnorm(1, mu = rep(0, length(x)), Sigma = Sigma)
-    }
 
     # Sample alpha and rho parameters
     trend_alphas <- runif(n_lv, 0.75, 1.25)
@@ -170,7 +257,10 @@ sim_mvgam = function(T = 100,
 
     # Generate latent GP trends
     trends <- do.call(cbind, lapply(seq_len(n_lv), function(lv){
-      sim_exp_gp(N = T, alpha = trend_alphas[lv], rho = trend_rhos[lv])
+      sim_gp(h = T,
+             last_trends = rnorm(3),
+             alpha_gp = trend_alphas[lv],
+             rho_gp = trend_rhos[lv])
     }))
 
   }
@@ -202,7 +292,7 @@ sim_mvgam = function(T = 100,
                                randomizer = "rnorm")$data, 'periodic')$time.series[,1]
   glob_season <- as.vector(scale(zoo::rollmean(stl_season, k = 6, na.pad = F)))
 
-  # Simulate observed series as discrete draws dependent on seasonality and trend
+  # Simulate observed series as dependent on seasonality and trend
   obs_trends <- matrix(NA, nrow = T, ncol = n_series)
    for(s in 1:n_series){
       obs_trends[,s] <- as.vector(scale(as.vector(loadings[,s] %*% t(trends))))
@@ -210,30 +300,65 @@ sim_mvgam = function(T = 100,
 
   obs_ys <- c(unlist(lapply(seq_len(n_series), function(x){
     if(seasonality == 'shared'){
-      obs <- exp(log(mu_obs[x]) + (glob_season * (1-trend_rel)) +
-                   (obs_trends[,x] * trend_rel))
 
+      dynamics <- (glob_season * (1-trend_rel)) +
+        (obs_trends[,x] * trend_rel)
 
     } else {
       yseason <- as.vector(scale(stl(ts(rnorm(T, glob_season, sd = 2),
                                         frequency = freq), 'periodic')$time.series[,1]))
-      obs <- exp(log(mu_obs[x]) + (yseason * (1-trend_rel)) +
-            (obs_trends[,x] * trend_rel))
+      dynamics <- (yseason * (1-trend_rel)) +
+        (obs_trends[,x] * trend_rel)
     }
 
-    if(family == 'nb'){
-      out <- rnbinom(length(obs), size = phi_obs[x],
-                     mu = obs)
+    if(family_char == 'negative binomial'){
+      out <- rnbinom(length(dynamics), size = phi[x],
+                     mu = exp(mu[x] + dynamics))
     }
 
-    if(family == 'poisson'){
-      out <- rpois(length(obs), lambda = obs)
+    if(family_char == 'poisson'){
+      out <- rpois(length(dynamics),
+                   lambda = exp(mu[x] + dynamics))
     }
 
-    if(family == 'tw'){
-      out <- rpois(n = length(obs),
-                   lambda = tweedie::rtweedie(length(obs), mu = obs,
-                                              power = 1.5, phi = phi_obs[x]))
+    if(family_char == 'tweedie'){
+      out <- rpois(n = length(dynamics),
+                   lambda = tweedie::rtweedie(length(dynamics),
+                                              mu = exp(mu[x] + dynamics),
+                                              power = 1.5, phi = phi[x]))
+    }
+
+    if(family_char == 'gaussian'){
+      out <- rnorm(length(dynamics),
+                   mean = mu[x] + dynamics,
+                   sd = sigma[x])
+    }
+
+    if(family_char == 'student'){
+      out <- rstudent_t(n = length(dynamics),
+                        df = nu[x],
+                        mu = mu[x] + dynamics,
+                        sigma = sigma[x])
+    }
+
+    if(family_char == 'lognormal'){
+      out <- rlnorm(length(dynamics),
+                   meanlog = mu[x] + (dynamics * 0.3),
+                   sd = sigma[x])
+    }
+
+    if(family_char == 'Gamma'){
+      out <- rgamma(length(dynamics),
+                    rate = shape[x] / exp(mu[x] + dynamics),
+                    shape = shape[x])
+    }
+
+    if(family_char == 'beta'){
+      shape_pars <- beta_shapes(mu = plogis(mu[x] + dynamics),
+                                     phi = phi[x])
+      out <- rbeta(length(dynamics),
+                   shape1 = shape_pars$shape1,
+                   shape2 = shape_pars$shape2)
     }
 
     out[is.infinite(out)] <- NA

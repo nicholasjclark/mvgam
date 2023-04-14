@@ -27,17 +27,24 @@
 #'@param ... further \code{\link[graphics]{par}} graphical parameters.
 #'@param return_forecasts \code{logical}. If \code{TRUE}, the function will plot the forecast
 #'as well as returning the forecast object (as a \code{matrix} of dimension \code{n_samples} x \code{horizon})
+#'@param return_score \code{logical}. If \code{TRUE} and out of sample test data is provided as
+#'\code{newdata}, a probabilistic score will be calculated and returned. The score used will depend on the
+#'observation family from the fitted model. Discrete families (\code{poisson}, \code{negative binomial})
+#'use the Discrete Rank Probability Score. Other families use the Continuous Rank Probability Score. The value
+#'returned is the \code{sum} of all scores within the out of sample forecast horizon
 #'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to calculate posterior
 #'empirical quantiles. If \code{realisations = FALSE}, these posterior quantiles are plotted along
 #'with the true observed data that was used to train the model. Otherwise, a spaghetti plot is returned
 #'to show possible forecast paths.
-#'@return A base \code{R} graphics plot and an optional \code{matrix} of the forecast distribution
+#'@return A base \code{R} graphics plot and an optional \code{list} containing the forecast distribution
+#'and the out of sample probabilistic forecast score
 #'@export
 plot_mvgam_fc = function(object, series = 1, newdata, data_test,
                          realisations = FALSE, n_realisations = 15,
                          hide_xlabels = FALSE, xlab, ylab, ylim,
                          n_cores = 1,
-                         return_forecasts = FALSE, ...){
+                         return_forecasts = FALSE,
+                         return_score = FALSE, ...){
 
   # Check arguments
   if(class(object) != 'mvgam'){
@@ -64,6 +71,10 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
     }
   }
 
+  if(return_score){
+    return_forecasts <- TRUE
+  }
+
   if(!missing("newdata")){
     data_test <- newdata
 
@@ -73,9 +84,14 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
     }
   }
 
+  # Use sensible ylimits for beta
+  if(object$family == 'beta'){
+    ylim <- c(0, 1)
+  }
+
   # Prediction indices for the particular series
   data_train <- object$obs_data
-  ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+  ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
               length.out = NCOL(object$ytimes) + 1)
   starts <- ends + 1
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
@@ -84,11 +100,11 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
   if(object$fit_engine == 'stan'){
 
     # For stan objects, ypred is stored as a vector in column-major order
-    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
-                                                                    dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+    preds <- mcmc_chains(object$model_output, 'ypred')[,seq(series,
+                                                                    dim(mcmc_chains(object$model_output, 'ypred'))[2],
                                                                     by = NCOL(object$ytimes))]
   } else {
-    preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+    preds <- mcmc_chains(object$model_output, 'ypred')[,starts[series]:ends[series]]
   }
 
   # Add variables to data_test if missing
@@ -184,7 +200,7 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
                                 n_cores = n_cores)
     } else {
       fc_preds <- forecast.mvgam(object, data_test = data_test,
-                                 n_cores = n_cores)
+                                 n_cores = n_cores, series = series)
     }
     preds <- cbind(preds, fc_preds)
   }
@@ -311,37 +327,7 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
     abline(v = last_train, col = '#FFFFFF60', lwd = 2.85)
     abline(v = last_train, col = 'black', lwd = 2.5, lty = 'dashed')
 
-    # Calculate out of sample DRPS and print the score
-    drps_score <- function(truth, fc, interval_width = 0.9){
-      nsum <- 1000
-      Fy = ecdf(fc)
-      ysum <- 0:nsum
-      indicator <- ifelse(ysum - truth >= 0, 1, 0)
-      score <- sum((indicator - Fy(ysum))^2)
-
-      # Is value within empirical interval?
-      interval <- quantile(fc, probs = c((1-interval_width)/2, (interval_width + (1-interval_width)/2)),
-                           na.rm = TRUE)
-      in_interval <- ifelse(truth <= interval[2] & truth >= interval[1], 1, 0)
-      return(c(score, in_interval))
-    }
-
-    # Wrapper to operate on all observations in fc_horizon
-    drps_mcmc_object <- function(truth, fc, interval_width = 0.9){
-      indices_keep <- which(!is.na(truth))
-      if(length(indices_keep) == 0){
-        scores = data.frame('drps' = rep(NA, length(truth)),
-                            'interval' = rep(NA, length(truth)))
-      } else {
-        scores <- matrix(NA, nrow = length(truth), ncol = 2)
-        for(i in indices_keep){
-          scores[i,] <- drps_score(truth = as.vector(truth)[i],
-                                   fc = fc[,i], interval_width)
-        }
-      }
-      scores
-    }
-
+    # Calculate out of sample probabilistic score
     truth <- as.matrix(data_test %>%
                          dplyr::filter(series == s_name) %>%
                          dplyr::select(time, y) %>%
@@ -359,13 +345,23 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
 
 
     if(all(is.na(truth))){
-      message('No non-missing values in data_test$y; cannot calculate DRPS')
+      score <- NULL
+      message('No non-missing values in data_test$y; cannot calculate forecast score')
       message()
     } else {
-      message('Out of sample DRPS:')
-      print(sum(drps_mcmc_object(as.vector(truth),
-                                 fc)[,1], na.rm = TRUE))
-      message()
+      if(object$family %in% c('poisson', 'negative binomial')){
+        score <- sum(drps_mcmc_object(as.vector(truth),
+                                      fc)[,1], na.rm = TRUE)
+        message('Out of sample DRPS:')
+        print(score)
+        message()
+      } else {
+        score <- sum(crps_mcmc_object(as.vector(truth),
+                                      fc)[,1], na.rm = TRUE)
+        message('Out of sample CRPS:')
+        print(score)
+        message()
+      }
     }
 
   } else {
@@ -390,12 +386,21 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
   }
 
   if(return_forecasts){
-    if(!missing(data_test)){
-      return(preds[,(last_train+1):NCOL(preds)])
+    if(return_score){
+      if(!missing(data_test)){
+        return(list(forecast = preds[,(last_train+1):NCOL(preds)],
+                    score = score))
+      } else {
+        return(list(forecast = preds,
+                    score = NULL))
+      }
     } else {
-      return(preds)
+      if(!missing(data_test)){
+        return(preds[,(last_train+1):NCOL(preds)])
+      } else {
+        return(preds)
+      }
     }
-
   }
 
 }

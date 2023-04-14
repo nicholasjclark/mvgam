@@ -29,7 +29,7 @@ set.seed(1111)
 library(mvgam)
 dat <- sim_mvgam(T = 100, n_series = 6, n_lv = 2,
                  family = 'poisson',
-                 mu_obs = runif(6, 4, 8),
+                 mu = runif(6, -1, 2),
                  trend_rel = 0.6, train_prop = 0.85)
 ```
 

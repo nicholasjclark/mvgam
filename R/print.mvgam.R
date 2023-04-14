@@ -8,13 +8,6 @@
 #'@return A \code{list} is printed on-screen
 #'@export
 print.mvgam = function(object){
-jam = object$jam_model
-
-# Convert stanfit objects to coda samples
-if(class(object$model_output) == 'stanfit'){
-  object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                function(x) coda::mcmc(as.array(object$model_output)[,x,])))
-}
 
 message("GAM formula:")
 print(object$call)
@@ -68,27 +61,11 @@ if(object$fit_engine == 'stan'){
   message()
 }
 
-if(object$family == 'Negative Binomial'){
-  message("Dispersion parameter estimates:")
-  print(MCMCvis::MCMCsummary(object$model_output, 'phi')[,c(3:7)])
-  message()
-}
-
-if(object$family == 'Tweedie'){
-  message("Dispersion parameter estimates:")
-  print(MCMCvis::MCMCsummary(object$model_output, 'phi')[,c(3:7)])
-  message()
-}
-
-message('Total estimated degrees of freedom:')
-cat(sum(jam$edf), '\n')
-message()
 }
 
 
 #'@export
 print.mvgam_prefit = function(object){
-  jam = object$jam_model
 
   message("GAM formula:")
   print(object$call)

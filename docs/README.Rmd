@@ -21,10 +21,10 @@ knitr::opts_chunk$set(
 *mvgam*
 ================
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for discrete time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others. 
+The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others. 
 
 ## Disclaimer
-Please note that the `mvgam` package is under very active development, and it is likely that certain functionality will change on a regular basis. As such, please take caution when implementing the package for automated routines.
+Please note that the `mvgam` package is under active development, and it is likely that certain functionality will change on a regular basis. As such, please take caution when implementing the package for automated routines. Also note that, because of the many advantages of `Stan` over `JAGS`, *further development of the package will only be applied to `Stan`*. This includes the planned addition of more response distributions, plans to handle zero-inflation, and plans to incorporate a greater variety of trend models. Users are strongly encouraged to opt for `Stan` over `JAGS` in any proceeding workflows.
 
 ## Resources
 A number of case studies have been compiled to highlight how DGAMs can be estimated using MCMC sampling. These are hosted currently on `RPubs` at the following links:
@@ -40,7 +40,7 @@ The package can also be used to generate all necessary data structures, initial 
   
 ## Installation
 Install the development version from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`. Note that to actually condition models with MCMC sampling, either the `JAGS` software must be installed (along with the `R` packages `rjags` and `runjags`) or the `Stan` software must be installed (along with either `rstan` and/or `cmdstanr`). These are not listed as dependencies of `mvgam` to ensure that installation is less difficult. If users wish to fit the models using `mvgam`, please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/), for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan), or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/).
+`devtools::install_github("nicholasjclark/mvgam")`. Note that to actually condition models with MCMC sampling, either the `JAGS` software must be installed (along with the `R` packages `rjags` and `runjags`) or the `Stan` software must be installed (along with either `rstan` and/or `cmdstanr`). Only `rstan` is listed as a dependency of `mvgam` to ensure that installation is less difficult. If users wish to fit the models using `mvgam`, please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/), for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan), or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/).
 
 ## Citing mvgam and related software
 When using open source software (or software in general), please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work, so we highly encourage you to cite any packages that you rely on for your research.
@@ -124,7 +124,8 @@ lynx_mvgam_prior <- mvgam(data = lynx_train,
 
 Plot a set of realisations from the prior seasonal smooth function
 ```{r}
-plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
+plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE,
+     n_realisations = 30)
 ```
 These functions are showing the marginal contribution of the seasonal smooth function to the linear predictor (on the log scale), and they are clearly allowed to move into ridiculous spaces that we should give very little prior plausibility to:
 ```{r}
@@ -155,7 +156,8 @@ lynx_mvgam_prior <- mvgam(data = lynx_train,
 
 Resulting prior realisations look more reasonable given the range of the observations, and there is clearly enough flexibility to support a wide range of functional shapes.
 ```{r}
-plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
+plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE,
+     n_realisations = 30)
 ```
 
 In practice, imparting domain knowledge into prior specifications for penalised smooth functions is challenging, as these behaviours are often the cumulative result of multiple penalty matrices that all have their own separate smoothing parameters. Changing the prior on the smoothing parameters is another option (`mvgam` uses a half-normal prior by default, which regularises functions more than the default approach used in `mgcv::jagam`). But without running through prior visualisations (and other prior pushforward checks) it will be more difficult to reason about how to set `k` to respect domain knowledge. In general it is highly recommended that users view `mvgam` and related interfaces such as `brms` as tools for building scaffold models that can then be modified to suit the bespoke needs of each particular analysis. 
@@ -306,8 +308,8 @@ mod2_eval <- eval_mvgam(lynx_mvgam_poor, eval_timepoint = 10, fc_horizon = 10)
 
 Summary statistics of the two models' out of sample Discrete Rank Probability Score (DRPS) indicate that the well-specified model performs markedly better (far lower DRPS) for this evaluation timepoint
 ```{r}
-summary(mod1_eval$series1$drps)
-summary(mod2_eval$series1$drps)
+summary(mod1_eval$series1$score)
+summary(mod2_eval$series1$score)
 ```
 
 Nominal coverages for both models' 90% prediction intervals
@@ -316,7 +318,47 @@ mean(mod1_eval$series1$in_interval)
 mean(mod2_eval$series1$in_interval)
 ```
 
-The `compare_mvgams` function automates this process by rolling along a set of timepoints for each model, ensuring a more in-depth evaluation of each competing model at the same set of timepoints. There are many more extended uses for `mvgam` models, including the ability to fit dynamic factor processes for analysing and forecasting sets of multivariate discrete time series
+The `compare_mvgams` function automates this process by rolling along a set of timepoints for each model, ensuring a more in-depth evaluation of each competing model at the same set of timepoints. There are many more extended uses for `mvgam` models, including the ability to fit dynamic factor processes for analysing and forecasting sets of multivariate time series
+
+## Extended observation families
+`mvgam` was originally designed to analyse and forecast non-negative integer-valued data (counts). These data are traditionally challenging to analyse with existing time-series analysis packages. But further development of `mvgam` has resulted in support for a growing number of observation families that extend to other types of data. Currently, the package can handle data for the following families:  
+`gaussian()` for real-valued data  
+`student_t()` for heavy-tailed real-valued data  
+`lognormal()` for non-negative real-valued data  
+`betar()` for proportional data on `(0,1)`  
+`poisson()` for count data  
+`nb()` for overdispersed count data  
+`tweedie()` for overdispersed count data  
+  
+Note that only `poisson()`, `nb()`, and `tweedie()` are available if using `JAGS`. All families, apart from `tweedie()`, are supported if using `Stan`. See `??mvgam_families` for more information. A simple example for simulating and modelling proportional data with `Beta` observations over a set of seasonal series with independent Gaussian Process dynamic trends:
+```{r, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=6.5, dpi=160}
+set.seed(100)
+data <- sim_mvgam(family = betar(),
+                 T = 80,
+                 trend_model = 'GP',
+                 trend_rel = 0.5, 
+                 seasonality = 'shared')
+plot_mvgam_series(data = data$data_train, series = 'all')
+```
+
+```{r, message=FALSE, warning=FALSE}
+mod <- mvgam(y ~ s(season),
+             trend_model = 'GP',
+             data = data$data_train,
+             newdata = data$data_test,
+             family = betar(),
+             run_model = TRUE)
+```
+
+Inspect the summary to see the posterior estimates for the `Beta` precision parameter
+```{r}
+summary(mod)
+```
+
+Plot the hindcast and forecast distributions for one series
+```{r}
+plot(mod, type = 'forecast', newdata = data$data_test, series = 2)
+```
 
 ## License
 This project is licensed under an `MIT` open source license

@@ -4,7 +4,7 @@
 #' @param model_file Prepared mvgam model file
 #' @param priors \code{data.frame} with prior definitions (in JAGS or Stan syntax)
 #' @return A `character string` containing the updated model file
-#' @export
+#' @noRd
 update_priors = function(model_file,
                          priors){
 

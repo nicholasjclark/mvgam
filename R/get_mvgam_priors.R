@@ -111,17 +111,24 @@ get_mvgam_priors = function(formula,
                             family = 'poisson',
                             use_lv = FALSE,
                             n_lv,
-                            use_stan = FALSE,
+                            use_stan = TRUE,
                             trend_model = 'None',
                             drift = FALSE){
 
-  # Check arguments
-  trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1",
-                                                          "AR2", "AR3", "GP"))
-  if(class(family) == 'family'){
-    family <- family$family
-  }
-  family <- match.arg(arg = family, choices = c("nb", "poisson", "tw"))
+  # Validate the family argument
+  family <- evaluate_family(family)
+  family_char <- match.arg(arg = family$family,
+                           choices = c('negative binomial',
+                                       "poisson",
+                                       "tweedie",
+                                       "beta",
+                                       "gaussian",
+                                       "lognormal",
+                                       "student",
+                                       "Gamma"))
+
+  # Validate the trend argument
+  trend_model <- evaluate_trend_model(trend_model)
 
   if(missing("data") & missing("data_train")){
     stop('Argument "data" is missing with no default')
@@ -138,7 +145,7 @@ get_mvgam_priors = function(formula,
     use_stan <- TRUE
   }
 
-  if(use_stan & family == 'tw'){
+  if(use_stan & family_char == 'tweedie'){
     warning('Tweedie family not yet supported for stan; reverting to JAGS')
     use_stan <- FALSE
   }
@@ -152,7 +159,8 @@ get_mvgam_priors = function(formula,
     # Must be able to index by time; it is too dangerous to 'guess' as this could make a huge
     # impact on resulting estimates / inferences
     if(!'time' %in% colnames(data_train)){
-      stop('data does not contain a "time" column')
+      stop('data does not contain a "time" column',
+           call. = FALSE)
     }
   }
 
@@ -162,7 +170,8 @@ get_mvgam_priors = function(formula,
     }
 
     if(!'time' %in% names(data_train)){
-      stop('data does not contain a "time" column')
+      stop('data does not contain a "time" column',
+           call. = FALSE)
     }
   }
 
@@ -172,7 +181,8 @@ get_mvgam_priors = function(formula,
       n_lv <- min(2, floor(length(unique(data_train$series)) / 2))
     }
     if(n_lv > length(unique(data_train$series))){
-      stop('number of latent variables cannot be greater than number of series')
+      stop('number of latent variables cannot be greater than number of series',
+           call. = FALSE)
     }
   }
 
@@ -194,32 +204,13 @@ get_mvgam_priors = function(formula,
 
   # Use a small fit from mgcv to extract relevant information on smooths included
   # in the model
-  if(family == 'nb'){
-    ss_gam <- mgcv::gam(formula(formula),
-                        data = data_train,
-                        method = "REML",
-                        family = nb(),
-                        drop.unused.levels = FALSE,
-                        control = list(nthreads = min(4, parallel::detectCores()-1),
-                                       maxit = 30))
-  } else if(family == 'poisson'){
-    ss_gam <- mgcv::gam(formula(formula),
-                        data = data_train,
-                        method = "REML",
-                        family = poisson(),
-                        drop.unused.levels = FALSE,
-                        control = list(nthreads = min(4, parallel::detectCores()-1),
-                                       maxit = 30))
-  } else {
-    ss_gam <- mgcv::gam(formula(formula),
-                        data = data_train,
-                        method = "REML",
-                        family = tw(),
-                        drop.unused.levels = FALSE,
-                        control = list(nthreads = min(4, parallel::detectCores()-1),
-                                       maxit = 30))
-  }
-
+  ss_gam <- mgcv::gam(formula(formula),
+                      data = data_train,
+                      method = "REML",
+                      family = family_to_mgcvfam(family),
+                      drop.unused.levels = FALSE,
+                      control = list(nthreads = min(4, parallel::detectCores()-1),
+                                     maxit = 30))
 
   # Check if smooth terms are included in the formula
   if(length(ss_gam$smooth) == 0){
@@ -657,30 +648,30 @@ get_mvgam_priors = function(formula,
   # Extract drift parameter information
   if(drift){
     if(use_stan){
-      drift_df <- data.frame(param_name = c('phi'),
+      drift_df <- data.frame(param_name = c('drift'),
                              param_length = ifelse(use_lv,
                                                    n_lv,
                                                    length(unique(data_train$series))),
                              param_info = c('trend drift'),
-                             prior = c('phi ~ std_normal();'),
+                             prior = c('drift ~ std_normal();'),
                              example_change = c(
                                paste0(
-                                 'phi ~ normal(',
+                                 'drift ~ normal(',
                                  round(runif(min = -1, max = 1, n = 1), 2),
                                  ', ',
                                  round(runif(min = 0.1, max = 1, n = 1), 2),
                                  ');'
                                )))
     } else {
-      drift_df <- data.frame(param_name = c('phi'),
+      drift_df <- data.frame(param_name = c('drift'),
                              param_length = ifelse(use_lv,
                                                    n_lv,
                                                    length(unique(data_train$series))),
                              param_info = c('trend drift (for each series s)'),
-                             prior = c('phi ~ dnorm(0, 10)'),
+                             prior = c('drift ~ dnorm(0, 10)'),
                              example_change = c(
                                paste0(
-                                 'phi ~ dnorm(',
+                                 'drift ~ dnorm(',
                                  round(runif(min = -1, max = 1, n = 1), 2),
                                  ', ',
                                  round(runif(min = 0.1, max = 1, n = 1), 2),
@@ -692,63 +683,16 @@ get_mvgam_priors = function(formula,
     drift_df <- NULL
   }
 
-  # Extract information for family-specific overdispersion parameters
-  if(family == 'nb'){
-    if(use_stan){
-      nb_df <- data.frame(param_name = c('phi_inv<lower=0>'),
-                          param_length = length(unique(data_train$series)),
-                          param_info = c('inverse of NB dispsersion'),
-                          prior = c('phi_inv ~ student_t(3, 0, 0.1);'),
-                          example_change = c(
-                            paste0(
-                              'phi_inv ~ normal(',
-                              round(runif(min = -1, max = 1, n = 1), 2),
-                              ', ',
-                              round(runif(min = 0.1, max = 1, n = 1), 2),
-                              ');'
-                            )))
-    } else {
-      nb_df <- data.frame(param_name = c('phi_inv<lower=0>'),
-                          param_length = length(unique(data_train$series)),
-                          param_info = c('inverse of NB dispsersion'),
-                          prior = c('phi_inv[s] ~ dexp(5)'),
-                          example_change = c(
-                            paste0(
-                              'phi_inv[s] ~ dnorm(',
-                              round(runif(min = -1, max = 1, n = 1), 2),
-                              ', ',
-                              round(runif(min = 0.1, max = 1, n = 1), 2),
-                              ')T(0, )'
-                            )))
-    }
-
-  } else {
-    nb_df <- NULL
-  }
-
-  if(family == 'tw'){
-    tw_df <- data.frame(param_name = c('phi_raw'),
-                        param_length = length(unique(data_train$series)),
-                        param_info = c('log of Tweedie dispsersion (for each series s)'),
-                        prior = c('phi_raw[s] ~ dnorm(0, 2)T(-3.5, 3.5)'),
-                        example_change = c(
-                          paste0(
-                            'phi_raw[s] ~ dnorm(',
-                            round(runif(min = -1, max = 1, n = 1), 2),
-                            ', ',
-                            round(runif(min = 0.5, max = 5, n = 1), 2),
-                            ')'
-                          )))
-  } else {
-    tw_df <- NULL
-  }
+  # Extract information for family-specific parameters
+  family_df <- family_prior_info(family = family_char,
+                                 use_stan = use_stan,
+                                 data = data_train)
 
   # Return the dataframe of prior information
   return(rbind(sp_df,
                re_df,
                trend_df,
                drift_df,
-               nb_df,
-               tw_df))
+               family_df))
 }
 

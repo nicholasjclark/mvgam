@@ -1,14 +1,20 @@
 #'Summary for a fitted mvgam object
 #'
-#'This function takes a fitted \code{mvgam} object and prints various useful summaries from it
-#'
+#'These functions take a fitted \code{mvgam} object and return various useful summaries
 #'@param object \code{list} object returned from \code{mvgam}
 #'@author Nicholas J Clark
-#'@details A brief summary of the model's call is printed, along with posterior intervals for
+#'@details `summary.mvgam` and `summary.mvgam_prefit` return brief summaries of the model's call is printed, along with posterior intervals for
 #'some of the key parameters in the model. Note that some smooths have extra penalties on the null space,
 #'so summaries for the \code{rho} parameters may include more penalty terms than the number of smooths in
 #'the original model formula.
-#'@return A \code{list} is printed on-screen showing the summaries for the model
+#'
+#'`coef.mvgam` returns either summaries or full posterior estimates for `GAM` component
+#'coefficients
+#'@return For `summary.mvgam` and `summary.mvgam_prefit`, Aa\code{list} is printed
+#'on-screen showing the summaries for the model
+#'
+#'For `coef.mvgam`, either a \code{matrix} of posterior coefficient distributions
+#'(if \code{summarise == FALSE} or \code{data.frame} of coefficient summaries)
 #'@export
 summary.mvgam = function(object){
 
@@ -65,21 +71,49 @@ if(object$fit_engine == 'stan'){
   message()
 }
 
-if(object$family == 'Negative Binomial'){
+if(object$family == 'negative binomial'){
   message("Dispersion parameter estimates:")
-  print(MCMCvis::MCMCsummary(object$model_output, 'phi')[,c(3:7)])
+  print(mcmc_summary(object$model_output, 'phi')[,c(3:7)])
   message()
 }
 
-if(object$family == 'Tweedie'){
+if(object$family == 'beta'){
+  message("Precision parameter estimates:")
+  print(mcmc_summary(object$model_output, 'phi')[,c(3:7)])
+  message()
+}
+
+if(object$family == 'tweedie'){
   message("Dispersion parameter estimates:")
-  print(MCMCvis::MCMCsummary(object$model_output, 'phi')[,c(3:7)])
+  print(mcmc_summary(object$model_output, 'phi')[,c(3:7)])
+  message()
+}
+
+if(object$family == 'gaussian'){
+  message("Observation error parameter estimates:")
+  print(mcmc_summary(object$model_output, 'sigma_obs')[,c(3:7)])
+  message()
+}
+
+if(object$family == 'student'){
+  message("Observation error parameter estimates:")
+  print(mcmc_summary(object$model_output, 'sigma_obs')[,c(3:7)])
+  message()
+
+  message("Observation df parameter estimates:")
+  print(mcmc_summary(object$model_output, 'nu')[,c(3:7)])
+  message()
+}
+
+if(object$family == 'lognormal'){
+  message("log(observation error) parameter estimates:")
+  print(mcmc_summary(object$model_output, 'sigma_obs')[,c(3:7)])
   message()
 }
 
 message("GAM coefficient (beta) estimates:")
 coef_names <- names(object$mgcv_model$coefficients)
-mvgam_coefs <- MCMCvis::MCMCsummary(object$model_output, 'b')[,c(3:7)]
+mvgam_coefs <- mcmc_summary(object$model_output, 'b')[,c(3:7)]
 rownames(mvgam_coefs) <- coef_names
 print(mvgam_coefs)
 message()
@@ -95,18 +129,18 @@ if(any(smooth_labs$class == 'random.effect')){
     dplyr::pull(label)
 
   if(object$fit_engine == 'jags'){
-    re_sds <- MCMCvis::MCMCsummary(object$model_output,
+    re_sds <- mcmc_summary(object$model_output,
                                    paste0('sigma_raw',
                                           seq_along(re_smooths)))[,c(3:7)]
 
-    re_mus <- MCMCvis::MCMCsummary(object$model_output,
+    re_mus <- mcmc_summary(object$model_output,
                                    paste0('mu_raw',
                                           seq_along(re_smooths)))[,c(3:7)]
   } else {
-    re_sds <- MCMCvis::MCMCsummary(object$model_output, 'sigma_raw',
+    re_sds <- mcmc_summary(object$model_output, 'sigma_raw',
                                    ISB = TRUE)[,c(3:7)]
 
-    re_mus <- MCMCvis::MCMCsummary(object$model_output, 'mu_raw',
+    re_mus <- mcmc_summary(object$model_output, 'mu_raw',
                                    ISB = TRUE)[,c(3:7)]
   }
 
@@ -123,20 +157,8 @@ if(any(smooth_labs$class == 'random.effect')){
 
 if(any(!is.na(object$sp_names))){
   message("GAM smoothing parameter (rho) estimates:")
-  rho_coefs <- MCMCvis::MCMCsummary(object$model_output, 'rho')[,c(3:7)]
-
-  name_starts <- unlist(purrr::map(object$pregam$smooth, 'first.sp'))
-  name_ends <- unlist(purrr::map(object$pregam$smooth, 'last.sp'))
-
-  rho_names <- unlist(lapply(seq(1:length(object$mgcv_model$smooth)), function(i){
-
-    number_seq <- seq(1:(1 + name_ends[i] - name_starts[i]))
-    number_seq[1] <- ''
-    paste0(rep(object$mgcv_model$smooth[[i]]$label,
-               length(number_seq)),
-           number_seq)
-  }))
-  rownames(rho_coefs) <- rho_names
+  rho_coefs <- mcmc_summary(object$model_output, 'rho')[,c(3:7)]
+  rownames(rho_coefs) <- object$sp_names
 
   # Don't print random effect lambdas as they follow the prior distribution
   if(any(smooth_labs$class == 'random.effect')){
@@ -157,7 +179,7 @@ if(object$use_lv){
     if(object$trend_model == 'RW'){
       if(object$drift){
         message("Latent trend drift estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('drift'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('drift'))[,c(3:7)])
         message()
       } else {
       }
@@ -165,18 +187,18 @@ if(object$use_lv){
 
     if(object$trend_model == 'GP'){
       message("Latent trend length scale (rho) estimates:")
-      print(MCMCvis::MCMCsummary(object$model_output, c('rho_gp'))[,c(3:7)])
+      print(mcmc_summary(object$model_output, c('rho_gp'))[,c(3:7)])
       message()
     }
 
     if(object$trend_model == 'AR1'){
       if(object$drift){
         message("Latent trend drift and parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('drift', 'ar1'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('drift', 'ar1'))[,c(3:7)])
         message()
       } else {
         message("Latent trend parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('ar1'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('ar1'))[,c(3:7)])
         message()
       }
     }
@@ -184,11 +206,11 @@ if(object$use_lv){
     if(object$trend_model == 'AR2'){
       if(object$drift){
         message("Latent trend drift and parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('drift', 'ar1', 'ar2'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2'))[,c(3:7)])
         message()
       } else {
         message("Latent trend parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('ar1', 'ar2'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('ar1', 'ar2'))[,c(3:7)])
         message()
       }
     }
@@ -196,11 +218,11 @@ if(object$use_lv){
     if(object$trend_model == 'AR3'){
       if(object$drift){
         message("Latent trend drift and parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('drift', 'ar1', 'ar2', 'ar3'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'ar3'))[,c(3:7)])
         message()
       } else {
         message("Latent trend parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('ar1', 'ar2', 'ar3'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('ar1', 'ar2', 'ar3'))[,c(3:7)])
         message()
       }
     }
@@ -212,11 +234,11 @@ if(!object$use_lv){
     if(object$trend_model == 'RW'){
       if(object$drift){
         message("Latent trend drift and sigma estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('drift', 'sigma'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('drift', 'sigma'))[,c(3:7)])
         message()
       } else {
         message("Latent trend variance estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('sigma'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('sigma'))[,c(3:7)])
         message()
       }
     }
@@ -224,11 +246,11 @@ if(!object$use_lv){
     if(object$trend_model == 'AR1'){
       if(object$drift){
         message("Latent trend drift and parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('drift', 'ar1', 'sigma'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('drift', 'ar1', 'sigma'))[,c(3:7)])
         message()
       } else {
         message("Latent trend parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('ar1', 'sigma'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('ar1', 'sigma'))[,c(3:7)])
         message()
       }
     }
@@ -236,11 +258,11 @@ if(!object$use_lv){
     if(object$trend_model == 'AR2'){
       if(object$drift){
         message("Latent trend drift and parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('drift', 'ar1', 'ar2', 'sigma'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'sigma'))[,c(3:7)])
         message()
       } else {
         message("Latent trend parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('ar1', 'ar2', 'sigma'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('ar1', 'ar2', 'sigma'))[,c(3:7)])
         message()
       }
     }
@@ -248,18 +270,18 @@ if(!object$use_lv){
     if(object$trend_model == 'AR3'){
       if(object$drift){
         message("Latent trend drift and parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('drift', 'ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
         message()
       } else {
         message("Latent trend parameter estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
         message()
       }
     }
 
     if(object$trend_model == 'GP'){
         message("Latent trend marginal deviation (alpha) and length scale (rho) estimates:")
-        print(MCMCvis::MCMCsummary(object$model_output, c('alpha_gp', 'rho_gp'))[,c(3:7)])
+        print(mcmc_summary(object$model_output, c('alpha_gp', 'rho_gp'))[,c(3:7)])
         message()
 
     }
@@ -275,7 +297,7 @@ if(object$fit_engine == 'stan'){
 
 if(object$fit_engine == 'jags'){
   message('JAGS MCMC diagnostics')
-  rhats <- MCMCvis::MCMCsummary(object$model_output)[,6]
+  rhats <- mcmc_summary(object$model_output)[,6]
   if(any(rhats > 1.05)){
     cat('Rhats above 1.05 found for',
         length(which(rhats > 1.05)),
@@ -289,8 +311,8 @@ if(object$fit_engine == 'jags'){
 
 }
 
-
-#'@export
+#' @rdname summary.mvgam
+#' @export
 summary.mvgam_prefit = function(object){
   message("GAM formula:")
   print(object$call)
@@ -301,7 +323,7 @@ summary.mvgam_prefit = function(object){
   message()
 
   message("Link function:")
-  cat(paste0('log', '\n'))
+  cat(paste0(family_links(object$family), '\n'))
   message()
 
   message("Trend model:")
@@ -331,3 +353,25 @@ summary.mvgam_prefit = function(object){
   message()
 }
 
+#' @rdname summary.mvgam
+#' @export
+#'@title Extract mvgam beta coefficients from the GAM component
+#'@param object \code{list} object returned from \code{mvgam}
+#'@param summarise \code{logical}. Summaries of coefficients will be returned
+#'if \code{TRUE}. Otherwise the full posterior distribution will be returned
+#'
+#'@method coef mvgam
+#'@export
+coef.mvgam = function(object, summarise = TRUE){
+  coef_names <- names(object$mgcv_model$coefficients)
+
+  if(summarise){
+    mvgam_coefs <- mcmc_summary(object$model_output, 'b')[,c(3:7)]
+    rownames(mvgam_coefs) <- coef_names
+  } else {
+    mvgam_coefs <- MCMCvis::MCMCchains(object$model_output, 'b')
+    colnames(mvgam_coefs) <- coef_names
+  }
+
+  return(mvgam_coefs)
+}

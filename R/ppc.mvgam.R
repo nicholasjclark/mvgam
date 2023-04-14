@@ -46,13 +46,20 @@ ppc <- function(x, what, ...){
 #'@rdname ppc.mvgam
 #'@method ppc mvgam
 #'@export
-ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'density',
+ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
                      n_bins, legend_position, xlab, ylab, ...){
 
   # Check arguments
   type <- match.arg(arg = type, choices = c("rootogram", "mean", "hist",
                                             "density", "pit", "cdf",
                                             "prop_zero"))
+
+  if(type == 'rootogram'){
+    if(!object$family %in% c('poisson', 'negative binomial', 'tweedie')){
+      stop('Rootograms not supported for checking non-count data',
+           call. = FALSE)
+    }
+  }
 
   optional_args <- list(...)
 
@@ -95,7 +102,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'density',
 
   # Pull out observations and posterior predictions for the specified series
   data_train <- object$obs_data
-  ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+  ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
               length.out = NCOL(object$ytimes) + 1)
   starts <- ends + 1
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
@@ -142,11 +149,11 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'density',
       if(object$fit_engine == 'stan'){
 
         # For stan objects, ypred is stored as a vector in column-major order
-        preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
-                                                                        dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+        preds <- mcmc_chains(object$model_output, 'ypred')[,seq(series,
+                                                                        dim(mcmc_chains(object$model_output, 'ypred'))[2],
                                                                         by = NCOL(object$ytimes))]
       } else {
-        preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+        preds <- mcmc_chains(object$model_output, 'ypred')[,starts[series]:ends[series]]
       }
 
       preds <- preds[,((length(data_train$y) / NCOL(object$ytimes))+1):
@@ -163,11 +170,11 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'density',
       if(object$fit_engine == 'stan'){
 
         # For stan objects, ypred is stored as a vector in column-major order
-        preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
-                                                                        dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+        preds <- mcmc_chains(object$model_output, 'ypred')[,seq(series,
+                                                                        dim(mcmc_chains(object$model_output, 'ypred'))[2],
                                                                         by = NCOL(object$ytimes))]
       } else {
-        preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+        preds <- mcmc_chains(object$model_output, 'ypred')[,starts[series]:ends[series]]
       }
 
       preds <- preds[,((NROW(data_train) / NCOL(object$ytimes))+1):
@@ -199,11 +206,11 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'density',
     if(object$fit_engine == 'stan'){
 
       # For stan objects, ypred is stored as a vector in column-major order
-      preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,seq(series,
-                                                                      dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+      preds <- mcmc_chains(object$model_output, 'ypred')[,seq(series,
+                                                                      dim(mcmc_chains(object$model_output, 'ypred'))[2],
                                                                       by = NCOL(object$ytimes))]
     } else {
-      preds <- MCMCvis::MCMCchains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+      preds <- mcmc_chains(object$model_output, 'ypred')[,starts[series]:ends[series]]
     }
 
     preds <- preds[,1:length(truths)]
@@ -442,8 +449,8 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'density',
   if(type == 'density'){
     max_x <- max(max(density(preds[1,], na.rm = TRUE)$x),
                  max(density(truths, na.rm = TRUE)$x))
-    #min_x <- min(density(preds[1,])$x)
-    min_x <- 0
+    min_x <- min(min(density(preds[1,], na.rm = TRUE)$x),
+                 min(density(truths, na.rm = TRUE)$x))
     pred_densities <- do.call(rbind, (lapply(1:NROW(preds), function(x){
       if(length(which(is.na(preds[x,]))) > (length(preds[x,]) - 3)){
         rep(0, length(density(truths, from = min_x,
@@ -472,10 +479,18 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'density',
       xlab <- ''
     }
 
+    if(object$family == 'beta'){
+      xlimits <- c(0, 1)
+    } else if(object$family %in% c('poisson', 'negative binomial', 'lognormal')){
+      xlimits <- c(0, max_x)
+    } else {
+      xlimits <- c(min_x, max_x)
+    }
+
     plot(1, type = "n", bty = 'L',
          xlab = xlab,
          ylab = ylab,
-         xlim = c(min_x, max_x),
+         xlim = xlimits,
          ylim = c(0, ymax),
          ...)
 
@@ -530,9 +545,19 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'density',
     bin_lims <- range(c(truths, as.vector(preds)), na.rm = TRUE)
     #delta <- diff(range(preds)) / n_bins
     breaks <- seq(bin_lims[1], bin_lims[2], length.out = n_bins)
-    xlim <- c(0,
+    xlim <- c(min(min(density(preds[1,], na.rm = TRUE)$x),
+                  min(density(truths, na.rm = TRUE)$x)),
               max(max(density(preds[1,], na.rm = TRUE)$x),
                   max(density(truths, na.rm = TRUE)$x)))
+
+    if(object$family == 'beta'){
+      xlim <- c(0, 1)
+    } else if(object$family %in% c('poisson', 'negative binomial', 'lognormal')){
+      xlim <- c(0, xlim[2])
+    } else {
+      xlim <- xlim
+    }
+
     ylim <- c(0, max(c(max(hist(truths, breaks = breaks, plot = F)$density, na.rm = TRUE),
                        max(hist(preds, breaks = breaks, plot = F)$density, na.rm = TRUE))))
 
@@ -594,8 +619,9 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'density',
       }
     }
 
-    plot_x <- seq(min(truths, na.rm = T),
-                  max(truths, na.rm = T))
+    plot_x <- seq(from = min(truths, na.rm = T),
+                  to = max(truths, na.rm = T),
+                  length.out = 100)
 
     pred_cdfs <- do.call(rbind, (lapply(1:NROW(preds), function(x){
       ecdf_plotdat(preds[x,], x = plot_x)
@@ -672,7 +698,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'density',
 
     P_xm1 <- vapply(seq_along(truths),
                     function(i) {
-                      sum(preds[i,] <= truths[i] - 1) / n_pred
+                      sum(preds[i,] <= truths[i] - 1.e-6) / n_pred
                     },
                     .0)
     # 1000 replicates for randomised PIT

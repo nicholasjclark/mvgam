@@ -4,9 +4,9 @@
 # *mvgam*
 
 The goal of `mvgam` is to use a Bayesian framework to estimate
-parameters of Generalized Additive Models for discrete time series with
-dynamic trend components. The motivation for the package and some of its
-primary objectives are described in detail by [Clark & Wells
+parameters of Generalized Additive Models for time series with dynamic
+trend components. The motivation for the package and some of its primary
+objectives are described in detail by [Clark & Wells
 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974)
 (published in *Methods in Ecology and Evolution*), with additional
 inspiration on the use of Bayesian probabilistic modelling to quantify
@@ -17,10 +17,15 @@ Fox](https://emilybfox.su.domains/), among many others.
 
 ## Disclaimer
 
-Please note that the `mvgam` package is under very active development,
-and it is likely that certain functionality will change on a regular
-basis. As such, please take caution when implementing the package for
-automated routines.
+Please note that the `mvgam` package is under active development, and it
+is likely that certain functionality will change on a regular basis. As
+such, please take caution when implementing the package for automated
+routines. Also note that, because of the many advantages of `Stan` over
+`JAGS`, *further development of the package will only be applied to
+`Stan`*. This includes the planned addition of more response
+distributions, plans to handle zero-inflation, and plans to incorporate
+a greater variety of trend models. Users are strongly encouraged to opt
+for `Stan` over `JAGS` in any proceeding workflows.
 
 ## Resources
 
@@ -51,7 +56,7 @@ Install the development version from `GitHub` using:
 actually condition models with MCMC sampling, either the `JAGS` software
 must be installed (along with the `R` packages `rjags` and `runjags`) or
 the `Stan` software must be installed (along with either `rstan` and/or
-`cmdstanr`). These are not listed as dependencies of `mvgam` to ensure
+`cmdstanr`). Only `rstan` is listed as a dependency of `mvgam` to ensure
 that installation is less difficult. If users wish to fit the models
 using `mvgam`, please refer to installation links for `JAGS`
 [here](https://sourceforge.net/projects/mcmc-jags/files/), for `Stan`
@@ -196,7 +201,8 @@ lynx_mvgam_prior <- mvgam(data = lynx_train,
 Plot a set of realisations from the prior seasonal smooth function
 
 ``` r
-plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
+plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE,
+     n_realisations = 30)
 ```
 
 <img src="README-unnamed-chunk-9-1.png" width="60%" style="display: block; margin: auto;" />
@@ -231,7 +237,8 @@ observations, and there is clearly enough flexibility to support a wide
 range of functional shapes.
 
 ``` r
-plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE)
+plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE,
+     n_realisations = 30)
 ```
 
 <img src="README-unnamed-chunk-13-1.png" width="60%" style="display: block; margin: auto;" />
@@ -267,12 +274,12 @@ test_priors
 #> 3             ar2            1       trend AR2 coefficient
 #> 4             ar3            1       trend AR3 coefficient
 #> 5  sigma<lower=0>            1                    trend sd
-#>                      prior             example_change
-#> 1 lambda ~ normal(10, 25); lambda ~ exponential(0.2);
-#> 2      ar1 ~ std_normal(); ar1 ~ normal(-0.29, 0.72);
-#> 3      ar2 ~ std_normal();  ar2 ~ normal(0.32, 0.62);
-#> 4      ar3 ~ std_normal();  ar3 ~ normal(-0.54, 0.4);
-#> 5  sigma ~ exponential(2); sigma ~ exponential(0.97);
+#>                      prior              example_change
+#> 1 lambda ~ normal(10, 25); lambda ~ exponential(0.23);
+#> 2      ar1 ~ std_normal();      ar1 ~ normal(1, 0.19);
+#> 3      ar2 ~ std_normal();    ar2 ~ normal(0.73, 0.1);
+#> 4      ar3 ~ std_normal();   ar3 ~ normal(-0.1, 0.21);
+#> 5  sigma ~ exponential(2);  sigma ~ exponential(0.86);
 ```
 
 Any of the above priors can be changed by modifying the `prior` column
@@ -297,58 +304,58 @@ lynx_mvgam <- mvgam(data = lynx_train,
 #> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) 
-#> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) 
-#> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) 
-#> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) 
-#> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) 
 #> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
-#> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) 
-#> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) 
 #> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) 
 #> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) 
-#> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) 
-#> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
-#> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 2 finished in 29.8 seconds.
+#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 3 finished in 30.1 seconds.
-#> Chain 4 finished in 30.2 seconds.
+#> Chain 3 finished in 25.9 seconds.
+#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 2 finished in 28.3 seconds.
+#> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
 #> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 1 finished in 31.2 seconds.
+#> Chain 1 finished in 31.8 seconds.
+#> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 4 finished in 33.3 seconds.
 #> 
 #> All 4 chains finished successfully.
-#> Mean chain execution time: 30.3 seconds.
-#> Total execution time: 31.3 seconds.
+#> Mean chain execution time: 29.8 seconds.
+#> Total execution time: 33.4 seconds.
 ```
 
 Inspect the resulting model file, which is written in the `Stan`
@@ -518,7 +525,7 @@ summary(lynx_mvgam)
 #> population ~ s(season, bs = "cc", k = 12)
 #> 
 #> Family:
-#> Poisson
+#> poisson
 #> 
 #> Link function:
 #> log
@@ -536,29 +543,29 @@ summary(lynx_mvgam)
 #> Fitted using Stan
 #> 
 #> GAM coefficient (beta) estimates:
-#>                     2.5%         50%       97.5% Rhat n.eff
-#> (Intercept)   6.50976700  6.73163000  6.97094975 1.00  1651
-#> s(season).1  -0.52701220  0.05518615  0.74531672 1.00   946
-#> s(season).2  -0.24032817  0.81511400  1.75200850 1.01   388
-#> s(season).3  -0.05913285  1.20650500  2.39905900 1.01   354
-#> s(season).4  -0.58263707  0.43134700  1.36017225 1.00   803
-#> s(season).5  -1.15155875 -0.15124250  0.93753662 1.00   454
-#> s(season).6  -1.02573100 -0.01850930  1.08575550 1.00   514
-#> s(season).7  -0.71321785  0.36646800  1.36718550 1.00   640
-#> s(season).8  -1.00653600  0.21252950  1.75936375 1.00   306
-#> s(season).9  -1.12760900 -0.34532400  0.68948080 1.00   366
-#> s(season).10 -1.36529700 -0.69741100 -0.02544059 1.00   574
+#>                     2.5%        50%      97.5% Rhat n.eff
+#> (Intercept)   6.78000750  6.8053600 6.83024050 1.00  2927
+#> s(season).1  -0.59260430  0.0622942 0.74350882 1.00   813
+#> s(season).2  -0.25712945  0.8220655 1.83328700 1.00   339
+#> s(season).3  -0.06052176  1.2116000 2.59213825 1.01   347
+#> s(season).4  -0.50076917  0.4395455 1.39608850 1.00   731
+#> s(season).5  -1.13397850 -0.1400525 0.92791657 1.00   437
+#> s(season).6  -1.06777125  0.0154995 1.02410625 1.01   590
+#> s(season).7  -0.77687085  0.3574775 1.45644075 1.00   581
+#> s(season).8  -0.98339267  0.2156885 1.75315600 1.01   270
+#> s(season).9  -1.16961075 -0.3518405 0.57945602 1.01   394
+#> s(season).10 -1.40888500 -0.7015145 0.01104424 1.00   475
 #> 
 #> GAM smoothing parameter (rho) estimates:
-#>               2.5%    50%   97.5% Rhat n.eff
-#> s(season) 2.096422 3.4179 4.25348    1   466
+#>               2.5%     50%    97.5% Rhat n.eff
+#> s(season) 2.007115 3.38823 4.274595    1   425
 #> 
 #> Latent trend parameter estimates:
-#>                2.5%        50%     97.5% Rhat n.eff
-#> ar1[1]    0.6731276  1.1223750 1.4346067    1   427
-#> ar2[1]   -0.8113491 -0.4081520 0.0619227    1  1136
-#> ar3[1]   -0.4765546 -0.1320530 0.3105695    1   430
-#> sigma[1]  0.3968855  0.4907045 0.6215614    1  1376
+#>                2.5%        50%      97.5% Rhat n.eff
+#> ar1[1]    0.7232032  1.1231800 1.42180775    1   595
+#> ar2[1]   -0.8279726 -0.3999070 0.06126145    1  1629
+#> ar3[1]   -0.4747259 -0.1292455 0.29368425    1   456
+#> sigma[1]  0.3950898  0.4937000 0.63499587    1  1473
 #> 
 #> Stan MCMC diagnostics
 #> n_eff / iter looks reasonable for all parameters
@@ -644,7 +651,7 @@ the entire series (testing and training)
 ``` r
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 #> Out of sample DRPS:
-#> [1] 1061.58
+#> [1] 1058.32
 #> 
 ```
 
@@ -741,58 +748,58 @@ lynx_mvgam_poor <- mvgam(data = lynx_train,
 #> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) 
-#> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
-#> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
-#> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) 
-#> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
 #> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) 
 #> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
-#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
-#> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) 
-#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) 
 #> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) 
-#> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) 
-#> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) 
-#> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) 
-#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) 
-#> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 2 finished in 7.1 seconds.
-#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 4 finished in 8.1 seconds.
+#> Chain 4 finished in 3.9 seconds.
+#> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 2 finished in 4.1 seconds.
+#> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
 #> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 1 finished in 4.3 seconds.
 #> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 1 finished in 8.6 seconds.
-#> Chain 3 finished in 8.5 seconds.
+#> Chain 3 finished in 4.5 seconds.
 #> 
 #> All 4 chains finished successfully.
-#> Mean chain execution time: 8.1 seconds.
-#> Total execution time: 8.7 seconds.
+#> Mean chain execution time: 4.2 seconds.
+#> Total execution time: 4.6 seconds.
 ```
 
 We choose a set of timepoints within the training data to forecast from,
@@ -812,12 +819,12 @@ Probability Score (DRPS) indicate that the well-specified model performs
 markedly better (far lower DRPS) for this evaluation timepoint
 
 ``` r
-summary(mod1_eval$series1$drps)
+summary(mod1_eval$series1$score)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   56.23   86.39  172.02  167.16  195.51  328.98
-summary(mod2_eval$series1$drps)
+#>   52.71   88.10  184.52  179.18  219.52  364.08
+summary(mod2_eval$series1$score)
 #>    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#>   60.94   64.94  262.89  263.59  386.05  613.20
+#>   33.87   42.42  312.07  288.92  457.02  675.30
 ```
 
 Nominal coverages for both models’ 90% prediction intervals
@@ -826,15 +833,194 @@ Nominal coverages for both models’ 90% prediction intervals
 mean(mod1_eval$series1$in_interval)
 #> [1] 0.9
 mean(mod2_eval$series1$in_interval)
-#> [1] 0.8
+#> [1] 0.7
 ```
 
 The `compare_mvgams` function automates this process by rolling along a
 set of timepoints for each model, ensuring a more in-depth evaluation of
 each competing model at the same set of timepoints. There are many more
 extended uses for `mvgam` models, including the ability to fit dynamic
-factor processes for analysing and forecasting sets of multivariate
-discrete time series
+factor processes for analysing and forecasting sets of multivariate time
+series
+
+## Extended observation families
+
+`mvgam` was originally designed to analyse and forecast non-negative
+integer-valued data (counts). These data are traditionally challenging
+to analyse with existing time-series analysis packages. But further
+development of `mvgam` has resulted in support for a growing number of
+observation families that extend to other types of data. Currently, the
+package can handle data for the following families:  
+`gaussian()` for real-valued data  
+`student_t()` for heavy-tailed real-valued data  
+`lognormal()` for non-negative real-valued data  
+`betar()` for proportional data on `(0,1)`  
+`poisson()` for count data  
+`nb()` for count data
+
+See `??mvgam_families` for more information. A simple example for
+simulating and modelling proportional data with `Beta` observations over
+a set of seasonal series with independent Gaussian Process dynamic
+trends:
+
+``` r
+set.seed(100)
+data <- sim_mvgam(family = betar(),
+                 T = 80,
+                 trend_model = 'GP',
+                 trend_rel = 0.5, 
+                 seasonality = 'shared')
+plot_mvgam_series(data = data$data_train, series = 'all')
+```
+
+<img src="README-unnamed-chunk-40-1.png" width="60%" style="display: block; margin: auto;" />
+
+``` r
+mod <- mvgam(y ~ s(season),
+             trend_model = 'GP',
+             data = data$data_train,
+             newdata = data$data_test,
+             family = betar(),
+             run_model = TRUE)
+#> Running MCMC with 4 parallel chains...
+#> 
+#> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) 
+#> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) 
+#> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup) 
+#> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) 
+#> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 1 finished in 9.6 seconds.
+#> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 3 finished in 9.9 seconds.
+#> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 4 finished in 9.9 seconds.
+#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 2 finished in 11.1 seconds.
+#> 
+#> All 4 chains finished successfully.
+#> Mean chain execution time: 10.1 seconds.
+#> Total execution time: 11.2 seconds.
+```
+
+Inspect the summary to see the posterior estimates for the `Beta`
+precision parameter
+
+``` r
+summary(mod)
+#> GAM formula:
+#> y ~ s(season)
+#> 
+#> Family:
+#> beta
+#> 
+#> Link function:
+#> logit
+#> 
+#> Trend model:
+#> GP
+#> 
+#> N series:
+#> 3
+#> 
+#> N observations:
+#> 180
+#> 
+#> Status:
+#> Fitted using Stan
+#> 
+#> Precision parameter estimates:
+#>            2.5%      50%    97.5% Rhat n.eff
+#> phi[1] 4.842004 7.180035 10.15668    1  1547
+#> phi[2] 4.993191 7.412000 10.64135    1  1882
+#> phi[3] 4.794589 6.992195  9.80917    1  2035
+#> 
+#> GAM coefficient (beta) estimates:
+#>                    2.5%          50%      97.5% Rhat n.eff
+#> (Intercept) -0.06503031  0.190306000 0.40911885 1.00  1027
+#> s(season).1 -0.10203927  0.252365000 0.66492057 1.00   897
+#> s(season).2 -1.11290500  0.007133675 1.18399850 1.01   743
+#> s(season).3 -0.44134790 -0.106289500 0.17276010 1.00   936
+#> s(season).4 -0.35838200  0.293418000 1.04808800 1.01   772
+#> s(season).5 -0.20853175  0.063184250 0.28589432 1.00   933
+#> s(season).6 -0.80582320 -0.231487000 0.29471405 1.00   755
+#> s(season).7 -0.25492200 -0.070607350 0.12361602 1.00   775
+#> s(season).8 -2.98297075 -1.348310000 0.08654903 1.00   730
+#> s(season).9 -0.59796723 -0.096201700 0.25249207 1.00   795
+#> 
+#> GAM smoothing parameter (rho) estimates:
+#>                  2.5%       50%    97.5% Rhat n.eff
+#> s(season)  -1.1774798 0.3679275 1.602198    1   771
+#> s(season)2  0.9870067 3.1387850 4.149200    1  1034
+#> 
+#> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
+#>                  2.5%        50%      97.5% Rhat n.eff
+#> alpha_gp[1] 0.2899545  0.5965660  1.0720827    1  1185
+#> alpha_gp[2] 0.3679857  0.6856335  1.2062022    1  1190
+#> alpha_gp[3] 0.1033669  0.3863915  0.8546067    1  1125
+#> rho_gp[1]   1.4918420  5.7257150 20.4610550    1  1036
+#> rho_gp[2]   2.9265673 21.6571500 62.6835775    1   502
+#> rho_gp[3]   1.3696123  8.1101450 48.5140800    1   644
+#> 
+#> Stan MCMC diagnostics
+#> n_eff / iter looks reasonable for all parameters
+#> Rhat looks reasonable for all parameters
+#> 15 of 2000 iterations ended with a divergence (0.75%)
+#> *Try running with larger adapt_delta to remove the divergences
+#> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
+#> E-FMI indicated no pathological behavior
+#> 
+```
+
+Plot the hindcast and forecast distributions for one series
+
+``` r
+plot(mod, type = 'forecast', newdata = data$data_test, series = 2)
+#> Out of sample CRPS:
+#> [1] 1.79015
+#> 
+```
+
+<img src="README-unnamed-chunk-43-1.png" width="60%" style="display: block; margin: auto;" />
 
 ## License
 

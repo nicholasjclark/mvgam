@@ -11,10 +11,10 @@
 get_monitor_pars = function(family, smooths_included = TRUE,
                             use_lv, trend_model, drift){
 
-  family <- match.arg(arg = family, choices = c("nb", "poisson",
-                                                "tw", "beta",
-                                                "normal", "lognormal",
-                                                "student", "gamma"))
+  family <- match.arg(arg = family, choices = c("negative binomial", "poisson",
+                                                "tweedie", "beta",
+                                                "gaussian", "lognormal",
+                                                "student", "Gamma"))
 
   if(smooths_included){
     param <- c('rho', 'b', 'ypred', 'mus')
@@ -22,62 +22,11 @@ get_monitor_pars = function(family, smooths_included = TRUE,
     param <- c('b', 'ypred', 'mus')
   }
 
-  param <- c(param, family_par_names(family_to_fullname(family)))
+  # Family-specific parameters to monitor
+  param <- c(param, family_par_names(family))
 
-  if(use_lv){
-    if(trend_model == 'RW'){
-      param <- c(param, 'trend', 'LV', 'penalty', 'lv_coefs')
-    }
+  # Trend-specific parameters
+  param <- c(param, trend_par_names(trend_model, use_lv, drift))
 
-    if(trend_model == 'AR1'){
-      param <- c(param, 'trend', 'ar1', 'LV',
-                 'penalty', 'lv_coefs')
-    }
-
-    if(trend_model == 'AR2'){
-      param <- c(param, 'trend', 'ar1', 'ar2', 'LV',
-                 'penalty', 'lv_coefs')
-    }
-
-    if(trend_model == 'AR3'){
-      param <- c(param, 'trend', 'ar1', 'ar2', 'ar3',
-                 'LV', 'penalty', 'lv_coefs')
-    }
-
-    if(trend_model == 'GP'){
-      param <- c(param, 'trend', 'alpha_gp', 'rho_gp',
-                 'LV', 'lv_coefs')
-    }
-
-  }
-
-  if(!use_lv){
-    if(trend_model == 'RW'){
-      param <- c(param, 'trend', 'tau', 'sigma')
-    }
-
-    if(trend_model == 'AR1'){
-      param <- c(param, 'trend', 'tau', 'sigma', 'ar1')
-    }
-
-    if(trend_model == 'AR2'){
-      param <- c(param, 'trend', 'tau', 'sigma', 'ar1', 'ar2')
-    }
-
-    if(trend_model == 'AR3'){
-      param <- c(param, 'trend', 'tau', 'sigma', 'ar1', 'ar2', 'ar3')
-    }
-
-    if(trend_model == 'GP'){
-      param <- c(param, 'trend', 'alpha_gp', 'rho_gp')
-    }
-
-  }
-
-  if(trend_model != 'None'){
-    if(drift){
-      param <- c(param, 'drift')
-    }
-  }
-  param
+  return(param)
 }

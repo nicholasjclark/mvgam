@@ -63,14 +63,13 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
   }
 
   # Beta coefficients for GAM component
-  betas <- MCMCvis::MCMCchains(object$model_output, 'b')
+  betas <- mcmc_chains(object$model_output, 'b')
 
   # Family of model
   family <- object$family
 
   # Family-specific parameters
-  pars <- mvgam:::extract_family_pars(family = family,
-                                      object = object)
+  family_pars <- mvgam:::extract_family_pars(object = object)
 
   # Determine which series each observation belongs to
   series_ind <- as.numeric(newdata$series)
@@ -79,7 +78,7 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
   cl <- parallel::makePSOCKcluster(n_cores)
   setDefaultCluster(cl)
   clusterExport(NULL, c('betas',
-                        'pars',
+                        'family_pars',
                         'newdata',
                         'Xp',
                         'series_ind'),
@@ -88,15 +87,15 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
   pbapply::pboptions(type = "none")
   predictions <- do.call(rbind, pbapply::pblapply(seq_len(dim(betas)[1]), function(x){
     # Family-specific parameters
-    par_extracts <- lapply(seq_along(pars), function(j){
-      if(is.matrix(pars[[j]])){
-        pars[[j]][x,series_ind[x]]
+    par_extracts <- lapply(seq_along(family_pars), function(j){
+      if(is.matrix(family_pars[[j]])){
+        family_pars[[j]][x,series_ind[x]]
       } else {
-        pars[[j]][x]
+        family_pars[[j]][x]
       }
     })
-    names(par_extracts) <- names(pars)
-    mvgam:::mvgam_predict(family = family,
+    names(par_extracts) <- names(family_pars)
+    mvgam_predict(family = family,
                   Xp = Xp,
                   type = type,
                   betas = betas[x,],
@@ -106,3 +105,4 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
 
   return(predictions)
 }
+

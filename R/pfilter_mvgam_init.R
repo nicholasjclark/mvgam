@@ -123,206 +123,28 @@ if(inherits(Xp, 'try-error')){
                                        type = 'lpmatrix'))
 }
 
-# Extract last trend / latent variable and precision estimates
-if(object$use_lv){
-  n_lv <- object$n_lv
-  if(object$fit_engine == 'stan'){
-    lvs <- lapply(seq_len(n_lv), function(lv){
-      inds_lv <- seq(lv, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2], by = n_lv)
-      lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,inds_lv]
-      # Need to only use estimates from the training period
-      s_name <- levels(object$obs_data$series)[1]
-      if(class(object$obs_data)[1] == 'list'){
-        end_train <- data.frame(y = object$obs_data$y,
-                                series = object$obs_data$series,
-                                time = object$obs_data$time) %>%
-          dplyr::filter(series == s_name) %>%
-          NROW()
-      } else {
-        end_train <- object$obs_data %>%
-          dplyr::filter(series == s_name) %>%
-          NROW()
-      }
-
-      if(object$trend_model == 'GP'){
-        lv_estimates <- lv_estimates[,1:end_train]
-      } else {
-        lv_estimates <- lv_estimates[,1:end_train]
-        lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
-      }
-
-      lv_estimates
-    })
-
-  } else {
-    ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'LV'))[2],
-                length.out = n_lv + 1)
-    starts <- ends + 1
-    starts <- c(1, starts[-c(1, (n_lv + 1))])
-    ends <- ends[-1]
-    lvs <- lapply(seq_len(n_lv), function(lv){
-      lv_estimates <- MCMCvis::MCMCchains(object$model_output, 'LV')[,starts[lv]:ends[lv]]
-
-      # Need to only use estimates from the training period
-      s_name <- levels(object$obs_data$series)[1]
-      end_train <- data.frame(series = object$obs_data$series) %>%
-        dplyr::filter(series == s_name) %>%
-        NROW()
-      lv_estimates <- lv_estimates[,1:end_train]
-      lv_estimates[,(NCOL(lv_estimates)-2):(NCOL(lv_estimates))]
-    })
-  }
-
-  if(object$trend_model == 'GP'){
-    taus <- NULL
-  } else {
-    taus <- MCMCvis::MCMCchains(object$model_output, 'penalty')
-  }
-
-  trends <- NULL
-} else {
-  ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'trend'))[2],
-              length.out = n_series + 1)
-  starts <- ends + 1
-  starts <- c(1, starts[-c(1, (n_series + 1))])
-  ends <- ends[-1]
-  trends <- lapply(seq_len(n_series), function(series){
-    if(object$fit_engine == 'stan'){
-      trend_estimates <- MCMCvis::MCMCchains(object$model_output, 'trend')[,seq(series,
-                                                                                dim(MCMCvis::MCMCchains(object$model_output,
-                                                                                                        'trend'))[2],
-                                                                                by = NCOL(object$ytimes))]
-    } else {
-      trend_estimates <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
-    }
-
-    # Need to only use estimates from the training period
-    s_name <- levels(object$obs_data$series)[1]
-    end_train <- data.frame(series = object$obs_data$series) %>%
-      dplyr::filter(series == s_name) %>%
-      NROW()
-    trend_estimates <- trend_estimates[,1:end_train]
-
-    # Only need last 3 timesteps if this is not a GP trend model
-    if(object$trend_model == 'GP'){
-      out <- trend_estimates
-    } else {
-      out <- trend_estimates[,(NCOL(trend_estimates)-2):(NCOL(trend_estimates))]
-    }
-    out
-  })
-
-  if(object$trend_model == 'GP'){
-    taus <- NULL
-  } else {
-    taus <- MCMCvis::MCMCchains(object$model_output, 'tau')
-  }
-
-  lvs <- NULL
-}
-
-# If use_lv, extract latent variable loadings
-if(object$use_lv){
-
-  lv_coefs <- lapply(seq_len(n_series), function(series){
-    if(object$fit_engine == 'stan'){
-      coef_start <- min(which(sort(rep(1:n_series, n_lv)) == series))
-      coef_end <- coef_start + n_lv - 1
-      as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,coef_start:coef_end])
-    } else {
-      lv_indices <- seq(1, n_series * n_lv, by = n_series) + (series - 1)
-      as.matrix(MCMCvis::MCMCchains(object$model_output, 'lv_coefs')[,lv_indices])
-    }
-  })
-
-} else {
-  lv_coefs <- NULL
-}
-
 # Beta coefficients for GAM component
-betas <- MCMCvis::MCMCchains(object$model_output, 'b')
-
-# drift estimates for latent trend drift terms
-if(object$drift){
-  drifts <- MCMCvis::MCMCchains(object$model_output, 'drift')
-} else {
-  if(object$use_lv){
-    drifts <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
-  } else {
-    drifts <- matrix(0, nrow = NROW(betas), ncol = n_series)
-  }
-}
-
-# AR term estimates
-if(object$trend_model == 'GP'){
-  alpha_gps <- MCMCvis::MCMCchains(object$model_output, 'alpha_gp')
-  rho_gps <- MCMCvis::MCMCchains(object$model_output, 'rho_gp')
-  ar1s <- NULL
-  ar2s <- NULL
-  ar3s <- NULL
-}
-
-if(object$trend_model == 'RW'){
-  if(object$use_lv){
-    alpha_gps <- NULL
-    rho_gps <- NULL
-    ar1s <- matrix(1, nrow = NROW(betas), ncol = object$n_lv)
-    ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
-    ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
-  } else {
-    alpha_gps <- NULL
-    rho_gps <- NULL
-    ar1s <- matrix(1, nrow = NROW(betas), ncol = n_series)
-    ar2s <- matrix(0, nrow = NROW(betas), ncol = n_series)
-    ar3s <- matrix(0, nrow = NROW(betas), ncol = n_series)
-  }
-}
-
-if(object$trend_model == 'AR1'){
-  ar1s <- MCMCvis::MCMCchains(object$model_output, 'ar1')
-  alpha_gps <- NULL
-  rho_gps <- NULL
-  if(object$use_lv){
-    ar2s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
-    ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
-  } else {
-    ar2s <- matrix(0, nrow = NROW(betas), ncol = n_series)
-    ar3s <- matrix(0, nrow = NROW(betas), ncol = n_series)
-  }
-}
-
-if(object$trend_model == 'AR2'){
-  ar1s <- MCMCvis::MCMCchains(object$model_output, 'ar1')
-  ar2s <- MCMCvis::MCMCchains(object$model_output, 'ar2')
-  alpha_gps <- NULL
-  rho_gps <- NULL
-
-  if(object$use_lv){
-    ar3s <- matrix(0, nrow = NROW(betas), ncol = object$n_lv)
-  } else {
-    ar3s <- matrix(0, nrow = NROW(betas), ncol = n_series)
-  }
-}
-
-if(object$trend_model == 'AR3'){
-  ar1s <- MCMCvis::MCMCchains(object$model_output, 'ar1')
-  ar2s <- MCMCvis::MCMCchains(object$model_output, 'ar2')
-  ar3s <- MCMCvis::MCMCchains(object$model_output, 'ar3')
-  alpha_gps <- NULL
-  rho_gps <- NULL
-}
-
+betas <- mcmc_chains(object$model_output, 'b')
 
 # Family-specific parameters
 family <- object$family
-pars <- mvgam:::extract_family_pars(family = family,
-                                    object = object)
+family_pars <- extract_family_pars(object = object)
+
+# Trend model
+trend_model <- object$trend_model
+use_lv <- object$use_lv
+
+# Trend-specific parameters; keep only the last 3 estimates for RW / AR trends
+# as we don't need any prior to that for propagating the trends forward. For GP
+# trends, we have to keep all estimates through time
+trend_pars <- extract_trend_pars(object = object,
+                                 keep_all_estimates = FALSE)
 
 # Generate sample sequence for n_particles
-if(n_particles < dim(drifts)[1]){
-  sample_seq <- sample(seq_len(dim(drifts)[1]), size = n_particles, replace = F)
+if(n_particles < dim(betas)[1]){
+  sample_seq <- sample(seq_len(dim(betas)[1]), size = n_particles, replace = F)
 } else {
-  sample_seq <- sample(seq_len(dim(drifts)[1]), size = n_particles, replace = T)
+  sample_seq <- sample(seq_len(dim(betas)[1]), size = n_particles, replace = T)
 }
 
 #### 2. Generate particles and calculate their proposal weights ####
@@ -330,29 +152,19 @@ use_lv <- object$use_lv
 truth <- series_test$y
 last_assim <- unique(series_test$time)
 upper_bounds <- object$upper_bounds
-trend_model <- object$trend_model
 
 cl <- parallel::makePSOCKcluster(n_cores)
 setDefaultCluster(cl)
 clusterExport(NULL, c('use_lv',
                       'trend_model',
+                      'trend_pars',
                       'Xp',
                       'betas',
                       'series_test',
                       'truth',
                       'last_assim',
-                      'taus',
-                      'drifts',
-                      'ar1s',
-                      'ar2s',
-                      'ar3s',
-                      'alpha_gps',
-                      'rho_gps',
-                      'lvs',
-                      'lv_coefs',
-                      'trends',
                       'family',
-                      'pars',
+                      'family_pars',
                       'n_series',
                       'n_particles',
                       'upper_bounds'),
@@ -364,74 +176,117 @@ particles <- pbapply::pblapply(sample_seq, function(x){
 
   samp_index <- x
 
-  if(is.null(alpha_gps)){
-    # Sample AR parameters
-    drift <- drifts[samp_index, ]
-    ar1 <- ar1s[samp_index, ]
-    ar2 <- ar2s[samp_index, ]
-    ar3 <- ar3s[samp_index, ]
-    alpha_gp <- rho_gp <- 0
-
-    # Sample trend precisions
-    tau <- taus[samp_index,]
-  } else {
-    drift <- ar1 <- ar2 <- ar3 <- tau <- 0
-    alpha_gp <- alpha_gps[samp_index, ]
-    rho_gp <- rho_gps[samp_index, ]
-  }
-
   # Sample beta coefs
   betas <- betas[samp_index, ]
 
-  if(use_lv){
+  # Sample general trend-specific parameters for storing in the particle
+  general_trend_pars <- lapply(seq_along(trend_pars), function(x){
 
-    # Sample a last state estimate for the latent variables
-  last_lvs <- lapply(seq_along(lvs), function(lv){
-    lvs[[lv]][samp_index, ]
+    if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends')){
+      out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
+
+    } else {
+      if(is.matrix(trend_pars[[x]])){
+        out <- unname(trend_pars[[x]][samp_index, ])
+      } else {
+        out <- unname(trend_pars[[x]][samp_index])
+      }
+    }
+    out
+
   })
+  names(general_trend_pars) <- names(trend_pars)
 
-  # Sample lv loadings
-  lv_coefs <- do.call(rbind, lapply(seq_len(n_series), function(series){
-    lv_coefs[[series]][samp_index,]
-  }))
+  if(use_lv){
+    # Propagate the lvs forward only once using the sampled trend parameters
+    trends <- forecast_trend(trend_model = trend_model,
+                             use_lv = use_lv,
+                             trend_pars = general_trend_pars,
+                             h = 1)
 
-  # Run the latent variables forward one timestep
-  if(is.null(alpha_gps)){
-    lv_states <- do.call(cbind, lapply(seq_along(lvs), function(lv){
-      sim_ar3(h = 1,
-              drift = drift[lv],
-              ar1 = ar1[lv],
-              ar2 = ar2[lv],
-              ar3 = ar3[lv],
-              tau = tau[lv],
-              last_trends = last_lvs[[lv]][1:3])
-    }))
-  } else {
-    lv_states <- do.call(cbind, lapply(seq_along(lvs), function(lv){
-      sim_gp(last_trends = last_lvs[[lv]],
-             h = 1,
-             alpha_gp = alpha_gp[lv],
-             rho_gp = rho_gp[lv])
-    }))
+    # Include previous states for each lv
+    if(trend_model != 'GP'){
+      general_trend_pars$last_lvs <- lapply(seq_along(general_trend_pars$last_lvs),
+                                            function(x){
+                                              c(general_trend_pars$last_lvs[[x]][2],
+                                                general_trend_pars$last_lvs[[x]][3],
+                                                trends[x])
+                                            })
+    } else {
+      general_trend_pars$last_lvs <- lapply(seq_along(general_trend_pars$last_lvs),
+                                            function(x){
+                                              c(general_trend_pars$last_lvs[[x]],
+                                                trends[x])
+                                            })
+    }
+
+    general_trend_pars$last_lvs <- lapply(general_trend_pars$last_lvs, unname)
   }
 
-  # Multiply lv states with loadings to generate each series' forecast trend state
-  trend_states <- as.numeric(lv_states %*% t(lv_coefs))
+  # Loop across series and produce the next trend estimate
+  trend_states <- do.call(cbind, (lapply(seq_len(n_series), function(series){
 
-  # Include previous states for each lv
-  if(is.null(alpha_gps)){
-    lv_states <- lapply(seq_along(lvs), function(lv){
-      as.vector(c(as.numeric(last_lvs[[lv]][2]),
-                  as.numeric(last_lvs[[lv]][3]),
-                  lv_states[lv]))
+    # Series-specific trend parameters
+    trend_extracts <- lapply(seq_along(trend_pars), function(x){
+
+      if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends')){
+        if(names(trend_pars)[x] %in% c('last_trends', 'lv_coefs')){
+          out <- unname(trend_pars[[x]][[series]][samp_index, ])
+        }
+
+        if(names(trend_pars)[x] == c('last_lvs')){
+          out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
+        }
+
+      } else {
+        if(is.matrix(trend_pars[[x]])){
+          if(use_lv){
+            out <- unname(trend_pars[[x]][samp_index, ])
+          } else {
+            out <- unname(trend_pars[[x]][samp_index, series])
+          }
+
+        } else {
+          out <- unname(trend_pars[[x]][samp_index])
+        }
+      }
+      out
+
     })
-  } else {
-    lv_states <- lapply(seq_along(lvs), function(lv){
-      as.vector(c(as.numeric(last_lvs[[lv]]),
-                  lv_states[lv]))
-    })
-  }
-  names(lv_states) <- paste0('lv', seq(1:length(lvs)))
+    names(trend_extracts) <- names(trend_pars)
+
+    if(use_lv){
+      # Multiply lv states with loadings to generate the series' forecast trend state
+      out <- as.numeric(trends %*% trend_extracts$lv_coefs)
+
+    } else {
+      # Propagate the series-specific trends forward
+      out <- mvgam:::forecast_trend(trend_model = trend_model,
+                                    use_lv = FALSE,
+                                    trend_pars = trend_extracts,
+                                    h = 1)
+    }
+
+    out
+  })))
+
+  # Include previous states for each series' trend in general trend parameters
+ if(!use_lv){
+   if(trend_model != 'GP'){
+     general_trend_pars$last_trends <- unname(lapply(seq_along(general_trend_pars$last_trends),
+                                           function(x){
+                                             unname(c(general_trend_pars$last_trends[[x]][2],
+                                               general_trend_pars$last_trends[[x]][3],
+                                               trend_states[,x]))
+                                           }))
+   } else {
+     general_trend_pars$last_trends <- unname(lapply(seq_along(general_trend_pars$last_trends),
+                                           function(x){
+                                             unname(c(general_trend_pars$last_trends[[x]],
+                                               trend_states[,x]))
+                                           }))
+   }
+ }
 
   # Calculate weight for the particle in the form of a composite likelihood
   liks <- unlist(lapply(seq_len(n_series), function(series){
@@ -441,23 +296,22 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     } else {
 
       # Family-specific parameters
-      par_extracts <- lapply(seq_along(pars), function(x){
-        if(is.matrix(pars[[x]])){
-          pars[[x]][samp_index, series]
+      family_extracts <- lapply(seq_along(family_pars), function(x){
+        if(is.matrix(family_pars[[x]])){
+          family_pars[[x]][samp_index, series]
         } else {
-          pars[[x]][samp_index]
+          family_pars[[x]][samp_index]
         }
       })
-      names(par_extracts) <- names(pars)
+      names(family_extracts) <- names(family_pars)
 
-      # Series-specific linear predictor matrix
       Xpmat <- t(rbind(as.matrix(Xp[which(as.numeric(series_test$series) == series),]),
-                     trend_states[series]))
+                     trend_states[,series]))
       attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
       # Likelihood
       weight <- mvgam:::mvgam_predict(family = family,
-                                      family_pars = par_extracts,
+                                      family_pars = family_extracts,
                                       truth = truth[series],
                                       Xp = Xpmat,
                                       betas = c(betas, 1),
@@ -467,116 +321,25 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     weight
   }))
   weight <- prod(liks, na.rm = T)
-  n_lv <- length(lvs)
-  trends <- NULL
-
-  } else {
-    lv_states = NULL
-    n_lv = NULL
-    lv_coefs = NULL
-
-    # Sample last state estimates for the trends
-    last_trends <- lapply(seq_along(trends), function(trend){
-      trends[[trend]][samp_index, ]
-    })
-
-    # Run the trends forward one timestep
-    if(is.null(alpha_gps)){
-      trends <- do.call(cbind, lapply(seq_along(trends), function(trend){
-        sim_ar3(h = 1,
-                drift = drift[trend],
-                ar1 = ar1[trend],
-                ar2 = ar2[trend],
-                ar3 = ar3[trend],
-                tau = tau[trend],
-                last_trends = last_trends[[trend]][1:3])
-      }))
-    } else {
-      trends <- do.call(cbind, lapply(seq_along(trends), function(trend){
-        sim_gp(last_trends = last_trends[[trend]],
-               h = 1,
-               alpha_gp = alpha_gp[trend],
-               rho_gp = rho_gp[trend])
-      }))
-    }
-
-    # Calculate weight for the particle in the form of a composite likelihood
-    liks <- unlist(lapply(seq_len(n_series), function(series){
-
-      if(is.na(truth[series])){
-        weight <- 1
-      } else {
-
-        # Family-specific parameters
-        par_extracts <- lapply(seq_along(pars), function(x){
-          if(is.matrix(pars[[x]])){
-            pars[[x]][samp_index, series]
-          } else {
-            pars[[x]][samp_index]
-          }
-        })
-        names(par_extracts) <- names(pars)
-
-        # Series-specific linear predictor matrix
-        Xpmat <- t(rbind(as.matrix(Xp[which(as.numeric(series_test$series) == series),]),
-                       trends[series]))
-        attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
-
-        # Likelihood
-        weight <- mvgam:::mvgam_predict(family = family,
-                                        family_pars = par_extracts,
-                                        truth = truth[series],
-                                        Xp = Xpmat,
-                                        betas = c(betas, 1),
-                                        density = TRUE)
-
-      }
-      weight
-    }))
-
-    weight <- prod(liks, na.rm = T)
-
-    # Include previous states for each trend
-    if(is.null(alpha_gps)){
-      trend_states <- lapply(seq_len(n_series), function(trend){
-        as.vector(c(last_trends[[trend]][2], last_trends[[trend]][3], trends[trend]))
-      })
-    } else {
-      trend_states <- lapply(seq_len(n_series), function(trend){
-        as.vector(c(last_trends[[trend]], trends[trend]))
-      })
-    }
-
-    names(trend_states) <- paste0('series', seq_len(n_series))
-}
 
   # Family-specific parameters
-  family_pars <- lapply(seq_along(pars), function(x){
-    if(is.matrix(pars[[x]])){
-      pars[[x]][samp_index, ]
+  general_family_pars <- lapply(seq_along(family_pars), function(x){
+    if(is.matrix(family_pars[[x]])){
+      family_pars[[x]][samp_index, ]
     } else {
-      pars[[x]][samp_index]
+      family_pars[[x]][samp_index]
     }
   })
-  names(family_pars) <- names(pars)
+  names(general_family_pars) <- names(family_pars)
 
   # Store important particle-specific information for later filtering
-  list(use_lv = use_lv,
-       n_lv = n_lv,
+  list(n_series = n_series,
+       use_lv = use_lv,
        family = family,
        trend_model = trend_model,
-       lv_states = lv_states,
-       lv_coefs = lv_coefs,
        betas = as.numeric(betas),
-       drift = as.numeric(drift),
-       ar1 = as.numeric(ar1),
-       ar2 = as.numeric(ar2),
-       ar3 = as.numeric(ar3),
-       tau = as.numeric(tau),
-       alpha_gp = as.numeric(alpha_gp),
-       rho_gp = as.numeric(rho_gp),
-       family_pars = family_pars,
-       trend_states = lapply(trend_states, unname),
+       trend_pars = general_trend_pars,
+       family_pars = general_family_pars,
        weight = weight,
        liks = liks,
        upper_bounds = upper_bounds,

@@ -72,7 +72,8 @@ This will be helpful if users wish to modify the model file to add
 other stochastic elements that are not currently avaiable in \code{mvgam}. Default is \code{FALSE} to reduce
 the size of the returned object, unless \code{run_model == FALSE}}
 
-\item{family}{\code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'}
+\item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
+families are: \code{nb()}, \code{poisson()}, \code{tweedie()}, \code{gaussian()}, \code{betar()}, \code{lognormal()}, \code{student_t()} and \code{Gamma()}}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series}
@@ -112,7 +113,7 @@ generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to 
 \item{threads}{\code{integer} Experimental option to use multithreading for within-chain
 parallelisation in \code{Stan}. We recommend its use only if you are experienced with
 \code{Stan}'s \code{reduce_sum} function and have a slow running model that cannot be sped
-up by any other means}
+up by any other means. Only available when using \code{Cmdstan} as the backend}
 
 \item{priors}{An optional \code{data.frame} with prior
 definitions (in JAGS or Stan syntax). See \code{\link{get_mvgam_priors}} and
@@ -206,20 +207,17 @@ autocorrelation will be evident. When a particular observation is missing, the r
 draws from the model's posterior distribution
 \cr
 \cr
-\emph{Using Stan}: A feature of \code{mvgam} is the ability to use Hamiltonian Monte Carlo for parameter estimation
-via the software \code{Stan} (using either the \code{cmdstanr} or \code{rstan} interface). Note that the \code{rstan} library is
-currently required for this option to work, even if using \code{cmdstanr} as the backend. This is because \code{rstan}'s functions
-are needed to arrange the posterior samples into the correct format for all of \code{mvgam}'s other functions to work.
-Also note that currently there is no support for
-fitting \code{Tweedie} responses in \code{Stan}.
-However there are great advantages when using \code{Stan}, which includes the option to estimate smooth latent trends
-via \href{https://arxiv.org/abs/2004.11408}{Hilbert space approximate Gaussian Processes}. This often makes sense for
-ecological series, which we expect to change smoothly. In \code{mvgam}, latent squared exponential GP trends are approximated using
-by default \code{40} basis functions, which saves computational costs compared to fitting full GPs while adequately estimating
-GP \code{alpha} and \code{rho} parameters. Because of the many advantages of \code{Stan} over \code{JAGS}, further development
-of the package will only be applied to \code{Stan}. This includes the planned addition of more response distributions,
-plans to handle zero-inflation, and plans to incorporate a greater variety of trend models. Users are strongly encouraged
-to opt for \code{Stan} over \code{JAGS} in any workflows
+\emph{Using Stan}: \code{mvgam} is primarily designed to use Hamiltonian Monte Carlo for parameter estimation
+via the software \code{Stan} (using either the \code{cmdstanr} or \code{rstan} interface).
+There are great advantages when using \code{Stan} over Gibbs / Metropolis Hastings samplers, which includes the option
+to estimate smooth latent trends via \href{https://arxiv.org/abs/2004.11408}{Hilbert space approximate Gaussian Processes}.
+This often makes sense for ecological series, which we expect to change smoothly. In \code{mvgam}, latent squared
+exponential GP trends are approximated using by default \code{40} basis functions, which saves computational
+costs compared to fitting full GPs while adequately estimating
+GP \code{alpha} and \code{rho} parameters. Because of the many advantages of \code{Stan} over \code{JAGS},
+\emph{further development of the package will only be applied to \code{Stan}}. This includes the planned addition
+of more response distributions, plans to handle zero-inflation, and plans to incorporate a greater
+variety of trend models. Users are strongly encouraged to opt for \code{Stan} over \code{JAGS} in any proceeding workflows
 }
 \examples{
 \donttest{

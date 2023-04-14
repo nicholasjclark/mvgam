@@ -119,6 +119,7 @@ mod1 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                 data = data_train,
                 newdata = data_test,
                 family = 'poisson',
+              use_stan = FALSE,
                 chains = 4,
                 burnin = 5000,
                 trend_model = 'None')
@@ -141,7 +142,8 @@ mod2 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                  te(precip, lag, k = c(6, 6)),
                 data = data_train,
                 newdata = data_test,
-                family = 'tw',
+                family = 'tweedie',
+                use_stan = FALSE,
                 chains = 4,
                 burnin = 5000,
                 trend_model = 'None')
@@ -167,7 +169,7 @@ As this is a timeseries and the residual plot hints at some autocorrelation rema
 priors <- get_mvgam_priors(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                  te(precip, lag, k = c(6, 6)),
                 data = data_train,
-                family = 'tw',
+                family = 'tweedie',
                 trend_model = 'AR3')
 priors
 ```
@@ -178,7 +180,8 @@ mod3 <- mvgam(formula =  y ~ te(mintemp, lag, k = c(6, 6)) +
                  te(precip, lag, k = c(6, 6)),
                 data = data_train,
                 newdata = data_test,
-                family = 'tw',
+                family = 'tweedie',
+              use_stan = FALSE,
                 priors = priors,
                 chains = 4,
                 burnin = 5000,

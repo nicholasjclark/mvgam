@@ -52,19 +52,19 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
 
   # Prediction indices for the particular series
   data_train <- object$obs_data
-  ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+  ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
               length.out = NCOL(object$ytimes) + 1)
   starts <- ends + 1
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
   ends <- ends[-1]
 
   if(object$fit_engine == 'stan'){
-    preds <- MCMCvis::MCMCchains(object$model_output, 'trend')[,seq(series,
-                                                           dim(MCMCvis::MCMCchains(object$model_output,
+    preds <- mcmc_chains(object$model_output, 'trend')[,seq(series,
+                                                           dim(mcmc_chains(object$model_output,
                                                                                    'trend'))[2],
                                                            by = NCOL(object$ytimes))]
   } else {
-    preds <- MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[series]:ends[series]]
+    preds <- mcmc_chains(object$model_output, 'trend')[,starts[series]:ends[series]]
   }
 
   # If the posterior predictions do not already cover the data_test period, the forecast needs to be

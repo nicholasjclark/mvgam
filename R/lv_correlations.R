@@ -9,23 +9,21 @@
 #'@export
 lv_correlations = function(object){
 
-  # Convert stanfit objects to coda samples
-  if(class(object$model_output) == 'stanfit'){
-    object$model_output <- coda::mcmc.list(lapply(1:NCOL(object$model_output),
-                                                  function(x) coda::mcmc(as.array(object$model_output)[,x,])))
+
+  # Check arguments
+  if(class(object) != 'mvgam'){
+    stop('argument "object" must be of class "mvgam"')
   }
 
-  data_train <- object$obs_data
-
   # Series start and end indices
-  ends <- seq(0, dim(MCMCvis::MCMCchains(object$model_output, 'ypred'))[2],
+  ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
               length.out = NCOL(object$ytimes) + 1)
   starts <- ends + 1
   starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
   ends <- ends[-1]
 
   # Total number of MCMC samples
-  n_preds <- dim(MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[1]:ends[1]])[1]
+  n_preds <- dim(mcmc_chains(object$model_output, 'trend')[,starts[1]:ends[1]])[1]
 
   # Total number of observations per series
   if(class(data_train)[1] == 'list'){
@@ -36,7 +34,16 @@ lv_correlations = function(object){
 
   # Extract series trends
   series_trends <- lapply(seq_len(length(ends)), function(y){
-    MCMCvis::MCMCchains(object$model_output, 'trend')[,starts[y]:ends[y]][,1:n_obs]
+    if(object$fit_engine == 'stan'){
+
+      # For stan objects, trend is stored as a vector in column-major order
+      mcmc_chains(object$model_output, 'trend')[,seq(y,
+                                                             dim(mcmc_chains(object$model_output, 'trend'))[2],
+                                                             by = NCOL(object$ytimes))]
+    } else {
+      mcmc_chains(object$model_output, 'trend')[,starts[y]:ends[y]][,1:n_obs]
+    }
+
   })
 
   # Get list of trend correlation estimates

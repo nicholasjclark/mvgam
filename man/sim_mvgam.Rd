@@ -14,9 +14,12 @@ sim_mvgam(
   drift = FALSE,
   trend_rel = 0.2,
   freq = 12,
-  family = "poisson",
-  phi_obs,
-  mu_obs = 4,
+  family = poisson(),
+  phi,
+  shape,
+  sigma,
+  nu,
+  mu,
   prop_missing = 0,
   train_prop = 0.85
 )
@@ -47,17 +50,31 @@ latent trends in a reduced dimension format. If \code{FALSE}, estimate independe
 
 \item{freq}{\code{integer}. The seasonal frequency of the series}
 
-\item{family}{\code{character} specifying the exponential observation family for the series. Must be either
-'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'}
+\item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
+families are: \code{nb()}, \code{poisson()}, \code{tweedie()}, \code{gaussian()}, \code{betar()}, \code{lognormal()}, \code{student_t()} and \code{Gamma()}}
 
-\item{phi_obs}{\code{vector} of dispersion parameters for the series (i.e. \code{size} for Negative Binomial or
-\code{phi} for Tweedie; ignored for Poisson). If \code{length(phi_obs) < n_series}, the first element of \code{phi_obs} will
-be replicated \code{n_series} times}
+\item{phi}{\code{vector} of dispersion parameters for the series (i.e. \code{size} for Negative Binomial or
+\code{phi} for Tweedie or Beta). If \code{length(phi) < n_series}, the first element of \code{phi} will
+be replicated \code{n_series} times. Defaults to \code{5} for Negative Binomial and Tweedie; \code{10} for
+Beta}
 
-\item{mu_obs}{\code{vector} of location parameters for the series. If \code{length(mu_obs) < n_series}, the first element of \code{mu_obs} will
-be replicated \code{n_series} times}
+\item{shape}{\code{vector} of shape parameters for the series (i.e. \code{shape} for Gamma)
+If \code{length(shape) < n_series}, the first element of \code{shape} will
+be replicated \code{n_series} times. Defaults to \code{10}}
 
-\item{prop_missing}{\code{numeric} stating proportion of observations that are missing}
+\item{sigma}{\code{vector} of scale parameters for the series (i.e. \code{sd} for Normal or Student-T,
+\code{log(sd)} for LogNormal). If \code{length(sigma) < n_series}, the first element of \code{sigma} will
+be replicated \code{n_series} times. Defaults to \code{0.5} for Normal and Student-T; \code{0.2} for Lognormal}
+
+\item{nu}{\code{vector} of degrees of freedom parameters for the series (i.e. \code{nu} for Student-T)
+If \code{length(nu) < n_series}, the first element of \code{nu} will
+be replicated \code{n_series} times. Defaults to \code{3}}
+
+\item{mu}{\code{vector} of location parameters for the series. If \code{length(mu) < n_series}, the first element of \code{mu} will
+be replicated \code{n_series} times. Defaults to small random values between \code{-0.5} and \code{0.5} on the link scale}
+
+\item{prop_missing}{\code{numeric} stating proportion of observations that are missing. Should be between
+\code{0} and \code{0.8}, inclusive}
 
 \item{train_prop}{\code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}}
 }

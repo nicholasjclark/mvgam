@@ -9,7 +9,7 @@
   newdata,
   data_test,
   series = 1,
-  type = "density",
+  type = "hist",
   n_bins,
   legend_position,
   xlab,
