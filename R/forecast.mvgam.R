@@ -140,7 +140,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
   }
 
   # Beta coefficients for GAM component
-  betas <- mcmc_chains(object$model_output, 'b')
+  betas <- mvgam:::mcmc_chains(object$model_output, 'b')
 
   # Family of model
   family <- object$family
@@ -192,40 +192,21 @@ forecast.mvgam = function(object, newdata, data_test, series = 1,
     })
     names(family_extracts) <- names(family_pars)
 
-    # Sample trend-specific parameters
-    trend_extracts <- lapply(seq_along(trend_pars), function(x){
-
-      if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends')){
-        if(names(trend_pars)[x] %in% c('last_trends', 'lv_coefs')){
-          out <- trend_pars[[x]][[series]][samp_index, ]
-        }
-
-        if(names(trend_pars)[x] == c('last_lvs')){
-          out <- lapply(trend_pars[[x]], `[`, samp_index, )
-        }
-
-      } else {
-        if(is.matrix(trend_pars[[x]])){
-          if(use_lv){
-            out <- trend_pars[[x]][samp_index, ]
-          } else {
-            out <- trend_pars[[x]][samp_index, series]
-          }
-
-        } else {
-          out <- trend_pars[[x]][samp_index]
-        }
-      }
-      out
-
-    })
-    names(trend_extracts) <- names(trend_pars)
+    # Sample series- and trend-specific parameters
+    trend_extracts <- mvgam:::extract_series_trend_pars(series = series,
+                                                        samp_index = samp_index,
+                                                        trend_pars = trend_pars,
+                                                        use_lv = use_lv)
 
     # Propagate the series' trend forward using the sampled trend parameters
     trends <- mvgam:::forecast_trend(trend_model = trend_model,
                                      use_lv = use_lv,
                                      trend_pars = trend_extracts,
                                      h = NROW(series_test))
+
+    if(trend_model == 'VAR1'){
+      trends <- trends[,series]
+    }
 
     if(use_lv){
       # Multiply lv states with loadings to generate the series' forecast trend state

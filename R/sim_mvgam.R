@@ -17,6 +17,7 @@
 #''AR1' (AR1 model with intercept),
 #''AR2' (AR2 model with intercept) or
 #''AR3' (AR3 model with intercept) or
+#''VAR1' (with possible drift; only available in \code{Stan}) or
 #''GP' (Gaussian process with squared exponential kernel
 #'@param drift \code{logical}, simulate a drift term for each trend
 #'@param trend_rel \code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}
@@ -64,7 +65,7 @@ sim_mvgam = function(T = 100,
                      train_prop = 0.85){
 
   # Validate the family argument
-  family <- evaluate_family(family)
+  family <- mvgam:::evaluate_family(family)
   family_char <- match.arg(arg = family$family,
                            choices = c('negative binomial',
                                        "poisson",
@@ -76,7 +77,10 @@ sim_mvgam = function(T = 100,
                                        "Gamma"))
 
   # Validate the trend arguments
-  trend_model <- evaluate_trend_model(trend_model)
+  trend_model <- mvgam:::evaluate_trend_model(trend_model)
+  if(trend_model == 'VAR1'){
+    use_lv <- FALSE
+  }
 
   if(missing(trend_rel)){
     trend_rel <- 0.2
@@ -229,7 +233,7 @@ sim_mvgam = function(T = 100,
     ar3s <- rnorm(n_lv, sd = 0.5)
   }
 
-  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'VAR1')){
     # Sample trend drift terms so they are (hopefully) not too correlated
     if(drift){
       trend_alphas <- rnorm(n_lv, sd = 0.15)
@@ -238,15 +242,38 @@ sim_mvgam = function(T = 100,
     }
 
     # Simulate latent trends
-    trends <- do.call(cbind, lapply(seq_len(n_lv), function(x){
-      sim_ar3(drift = trend_alphas[x],
-              ar1 = ar1s[x],
-              ar2 = ar2s[x],
-              ar3 = ar3s[x],
-              tau = 1,
-              last_trends = rnorm(3),
-              h = T)
-    }))
+    if(trend_model != 'VAR1'){
+      trends <- do.call(cbind, lapply(seq_len(n_lv), function(x){
+        mvgam:::sim_ar3(drift = trend_alphas[x],
+                ar1 = ar1s[x],
+                ar2 = ar2s[x],
+                ar3 = ar3s[x],
+                tau = 1,
+                last_trends = rnorm(3),
+                h = T)
+      }))
+    } else {
+      # Simulate the Sigma matrix (contemporaneously uncorrelated)
+      Sigma <- matrix(0, nrow = n_lv, ncol = n_lv)
+      diag(Sigma) <- sigma
+
+      # Create the VAR coefficient matrix
+      A <- matrix(NA, nrow = n_lv, ncol = n_lv)
+
+      # Off-diagonals represent VAR coefficients (need not be symmetric)
+      A[lower.tri(A)] <- rnorm(length(A[lower.tri(A)]), 0, 0.15)
+      A[upper.tri(A)] <- rnorm(length(A[upper.tri(A)]), 0, 0.15)
+
+      # Diagonals represent AR coefficients
+      diag(A) <- rbeta(n_lv, 8, 5)
+
+      trends <- mvgam:::sim_var1(drift = trend_alphas,
+                         A = A,
+                         Sigma = Sigma,
+                         last_trends = rnorm(n_lv),
+                         h = T)
+    }
+
   }
 
   if(trend_model == 'GP'){
@@ -390,23 +417,30 @@ sim_mvgam = function(T = 100,
     dplyr::group_by(series) %>%
     dplyr::arrange(time)
 
-  if(trend_model == 'GP'){
+
+  if(!use_lv){
+
+    if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+      trend_params = list(ar1 = ar1s,
+                          ar2 = ar2s,
+                          ar3 = ar3s)
+    }
+
+    if(trend_model == 'VAR1'){
+      trend_params = list(var1 = A)
+    }
+
+    if(trend_model == 'GP'){
+      trend_params = list(alpha = trend_alphas,
+                          rho = trend_rhos)
+    }
+
     out <-   list(data_train = data.frame(data_train),
                   data_test = data.frame(data_test),
                   true_corrs = cov2cor(cov(obs_trends)),
                   true_trends = obs_trends,
                   global_seasonality = glob_season,
-                  gp_params = list(alpha = trend_alphas,
-                                   rho = trend_rhos))
-  } else if(!use_lv & trend_model != 'GP'){
-    out <-   list(data_train = data.frame(data_train),
-                  data_test = data.frame(data_test),
-                  true_corrs = cov2cor(cov(obs_trends)),
-                  true_trends = obs_trends,
-                  global_seasonality = glob_season,
-                  trend_params = list(ar1 = ar1s,
-                                      ar2 = ar2s,
-                                      ar3 = ar3s))
+                  trend_params = trend_params)
   } else {
     out <-   list(data_train = data.frame(data_train),
                   data_test = data.frame(data_test),

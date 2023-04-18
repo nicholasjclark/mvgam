@@ -158,11 +158,11 @@ eval_mvgam = function(object,
                        type = 'lpmatrix')
 
   # Beta coefficients for GAM component
-  betas <- mcmc_chains(object$model_output, 'b')
+  betas <- mvgam:::mcmc_chains(object$model_output, 'b')
 
   # Family-specific parameters
   family <- object$family
-  family_pars <- extract_family_pars(object = object)
+  family_pars <- mvgam:::extract_family_pars(object = object)
 
   # Trend model
   trend_model <- object$trend_model
@@ -170,9 +170,9 @@ eval_mvgam = function(object,
 
   # Trend-specific parameters; keep only the trend / lv estimates
   # up to the specific evaluation timepoint
-  trend_pars <- extract_trend_pars(object = object,
-                                   keep_all_estimates = FALSE,
-                                   ending_time = eval_timepoint)
+  trend_pars <- mvgam:::extract_trend_pars(object = object,
+                                           keep_all_estimates = FALSE,
+                                           ending_time = eval_timepoint)
 
   # Generate sample sequence for n_samples
   if(n_samples < dim(betas)[1]){
@@ -212,74 +212,43 @@ eval_mvgam = function(object,
       # Sample beta coefs
       betas <- betas[samp_index, ]
 
-      # Sample general trend-specific parameters for storing in the particle
-      general_trend_pars <- lapply(seq_along(trend_pars), function(x){
+      # Sample general trend-specific parameters
+      general_trend_pars <- mvgam:::extract_general_trend_pars(trend_pars = trend_pars,
+                                                               samp_index = samp_index)
 
-        if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends')){
-          out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
-
-        } else {
-          if(is.matrix(trend_pars[[x]])){
-            out <- unname(trend_pars[[x]][samp_index, ])
-          } else {
-            out <- unname(trend_pars[[x]][samp_index])
-          }
-        }
-        out
-
-      })
-      names(general_trend_pars) <- names(trend_pars)
-
-      if(use_lv){
+      if(use_lv || trend_model == 'VAR1'){
         # Propagate the lvs forward using the sampled trend parameters
-        trends <- forecast_trend(trend_model = trend_model,
-                                 use_lv = use_lv,
-                                 trend_pars = general_trend_pars,
-                                 h = fc_horizon)
+        trends <- mvgam:::forecast_trend(trend_model = trend_model,
+                                         use_lv = use_lv,
+                                         trend_pars = general_trend_pars,
+                                         h = fc_horizon)
       }
 
       # Loop across series and produce the next trend estimate
       trend_states <- do.call(cbind, (lapply(seq_len(n_series), function(series){
 
-        # Series-specific trend parameters
-        trend_extracts <- lapply(seq_along(trend_pars), function(x){
+        # Sample series- and trend-specific parameters
+        trend_extracts <- mvgam:::extract_series_trend_pars(series = series,
+                                                            samp_index = samp_index,
+                                                            trend_pars = trend_pars,
+                                                            use_lv = use_lv)
 
-          if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends')){
-            if(names(trend_pars)[x] %in% c('last_trends', 'lv_coefs')){
-              out <- unname(trend_pars[[x]][[series]][samp_index, ])
-            }
-
-            if(names(trend_pars)[x] == c('last_lvs')){
-              out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
-            }
-
-          } else {
-            if(is.matrix(trend_pars[[x]])){
-              if(use_lv){
-                out <- unname(trend_pars[[x]][samp_index, ])
-              } else {
-                out <- unname(trend_pars[[x]][samp_index, series])
-              }
-
-            } else {
-              out <- unname(trend_pars[[x]][samp_index])
-            }
+        if(use_lv || trend_model == 'VAR1'){
+          if(use_lv){
+            # Multiply lv states with loadings to generate the series' forecast trend state
+            out <- as.numeric(trends %*% trend_extracts$lv_coefs)
           }
-          out
 
-        })
-        names(trend_extracts) <- names(trend_pars)
-
-        if(use_lv){
-          # Multiply lv states with loadings to generate the series' forecast trend state
-          out <- as.numeric(trends %*% trend_extracts$lv_coefs)
+          if(trend_model == 'VAR1'){
+            out <- trends[, series]
+          }
 
         } else {
           # Propagate the series-specific trends forward
-          out <- forecast_trend(trend_model = trend_model,
-                                use_lv = FALSE,
-                                trend_pars = trend_extracts,
-                                h = fc_horizon)
+          out <- mvgam:::forecast_trend(trend_model = trend_model,
+                                        use_lv = FALSE,
+                                        trend_pars = trend_extracts,
+                                        h = fc_horizon)
         }
 
         out
@@ -321,27 +290,13 @@ eval_mvgam = function(object,
       # Sample beta coefs
       betas <- betas[samp_index, ]
 
-      # Sample general trend-specific parameters for storing in the particle
-      general_trend_pars <- lapply(seq_along(trend_pars), function(x){
+      # Sample general trend-specific parameters
+      general_trend_pars <- mvgam:::extract_general_trend_pars(trend_pars = trend_pars,
+                                                       samp_index = samp_index)
 
-        if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends')){
-          out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
-
-        } else {
-          if(is.matrix(trend_pars[[x]])){
-            out <- unname(trend_pars[[x]][samp_index, ])
-          } else {
-            out <- unname(trend_pars[[x]][samp_index])
-          }
-        }
-        out
-
-      })
-      names(general_trend_pars) <- names(trend_pars)
-
-      if(use_lv){
+      if(use_lv || trend_model == 'VAR1'){
         # Propagate the lvs forward using the sampled trend parameters
-        trends <- forecast_trend(trend_model = trend_model,
+        trends <- mvgam:::forecast_trend(trend_model = trend_model,
                                  use_lv = use_lv,
                                  trend_pars = general_trend_pars,
                                  h = fc_horizon)
@@ -350,38 +305,21 @@ eval_mvgam = function(object,
       # Loop across series and produce the next trend estimate
       trend_states <- do.call(cbind, (lapply(seq_len(n_series), function(series){
 
-        # Series-specific trend parameters
-        trend_extracts <- lapply(seq_along(trend_pars), function(x){
+        # Sample series- and trend-specific parameters
+        trend_extracts <- mvgam:::extract_series_trend_pars(series = series,
+                                                            samp_index = samp_index,
+                                                            trend_pars = trend_pars,
+                                                            use_lv = use_lv)
 
-          if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends')){
-            if(names(trend_pars)[x] %in% c('last_trends', 'lv_coefs')){
-              out <- unname(trend_pars[[x]][[series]][samp_index, ])
-            }
-
-            if(names(trend_pars)[x] == c('last_lvs')){
-              out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
-            }
-
-          } else {
-            if(is.matrix(trend_pars[[x]])){
-              if(use_lv){
-                out <- unname(trend_pars[[x]][samp_index, ])
-              } else {
-                out <- unname(trend_pars[[x]][samp_index, series])
-              }
-
-            } else {
-              out <- unname(trend_pars[[x]][samp_index])
-            }
+        if(use_lv || trend_model == 'VAR1'){
+          if(use_lv){
+            # Multiply lv states with loadings to generate the series' forecast trend state
+            out <- as.numeric(trends %*% trend_extracts$lv_coefs)
           }
-          out
 
-        })
-        names(trend_extracts) <- names(trend_pars)
-
-        if(use_lv){
-          # Multiply lv states with loadings to generate the series' forecast trend state
-          out <- as.numeric(trends %*% trend_extracts$lv_coefs)
+          if(trend_model == 'VAR1'){
+            out <- trends[, series]
+          }
 
         } else {
           # Propagate the series-specific trends forward
@@ -540,7 +478,7 @@ roll_eval_mvgam = function(object,
                         'eval_mvgam'),
                 envir = environment())
   parallel::clusterEvalQ(cl, library(mgcv))
-  parallel::clusterEvalQ(cl, library(coda))
+  parallel::clusterEvalQ(cl, library(rstan))
 
   pbapply::pboptions(type = "none")
   evals <- pbapply::pblapply(evaluation_seq, function(timepoint){

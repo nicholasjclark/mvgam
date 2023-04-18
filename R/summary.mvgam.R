@@ -193,11 +193,11 @@ if(object$use_lv){
 
     if(object$trend_model == 'AR1'){
       if(object$drift){
-        message("Latent trend drift and parameter estimates:")
+        message("Latent trend drift and AR parameter estimates:")
         print(mcmc_summary(object$model_output, c('drift', 'ar1'))[,c(3:7)])
         message()
       } else {
-        message("Latent trend parameter estimates:")
+        message("Latent trend AR parameter estimates:")
         print(mcmc_summary(object$model_output, c('ar1'))[,c(3:7)])
         message()
       }
@@ -205,11 +205,11 @@ if(object$use_lv){
 
     if(object$trend_model == 'AR2'){
       if(object$drift){
-        message("Latent trend drift and parameter estimates:")
+        message("Latent trend drift and AR parameter estimates:")
         print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2'))[,c(3:7)])
         message()
       } else {
-        message("Latent trend parameter estimates:")
+        message("Latent trend AR parameter estimates:")
         print(mcmc_summary(object$model_output, c('ar1', 'ar2'))[,c(3:7)])
         message()
       }
@@ -217,11 +217,11 @@ if(object$use_lv){
 
     if(object$trend_model == 'AR3'){
       if(object$drift){
-        message("Latent trend drift and parameter estimates:")
+        message("Latent trend drift and AR parameter estimates:")
         print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'ar3'))[,c(3:7)])
         message()
       } else {
-        message("Latent trend parameter estimates:")
+        message("Latent trend AR parameter estimates:")
         print(mcmc_summary(object$model_output, c('ar1', 'ar2', 'ar3'))[,c(3:7)])
         message()
       }
@@ -243,13 +243,25 @@ if(!object$use_lv){
       }
     }
 
+    if(object$trend_model == 'VAR1'){
+      if(object$drift){
+        message("Latent trend drift and VAR parameter estimates:")
+        print(mcmc_summary(object$model_output, c('drift', 'A', 'Sigma'))[,c(3:7)])
+        message()
+      } else {
+        message("Latent trend VAR parameter estimates:")
+        print(mcmc_summary(object$model_output, c('A', 'Sigma'))[,c(3:7)])
+        message()
+      }
+    }
+
     if(object$trend_model == 'AR1'){
       if(object$drift){
-        message("Latent trend drift and parameter estimates:")
+        message("Latent trend drift and AR parameter estimates:")
         print(mcmc_summary(object$model_output, c('drift', 'ar1', 'sigma'))[,c(3:7)])
         message()
       } else {
-        message("Latent trend parameter estimates:")
+        message("Latent trend parameter AR estimates:")
         print(mcmc_summary(object$model_output, c('ar1', 'sigma'))[,c(3:7)])
         message()
       }
@@ -257,11 +269,11 @@ if(!object$use_lv){
 
     if(object$trend_model == 'AR2'){
       if(object$drift){
-        message("Latent trend drift and parameter estimates:")
+        message("Latent trend drift and AR parameter estimates:")
         print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'sigma'))[,c(3:7)])
         message()
       } else {
-        message("Latent trend parameter estimates:")
+        message("Latent trend AR parameter estimates:")
         print(mcmc_summary(object$model_output, c('ar1', 'ar2', 'sigma'))[,c(3:7)])
         message()
       }
@@ -269,11 +281,11 @@ if(!object$use_lv){
 
     if(object$trend_model == 'AR3'){
       if(object$drift){
-        message("Latent trend drift and parameter estimates:")
+        message("Latent trend drift and AR parameter estimates:")
         print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
         message()
       } else {
-        message("Latent trend parameter estimates:")
+        message("Latent trend AR parameter estimates:")
         print(mcmc_summary(object$model_output, c('ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
         message()
       }

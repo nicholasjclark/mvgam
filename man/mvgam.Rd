@@ -85,11 +85,12 @@ Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series 
 'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 and the observation process is the only source of error; similarly to what is estimated by \code{\link[mcgv]{gam}}),
 'RW' (random walk with possible drift),
-'AR1' (AR1 model with intercept),
-'AR2' (AR2 model with intercept) or
-'AR3' (AR3 model with intercept) or
+'AR1' (with possible drift),
+'AR2' (with possible drift) or
+'AR3' (with possible drift) or
+'VAR1' (with possible drift; only available in \code{Stan}) or
 'GP' (Gaussian Process with squared exponential kernel;
-only available for estimation in \code{stan})}
+only available in \code{stan})}
 
 \item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,

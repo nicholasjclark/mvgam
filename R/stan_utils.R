@@ -53,319 +53,8 @@ code = function(object){
 
 #### Replacement for MCMCvis functions to remove dependence on rstan for working
 # with stanfit objects ####
-# This code is borrowed from the rstan and MCMCvis packages
 #' @noRd
-read_rdump <- function(f, keep.source = FALSE, ...) {
-  # Read data defined in an R dump file to an R list
-  #
-  # Args:
-  #   f: the file to be sourced
-  #   keep.source: see doc of function source
-  #
-  # Returns:
-  #   A list
-
-  if (missing(f))
-    stop("no file specified.")
-  e <- new.env()
-  source(file = f, local = e, keep.source = keep.source, ...)
-  as.list(e)
-}
-
-#' @noRd
-idx_col2rowm <- function(d) {
-  # Suppose an iteration of samples for an array parameter is ordered by
-  # col-major. This function generates the indexes that can be used to change
-  # the sequences to row-major.
-  # Args:
-  #   d: the dimension of the parameter
-  len <- length(d)
-  if (0 == len) return(1)
-  if (1 == len) return(1:d)
-  idx <- aperm(array(1:prod(d), dim = d))
-  return(as.vector(idx))
-}
-
-#' @noRd
-idx_row2colm <- function(d) {
-  # What if it is row-major and we want col_major?
-  len <- length(d)
-  if (0 == len) return(1)
-  if (1 == len) return(1:d)
-  idx <- aperm(array(1:prod(d), dim = rev(d)))
-  return(as.vector(idx))
-}
-
-#' @noRd
-multi_idx_row2colm <- function(dims) {
-  # Suppose we want to change a vector of parameter names (each of which is in
-  # row major) to col major.  This function serves to get the indexes.
-  # Args:
-  #   dims: a list of dimensions for all the parameters
-  #
-  ## print(dims)
-  shifts <- calc_starts(dims) - 1
-  idx <- lapply(seq_along(shifts), function(i) shifts[i] + idx_row2colm(dims[[i]]))
-  do.call(c, idx)
-}
-
-#' @noRd
-seq_array_ind <- function(d, col_major = FALSE) {
-  #
-  # Generate an array of indexes for an array parameter
-  # in order of major or column.
-  #
-  # Args:
-  #   d: the dimensions of an array parameter, for example,
-  #     c(2, 3).
-  #
-  #   col_major: Determine what is the order of indexes.
-  #   If col_major = TRUE, for d = c(2, 3), return
-  #   [1, 1]
-  #   [2, 1]
-  #   [1, 2]
-  #   [2, 2]
-  #   [1, 3]
-  #   [2, 3]
-  #   If col_major = FALSE, for d = c(2, 3), return
-  #   [1, 1]
-  #   [1, 2]
-  #   [1, 3]
-  #   [2, 1]
-  #   [2, 2]
-  #   [2, 3]
-  #
-  # Returns:
-  #   If length of d is 0, return empty vector.
-  #   Otherwise, return an array of indexes, each
-  #   row of which is an index.
-  #
-  # Note:
-  #   R function arrayInd might be helpful sometimes.
-  #
-  if (length(d) == 0L)
-    return(numeric(0L))
-
-  total <- prod(d)
-  if (total == 0L)
-    return(array(0L, dim = 0L))
-
-  len <- length(d)
-  if (len == 1L)
-    return(array(1:total, dim = c(total, 1)))
-
-  res <- array(1L, dim = c(total, len))
-
-  # Handle cases like 1x1 matrices
-  if (total == 1)
-    return(res)
-
-  jidx <- if (col_major) 1L:len else len:1L
-  for (i in 2L:total) {
-    res[i, ] <- res[i - 1, ]
-    for (j in jidx) {
-      if (res[i - 1, j] < d[j]) {
-        res[i, j] <- res[i - 1, j] + 1
-        break
-      }
-      res[i, j] <- 1
-    }
-  }
-  res
-}
-
-#' @noRd
-flat_one_par <- function(n, d, col_major = FALSE) {
-  # Return all the elemenetwise parameters for a vector/array
-  # parameter.
-  #
-  # Args:
-  #  n: Name of the parameter. For example, n = "alpha"
-  #  d: A vector indicates the dimensions of parameter n.
-  #     For example, d = c(2, 3).  d could be empty
-  #     as well when n is a scalar.
-  #
-  if (0 == length(d)) return(n)
-  nameidx <- seq_array_ind(d, col_major)
-  names <- apply(nameidx, 1, function(x) paste(n, "[", paste(x, collapse = ','), "]", sep = ''))
-  as.vector(names)
-}
-
-#' @noRd
-flatnames <- function(names, dims, col_major = FALSE) {
-  if (length(names) == 1)
-    return(flat_one_par(names, dims[[1]], col_major = col_major))
-  nameslst <- mapply(flat_one_par, names, dims,
-                     MoreArgs = list(col_major = col_major),
-                     SIMPLIFY = FALSE,
-                     USE.NAMES = FALSE)
-  if (is.vector(nameslst, "character"))
-    return(nameslst)
-  do.call(c, nameslst)
-}
-
-#' @noRd
-num_pars <- function(d) prod(d)
-
-#' @noRd
-calc_starts <- function(dims) {
-  len <- length(dims)
-  s <- sapply(unname(dims), function(d)  num_pars(d), USE.NAMES = FALSE)
-  cumsum(c(1, s))[1:len]
-}
-#' @noRd
-pars_total_indexes <- function(names, dims, fnames, pars) {
-  # Obtain the total indexes for parameters (pars) in the
-  # whole sequences of names that is order by 'column major.'
-  # Args:
-  #   names: all the parameters names specifying the sequence of parameters
-  #   dims:  the dimensions for all parameters, the order for all parameters
-  #          should be the same with that in 'names'
-  #   fnames: all the parameter names specified by names and dims
-  #   pars:  the parameters of interest. This function assumes that
-  #     pars are in names.
-  # Note: inside each parameter (vector or array), the sequence is in terms of
-  #   col-major. That means if we have parameter alpha and beta, the dims
-  #   of which are [2,2] and [2,3] respectively.  The whole parameter sequence
-  #   are alpha[1,1], alpha[2,1], alpha[1,2], alpha[2,2], beta[1,1], beta[2,1],
-  #   beta[1,2], beta[2,2], beta[1,3], beta[2,3]. In addition, for the col-majored
-  #   sequence, an attribute named 'row_major_idx' is attached, which could
-  #   be used when row major index is favored.
-
-  starts <- calc_starts(dims)
-  par_total_indexes <- function(par) {
-    # for just one parameter
-    #
-    p <- match(par, fnames)
-    # note that here when `par' is a scalar, it would
-    # match one of `fnames'
-    if (!is.na(p)) {
-      names(p) <- par
-      attr(p, "row_major_idx") <- p
-      return(p)
-    }
-    p <- match(par, names)
-    np <- num_pars(dims[[p]])
-    if (np == 0) return(NULL)
-    idx <- starts[p] + seq(0, by = 1, length.out = np)
-    names(idx) <- fnames[idx]
-    attr(idx, "row_major_idx") <- starts[p] + idx_col2rowm(dims[[p]]) - 1
-    idx
-  }
-  idx <- lapply(pars, FUN = par_total_indexes)
-  nulls <- sapply(idx, is.null)
-  idx <- idx[!nulls]
-  names(idx) <- pars[!nulls]
-  idx
-}
-
-#' @noRd
-remove_empty_pars <- function(pars, model_dims) {
-  #
-  # Remove parameters that are actually empty, which
-  # could happen when for exmample a user specify the
-  # following stan model code:
-  #
-  # transformed data { int n; n <- 0; }
-  # parameters { real y[n]; }
-  #
-  # Args:
-  #   pars: a character vector of parameters names
-  #   model_dims: a named list of the parameter dimension
-  #
-  # Returns:
-  #   A character vector of parameter names with empty parameter
-  #   being removed.
-  #
-  ind <- rep(TRUE, length(pars))
-  model_pars <- names(model_dims)
-  if (is.null(model_pars)) stop("model_dims need be a named list")
-  for (i in seq_along(pars)) {
-    p <- pars[i]
-    m <- match(p, model_pars)
-    if (!is.na(m) && prod(model_dims[[p]]) == 0)  ind[i] <- FALSE
-  }
-  pars[ind]
-}
-
-#' @noRd
-check_stanpars <- function(allpars, pars) {
-  pars_wo_ws <- gsub('\\s+', '', pars)
-  m <- which(match(pars_wo_ws, allpars, nomatch = 0) == 0)
-  if (length(m) > 0)
-    stop("no parameter ", paste(pars[m], collapse = ', '))
-  if (length(pars_wo_ws) == 0)
-    stop("no parameter specified (pars is empty)")
-  unique(pars_wo_ws)
-}
-
-#' @noRd
-check_stanpars_first <- function(object, pars) {
-  # Check if all parameters in pars are valid parameters of the model
-  # Args:
-  #   object: a stanfit object
-  #   pars: a character vector of parameter names
-  # Returns:
-  #   pars without white spaces, if any, if all are valid
-  #   otherwise stop reporting error
-  allpars <- cbind(object@model_pars, flatnames(object@model_pars))
-  check_stanpars(allpars, pars)
-}
-
-#' @noRd
-check_stanpars_second <- function(sim, pars) {
-  #
-  # Check if all parameters in pars are parameters for which we saved
-  # their samples
-  #
-  # Args:
-  #   sim: The sim slot of class stanfit
-  #   pars: a character vector of parameter names
-  #
-  # Returns:
-  #   pars without white spaces, if any, if all are valid
-  #   otherwise stop reporting error
-  if (missing(pars)) return(sim$pars_oi)
-  allpars <- c(sim$pars_oi, sim$fnames_oi)
-  check_stanpars(allpars, pars)
-}
-
-#' @noRd
-mcmclist_stanfit <- function(object, pars, ...) {
-  pars <- if (missing(pars)) object@sim$pars_oi else check_stanpars_second(object@sim, pars)
-  pars <- remove_empty_pars(pars, object@sim$dims_oi)
-  tidx <- pars_total_indexes(object@sim$pars_oi, object@sim$dims_oi, object@sim$fnames_oi, pars)
-  tidx <- lapply(tidx, function(x) attr(x, "row_major_idx"))
-  tidx <- unlist(tidx, use.names = FALSE)
-
-  lst <- vector("list", object@sim$chains)
-  for (ic in 1:object@sim$chains) {
-    x <- do.call(cbind, object@sim$samples[[ic]])[,tidx,drop=FALSE]
-    warmup2 <- object@sim$warmup2[ic]
-    if (warmup2 > 0) x <- x[-(1:warmup2), ]
-    x <- as.matrix(x)
-    if (is.null(colnames(x))) colnames(x) <- pars
-    end <- object@sim$iter
-    thin <- object@sim$thin
-    start <- end - (nrow(x) - 1) * thin
-    class(x) <- 'mcmc'
-    attr(x, "mcpar") <- c(start, end, thin)
-    lst[[ic]] <- x
-  }
-  class(lst) <- "mcmc.list"
-  return(lst)
-}
-
-#' @noRd
-As_mcmclist <- function(object, pars, include = TRUE, ...) {
-  if (missing(pars)) pars <- object@sim$pars_oi
-  else if (!include) pars <- setdiff(object@sim$pars_oi, pars)
-  pars <-  check_stanpars_second(object@sim, pars)
-  return(mcmclist_stanfit(object, pars = pars))
-}
-
-#' @noRd
-mcmc_summary <- function(object,
+mcmc_summary = function(object,
             params = 'all',
             excl = NULL,
             ISB = TRUE,
@@ -379,8 +68,7 @@ mcmc_summary <- function(object,
             Rhat = TRUE,
             n.eff = TRUE,
             func = NULL,
-            func_name = NULL)
-{
+            func_name = NULL){
   # SORTING BLOCK
 
   if (methods::is(object, 'matrix'))
@@ -1026,7 +714,7 @@ mcmc_summary <- function(object,
 mcmc_chains = function(object, params = 'all', ISB = TRUE,
                        excl = NULL, exact = TRUE, mcmc.list = FALSE,
                        chain_num = NULL){
-  temp_in <- As_mcmclist(object)
+  temp_in <- As.mcmc.list(object)
 
   if (ISB == TRUE)
   {
@@ -1282,15 +970,7 @@ mcmc_chains = function(object, params = 'all', ISB = TRUE,
 #' @param model_file Stan model file to be edited
 #' @param model_data Prepared mvgam data for Stan modelling
 #' @param family \code{character}
-#' @param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
-#''None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mcgv]{gam}}),
-#''RW' (random walk with possible drift),
-#''AR1' (AR1 model with intercept),
-#''AR2' (AR2 model with intercept) or
-#''AR3' (AR3 model with intercept) or
-#''GP' (Gaussian process with squared exponential kernel; currently under development and
-#'only available for estimation in \code{stan})
+#' @param trend_model \code{character} specifying the time series dynamics for the latent trend.
 #' @param offset \code{logical}
 #' @param threads \code{integer} Experimental option to use multithreading for within-chain
 #'parallelisation in \code{Stan}. We recommend its use only if you are experienced with
@@ -1300,6 +980,18 @@ mcmc_chains = function(object, params = 'all', ISB = TRUE,
 vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
                               trend_model = 'None', offset = FALSE,
                               threads = 1){
+
+  trend_model <- evaluate_trend_model(trend_model)
+
+  # Hack for adding VAR1 models
+  if(trend_model == 'VAR1'){
+    VAR1 <- TRUE
+    trend_model <- 'RW'
+  } else {
+    VAR1 <- FALSE
+  }
+
+  #### Family specifications ####
   if(threads > 1){
     if(family == 'gaussian'){
       if(any(grepl('functions {', model_file, fixed = TRUE))){
@@ -1668,6 +1360,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
     model_file <- readLines(textConnection(model_file), n = -1)
   }
 
+  #### Data modifications ####
   # Gather the number of nonmissing observations
   model_data$n_nonmissing <- length(which(model_data$y_observed == 1))
 
@@ -1913,6 +1606,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
                                                          '}')
   }
 
+  #### Trend modifications ####
   # Vectorise trend models
   if(trend_model == 'RW'){
     if(any(grepl('// dynamic factor estimates', model_file, fixed = TRUE))){
@@ -2101,6 +1795,55 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
                                    model_file, fixed = TRUE)]
     model_file <- model_file[-grep('flat_trends = (to_vector(trend))[obs_ind];',
                                    model_file, fixed = TRUE)]
+  }
+
+  # New additions for VAR1 models
+  if(VAR1){
+    model_file <- model_file[-grep('vector[n_series] tau;', model_file, fixed = TRUE)]
+    model_file[grep('// latent trends', model_file, fixed = TRUE)] <-
+      '// raw latent trends'
+    model_file[grep('matrix[n, n_series] trend;', model_file, fixed = TRUE)] <-
+      'vector[n_series] trend_raw[n];'
+    model_file[grep('// latent trend variance parameters', model_file, fixed = TRUE) - 1] <-
+      paste0('\n// latent trend VAR1 terms\n',
+             'matrix<lower=-1,upper=1>[n_series, n_series] A;\n')
+    model_file = readLines(textConnection(model_file), n = -1)
+    model_file[grep('vector[num_basis] b;', model_file, fixed = TRUE) + 1] <-
+      paste0('\n// trend estimates in matrix-form\n',
+             'matrix[n, n_series] trend;\n',
+             '\nfor(i in 1:n){\n',
+             'trend[i, 1:n_series] = to_row_vector(trend_raw[i]);\n',
+             '}\n')
+    model_file = readLines(textConnection(model_file), n = -1)
+    model_file[grep('model {', model_file, fixed = TRUE)] <-
+      paste0('model {\n',
+             '// latent trend mean parameters\n',
+             'vector[n_series] mu[n - 1];\n')
+    model_file[grep('sigma ~ exponential(2);', model_file, fixed = TRUE)] <-
+      paste0('sigma ~ inv_gamma(2.3693353, 0.7311319);\n\n',
+             '// VAR coefficients\n',
+             'to_vector(A) ~ normal(0, 0.5);\n\n',
+             '// trend means\n',
+             'for(i in 2:n){\n',
+             'mu[i - 1] = A * trend_raw[i - 1];\n',
+             '}\n\n',
+             '// stochastic latent trends (contemporaneously uncorrelated)\n',
+             'trend_raw[1] ~ normal(0, sigma);\n',
+             'for(i in 2:n){\n',
+             'trend_raw[i] ~ normal(mu[i - 1], sigma);\n',
+             '}\n')
+    model_file = readLines(textConnection(model_file), n = -1)
+    model_file <- model_file[-c((grep("trend[1, 1:n_series] ~ normal(0, sigma);", model_file, fixed = TRUE) - 2):
+                                  (grep("trend[1, 1:n_series] ~ normal(0, sigma);" , model_file, fixed = TRUE) + 3))]
+    model_file[grep("generated quantities {" , model_file, fixed = TRUE)] <-
+      paste0('generated quantities {\n',
+             'matrix[n_series, n_series] Sigma;')
+    model_file = readLines(textConnection(model_file), n = -1)
+    model_file <- model_file[-c((grep("tau[s] = pow(sigma[s], -2.0);", model_file, fixed = TRUE) - 1):
+                                  (grep("tau[s] = pow(sigma[s], -2.0);" , model_file, fixed = TRUE) + 1))]
+    model_file[grep("// posterior predictions" , model_file, fixed = TRUE) - 1] <-
+      paste0('Sigma = diag_matrix(square(sigma));\n')
+    model_file = readLines(textConnection(model_file), n = -1)
   }
 
   # Tidying the representation

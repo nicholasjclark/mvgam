@@ -1,3 +1,21 @@
+#' Supported mvgam trend models
+#' @details \code{mvgam} currently supports the following dynamic trend models:
+#'\itemize{
+#'   \item \code{RW} Random Walk
+#'   \item \code{AR1} Autoregressive model with AR coefficient for lag 1
+#'   \item \code{AR2} Autoregressive model with AR coefficients for lags 1 and 2
+#'   \item \code{AR3} Autoregressive model with AR coefficients for lags 1, 2 and 3
+#'   \item \code{VAR1} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated errors
+#'   \item \code{GP} Squared exponential Gaussian Process
+#'   }
+#'
+#'
+#'Dynamic factor models can be used in which the latent factors evolve as either
+#'`RW`, `AR1`, `AR2`, `AR3` or `GP`. Note that only `RW`, `AR1`, `AR2` and `AR3` are available if
+#'using `JAGS`. All trend models are supported if using `Stan`.
+#' @name mvgam_trends
+NULL
+
 #### Generic trend information ####
 #' @noRd
 evaluate_trend_model = function(trend_model){
@@ -6,7 +24,8 @@ evaluate_trend_model = function(trend_model){
                                        "GP",
                                        'AR1',
                                        'AR2',
-                                       'AR3'))
+                                       'AR3',
+                                       'VAR1'))
   return(trend_model)
 }
 
@@ -56,14 +75,51 @@ sim_ar3 = function(drift, ar1, ar2, ar3, tau, last_trends, h){
   states[-c(1:3)]
 }
 
+#' VAR1 simulation function
+#' @noRd
+sim_var1 = function(drift, A, Sigma, last_trends, h){
+
+  if(NCOL(A) != NCOL(Sigma)){
+    stop('VAR coefficient matrix "A" and error matrix "Sigma" must have equal dimensions',
+         call. = FALSE)
+  }
+
+  if(NROW(A) != NROW(Sigma)){
+    stop('VAR coefficient matrix "A" and error matrix "Sigma" must have equal dimensions',
+         call. = FALSE)
+  }
+
+  if(missing(drift)){
+    drift <- rep(0, NROW(A))
+  }
+
+  if(length(drift) != NROW(A)){
+    stop('Number of drift parameters must match number of rows in VAR coefficient matrix "A"',
+         call. = FALSE)
+  }
+
+  # Last estimate in time is where the series will start
+  states <- matrix(NA, nrow = h + 1, ncol = NCOL(A))
+  states[1, ] <- last_trends
+
+  # Stochastic realisations
+  for (t in 2:(h + 1)) {
+    states[t, ] <- MASS::mvrnorm(1,
+                                  mu = A %*% states[t-1,] + drift,
+                                  Sigma = Sigma)
+  }
+
+  # Return state estimates
+  states[-1, ]
+}
+
 #' Parameters to monitor / extract
 #' @noRd
 trend_par_names = function(trend_model, use_lv = FALSE,
                            drift = FALSE){
 
   # Check arguments
-  trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1",
-                                                          "AR2", "AR3", "GP"))
+  trend_model <- evaluate_trend_model(trend_model)
 
   if(use_lv){
     if(trend_model == 'RW'){
@@ -110,6 +166,10 @@ trend_par_names = function(trend_model, use_lv = FALSE,
 
     if(trend_model == 'GP'){
       param <- c('trend', 'alpha_gp', 'rho_gp')
+    }
+
+    if(trend_model == 'VAR1'){
+      param <- c('trend', 'A', 'Sigma')
     }
 
   }
@@ -181,7 +241,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
 
   if(!keep_all_estimates){
     #### Extract last xxx timepoints of latent trends for propagating forecasts
-    # foreward ####
+    # forward ####
 
     # Latent trend estimates for dynamic factor models
     if(object$use_lv){
@@ -307,6 +367,13 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
 
         out$trend <- NULL
 
+        if(object$trend_model == 'VAR1'){
+          # Need to ensure all series' trends are retained when subsampling
+          # to produce draw-specific forecasts from VAR models
+          out$last_lvs <- out$last_trends
+          out$last_trends <- NULL
+        }
+
       }
     }
   }
@@ -315,13 +382,83 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
   out
 }
 
+#' Function for extracting a single draw of trend parameters for use
+#' in many of the forecasting / evaluation functions
+#' @noRd
+extract_general_trend_pars = function(samp_index, trend_pars){
+  general_trend_pars <- lapply(seq_along(trend_pars), function(x){
+
+    if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
+                                   'A', 'Sigma')){
+
+      if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends')){
+        out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
+      }
+
+      if(names(trend_pars)[x] %in% c('A', 'Sigma')){
+        out <- unname(trend_pars[[x]][samp_index, ])
+      }
+
+    } else {
+      if(is.matrix(trend_pars[[x]])){
+        out <- unname(trend_pars[[x]][samp_index, ])
+      } else {
+        out <- unname(trend_pars[[x]][samp_index])
+      }
+    }
+    out
+
+  })
+  names(general_trend_pars) <- names(trend_pars)
+  return(general_trend_pars)
+}
+
+#' Function for extracting a single draw of trend parameters for a single series, for use
+#' in many of the forecasting / evaluation functions
+#' @noRd
+extract_series_trend_pars = function(series, samp_index, trend_pars,
+                                     use_lv = FALSE){
+  trend_extracts <- lapply(seq_along(trend_pars), function(x){
+
+    if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
+                                   'A', 'Sigma')){
+      if(names(trend_pars)[x] %in% c('last_trends', 'lv_coefs')){
+        out <- trend_pars[[x]][[series]][samp_index, ]
+      }
+
+      if(names(trend_pars)[x] %in% c('last_lvs')){
+        out <- lapply(trend_pars[[x]], `[`, samp_index, )
+      }
+
+      if(names(trend_pars)[x] %in% c('A', 'Sigma')){
+        out <- trend_pars[[x]][samp_index, ]
+      }
+
+    } else {
+      if(is.matrix(trend_pars[[x]])){
+        if(use_lv){
+          out <- trend_pars[[x]][samp_index, ]
+        } else {
+          out <- trend_pars[[x]][samp_index, series]
+        }
+
+      } else {
+        out <- trend_pars[[x]][samp_index]
+      }
+    }
+    out
+
+  })
+  names(trend_extracts) <- names(trend_pars)
+  return(trend_extracts)
+}
+
 #' Wrapper function to forecast trends
 #' @noRd
 forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
 
   # Check arguments
-  trend_model <- match.arg(arg = trend_model, choices = c("None", "RW", "AR1",
-                                                          "AR2", "AR3", "GP"))
+  trend_model <- evaluate_trend_model(trend_model)
 
   # Propagate dynamic factors forward
   if(use_lv){
@@ -396,6 +533,23 @@ forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
                                  rho_gp = trend_pars$rho_gp,
                                  last_trends = trend_pars$last_trends,
                                  h = h)
+    }
+
+    if(trend_model == 'VAR1'){
+      # Reconstruct the A and Sigma matrices
+      Amat <- matrix(trend_pars$A, nrow = length(trend_pars$last_lvs),
+                     ncol = length(trend_pars$last_lvs))
+      Sigmamat <- matrix(trend_pars$Sigma, nrow = length(trend_pars$last_lvs),
+                         ncol = length(trend_pars$last_lvs))
+
+      # Reconstruct the last trend vector
+      last_trendvec <- unlist(lapply(trend_pars$last_lvs,
+                                     function(x) tail(x, 1)))
+
+      trend_fc <- mvgam:::sim_var1(A = Amat,
+                                   Sigma = Sigmamat,
+                                   last_trends = last_trendvec,
+                                   h = h)
     }
 
   }

@@ -180,25 +180,11 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   betas <- betas[samp_index, ]
 
   # Sample general trend-specific parameters for storing in the particle
-  general_trend_pars <- lapply(seq_along(trend_pars), function(x){
+  general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
+                                                   samp_index = samp_index)
 
-    if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends')){
-      out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
-
-    } else {
-      if(is.matrix(trend_pars[[x]])){
-        out <- unname(trend_pars[[x]][samp_index, ])
-      } else {
-        out <- unname(trend_pars[[x]][samp_index])
-      }
-    }
-    out
-
-  })
-  names(general_trend_pars) <- names(trend_pars)
-
-  if(use_lv){
-    # Propagate the lvs forward only once using the sampled trend parameters
+  if(use_lv || trend_model == 'VAR1'){
+    # Propagate the lvs of VAR forward only once using the sampled trend parameters
     trends <- forecast_trend(trend_model = trend_model,
                              use_lv = use_lv,
                              trend_pars = general_trend_pars,
@@ -226,38 +212,21 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   # Loop across series and produce the next trend estimate
   trend_states <- do.call(cbind, (lapply(seq_len(n_series), function(series){
 
-    # Series-specific trend parameters
-    trend_extracts <- lapply(seq_along(trend_pars), function(x){
+    # Sample series- and trend-specific parameters
+    trend_extracts <- mvgam:::extract_series_trend_pars(series = series,
+                                                        samp_index = samp_index,
+                                                        trend_pars = trend_pars,
+                                                        use_lv = use_lv)
 
-      if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends')){
-        if(names(trend_pars)[x] %in% c('last_trends', 'lv_coefs')){
-          out <- unname(trend_pars[[x]][[series]][samp_index, ])
-        }
-
-        if(names(trend_pars)[x] == c('last_lvs')){
-          out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
-        }
-
-      } else {
-        if(is.matrix(trend_pars[[x]])){
-          if(use_lv){
-            out <- unname(trend_pars[[x]][samp_index, ])
-          } else {
-            out <- unname(trend_pars[[x]][samp_index, series])
-          }
-
-        } else {
-          out <- unname(trend_pars[[x]][samp_index])
-        }
+    if(use_lv || trend_model == 'VAR1'){
+      if(use_lv){
+        # Multiply lv states with loadings to generate the series' forecast trend state
+        out <- as.numeric(trends %*% trend_extracts$lv_coefs)
       }
-      out
 
-    })
-    names(trend_extracts) <- names(trend_pars)
-
-    if(use_lv){
-      # Multiply lv states with loadings to generate the series' forecast trend state
-      out <- as.numeric(trends %*% trend_extracts$lv_coefs)
+      if(trend_model == 'VAR1'){
+        out <- trends[, series]
+      }
 
     } else {
       # Propagate the series-specific trends forward
@@ -271,20 +240,22 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   })))
 
   # Include previous states for each series' trend in general trend parameters
- if(!use_lv){
-   if(trend_model != 'GP'){
+ if(!use_lv && trend_model != 'VAR1'){
+   if(!trend_model %in% c('GP')){
      general_trend_pars$last_trends <- unname(lapply(seq_along(general_trend_pars$last_trends),
                                            function(x){
                                              unname(c(general_trend_pars$last_trends[[x]][2],
                                                general_trend_pars$last_trends[[x]][3],
                                                trend_states[,x]))
                                            }))
-   } else {
+   }
+
+   if(trend_model == 'GP'){
      general_trend_pars$last_trends <- unname(lapply(seq_along(general_trend_pars$last_trends),
-                                           function(x){
-                                             unname(c(general_trend_pars$last_trends[[x]],
-                                               trend_states[,x]))
-                                           }))
+                                                     function(x){
+                                                       unname(c(general_trend_pars$last_trends[[x]],
+                                                                trend_states[,x]))
+                                                     }))
    }
  }
 

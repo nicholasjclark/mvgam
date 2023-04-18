@@ -164,7 +164,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   particle_fcs <- pbapply::pblapply(fc_samples, function(x){
     use_lv <- particles[[x]]$use_lv
 
-    if(use_lv){
+    if(use_lv || trend_model == 'VAR1'){
       # Run the latent variables forward fc_horizon timesteps
       lv_preds <- mvgam:::forecast_trend(trend_model = particles[[x]]$trend_model,
                                     use_lv = TRUE,
@@ -173,8 +173,16 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
 
       # Generate predictions on the response scale
       series_fcs <- lapply(seq_len(n_series), function(series){
-        trend_preds <- as.numeric(lv_preds %*%
-                                    particles[[x]]$trend_pars$lv_coefs[[series]])
+
+        if(use_lv){
+          trend_preds <- as.numeric(lv_preds %*%
+                                      particles[[x]]$trend_pars$lv_coefs[[series]])
+        }
+
+        if(trend_model == 'VAR1'){
+          trend_preds <- lv_preds
+        }
+
         Xpmat <- cbind(Xp[which(as.numeric(series_test$series) == series),], trend_preds)
         attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 

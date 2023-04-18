@@ -17,10 +17,9 @@ Description: This package is for fitting Bayesian Generalised Additive Models to
              Clark & Wells (2022) <https://doi.org/10.1111/2041-210X.13974>
 Maintainer: Nicholas J Clark <nicholas.j.clark1214@gmail.com>
 License: MIT + file LICENSE
-Depends: R (>= 3.6.0), mgcv, parallel
+Depends: R (>= 3.6.0), mgcv, parallel, rstan (>= 2.19.2)
 Imports: 
     pbapply,
-    rstan (>= 2.19.2),
     tweedie,
     lubridate,
     MASS,

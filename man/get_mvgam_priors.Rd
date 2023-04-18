@@ -54,6 +54,7 @@ and the observation process is the only source of error; similarly to what is es
 'AR1' (AR1 model with intercept),
 'AR2' (AR2 model with intercept) or
 'AR3' (AR3 model with intercept) or
+'VAR1' (with possible drift; only available in \code{Stan}) or
 'GP' (Gaussian Process with squared exponential kernel;
 only available for estimation in \code{Stan})}
 

@@ -42,6 +42,7 @@ latent trends in a reduced dimension format. If \code{FALSE}, estimate independe
 'AR1' (AR1 model with intercept),
 'AR2' (AR2 model with intercept) or
 'AR3' (AR3 model with intercept) or
+'VAR1' (with possible drift; only available in \code{Stan}) or
 'GP' (Gaussian process with squared exponential kernel}
 
 \item{drift}{\code{logical}, simulate a drift term for each trend}

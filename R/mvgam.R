@@ -45,11 +45,12 @@
 #''None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 #'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mcgv]{gam}}),
 #''RW' (random walk with possible drift),
-#''AR1' (AR1 model with intercept),
-#''AR2' (AR2 model with intercept) or
-#''AR3' (AR3 model with intercept) or
+#''AR1' (with possible drift),
+#''AR2' (with possible drift) or
+#''AR3' (with possible drift) or
+#''VAR1' (with possible drift; only available in \code{Stan}) or
 #''GP' (Gaussian Process with squared exponential kernel;
-#'only available for estimation in \code{stan})
+#'only available in \code{stan})
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 #'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 #'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
@@ -339,8 +340,41 @@ mvgam = function(formula,
     data_train <- data
   }
 
+  # Ensure each series has an observation, even if NA, for each
+  # unique timepoint
+  all_times_avail = function(time, min_time, max_time){
+    identical(sort(time), seq.int(from = min_time, to = max_time))
+  }
+  min_time <- min(data_train$time)
+  max_time <- max(data_train$time)
+  data.frame(series = data_train$series,
+             time = data_train$time) %>%
+    dplyr::group_by(series) %>%
+    dplyr::summarise(all_there = all_times_avail(time,
+                                                 min_time,
+                                                 max_time)) -> checked_times
+  if(any(checked_times$all_there == FALSE)){
+    stop('One or more series in "data" is missing observations for one or more timepoints',
+         call. = FALSE)
+  }
+
   if(!missing("newdata")){
     data_test <- newdata
+
+    # Repeat the check that each series has an observation for each
+    # unique timepoint
+    min_time <- min(data_test$time)
+    max_time <- max(data_test$time)
+    data.frame(series = data_test$series,
+               time = data_test$time) %>%
+      dplyr::group_by(series) %>%
+      dplyr::summarise(all_there = all_times_avail(time,
+                                                   min_time,
+                                                   max_time)) -> checked_times
+    if(any(checked_times$all_there == FALSE)){
+      stop('One or more series in "newdata" is missing observations for one or more timepoints',
+           call. = FALSE)
+    }
   }
 
   if(chains%%1 != 0){
@@ -396,10 +430,9 @@ mvgam = function(formula,
 
     }
 
-  # JAGS cannot support latent GP trends as there is no easy way to use Hilbert base
-  # approximation to reduce the computational demands
-  if(!use_stan & trend_model == 'GP'){
-    warning('gaussian process trends not supported for JAGS; reverting to Stan')
+  # JAGS cannot support latent GP or VAR trends
+  if(!use_stan & trend_model %in%c ('GP', 'VAR1')){
+    warning('gaussian process and VAR trends not yet supported for JAGS; reverting to Stan')
     use_stan <- TRUE
   }
 
@@ -736,7 +769,7 @@ mvgam = function(formula,
   # Modify lines needed for the specified trend model
   model_file <- add_trend_lines(model_file, stan = FALSE,
                                 use_lv = use_lv,
-                                trend_model = trend_model,
+                                trend_model = if(trend_model %in% c('RW', 'VAR1')){'RW'} else {trend_model},
                                 drift = drift)
 
   # Use informative priors based on the fitted mgcv model to speed convergence
@@ -1077,7 +1110,7 @@ mvgam = function(formula,
       base_stan_model <- add_trend_lines(model_file = base_stan_model,
                                          use_lv = use_lv,
                                          stan = TRUE,
-                                         trend_model = trend_model,
+                                         trend_model = if(trend_model %in% c('RW', 'VAR1')){'RW'} else {trend_model},
                                          drift = drift)
 
       # Add remaining data, model and parameters blocks to the Stan model file;
@@ -1191,7 +1224,7 @@ mvgam = function(formula,
       # Add necessary trend structure
       base_stan_model <- add_trend_lines(model_file = base_stan_model,
                                          stan = TRUE,
-                                         trend_model = trend_model,
+                                         trend_model = if(trend_model %in% c('RW', 'VAR1')){'RW'} else {trend_model},
                                          use_lv = use_lv,
                                          drift = drift)
 

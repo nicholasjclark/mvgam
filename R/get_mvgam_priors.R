@@ -27,6 +27,7 @@
 #''AR1' (AR1 model with intercept),
 #''AR2' (AR2 model with intercept) or
 #''AR3' (AR3 model with intercept) or
+#''VAR1' (with possible drift; only available in \code{Stan}) or
 #''GP' (Gaussian Process with squared exponential kernel;
 #'only available for estimation in \code{Stan})
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
@@ -138,10 +139,9 @@ get_mvgam_priors = function(formula,
     data_train <- data
   }
 
-  # JAGS cannot support latent GP trends as there is no easy way to use Hilbert base
-  # approximation to reduce the computational demands
-  if(!use_stan & trend_model == 'GP'){
-    warning('gaussian process trends not yet supported for JAGS; reverting to Stan')
+  # JAGS cannot support latent GP or VAR trends
+  if(!use_stan & trend_model %in%c ('GP', 'VAR1')){
+    warning('gaussian process and VAR trends not yet supported for JAGS; reverting to Stan')
     use_stan <- TRUE
   }
 
@@ -433,6 +433,24 @@ get_mvgam_priors = function(formula,
                                )))
     }
 
+  }
+
+  if(trend_model == 'VAR1'){
+      trend_df <- data.frame(param_name = c('sigma<lower=0>', 'A<lower=-1,upper=1>'),
+                             param_length = c(length(unique(data_train$series)),
+                                              length(unique(data_train$series))^2),
+                             param_info = c('trend sd', 'VAR1 coefficients'),
+                             prior = c('inv_gamma(2.3693353, 0.7311319);',
+                                       'to_vector(A) ~ normal(0, 0.5);'),
+                             example_change = c(
+                               paste0('sigma ~ exponential(',
+                                      round(runif(min = 0.01, max = 1, n = 1), 2),
+                                      ');'
+                               ),
+                               paste0('to_vector(A) ~ normal(0, ',
+                                      round(runif(min = 0.01, max = 1, n = 1), 2),
+                                      ');'
+                               )))
   }
 
   if(trend_model == 'AR1'){
