@@ -440,7 +440,7 @@ get_mvgam_priors = function(formula,
                              param_length = c(length(unique(data_train$series)),
                                               length(unique(data_train$series))^2),
                              param_info = c('trend sd', 'VAR1 coefficients'),
-                             prior = c('inv_gamma(2.3693353, 0.7311319);',
+                             prior = c('sigma ~ inv_gamma(2.3693353, 0.7311319);',
                                        'to_vector(A) ~ normal(0, 0.5);'),
                              example_change = c(
                                paste0('sigma ~ exponential(',

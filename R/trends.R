@@ -7,6 +7,7 @@
 #'   \item \code{AR3} Autoregressive model with AR coefficients for lags 1, 2 and 3
 #'   \item \code{VAR1} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated errors
 #'   \item \code{GP} Squared exponential Gaussian Process
+#'   \item \code{None} No latent trend is fitted
 #'   }
 #'
 #'
@@ -25,7 +26,8 @@ evaluate_trend_model = function(trend_model){
                                        'AR1',
                                        'AR2',
                                        'AR3',
-                                       'VAR1'))
+                                       'VAR1',
+                                       'None'))
   return(trend_model)
 }
 

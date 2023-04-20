@@ -23,7 +23,7 @@
 #'Note, all plots use posterior medians of fitted values / residuals, so uncertainty is not represented.
 #'@return A series of base \code{R} plots
 #'@export
-plot_mvgam_resids = function(object, series = 1, n_bins = 20,
+plot_mvgam_resids = function(object, series = 1, n_bins = 15,
                              newdata, data_test){
 
   # Check arguments
@@ -66,7 +66,7 @@ c_dark_highlight <- c("#7C0000")
 
 # Prediction indices for the particular series
 data_train <- object$obs_data
-ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
+ends <- seq(0, dim(mvgam:::mcmc_chains(object$model_output, 'ypred'))[2],
             length.out = NCOL(object$ytimes) + 1)
 starts <- ends + 1
 starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
@@ -103,11 +103,11 @@ if(missing(data_test)){
 
     # For stan objects, mus is stored as a vector in column-major order
     linkfun <- mvgam:::family_invlinks(object$family)
-    preds <- linkfun(mcmc_chains(object$model_output, 'mus')[,seq(series,
-                                                                    dim(mcmc_chains(object$model_output, 'mus'))[2],
+    preds <- linkfun(mvgam:::mcmc_chains(object$model_output, 'mus')[,seq(series,
+                                                                    dim(mvgam:::mcmc_chains(object$model_output, 'mus'))[2],
                                                                     by = NCOL(object$ytimes))][, 1:obs_length])
   } else {
-    preds <- mcmc_chains(object$model_output, 'mus')[,starts[series]:ends[series]][, 1:obs_length]
+    preds <- mvgam:::mcmc_chains(object$model_output, 'mus')[,starts[series]:ends[series]][, 1:obs_length]
   }
 
 } else {
@@ -211,7 +211,11 @@ if(missing(data_test)){
   }
 }
 
+bottom_preds <- apply(preds, 2, function(x) quantile(x, 0.05, na.rm = TRUE))
+lower_preds <- apply(preds, 2, function(x) quantile(x, 0.1, na.rm = TRUE))
 median_preds <- apply(preds, 2, function(x) quantile(x, 0.5, na.rm = TRUE))
+upper_preds <- apply(preds, 2, function(x) quantile(x, 0.9, na.rm = TRUE))
+top_preds <- apply(preds, 2, function(x) quantile(x, 0.95, na.rm = TRUE))
 
 # Graphical parameters
 layout(matrix(1:4, ncol = 2, nrow = 2, byrow = TRUE))
@@ -220,24 +224,38 @@ layout(matrix(1:4, ncol = 2, nrow = 2, byrow = TRUE))
 n_fitted_bins = n_bins
 
 # Get x-axis values and bin if necessary to prevent overplotting
-sorted_x <- sort(unique(round(median_preds, 6)))
+sorted_x <- sort(unique(round(c(bottom_preds,
+                                lower_preds,
+                                median_preds,
+                                upper_preds,
+                                top_preds), 6)))
+sorted_x <- seq(from = min(sorted_x),
+                to = max(sorted_x),
+                length.out = length(sorted_x))
 
 if(length(sorted_x) > n_fitted_bins){
   sorted_x <- seq(min(sorted_x), max(sorted_x), length.out = n_fitted_bins)
-  resid_probs <- do.call(rbind, lapply(2:n_fitted_bins, function(i){
-    quantile(as.vector(series_residuals[,which(round(median_preds, 6) <= sorted_x[i] &
-                                               round(median_preds, 6) > sorted_x[i-1])]),
-             probs = probs, na.rm = TRUE)
+  resid_probs <- do.call(rbind, lapply(seq_along(sorted_x), function(i){
+    if(i == 1){
+      quantile(series_residuals[which(preds <= sorted_x[i])], probs = probs, na.rm = TRUE)
+    } else if(i == length(sorted_x)){
+      quantile(series_residuals[which(preds >= sorted_x[i])], probs = probs, na.rm = TRUE)
+    } else {
+      quantile(series_residuals[which(preds > sorted_x[i - 1] &
+                                        preds <= sorted_x[i])], probs = probs, na.rm = TRUE)
+    }
   }))
-  resid_probs <- rbind(quantile(as.vector(series_residuals[,which(round(median_preds, 6) == sorted_x[1])]),
-                                probs = probs,
-                                na.rm = TRUE),
-                       resid_probs)
 
 } else {
-  resid_probs <- do.call(rbind, lapply(sorted_x, function(i){
-    quantile(as.vector(series_residuals[,which(round(median_preds, 6) == i)]),
-             probs = probs, na.rm = TRUE)
+  resid_probs <- do.call(rbind, lapply(seq_along(sorted_x), function(i){
+    if(i == 1){
+      quantile(series_residuals[which(preds <= sorted_x[i])], probs = probs, na.rm = TRUE)
+    } else if(i == length(sorted_x)){
+      quantile(series_residuals[which(preds >= sorted_x[i])], probs = probs, na.rm = TRUE)
+    } else {
+      quantile(series_residuals[which(preds > sorted_x[i - 1] &
+                                        preds <= sorted_x[i])], probs = probs, na.rm = TRUE)
+    }
   }))
 }
 
@@ -253,6 +271,7 @@ x <- sapply(1:length(idx),
 
 # Plot
 plot(median_preds[1:length(series_residuals)],
+     xlim = range(sorted_x),
      series_residuals,
      bty = 'L',
      xlab = 'Fitted values',

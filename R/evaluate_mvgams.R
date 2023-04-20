@@ -13,7 +13,8 @@
 #'generate an 'out-of-sample' forecast that is evaluated against the true observations in the horizon window.
 #'This function therefore simulates a situation where the model's parameters had already been estimated but
 #'we have only observed data up to the evaluation timepoint and would like to generate forecasts from the
-#'latent trends. Evaluation involves calculating the Discrete Rank Probability Score and a binary indicator
+#'latent trends that have been observed up to that timepoint. Evaluation involves calculating an
+#'appropriate Rank Probability Score and a binary indicator
 #'for whether or not the true value lies within the forecast's 90% prediction interval
 #'
 #'`roll_eval_mvgam` sets up a sequence of evaluation timepoints along a rolling window and iteratively

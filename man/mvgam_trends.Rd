@@ -15,6 +15,7 @@ Supported mvgam trend models
 \item \code{AR3} Autoregressive model with AR coefficients for lags 1, 2 and 3
 \item \code{VAR1} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated errors
 \item \code{GP} Squared exponential Gaussian Process
+\item \code{None} No latent trend is fitted
 }
 
 Dynamic factor models can be used in which the latent factors evolve as either

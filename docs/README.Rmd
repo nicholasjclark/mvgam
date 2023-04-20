@@ -61,6 +61,19 @@ Further, `mvgam` relies on several other `R` packages and, of course, on `R` its
 find out how to cite R and its packages, use the `citation` function. There are
 some features of `mvgam` which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines, which entirely rely on `mgcv`. The `rstan` and `cmdstanr` packages together with `Rcpp` makes `Stan` conveniently accessible in `R`, while the `rjags` and `runjags` packages together with the `coda` package make `JAGS` accessible in `R`. If you use some of these features, please also consider citing the related packages.
 
+## Dynamic latent temporal processes
+`mvgam` is designed to propagate unobserved temporal processes to capture autocorrelation in the observed time series. This works in a state-space format, with the temporal *trend* evolving independently of the observation process. Available trend models are: 
+  
+* `RW` Random Walk
+* `AR1` Autoregressive model with AR coefficient for lag 1
+* `AR2` Autoregressive model with AR coefficients for lags 1 and 2
+* `AR3` Autoregressive model with AR coefficients for lags 1, 2 and 3 
+* `VAR1` Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated errors 
+* `GP` Squared exponential Gaussian Process 
+* `None` No latent trend is fitted
+  
+When using `Stan` as the back-end, all of these trend models (apart from `VAR1`) can be estimated using a set of dimension-reduced dynamic factors. Please see [mvgam case study 2: multivariate models](https://rpubs.com/NickClark47/mvgam2) for more information
+
 ## A brief introduction to the package
 We can explore the model’s primary functions using a test dataset that
 is available with all `R` installations. We introduce Dynamic Generalized Additive Models and some of the key utility functions provided in `mvgam`. First, load the `lynx` data and plot the series as well as its estimated autocorrelation function
@@ -311,13 +324,14 @@ Summary statistics of the two models' out of sample Discrete Rank Probability Sc
 
 ## Extended observation families
 `mvgam` was originally designed to analyse and forecast non-negative integer-valued data (counts). These data are traditionally challenging to analyse with existing time-series analysis packages. But further development of `mvgam` has resulted in support for a growing number of observation families that extend to other types of data. Currently, the package can handle data for the following families:  
-`gaussian()` for real-valued data  
-`student_t()` for heavy-tailed real-valued data  
-`lognormal()` for non-negative real-valued data  
-`betar()` for proportional data on `(0,1)`  
-`poisson()` for count data  
-`nb()` for overdispersed count data  
-`tweedie()` for overdispersed count data  
+  
+* `gaussian()` for real-valued data 
+* `student_t()` for heavy-tailed real-valued data
+* `lognormal()` for non-negative real-valued data
+* `betar()` for proportional data on `(0,1)`
+* `poisson()` for count data
+* `nb()` for overdispersed count data
+* `tweedie()` for overdispersed count data
   
 Note that only `poisson()`, `nb()`, and `tweedie()` are available if using `JAGS`. All families, apart from `tweedie()`, are supported if using `Stan`. See `??mvgam_families` for more information. A simple example for simulating and modelling proportional data with `Beta` observations over a set of seasonal series with independent Gaussian Process dynamic trends:
 ```{r, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=6.5, dpi=160}
