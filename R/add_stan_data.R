@@ -239,24 +239,30 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
     jags_smooth_text <- gsub('##', '//', jags_smooth_text)
     jags_smooth_text <- gsub('dexp', 'exponential', jags_smooth_text)
 
-    if(any(grep('K.* <- ', jags_smooth_text))){
-      K_starts <- grep('K.* <- ', jags_smooth_text)
-      for(i in 1:length(K_starts)){
-        jags_smooth_text[K_starts[i]+1] <- gsub('\\bb\\b', 'b_raw',
-                                                gsub('dmnorm', 'multi_normal_prec',
-                                                     paste0(gsub('K.*',
-                                                                 trimws(gsub('K.* <- ', '',
-                                                                             jags_smooth_text[K_starts[i]])),
-                                                                 jags_smooth_text[K_starts[i]+1]), ')')))
+    any_ks <- any(grep('K.* <- ', jags_smooth_text))
+    if(any_ks ||
+       any(grep('// prior for s(time):', jags_smooth_text, fixed = TRUE))){
+
+      if(any(grep('K.* <- ', jags_smooth_text))){
+        K_starts <- grep('K.* <- ', jags_smooth_text)
+        for(i in 1:length(K_starts)){
+          jags_smooth_text[K_starts[i]+1] <- gsub('\\bb\\b', 'b_raw',
+                                                  gsub('dmnorm', 'multi_normal_prec',
+                                                       paste0(gsub('K.*',
+                                                                   trimws(gsub('K.* <- ', '',
+                                                                               jags_smooth_text[K_starts[i]])),
+                                                                   jags_smooth_text[K_starts[i]+1]), ')')))
+        }
+        jags_smooth_text <- jags_smooth_text[-K_starts]
       }
-      jags_smooth_text <- jags_smooth_text[-K_starts]
+
     } else {
-      # If no K terms then there are no smoothing parameters in the model
+      # If no K terms or time-varying terms, then there are no smoothing parameters in the model
       # (probably the only smooth terms included are random effect bases, which don't need
       # smoothing parameters when we use the non-centred parameterisation)
       stan_file <- stan_file[-grep('// priors for smoothing parameters', stan_file,
                                    fixed = TRUE)]
-      stan_file <- stan_file[-grep('lambda ~ normal', stan_file,
+      stan_file <- stan_file[-grep('lambda ~ ', stan_file,
                                    fixed = TRUE)]
       stan_file <- stan_file[-grep('vector[n_sp] rho', stan_file,
                                    fixed = TRUE)]
@@ -269,6 +275,13 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
       stan_file <- stan_file[-grep('vector[num_basis] zero; //', stan_file,
                                    fixed = TRUE)]
       stan_file <- stan_file[-grep('int<lower=0> n_sp; //', stan_file,
+                                   fixed = TRUE)]
+    }
+
+    # If there are no K terms but there are time-varying, we don't need
+    # the zero vector
+    if(!any_ks){
+      stan_file <- stan_file[-grep('vector[num_basis] zero; //', stan_file,
                                    fixed = TRUE)]
     }
 
@@ -523,6 +536,14 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
   # Replace any normal(0, 1) with std_normal() for faster computation
   stan_file <- readLines(textConnection(stan_file), n = -1)
   stan_file <- gsub('normal(0, 1)', 'std_normal()', stan_file, fixed = TRUE)
+
+  # Change b to b_raw for any idx normals
+  if(any(grep('for (i in idx', stan_file, fixed = TRUE))){
+    lines_matching <- grep('for (i in idx', stan_file, fixed = TRUE)
+    for(i in lines_matching){
+      stan_file[i] <- gsub('\\bb\\b', 'b_raw', stan_file[i])
+    }
+  }
 
   # Final tidying of the Stan model for readability
   unlink('base_gam_stan.txt')

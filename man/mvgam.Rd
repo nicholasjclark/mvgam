@@ -227,23 +227,23 @@ dat <- sim_mvgam(T = 80, n_series = 3, prop_missing = 0.1,
                 trend_rel = 0.6)
 
 # Plot key summary statistics for a single series
-plot_mvgam_series(data_train = dat$data_train, series = 1)
+plot_mvgam_series(data = dat$data_train, series = 1)
 
 # Plot all series together
-plot_mvgam_series(data_train = dat$data_train, series = 'all')
+plot_mvgam_series(data = dat$data_train, series = 'all')
 
 # Formulate a model using Stan where series share a cyclic smooth for
 # seasonality and each series has an independent random walk temporal process;
 # Set run_model = FALSE to inspect the returned objects
 mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
-             data_train = dat$data_train,
+             data = dat$data_train,
              trend_model = 'RW',
              family = 'poisson',
              use_stan = TRUE,
              run_model = FALSE)
 
 # View the model code in Stan language
-mod1$model_file
+code(mod1)
 
 # Inspect the data objects needed to condition the model
 str(mod1$model_data)
@@ -272,9 +272,9 @@ fit <- cmd_mod$sample(data = model_data,
 
 # Now fit the model using mvgam with the Stan backend
 mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
-              data_train = dat$data_train,
+              data = dat$data_train,
               trend_model = 'RW',
-              family = 'poisson',
+              family = poisson(),
               use_stan = TRUE)
 
 # Extract the model summary
@@ -285,9 +285,9 @@ plot(mod1, type = 'trend', series = 1)
 plot(mod1, type = 'forecast', series = 1)
 
 # Compute the forecast using covariate information in data_test
-plot(object = mod1, type = 'trend', data_test = dat$data_test,
+plot(object = mod1, type = 'trend', newdata = dat$data_test,
      series = 1)
-plot(object = mod1, type = 'forecast', data_test = dat$data_test,
+plot(object = mod1, type = 'forecast', newdata = dat$data_test,
      series = 1)
 
 # Plot the estimated seasonal smooth function
@@ -301,6 +301,42 @@ plot(mod1, type = 'smooths', residuals = TRUE)
 
 # Plot posterior realisations for the smooth
 plot(mod1, type = 'smooths', realisations = TRUE)
+
+# Example of how to use dynamic coefficients
+# Simulate a time-varying coefficient for the effect of temperature
+set.seed(3)
+N = 200
+beta_temp <- vector(length = N)
+beta_temp[1] <- 0.4
+for(i in 2:N){
+  beta_temp[i] <- rnorm(1, mean = beta_temp[i - 1], sd = 0.025)
+}
+
+# Simulate the temperature covariate
+temp <- rnorm(N, sd = 1)
+# Simulate the Gaussian observation process
+out <- rnorm(N, mean = 4 + beta_temp * temp,
+             sd = 0.5)
+
+# Gather necessary data into a data.frame; split into training / testing
+data = data.frame(out, temp, time = seq_along(temp))
+data_train <- data[1:180,]
+data_test <- data[181:200,]
+
+# Fit the model using the dynamic() formula helper
+mod <- mvgam(formula = out ~ dynamic(temp, rho = 8),
+             family = gaussian(),
+            data = data_train,
+            newdata = data_test)
+
+# Inspect the model summary, forecast and time-varying coefficient distribution
+summary(mod)
+plot(mod, type = 'smooths')
+plot(mod, type = 'forecast', newdata = data_test)
+
+# Propagating the smooth term shows how the coefficient is expected to evolve
+plot_mvgam_smooth(mod, smooth = 1, newdata = data)
+abline(v = 180, lty = 'dashed', lwd = 2)
 
 # Example showing how to incorporate an offset; simulate some count data
 # with different means per series

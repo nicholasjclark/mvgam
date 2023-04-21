@@ -1,5 +1,4 @@
-#' Generic GAM setup function. All credit goes to Simon Wood
-#' @details A generic function for setting up a GAM object with appropriate smooths
+#' Generic GAM setup function
 #' @noRd
 #'
 mvgam_setup <- function(formula,

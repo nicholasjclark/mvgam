@@ -52,7 +52,7 @@ if(!is.null(object$upper_bounds)){
 }
 
 message('N timepoints:')
-max(object$obs_data$time)
+cat(max(object$obs_data$time), '\n')
 message()
 
 if(object$fit_engine == 'jags'){
@@ -349,7 +349,7 @@ summary.mvgam_prefit = function(object){
   message()
 
   message('N timepoints:')
-  max(object$obs_data$time)
+  cat(max(object$obs_data$time), '\n')
   message()
 
   message('Status:')

@@ -200,6 +200,19 @@ plot_mvgam_smooth = function(object,
       }
     } else {
       pred_dat <- newdata
+
+      # Add series factor variable if missing
+      if(class(pred_dat)[1] != 'list'){
+        if(!'series' %in% colnames(pred_dat)){
+          pred_dat$series <- factor('series1')
+        }
+      }
+
+      if(class(pred_dat)[1] == 'list'){
+        if(!'series' %in% names(pred_dat)){
+          pred_dat$series <- factor('series1')
+        }
+      }
     }
 
     # Generate linear predictor matrix from fitted mgcv model
@@ -228,10 +241,10 @@ plot_mvgam_smooth = function(object,
                                       type = 'lpmatrix'))
     }
 
-    if(missing(newdata)){
-      # Zero out all other columns in Xp
-      Xp[,!grepl(paste0('(', smooth, ')'), colnames(Xp), fixed = T)] <- 0
-    }
+    # Zero out all other columns in Xp
+    keeps <- object$mgcv_model$smooth[[smooth_int]]$first.para:
+      object$mgcv_model$smooth[[smooth_int]]$last.para
+    Xp[, ! seq_len(length.out = NCOL(Xp)) %in% keeps] <- 0
 
     # Prediction x-axis values
     if(class(pred_dat)[1] == 'list'){

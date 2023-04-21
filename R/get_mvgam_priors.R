@@ -175,6 +175,24 @@ get_mvgam_priors = function(formula,
     }
   }
 
+  # Ensure each series has an observation, even if NA, for each
+  # unique timepoint
+  all_times_avail = function(time, min_time, max_time){
+    identical(sort(time), seq.int(from = min_time, to = max_time))
+  }
+  min_time <- min(data_train$time)
+  max_time <- max(data_train$time)
+  data.frame(series = data_train$series,
+             time = data_train$time) %>%
+    dplyr::group_by(series) %>%
+    dplyr::summarise(all_there = all_times_avail(time,
+                                                 min_time,
+                                                 max_time)) -> checked_times
+  if(any(checked_times$all_there == FALSE)){
+    stop('One or more series in "data" is missing observations for one or more timepoints',
+         call. = FALSE)
+  }
+
   # Number of latent variables cannot be greater than number of series
   if(use_lv){
     if(missing(n_lv)){

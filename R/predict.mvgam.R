@@ -63,7 +63,7 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
   }
 
   # Beta coefficients for GAM component
-  betas <- mcmc_chains(object$model_output, 'b')
+  betas <- mvgam:::mcmc_chains(object$model_output, 'b')
 
   # Family of model
   family <- object$family
@@ -79,23 +79,23 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
   setDefaultCluster(cl)
   clusterExport(NULL, c('betas',
                         'family_pars',
-                        'newdata',
                         'Xp',
                         'series_ind'),
                 envir = environment())
 
   pbapply::pboptions(type = "none")
   predictions <- do.call(rbind, pbapply::pblapply(seq_len(dim(betas)[1]), function(x){
+
     # Family-specific parameters
     par_extracts <- lapply(seq_along(family_pars), function(j){
       if(is.matrix(family_pars[[j]])){
-        family_pars[[j]][x,series_ind[x]]
+        family_pars[[j]][x, series_ind]
       } else {
         family_pars[[j]][x]
       }
     })
     names(par_extracts) <- names(family_pars)
-    mvgam_predict(family = family,
+    mvgam:::mvgam_predict(family = family,
                   Xp = Xp,
                   type = type,
                   betas = betas[x,],

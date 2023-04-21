@@ -168,23 +168,23 @@
 #'                 trend_rel = 0.6)
 #'
 #'# Plot key summary statistics for a single series
-#'plot_mvgam_series(data_train = dat$data_train, series = 1)
+#'plot_mvgam_series(data = dat$data_train, series = 1)
 #'
 #'# Plot all series together
-#'plot_mvgam_series(data_train = dat$data_train, series = 'all')
+#'plot_mvgam_series(data = dat$data_train, series = 'all')
 #'
 #'# Formulate a model using Stan where series share a cyclic smooth for
 #'# seasonality and each series has an independent random walk temporal process;
 #'# Set run_model = FALSE to inspect the returned objects
 #'mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
-#'              data_train = dat$data_train,
+#'              data = dat$data_train,
 #'              trend_model = 'RW',
 #'              family = 'poisson',
 #'              use_stan = TRUE,
 #'              run_model = FALSE)
 #'
 #'# View the model code in Stan language
-#' mod1$model_file
+#' code(mod1)
 #'
 #' # Inspect the data objects needed to condition the model
 #' str(mod1$model_data)
@@ -213,9 +213,9 @@
 #'
 #' # Now fit the model using mvgam with the Stan backend
 #' mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
-#'               data_train = dat$data_train,
+#'               data = dat$data_train,
 #'               trend_model = 'RW',
-#'               family = 'poisson',
+#'               family = poisson(),
 #'               use_stan = TRUE)
 #'
 #' # Extract the model summary
@@ -226,9 +226,9 @@
 #' plot(mod1, type = 'forecast', series = 1)
 #'
 #' # Compute the forecast using covariate information in data_test
-#' plot(object = mod1, type = 'trend', data_test = dat$data_test,
+#' plot(object = mod1, type = 'trend', newdata = dat$data_test,
 #'      series = 1)
-#' plot(object = mod1, type = 'forecast', data_test = dat$data_test,
+#' plot(object = mod1, type = 'forecast', newdata = dat$data_test,
 #'      series = 1)
 #'
 #' # Plot the estimated seasonal smooth function
@@ -242,6 +242,42 @@
 #'
 #' # Plot posterior realisations for the smooth
 #' plot(mod1, type = 'smooths', realisations = TRUE)
+#'
+#' # Example of how to use dynamic coefficients
+#' # Simulate a time-varying coefficient for the effect of temperature
+#' set.seed(3)
+#' N = 200
+#' beta_temp <- vector(length = N)
+#' beta_temp[1] <- 0.4
+#' for(i in 2:N){
+#'   beta_temp[i] <- rnorm(1, mean = beta_temp[i - 1], sd = 0.025)
+#'}
+#'
+#' # Simulate the temperature covariate
+#' temp <- rnorm(N, sd = 1)
+#' # Simulate the Gaussian observation process
+#' out <- rnorm(N, mean = 4 + beta_temp * temp,
+#'              sd = 0.5)
+#'
+#' # Gather necessary data into a data.frame; split into training / testing
+#'data = data.frame(out, temp, time = seq_along(temp))
+#'data_train <- data[1:180,]
+#'data_test <- data[181:200,]
+#'
+#' # Fit the model using the dynamic() formula helper
+#' mod <- mvgam(formula = out ~ dynamic(temp, rho = 8),
+#'              family = gaussian(),
+#'             data = data_train,
+#'             newdata = data_test)
+#'
+#' # Inspect the model summary, forecast and time-varying coefficient distribution
+#' summary(mod)
+#' plot(mod, type = 'smooths')
+#' plot(mod, type = 'forecast', newdata = data_test)
+#'
+#' # Propagating the smooth term shows how the coefficient is expected to evolve
+#' plot_mvgam_smooth(mod, smooth = 1, newdata = data)
+#' abline(v = 180, lty = 'dashed', lwd = 2)
 #'
 #' # Example showing how to incorporate an offset; simulate some count data
 #' # with different means per series
@@ -340,41 +376,13 @@ mvgam = function(formula,
     data_train <- data
   }
 
-  # Ensure each series has an observation, even if NA, for each
-  # unique timepoint
-  all_times_avail = function(time, min_time, max_time){
-    identical(sort(time), seq.int(from = min_time, to = max_time))
-  }
-  min_time <- min(data_train$time)
-  max_time <- max(data_train$time)
-  data.frame(series = data_train$series,
-             time = data_train$time) %>%
-    dplyr::group_by(series) %>%
-    dplyr::summarise(all_there = all_times_avail(time,
-                                                 min_time,
-                                                 max_time)) -> checked_times
-  if(any(checked_times$all_there == FALSE)){
-    stop('One or more series in "data" is missing observations for one or more timepoints',
+  if(!as.character(terms(formula(formula))[[2]]) %in% names(data_train)){
+    stop(paste0('variable ', terms(formula(formula))[[2]], ' not found in data'),
          call. = FALSE)
   }
 
   if(!missing("newdata")){
     data_test <- newdata
-
-    # Repeat the check that each series has an observation for each
-    # unique timepoint
-    min_time <- min(data_test$time)
-    max_time <- max(data_test$time)
-    data.frame(series = data_test$series,
-               time = data_test$time) %>%
-      dplyr::group_by(series) %>%
-      dplyr::summarise(all_there = all_times_avail(time,
-                                                   min_time,
-                                                   max_time)) -> checked_times
-    if(any(checked_times$all_there == FALSE)){
-      stop('One or more series in "newdata" is missing observations for one or more timepoints',
-           call. = FALSE)
-    }
   }
 
   if(chains%%1 != 0){
@@ -505,6 +513,42 @@ mvgam = function(formula,
     }
   }
 
+  # Ensure each series has an observation, even if NA, for each
+  # unique timepoint
+  all_times_avail = function(time, min_time, max_time){
+    identical(sort(time), seq.int(from = min_time, to = max_time))
+  }
+  min_time <- min(data_train$time)
+  max_time <- max(data_train$time)
+  data.frame(series = data_train$series,
+             time = data_train$time) %>%
+    dplyr::group_by(series) %>%
+    dplyr::summarise(all_there = all_times_avail(time,
+                                                 min_time,
+                                                 max_time)) -> checked_times
+  if(any(checked_times$all_there == FALSE)){
+    stop('One or more series in "data" is missing observations for one or more timepoints',
+         call. = FALSE)
+  }
+
+  if(!missing(data_test)){
+
+    # Repeat the check that each series has an observation for each
+    # unique timepoint
+    min_time <- min(data_test$time)
+    max_time <- max(data_test$time)
+    data.frame(series = data_test$series,
+               time = data_test$time) %>%
+      dplyr::group_by(series) %>%
+      dplyr::summarise(all_there = all_times_avail(time,
+                                                   min_time,
+                                                   max_time)) -> checked_times
+    if(any(checked_times$all_there == FALSE)){
+      stop('One or more series in "newdata" is missing observations for one or more timepoints',
+           call. = FALSE)
+    }
+  }
+
   # Upper bounds needs to be same length as number of series
   if(!missing(upper_bounds)){
     if(length(upper_bounds) != length(unique(data_train$series))){
@@ -530,6 +574,8 @@ mvgam = function(formula,
   }
 
   # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
+  orig_formula <- formula
+  formula <- mvgam:::interpret_mvgam(formula, N = max(data_train$time))
   form_terms <- terms(formula(formula))
   if(terms(formula(formula))[[2]] != 'y'){
     if('y' %in% names(data_train)){
@@ -555,8 +601,8 @@ mvgam = function(formula,
 
   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the Bayesian model later on;
-  ss_gam <- mvgam_setup(formula = formula,
-                        family = family_to_mgcvfam(family),
+  ss_gam <- mvgam:::mvgam_setup(formula = formula,
+                        family = mvgam:::family_to_mgcvfam(family),
                         data = data_train,
                         drop.unused.levels = FALSE,
                         maxit = 30)
@@ -615,7 +661,7 @@ mvgam = function(formula,
   } else {
     ss_jagam <- mgcv::jagam(formula,
                             data = data_train,
-                            family = family_to_jagamfam(family_char),
+                            family = mvgam:::family_to_jagamfam(family_char),
                             file = 'base_gam.txt',
                             sp.prior = 'gamma',
                             diagonalize = FALSE,
@@ -747,7 +793,7 @@ mvgam = function(formula,
 
   # Add replacement lines for priors, trends and the linear predictor
   fil <- tempfile(fileext = ".xt")
-  modification <- add_base_dgam_lines(use_lv)
+  modification <- mvgam:::add_base_dgam_lines(use_lv)
   cat(c(readLines(textConnection(modification)), base_model), file = fil,
       sep = "\n")
   model_file <- trimws(readLines(fil, n = -1))
@@ -767,7 +813,7 @@ mvgam = function(formula,
   }
 
   # Modify lines needed for the specified trend model
-  model_file <- add_trend_lines(model_file, stan = FALSE,
+  model_file <- mvgam:::add_trend_lines(model_file, stan = FALSE,
                                 use_lv = use_lv,
                                 trend_model = if(trend_model %in% c('RW', 'VAR1')){'RW'} else {trend_model},
                                 drift = drift)
@@ -1027,10 +1073,16 @@ mvgam = function(formula,
   }
 
   # A second check for any smooth parameters
+  if(any(grep('lambda', model_file, fixed = TRUE))){
+    smooths_included <- TRUE
+  } else {
+    smooths_included <- smooths_included
+  }
+
   if(any(grep('K.* <- ', model_file))){
     smooths_included <- TRUE
   } else {
-    smooths_included <- FALSE
+    smooths_included <- smooths_included
   }
 
   # Add in additional data structure information for the model file heading
@@ -1145,7 +1197,7 @@ mvgam = function(formula,
       }
 
 
-      output <- structure(list(call = formula,
+      output <- structure(list(call = orig_formula,
                                family = family_char,
                                trend_model = trend_model,
                                drift = drift,
@@ -1178,7 +1230,7 @@ mvgam = function(formula,
         model_file <- update_priors(model_file, priors)
       }
 
-      output <- structure(list(call = formula,
+      output <- structure(list(call = orig_formula,
                                family = family_char,
                                trend_model = trend_model,
                                drift = drift,
@@ -1531,7 +1583,7 @@ mvgam = function(formula,
   }
 
   if(return_model_data){
-    output <- structure(list(call = formula,
+    output <- structure(list(call = orig_formula,
                              family = family_char,
                              trend_model = trend_model,
                              drift = drift,
@@ -1552,7 +1604,7 @@ mvgam = function(formula,
                              adapt_delta = adapt_delta),
                         class = 'mvgam')
   } else {
-    output <- structure(list(call = formula,
+    output <- structure(list(call = orig_formula,
                              family = family_char,
                              trend_model = trend_model,
                              drift = drift,

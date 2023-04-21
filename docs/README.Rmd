@@ -363,5 +363,62 @@ Plot the hindcast and forecast distributions for one series
 plot(mod, type = 'forecast', newdata = data$data_test, series = 2)
 ```
 
+Dynamic fixed-effect coefficients (often referred to as dynamic linear models) can also be readily incorporated into GAMs / DGAMs. In `mvgam`, the `dynamic()` formula wrapper is used to set these up. The plan is to incorporate a range of dynamic options (such as random walk, ar1 etc...) but for the moment only low-rank Gaussian Process smooths are allowed (making use of the `gp` basis in `mgcv`). An example below illustrates:
+  
+Simulate a time-varying coefficient using a squared exponential Gaussian Process function with length scale $\rho$`=6`
+```{r}
+set.seed(1111)
+N = 200
+beta_temp <- mvgam:::sim_gp(rnorm(1),
+                            alpha_gp = 0.75,
+                            rho_gp = 10,
+                            h = N) + 0.5
+plot(beta_temp, type = 'l', lwd = 3, 
+     bty = 'l', xlab = 'Time', ylab = 'Coefficient',
+     col = 'darkred')
+box(bty = 'l', lwd = 2)
+```
+
+Now simulate the outcome, which is a Gaussian observation process (with observation error) over the time-varying effect of $temperature$
+```{r}
+temp <- rnorm(N, sd = 1)
+out <- rnorm(N, mean = 4 + beta_temp * temp,
+             sd = 0.25)
+time <- seq_along(temp)
+plot(out,  type = 'l', lwd = 3, 
+     bty = 'l', xlab = 'Time', ylab = 'Outcome',
+     col = 'darkred')
+box(bty = 'l', lwd = 2)
+```
+
+Gather the data into a `data.frame` and fit a model using the `dynamic()` formula wrapper to specify a low-rank Gaussian Process smooth function to estimate the time-varying coefficient of $temperature$. We will mis-specify the $\rho$ parameter here as, in practice, it is never known 
+```{r, message=FALSE, warning=FALSE}
+data = data.frame(out, temp, time)
+data_train <- data[1:190,]
+data_test <- data[191:200,]
+mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
+             family = gaussian(),
+             data = data_train)
+summary(mod)
+```
+
+Plot the estimated time-varying coefficient for the in-sample training period
+```{r}
+plot(mod, type = 'smooths')
+```
+
+Plot the estimates for the in-sample and out-of-sample periods to see how the Gaussian Process function produces sensible smooth forecasts. Overlay the true simulated function to see that the model has adequately estimated it's dynamics
+```{r}
+plot_mvgam_smooth(mod, smooth = 1, newdata = data)
+abline(v = 180, lty = 'dashed', lwd = 2)
+lines(beta_temp, lwd = 2, col = 'white')
+lines(beta_temp, lwd = 1.5)
+```
+
+This results in sensible forecasts of the observations as well
+```{r}
+plot(mod, type = 'forecast', newdata = data_test)
+```
+
 ## License
 This project is licensed under an `MIT` open source license

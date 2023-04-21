@@ -17,6 +17,28 @@ test_that("trend_model must be correctly specified", {
                             run_model = FALSE))
 })
 
+test_that("outcome variable must be present in data", {
+  data = data.frame(out = rnorm(100),
+                    temp = rnorm(100),
+                    time = rnorm(100))
+  expect_error(mod <- mvgam(formula = y ~ dynamic(temp, rho = 120),
+                            data = data,
+                            family = gaussian(),
+                            run_model = FALSE),
+               'variable y not found in data')
+})
+
+test_that("rho argument must be positive numeric", {
+  data = data.frame(out = rnorm(100),
+                    temp = rnorm(100),
+                    time = 1:100)
+  expect_error(mod <- mvgam(formula = out ~ dynamic(temp, rho = -1),
+                            data = data,
+                            family = gaussian(),
+                            run_model = FALSE),
+               'argument "rho" must be a positive value')
+})
+
 test_that("all series must have observations for all unique timepoints", {
   data <- sim_mvgam()
   data$data_train <- data$data_train[-2,]
