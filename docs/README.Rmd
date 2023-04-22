@@ -121,7 +121,7 @@ lynx_mvgam_prior <- mvgam(data = lynx_train,
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               chains = 2,
+               chains = 4,
                prior_simulation = TRUE)
 ```
 
@@ -131,19 +131,26 @@ lynx_mvgam_prior <- mvgam(data = lynx_train,
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               chains = 2,
+               chains = 4,
                prior_simulation = TRUE)
+```
+
+
+Plot empirical quantiles of the prior seasonal smooth function
+```{r}
+plot(lynx_mvgam_prior, type = 'smooths')
 ```
 
 Plot a set of realisations from the prior seasonal smooth function
 ```{r}
 plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE,
-     n_realisations = 30)
+     n_realisations = 20)
 ```
+
 These functions are showing the marginal contribution of the seasonal smooth function to the linear predictor (on the log scale), and they are clearly allowed to move into ridiculous spaces that we should give very little prior plausibility to:
 ```{r}
-exp(-17)
-exp(17)
+exp(-15)
+exp(15)
 ```
 
 Setting `k` to a smaller value results in less flexibility. This is because number of basis functions that contribute to functional behaviour is reduced
@@ -153,7 +160,7 @@ lynx_mvgam_prior <- mvgam(data = lynx_train,
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               chains = 2,
+               chains = 4,
                prior_simulation = TRUE)
 ```
 
@@ -163,14 +170,18 @@ lynx_mvgam_prior <- mvgam(data = lynx_train,
                knots = list(season = c(0.5, 19.5)),
                family = 'poisson',
                trend_model = 'AR3',
-               chains = 2,
+               chains = 4,
                prior_simulation = TRUE)
 ```
 
-Resulting prior realisations look more reasonable given the range of the observations, and there is clearly enough flexibility to support a wide range of functional shapes.
+The resulting prior looks more reasonable given the range of the observations, and there is clearly enough flexibility to support a wide range of functional shapes.
+```{r}
+plot(lynx_mvgam_prior, type = 'smooths')
+```
+
 ```{r}
 plot(lynx_mvgam_prior, type = 'smooths', realisations = TRUE,
-     n_realisations = 30)
+     n_realisations = 20)
 ```
 
 In practice, imparting domain knowledge into prior specifications for penalised smooth functions is challenging, as these behaviours are often the cumulative result of multiple penalty matrices that all have their own separate smoothing parameters. Changing the prior on the smoothing parameters is another option (`mvgam` uses a half-normal prior by default, which regularises functions more than the default approach used in `mgcv::jagam`). But without running through prior visualisations (and other prior pushforward checks) it will be more difficult to reason about how to set `k` to respect domain knowledge. In general it is highly recommended that users view `mvgam` and related interfaces such as `brms` as tools for building scaffold models that can then be modified to suit the bespoke needs of each particular analysis. 
@@ -353,7 +364,7 @@ mod <- mvgam(y ~ s(season),
              run_model = TRUE)
 ```
 
-Inspect the summary to see the posterior estimates for the `Beta` precision parameter
+Inspect the summary to see that the posterior now also contains estimates for the `Beta` precision parameters
 ```{r}
 summary(mod)
 ```
@@ -363,9 +374,10 @@ Plot the hindcast and forecast distributions for one series
 plot(mod, type = 'forecast', newdata = data$data_test, series = 2)
 ```
 
+## Dynamic coefficient models
 Dynamic fixed-effect coefficients (often referred to as dynamic linear models) can also be readily incorporated into GAMs / DGAMs. In `mvgam`, the `dynamic()` formula wrapper is used to set these up. The plan is to incorporate a range of dynamic options (such as random walk, ar1 etc...) but for the moment only low-rank Gaussian Process smooths are allowed (making use of the `gp` basis in `mgcv`). An example below illustrates:
   
-Simulate a time-varying coefficient using a squared exponential Gaussian Process function with length scale $\rho$`=6`
+Simulate a time-varying coefficient using a squared exponential Gaussian Process function with length scale $\rho$=10
 ```{r}
 set.seed(1111)
 N = 200
@@ -399,6 +411,10 @@ data_test <- data[191:200,]
 mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
              family = gaussian(),
              data = data_train)
+```
+
+Inspect the model summary, which now contains estimates for the observation errors
+```{r}
 summary(mod)
 ```
 
@@ -407,12 +423,12 @@ Plot the estimated time-varying coefficient for the in-sample training period
 plot(mod, type = 'smooths')
 ```
 
-Plot the estimates for the in-sample and out-of-sample periods to see how the Gaussian Process function produces sensible smooth forecasts. Overlay the true simulated function to see that the model has adequately estimated it's dynamics
+Plot the estimates for the in-sample and out-of-sample periods to see how the Gaussian Process function produces sensible smooth forecasts. Overlay the true simulated function to see that the model has adequately estimated it's dynamics in both the training and testing data partitions
 ```{r}
 plot_mvgam_smooth(mod, smooth = 1, newdata = data)
-abline(v = 180, lty = 'dashed', lwd = 2)
-lines(beta_temp, lwd = 2, col = 'white')
-lines(beta_temp, lwd = 1.5)
+abline(v = 190, lty = 'dashed', lwd = 2)
+lines(beta_temp, lwd = 2.5, col = 'white')
+lines(beta_temp, lwd = 2)
 ```
 
 This results in sensible forecasts of the observations as well
