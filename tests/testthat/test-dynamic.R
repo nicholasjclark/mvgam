@@ -1,21 +1,22 @@
 context("dynamic")
 
 test_that("dynamic to gp is working properly", {
-expect_match(attr(terms(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate, rho = 1),
+expect_match(attr(terms(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate, rho = 1,
+                                                                      stationary = FALSE),
                                                 N = 100)), 'term.labels'),
-             "s(time, by = covariate, bs = \"gp\", m = c(2, 1, 2), k = 50)",
+             's(time, by = covariate, bs = "gp", m = c(2, 1, 2), k = 50)',
              fixed = TRUE)
 
   # k will decrease as rho increases
   expect_match(attr(terms(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate, rho = 11),
                                                   N = 100)), 'term.labels'),
-               "s(time, by = covariate, bs = \"gp\", m = c(2, 11, 2), k = 11)",
+               's(time, by = covariate, bs = "gp", m = c(-2, 11, 2), k = 11)',
                fixed = TRUE)
 
   # k will be fixed at N if N <= 8
   expect_match(attr(terms(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate, rho = 5),
                                                   N = 7)), 'term.labels'),
-               "s(time, by = covariate, bs = \"gp\", m = c(2, 5, 2), k = 7)",
+               's(time, by = covariate, bs = "gp", m = c(-2, 5, 2), k = 7)',
                fixed = TRUE)
 })
 
