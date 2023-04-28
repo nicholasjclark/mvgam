@@ -43,9 +43,16 @@
 #'in \code{Stan} can support latent GP trends while estimation in \code{JAGS} cannot
 #'@details Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and
 #'altered. To make alterations, change the contents of the `prior` column and supplying this
-#'\code{data.frame} to the `mvgam` function using the argument `priors`
-#' @note Only the `prior` column of the output should be altered when defining
-#' the user-defined priors for the `mvgam` model
+#'\code{data.frame} to the `mvgam` function using the argument `priors`. If using `Stan` as the backend,
+#'users can also modify the parameter bounds by modifying the `new_lowerbound` and/or `new_upperbound` columns.
+#'This will be necessary if using restrictive distributions on some parameters, such as a Beta distribution
+#'for the trend sd parameters for example (Beta only has support on  \code{(0,1)}), so the upperbound cannot
+#'be above `1`
+#' @note Only the `prior`, `new_lowerbound` and/or `new_upperbound` columns of the output
+#' should be altered when defining the user-defined priors for the `mvgam` model. Use only if you are
+#' familiar with the underlying probabilistic programming language. There are no sanity checks done to
+#' ensure that the code is legal (i.e. to check that lower bounds are smaller than upper bounds, for
+#' example)
 #'@author Nicholas J Clark
 #'@seealso \code{\link{mvgam}}
 #'@return either a \code{data.frame} containing the prior definitions (if any suitable
@@ -178,7 +185,8 @@ get_mvgam_priors = function(formula,
   # Ensure each series has an observation, even if NA, for each
   # unique timepoint
   all_times_avail = function(time, min_time, max_time){
-    identical(sort(time), seq.int(from = min_time, to = max_time))
+    identical(as.numeric(sort(time)),
+              as.numeric(seq.int(from = min_time, to = max_time)))
   }
   min_time <- min(data_train$time)
   max_time <- max(data_train$time)
@@ -257,7 +265,7 @@ get_mvgam_priors = function(formula,
 
 
     if(use_stan){
-      sp_df <- data.frame(param_name = 'lambda<lower=0>',
+      sp_df <- data.frame(param_name = 'vector<lower=0>[n_sp] lambda;',
                           param_length = sum(smooth_labs$nsp),
                           param_info = c(paste(nonre_smooths,
                                                'smooth parameters',
@@ -289,8 +297,8 @@ get_mvgam_priors = function(formula,
     n_re_terms <- length(re_smooths)
 
     if(use_stan){
-      re_df <- data.frame(param_name = c('mu_raw',
-                                         'sigma_raw<lower=0>'),
+      re_df <- data.frame(param_name = c(paste0('vector[',n_re_terms,'] mu_raw;'),
+                                         paste0('vector<lower=0>[',n_re_terms,'] sigma_raw;')),
                           param_length = rep(n_re_terms, 2),
                           param_info = c(paste(re_smooths, 'pop mean',
                                                collapse = ', '),
@@ -390,8 +398,8 @@ get_mvgam_priors = function(formula,
 
   if(trend_model == 'GP'){
     if(use_lv){
-      trend_df <- data.frame(param_name = c('rho_gp<lower=0>'),
-                             param_length = length(unique(data_train$series)),
+      trend_df <- data.frame(param_name = c('vector<lower=0>[n_lv] rho_gp;'),
+                             param_length = n_lv,
                              param_info = c('trend length scale'),
                              prior = c('rho_gp ~ inv_gamma(1.499007, 5.670433);'),
                              example_change =
@@ -400,8 +408,8 @@ get_mvgam_priors = function(formula,
                                       ');'
                                ))
     } else {
-      trend_df <- data.frame(param_name = c('alpha_gp<lower=0>',
-                                            'rho_gp<lower=0>'),
+      trend_df <- data.frame(param_name = c('vector<lower=0>[n_series] alpha_gp;',
+                                            'vector<lower=0>[n_series] rho_gp;'),
                              param_length = length(unique(data_train$series)),
                              param_info = c('trend amplitude',
                                             'trend length scale'),
@@ -421,7 +429,7 @@ get_mvgam_priors = function(formula,
     }
 
     trend_df <- rbind(trend_df,
-                      data.frame(param_name = c('num_gp_basis<lower=1>'),
+                      data.frame(param_name = c('int<lower=1> num_gp_basis;'),
                                  param_length = 1,
                                  param_info = c('basis dimension for approximate GP'),
                                  prior = c('num_gp_basis = min(20, n);'),
@@ -430,17 +438,30 @@ get_mvgam_priors = function(formula,
 
   if(trend_model == 'RW'){
     if(use_stan){
-      trend_df <- data.frame(param_name = c('sigma<lower=0>'),
-                             param_length = length(unique(data_train$series)),
-                             param_info = c('trend sd'),
-                             prior = c('sigma ~ exponential(1);'),
-                             example_change = c(
-                               paste0('sigma ~ exponential(',
-                                      round(runif(min = 0.01, max = 1, n = 1), 2),
-                                      ');'
-                               )))
+      if(use_lv){
+        trend_df <- data.frame(param_name = c('vector<lower=0>[n_lv] sigma;'),
+                               param_length = n_lv,
+                               param_info = c('trend sd'),
+                               prior = c('sigma ~ exponential(1);'),
+                               example_change = c(
+                                 paste0('sigma ~ exponential(',
+                                        round(runif(min = 0.01, max = 1, n = 1), 2),
+                                        ');'
+                                 )))
+      } else {
+        trend_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma;'),
+                               param_length = length(unique(data_train$series)),
+                               param_info = c('trend sd'),
+                               prior = c('sigma ~ exponential(1);'),
+                               example_change = c(
+                                 paste0('sigma ~ exponential(',
+                                        round(runif(min = 0.01, max = 1, n = 1), 2),
+                                        ');'
+                                 )))
+      }
+
     } else {
-      trend_df <- data.frame(param_name = c('sigma<lower=0>'),
+      trend_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma'),
                              param_length = length(unique(data_train$series)),
                              param_info = 'trend sd (for each series s)',
                              prior = c('sigma[s] ~ dexp(1)T(0.075, 5)'),
@@ -454,7 +475,8 @@ get_mvgam_priors = function(formula,
   }
 
   if(trend_model == 'VAR1'){
-      trend_df <- data.frame(param_name = c('sigma<lower=0>', 'A<lower=-1,upper=1>'),
+      trend_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma;',
+                                            'matrix<lower=-1,upper=1>[n_series, n_series] A;'),
                              param_length = c(length(unique(data_train$series)),
                                               length(unique(data_train$series))^2),
                              param_info = c('trend sd', 'VAR1 coefficients'),
@@ -473,8 +495,12 @@ get_mvgam_priors = function(formula,
 
   if(trend_model == 'AR1'){
     if(use_stan){
-      trend_df <- data.frame(param_name = c('ar1',
-                                            'sigma<lower=0>'),
+      trend_df <- data.frame(param_name = c(paste0('vector<lower=-1.5,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar1;'),
+                                            paste0('vector<lower=0>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] sigma;')),
                              param_length = ifelse(use_lv,
                                                    n_lv,
                                                    length(unique(data_train$series))),
@@ -494,8 +520,12 @@ get_mvgam_priors = function(formula,
                                     ');'
                              )))
     } else {
-      trend_df <- data.frame(param_name = c('ar1',
-                                            'sigma<lower=0>'),
+      trend_df <- data.frame(param_name = c(paste0('vector<lower=-1.5,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar1;'),
+                                            paste0('vector<lower=0>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] sigma;')),
                              param_length = ifelse(use_lv,
                                                    n_lv,
                                                    length(unique(data_train$series))),
@@ -520,8 +550,15 @@ get_mvgam_priors = function(formula,
 
   if(trend_model == 'AR2'){
     if(use_stan){
-      trend_df <- data.frame(param_name = c('ar1', 'ar2',
-                                            'sigma<lower=0>'),
+      trend_df <- data.frame(param_name = c(paste0('vector<lower=-1.5,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar1;'),
+                                            paste0('vector<lower=-1.5,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar2;'),
+                                            paste0('vector<lower=0>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] sigma;')),
                              param_length = ifelse(use_lv,
                                                    n_lv,
                                                    length(unique(data_train$series))),
@@ -550,8 +587,15 @@ get_mvgam_priors = function(formula,
                                     ');'
                              )))
     } else {
-      trend_df <- data.frame(param_name = c('ar1', 'ar2',
-                                            'sigma<lower=0>'),
+      trend_df <- data.frame(param_name = c(paste0('vector<lower=-1.5,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar1;'),
+                                            paste0('vector<lower=-1.5,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar2;'),
+                                            paste0('vector<lower=0>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] sigma;')),
                              param_length = ifelse(use_lv,
                                                    n_lv,
                                                    length(unique(data_train$series))),
@@ -585,8 +629,18 @@ get_mvgam_priors = function(formula,
 
   if(trend_model == 'AR3'){
     if(use_stan){
-      trend_df <- data.frame(param_name = c('ar1', 'ar2', 'ar3',
-                                            'sigma<lower=0>'),
+      trend_df <- data.frame(param_name = c(paste0('vector<lower=-1.5,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar1;'),
+                                            paste0('vector<lower=-1.5,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar2;'),
+                                            paste0('vector<lower=-1.5,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar3;'),
+                                            paste0('vector<lower=0>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] sigma;')),
                              param_length = ifelse(use_lv,
                                                    n_lv,
                                                    length(unique(data_train$series))),
@@ -624,8 +678,18 @@ get_mvgam_priors = function(formula,
                                     ');'
                              )))
     } else {
-      trend_df <- data.frame(param_name = c('ar1', 'ar2', 'ar3',
-                                            'sigma<lower=0>'),
+      trend_df <- data.frame(param_name = c(paste0('vector<lower=-1.5,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar1;'),
+                                            paste0('vector<lower=-1.5,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar2;'),
+                                            paste0('vector<lower=-1.5,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar3;'),
+                                            paste0('vector<lower=0>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] sigma;')),
                              param_length = ifelse(use_lv,
                                                    n_lv,
                                                    length(unique(data_train$series))),
@@ -669,11 +733,13 @@ get_mvgam_priors = function(formula,
   # Remove options for trend variance priors if using a dynamic factor model
   if(use_lv){
     trend_df %>%
-      dplyr::filter(!grepl('sigma', param_name)) -> trend_df
+      dplyr::filter(!grepl(paste0('vector<lower=0>[',
+                                  ifelse(use_lv, 'n_lv', 'n_series'),
+                                  '] sigma;'), param_name)) -> trend_df
 
     if(use_stan){
       trend_df <- rbind(trend_df,
-                        data.frame(param_name = c('L'),
+                        data.frame(param_name = c('vector[M] L;'),
                                    param_length = n_lv * length(unique(data_train$series)),
                                    param_info = c('factor loadings'),
                                    prior = c('L ~ student_t(5, 0, 1);'),
@@ -684,7 +750,9 @@ get_mvgam_priors = function(formula,
   # Extract drift parameter information
   if(drift){
     if(use_stan){
-      drift_df <- data.frame(param_name = c('drift'),
+      drift_df <- data.frame(param_name = paste0('vector[',
+                                                 ifelse(use_lv, 'n_lv', 'n_series'),
+                                                 '] drift;'),
                              param_length = ifelse(use_lv,
                                                    n_lv,
                                                    length(unique(data_train$series))),
@@ -699,7 +767,9 @@ get_mvgam_priors = function(formula,
                                  ');'
                                )))
     } else {
-      drift_df <- data.frame(param_name = c('drift'),
+      drift_df <- data.frame(param_name = paste0('vector[',
+                                                 ifelse(use_lv, 'n_lv', 'n_series'),
+                                                 '] drift;'),
                              param_length = ifelse(use_lv,
                                                    n_lv,
                                                    length(unique(data_train$series))),
@@ -725,10 +795,15 @@ get_mvgam_priors = function(formula,
                                  data = data_train)
 
   # Return the dataframe of prior information
-  return(rbind(sp_df,
-               re_df,
-               trend_df,
-               drift_df,
-               family_df))
+  prior_df <- rbind(sp_df,
+                    re_df,
+                    trend_df,
+                    drift_df,
+                    family_df)
+
+  prior_df$new_lowerbound <- NA
+  prior_df$new_upperbound <- NA
+
+  return(prior_df)
 }
 

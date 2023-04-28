@@ -7,6 +7,10 @@
 #'set of outcome data
 #'@param fc_horizon \code{integer} specifying the length of the forecast horizon for evaluating forecasts
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
+#'@param score \code{character} specifying the type of ranked probability score to use for evaluation. Options are:
+#'`variogram`, `drps` or `crps`
+#'@param log \code{logical}. Should the scores be logged? This is often appropriate for comparing
+#'performance of models when series vary in their observation ranges
 #'@details `eval_mvgam` generates a set of samples representing fixed parameters estimated from the full
 #'\code{mvgam} model and latent trend states at a given point in time. The trends are rolled forward
 #'a total of \code{fc_horizon} timesteps according to their estimated state space dynamics to
@@ -25,13 +29,14 @@
 #'`compare_mvgams` automates the evaluation to compare two fitted models using rolling window forecast evaluation and
 #'provides a series of summary plots to facilitate model selection. It is essentially a wrapper for
 #'\code{roll_eval_mvgam}
-#'@return For `eval_mvgam`, a \code{list} object containing information on specific evaluations for each series.
+#'@return For `eval_mvgam`, a \code{list} object containing information on specific evaluations for each series
+#'(if using `drps` or `crps` as the score) or a vector of scores when using `variogram`.
 #'
 #'For `roll_eval_mvgam`, a \code{list} object containing information on specific evaluations for each series as well as
 #'a total evaluation summary (taken by summing the forecast score for each series at each evaluation and averaging
 #'the coverages at each evaluation)
 #'
-#'For `compare_mvgams`, a series of plots comparing forecast Rank Probability Scores (CRPS or DRPS) for each competing
+#'For `compare_mvgams`, a series of plots comparing forecast Rank Probability Scores for each competing
 #'model. A lower score is preferred. Note however that it is possible to select a model that ultimately
 #'would perform poorly in true out-of-sample forecasting. For example if a wiggly smooth function of 'year'
 #'is included in the model then this function will be learned prior to evaluating rolling window forecasts,
@@ -52,7 +57,9 @@ eval_mvgam = function(object,
                       n_samples = 5000,
                       eval_timepoint = 3,
                       fc_horizon = 3,
-                      n_cores = 2){
+                      n_cores = 2,
+                      score = 'drps',
+                      log = TRUE){
 
   # Check arguments
   if(class(object) != 'mvgam'){
@@ -117,46 +124,59 @@ eval_mvgam = function(object,
   }
 
   # Filter training data to correct point (just following evaluation timepoint)
-  if(class(object$obs_data)[1] == 'list'){
+  data.frame(time = object$obs_data$time,
+             series = object$obs_data$series) %>%
+    dplyr::mutate(row_number = dplyr::row_number()) %>%
+    dplyr::left_join(data.frame(time = object$obs_data$time,
+                                series = object$obs_data$series),
+                     by = c('time', 'series')) %>%
+    dplyr::arrange(time, series) %>%
+    dplyr::filter(time > (eval_timepoint) &
+                    time <= (eval_timepoint + fc_horizon)) %>%
+    dplyr::pull(row_number) -> assim_rows
 
-    times <- (data.frame(time = object$obs_data$time) %>%
-        dplyr::select(time) %>%
-        dplyr::distinct() %>%
-        dplyr::arrange(time) %>%
-        dplyr::mutate(time = dplyr::row_number())) %>%
-      dplyr::pull(time)
+  if(class(object$obs_data)[1] == 'list'){
 
     data_assim <- lapply(object$obs_data, function(x){
       if(is.matrix(x)){
-        matrix(x[which(times > (eval_timepoint) &
-                  times <= (eval_timepoint + fc_horizon)),],
+        matrix(x[assim_rows, ],
                ncol = NCOL(x))
       } else {
-        x[which(times > (eval_timepoint) &
-                  times <= (eval_timepoint + fc_horizon))]
+        x[assim_rows]
       }
 
     })
 
 
   } else {
-    (object$obs_data %>%
-       dplyr::select(time) %>%
-       dplyr::distinct() %>%
-       dplyr::arrange(time) %>%
-       dplyr::mutate(time = dplyr::row_number())) %>%
-      dplyr::left_join(object$obs_data,
-                       by = c('time')) %>%
-      dplyr::arrange(time, series) %>%
-      dplyr::filter(time > (eval_timepoint ) &
-                      time <= (eval_timepoint + fc_horizon)) -> data_assim
+    object$obs_data[assim_rows, ] -> data_assim
   }
 
+  # Generate linear predictor matrix from fitted mgcv model
+  suppressWarnings(Xp  <- try(predict(object$mgcv_model,
+                                      newdata = data_assim,
+                                      type = 'lpmatrix'),
+                              silent = TRUE))
 
-  # Linear predictor matrix for the evaluation observations
-  Xp <- predict(object$mgcv_model,
-                       newdata = data_assim,
-                       type = 'lpmatrix')
+  if(inherits(Xp, 'try-error')){
+    testdat <- data.frame(series = data_assim$series)
+
+    terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients)
+                                                                 %in% '(Intercept)')]
+    if(length(terms_include) > 0){
+      newnames <- vector()
+      newnames[1] <- 'series'
+      for(i in 1:length(terms_include)){
+        testdat <- cbind(testdat, data.frame(data_assim[[terms_include[i]]]))
+        newnames[i+1] <- terms_include[i]
+      }
+      colnames(testdat) <- newnames
+    }
+
+    suppressWarnings(Xp  <- predict(object$mgcv_model,
+                                    newdata = testdat,
+                                    type = 'lpmatrix'))
+  }
 
   # Beta coefficients for GAM component
   betas <- mvgam:::mcmc_chains(object$model_output, 'b')
@@ -181,7 +201,6 @@ eval_mvgam = function(object,
   } else {
     sample_seq <- sample(seq_len(dim(betas)[1]), size = n_samples, replace = T)
   }
-
 
   #### 2. Run trends forward fc_horizon steps to generate the forecast distribution ####
   use_lv <- object$use_lv
@@ -271,7 +290,7 @@ eval_mvgam = function(object,
         })
         names(family_extracts) <- names(family_pars)
 
-        mvgam_predict(family = family,
+        mvgam:::mvgam_predict(family = family,
                       Xp = Xpmat,
                       type = 'response',
                       betas = c(betas, 1),
@@ -324,7 +343,7 @@ eval_mvgam = function(object,
 
         } else {
           # Propagate the series-specific trends forward
-          out <- forecast_trend(trend_model = trend_model,
+          out <- mvgam:::forecast_trend(trend_model = trend_model,
                                 use_lv = FALSE,
                                 trend_pars = trend_extracts,
                                 h = fc_horizon)
@@ -349,7 +368,7 @@ eval_mvgam = function(object,
         })
         names(family_extracts) <- names(family_pars)
 
-        mvgam_predict(family = family,
+        mvgam:::mvgam_predict(family = family,
                       Xp = Xpmat,
                       type = 'response',
                       betas = c(betas, 1),
@@ -360,7 +379,6 @@ eval_mvgam = function(object,
     })
   }
 
-
   # Final forecast distribution
   series_fcs <- lapply(seq_len(n_series), function(series){
     indexed_forecasts <- do.call(rbind, lapply(seq_along(draw_fcs), function(x){
@@ -370,35 +388,70 @@ eval_mvgam = function(object,
   })
   names(series_fcs) <- levels(data_assim$series)
 
-  # Evaluate against the truth
-  series_truths <- lapply(seq_len(n_series), function(series){
-    if(class(object$obs_data)[1] == 'list'){
-      data_assim[['y']][which(as.numeric(data_assim$series) == series)]
+  # If variogram score is chosen
+  if(score == 'variogram'){
+
+    # Get truths (out of sample) into correct format
+    truths <- do.call(rbind, lapply(seq_len(n_series), function(series){
+      s_name <- levels(data_assim$series)[series]
+      data.frame(series = data_assim$series,
+                 y = data_assim$y,
+                 time = data_assim$time) %>%
+        dplyr::filter(series == s_name) %>%
+        dplyr::select(time, y) %>%
+        dplyr::distinct() %>%
+        dplyr::arrange(time) %>%
+        dplyr::pull(y)
+    }))
+
+    if(log){
+      series_score <- log(mvgam:::variogram_mcmc_object(truths = truths,
+                                                    fcs = series_fcs) + 0.0001)
     } else {
-      data_assim[which(as.numeric(data_assim$series) == series),'y']
+      series_score <- mvgam:::variogram_mcmc_object(truths = truths,
+                                                    fcs = series_fcs)
     }
 
-  })
+  }
 
-  # Calculate score and interval coverage per series
-  if(object$family %in% c('poisson', 'negative binomial')){
-    series_score <- lapply(seq_len(n_series), function(series){
-      DRPS <- data.frame(drps_mcmc_object(as.vector(as.matrix(series_truths[[series]])),
-                                          series_fcs[[series]]))
-      colnames(DRPS) <- c('score','in_interval')
-      DRPS$eval_horizon <- seq(1, fc_horizon)
-      DRPS
+  # If not using variogram score
+  if(score != 'variogram'){
+
+    # Evaluate against the truth
+    series_truths <- lapply(seq_len(n_series), function(series){
+      if(class(object$obs_data)[1] == 'list'){
+        data_assim[['y']][which(as.numeric(data_assim$series) == series)]
+      } else {
+        data_assim[which(as.numeric(data_assim$series) == series),'y']
+      }
     })
-    names(series_score) <- levels(data_assim$series)
-  } else {
-    series_score <- lapply(seq_len(n_series), function(series){
-      CRPS <- data.frame(crps_mcmc_object(as.vector(as.matrix(series_truths[[series]])),
-                                          series_fcs[[series]]))
-      colnames(CRPS) <- c('score','in_interval')
-      CRPS$eval_horizon <- seq(1, fc_horizon)
-      CRPS
-    })
-    names(series_score) <- levels(data_assim$series)
+
+    # Calculate score and interval coverage per series
+    if(object$family %in% c('poisson', 'negative binomial')){
+      series_score <- lapply(seq_len(n_series), function(series){
+        DRPS <- data.frame(drps_mcmc_object(as.vector(as.matrix(series_truths[[series]])),
+                                            series_fcs[[series]]))
+        colnames(DRPS) <- c('score','in_interval')
+        if(log){
+          DRPS$score <- log(DRPS$score + 0.0001)
+        }
+        DRPS$eval_horizon <- seq(1, fc_horizon)
+        DRPS
+      })
+      names(series_score) <- levels(data_assim$series)
+    } else {
+      series_score <- lapply(seq_len(n_series), function(series){
+        CRPS <- data.frame(crps_mcmc_object(as.vector(as.matrix(series_truths[[series]])),
+                                            series_fcs[[series]]))
+        colnames(CRPS) <- c('score','in_interval')
+        if(log){
+          CRPS$score <- log(CRPS$score + 0.0001)
+        }
+        CRPS$eval_horizon <- seq(1, fc_horizon)
+        CRPS
+      })
+      names(series_score) <- levels(data_assim$series)
+    }
   }
 
   return(series_score)
@@ -422,7 +475,9 @@ roll_eval_mvgam = function(object,
                            evaluation_seq,
                            n_samples = 5000,
                            fc_horizon = 3,
-                           n_cores = 2){
+                           n_cores = 2,
+                           score = 'drps',
+                           log = TRUE){
 
   # Check arguments
   if(class(object) != 'mvgam'){
@@ -476,7 +531,9 @@ roll_eval_mvgam = function(object,
                         'object',
                         'n_samples',
                         'fc_horizon',
-                        'eval_mvgam'),
+                        'eval_mvgam',
+                        'score',
+                        'log'),
                 envir = environment())
   parallel::clusterEvalQ(cl, library(mgcv))
   parallel::clusterEvalQ(cl, library(rstan))
@@ -487,7 +544,9 @@ roll_eval_mvgam = function(object,
                n_samples = n_samples,
                n_cores = 1,
                eval_timepoint = timepoint,
-               fc_horizon = fc_horizon)
+               fc_horizon = fc_horizon,
+               score = score,
+               log = log)
   },
   cl = cl)
   stopCluster(cl)
@@ -501,33 +560,61 @@ roll_eval_mvgam = function(object,
     }
   }
 
-  evals_df <- do.call(rbind, do.call(rbind, evals)) %>%
-    dplyr::group_by(eval_horizon) %>%
-    dplyr::summarise(score = sum_or_na(score),
-                     in_interval = mean(in_interval, na.rm = T))
+  if(score == 'variogram'){
+    eval_horizons <- do.call(rbind, lapply(seq_along(evals), function(x){
+      data.frame(seq_along(evals[[x]]))
+    }))
 
-  # Calculate summary statistics for each series
-  tidy_evals <- lapply(seq_len(length(levels(object$obs_data$series))), function(series){
-    all_evals <- do.call(rbind, purrr::map(evals, levels(object$obs_data$series)[series]))
-    list(sum_drps = sum_or_na(all_evals$score),
-         score_summary = summary(all_evals$score),
-         score_horizon_summary = all_evals %>%
-           dplyr::group_by(eval_horizon) %>%
-           dplyr::summarise(mean_score = mean(score, na.rm = T)),
-         interval_coverage = mean(all_evals$in_interval, na.rm = T),
-         all_scores = all_evals)
+    scores <- do.call(rbind, lapply(seq_along(evals), function(x){
+      data.frame(evals[[x]])
+    }))
 
-  })
-  names(tidy_evals) <- levels(object$obs_data$series)
+    evals_df <- data.frame(score = scores,
+                           eval_horizon = eval_horizons,
+                           in_interval = NA)
+    colnames(evals_df) <- c('score', 'eval_horizon', 'in_interval')
 
-  # Return series-specific summaries and the total summary statistics
-  return(list(sum_score = sum_or_na(evals_df$score),
-              score_summary = summary(evals_df$score),
-              score_horizon_summary = evals_df %>%
-                dplyr::group_by(eval_horizon) %>%
-                dplyr::summarise(mean_score = mean(score, na.rm = T)),
-              interval_coverage = mean(evals_df$in_interval, na.rm = T),
-              series_evals = tidy_evals))
+    # Calculate summary statistics for each series
+    out <- list(sum_score = sum_or_na(evals_df$score),
+                score_summary = summary(evals_df$score),
+                score_horizon_summary = evals_df %>%
+                  dplyr::group_by(eval_horizon) %>%
+                  dplyr::summarise(median_score = median(score, na.rm = T)),
+                interval_coverage = NA,
+                series_evals = NA,
+                all_scores = evals_df)
+
+  } else {
+    evals_df <- do.call(rbind, do.call(rbind, evals)) %>%
+      dplyr::group_by(eval_horizon) %>%
+      dplyr::summarise(score = sum_or_na(score),
+                       in_interval = mean(in_interval, na.rm = T))
+
+    # Calculate summary statistics for each series
+    tidy_evals <- lapply(seq_len(length(levels(object$obs_data$series))), function(series){
+      all_evals <- do.call(rbind, purrr::map(evals, levels(object$obs_data$series)[series]))
+      list(sum_drps = sum_or_na(all_evals$score),
+           score_summary = summary(all_evals$score),
+           score_horizon_summary = all_evals %>%
+             dplyr::group_by(eval_horizon) %>%
+             dplyr::summarise(median_score = mean(score, na.rm = T)),
+           interval_coverage = mean(all_evals$in_interval, na.rm = T),
+           all_scores = all_evals)
+
+    })
+    names(tidy_evals) <- levels(object$obs_data$series)
+
+    out <- list(sum_score = sum_or_na(evals_df$score),
+                score_summary = summary(evals_df$score),
+                score_horizon_summary = evals_df %>%
+                  dplyr::group_by(eval_horizon) %>%
+                  dplyr::summarise(median_score = median(score, na.rm = T)),
+                interval_coverage = mean(evals_df$in_interval, na.rm = T),
+                series_evals = tidy_evals)
+  }
+
+  # Return score summary statistics
+  return(out)
 
 }
 
@@ -548,7 +635,9 @@ compare_mvgams = function(model1,
                           n_samples = 1000,
                           fc_horizon = 3,
                           n_evaluations = 10,
-                          n_cores = 2){
+                          n_cores = 2,
+                          score = 'drps',
+                          log = TRUE){
 
   # Check arguments
   if(class(model1) != 'mvgam'){
@@ -594,23 +683,29 @@ compare_mvgams = function(model1,
                                n_samples = n_samples,
                                fc_horizon = fc_horizon,
                                n_cores = n_cores,
-                               n_evaluations = n_evaluations)
+                               n_evaluations = n_evaluations,
+                               score = score,
+                               log = log)
   mod2_eval <- roll_eval_mvgam(model2,
                                n_samples = n_samples,
                                fc_horizon = fc_horizon,
                                n_cores = n_cores,
-                               n_evaluations = n_evaluations)
+                               n_evaluations = n_evaluations,
+                               score = score,
+                               log = log)
 
-  # Generate a simple summary of forecast DRPS for each model
+  # Generate a simple summary of forecast scores for each model
   model_summary <- rbind(mod1_eval$score_summary, mod2_eval$score_summary)
   rownames(model_summary) <- c('Model 1', 'Model 2')
   cat('RPS summaries per model (lower is better)\n')
   print(model_summary)
 
   # Print 90% interval coverages for each model
-  cat('\n90% interval coverages per model (closer to 0.9 is better)\n')
-  cat('Model 1', mod1_eval$interval_coverage, '\n')
-  cat('Model 2', mod2_eval$interval_coverage)
+  if(score != 'variogram'){
+    cat('\n90% interval coverages per model (closer to 0.9 is better)\n')
+    cat('Model 1', mod1_eval$interval_coverage, '\n')
+    cat('Model 2', mod2_eval$interval_coverage)
+  }
 
   # Set up plotting loop and return summary plots of DRPS
   ask <- TRUE
@@ -631,14 +726,17 @@ compare_mvgams = function(model1,
       axis(side = 2, lwd = 2)
       axis(side = 1, at = c(1, 2), labels = c('model 1', 'model 2'), lwd = 0)
     } else {
-      plot_dat <- rbind(mod1_eval$score_horizon_summary$mean_score,
-                        mod2_eval$score_horizon_summary$mean_score)
+      plot_dat <- rbind(mod1_eval$score_horizon_summary$median_score,
+                        mod2_eval$score_horizon_summary$median_score)
       colnames(plot_dat) <- seq(1:NCOL(plot_dat))
+
+      ylim = c(min(0, min(plot_dat, na.rm = TRUE)), max(plot_dat, na.rm = T) * 1.4)
+
       barplot(plot_dat,
-              ylim = c(0, max(plot_dat, na.rm = T) * 1.5),
+              ylim = ylim,
               beside = T,
               xlab = 'Forecast horizon',
-              ylab = 'Mean RPS',
+              ylab = 'Median RPS',
               col = c("#B97C7C",  "#7C0000"),
               lwd = 2,
               border = NA,
@@ -715,6 +813,45 @@ drps_score <- function(truth, fc, interval_width = 0.9){
                        na.rm = TRUE)
   in_interval <- ifelse(truth <= interval[2] & truth >= interval[1], 1, 0)
   return(c(score, in_interval))
+}
+
+#' Compute the variogram score, using the median pairwise difference
+#' from the forecast distribution (scoringRules::vs_sample uses the
+#' mean, which is not appropriate for skewed distributions)
+#' @noRd
+variogram_score = function(truth, fc){
+  out <- matrix(NA, length(truth), length(truth))
+  for(i in 1:length(truth)){
+    for(j in 1:length(truth)){
+      if(i == j){
+        out[i,j] <- 0
+      } else {
+        v_fc <- quantile(abs(fc[i,] - fc[j,]) ^ 0.5, 0.5)
+        v_dat <- abs(truth[i] - truth[j]) ^ 0.5
+        out[i,j] <- 2 * ((v_dat - v_fc) ^ 2)
+      }
+    }
+  }
+  # Divide by two as we have (inefficiently) computed each pairwise
+  # comparison twice
+  score <- sum(out) / 2
+
+}
+
+#' Wrapper to calculate variogram score on all observations in fc_horizon
+#' @noRd
+variogram_mcmc_object <- function(truths, fcs){
+  fc_horizon <- length(fcs[[1]][1,])
+  fcs_per_horizon <- lapply(seq_len(fc_horizon), function(horizon){
+    do.call(rbind, lapply(seq_along(fcs), function(fc){
+      fcs[[fc]][,horizon]
+    }))
+  })
+
+  unlist(lapply(seq_len(fc_horizon), function(horizon){
+    variogram_score(truth = truths[,horizon],
+                    fc = fcs_per_horizon[[horizon]])
+  }))
 }
 
 # Wrapper to calculate scores on all observations in fc_horizon

@@ -16,7 +16,7 @@ squared exponential Gaussian Process smooth. See \code{\link[mcgv]{gp.smooth}} f
 smooth will not have a linear trend component. If \code{FALSE},
 a linear trend in the covariate is added to the Gaussian Process smooth. Leave at \code{TRUE}
 if you do not believe the coefficient is evolving with much trend, as the linear component of the
-basis functions can be hard to penalize to zero. This sometimes causes divergence issues in \code{Stan}
+basis functions can be hard to penalize to zero. This sometimes causes divergence issues in \code{Stan}.
 See \code{\link[mcgv]{gp.smooth}} for details}
 }
 \description{

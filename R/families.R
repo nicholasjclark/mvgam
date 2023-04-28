@@ -398,16 +398,9 @@ family_inits = function(family, trend_model,
   # as there is a risk the user will place bounds on priors that conflict
   # with the inits. Just let Stan choose reasonable and diffuse inits,
   # this is better anyway for sampling
-  if(smooths_included){
-    inits <- function() {
-      list(b_raw = runif(model_data$num_basis, -2, 2),
-           lambda = runif(model_data$n_sp, 5, 25))
-    }
-  } else {
     inits <- function() {
       list(b_raw = runif(model_data$num_basis, -2, 2))
     }
-  }
   return(inits)
 }
 
@@ -440,7 +433,7 @@ extract_family_pars = function(object){
 #' @noRd
 family_prior_info = function(family, use_stan, data){
   if(family == 'gaussian'){
-    prior_df <- data.frame(param_name = c('sigma_obs<lower=0>'),
+    prior_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma_obs;'),
                           param_length = length(unique(data$series)),
                           param_info = c('observation error sd'),
                           prior = c('sigma_obs ~ student_t(3, 0, 2);'),
@@ -455,7 +448,7 @@ family_prior_info = function(family, use_stan, data){
   }
 
   if(family == 'lognormal'){
-    prior_df <- data.frame(param_name = c('sigma_obs<lower=0>'),
+    prior_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma_obs;'),
                            param_length = length(unique(data$series)),
                            param_info = c('log(observation error sd)'),
                            prior = c('sigma_obs ~ student_t(3, 0, 1);'),
@@ -470,8 +463,8 @@ family_prior_info = function(family, use_stan, data){
   }
 
   if(family == 'student'){
-    prior_df <- data.frame(param_name = c('sigma_obs<lower=0>',
-                                          'nu<lower=0'),
+    prior_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma_obs;',
+                                          'vector<lower=0>[n_series] nu;'),
                            param_length = rep(length(unique(data$series)),
                                               2),
                            param_info = c('observation error sd',
@@ -496,7 +489,7 @@ family_prior_info = function(family, use_stan, data){
   }
 
   if(family == 'beta'){
-    prior_df <- data.frame(param_name = c('phi<lower=0>'),
+    prior_df <- data.frame(param_name = c('vector<lower=0>[n_series] phi;'),
                            param_length = length(unique(data$series)),
                            param_info = c('Beta precision parameter'),
                            prior = c('phi ~ gamma(0.01, 0.01);'),
@@ -512,7 +505,7 @@ family_prior_info = function(family, use_stan, data){
 
   if(family == 'negative binomial'){
     if(use_stan){
-      prior_df <- data.frame(param_name = c('phi_inv<lower=0>'),
+      prior_df <- data.frame(param_name = c('vector<lower=0>[n_series] phi_inv;'),
                           param_length = length(unique(data$series)),
                           param_info = c('inverse of NB dispsersion'),
                           prior = c('phi_inv ~ student_t(3, 0, 0.1);'),
@@ -525,7 +518,7 @@ family_prior_info = function(family, use_stan, data){
                               ');'
                             )))
     } else {
-      prior_df <- data.frame(param_name = c('phi_inv<lower=0>'),
+      prior_df <- data.frame(param_name = c('vector<lower=0>[n_series] phi_inv;'),
                           param_length = length(unique(data$series)),
                           param_info = c('inverse of NB dispsersion'),
                           prior = c('phi_inv[s] ~ dexp(5)'),
@@ -542,7 +535,7 @@ family_prior_info = function(family, use_stan, data){
   }
 
   if(family == 'tweedie'){
-    prior_df<- data.frame(param_name = c('phi_raw'),
+    prior_df<- data.frame(param_name = c('vector<lower=0>[n_series] phi_raw;'),
                         param_length = length(unique(data$series)),
                         param_info = c('log of Tweedie dispsersion (for each series s)'),
                         prior = c('phi_raw[s] ~ dnorm(0, 2)T(-3.5, 3.5)'),

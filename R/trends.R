@@ -103,12 +103,12 @@ sim_var1 = function(drift, A, Sigma, last_trends, h){
   # Last estimate in time is where the series will start
   states <- matrix(NA, nrow = h + 1, ncol = NCOL(A))
   states[1, ] <- last_trends
+  errors <- MASS::mvrnorm(h + 1, mu = rep(0, NROW(A)),
+                          Sigma = Sigma)
 
   # Stochastic realisations
   for (t in 2:(h + 1)) {
-    states[t, ] <- MASS::mvrnorm(1,
-                                  mu = A %*% states[t-1,] + drift,
-                                  Sigma = Sigma)
+    states[t, ] <- A %*% states[t-1,] + drift + errors[t, ]
   }
 
   # Return state estimates

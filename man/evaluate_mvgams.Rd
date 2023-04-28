@@ -12,7 +12,9 @@ eval_mvgam(
   n_samples = 5000,
   eval_timepoint = 3,
   fc_horizon = 3,
-  n_cores = 2
+  n_cores = 2,
+  score = "drps",
+  log = TRUE
 )
 
 roll_eval_mvgam(
@@ -21,7 +23,9 @@ roll_eval_mvgam(
   evaluation_seq,
   n_samples = 5000,
   fc_horizon = 3,
-  n_cores = 2
+  n_cores = 2,
+  score = "drps",
+  log = TRUE
 )
 
 compare_mvgams(
@@ -30,7 +34,9 @@ compare_mvgams(
   n_samples = 1000,
   fc_horizon = 3,
   n_evaluations = 10,
-  n_cores = 2
+  n_cores = 2,
+  score = "drps",
+  log = TRUE
 )
 }
 \arguments{
@@ -46,6 +52,12 @@ set of outcome data}
 
 \item{n_cores}{\code{integer} specifying number of cores for generating particle forecasts in parallel}
 
+\item{score}{\code{character} specifying the type of ranked probability score to use for evaluation. Options are:
+\code{variogram}, \code{drps} or \code{crps}}
+
+\item{log}{\code{logical}. Should the scores be logged? This is often appropriate for comparing
+performance of models when series vary in their observation ranges}
+
 \item{n_evaluations}{\code{integer} specifying the total number of evaluations to perform}
 
 \item{evaluation_seq}{Optional \code{integer sequence} specifying the exact set of timepoints for
@@ -59,13 +71,14 @@ evaluated}
 evaluated}
 }
 \value{
-For \code{eval_mvgam}, a \code{list} object containing information on specific evaluations for each series.
+For \code{eval_mvgam}, a \code{list} object containing information on specific evaluations for each series
+(if using \code{drps} or \code{crps} as the score) or a vector of scores when using \code{variogram}.
 
 For \code{roll_eval_mvgam}, a \code{list} object containing information on specific evaluations for each series as well as
 a total evaluation summary (taken by summing the forecast score for each series at each evaluation and averaging
 the coverages at each evaluation)
 
-For \code{compare_mvgams}, a series of plots comparing forecast Rank Probability Scores (CRPS or DRPS) for each competing
+For \code{compare_mvgams}, a series of plots comparing forecast Rank Probability Scores for each competing
 model. A lower score is preferred. Note however that it is possible to select a model that ultimately
 would perform poorly in true out-of-sample forecasting. For example if a wiggly smooth function of 'year'
 is included in the model then this function will be learned prior to evaluating rolling window forecasts,

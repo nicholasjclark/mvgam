@@ -391,7 +391,7 @@ mvgam = function(formula,
   }
 
   # Validate the family argument
-  family <- evaluate_family(family)
+  family <- mvgam:::evaluate_family(family)
   family_char <- match.arg(arg = family$family,
                            choices = c('negative binomial',
                                        "poisson",
@@ -403,7 +403,7 @@ mvgam = function(formula,
                                        "Gamma"))
 
   # Validate the trend argument
-  trend_model <- evaluate_trend_model(trend_model)
+  trend_model <- mvgam:::evaluate_trend_model(trend_model)
 
   if(sign(chains) != 1){
     stop('argument "chains" must be a positive integer',
@@ -516,7 +516,8 @@ mvgam = function(formula,
   # Ensure each series has an observation, even if NA, for each
   # unique timepoint
   all_times_avail = function(time, min_time, max_time){
-    identical(sort(time), seq.int(from = min_time, to = max_time))
+    identical(as.numeric(sort(time)),
+              as.numeric(seq.int(from = min_time, to = max_time)))
   }
   min_time <- min(data_train$time)
   max_time <- max(data_train$time)
@@ -800,10 +801,10 @@ mvgam = function(formula,
 
   # Modify observation distribution lines
   if(family_char == 'tweedie'){
-    model_file <- add_tweedie_lines(model_file, upper_bounds = upper_bounds)
+    model_file <- mvgam:::add_tweedie_lines(model_file, upper_bounds = upper_bounds)
 
   } else if(family_char == 'poisson'){
-    model_file <- add_poisson_lines(model_file, upper_bounds = upper_bounds)
+    model_file <- mvgam:::add_poisson_lines(model_file, upper_bounds = upper_bounds)
 
   } else {
     if(missing(upper_bounds)){
@@ -1152,14 +1153,14 @@ mvgam = function(formula,
     unlink('base_gam.txt')
     if(use_stan){
       # Import the base Stan model file
-      modification <- add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
+      modification <- mvgam:::add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
       unlink('base_gam_stan.txt')
       cat(modification, file = 'base_gam_stan.txt', sep = '\n', append = T)
       base_stan_model <- trimws(suppressWarnings(readLines('base_gam_stan.txt')))
       unlink('base_gam_stan.txt')
 
       # Add necessary trend structure
-      base_stan_model <- add_trend_lines(model_file = base_stan_model,
+      base_stan_model <- mvgam:::add_trend_lines(model_file = base_stan_model,
                                          use_lv = use_lv,
                                          stan = TRUE,
                                          trend_model = if(trend_model %in% c('RW', 'VAR1')){'RW'} else {trend_model},
@@ -1167,13 +1168,13 @@ mvgam = function(formula,
 
       # Add remaining data, model and parameters blocks to the Stan model file;
       # gather Stan data structure
-      stan_objects <- add_stan_data(jags_file = trimws(model_file),
-                                    stan_file = base_stan_model,
-                                    use_lv = use_lv,
-                                    n_lv = n_lv,
-                                    jags_data = ss_jagam$jags.data,
-                                    family = family_char,
-                                    upper_bounds = upper_bounds)
+      stan_objects <- mvgam:::add_stan_data(jags_file = trimws(model_file),
+                                            stan_file = base_stan_model,
+                                            use_lv = use_lv,
+                                            n_lv = n_lv,
+                                            jags_data = ss_jagam$jags.data,
+                                            family = family_char,
+                                            upper_bounds = upper_bounds)
 
       if(use_lv){
         stan_objects$model_data$n_lv <- n_lv
@@ -1193,7 +1194,7 @@ mvgam = function(formula,
 
       if(!missing(priors)){
         vectorised$model_file <- update_priors(vectorised$model_file,
-                                                priors)
+                                                priors, use_stan = TRUE)
       }
 
 
@@ -1227,7 +1228,7 @@ mvgam = function(formula,
       inits <- initlist
 
       if(!missing(priors)){
-        model_file <- update_priors(model_file, priors)
+        model_file <- update_priors(model_file, priors, use_stan = FALSE)
       }
 
       output <- structure(list(call = orig_formula,
@@ -1256,16 +1257,6 @@ mvgam = function(formula,
       fit_engine <- 'stan'
       use_cmdstan <- FALSE
 
-      # Set monitor parameters
-      param <- get_monitor_pars(family = family_char,
-                                use_lv = use_lv,
-                                trend_model = trend_model,
-                                smooths_included = smooths_included,
-                                drift = drift)
-      if(any(smooth_labs$class == 'random.effect')){
-        param <- c(param, 'mu_raw', 'sigma_raw')
-      }
-
       # Import the base Stan model file
       modification <- add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
       unlink('base_gam_stan.txt')
@@ -1290,6 +1281,16 @@ mvgam = function(formula,
                                     family = family_char,
                                     upper_bounds = upper_bounds)
 
+      # Set monitor parameters
+      param <- get_monitor_pars(family = family_char,
+                                use_lv = use_lv,
+                                trend_model = trend_model,
+                                smooths_included = stan_objects$smooths_included,
+                                drift = drift)
+      if(any(smooth_labs$class == 'random.effect')){
+        param <- c(param, 'mu_raw', 'sigma_raw')
+      }
+
       model_data <- stan_objects$model_data
       if(use_lv){
         model_data$n_lv <- n_lv
@@ -1309,7 +1310,8 @@ mvgam = function(formula,
                                        offset = offset)
 
       if(!missing(priors)){
-        vectorised$model_file <- update_priors(vectorised$model_file, priors)
+        vectorised$model_file <- update_priors(vectorised$model_file, priors,
+                                               use_stan = TRUE)
       }
 
 
@@ -1451,7 +1453,7 @@ mvgam = function(formula,
       require(runjags)
 
       if(!missing(priors)){
-        model_file <- update_priors(model_file, priors)
+        model_file <- update_priors(model_file, priors, use_stan = FALSE)
       }
 
       fit_engine <- 'jags'

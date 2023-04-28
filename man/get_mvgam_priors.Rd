@@ -75,11 +75,18 @@ changed for a given \code{mvgam} model, as well listing their default distributi
 \details{
 Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and
 altered. To make alterations, change the contents of the \code{prior} column and supplying this
-\code{data.frame} to the \code{mvgam} function using the argument \code{priors}
+\code{data.frame} to the \code{mvgam} function using the argument \code{priors}. If using \code{Stan} as the backend,
+users can also modify the parameter bounds by modifying the \code{new_lowerbound} and/or \code{new_upperbound} columns.
+This will be necessary if using restrictive distributions on some parameters, such as a Beta distribution
+for the trend sd parameters for example (Beta only has support on  \code{(0,1)}), so the upperbound cannot
+be above \code{1}
 }
 \note{
-Only the \code{prior} column of the output should be altered when defining
-the user-defined priors for the \code{mvgam} model
+Only the \code{prior}, \code{new_lowerbound} and/or \code{new_upperbound} columns of the output
+should be altered when defining the user-defined priors for the \code{mvgam} model. Use only if you are
+familiar with the underlying probabilistic programming language. There are no sanity checks done to
+ensure that the code is legal (i.e. to check that lower bounds are smaller than upper bounds, for
+example)
 }
 \examples{
 # Simulate three integer-valued time series

@@ -162,7 +162,7 @@ if(any(!is.na(object$sp_names))){
       dplyr::filter(class == 'random.effect') %>%
       dplyr::pull(label)
 
-  print(rho_coefs[!rho_names %in% re_smooths,])
+  print(rho_coefs[!rownames(rho_coefs) %in% re_smooths,])
 
   } else {
     print(rho_coefs)

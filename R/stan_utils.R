@@ -1808,8 +1808,9 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
       paste0('\n// latent trend VAR1 terms\n',
              'matrix<lower=-1,upper=1>[n_series, n_series] A;\n')
     model_file = readLines(textConnection(model_file), n = -1)
-    model_file[grep('vector[num_basis] b;', model_file, fixed = TRUE) + 1] <-
-      paste0('\n// trend estimates in matrix-form\n',
+    model_file[grep('vector[num_basis] b;', model_file, fixed = TRUE)] <-
+      paste0('vector[num_basis] b;',
+             '\n// trend estimates in matrix-form\n',
              'matrix[n, n_series] trend;\n',
              '\nfor(i in 1:n){\n',
              'trend[i, 1:n_series] = to_row_vector(trend_raw[i]);\n',

@@ -240,8 +240,9 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
     jags_smooth_text <- gsub('dexp', 'exponential', jags_smooth_text)
 
     any_ks <- any(grep('K.* <- ', jags_smooth_text))
+    any_timevarying <- any(grep('// prior for s(time):', jags_smooth_text, fixed = TRUE))
     if(any_ks ||
-       any(grep('// prior for s(time):', jags_smooth_text, fixed = TRUE))){
+       any_timevarying){
 
       if(any(grep('K.* <- ', jags_smooth_text))){
         K_starts <- grep('K.* <- ', jags_smooth_text)
@@ -280,9 +281,17 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
 
     # If there are no K terms but there are time-varying, we don't need
     # the zero vector
-    if(!any_ks){
+    if(any_timevarying & !any_ks){
       stan_file <- stan_file[-grep('vector[num_basis] zero; //', stan_file,
                                    fixed = TRUE)]
+    }
+
+    # Create a new smooths_included check after working through the
+    # random effects
+    if(!any_timevarying & !any_ks){
+      smooths_included <- FALSE
+    } else {
+      smooths_included <- TRUE
     }
 
     if(any(grep('b\\[i\\] = b_raw', jags_smooth_text))){
@@ -418,6 +427,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
 
   } else {
     ## No smooths included
+    smooths_included <- FALSE
     stan_file <- stan_file[-grep('// priors for smoothing parameters', stan_file,
                                  fixed = TRUE)]
     stan_file <- stan_file[-grep('lambda ~ normal', stan_file,
@@ -615,5 +625,6 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
   }
 
   return(list(stan_file = stan_file,
-              model_data = stan_data))
+              model_data = stan_data,
+              smooths_included = smooths_included))
 }
