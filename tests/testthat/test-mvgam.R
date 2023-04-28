@@ -36,7 +36,8 @@ test_that("rho argument must be positive numeric", {
                             data = data,
                             family = gaussian(),
                             run_model = FALSE),
-               'argument "rho" must be a positive value')
+               'argument "rho" in dynamic() must be a positive value',
+               fixed = TRUE)
 })
 
 test_that("all series must have observations for all unique timepoints", {
