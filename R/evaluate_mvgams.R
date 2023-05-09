@@ -202,6 +202,17 @@ eval_mvgam = function(object,
     sample_seq <- sample(seq_len(dim(betas)[1]), size = n_samples, replace = T)
   }
 
+  if(object$trend_model == 'VAR1'){
+    all_trends <- propagate_var_fcs(trend_pars,
+                                    n_samples,
+                                    sample_seq,
+                                    eval_timepoint,
+                                    n_series,
+                                    fc_horizon = fc_horizon)
+  } else {
+    all_trends <- NULL
+  }
+
   #### 2. Run trends forward fc_horizon steps to generate the forecast distribution ####
   use_lv <- object$use_lv
   upper_bounds <- object$upper_bounds
@@ -221,7 +232,8 @@ eval_mvgam = function(object,
                           'trend_pars',
                           'family_pars',
                           'n_series',
-                          'upper_bounds'),
+                          'upper_bounds',
+                          'all_trends'),
                   envir = environment())
 
     pbapply::pboptions(type = "none")
@@ -236,7 +248,7 @@ eval_mvgam = function(object,
       general_trend_pars <- mvgam:::extract_general_trend_pars(trend_pars = trend_pars,
                                                                samp_index = samp_index)
 
-      if(use_lv || trend_model == 'VAR1'){
+      if(use_lv){
         # Propagate the lvs forward using the sampled trend parameters
         trends <- mvgam:::forecast_trend(trend_model = trend_model,
                                          use_lv = use_lv,
@@ -260,7 +272,7 @@ eval_mvgam = function(object,
           }
 
           if(trend_model == 'VAR1'){
-            out <- trends[, series]
+            out <- all_trends[which(sample_seq == x), , series]
           }
 
         } else {
@@ -314,7 +326,7 @@ eval_mvgam = function(object,
       general_trend_pars <- mvgam:::extract_general_trend_pars(trend_pars = trend_pars,
                                                        samp_index = samp_index)
 
-      if(use_lv || trend_model == 'VAR1'){
+      if(use_lv){
         # Propagate the lvs forward using the sampled trend parameters
         trends <- mvgam:::forecast_trend(trend_model = trend_model,
                                  use_lv = use_lv,
@@ -338,7 +350,7 @@ eval_mvgam = function(object,
           }
 
           if(trend_model == 'VAR1'){
-            out <- trends[, series]
+            out <- all_trends[which(sample_seq == x), , series]
           }
 
         } else {
@@ -885,4 +897,144 @@ crps_mcmc_object <- function(truth, fc, interval_width = 0.9){
     }
   }
   scores
+}
+
+#' @noRd
+propagate_var_fcs = function(trend_pars, n_samples, sample_seq,
+                             eval_timepoint, n_series,
+                             fc_horizon){
+
+  # Define the Stan code for propagating VAR1 trends forward
+  var1_forecast_all <-
+    '
+data {
+    int n;                        // total number of observations
+    int n_series;                 // number of series
+    int n_training;               // number of training observations
+    int n_draws;                  // number of draws to process
+    vector[n_series] sigma[n_draws]; // array of sigma vectors
+    matrix[n_series, n_series] A[n_draws]; // array of VAR1 coefficients matrices
+    matrix[n_training, n_series] trend_obs[n_draws]; // trend observations up to current timepoint
+}
+
+parameters {
+  matrix<lower=-1,upper=1>[n_series, n_series] A_new[n_draws];
+}
+
+transformed parameters {
+  matrix[n, n_series] mu[n_draws];
+  for(d in 1:n_draws){
+    mu[d, 1] = trend_obs[d, 1];
+    for(i in 2:n_training){
+     mu[d, i] = to_row_vector(A_new[d] * to_vector(trend_obs[d, i - 1]));
+    }
+    for(i in (n_training+1):n){
+     mu[d, i] = to_row_vector(A_new[d] * to_vector(mu[d, i - 1]));
+  }
+  }
+}
+
+model {
+  for(d in 1:n_draws){
+  to_vector(A_new[d]) ~ normal(to_vector(A[d]), 0.1);
+    for(i in 1:n_training){
+     trend_obs[d, i] ~ normal(mu[d, i], sigma[d]);
+   }
+  }
+}
+generated quantities {
+
+ matrix[n, n_series] fc[n_draws];
+ for(d in 1:n_draws){
+ fc[d, 1] = trend_obs[d, 1];
+  for(i in 2:n){
+    fc[d, i] = to_row_vector(normal_rng(mu[d, i], sigma[d]));
+  }
+ }
+
+}
+'
+
+# Use Stan to compile the model code
+if(!requireNamespace('cmdstanr', quietly = TRUE)){
+  if(!requireNamespace('rstan', quietly = TRUE)){
+    warning('rstan library not found; checking for cmdstanr library')
+    backend <- 'rstan'
+  } else {
+    stop('neither cmdstanr or rstan libraries are installed; cannot propagate VAR models')
+  }
+} else {
+  backend <- 'cmdstanr'
+}
+
+# Create data structures to feed to Stan for propagating the VAR
+# trends forward
+A <- array(NA, dim = c(n_samples, n_series, n_series))
+sigma <- array(NA, dim = c(n_samples, n_series))
+trend_obs <- array(NA, dim = c(n_samples, eval_timepoint, n_series))
+
+for(draw in 1:n_samples){
+  A[draw, , ] <- matrix(trend_pars$A[draw,], n_series, n_series)
+  Sigma <- matrix(trend_pars$Sigma[draw,], n_series, n_series)
+  sigma[draw, ] <- sqrt(diag(Sigma))
+
+  trend_obs[draw, , ] <- do.call(cbind, lapply(1:n_series, function(series){
+    trend_pars$last_lvs[[series]][draw, ]
+  }))
+}
+
+# Gather data into a list for conditioning the Stan model
+stan_data <- list(n = eval_timepoint + fc_horizon,
+                  n_series = n_series,
+                  n_draws = n_samples,
+                  n_training = eval_timepoint,
+                  A = A,
+                  sigma = sigma,
+                  trend_obs = trend_obs)
+
+# Compile and run the stan code
+if(backend == 'cmdstanr'){
+  require(cmdstanr)
+  cmd_mod <- cmdstan_model(write_stan_file(var1_forecast_all,
+                                           dir = tools::R_user_dir("mvgam", which = "cache")),
+                           stanc_options = list('canonicalize=deprecations,braces,parentheses'))
+  fit <- cmd_mod$optimize(data = stan_data)
+  post_trends <- fit$draws("fc", format = 'draws_matrix')
+  draw_names <- dimnames(post_trends)$variable
+
+  } else {
+  require(rstan)
+  options(mc.cores = parallel::detectCores())
+  m <- rstan::stan_model(model_code = var1_forecast_all)
+  fit <- optimizing(object = m,
+                     data = stan_data)
+  post_trends <- mvgam:::mcmc_chains(fit, "fc")
+}
+
+
+all_inds <- strsplit(gsub('fc\\[', '', gsub('\\]', '', draw_names)),
+                     ',')
+draw_inds <- as.numeric(unlist(lapply(seq_along(all_inds), function(x){
+  all_inds[[x]][1]
+})))
+
+time_inds <- as.numeric(unlist(lapply(seq_along(all_inds), function(x){
+  all_inds[[x]][2]
+})))
+
+series_inds <- as.numeric(unlist(lapply(seq_along(all_inds), function(x){
+  all_inds[[x]][3]
+})))
+
+# Store each sample's trend forecasts as an array
+all_trends <- array(NA, dim = c(n_samples, fc_horizon, n_series))
+for(draw in 1:n_samples){
+  all_trends[draw, , ] <- do.call(cbind, lapply(1:n_series, function(series){
+    post_trends[which(draw_inds == draw &
+                        series_inds == series)][(eval_timepoint + 1):(eval_timepoint + fc_horizon)]
+  }))
+}
+
+return(all_trends)
+
 }
