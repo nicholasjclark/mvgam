@@ -9,7 +9,8 @@
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
 #'@param score \code{character} specifying the type of ranked probability score to use for evaluation. Options are:
 #'`variogram`, `drps` or `crps`
-#'@param log \code{logical}. Should the scores be logged? This is often appropriate for comparing
+#'@param log \code{logical}. Should the forecasts and truths be logged prior to scoring?
+#'This is often appropriate for comparing
 #'performance of models when series vary in their observation ranges
 #'@details `eval_mvgam` generates a set of samples representing fixed parameters estimated from the full
 #'\code{mvgam} model and latent trend states at a given point in time. The trends are rolled forward
@@ -416,14 +417,9 @@ eval_mvgam = function(object,
         dplyr::pull(y)
     }))
 
-    if(log){
-      series_score <- log(mvgam:::variogram_mcmc_object(truths = truths,
-                                                    fcs = series_fcs) + 0.0001)
-    } else {
-      series_score <- mvgam:::variogram_mcmc_object(truths = truths,
-                                                    fcs = series_fcs)
-    }
-
+    series_score <- mvgam:::variogram_mcmc_object(truths = truths,
+                                                    fcs = series_fcs,
+                                                    log = log)
   }
 
   # If not using variogram score
@@ -442,19 +438,19 @@ eval_mvgam = function(object,
     if(object$family %in% c('poisson', 'negative binomial')){
       series_score <- lapply(seq_len(n_series), function(series){
         DRPS <- data.frame(drps_mcmc_object(as.vector(as.matrix(series_truths[[series]])),
-                                            series_fcs[[series]]))
+                                              series_fcs[[series]],
+                                            log = log))
         colnames(DRPS) <- c('score','in_interval')
-        if(log){
-          DRPS$score <- log(DRPS$score + 0.0001)
-        }
         DRPS$eval_horizon <- seq(1, fc_horizon)
         DRPS
       })
       names(series_score) <- levels(data_assim$series)
     } else {
       series_score <- lapply(seq_len(n_series), function(series){
-        CRPS <- data.frame(crps_mcmc_object(as.vector(as.matrix(series_truths[[series]])),
-                                            series_fcs[[series]]))
+      CRPS <- data.frame(crps_mcmc_object(as.vector(as.matrix(series_truths[[series]])),
+                                              series_fcs[[series]],
+                                          log = log))
+
         colnames(CRPS) <- c('score','in_interval')
         if(log){
           CRPS$score <- log(CRPS$score + 0.0001)
@@ -793,7 +789,13 @@ crps_edf <- function(y, dat, w = NULL) {
 # code borrowed from scoringRules: https://github.com/FK83/scoringRules/blob/master/R/scores_sample_univ.R
 #' @noRd
 crps_score <- function(truth, fc, method = "edf", w = NULL,
-                       interval_width = 0.9){
+                       interval_width = 0.9, log = FALSE){
+
+  if(log){
+    truth <- log(truth + 0.001)
+    fc <- log(fc + 0.001)
+  }
+
   if (identical(length(truth), 1L) && is.vector(fc)) {
     score <- crps_edf(truth, fc, w)
   } else {
@@ -812,7 +814,13 @@ crps_score <- function(truth, fc, method = "edf", w = NULL,
 
 # Calculate out of sample DRPS
 #' @noRd
-drps_score <- function(truth, fc, interval_width = 0.9){
+drps_score <- function(truth, fc, interval_width = 0.9,
+                       log = FALSE){
+  if(log){
+    truth <- log(truth + 0.001)
+    fc <- log(fc + 0.001)
+  }
+
   nsum <- 1000
   Fy = ecdf(fc)
   ysum <- 0:nsum
@@ -831,7 +839,12 @@ drps_score <- function(truth, fc, interval_width = 0.9){
 #' from the forecast distribution (scoringRules::vs_sample uses the
 #' mean, which is not appropriate for skewed distributions)
 #' @noRd
-variogram_score = function(truth, fc){
+variogram_score = function(truth, fc, log = FALSE){
+  if(log){
+    truth <- log(truth + 0.001)
+    fc <- log(fc + 0.001)
+  }
+
   out <- matrix(NA, length(truth), length(truth))
   for(i in 1:length(truth)){
     for(j in 1:length(truth)){
@@ -852,7 +865,7 @@ variogram_score = function(truth, fc){
 
 #' Wrapper to calculate variogram score on all observations in fc_horizon
 #' @noRd
-variogram_mcmc_object <- function(truths, fcs){
+variogram_mcmc_object <- function(truths, fcs, log = FALSE){
   fc_horizon <- length(fcs[[1]][1,])
   fcs_per_horizon <- lapply(seq_len(fc_horizon), function(horizon){
     do.call(rbind, lapply(seq_along(fcs), function(fc){
@@ -862,13 +875,15 @@ variogram_mcmc_object <- function(truths, fcs){
 
   unlist(lapply(seq_len(fc_horizon), function(horizon){
     variogram_score(truth = truths[,horizon],
-                    fc = fcs_per_horizon[[horizon]])
+                    fc = fcs_per_horizon[[horizon]],
+                    log = log)
   }))
 }
 
 # Wrapper to calculate scores on all observations in fc_horizon
 #' @noRd
-drps_mcmc_object <- function(truth, fc, interval_width = 0.9){
+drps_mcmc_object <- function(truth, fc, interval_width = 0.9,
+                             log = FALSE){
   indices_keep <- which(!is.na(truth))
   if(length(indices_keep) == 0){
     scores = data.frame('drps' = rep(NA, length(truth)),
@@ -877,14 +892,16 @@ drps_mcmc_object <- function(truth, fc, interval_width = 0.9){
     scores <- matrix(NA, nrow = length(truth), ncol = 2)
     for(i in indices_keep){
       scores[i,] <- drps_score(truth = as.vector(truth)[i],
-                               fc = fc[,i], interval_width)
+                               fc = fc[,i], interval_width,
+                               log = log)
     }
   }
   scores
 }
 
 #' @noRd
-crps_mcmc_object <- function(truth, fc, interval_width = 0.9){
+crps_mcmc_object <- function(truth, fc, interval_width = 0.9,
+                             log = FALSE){
   indices_keep <- which(!is.na(truth))
   if(length(indices_keep) == 0){
     scores = data.frame('drps' = rep(NA, length(truth)),
@@ -893,7 +910,8 @@ crps_mcmc_object <- function(truth, fc, interval_width = 0.9){
     scores <- matrix(NA, nrow = length(truth), ncol = 2)
     for(i in indices_keep){
       scores[i,] <- crps_score(truth = as.vector(truth)[i],
-                               fc = fc[,i], interval_width)
+                               fc = fc[,i], interval_width,
+                               log = log)
     }
   }
   scores

@@ -55,7 +55,8 @@ set of outcome data}
 \item{score}{\code{character} specifying the type of ranked probability score to use for evaluation. Options are:
 \code{variogram}, \code{drps} or \code{crps}}
 
-\item{log}{\code{logical}. Should the scores be logged? This is often appropriate for comparing
+\item{log}{\code{logical}. Should the forecasts and truths be logged prior to scoring?
+This is often appropriate for comparing
 performance of models when series vary in their observation ranges}
 
 \item{n_evaluations}{\code{integer} specifying the total number of evaluations to perform}
