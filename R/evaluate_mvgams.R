@@ -1020,37 +1020,51 @@ if(backend == 'cmdstanr'){
   post_trends <- fit$draws("fc", format = 'draws_matrix')
   draw_names <- dimnames(post_trends)$variable
 
+
+  all_inds <- strsplit(gsub('fc\\[', '', gsub('\\]', '', draw_names)),
+                       ',')
+  draw_inds <- as.numeric(unlist(lapply(seq_along(all_inds), function(x){
+    all_inds[[x]][1]
+  })))
+
+  time_inds <- as.numeric(unlist(lapply(seq_along(all_inds), function(x){
+    all_inds[[x]][2]
+  })))
+
+  series_inds <- as.numeric(unlist(lapply(seq_along(all_inds), function(x){
+    all_inds[[x]][3]
+  })))
+
+  # Store each sample's trend forecasts as an array
+  all_trends <- array(NA, dim = c(n_samples, fc_horizon, n_series))
+  for(draw in 1:n_samples){
+    all_trends[draw, , ] <- do.call(cbind, lapply(1:n_series, function(series){
+      post_trends[which(draw_inds == draw &
+                          series_inds == series)][(eval_timepoint + 1):(eval_timepoint + fc_horizon)]
+    }))
+  }
+
   } else {
   require(rstan)
   options(mc.cores = parallel::detectCores())
-  m <- rstan::stan_model(model_code = var1_forecast_all)
+  dir.create(paste0(tools::R_user_dir("mvgam", which = "cache")),
+             showWarnings = FALSE)
+  writeLines(var1_forecast_all,
+             paste0(tools::R_user_dir("mvgam", which = "cache"), '/var1_forecast_all.stan'))
+  m <- rstan::stan_model(file = paste0(tools::R_user_dir("mvgam", which = "cache"),
+                                       '/var1_forecast_all.stan'),
+                         auto_write = TRUE)
   fit <- optimizing(object = m,
-                     data = stan_data)
-  post_trends <- mvgam:::mcmc_chains(fit, "fc")
-}
+                     data = stan_data,
+                    as_vector = FALSE)
+  post_trends <- fit$par$fc
 
+  # Store each sample's trend forecasts as an array
+  all_trends <- array(NA, dim = c(n_samples, fc_horizon, n_series))
+  for(draw in 1:n_samples){
+    all_trends[draw, , ] <- post_trends[draw, (eval_timepoint + 1):(eval_timepoint + fc_horizon), ]
+  }
 
-all_inds <- strsplit(gsub('fc\\[', '', gsub('\\]', '', draw_names)),
-                     ',')
-draw_inds <- as.numeric(unlist(lapply(seq_along(all_inds), function(x){
-  all_inds[[x]][1]
-})))
-
-time_inds <- as.numeric(unlist(lapply(seq_along(all_inds), function(x){
-  all_inds[[x]][2]
-})))
-
-series_inds <- as.numeric(unlist(lapply(seq_along(all_inds), function(x){
-  all_inds[[x]][3]
-})))
-
-# Store each sample's trend forecasts as an array
-all_trends <- array(NA, dim = c(n_samples, fc_horizon, n_series))
-for(draw in 1:n_samples){
-  all_trends[draw, , ] <- do.call(cbind, lapply(1:n_series, function(series){
-    post_trends[which(draw_inds == draw &
-                        series_inds == series)][(eval_timepoint + 1):(eval_timepoint + fc_horizon)]
-  }))
 }
 
 return(all_trends)
