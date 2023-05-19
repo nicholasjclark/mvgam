@@ -12,6 +12,10 @@
 #'@param log \code{logical}. Should the forecasts and truths be logged prior to scoring?
 #'This is often appropriate for comparing
 #'performance of models when series vary in their observation ranges
+#'@param weights optional \code{vector} of weights (where \code{length(weights) == n_series})
+#'for weighting pairwise correlations when evaluating the variogram score for multivariate
+#'forecasts. Useful for down-weighting series that have larger magnitude observations or that
+#'are of less interest when forecasting. Ignored if \code{score != 'variogram'}
 #'@details `eval_mvgam` generates a set of samples representing fixed parameters estimated from the full
 #'\code{mvgam} model and latent trend states at a given point in time. The trends are rolled forward
 #'a total of \code{fc_horizon} timesteps according to their estimated state space dynamics to
@@ -60,7 +64,8 @@ eval_mvgam = function(object,
                       fc_horizon = 3,
                       n_cores = 2,
                       score = 'drps',
-                      log = TRUE){
+                      log = TRUE,
+                      weights){
 
   # Check arguments
   if(class(object) != 'mvgam'){
@@ -419,7 +424,8 @@ eval_mvgam = function(object,
 
     series_score <- mvgam:::variogram_mcmc_object(truths = truths,
                                                     fcs = series_fcs,
-                                                    log = log)
+                                                    log = log,
+                                                  weights = weights)
   }
 
   # If not using variogram score
@@ -485,7 +491,8 @@ roll_eval_mvgam = function(object,
                            fc_horizon = 3,
                            n_cores = 2,
                            score = 'drps',
-                           log = TRUE){
+                           log = TRUE,
+                           weights){
 
   # Check arguments
   if(class(object) != 'mvgam'){
@@ -532,6 +539,10 @@ roll_eval_mvgam = function(object,
   }
 
   # Loop across evaluation sequence and calculate evaluation metrics
+  if(missing(weights)){
+    weights <- rep(1, NCOL(object$ytimes))
+  }
+
   cl <- parallel::makePSOCKcluster(n_cores)
   setDefaultCluster(cl)
   clusterExport(NULL, c('all_timepoints',
@@ -541,7 +552,8 @@ roll_eval_mvgam = function(object,
                         'fc_horizon',
                         'eval_mvgam',
                         'score',
-                        'log'),
+                        'log',
+                        'weights'),
                 envir = environment())
   parallel::clusterEvalQ(cl, library(mgcv))
   parallel::clusterEvalQ(cl, library(rstan))
@@ -554,7 +566,8 @@ roll_eval_mvgam = function(object,
                eval_timepoint = timepoint,
                fc_horizon = fc_horizon,
                score = score,
-               log = log)
+               log = log,
+               weights = weights)
   },
   cl = cl)
   stopCluster(cl)
@@ -645,7 +658,8 @@ compare_mvgams = function(model1,
                           n_evaluations = 10,
                           n_cores = 2,
                           score = 'drps',
-                          log = TRUE){
+                          log = TRUE,
+                          weights){
 
   # Check arguments
   if(class(model1) != 'mvgam'){
@@ -687,20 +701,26 @@ compare_mvgams = function(model1,
   }
 
   # Evaluate the two models
+  if(missing(weights)){
+    weights <- rep(1, NCOL(object$ytimes))
+  }
+
   mod1_eval <- roll_eval_mvgam(model1,
                                n_samples = n_samples,
                                fc_horizon = fc_horizon,
                                n_cores = n_cores,
                                n_evaluations = n_evaluations,
                                score = score,
-                               log = log)
+                               log = log,
+                               weights = weights)
   mod2_eval <- roll_eval_mvgam(model2,
                                n_samples = n_samples,
                                fc_horizon = fc_horizon,
                                n_cores = n_cores,
                                n_evaluations = n_evaluations,
                                score = score,
-                               log = log)
+                               log = log,
+                               weights = weights)
 
   # Generate a simple summary of forecast scores for each model
   model_summary <- rbind(mod1_eval$score_summary, mod2_eval$score_summary)
@@ -839,10 +859,20 @@ drps_score <- function(truth, fc, interval_width = 0.9,
 #' from the forecast distribution (scoringRules::vs_sample uses the
 #' mean, which is not appropriate for skewed distributions)
 #' @noRd
-variogram_score = function(truth, fc, log = FALSE){
+variogram_score = function(truth, fc, log = FALSE, weights){
   if(log){
     truth <- log(truth + 0.001)
     fc <- log(fc + 0.001)
+  }
+
+  # Use weight of 1 for each pairwise combination if no weights
+  # are supplied; else take the product of each pair of weights
+  if(missing(weights)){
+    weights <- matrix(1, nrow = length(obs), ncol = length(obs))
+  } else {
+    weights <- outer(weights, weights, FUN = function(X, Y){
+      (X + Y) / 2
+    })
   }
 
   out <- matrix(NA, length(truth), length(truth))
@@ -853,7 +883,7 @@ variogram_score = function(truth, fc, log = FALSE){
       } else {
         v_fc <- quantile(abs(fc[i,] - fc[j,]) ^ 0.5, 0.5)
         v_dat <- abs(truth[i] - truth[j]) ^ 0.5
-        out[i,j] <- 2 * ((v_dat - v_fc) ^ 2)
+        out[i,j] <- 2 * weights[i, j] * ((v_dat - v_fc) ^ 2)
       }
     }
   }
@@ -865,7 +895,8 @@ variogram_score = function(truth, fc, log = FALSE){
 
 #' Wrapper to calculate variogram score on all observations in fc_horizon
 #' @noRd
-variogram_mcmc_object <- function(truths, fcs, log = FALSE){
+variogram_mcmc_object <- function(truths, fcs, log = FALSE,
+                                  weights){
   fc_horizon <- length(fcs[[1]][1,])
   fcs_per_horizon <- lapply(seq_len(fc_horizon), function(horizon){
     do.call(rbind, lapply(seq_along(fcs), function(fc){
@@ -876,7 +907,8 @@ variogram_mcmc_object <- function(truths, fcs, log = FALSE){
   unlist(lapply(seq_len(fc_horizon), function(horizon){
     variogram_score(truth = truths[,horizon],
                     fc = fcs_per_horizon[[horizon]],
-                    log = log)
+                    log = log,
+                    weights = weights)
   }))
 }
 

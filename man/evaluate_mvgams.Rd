@@ -14,7 +14,8 @@ eval_mvgam(
   fc_horizon = 3,
   n_cores = 2,
   score = "drps",
-  log = TRUE
+  log = TRUE,
+  weights
 )
 
 roll_eval_mvgam(
@@ -25,7 +26,8 @@ roll_eval_mvgam(
   fc_horizon = 3,
   n_cores = 2,
   score = "drps",
-  log = TRUE
+  log = TRUE,
+  weights
 )
 
 compare_mvgams(
@@ -36,7 +38,8 @@ compare_mvgams(
   n_evaluations = 10,
   n_cores = 2,
   score = "drps",
-  log = TRUE
+  log = TRUE,
+  weights
 )
 }
 \arguments{
@@ -58,6 +61,11 @@ set of outcome data}
 \item{log}{\code{logical}. Should the forecasts and truths be logged prior to scoring?
 This is often appropriate for comparing
 performance of models when series vary in their observation ranges}
+
+\item{weights}{optional \code{vector} of weights (where \code{length(weights) == n_series})
+for weighting pairwise correlations when evaluating the variogram score for multivariate
+forecasts. Useful for down-weighting series that have larger magnitude observations or that
+are of less interest when forecasting}
 
 \item{n_evaluations}{\code{integer} specifying the total number of evaluations to perform}
 
