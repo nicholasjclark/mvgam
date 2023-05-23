@@ -30,6 +30,12 @@ plot_mvgam_uncertainty = function(object, series = 1, newdata,
     }
   }
 
+  if(series > NCOL(object$ytimes)){
+    stop(paste0('object only contains data / predictions for ',
+                NCOL(object$ytimes), ' series'),
+         call. = FALSE)
+  }
+
   if(!missing("newdata")){
     data_test <- newdata
   }

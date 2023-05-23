@@ -41,6 +41,12 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
     }
   }
 
+  if(series > NCOL(object$ytimes)){
+    stop(paste0('object only contains data / predictions for ',
+                NCOL(object$ytimes), ' series'),
+         call. = FALSE)
+  }
+
   if(object$trend_model == 'None'){
     stop('no trend was estimated in object',
          call. = FALSE)
@@ -121,7 +127,7 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
     if(dim(preds)[2] != length(all_obs)){
       fc_preds <- forecast(object, series = series, data_test = data_test,
                                  type = 'trend',
-                           n_cores = n_cores)
+                           n_cores = n_cores)$forecasts[[1]]
       preds <- cbind(preds, fc_preds)
     }
   }

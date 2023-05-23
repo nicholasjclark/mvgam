@@ -61,6 +61,12 @@ plot_mvgam_smooth = function(object,
     }
   }
 
+  if(series > NCOL(object$ytimes)){
+    stop(paste0('object only contains data / predictions for ',
+                NCOL(object$ytimes), ' series'),
+         call. = FALSE)
+  }
+
   if(sign(n_resid_bins) != 1){
     stop('argument "n_resid_bins" must be a positive integer',
          call. = FALSE)

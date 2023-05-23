@@ -8,7 +8,7 @@
   object,
   newdata,
   data_test,
-  series = 1,
+  series = "all",
   n_cores = 1,
   type = "response"
 )
@@ -28,7 +28,10 @@ observation of series 1 in \code{data} and the first observation for series 1 in
 \item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
 \code{newdata} instead for more seamless integration into \code{R} workflows}
 
-\item{series}{\code{integer} specifying which series in the set is to be forecast}
+\item{series}{Either a \code{integer} specifying which series in the set is to be forecast,
+or the character string \code{'all'}, specifying that all series should be forecast. This is preferable
+if the fitted model contained multivariate trends (either as a dynamic factor or \code{VAR} process),
+as it saves recomputing the full set of trends for each series individually}
 
 \item{n_cores}{\code{integer} specifying number of cores for generating forecasts in parallel}
 
@@ -38,7 +41,8 @@ predictions on the outcome (discrete) scale (default). When \code{trend} is used
 latent trend is returned.}
 }
 \value{
-A \code{matrix} of the forecast distribution
+An object of class \code{mvgam_forecast} containing hindcast and forecast distributions
+for the required series
 }
 \description{
 Compute out of sample forecasts for a fitted \code{mvgam} object

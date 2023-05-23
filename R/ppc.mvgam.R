@@ -77,6 +77,12 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
     }
   }
 
+  if(series > NCOL(object$ytimes)){
+    stop(paste0('object only contains data / predictions for ',
+                NCOL(object$ytimes), ' series'),
+         call. = FALSE)
+  }
+
   if(type == 'rootogram' & missing(n_bins)){
     n_bins <- 50
 

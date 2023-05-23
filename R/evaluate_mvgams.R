@@ -224,6 +224,10 @@ eval_mvgam = function(object,
   upper_bounds <- object$upper_bounds
   trend_model <- object$trend_model
 
+  if(missing(weights)){
+    weights <- rep(1, NCOL(object$ytimes))
+  }
+
   # Run particles forward in time to generate their forecasts
   if(n_cores > 1){
     cl <- parallel::makePSOCKcluster(n_cores)
@@ -239,7 +243,9 @@ eval_mvgam = function(object,
                           'family_pars',
                           'n_series',
                           'upper_bounds',
-                          'all_trends'),
+                          'all_trends',
+                          'sample_seq',
+                          'weights'),
                   envir = environment())
 
     pbapply::pboptions(type = "none")
@@ -702,7 +708,7 @@ compare_mvgams = function(model1,
 
   # Evaluate the two models
   if(missing(weights)){
-    weights <- rep(1, NCOL(object$ytimes))
+    weights <- rep(1, NCOL(model1$ytimes))
   }
 
   mod1_eval <- roll_eval_mvgam(model1,

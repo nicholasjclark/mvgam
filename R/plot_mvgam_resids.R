@@ -41,6 +41,12 @@ plot_mvgam_resids = function(object, series = 1, n_bins = 15,
     }
   }
 
+  if(series > NCOL(object$ytimes)){
+    stop(paste0('object only contains data / predictions for ',
+                NCOL(object$ytimes), ' series'),
+         call. = FALSE)
+  }
+
   if(sign(n_bins) != 1){
     stop('argument "n_bins" must be a positive integer',
          call. = FALSE)

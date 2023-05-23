@@ -1584,6 +1584,14 @@ mvgam = function(formula,
     ss_gam$coefficients <- p
   }
 
+  if(missing(data_test)){
+    test_data <- NULL
+  } else {
+    test_data <- data.frame(series = data_test$series,
+                            y = data_test$y,
+                            time = data_test$time)
+  }
+
   if(return_model_data){
     output <- structure(list(call = orig_formula,
                              family = family_char,
@@ -1601,6 +1609,7 @@ mvgam = function(formula,
                              n_lv = n_lv,
                              upper_bounds = upper_bounds,
                              obs_data = data_train,
+                             test_data = test_data,
                              fit_engine = fit_engine,
                              max_treedepth = max_treedepth,
                              adapt_delta = adapt_delta),
@@ -1620,6 +1629,7 @@ mvgam = function(formula,
                              n_lv = n_lv,
                              upper_bounds = upper_bounds,
                              obs_data = data_train,
+                             test_data = test_data,
                              fit_engine = fit_engine,
                              max_treedepth = max_treedepth,
                              adapt_delta = adapt_delta),

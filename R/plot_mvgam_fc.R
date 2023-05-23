@@ -29,16 +29,25 @@
 #'as well as returning the forecast object (as a \code{matrix} of dimension \code{n_samples} x \code{horizon})
 #'@param return_score \code{logical}. If \code{TRUE} and out of sample test data is provided as
 #'\code{newdata}, a probabilistic score will be calculated and returned. The score used will depend on the
-#'observation family from the fitted model. Discrete families (\code{poisson}, \code{negative binomial})
+#'observation family from the fitted model. Discrete families (\code{poisson}, \code{negative binomial}, \code{tweedie})
 #'use the Discrete Rank Probability Score. Other families use the Continuous Rank Probability Score. The value
 #'returned is the \code{sum} of all scores within the out of sample forecast horizon
-#'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to calculate posterior
-#'empirical quantiles. If \code{realisations = FALSE}, these posterior quantiles are plotted along
+#'@details `plot_mvgam_fc` draws posterior predictions from an object of class \code{mvgam} and calculates posterior
+#'empirical quantiles.
+#'
+#'`plot.mvgam_forecast` takes an object of class `mvgam_forecast`, in which forecasts have already
+#'been computed, and plots the resulting forecast distribution.
+#'
+#'If \code{realisations = FALSE}, these posterior quantiles are plotted along
 #'with the true observed data that was used to train the model. Otherwise, a spaghetti plot is returned
 #'to show possible forecast paths.
 #'@return A base \code{R} graphics plot and an optional \code{list} containing the forecast distribution
 #'and the out of sample probabilistic forecast score
-#'@export
+#' @name plot_mvgam_forecasts
+NULL
+
+#' @rdname plot_mvgam_forecasts
+#' @export
 plot_mvgam_fc = function(object, series = 1, newdata, data_test,
                          realisations = FALSE, n_realisations = 15,
                          hide_xlabels = FALSE, xlab, ylab, ylim,
@@ -59,6 +68,11 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
       stop('argument "series" must be a positive integer',
            call. = FALSE)
     }
+  }
+
+  if(series > NCOL(object$ytimes)){
+    stop(paste0('object only contains data / predictions for ', NCOL(object$ytimes), ' series'),
+         call. = FALSE)
   }
 
   if(sign(n_realisations) != 1){
@@ -200,7 +214,7 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
                                 n_cores = n_cores)
     } else {
       fc_preds <- forecast.mvgam(object, data_test = data_test,
-                                 n_cores = n_cores, series = series)
+                                 n_cores = n_cores, series = series)$forecasts[[1]]
     }
     preds <- cbind(preds, fc_preds)
   }
@@ -349,7 +363,7 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
       message('No non-missing values in data_test$y; cannot calculate forecast score')
       message()
     } else {
-      if(object$family %in% c('poisson', 'negative binomial')){
+      if(object$family %in% c('poisson', 'negative binomial', 'tweedie')){
         score <- sum(drps_mcmc_object(as.vector(truth),
                                       fc)[,1], na.rm = TRUE)
         message('Out of sample DRPS:')
@@ -403,4 +417,180 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
     }
   }
 
+}
+
+#' @rdname plot_mvgam_forecasts
+#' @method plot mvgam_forecast
+#' @export
+plot.mvgam_forecast = function(object, series = 1,
+                               realisations = FALSE,
+                               n_realisations = 15,
+                               hide_xlabels = FALSE,
+                               xlab, ylab, ylim,
+                               return_score = FALSE,
+                               ...){
+
+  if(sign(series) != 1){
+    stop('argument "series" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(series%%1 != 0){
+      stop('argument "series" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+  if(series > length(object$series_names)){
+    stop(paste0('object only contains data / predictions for ',
+                length(object$series_names), ' series'),
+         call. = FALSE)
+  }
+
+  s_name <- object$series_names[series]
+  if(!s_name %in% names(object$hindcasts)){
+    stop(paste0('forecasts for ', s_name, ' have not yet been computed'),
+         call. = FALSE)
+  }
+
+  # Extract hindcast and forecast predictions
+  type <- object$type
+
+  preds <- cbind(object$hindcasts[[which(names(object$hindcasts) == s_name)]],
+                 object$forecasts[[which(names(object$forecasts) == s_name)]])
+
+  # Plot quantiles of the forecast distribution
+  preds_last <- preds[1,]
+  probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+  cred <- sapply(1:NCOL(preds),
+                 function(n) quantile(preds[,n],
+                                      probs = probs, na.rm = TRUE))
+
+  c_light <- c("#DCBCBC")
+  c_light_highlight <- c("#C79999")
+  c_mid <- c("#B97C7C")
+  c_mid_highlight <- c("#A25050")
+  c_dark <- c("#8F2727")
+  c_dark_highlight <- c("#7C0000")
+
+  if(type == 'trend'){
+    if(missing(ylab)){
+      ylab <- paste0('Estimated trend for ', s_name)
+    }
+
+    ylim <- range(cred)
+
+  } else {
+
+    if(missing(ylim)){
+      ytrain <- object$train_observations[[which(names(object$train_observations) ==
+                                                   s_name)]]
+      ylim <- c(min(cred, min(ytrain, na.rm = TRUE)),
+                max(cred, max(ytrain, na.rm = TRUE)) + 2)
+    }
+
+    if(missing(ylab)){
+      ylab <- paste0('Predicitons for ', s_name)
+    }
+  }
+
+  if(missing(xlab)){
+    xlab <- 'Time'
+  }
+
+  pred_vals <- seq(1:length(preds_last))
+  if(hide_xlabels){
+    plot(1, type = "n", bty = 'L',
+         xlab = '',
+         xaxt = 'n',
+         ylab = ylab,
+         xlim = c(0, length(preds_last)),
+         ylim = ylim, ...)
+  } else {
+    plot(1, type = "n", bty = 'L',
+         xlab = xlab,
+         ylab = ylab,
+         xlim = c(0, length(preds_last)),
+         ylim = ylim, ...)
+  }
+
+  if(realisations){
+    for(i in 1:n_realisations){
+      lines(x = pred_vals,
+            y = preds[i,],
+            col = 'white',
+            lwd = 2.5)
+      lines(x = pred_vals,
+            y = preds[i,],
+            col = sample(c("#DCBCBC",
+                           "#C79999",
+                           "#B97C7C",
+                           "#A25050",
+                           "#7C0000"), 1),
+            lwd = 2.25)
+    }
+  } else {
+    polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
+            col = c_light, border = NA)
+    polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
+            col = c_light_highlight, border = NA)
+    polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
+            col = c_mid, border = NA)
+    polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
+            col = c_mid_highlight, border = NA)
+    lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
+  }
+  box(bty = 'L', lwd = 2)
+
+  last_train <- length(object$train_observations[[s_name]])
+
+  # Show historical (hindcast) distribution in grey
+  if(type == 'response'){
+    if(!realisations){
+      polygon(c(pred_vals[1:last_train],
+                rev(pred_vals[1:last_train])),
+              c(cred[1,1:last_train],
+                rev(cred[9,1:last_train])),
+              col = 'grey70', border = NA)
+      lines(pred_vals[1:last_train],
+            cred[5,1:last_train],
+            col = 'grey70', lwd = 2.5)
+    }
+  }
+
+  if(type == 'response'){
+    # Plot training and testing points
+    points(c(object$train_observations[[s_name]],
+             object$test_observations[[s_name]]), pch = 16, col = "white", cex = 0.8)
+    points(c(object$train_observations[[s_name]],
+             object$test_observations[[s_name]]), pch = 16, col = "black", cex = 0.65)
+    abline(v = last_train, col = '#FFFFFF60', lwd = 2.85)
+    abline(v = last_train, col = 'black', lwd = 2.5, lty = 'dashed')
+
+    # Calculate out of sample probabilistic score
+    fc <- object$forecasts[[s_name]]
+    truth <- object$test_observations[[s_name]]
+
+    if(all(is.na(truth))){
+      score <- NULL
+      message('No non-missing values in test_observations; cannot calculate forecast score')
+      message()
+    } else {
+      if(object$family %in% c('poisson', 'negative binomial', 'tweedie')){
+        score <- sum(drps_mcmc_object(as.vector(truth),
+                                      fc)[,1], na.rm = TRUE)
+        message('Out of sample DRPS:')
+        print(score)
+        message()
+      } else {
+        score <- sum(crps_mcmc_object(as.vector(truth),
+                                      fc)[,1], na.rm = TRUE)
+        message('Out of sample CRPS:')
+        print(score)
+        message()
+      }
+    }
+  } else {
+    abline(v = last_train, col = '#FFFFFF60', lwd = 2.85)
+    abline(v = last_train, col = 'black', lwd = 2.5, lty = 'dashed')
+  }
 }
