@@ -66,6 +66,7 @@ sim_gp = function(last_trends, h, rho_gp, alpha_gp){
 #' @noRd
 sim_ar3 = function(drift, ar1, ar2, ar3, tau, last_trends, h){
   states <- rep(NA, length = h + 3)
+  last_trends <- tail(last_trends, 3)
   states[1] <- last_trends[1]
   states[2] <- last_trends[2]
   states[3] <- last_trends[3]
@@ -486,7 +487,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
                                      trend_pars$ar3[lv],
                                      0),
                         tau = trend_pars$tau[lv],
-                        last_trends = trend_pars$last_lvs[[lv]],
+                        last_trends = tail(trend_pars$last_lvs[[lv]], 3),
                         h = h)
       }))
     }
@@ -526,7 +527,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
                                                 trend_pars$ar3,
                                                 0),
                                    tau = trend_pars$tau,
-                                   last_trends = trend_pars$last_trends,
+                                   last_trends = tail(trend_pars$last_trends, 3),
                                    h = h)
     }
 
