@@ -5,3 +5,5 @@
 NEON_manuscript/Results/
 doc
 Meta
+tests/testthat/_snaps
+*.Rproj*

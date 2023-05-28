@@ -13,23 +13,23 @@ library("mvgam")
 # use 1000 posterior samples for each chain so out of sample forecast
 # scores can be compared with more precision ####
 # Simple Gaussian models
-set.seed(100)
-gaus_data <- sim_mvgam(family = gaussian(),
-                       T = 80,
-                       trend_model = 'AR1',
-                       seasonality = 'shared',
-                       trend_rel = 0.5)
-gaus_ar1 <- mvgam(y ~ s(season, bs = 'cc'),
-                  trend_model = 'AR1',
-                  data = gaus_data$data_train,
-                  family = gaussian(),
-                  samples = 1000)
-gaus_ar1fc <- mvgam(y ~ s(season, bs = 'cc'),
-                  trend_model = 'AR1',
-                  data = gaus_data$data_train,
-                  newdata = gaus_data$data_test,
-                  family = gaussian(),
-                  samples = 1000)
+# set.seed(100)
+# gaus_data <- sim_mvgam(family = gaussian(),
+#                        T = 80,
+#                        trend_model = 'AR1',
+#                        seasonality = 'shared',
+#                        trend_rel = 0.5)
+# gaus_ar1 <- mvgam(y ~ s(season, bs = 'cc'),
+#                   trend_model = 'AR1',
+#                   data = gaus_data$data_train,
+#                   family = gaussian(),
+#                   samples = 1000)
+# gaus_ar1fc <- mvgam(y ~ s(season, bs = 'cc'),
+#                   trend_model = 'AR1',
+#                   data = gaus_data$data_train,
+#                   newdata = gaus_data$data_test,
+#                   family = gaussian(),
+#                   samples = 1000)
 
 # Simple Beta models
 set.seed(100)
