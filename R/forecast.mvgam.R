@@ -236,6 +236,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
     trend_pars <- mvgam:::extract_trend_pars(object = object,
                                              keep_all_estimates = FALSE)
     all_trends <- NULL
+    sample_seq <- NULL
   }
 
   # Produce forecasts

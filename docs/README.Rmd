@@ -331,7 +331,7 @@ We choose a set of timepoints within the training data to forecast from, allowin
 compare_mvgams(lynx_mvgam, lynx_mvgam_poor, fc_horizon = 10)
 ```
 
-Summary statistics of the two models' out of sample Discrete Rank Probability Score (DRPS) indicate that the well-specified model performs markedly better (lower DRPS) across most out of sample horizons. There are many more extended uses for `mvgam` models, including the ability to fit dynamic factor processes for analysing and forecasting sets of multivariate time series
+Summary statistics of the two models' out of sample Discrete Rank Probability Score (DRPS) indicate that the well-specified model performs markedly better (lower DRPS) across most out of sample horizons.
 
 ## Extended observation families
 `mvgam` was originally designed to analyse and forecast non-negative integer-valued data (counts). These data are traditionally challenging to analyse with existing time-series analysis packages. But further development of `mvgam` has resulted in support for a growing number of observation families that extend to other types of data. Currently, the package can handle data for the following families:  
@@ -435,6 +435,8 @@ This results in sensible forecasts of the observations as well
 ```{r}
 plot(mod, type = 'forecast', newdata = data_test)
 ```
+
+There are many more extended uses for `mvgam` models, including the ability to fit dynamic factor processes for analysing and forecasting sets of multivariate time series. See the package documentation for more details.
 
 ## License
 This project is licensed under an `MIT` open source license

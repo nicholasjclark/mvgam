@@ -153,7 +153,8 @@
 #'of more response distributions, plans to handle zero-inflation, and plans to incorporate a greater
 #'variety of trend models. Users are strongly encouraged to opt for `Stan` over `JAGS` in any proceeding workflows
 #'@author Nicholas J Clark
-#'
+#'@references Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series
+#'Methods in Ecology and Evolution. 14:3, 771-784.
 #'@seealso \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
 #'@return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
@@ -603,10 +604,10 @@ mvgam = function(formula,
   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the Bayesian model later on;
   ss_gam <- mvgam:::mvgam_setup(formula = formula,
-                        family = mvgam:::family_to_mgcvfam(family),
-                        data = data_train,
-                        drop.unused.levels = FALSE,
-                        maxit = 30)
+                                family = mvgam:::family_to_mgcvfam(family),
+                                data = data_train,
+                                drop.unused.levels = FALSE,
+                                maxit = 30)
 
   # Fill in missing observations in data_train so the size of the dataset is correct when
   # building the JAGS model
@@ -620,12 +621,12 @@ mvgam = function(formula,
     # it from the model and data structures later
     data_train$fakery <- rnorm(length(data_train$y))
     form_fake <- update(formula, ~ . + s(fakery))
-    fakery_names <- names(mgcv::gam(form_fake,
-                              data = data_train,
-                              family = family_to_mgcvfam(family),
-                              drop.unused.levels = FALSE,
-                              control = list(nthreads = min(4, parallel::detectCores()-1),
-                                             maxit = 1))$coefficients)
+    fakery_names <- names(suppressWarnings(mgcv::gam(form_fake,
+                                                     data = data_train,
+                                                     family = family_to_mgcvfam(family),
+                                                     drop.unused.levels = FALSE,
+                                                     control = list(nthreads = min(4, parallel::detectCores()-1),
+                                                                    maxit = 1)))$coefficients)
     xcols_drop <- grep('s(fakery', fakery_names, fixed = TRUE)
     if(!missing(knots)){
       ss_jagam <- mgcv::jagam(form_fake,
@@ -1017,6 +1018,10 @@ mvgam = function(formula,
     n_lv <- NULL
   }
 
+  if(missing(data_test)){
+    data_test <- NULL
+  }
+
   # Remove Smooth penalty matrix if no smooths were used in the formula
   if(!smooths_included){
     ss_jagam$jags.data[[grep('S.*', names(ss_jagam$jags.data))]] <- NULL
@@ -1195,6 +1200,8 @@ mvgam = function(formula,
       if(!missing(priors)){
         vectorised$model_file <- update_priors(vectorised$model_file,
                                                 priors, use_stan = TRUE)
+      } else {
+        priors <- NULL
       }
 
 
@@ -1202,6 +1209,7 @@ mvgam = function(formula,
                                family = family_char,
                                trend_model = trend_model,
                                drift = drift,
+                               priors = priors,
                                model_file = vectorised$model_file,
                                model_data = vectorised$model_data,
                                inits = inits,
@@ -1212,6 +1220,7 @@ mvgam = function(formula,
                                n_lv = n_lv,
                                upper_bounds = upper_bounds,
                                obs_data = data_train,
+                               test_data = data_test,
                                fit_engine = 'stan',
                                max_treedepth = 12,
                                adapt_delta = 0.85),
@@ -1229,12 +1238,15 @@ mvgam = function(formula,
 
       if(!missing(priors)){
         model_file <- update_priors(model_file, priors, use_stan = FALSE)
+      } else {
+        priors <- NULL
       }
 
       output <- structure(list(call = orig_formula,
                                family = family_char,
                                trend_model = trend_model,
                                drift = drift,
+                               priors = priors,
                                model_file = trimws(model_file),
                                model_data = ss_jagam$jags.data,
                                inits = inits,
@@ -1245,6 +1257,7 @@ mvgam = function(formula,
                                n_lv = n_lv,
                                upper_bounds = upper_bounds,
                                obs_data = data_train,
+                               test_data = data_test,
                                fit_engine = 'jags',
                                max_treedepth = NULL,
                                adapt_delta = NULL),
@@ -1312,6 +1325,8 @@ mvgam = function(formula,
       if(!missing(priors)){
         vectorised$model_file <- update_priors(vectorised$model_file, priors,
                                                use_stan = TRUE)
+      } else {
+        priors <- NULL
       }
 
 
@@ -1454,6 +1469,8 @@ mvgam = function(formula,
 
       if(!missing(priors)){
         model_file <- update_priors(model_file, priors, use_stan = FALSE)
+      } else {
+        priors <- NULL
       }
 
       fit_engine <- 'jags'
@@ -1584,23 +1601,16 @@ mvgam = function(formula,
     ss_gam$coefficients <- p
   }
 
-  if(missing(data_test)){
-    test_data <- NULL
-  } else {
-    test_data <- data.frame(series = data_test$series,
-                            y = data_test$y,
-                            time = data_test$time)
-  }
-
   if(return_model_data){
     output <- structure(list(call = orig_formula,
                              family = family_char,
                              trend_model = trend_model,
                              drift = drift,
+                             priors = priors,
                              model_output = out_gam_mod,
                              model_file = model_file,
-                             sp_names = rho_names,
                              model_data = model_data,
+                             sp_names = rho_names,
                              inits = inits,
                              mgcv_model = ss_gam,
                              ytimes = ytimes,
@@ -1609,7 +1619,7 @@ mvgam = function(formula,
                              n_lv = n_lv,
                              upper_bounds = upper_bounds,
                              obs_data = data_train,
-                             test_data = test_data,
+                             test_data = data_test,
                              fit_engine = fit_engine,
                              max_treedepth = max_treedepth,
                              adapt_delta = adapt_delta),
@@ -1619,6 +1629,7 @@ mvgam = function(formula,
                              family = family_char,
                              trend_model = trend_model,
                              drift = drift,
+                             priors = priors,
                              model_output = out_gam_mod,
                              model_file = model_file,
                              sp_names = rho_names,
@@ -1629,7 +1640,7 @@ mvgam = function(formula,
                              n_lv = n_lv,
                              upper_bounds = upper_bounds,
                              obs_data = data_train,
-                             test_data = test_data,
+                             test_data = data_test,
                              fit_engine = fit_engine,
                              max_treedepth = max_treedepth,
                              adapt_delta = adapt_delta),

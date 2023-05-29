@@ -992,7 +992,7 @@ transformed parameters {
 
 model {
   for(d in 1:n_draws){
-  to_vector(A_new[d]) ~ normal(to_vector(A[d]), 0.1);
+  to_vector(A_new[d]) ~ normal(to_vector(A[d]), 0.01);
     for(i in 1:n_training){
      trend_obs[d, i] ~ normal(mu[d, i], sigma[d]);
    }

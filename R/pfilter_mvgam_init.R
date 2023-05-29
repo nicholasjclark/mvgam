@@ -281,12 +281,12 @@ particles <- pbapply::pblapply(sample_seq, function(x){
       attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
       # Likelihood
-      weight <- mvgam:::mvgam_predict(family = family,
+      weight <- exp(mvgam:::mvgam_predict(family = family,
                                       family_pars = family_extracts,
                                       truth = truth[series],
                                       Xp = Xpmat,
                                       betas = c(betas, 1),
-                                      density = TRUE)
+                                      density = TRUE))
 
     }
     weight

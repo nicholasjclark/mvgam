@@ -398,6 +398,10 @@ for(i in 2:50){
 layout(1)
 }
 }
+\references{
+Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series
+Methods in Ecology and Evolution. 14:3, 771-784.
+}
 \seealso{
 \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
 }

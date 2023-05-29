@@ -144,7 +144,7 @@ rstudent_t = function(n, df, mu = 0, sigma = 1) {
 #' predictions on the outcome scale
 #' @param family_pars Additional arguments for each specific observation process (i.e.
 #' overdispersion parameter if `family == "nb"`)
-#' @param density logical. Rather than calculating a prediction, evaluate the likelihood.
+#' @param density logical. Rather than calculating a prediction, evaluate the log-likelihood.
 #' Use this option when particle filtering
 #' @param truth Observation to use for evaluating the likelihood (if `density == TRUE`)
 #' @details A generic prediction function that will make it easier to add new
@@ -163,7 +163,8 @@ mvgam_predict = function(Xp, family, betas,
                           betas) + attr(Xp, 'model.offset'))
       if(density){
         out <- dnorm(truth, mean = out,
-                     sd = family_pars$sigma_obs)
+                     sd = family_pars$sigma_obs,
+                     log = TRUE)
       }
 
     } else {
@@ -182,7 +183,8 @@ mvgam_predict = function(Xp, family, betas,
                           betas) + attr(Xp, 'model.offset'))
       if(density){
         out <- dlnorm(truth, meanlog = out,
-                      sdlog = family_pars$sigma_obs)
+                      sdlog = family_pars$sigma_obs,
+                      log = TRUE)
       }
 
     } else {
@@ -203,7 +205,8 @@ mvgam_predict = function(Xp, family, betas,
         out <- dstudent_t(truth,
                           df = family_pars$nu,
                           mu = out,
-                          sigma = family_pars$sigma_obs)
+                          sigma = family_pars$sigma_obs,
+                          log = TRUE)
       }
 
     } else {
@@ -222,7 +225,8 @@ mvgam_predict = function(Xp, family, betas,
       out <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                           betas) + attr(Xp, 'model.offset'))
       if(density){
-        out <- dpois(truth, lambda = exp(out))
+        out <- dpois(truth, lambda = exp(out),
+                     log = TRUE)
       }
 
     } else {
@@ -241,7 +245,8 @@ mvgam_predict = function(Xp, family, betas,
 
       if(density){
         out <- dnbinom(truth, mu = exp(out),
-                       size = family_pars$phi)
+                       size = family_pars$phi,
+                       log = TRUE)
       }
 
     } else {
@@ -265,7 +270,8 @@ mvgam_predict = function(Xp, family, betas,
       if(density){
         out <- dbeta(truth,
                      shape1 = shape_pars$shape1,
-                     shape2 = shape_pars$shape2)
+                     shape2 = shape_pars$shape2,
+                     log = TRUE)
       }
 
     } else {
@@ -282,12 +288,12 @@ mvgam_predict = function(Xp, family, betas,
                           betas) + attr(Xp, 'model.offset'))
 
       if(density){
-        out <- exp(mgcv::ldTweedie(y = truth,
+        out <- mgcv::ldTweedie(y = truth,
                                    mu = exp(out),
                                    # Power parameter is fixed
                                    p = 1.5,
                                    phi = family_pars$phi,
-                                   all.derivs = F)[,1])
+                                   all.derivs = F)[,1]
       }
 
     } else {

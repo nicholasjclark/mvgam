@@ -191,12 +191,12 @@ pfilter_mvgam_smooth = function(particles,
       names(family_extracts) <- names(particles[[x]]$family_pars)
 
       # Likelihood
-      series_weight <- mvgam:::mvgam_predict(family = particles[[x]]$family,
+      series_weight <- exp(mvgam:::mvgam_predict(family = particles[[x]]$family,
                                              family_pars = family_extracts,
                                              truth = next_assim$y[series],
                                              Xp = Xpmat,
                                              betas = c(particles[[x]]$betas, 1),
-                                             density = TRUE)
+                                             density = TRUE))
 
     }
     series_weight

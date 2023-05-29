@@ -12,12 +12,12 @@ mvgam_setup <- function(formula,
   # Initialise the GAM for a few iterations to get all necessary structures for
   # generating predictions; also provides information to regularize parametric
   # effect priors for better identifiability of latent trends
-  mgcv::gam(formula(formula),
-            data = data,
-            method = "REML",
-            family = family,
-            knots = knots,
-            control = list(nthreads = min(4, parallel::detectCores() - 1),
-                           maxit = maxit),
-            drop.unused.levels = FALSE)
+  suppressWarnings(mgcv::gam(formula(formula),
+                             data = data,
+                             method = "REML",
+                             family = family,
+                             knots = knots,
+                             control = list(nthreads = min(4, parallel::detectCores() - 1),
+                                            maxit = maxit),
+                             drop.unused.levels = FALSE))
 }
