@@ -27,6 +27,7 @@ Imports:
     zoo,
     smooth,
     MCMCpack,
+    loo,
     dplyr,
     magrittr
 Encoding: UTF-8
