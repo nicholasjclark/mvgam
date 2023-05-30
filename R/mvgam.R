@@ -610,11 +610,30 @@ mvgam = function(formula,
                                 maxit = 30)
 
   # Fill in missing observations in data_train so the size of the dataset is correct when
-  # building the JAGS model
-  suppressWarnings(data_train$y[which(is.na(data_train$y))] <- 0)
+  # building the initial JAGS model.
+  replace_nas = function(var){
+    if(all(is.na(var))){
+      # Sampling from uniform[0.1,0.99] will allow all the gam models
+      # to work, even though the Poisson / Negative Binomial will issue
+      # warnings. This is ok as we just need to produce the linear predictor matrix
+      # and store the coefficient names
+      var <- runif(length(var), 0.1, 0.99)
+    } else {
+      # If there are some non-missing observations,
+      # sample from the observed values to ensure
+      # distributional assumptions are met without warnings
+      var[which(is.na(var))] <-
+        sample(var[which(!is.na(var))],
+               length(which(is.na(var))),
+               replace = TRUE)
+    }
+    var
+  }
 
-  # Make JAGS file and appropriate data structures; note this has to use Poisson but the
-  # resulting JAGS file will be modified to accommodate the specified response distribution accordingly
+  data_train[[terms(formula(formula))[[2]]]] <-
+    replace_nas(data_train[[terms(formula(formula))[[2]]]])
+
+  # Make JAGS file and appropriate data structures
   if(length(ss_gam$smooth) == 0){
     smooths_included <- FALSE
     # If no smooth terms are included, jagam will fail; so add a fake one and remove
