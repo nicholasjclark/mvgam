@@ -46,3 +46,12 @@ test_that('high trend_rel should give a strong trend', {
   expect_doppelganger('high trend_rel gives strong trend',
                       plot_mvgam_series(data = data$data_train))
 })
+
+
+# test_that('test-sim_mvgam', {
+#   library(mvgam)
+#   dat <- sim_mvgam()
+#   mod <- mvgam(y ~ 1,
+#                use_stan = TRUE,
+#                data = dat$data_train)
+# })
