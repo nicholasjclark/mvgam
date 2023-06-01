@@ -9,7 +9,7 @@
   data,
   min_t,
   fc_horizon = 1,
-  pareto_k_threshold = 0.6,
+  pareto_k_threshold = 0.7,
   n_cores = 1
 )
 }
@@ -29,13 +29,13 @@ from the data. Default is either \code{30}, or whatever training time allows for
 \item{fc_horizon}{Integer specifying the number of time steps ahead for evaluating forecasts}
 
 \item{pareto_k_threshold}{Proportion specifying the threshold over which the Pareto shape parameter
-is considered unstable, triggering a model refit. Default is \code{0.6}}
+is considered unstable, triggering a model refit. Default is \code{0.7}}
 
 \item{n_cores}{\code{integer} specifying number of cores for calculating likelihoods in parallel}
 }
 \value{
-A \code{list} containing the sum of approximate ELPD scores, the Pareto-k shape values and
-the specified \code{pareto_k_threshold}
+A \code{list} of class \code{mvgam_lfo} containing the approximate ELPD scores,
+the Pareto-k shape values and 'the specified \code{pareto_k_threshold}
 }
 \description{
 Approximate leave-future-out cross-validation of fitted \code{mvgam} objects

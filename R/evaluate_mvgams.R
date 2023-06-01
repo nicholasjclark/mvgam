@@ -102,6 +102,15 @@ eval_mvgam = function(object,
          call. = FALSE)
   }
 
+  if(sign(n_cores) != 1){
+    stop('argument "n_cores" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_cores%%1 != 0){
+      stop('argument "n_cores" must be a positive integer',
+           call. = FALSE)
+    }
+  }
 
   #### 1. Generate linear predictor matrix for covariates and extract trend estimates at timepoint
   data_train <- object$obs_data
@@ -510,6 +519,16 @@ roll_eval_mvgam = function(object,
          call. = FALSE)
   }
 
+  if(sign(n_cores) != 1){
+    stop('argument "n_cores" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_cores%%1 != 0){
+      stop('argument "n_cores" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
   # Generate time variable from training data
   if(class(object$obs_data)[1] == 'list'){
     all_timepoints <- (data.frame(time = object$obs_data$time)  %>%
@@ -702,6 +721,16 @@ compare_mvgams = function(model1,
   } else {
     if(n_evaluations%%1 != 0){
       stop('argument "n_evaluations" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+  if(sign(n_cores) != 1){
+    stop('argument "n_cores" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_cores%%1 != 0){
+      stop('argument "n_cores" must be a positive integer',
            call. = FALSE)
     }
   }

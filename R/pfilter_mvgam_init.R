@@ -36,6 +36,16 @@ pfilter_mvgam_init = function(object,
     data_assim <- newdata
   }
 
+  if(sign(n_cores) != 1){
+    stop('argument "n_cores" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_cores%%1 != 0){
+      stop('argument "n_cores" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
   # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
   mod_call <- object$call
   if(terms(formula(mod_call))[[2]] != 'y'){

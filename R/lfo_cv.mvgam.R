@@ -11,7 +11,7 @@
 #'`10` lfo-cv calculations (i.e. `pmin(max(data$time) - 10, 30)`)
 #'@param fc_horizon Integer specifying the number of time steps ahead for evaluating forecasts
 #'@param pareto_k_threshold Proportion specifying the threshold over which the Pareto shape parameter
-#'is considered unstable, triggering a model refit. Default is `0.6`
+#'is considered unstable, triggering a model refit. Default is `0.7`
 #'@param n_cores \code{integer} specifying number of cores for calculating likelihoods in parallel
 #'@details Approximate leave-future-out cross-validation uses an expanding training window scheme
 #' to evaluate a model on its forecasting ability. The steps used in this function mirror those laid out
@@ -32,8 +32,8 @@
 #' crossing a certain threshold `pareto_k_threshold`. Only then do we refit the model using
 #' all of the observations up to the time of the failure. We then restart the process and iterate forward
 #' until the next refit is triggered (Bürkner et al. 2020).
-#'@return A `list` containing the sum of approximate ELPD scores, the Pareto-k shape values and
-#'the specified `pareto_k_threshold`
+#'@return A `list` of class `mvgam_lfo` containing the approximate ELPD scores,
+#'the Pareto-k shape values and 'the specified `pareto_k_threshold`
 #'@references Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-future-out cross-validation for Bayesian time series models
 #'Journal of Statistical Computation and Simulation. 90:14, 2499-2523.
 #'@author Nicholas J Clark
@@ -50,8 +50,33 @@ lfo_cv.mvgam = function(object,
                         data,
                         min_t,
                         fc_horizon = 1,
-                        pareto_k_threshold = 0.6,
+                        pareto_k_threshold = 0.7,
                         n_cores = 1){
+
+  if(pareto_k_threshold < 0 || pareto_k_threshold > 1){
+    stop('Argument "pareto_k_threshold" must be a proportion ranging from 0 to 1, inclusive',
+         call. = FALSE)
+  }
+
+  if(sign(fc_horizon) != 1){
+    stop('argument "fc_horizon" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(fc_horizon%%1 != 0){
+      stop('argument "fc_horizon" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
+  if(sign(n_cores) != 1){
+    stop('argument "n_cores" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_cores%%1 != 0){
+      stop('argument "n_cores" must be a positive integer',
+           call. = FALSE)
+    }
+  }
 
   if(missing(data)){
     all_data <- object$obs_data
@@ -61,9 +86,23 @@ lfo_cv.mvgam = function(object,
   N <- max(all_data$time)
 
   # Default minimum training time is 30, or
-  # whatever training time allows for lfo_cv calculations
+  # whatever training time allows for at least 10 lfo_cv calculations
   if(missing(min_t)){
-    min_t <- pmin(max(all_data$time) - 10, 30)
+    min_t <- pmin(N - 10 - fc_horizon, 30)
+  }
+
+  if(min_t < 0){
+    min_t <- 1
+  }
+
+  if(sign(min_t) != 1){
+    stop('argument "min_t" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(min_t%%1 != 0){
+      stop('argument "min_t" must be a positive integer',
+           call. = FALSE)
+    }
   }
 
   # Store the Expected Log Predictive Density (EPLD) at each time point
@@ -86,23 +125,21 @@ lfo_cv.mvgam = function(object,
   loglik_past <- logLik(fit_past, n_cores = n_cores)
 
   # Store the EPLD estimate
-  approx_elpds[min_t + 1] <- log_mean_exp(rowSums(loglik_past[,fc_indices],
-                                                  na.rm = TRUE))
+  approx_elpds[min_t + 1] <- mvgam:::log_mean_exp(mvgam:::sum_rows(loglik_past[,fc_indices]))
 
   # Iterate over i > min_t
   i_refit <- min_t
   refits <- min_t
   ks <- NULL
 
-  for (i in (min_t + 1):(N - fc_horizon)) {
+  for(i in (min_t + 1):(N - fc_horizon)) {
 
     # Get log likelihoods of what would be the
     # last training observations for calculating Pareto k values
     last_obs_indices <- which(c(data_splits$data_train$time,
                                 data_splits$data_test$time) %in%
                                 (i_refit + 1):i)
-    logratio <- rowSums(loglik_past[, last_obs_indices],
-                        na.rm = TRUE)
+    logratio <- mvgam:::sum_rows(loglik_past[, last_obs_indices])
 
     # Use PSIS to estimate whether the Pareto shape parameter of the
     # importance weights is below the specified threshold; a lower value
@@ -134,8 +171,7 @@ lfo_cv.mvgam = function(object,
                             data_splits$data_test$time) %in%
                             (i + 1):(i + fc_horizon))
       loglik_past <- logLik(fit_past, n_cores = n_cores)
-      approx_elpds[i + 1] <- log_mean_exp(rowSums(loglik_past[,fc_indices],
-                                                  na.rm = TRUE))
+      approx_elpds[i + 1] <- mvgam:::log_mean_exp(mvgam:::sum_rows(loglik_past[,fc_indices]))
     } else {
       # If k below threshold, calculate log likelihoods for the
       # forecast observations using the normalised importance weights
@@ -144,15 +180,95 @@ lfo_cv.mvgam = function(object,
                             data_splits$data_test$time) %in%
                             (i + 1):(i + fc_horizon))
       lw <- loo::weights.importance_sampling(psis_obj, normalize = TRUE)[, 1]
-      approx_elpds[i + 1] <- log_sum_exp(lw + rowSums(loglik_past[,fc_indices],
-                                                      na.rm = TRUE))
+      approx_elpds[i + 1] <- mvgam:::log_sum_exp(lw + mvgam:::sum_rows(loglik_past[,fc_indices]))
     }
   }
-return(list(elpds = approx_elpds[(min_t + 1):(N - fc_horizon)],
-            sum_ELPD = sum(approx_elpds, na.rm = TRUE),
-            pareto_ks = ks,
-            eval_timepoints = (min_t + 1):(N - fc_horizon),
-            pareto_k_threshold = pareto_k_threshold))
+  return(structure(list(elpds = approx_elpds[(min_t + 1):(N - fc_horizon)],
+                        sum_ELPD = sum(approx_elpds, na.rm = TRUE),
+                        pareto_ks = ks,
+                        eval_timepoints = (min_t + 1):(N - fc_horizon),
+                        pareto_k_threshold = pareto_k_threshold),
+                   class = 'mvgam_lfo'))
+}
+
+#' Plot Pareto-k and ELPD values from a leave-future-out object
+#'
+#' This function takes an object of class `mvgam_lfo` and create several
+#' informative diagnostic plots
+#' @param object An object of class `mvgam_lfo`
+#' @return A base `R` plot of Pareto-k and ELPD values over the
+#' evaluation timepoints. For the Pareto-k plot, a dashed red line indicates the
+#' specified threshold chosen for triggering model refits. For the ELPD plot,
+#' a dashed red line indicated the bottom 10% quantile of ELPD values. Points below
+#' this threshold may represent outliers that were more difficult to forecast
+#' @export
+plot.mvgam_lfo = function(object){
+
+  # Graphical parameters
+  layout(matrix(1:2, nrow = 2))
+
+  # Plot Pareto-k values over time
+  plot(1, type = "n", bty = 'L',
+       xlab = '',
+       ylab = 'Pareto k',
+       xaxt = 'n',
+       xlim = range(object$eval_timepoints),
+       ylim = c(min(object$pareto_ks) - 0.1,
+                max(object$pareto_ks) + 0.1))
+  axis(side = 1, labels = NA, lwd = 2)
+
+  lines(x = object$eval_timepoints,
+        y = object$pareto_ks,
+        lwd = 2.5)
+
+  abline(h = object$pareto_k_threshold, col = 'white', lwd = 2.85)
+  abline(h = object$pareto_k_threshold, col = "#A25050", lwd = 2.5, lty = 'dashed')
+
+  points(x = object$eval_timepoints,
+         y = object$pareto_ks, pch = 16, col = "white", cex = 1.25)
+  points(x = object$eval_timepoints,
+         y = object$pareto_ks, pch = 16, col = "black", cex = 1)
+
+  points(x = object$eval_timepoints[which(object$pareto_ks > object$pareto_k_threshold)],
+         y = object$pareto_ks[which(object$pareto_ks > object$pareto_k_threshold)],
+         pch = 16, col = "white", cex = 1.5)
+  points(x = object$eval_timepoints[which(object$pareto_ks > object$pareto_k_threshold)],
+         y = object$pareto_ks[which(object$pareto_ks > object$pareto_k_threshold)],
+         pch = 16, col = "#7C0000", cex = 1.25)
+
+  box(bty = 'l', lwd = 2)
+
+  # Plot ELPD values over time
+  plot(1, type = "n", bty = 'L',
+       xlab = 'Time point',
+       ylab = 'ELPD',
+       xlim = range(object$eval_timepoints),
+       ylim = c(min(object$elpds) - 0.1,
+                max(object$elpds) + 0.1))
+
+  lines(x = object$eval_timepoints,
+        y = object$elpds,
+        lwd = 2.5)
+
+  lower_vals <- quantile(object$elpds, probs = c(0.15))
+  abline(h = lower_vals, col = 'white', lwd = 2.85)
+  abline(h = lower_vals, col = "#A25050", lwd = 2.5, lty = 'dashed')
+
+  points(x = object$eval_timepoints,
+         y = object$elpds, pch = 16, col = "white", cex = 1.25)
+  points(x = object$eval_timepoints,
+         y = object$elpds, pch = 16, col = "black", cex = 1)
+
+  points(x = object$eval_timepoints[which(object$elpds < lower_vals)],
+         y = object$elpds[which(object$elpds < lower_vals)],
+         pch = 16, col = "white", cex = 1.5)
+  points(x = object$eval_timepoints[which(object$elpds < lower_vals)],
+         y = object$elpds[which(object$elpds < lower_vals)],
+         pch = 16, col = "#7C0000", cex = 1.25)
+
+  box(bty = 'l', lwd = 2)
+
+  layout(1)
 }
 
 #' Function to generate training and testing splits
@@ -210,4 +326,15 @@ log_sum_exp <- function(x) {
 #' @noRd
 log_mean_exp <- function(x) {
   log_sum_exp(x) - log(length(x))
+}
+
+#' Summing without NAs
+#' @noRd
+sum_rows = function(x){
+  if(NCOL(x) > 1){
+    out <- rowSums(x, na.rm = TRUE)
+  } else {
+    out <- x[!is.na(x)]
+  }
+  return(out)
 }

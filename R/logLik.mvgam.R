@@ -9,6 +9,16 @@
 #'@export
 logLik.mvgam = function(object, n_cores = 1){
 
+  if(sign(n_cores) != 1){
+    stop('argument "n_cores" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_cores%%1 != 0){
+      stop('argument "n_cores" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
   # Extract the location predictions from the fitted model
   mus <- mvgam:::mcmc_chains(object$model_output, 'mus')
 

@@ -40,6 +40,26 @@ pfilter_mvgam_smooth = function(particles,
                                 use_resampling = FALSE,
                                 kernel_lambda = 0.5){
 
+  if(threshold < 0 || threshold > 1){
+    stop('Argument "threshold" must be a proportion ranging from 0 to 1, inclusive',
+         call. = FALSE)
+  }
+
+  if(kernel_lambda < 0 || kernel_lambda > 1){
+    stop('Argument "kernel_lambda" must be a proportion ranging from 0 to 1, inclusive',
+         call. = FALSE)
+  }
+
+  if(sign(n_cores) != 1){
+    stop('argument "n_cores" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_cores%%1 != 0){
+      stop('argument "n_cores" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
   # GP models smooth towards the entire state history, so they are more likely
   # to 'overreact' to changing conditions than are AR or RW trend models. Set the
   # kernel_lambda to be lower as a result

@@ -38,6 +38,16 @@ pfilter_mvgam_online = function(newdata,
     data_assim <- newdata
   }
 
+  if(sign(n_cores) != 1){
+    stop('argument "n_cores" must be a positive integer',
+         call. = FALSE)
+  } else {
+    if(n_cores%%1 != 0){
+      stop('argument "n_cores" must be a positive integer',
+           call. = FALSE)
+    }
+  }
+
   # Load the particles and key objects for tracking last assimilation dates
   if(file.exists(paste0(file_path, '/particles.rda'))){
     load(paste0(file_path, '/particles.rda'))

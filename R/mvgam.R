@@ -71,6 +71,8 @@
 #'@param priors An optional \code{data.frame} with prior
 #'definitions (in JAGS or Stan syntax). See \code{\link{get_mvgam_priors}} and
 #''Details' for more information on changing default prior distributions
+#'@param refit Logical indicating whether this is a refit, called using \code{\link{update.mvgam}}. Users should leave
+#'as `FALSE`
 #'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 #'this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
@@ -363,6 +365,7 @@ mvgam = function(formula,
                  threads = 1,
                  priors,
                  upper_bounds,
+                 refit = FALSE,
                  use_stan = TRUE,
                  max_treedepth,
                  adapt_delta,
@@ -580,9 +583,13 @@ mvgam = function(formula,
   formula <- mvgam:::interpret_mvgam(formula, N = max(data_train$time))
   form_terms <- terms(formula(formula))
   if(terms(formula(formula))[[2]] != 'y'){
-    if('y' %in% names(data_train)){
-      stop('variable "y" found in data but not used as outcome. mvgam uses the name "y" when modeling so this variable should be re-named',
-           call. = FALSE)
+
+    # Check if 'y' is in names, but only if this is not a refit
+    if(!refit){
+      if('y' %in% names(data_train)){
+        stop('variable "y" found in data but not used as outcome. mvgam uses the name "y" when modeling so this variable should be re-named',
+             call. = FALSE)
+      }
     }
     data_train$y <- data_train[[terms(formula(formula))[[2]]]]
     if(!missing(data_test)){

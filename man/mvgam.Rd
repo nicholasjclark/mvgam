@@ -27,6 +27,7 @@ mvgam(
   threads = 1,
   priors,
   upper_bounds,
+  refit = FALSE,
   use_stan = TRUE,
   max_treedepth,
   adapt_delta,
@@ -124,6 +125,9 @@ definitions (in JAGS or Stan syntax). See \code{\link{get_mvgam_priors}} and
 this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 truncation entirely (i.e. there is no upper bound for each series)}
+
+\item{refit}{Logical indicating whether this is a refit, called using \code{\link{update.mvgam}}. Users should leave
+as \code{FALSE}}
 
 \item{use_stan}{Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
 the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if \code{cmdstanr} is not available,
