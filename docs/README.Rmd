@@ -21,7 +21,17 @@ knitr::opts_chunk$set(
 *mvgam*
 ================
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models for time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others. 
+The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models (DGAMs) for time series with dynamic trend components. The general form of a DGAM is as follows:
+
+$$f(\tilde{\boldsymbol{y}}_{t})={\boldsymbol{a}}+\sum\limits_{i=1}^I\boldsymbol{s}_{i,t}\boldsymbol{x}_{i,t}+\boldsymbol{z}_{t}\,,$$
+
+Here $\boldsymbol{f}$ is an appropriate link function, $\boldsymbol{a}$ is the unknown intercept, the $\boldsymbol{s}$'s are unknown smooth functions of covariates ($\boldsymbol{x}$'s) and $\boldsymbol{z}$ is a dynamic latent trend. Each smooth function $\boldsymbol{s}_{i}$ is composed of basis expansions whose coefficients, which must be estimated, control the functional relationship between $\boldsymbol{x}_{i}$ and $f(\tilde{\boldsymbol{y}})$. For the dynamic latent component, in its most basic form we assume a random walk with drift:
+
+$$\boldsymbol{z}_{t}=\phi+\boldsymbol{z}_{t-1}+\boldsymbol{e}_{t}\,,$$
+
+where $\phi$ is an optional drift parameter (if the latent trend is assumed to not be stationary) and $\boldsymbol{e}$ is drawn from a zero-centred Gaussian distribution. This model is easily modified to include other autoregressive terms or to evolve as smooth Gaussian Process functions.
+
+The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others. 
 
 ## Disclaimer
 Please note that the `mvgam` package is under active development, and it is likely that certain functionality will change on a regular basis. As such, please take caution when implementing the package for automated routines. Also note that, because of the many advantages of `Stan` over `JAGS`, *further development of the package will only be applied to `Stan`*. This includes the planned addition of more response distributions, plans to handle zero-inflation, and plans to incorporate a greater variety of trend models. Users are strongly encouraged to opt for `Stan` over `JAGS` in any proceeding workflows.
@@ -57,7 +67,7 @@ As `mvgam` acts as an interface to `Stan` and `JAGS`, please additionally cite w
   10.18637/jss.v076.i01
 - Plummer, M. (2013). JAGS: A program for analysis of Bayesian graphical models using Gibbs sampling.          *Proceedings of the 3rd International Workshop on Distributed Statistical Computing*. 124(125.10).
 
-Further, `mvgam` relies on several other `R` packages and, of course, on `R` itself. To
+`mvgam` relies on several other `R` packages and, of course, on `R` itself. To
 find out how to cite R and its packages, use the `citation` function. There are
 some features of `mvgam` which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines, which entirely rely on `mgcv`. The `rstan` and `cmdstanr` packages together with `Rcpp` makes `Stan` conveniently accessible in `R`, while the `rjags` and `runjags` packages together with the `coda` package make `JAGS` accessible in `R`. If you use some of these features, please also consider citing the related packages.
 
@@ -377,12 +387,14 @@ lfo_poor <- lfo_cv(poor, min_t = 36,
                    n_cores = 3)
 ```
 
-The `S3` plotting function for these `lfo_cv` objects will show the Pareto-k values and ELPD values over the evaluation time points. For the Pareto-k plot, a dashed red line indicates the specified threshold chosen for triggering model refits. For the ELPD plot, a dashed red line indicated the bottom 10% quantile of ELPD values. Points below this threshold may represent outliers that were more difficult to forecast
+The `S3` plotting function for these `lfo_cv` objects will show the Pareto-k values and ELPD values over the evaluation time points. For the Pareto-k plot, a dashed red line indicates the specified threshold chosen for triggering model refits. For the ELPD plot, a dashed red line indicates the bottom 10% quantile of ELPD values. Points below this threshold may represent outliers that were more difficult to forecast
 ```{r, fig.width=6.5, fig.height=7.5, dpi=160}
+par(mar = c(4,4, 1, 1))
 plot(lfo_good)
 ```
 
 ```{r, fig.width=6.5, fig.height=7.5, dpi=160}
+par(mar = c(4,4, 1, 1))
 plot(lfo_poor)
 ```
 
@@ -398,7 +410,7 @@ lfo_good$sum_ELPD
 lfo_poor$sum_ELPD
 ```
 
-As before, these metrics all favour the more complex model over the simpler "poor" model. This gives us confidence that the more complex model will perform better in future forecasting exercises. The first approximator is faster as it does not require refits, but caution is needed as the state of the latent trend at the evaluation time point has already been informed by both the past and future observations. The second approximator, using PSIS for approximate leave-future-out, should be preferred when compuationally accessible.
+As before, these metrics all favour the more complex model over the simpler "poor" model. This gives us confidence that the more complex model will perform better in future forecasting exercises. The first approximator is faster as it does not require refits, but caution is needed as the state of the latent trend at the evaluation time point has already been informed by both the past and future observations. The second approximator, using PSIS for approximate leave-future-out, should be preferred when computationally accessible.
 
 ## Extended observation families
 `mvgam` was originally designed to analyse and forecast non-negative integer-valued data (counts). These data are traditionally challenging to analyse with existing time-series analysis packages. But further development of `mvgam` has resulted in support for a growing number of observation families that extend to other types of data. Currently, the package can handle data for the following families:  
@@ -411,7 +423,7 @@ As before, these metrics all favour the more complex model over the simpler "poo
 * `nb()` for overdispersed count data
 * `tweedie()` for overdispersed count data
   
-Note that only `poisson()`, `nb()`, and `tweedie()` are available if using `JAGS`. All families, apart from `tweedie()`, are supported if using `Stan`. See `??mvgam_families` for more information. A simple example for simulating and modelling proportional data with `Beta` observations over a set of seasonal series with independent Gaussian Process dynamic trends:
+Note that only `poisson()`, `nb()`, and `tweedie()` are available if using `JAGS`. All families, apart from `tweedie()`, are supported if using `Stan`. See `??mvgam_families` for more information. Below is a simple example for simulating and modelling proportional data with `Beta` observations over a set of seasonal series with independent Gaussian Process dynamic trends:
 ```{r, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=6.5, dpi=160}
 set.seed(100)
 data <- sim_mvgam(family = betar(),
@@ -431,7 +443,7 @@ mod <- mvgam(y ~ s(season),
              run_model = TRUE)
 ```
 
-Inspect the summary to see that the posterior now also contains estimates for the `Beta` precision parameters
+Inspect the summary to see that the posterior now also contains estimates for the `Beta` precision parameters $\phi$
 ```{r}
 summary(mod)
 ```
@@ -442,7 +454,7 @@ plot(mod, type = 'forecast', newdata = data$data_test, series = 2)
 ```
 
 ## Dynamic coefficient models
-Dynamic fixed-effect coefficients (often referred to as dynamic linear models) can also be readily incorporated into GAMs / DGAMs. In `mvgam`, the `dynamic()` formula wrapper is used to set these up. The plan is to incorporate a range of dynamic options (such as random walk, ar1 etc...) but for the moment only low-rank Gaussian Process smooths are allowed (making use of the `gp` basis in `mgcv`). An example below illustrates:
+Dynamic fixed-effect coefficients (often referred to as dynamic linear models) can also be readily incorporated into GAMs / DGAMs. In `mvgam`, the `dynamic()` formula wrapper is used to set these up. The plan is to incorporate a range of dynamic options (such as random walk, AR1 etc...) but for the moment only low-rank Gaussian Process smooths are allowed (making use of the `gp` basis in `mgcv`). An example below illustrates:
   
 Simulate a time-varying coefficient using a squared exponential Gaussian Process function with length scale $\rho$=10
 ```{r}
