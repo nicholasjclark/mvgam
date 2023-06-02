@@ -31,16 +31,8 @@ jobs:
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           dependencies: NA
-          extra-packages: |
-              any::pkgdown
-              stan-dev/cmdstanr
+          extra-packages: any::pkgdown, local::.
           needs: website
-
-      - name: Build Cmdstan
-        run: |
-          cmdstanr::check_cmdstan_toolchain(fix = TRUE)
-          cmdstanr::install_cmdstan(cores = parallel::detectCores())
-        shell: Rscript {0}
 
       - name: Build site
         run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)

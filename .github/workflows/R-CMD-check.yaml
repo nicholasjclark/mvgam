@@ -54,6 +54,7 @@ jobs:
               stan-dev/cmdstanr
               testthat
               rcmdcheck
+
       - name: Build Cmdstan
         run: |
           cmdstanr::check_cmdstan_toolchain(fix = TRUE)
