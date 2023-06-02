@@ -32,12 +32,13 @@ jobs:
 
       # As cmdstanr is not yet on CRAN, configure the action to only install the
       # 'Depends' packages by default and then manually specify the 'Suggests'
-      # packages that are needed for R CMD CHECK
+      # packages that are needed for pkgdown
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           dependencies: NA
           extra-packages: |
-              pkgdown
+              any::pkgdown
+              local::.
               knitr
               rmarkdown
               stan-dev/cmdstanr
