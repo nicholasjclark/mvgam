@@ -30,10 +30,26 @@ jobs:
         with:
           use-public-rspm: true
 
+      # As cmdstanr is not yet on CRAN, configure the action to only install the
+      # 'Depends' packages by default and then manually specify the 'Suggests'
+      # packages that are needed for R CMD CHECK
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::pkgdown, local::.
+          dependencies: NA
+          extra-packages: |
+              pkgdown
+              knitr
+              rmarkdown
+              stan-dev/cmdstanr
+              testthat
+              rcmdcheck
           needs: website
+
+      - name: Build Cmdstan
+        run: |
+          cmdstanr::check_cmdstan_toolchain(fix = TRUE)
+          cmdstanr::install_cmdstan(cores = parallel::detectCores())
+        shell: Rscript {0}
 
       - name: Build site
         run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)

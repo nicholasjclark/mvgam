@@ -40,8 +40,7 @@ Suggests:
     cmdstanr (>= 0.4.0),
     rjags,
     runjags,
-    testthat,
-    vdiffr
+    testthat
 VignetteBuilder: knitr
 URL: https://github.com/nicholasjclark/mvgam,
     https://nicholasjclark.github.io/mvgam/

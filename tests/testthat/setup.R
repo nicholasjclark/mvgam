@@ -2,12 +2,6 @@
 library("testthat")
 library("mvgam")
 
-#### Allow conditional use of vdiffr ####
-`expect_doppelganger` <- function(title, fig, ...) {
-  testthat::skip_if_not_installed("vdiffr")
-  vdiffr::expect_doppelganger(title, fig, ...)
-}
-
 #### Fit two models for each testing combination to ensure
 # Stan-based forecasts and mvgam-based forecasts are similar;
 # use 1000 posterior samples for each chain so out of sample forecast

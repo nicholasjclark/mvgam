@@ -52,10 +52,7 @@ jobs:
               knitr
               rmarkdown
               stan-dev/cmdstanr
-              rjags
-              runjags
               testthat
-              vdiffr
               rcmdcheck
       - name: Build Cmdstan
         run: |
