@@ -43,4 +43,5 @@ Suggests:
     testthat,
     vdiffr
 VignetteBuilder: knitr
-URL: https://github.com/nicholasjclark/mvgam
+URL: https://github.com/nicholasjclark/mvgam,
+    https://nicholasjclark.github.io/mvgam/
