@@ -27,7 +27,7 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
                             ...){
 
   # Check arguments
-  if(class(object) != 'mvgam'){
+  if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 

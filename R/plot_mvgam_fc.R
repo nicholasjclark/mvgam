@@ -56,7 +56,7 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
                          return_score = FALSE, ...){
 
   # Check arguments
-  if(class(object) != 'mvgam'){
+  if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 

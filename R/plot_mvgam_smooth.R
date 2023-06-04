@@ -47,7 +47,7 @@ plot_mvgam_smooth = function(object,
                              newdata){
 
   # Check arguments
-  if(class(object) != 'mvgam'){
+  if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 

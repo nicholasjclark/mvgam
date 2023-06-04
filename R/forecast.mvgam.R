@@ -37,7 +37,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
                           n_cores = 1,
                           type = 'response'){
   # Check arguments
-  if(class(object) != 'mvgam'){
+  if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 

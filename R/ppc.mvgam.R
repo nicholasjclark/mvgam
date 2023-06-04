@@ -63,7 +63,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
 
   optional_args <- list(...)
 
-  if(class(object) != 'mvgam'){
+  if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 

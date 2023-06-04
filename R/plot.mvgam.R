@@ -42,7 +42,7 @@ plot.mvgam = function(object, type = 'residuals',
                                             "pterms", "forecast", "trend",
                                             "uncertainty", "factors", "series"))
 
-  if(class(object) != 'mvgam'){
+  if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 

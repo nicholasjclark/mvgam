@@ -68,7 +68,7 @@ eval_mvgam = function(object,
                       weights){
 
   # Check arguments
-  if(class(object) != 'mvgam'){
+  if (!(inherits(object, 'mvgam'))) {
     stop('argument "object" must be of class "mvgam"')
   }
 
@@ -510,7 +510,7 @@ roll_eval_mvgam = function(object,
                            weights){
 
   # Check arguments
-  if(class(object) != 'mvgam'){
+  if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 
@@ -687,11 +687,11 @@ compare_mvgams = function(model1,
                           weights){
 
   # Check arguments
-  if(class(model1) != 'mvgam'){
+  if (!(inherits(model1, "mvgam"))) {
     stop('argument "model1" must be of class "mvgam"')
   }
 
-  if(class(model2) != 'mvgam'){
+  if (!(inherits(model2, "mvgam"))) {
     stop('argument "model2" must be of class "mvgam"')
   }
 

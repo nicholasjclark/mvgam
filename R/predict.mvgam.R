@@ -22,7 +22,7 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
                          n_cores = 1){
 
   # Argument checks
-  if(class(object) != 'mvgam'){
+  if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 

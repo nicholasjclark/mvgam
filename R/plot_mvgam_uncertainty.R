@@ -16,7 +16,7 @@ plot_mvgam_uncertainty = function(object, series = 1, newdata,
                                   hide_xlabels = FALSE){
 
   # Check arguments
-  if(class(object) != 'mvgam'){
+  if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 
