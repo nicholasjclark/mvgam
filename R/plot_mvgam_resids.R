@@ -27,7 +27,7 @@ plot_mvgam_resids = function(object, series = 1, n_bins = 15,
                              newdata, data_test){
 
   # Check arguments
-  if(class(object) != 'mvgam'){
+  if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 

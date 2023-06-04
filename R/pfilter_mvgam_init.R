@@ -28,7 +28,7 @@ pfilter_mvgam_init = function(object,
                               n_cores = 2){
 
   # Check arguments
-  if(class(object) != 'mvgam'){
+  if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 

@@ -47,7 +47,7 @@ plot_mvgam_series = function(object,
 
   # Check arguments
   if(!missing(object)){
-    if(class(object) != 'mvgam'){
+    if (!(inherits(object, "mvgam"))) {
       stop('argument "object" must be of class "mvgam"')
     }
   }
