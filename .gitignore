@@ -1,4 +1,3 @@
-.Rproj.user
 .Rhistory
 .RData
 .Ruserdata
@@ -6,3 +5,4 @@ NEON_manuscript/Results/
 manuscript_analysis
 doc
 Meta
+*.Rproj*
