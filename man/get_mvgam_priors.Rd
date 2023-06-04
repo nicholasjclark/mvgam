@@ -100,7 +100,6 @@ mod_default <- mvgam(y ~ s(series, bs = 're') +
               family = 'nb',
               data = dat$data_train,
               trend_model = 'AR2',
-              priors = test_priors,
               run_model = FALSE)
 
 # Inspect the model file with default mvgam priors
