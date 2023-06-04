@@ -3,7 +3,7 @@ Title: Multivariate (Dynamic) Generalized Additive Models
 Version: 1.0.5
 Date: 2023-06-03
 Authors@R:
-    person("Nicholas", "Clark", , "nicholas.j.clark1214@gmail.com", role = c("aut", "cre"),
+    person("Nicholas J", "Clark", , "nicholas.j.clark1214@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-7131-3301"))
 Description: Fitting Bayesian Generalised Additive Models to sets of discrete
     time series. The primary purpose of the package is to build a version
