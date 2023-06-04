@@ -1,46 +1,51 @@
 Package: mvgam
 Title: Multivariate (Dynamic) Generalized Additive Models
 Version: 1.0.5
-Date: 2023-03-29
-Authors@R: 
-    person(given = "Nicholas",
-           family = "Clark",
-           role = c("aut", "cre"),
-           email = "nicholas.j.clark1214@gmail.com")
-Description: This package is for fitting Bayesian Generalised Additive Models to sets of discrete time series. 
-             The primary purpose of the package is to build a version of dynamic factor models that incorporates 
-             the flexibility of GAMs in the linear predictor and latent dynamic trend components that are useful 
-             for time series analysis and forecasting. Estimation is performed using Markov Chain Monte Carlo (MCMC) with
-             either the Gibbs sampling software JAGS or with Hamiltonian Monte Carlo in the software Stan. The package also includes 
-             utilities for online updating of  forecast distributions with a recursive particle filter that 
-             uses sequential importance sampling to assimilate new observations as they become available. References: 
-             Clark & Wells (2022) <https://doi.org/10.1111/2041-210X.13974>
-Maintainer: Nicholas J Clark <nicholas.j.clark1214@gmail.com>
+Date: 2023-06-03
+Authors@R:
+    person("Nicholas", "Clark", , "nicholas.j.clark1214@gmail.com", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0001-7131-3301"))
+Description: Fitting Bayesian Generalised Additive Models to sets of discrete
+    time series. The primary purpose of the package is to build a version
+    of dynamic factor models that incorporates the flexibility of GAMs in
+    the linear predictor and latent dynamic trend components that are
+    useful for time series analysis and forecasting. Estimation is
+    performed using Markov Chain Monte Carlo (MCMC) with either the Gibbs
+    sampling software JAGS or with Hamiltonian Monte Carlo in the software
+    Stan. The package also includes utilities for online updating of
+    forecast distributions with a recursive particle filter that uses
+    sequential importance sampling to assimilate new observations as they
+    become available. References: Clark & Wells (2022)
+    <doi:10.1111/2041-210X.13974>.
 License: MIT + file LICENSE
-Depends: R (>= 3.6.0), mgcv, parallel, rstan (>= 2.19.2)
+URL: https://github.com/nicholasjclark/mvgam
+Depends:
+    mgcv,
+    parallel,
+    R (>= 3.6.0),
+    rstan (>= 2.19.2)
 Imports: 
-    pbapply,
-    tweedie,
-    lubridate,
-    MASS,
-    purrr,
-    zoo,
-    smooth,
-    MCMCpack,
-    loo,
     dplyr,
-    magrittr
+    lubridate,
+    magrittr,
+    MASS,
+    MCMCpack,
+    pbapply,
+    purrr,
+    smooth,
+    tweedie,
+    zoo
+Suggests: 
+    cmdstanr (>= 0.4.0),
+    knitr,
+    rjags,
+    rmarkdown,
+    runjags,
+    testthat,
+    vdiffr
+VignetteBuilder:
+    knitr
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
-Suggests: 
-    knitr, 
-    rmarkdown, 
-    cmdstanr (>= 0.4.0),
-    rjags,
-    runjags,
-    testthat
-VignetteBuilder: knitr
-URL: https://github.com/nicholasjclark/mvgam,
-    https://nicholasjclark.github.io/mvgam/
