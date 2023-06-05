@@ -1,4 +1,7 @@
 #'@title Plot mvgam posterior predictive checks for a specified series
+#'@importFrom stats quantile density ecdf formula terms
+#'@importFrom graphics hist abline box rect lines polygon par
+#'@importFrom grDevices rgb
 #'@name ppc.mvgam
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'

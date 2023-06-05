@@ -9,7 +9,7 @@ pfilter_mvgam_smooth(
   mgcv_model,
   next_assim,
   threshold = 0.25,
-  n_cores = parallel::detectCores() - 1,
+  n_cores = 1,
   use_resampling = FALSE,
   kernel_lambda = 0.5
 )
@@ -42,8 +42,6 @@ will be no loss of diversity, especially if successive resampling take place. De
 
 \item{kernel_lambda}{\code{proportional numeric} specifying the strength of smoothing to use when
 pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}}
-
-\item{file_path}{\code{character} string specifying the file path for locating the particles}
 }
 \value{
 A \code{list} object of \code{length = n_particles} containing information on parameters and

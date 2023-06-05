@@ -10,14 +10,14 @@ dynamic(variable, rho = 5, stationary = TRUE)
 \item{variable}{The variable that the dynamic smooth will be a function of}
 
 \item{rho}{Positive numeric stating the length scale to be used for approximating the
-squared exponential Gaussian Process smooth. See \code{\link[mcgv]{gp.smooth}} for details}
+squared exponential Gaussian Process smooth. See \code{\link[mgcv]{gp.smooth}} for details}
 
 \item{stationary}{logical. If \code{TRUE} (the default), the latent Gaussian Process
 smooth will not have a linear trend component. If \code{FALSE},
 a linear trend in the covariate is added to the Gaussian Process smooth. Leave at \code{TRUE}
 if you do not believe the coefficient is evolving with much trend, as the linear component of the
 basis functions can be hard to penalize to zero. This sometimes causes divergence issues in \code{Stan}.
-See \code{\link[mcgv]{gp.smooth}} for details}
+See \code{\link[mgcv]{gp.smooth}} for details}
 }
 \description{
 Set up time-varying (dynamic) coefficients for use in mvgam models. Currently, only

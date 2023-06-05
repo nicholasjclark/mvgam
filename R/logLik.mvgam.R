@@ -1,5 +1,6 @@
 #'@title Compute pointwise Log-Likelihoods from fitted `mvgam` objects
 #'
+#'@importFrom parallel setDefaultCluster stopCluster
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param n_cores \code{integer} specifying number of cores for calculating likelihoods in parallel
 #'@return A `matrix` of dimension `n_samples x n_observations` containing the pointwise
@@ -20,7 +21,7 @@ logLik.mvgam = function(object, n_cores = 1){
   }
 
   # Extract the location predictions from the fitted model
-  mus <- mvgam:::mcmc_chains(object$model_output, 'mus')
+  mus <- mcmc_chains(object$model_output, 'mus')
 
   # Need to know which series each observation belongs to so we can
   # pull out appropriate family-level parameters (overdispersions, shapes, etc...)
@@ -41,7 +42,7 @@ logLik.mvgam = function(object, n_cores = 1){
 
   # Family-specific parameters
   family <- object$family
-  family_pars <- mvgam:::extract_family_pars(object = object)
+  family_pars <- extract_family_pars(object = object)
   n_series <- NCOL(object$ytimes)
 
   # Calculate log-likelihoods
@@ -74,7 +75,7 @@ logLik.mvgam = function(object, n_cores = 1){
       # Log-likelihood
       Xp <- t(as.matrix(mus[samp_index, x]))
       attr(Xp, 'model.offset') <- 0
-      mvgam:::mvgam_predict(family = family,
+      mvgam_predict(family = family,
                             family_pars = family_extracts,
                             truth = obs[x],
                             Xp = Xp,

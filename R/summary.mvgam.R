@@ -373,7 +373,7 @@ coef.mvgam = function(object, summarise = TRUE){
     mvgam_coefs <- mcmc_summary(object$model_output, 'b')[,c(3:7)]
     rownames(mvgam_coefs) <- coef_names
   } else {
-    mvgam_coefs <- MCMCvis::MCMCchains(object$model_output, 'b')
+    mvgam_coefs <- mcmc_chains(object$model_output, 'b')
     colnames(mvgam_coefs) <- coef_names
   }
 

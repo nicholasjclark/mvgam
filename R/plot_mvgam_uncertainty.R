@@ -1,4 +1,6 @@
 #'Plot mvgam forecast uncertainty contributions for a specified series
+#'@importFrom graphics legend
+#'@importFrom stats predict
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param newdata A \code{dataframe} or \code{list} containing at least 'series' and 'time' for the forecast horizon, in

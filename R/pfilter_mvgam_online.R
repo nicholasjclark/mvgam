@@ -32,7 +32,7 @@ pfilter_mvgam_online = function(newdata,
                                 threshold = 0.5,
                                 use_resampling = FALSE,
                                 kernel_lambda = 0.25,
-                                n_cores = parallel::detectCores() - 1){
+                                n_cores = 1){
 
   if(!missing("newdata")){
     data_assim <- newdata

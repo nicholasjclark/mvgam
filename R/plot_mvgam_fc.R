@@ -1,4 +1,5 @@
 #'Plot mvgam posterior predictions for a specified series
+#'@importFrom stats formula terms
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'

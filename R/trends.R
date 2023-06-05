@@ -1,4 +1,6 @@
 #' Supported mvgam trend models
+#' @importFrom utils tail
+#' @importFrom stats rnorm
 #' @details \code{mvgam} currently supports the following dynamic trend models:
 #'\itemize{
 #'   \item \code{RW} Random Walk
@@ -476,7 +478,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
           ar1 <- 1
         }
 
-        mvgam:::sim_ar3(drift = ifelse('drift' %in% names(trend_pars),
+        sim_ar3(drift = ifelse('drift' %in% names(trend_pars),
                                        trend_pars$drift[lv],
                                        0),
                         ar1 = ar1,
@@ -494,7 +496,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
 
     if(trend_model == 'GP'){
       next_lvs <- do.call(cbind, lapply(seq_len(n_lv), function(lv){
-        mvgam:::sim_gp(alpha_gp = trend_pars$alpha_gp[lv],
+        sim_gp(alpha_gp = trend_pars$alpha_gp[lv],
                        rho_gp = trend_pars$rho_gp[lv],
                        last_trends = trend_pars$last_lvs[[lv]],
                        h = h)
@@ -516,7 +518,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
         ar1 <- 1
       }
 
-      trend_fc <-  mvgam:::sim_ar3(drift = ifelse('drift' %in% names(trend_pars),
+      trend_fc <-  sim_ar3(drift = ifelse('drift' %in% names(trend_pars),
                                                   trend_pars$drift,
                                                   0),
                                    ar1 = ar1,
@@ -532,7 +534,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
     }
 
     if(trend_model == 'GP'){
-      trend_fc <- mvgam:::sim_gp(alpha_gp = trend_pars$alpha_gp,
+      trend_fc <- sim_gp(alpha_gp = trend_pars$alpha_gp,
                                  rho_gp = trend_pars$rho_gp,
                                  last_trends = trend_pars$last_trends,
                                  h = h)
@@ -549,7 +551,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
       last_trendvec <- unlist(lapply(trend_pars$last_lvs,
                                      function(x) tail(x, 1)))
 
-      trend_fc <- mvgam:::sim_var1(A = Amat,
+      trend_fc <- sim_var1(A = Amat,
                                    Sigma = Sigmamat,
                                    last_trends = last_trendvec,
                                    h = h)

@@ -1,5 +1,6 @@
 #'@title Approximate leave-future-out cross-validation of fitted `mvgam` objects
 #'@name lfo_cv.mvgam
+#'@importFrom stats update logLik
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
@@ -110,7 +111,7 @@ lfo_cv.mvgam = function(object,
 
   # Initialize the process for i = min_t, generating a
   # conditional forecast for all of the future data
-  data_splits <- mvgam:::cv_split(all_data, last_train = min_t)
+  data_splits <- cv_split(all_data, last_train = min_t)
 
   # Fit model to training and forecast the testing
   fit_past <- update(object,
@@ -125,7 +126,7 @@ lfo_cv.mvgam = function(object,
   loglik_past <- logLik(fit_past, n_cores = n_cores)
 
   # Store the EPLD estimate
-  approx_elpds[min_t + 1] <- mvgam:::log_mean_exp(mvgam:::sum_rows(loglik_past[,fc_indices]))
+  approx_elpds[min_t + 1] <- log_mean_exp(sum_rows(loglik_past[,fc_indices]))
 
   # Iterate over i > min_t
   i_refit <- min_t
@@ -139,7 +140,7 @@ lfo_cv.mvgam = function(object,
     last_obs_indices <- which(c(data_splits$data_train$time,
                                 data_splits$data_test$time) %in%
                                 (i_refit + 1):i)
-    logratio <- mvgam:::sum_rows(loglik_past[, last_obs_indices])
+    logratio <- sum_rows(loglik_past[, last_obs_indices])
 
     # Use PSIS to estimate whether the Pareto shape parameter of the
     # importance weights is below the specified threshold; a lower value
@@ -159,7 +160,7 @@ lfo_cv.mvgam = function(object,
       refits <- c(refits, i)
 
       # Subset the data to now include the last set of training observations
-      data_splits <- mvgam:::cv_split(all_data, last_train = i)
+      data_splits <- cv_split(all_data, last_train = i)
 
       # Re-fit the model
       fit_past <- update(fit_past,
@@ -170,8 +171,8 @@ lfo_cv.mvgam = function(object,
       fc_indices <- which(c(data_splits$data_train$time,
                             data_splits$data_test$time) %in%
                             (i + 1):(i + fc_horizon))
-      loglik_past <- logLik(fit_past, n_cores = n_cores)
-      approx_elpds[i + 1] <- mvgam:::log_mean_exp(mvgam:::sum_rows(loglik_past[,fc_indices]))
+      loglik_past <- logLik.mvgam(fit_past, n_cores = n_cores)
+      approx_elpds[i + 1] <- log_mean_exp(sum_rows(loglik_past[,fc_indices]))
     } else {
       # If k below threshold, calculate log likelihoods for the
       # forecast observations using the normalised importance weights
@@ -180,7 +181,7 @@ lfo_cv.mvgam = function(object,
                             data_splits$data_test$time) %in%
                             (i + 1):(i + fc_horizon))
       lw <- loo::weights.importance_sampling(psis_obj, normalize = TRUE)[, 1]
-      approx_elpds[i + 1] <- mvgam:::log_sum_exp(lw + mvgam:::sum_rows(loglik_past[,fc_indices]))
+      approx_elpds[i + 1] <- log_sum_exp(lw + sum_rows(loglik_past[,fc_indices]))
     }
   }
   return(structure(list(elpds = approx_elpds[(min_t + 1):(N - fc_horizon)],
@@ -195,6 +196,7 @@ lfo_cv.mvgam = function(object,
 #'
 #' This function takes an object of class `mvgam_lfo` and create several
 #' informative diagnostic plots
+#' @importFrom graphics layout axis lines abline polygon points
 #' @param object An object of class `mvgam_lfo`
 #' @return A base `R` plot of Pareto-k and ELPD values over the
 #' evaluation timepoints. For the Pareto-k plot, a dashed red line indicates the

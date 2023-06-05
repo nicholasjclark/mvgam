@@ -164,7 +164,7 @@ Cannot be <code>&gt;n_series</code>. Defaults arbitrarily to <code>min(2, floor(
 <dt>trend_model</dt>
 <dd><p><code>character</code> specifying the time series dynamics for the latent trend. Options are:
 'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-and the observation process is the only source of error; similarly to what is estimated by <code>gam</code>),
+and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>),
 'RW' (random walk with possible drift),
 'AR1' (with possible drift),
 'AR2' (with possible drift) or
@@ -178,7 +178,7 @@ only available in <code>stan</code>)</p></dd>
 <dd><p><code>logical</code> estimate a drift parameter in the latent trend components. Useful if the latent
 trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-predictor (which it is by default when calling <code>jagam</code>). Therefore this defaults to <code>FALSE</code></p></dd>
+predictor (which it is by default when calling <code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>). Therefore this defaults to <code>FALSE</code></p></dd>
 
 
 <dt>chains</dt>
@@ -276,7 +276,7 @@ In addition, smooths can often try to wiggle excessively to capture any autocorr
 which exacerbates the problem of forecasting ahead. As GAMs are very naturally viewed through a Bayesian lens, and we often
 must model time series that show complex distributional features and missing data, parameters for <code>mvgam</code> models are estimated
 in a Bayesian framework using Markov Chain Monte Carlo.
-<br><br><em>Priors</em>: A <code>jagam</code> model file is generated from <code>formula</code> and modified to include any latent
+<br><br><em>Priors</em>: A <code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code> model file is generated from <code>formula</code> and modified to include any latent
 temporal processes. Prior distributions for most important model parameters can be altered by the user to inspect model
 sensitivities to given priors (see <code><a href="get_mvgam_priors.html">get_mvgam_priors</a></code> for details). Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 accordingly. However more control over the model specification can be accomplished by first using <code>mvgam</code> as a
@@ -285,11 +285,11 @@ of <code>mvgam</code> by setting <code>run_model = FALSE</code> and this is enco
 formally checked to ensure they are in the right syntax for the respective probabilistic modelling framework, so it is
 up to the user to ensure these are correct (i.e. use <code>dnorm</code> for normal densities in <code>JAGS</code>, with the mean and precision
 parameterisation; but use <code>normal</code> for normal densities in <code>Stan</code>, with the mean and standard deviation parameterisation)
-<br><br><em>Random effects</em>: For any smooth terms using the random effect basis (<code>smooth.construct.re.smooth.spec</code>),
+<br><br><em>Random effects</em>: For any smooth terms using the random effect basis (<code><a href="https://rdrr.io/pkg/mgcv/man/smooth.construct.re.smooth.spec.html" class="external-link">smooth.construct.re.smooth.spec</a></code>),
 a non-centred parameterisation is automatically employed to avoid degeneracies that are common in hierarchical models.
 Note however that centred versions may perform better for series that are particularly informative, so as with any
 foray into Bayesian modelling, it is worth building an understanding of the model's assumptions and limitations by following a
-principled workflow. Also note that models are parameterised using <code>drop.unused.levels = FALSE</code> in <code>jagam</code>
+principled workflow. Also note that models are parameterised using <code>drop.unused.levels = FALSE</code> in <code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>
 to ensure predictions can be made for all levels of the supplied factor variable
 <br><br><em>Overdispersion parameters</em>: When more than one series is included in <code>data_train</code> and an overdispersed
 exponential family is used, by default the overdispersion parameters (<code>r</code> for Negative Binomial, <code>twdis</code> for Tweedie) are
@@ -326,7 +326,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code>jagam</code>, <code>gam</code></p></div>
+    <div class="dont-index"><p><code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -335,18 +335,16 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate a collection of three time series that have shared seasonal dynamics</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>T <span class="op">=</span> <span class="fl">80</span>, n_series <span class="op">=</span> <span class="fl">3</span>, prop_missing <span class="op">=</span> <span class="fl">0.1</span>,</span></span>
 <span class="r-in"><span>                trend_rel <span class="op">=</span> <span class="fl">0.6</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot key summary statistics for a single series</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot all series together</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Formulate a model using Stan where series share a cyclic smooth for</span></span></span>
 <span class="r-in"><span><span class="co"># seasonality and each series has an independent random walk temporal process;</span></span></span>
@@ -360,118 +358,12 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># View the model code in Stan language</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // Stan model code generated by package mvgam</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> data {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; total_obs; // total number of observations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n; // number of timepoints per series</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_sp; // number of smoothing parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_series; // number of series</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; num_basis; // total number of basis coefficients</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] zero; // prior locations for basis coefficients</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   real p_taus[1]; // prior precisions for parametric coefficients</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   real p_coefs[1]; // prior locations for parametric coefficients</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[total_obs, num_basis] X; // mgcv GAM design matrix</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[8,8] S1; // mgcv smooth penalty matrix S1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; flat_ys[n_nonmissing]; // flattened nonmissing observations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n_nonmissing, num_basis] flat_xs; // X values for nonmissing observations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; obs_ind[n_nonmissing]; // indices of nonmissing observations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> parameters {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // raw basis coefficients</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] b_raw;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] sigma;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trends</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n, n_series] trend;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // smoothing parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_sp] lambda;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> transformed parameters {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // basis coefficients</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] b;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b[1:num_basis] = b_raw[1:num_basis];</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // parametric effect priors (regularised for identifiability)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   for (i in 1:1) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[i] ~ normal(p_coefs[i], sqrt(1 / p_taus[i]));</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(season)...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[2:9] ~ multi_normal_prec(zero[2:9],S1[1:8,1:8] * lambda[1]);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for smoothing parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(10, 25);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ exponential(2);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // trend estimates</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1:n_series] ~ normal(0, sigma);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   for(s in 1:n_series){</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   trend[2:n, s] ~ normal(trend[1:(n - 1), s], sigma[s]);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // likelihood functions</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_nonmissing] flat_trends;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   flat_trends = (to_vector(trend))[obs_ind];</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends),</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   0.0,append_row(b, 1.0));</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> generated quantities {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[total_obs] eta;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n, n_series] mus;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_sp] rho;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_series] tau;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   array[n, n_series] int ypred;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   rho = log(lambda);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   for (s in 1:n_series) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   tau[s] = pow(sigma[s], -2.0);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // posterior predictions</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   eta = X * b;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   for(s in 1:n_series){ </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ypred[1:n, s] = poisson_log_rng(mus[1:n, s]);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the data objects needed to condition the model</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">$</span><span class="va">model_data</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> List of 18</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ y           : num [1:60, 1:3] 1 1 2 2 2 1 1 1 0 2 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ n           : int 60</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ X           : num [1:180, 1:9] 1 1 1 1 1 1 1 1 1 1 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "dimnames")=List of 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : chr [1:9] "X.Intercept." "V2" "V3" "V4" ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ S1          : num [1:8, 1:8] 1.019 -0.421 0.409 0.109 0.18 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ zero        : num [1:9] 0 0 0 0 0 0 0 0 0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ p_coefs     : num [1(1d)] 0.606</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ p_taus      : num [1(1d)] 69.1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ ytimes      : int [1:60, 1:3] 1 4 7 10 13 16 19 22 25 28 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ n_series    : int 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ sp          : Named num 94.6</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "names")= chr "s(season)"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ y_observed  : num [1:60, 1:3] 1 1 1 1 1 1 1 1 1 1 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ total_obs   : int 180</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ num_basis   : int 9</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ n_sp        : num 1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ n_nonmissing: int 166</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ obs_ind     : int [1:166] 1 2 3 4 5 6 7 8 9 10 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ flat_ys     : num [1:166] 1 1 2 2 2 1 1 1 0 2 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ flat_xs     : num [1:166, 1:9] 1 1 1 1 1 1 1 1 1 1 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "dimnames")=List of 2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..$ : chr [1:9] "X.Intercept." "V2" "V3" "V4" ...</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the initial value function used to initialise the MCMC chains</span></span></span>
 <span class="r-in"><span><span class="va">mod1</span><span class="op">$</span><span class="va">inits</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> function () </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     list(b_raw = runif(model_data$num_basis, -2, 2))</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;bytecode: 0x000001e2d9a169d8&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001e2df743480&gt;</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The following code can be used to run the model outside of mvgam; first using rstan</span></span></span>
 <span class="r-in"><span><span class="va">model_data</span> <span class="op">&lt;-</span> <span class="va">mod1</span><span class="op">$</span><span class="va">model_data</span></span></span>
@@ -479,228 +371,18 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></span><span class="op">(</span>model_code <span class="op">=</span> <span class="va">mod1</span><span class="op">$</span><span class="va">model_file</span>,</span></span>
 <span class="r-in"><span>           data <span class="op">=</span> <span class="va">model_data</span>,</span></span>
 <span class="r-in"><span>           init <span class="op">=</span> <span class="va">mod1</span><span class="op">$</span><span class="va">inits</span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>incomplete final line found on 'C:/Users/Nick/Documents/.R/Makevars.win'</span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in family_inits(family = family_char, trend_model, smooths_included,     model_data):</span> object 'model_data' not found</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now using cmdstanr</span></span></span>
 <span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mc-stan.org/cmdstanr/" class="external-link">cmdstanr</a></span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> This is cmdstanr version 0.5.3</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> - CmdStanR documentation and vignettes: mc-stan.org/cmdstanr</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> - CmdStan path: C:/Users/Nick/Documents/.cmdstan/cmdstan-2.32.0</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> - CmdStan version: 2.32.0</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> A newer version of CmdStan is available. See ?install_cmdstan() to install it.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> To disable this check set option or environment variable CMDSTANR_NO_VER_CHECK=TRUE.</span>
 <span class="r-in"><span><span class="va">model_data</span> <span class="op">&lt;-</span> <span class="va">mod1</span><span class="op">$</span><span class="va">model_data</span></span></span>
 <span class="r-in"><span><span class="va">cmd_mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/cmdstanr/reference/cmdstan_model.html" class="external-link">cmdstan_model</a></span><span class="op">(</span><span class="fu"><a href="https://mc-stan.org/cmdstanr/reference/write_stan_file.html" class="external-link">write_stan_file</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">$</span><span class="va">model_file</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                        stanc_options <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">'canonicalize=deprecations,braces,parentheses'</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/lib/boost_1.78.0/boost/multi_array/multi_array_ref.hpp:32,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/boost_1.78.0/boost/multi_array.hpp:34,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/boost_1.78.0/boost/numeric/odeint/algebra/multi_array_algebra.hpp:22,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/boost_1.78.0/boost/numeric/odeint.hpp:63,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/functor/ode_rk45.hpp:9,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/functor/integrate_ode_rk45.hpp:6,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/functor.hpp:15,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/fun.hpp:198,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:10,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f50393c1258.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:180:45: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   180 |         : public boost::functional::detail::unary_function&lt;typename unary_traits&lt;Predicate&gt;::argument_type,bool&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                             ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/string:48,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/locale_classes.h:40,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/ios_base.h:41,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/ios:42,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/istream:38,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/sstream:38,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/complex:45,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/eigen_3.4.0/Eigen/Core:50,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/eigen_3.4.0/Eigen/Dense:1,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/fun/Eigen.hpp:22,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:4:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:214:45: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   214 |         : public boost::functional::detail::binary_function&lt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                             ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:252:45: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   252 |         : public boost::functional::detail::unary_function&lt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                             ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_ma</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> th/lib/boost_1.78.0/boost/functional.hpp:299:45: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   299 |         : public boost::functional::detail::unary_function&lt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                             ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:345:57: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   345 |     class mem_fun_t : public boost::functional::detail::unary_function&lt;T*, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                         ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:361:58: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   361 |     class mem_fun1_t : public boost::functional::detail::binary_function&lt;T*, A, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                          ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:377:63: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   377 |     class const_mem_fun_t : public boost::functional::detail::unary_function&lt;const T*, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                               ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |   </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>          ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:393:64: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   393 |     class const_mem_fun1_t : public boost::functional::detail::binary_function&lt;const T*, A, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:438:61: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   438 |     class mem_fun_ref_t : public boost::functional::detail::unary_function&lt;T&amp;, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                             ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:454:62: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   454 |     class mem_fun1_ref_t : public boost::functional::detail::binary_function&lt;T&amp;, A, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                              ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:470:67: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   470 |     class const_mem_fun_ref_t : public boost::functional::detail::unary_function&lt;const T&amp;, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                   ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:487:68: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   487 |     class const_mem_fun1_ref_t : public boost::functional::detail::binary_function&lt;const T&amp;, A, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                    ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:533:73: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   533 |     class pointer_to_unary_function : public boost::functional::detail::unary_function&lt;Arg,Result&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                         ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:557:74: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   557 |     class pointer_to_binary_function : public boost::functional::detail::binary_function&lt;Arg1,Arg2,Result&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                          ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
 <span class="r-in"><span><span class="va">cmd_mod</span><span class="op">$</span><span class="fu">print</span><span class="op">(</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // Stan model code generated by package mvgam</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> data {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> int&lt;lower=0&gt; total_obs; // total number of observations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> int&lt;lower=0&gt; n; // number of timepoints per series</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> int&lt;lower=0&gt; n_sp; // number of smoothing parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> int&lt;lower=0&gt; n_series; // number of series</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> int&lt;lower=0&gt; num_basis; // total number of basis coefficients</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> vector[num_basis] zero; // prior locations for basis coefficients</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> real p_taus[1]; // prior precisions for parametric coefficients</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> real p_coefs[1]; // prior locations for parametric coefficients</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> matrix[total_obs, num_basis] X; // mgcv GAM design matrix</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> int&lt;lower=0&gt; ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> matrix[8,8] S1; // mgcv smooth penalty matrix S1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> int&lt;lower=0&gt; flat_ys[n_nonmissing]; // flattened nonmissing observations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> matrix[n_nonmissing, num_basis] flat_xs; // X values for nonmissing observations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> int&lt;lower=0&gt; obs_ind[n_nonmissing]; // indices of nonmissing observations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> parameters {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // raw basis coefficients</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> vector[num_basis] b_raw;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> vector&lt;lower=0&gt;[n_series] sigma;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // latent trends</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> matrix[n, n_series] trend;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // smoothing parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> vector&lt;lower=0&gt;[n_sp] lambda;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> transformed parameters {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // basis coefficients</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> vector[num_basis] b;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> b[1:num_basis] = b_raw[1:num_basis];</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // parametric effect priors (regularised for identifiability)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> for (i in 1:1) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> b_raw[i] ~ normal(p_coefs[i], sqrt(1 / p_taus[i]));</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // prior for s(season)...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> b_raw[2:9] ~ multi_normal_prec(zero[2:9],S1[1:8,1:8] * lambda[1]);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // priors for smoothing parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> lambda ~ normal(10, 25);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // priors for latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma ~ exponential(2);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // trend estimates</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> trend[1, 1:n_series] ~ normal(0, sigma);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> for(s in 1:n_series){</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> trend[2:n, s] ~ normal(trend[1:(n - 1), s], sigma[s]);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // likelihood functions</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> vector[n_nonmissing] flat_trends;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> flat_trends = (to_vector(trend))[obs_ind];</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends),</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0.0,append_row(b, 1.0));</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> generated quantities {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> vector[total_obs] eta;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> matrix[n, n_series] mus;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> vector[n_sp] rho;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> vector[n_series] tau;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> array[n, n_series] int ypred;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> rho = log(lambda);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> for (s in 1:n_series) {</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> tau[s] = pow(sigma[s], -2.0);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> // posterior predictions</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> eta = X * b;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> for(s in 1:n_series){ </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ypred[1:n, s] = poisson_log_rng(mus[1:n, s]);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="va">cmd_mod</span><span class="op">$</span><span class="fu">sample</span><span class="op">(</span>data <span class="op">=</span> <span class="va">model_data</span>,</span></span>
 <span class="r-in"><span>                     chains <span class="op">=</span> <span class="fl">4</span>,</span></span>
 <span class="r-in"><span>                     parallel_chains <span class="op">=</span> <span class="fl">4</span>,</span></span>
 <span class="r-in"><span>                     refresh <span class="op">=</span> <span class="fl">100</span>,</span></span>
 <span class="r-in"><span>                     init <span class="op">=</span> <span class="va">mod1</span><span class="op">$</span><span class="va">inits</span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>restarting interrupted promise evaluation</span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in family_inits(family = family_char, trend_model, smooths_included,     model_data):</span> object 'model_data' not found</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now fit the model using mvgam with the Stan backend</span></span></span>
 <span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
@@ -708,183 +390,31 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span>              trend_model <span class="op">=</span> <span class="st">'RW'</span>,</span></span>
 <span class="r-in"><span>              family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              use_stan <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Using cmdstanr as the backend</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Init values were only set for a subset of parameters. </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Missing init values for the following parameters:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 1: sigma, trend, lambda</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 2: sigma, trend, lambda</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 3: sigma, trend, lambda</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 4: sigma, trend, lambda</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 4 parallel chains...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: multi_normal_prec_lpdf: Precision matrix is not symmetric. Precision matrix[2,8] = 9.67096e+26, but Precision matrix[8,2] = 9.67096e+26 (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f50393c1258.stan', line 48, column 0 to column 66)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: multi_normal_prec_lpdf: Precision matrix is not symmetric. Precision matrix[2,8] = 7.18438e+113, but Precision matrix[8,2] = 7.18438e+113 (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f50393c1258.stan', line 48, column 0 to column 66)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 Exception: multi_normal_prec_lpdf: Precision matrix is not symmetric. Precision matrix[2,8] = 8.29854e+12, but Precision matrix[8,2] = 8.29854e+12 (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f50393c1258.stan', line 48, column 0 to column 66)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Exception: multi_normal_prec_lpdf: Precision matrix is not symmetric. Precision matrix[2,8] = 1.31434e+140, but Precision matrix[8,2] = 1.31434e+140 (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f50393c1258.stan', line 48, column 0 to column 66)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 finished in 4.0 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 4.6 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 6.2 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 finished in 7.7 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> All 4 chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 5.6 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 7.8 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 4 of 4 chains had an E-BFMI less than 0.2.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Extract the model summary</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> GAM formula:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001e2d9811780&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Family:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Link function:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> log</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Trend model:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> RW</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> N series:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> N timepoints:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 60 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Status:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Fitted using Stan </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                    2.5%        50%       97.5% Rhat n.eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  0.28372785  0.4927870  0.69300185    1   371</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -0.25128640  0.0523098  0.33692460    1  2078</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2 -0.34197497 -0.0401931  0.27661705    1  2448</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3 -0.66018485 -0.3539210 -0.03510196    1  2705</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4 -1.04790600 -0.6687195 -0.32652333    1  2469</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5 -0.89876700 -0.5283935 -0.19634105    1  3016</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6 -0.81562630 -0.4507555 -0.13070048    1  2932</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7 -0.58964575 -0.2200405  0.09842452    1  3321</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8 -0.03064462  0.2434340  0.51568128    1  2294</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> GAM smoothing parameter (rho) estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%     50%    97.5% Rhat n.eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 2.297529 3.54606 4.312803    1  1324</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Latent trend variance estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                2.5%       50%     97.5% Rhat n.eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1] 0.03803160 0.1005715 0.2257391 1.06    64</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2] 0.05788034 0.1937425 0.4051644 1.07    47</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[3] 0.13446390 0.2560340 0.4534499 1.05    99</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Rhats above 1.05 found for 4 parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> *Diagnose further to investigate why the chains have not mixed</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 2000 iterations ended with a divergence (0%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1: E-FMI = 0.1095Chain 2: E-FMI = 0.1069Chain 3: E-FMI = 0.097Chain 4: E-FMI = 0.1642*E-FMI below 0.2 indicates you may need to reparameterize your model</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot the estimated historical trend and forecast for one series</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compute the forecast using covariate information in data_test</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span>object <span class="op">=</span> <span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'trend'</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
 <span class="r-in"><span>     series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span>object <span class="op">=</span> <span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
 <span class="r-in"><span>     series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 25.23879</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-plt img"><img src="mvgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot the estimated seasonal smooth function</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'smooths'</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-7.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot estimated first derivatives of the smooth</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, derivatives <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-8.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot partial residuals of the smooth</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, residuals <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-9.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot posterior realisations for the smooth</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, realisations <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-10.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Example of how to use dynamic coefficients</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate a time-varying coefficient for the effect of temperature</span></span></span>
@@ -912,313 +442,20 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            data <span class="op">=</span> <span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>            newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Using cmdstanr as the backend</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/lib/boost_1.78.0/boost/multi_array/multi_array_ref.hpp:32,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/boost_1.78.0/boost/multi_array.hpp:34,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/boost_1.78.0/boost/numeric/odeint/algebra/multi_array_algebra.hpp:22,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/boost_1.78.0/boost/numeric/odeint.hpp:63,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/functor/ode_rk45.hpp:9,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/functor/integrate_ode_rk45.hpp:6,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/functor.hpp:15,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/fun.hpp:198,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:10,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f504a1f7193.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:180:45: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   180 |         : public boost::functional::detail::unary_function&lt;typename unary_traits&lt;Predicate&gt;::argument_type,bool&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                             ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/string:48,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/locale_classes.h:40,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/ios_base.h:41,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/ios:42,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/istream:38,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/sstream:38,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/complex:45,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/eigen_3.4.0/Eigen/Core:50,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/eigen_3.4.0/Eigen/Dense:1,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/fun/Eigen.hpp:22,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:4:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:214:45: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   214 |         : public boost::functional::detail::binary_function&lt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                             ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:252:45: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   252 |         : public boost::functional::detail::unary_function&lt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                             ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_ma</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> th/lib/boost_1.78.0/boost/functional.hpp:299:45: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   299 |         : public boost::functional::detail::unary_function&lt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                             ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:345:57: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   345 |     class mem_fun_t : public boost::functional::detail::unary_function&lt;T*, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                         ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:361:58: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   361 |     class mem_fun1_t : public boost::functional::detail::binary_function&lt;T*, A, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                          ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:377:63: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   377 |     class const_mem_fun_t : public boost::functional::detail::unary_function&lt;const T*, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                               ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:393:64: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   393 |     class const_mem_fun1_t : public boost::functional::detail::binary_function&lt;const T*, A, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:438:61: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   438 |     class mem_fun_ref_t : public boost::functional::detail::unary_function&lt;T&amp;, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                             ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:454:62: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   454 |     class mem_fun1_ref_t : public boost::functional::detail::binary_function&lt;T&amp;, A, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                              ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> ++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:470:67: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   470 |     class const_mem_fun_ref_t : public boost::functional::detail::unary_function&lt;const T&amp;, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                   ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:487:68: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   487 |     class const_mem_fun1_ref_t : public boost::functional::detail::binary_function&lt;const T&amp;, A, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                    ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:533:73: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   533 |     class pointer_to_unary_function : public boost::functional::detail::unary_function&lt;Arg,Result&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                         ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:557:74: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   557 |     class pointer_to_binary_functi</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> on : public boost::functional::detail::binary_function&lt;Arg1,Arg2,Result&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                          ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Init values were only set for a subset of parameters. </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Missing init values for the following parameters:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 1: sigma_obs, lambda</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 2: sigma_obs, lambda</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 3: sigma_obs, lambda</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 4: sigma_obs, lambda</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 4 parallel chains...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f504a1f7193.stan', line 72, column 0 to line 74, column 16)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f504a1f7193.stan', line 72, column 0 to line 74, column 16)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f504a1f7193.stan', line 72, column 0 to line 74, column 16)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: normal_lpdf: Scale parameter is 0, but must be positive! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f504a1f7193.stan', line 59, column 18 to column 50)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 Exception: normal_lpdf: Scale parameter is 0, but must be positive! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f504a1f7193.stan', line 59, column 18 to column 50)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f504a1f7193.stan', line 72, column 0 to line 74, column 16)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f504a1f7193.stan', line 72, column 0 to line 74, column 16)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Exception: normal_lpdf: Scale parameter is 0, but must be positive! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f504a1f7193.stan', line 59, column 18 to column 50)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.7 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.6 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 finished in 0.6 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 finished in 0.7 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> All 4 chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.6 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.8 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 4 chains had an E-BFMI less than 0.2.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the model summary, forecast and time-varying coefficient distribution</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> GAM formula:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> out ~ dynamic(temp, rho = 8)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001e2d9811780&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Family:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Link function:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> identity</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Trend model:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> None</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> N series:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> N timepoints:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 180 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Status:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Fitted using Stan </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Observation error parameter estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                   2.5%      50%     97.5% Rhat n.eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[1] 0.4658227 0.517289 0.5785754    1  2144</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                         2.5%           50%      97.5% Rhat n.eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)      3.943714500  4.0120800000 4.07530350 1.00  2288</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.1  -0.111552050 -0.0160818500 0.04704970 1.00   898</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.2  -0.078046920 -0.0162655500 0.02761083 1.00   730</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.3  -0.008135804  0.0444124500 0.11878077 1.02   243</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.4  -0.060512980 -0.0036637650 0.04830456 1.00  2981</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.5  -0.030748270  0.0148170500 0.07897441 1.00  1342</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.6  -0.094586938 -0.0245227000 0.02087198 1.01   456</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.7  -0.064651340 -0.0049653550 0.05454625 1.00  3082</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.8  -0.053493452  0.0033012300 0.06209671 1.00  3030</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.9  -0.082127185 -0.0104171000 0.03920751 1.00  1196</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.10 -0.074227078 -0.0063272500 0.04907026 1.00  2087</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.11 -0.065581037 -0.0038217450 0.05837250 1.00  2879</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.12 -0.048184408  0.0116623500 0.09193376 1.01  1328</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.13 -0.056134755  0.0039679100 0.07860247 1.00  1712</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.14 -0.096727177 -0.0049157300 0.06318503 1.00  2627</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.15 -0.060965772  0.0101946500 0.11036877 1.00  1391</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.16 -0.063864628  0.0019344400 0.08013428 1.00  2798</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.17 -0.063769393  0.0057590550 0.10066907 1.00  1521</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.18 -0.088537710 -0.0019719100 0.07346853 1.00  2599</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.19 -0.098314758 -0.0050555400 0.07081838 1.00  2567</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.20 -0.069746648  0.0038169050 0.09595735 1.00  2490</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.21 -0.077636225  0.0021423200 0.08316651 1.00  2712</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.22 -0.103281075 -0.0040573400 0.07663658 1.00  1849</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.23 -0.081677875 -0.0002926995 0.08511869 1.00  2593</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.24 -0.079156288  0.0004921035 0.09594754 1.00  3106</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp.25  0.239141425  0.3617760000 0.47429915 1.00  1758</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> GAM smoothing parameter (rho) estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                    2.5%      50%     97.5% Rhat n.eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp  -4.923213 -3.35104 -2.576742 1.05    73</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):temp2 -1.342509  1.24654  3.751028 1.00  1451</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Rhat looks reasonable for all parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 2000 iterations ended with a divergence (0%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1: E-FMI = 0.1604Chain 2: E-FMI = 0.178*E-FMI below 0.2 indicates you may need to reparameterize your model</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'smooths'</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-11.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample CRPS:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 5.34492</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-plt img"><img src="mvgam-12.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Propagating the smooth term shows how the coefficient is expected to evolve</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="plot_mvgam_smooth.html">plot_mvgam_smooth</a></span><span class="op">(</span><span class="va">mod</span>, smooth <span class="op">=</span> <span class="fl">1</span>, newdata <span class="op">=</span> <span class="va">data</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">180</span>, lty <span class="op">=</span> <span class="st">'dashed'</span>, lwd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="mvgam-13.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Example showing how to incorporate an offset; simulate some count data</span></span></span>
 <span class="r-in"><span><span class="co"># with different means per series</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">100</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>trend_rel <span class="op">=</span> <span class="fl">0</span>, mu_obs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">8</span>, <span class="fl">8</span><span class="op">)</span>, seasonality <span class="op">=</span> <span class="st">'hierarchical'</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in sim_mvgam(trend_rel = 0, mu_obs = c(4, 8, 8), seasonality = "hierarchical"):</span> unused argument (mu_obs = c(4, 8, 8))</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Add offset terms to the training and testing data</span></span></span>
 <span class="r-in"><span><span class="va">dat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">offset</span> <span class="op">&lt;-</span> <span class="fl">0.5</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">series</span><span class="op">)</span></span></span>
@@ -1232,318 +469,23 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span>         data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>         trend_model <span class="op">=</span> <span class="st">'None'</span>,</span></span>
 <span class="r-in"><span>         use_stan <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Using cmdstanr as the backend</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/lib/boost_1.78.0/boost/multi_array/multi_array_ref.hpp:32,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/boost_1.78.0/boost/multi_array.hpp:34,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/boost_1.78.0/boost/numeric/odeint/algebra/multi_array_algebra.hpp:22,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/boost_1.78.0/boost/numeric/odeint.hpp:63,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/functor/ode_rk45.hpp:9,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/functor/integrate_ode_rk45.hpp:6,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/functor.hpp:15,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev/fun.hpp:198,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:10,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f50a48626a.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:180:45: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   180 |         : public boost::functional::detail::unary_function&lt;typename unary_traits&lt;Predicate&gt;::argument_type,bool&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                             ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/string:48,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/locale_classes.h:40,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/ios_base.h:41,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/ios:42,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/istream:38,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/sstream:38,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/complex:45,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/eigen_3.4.0/Eigen/Core:50,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/lib/eigen_3.4.0/Eigen/Dense:1,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/fun/Eigen.hpp:22,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:4:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:214:45: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   214 |         : public boost::functional::detail::binary_function&lt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                             ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:252:45: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   252 |         : public boost::functional::detail::unary_function&lt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                             ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_ma</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> th/lib/boost_1.78.0/boost/functional.hpp:299:45: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   299 |         : public boost::functional::detail::unary_function&lt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                             ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:345:57: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   345 |     class mem_fun_t : public boost::functional::detail::unary_function&lt;T*, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                         ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:361:58: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   361 |     class mem_fun1_t : public boost::functional::detail::binary_function&lt;T*, A, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                          ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:377:63: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   377 |     class const_mem_fun_t : public boost::functional::detail::unary_function&lt;const T*, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                               ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:393:64: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   393 |     class const_mem_fun1_t : public boost::functional::detail::binary_function&lt;const T*, A, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:438:61: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   438 |     class mem_fun_ref_t : public boost::functional::detail::unary_function&lt;T&amp;, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                             ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:454:62: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   454 |     class mem_fun1_ref_t : public boost::functional::detail::binary_function&lt;T&amp;, A, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                              ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> ++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:470:67: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   470 |     class const_mem_fun_ref_t : public boost::functional::detail::unary_function&lt;const T&amp;, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                   ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:487:68: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   487 |     class const_mem_fun1_ref_t : public boost::functional::detail::binary_function&lt;const T&amp;, A, S&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                    ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:533:73: warning: 'template&lt;class _Arg, class _Result&gt; struct std::unary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   533 |     class pointer_to_unary_function : public boost::functional::detail::unary_function&lt;Arg,Result&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                         ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   117 |     struct unary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:557:74: warning: 'template&lt;class _Arg1, class _Arg2, class _Result&gt; struct std::binary_function' is deprecated [-Wdeprecated-declarations]</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   557 |     class pointer_to_binary_functi</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> on : public boost::functional::detail::binary_function&lt;Arg1,Arg2,Result&gt;</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |                                                                          ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   131 |     struct binary_function</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       |            ^~~~~~~~~~~~~~~</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Init values were only set for a subset of parameters. </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Missing init values for the following parameters:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 1: lambda</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 2: lambda</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 3: lambda</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 4: lambda</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 4 parallel chains...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: multi_normal_prec_lpdf: Precision matrix is not symmetric. Precision matrix[2,8] = 1.72115e+151, but Precision matrix[8,2] = 1.72115e+151 (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f50a48626a.stan', line 46, column 0 to column 66)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: multi_normal_prec_lpdf: Precision matrix is not symmetric. Precision matrix[2,8] = 2.02742e+127, but Precision matrix[8,2] = 2.02742e+127 (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f50a48626a.stan', line 46, column 0 to column 66)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 Exception: multi_normal_prec_lpdf: Precision matrix is not symmetric. Precision matrix[2,8] = 4.72695e+173, but Precision matrix[8,2] = 4.72695e+173 (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f50a48626a.stan', line 46, column 0 to column 66)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 0. (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f50a48626a.stan', line 46, column 0 to column 66)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: multi_normal_prec_lpdf: Precision matrix is not symmetric. Precision matrix[2,8] = 1.93551e+11, but Precision matrix[8,2] = 1.93551e+11 (in 'C:/Users/Nick/AppData/Local/Temp/RtmpUrpXFF/model-6f50a48626a.stan', line 46, column 0 to column 66)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.7 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.8 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 finished in 0.7 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 finished in 0.8 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> All 4 chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.8 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.9 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the model file to see the modification to the linear predictor</span></span></span>
 <span class="r-in"><span><span class="co"># (eta)</span></span></span>
 <span class="r-in"><span><span class="va">mod1</span><span class="op">$</span><span class="va">model_file</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [1] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [2] "// Stan model code generated by package mvgam"                                                                        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [3] "data {"                                                                                                               </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [4] "int&lt;lower=0&gt; total_obs; // total number of observations"                                                              </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [5] "int&lt;lower=0&gt; n; // number of timepoints per series"                                                                   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [6] "int&lt;lower=0&gt; n_sp; // number of smoothing parameters"                                                                 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [7] "int&lt;lower=0&gt; n_series; // number of series"                                                                           </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [8] "int&lt;lower=0&gt; num_basis; // total number of basis coefficients"                                                        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [9] "vector[num_basis] zero; // prior locations for basis coefficients"                                                    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [10] "vector[total_obs] offset; // offset vector"                                                                           </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [11] "real p_taus[1]; // prior precisions for parametric coefficients"                                                      </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [12] "real p_coefs[1]; // prior locations for parametric coefficients"                                                      </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [13] "matrix[total_obs, num_basis] X; // mgcv GAM design matrix"                                                            </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [14] "int&lt;lower=0&gt; ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [15] "matrix[8,8] S1; // mgcv smooth penalty matrix S1"                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [16] "matrix[4,4] S2; // mgcv smooth penalty matrix S2"                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [17] "matrix[4,4] S3; // mgcv smooth penalty matrix S3"                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [18] "matrix[4,4] S4; // mgcv smooth penalty matrix S4"                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [19] "int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations"                                                      </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [20] "int&lt;lower=0&gt; flat_ys[n_nonmissing]; // flattened nonmissing observations"                                             </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [21] "matrix[n_nonmissing, num_basis] flat_xs; // X values for nonmissing observations"                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [22] "int&lt;lower=0&gt; obs_ind[n_nonmissing]; // indices of nonmissing observations"                                            </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [23] "}"                                                                                                                    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [24] "parameters {"                                                                                                         </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [25] "// raw basis coefficients"                                                                                            </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [26] "vector[num_basis] b_raw;"                                                                                             </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [27] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [28] "// smoothing parameters"                                                                                              </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [29] "vector&lt;lower=0&gt;[n_sp] lambda;"                                                                                        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [30] "}"                                                                                                                    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [31] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [32] "transformed parameters {"                                                                                             </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [33] "// basis coefficients"                                                                                                </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [34] "vector[num_basis] b;"                                                                                                 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [35] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [36] "b[1:num_basis] = b_raw[1:num_basis];"                                                                                 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [37] "}"                                                                                                                    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [38] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [39] "model {"                                                                                                              </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [40] "// parametric effect priors (regularised for identifiability)"                                                        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [41] "for (i in 1:1) {"                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [42] "b_raw[i] ~ normal(p_coefs[i], sqrt(1 / p_taus[i]));"                                                                  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [43] "}"                                                                                                                    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [44] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [45] "// prior for s(season)..."                                                                                            </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [46] "b_raw[2:9] ~ multi_normal_prec(zero[2:9],S1[1:8,1:8] * lambda[1]);"                                                   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [47] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [48] "// prior for s(season):seriesseries_1..."                                                                             </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [49] "b_raw[10:13] ~ multi_normal_prec(zero[10:13],S2[1:4,1:4] * lambda[2]);"                                               </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [50] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [51] "// prior for s(season):seriesseries_2..."                                                                             </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [52] "b_raw[14:17] ~ multi_normal_prec(zero[14:17],S3[1:4,1:4] * lambda[3]);"                                               </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [53] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [54] "// prior for s(season):seriesseries_3..."                                                                             </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [55] "b_raw[18:21] ~ multi_normal_prec(zero[18:21],S4[1:4,1:4] * lambda[4]);"                                               </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [56] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [57] "// priors for smoothing parameters"                                                                                   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [58] "lambda ~ normal(10, 25);"                                                                                             </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [59] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [60] "{"                                                                                                                    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [61] "// likelihood functions"                                                                                              </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [62] "flat_ys ~ poisson_log_glm(flat_xs,"                                                                                   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [63] "offset[obs_ind],b);"                                                                                                  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [64] "}"                                                                                                                    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [65] "}"                                                                                                                    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [66] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [67] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [68] "generated quantities {"                                                                                               </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [69] "vector[total_obs] eta;"                                                                                               </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [70] "matrix[n, n_series] mus;"                                                                                             </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [71] "vector[n_sp] rho;"                                                                                                    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [72] "array[n, n_series] int ypred;"                                                                                        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [73] "rho = log(lambda);"                                                                                                   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [74] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [75] "// posterior predictions"                                                                                             </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [76] "eta = X * b + offset;"                                                                                                </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [77] "for(s in 1:n_series){ "                                                                                               </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [78] "mus[1:n, s] = eta[ytimes[1:n, s]];"                                                                                   </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [79] "ypred[1:n, s] = poisson_log_rng(mus[1:n, s]);"                                                                        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [80] "}"                                                                                                                    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [81] "}"                                                                                                                    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [82] ""                                                                                                                     </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Forecasts for the first two series will differ in magnitude</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span>, ncol <span class="op">=</span> <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">1</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
 <span class="r-in"><span>     ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">70</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 48.96913</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">2</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
 <span class="r-in"><span>     ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">70</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 31.29473</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-plt img"><img src="mvgam-14.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Changing the offset for the testing data should lead to changes in</span></span></span>
 <span class="r-in"><span><span class="co"># the forecast</span></span></span>
 <span class="r-in"><span><span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">$</span><span class="va">offset</span> <span class="op">&lt;-</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">$</span><span class="va">offset</span> <span class="op">-</span> <span class="fl">2</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, <span class="st">'forecast'</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 72.20892</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-plt img"><img src="mvgam-15.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Relative Risks can be computed by fixing the offset to the same value</span></span></span>
 <span class="r-in"><span><span class="co"># for each series</span></span></span>
@@ -1567,9 +509,8 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="kw">for</span><span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fl">2</span><span class="op">:</span><span class="fl">50</span><span class="op">)</span><span class="op">{</span></span></span>
 <span class="r-in"><span> <span class="fu"><a href="https://rdrr.io/r/graphics/lines.html" class="external-link">lines</a></span><span class="op">(</span><span class="va">preds_rr</span><span class="op">[</span><span class="va">i</span>, <span class="va">series2_inds</span><span class="op">]</span>, col <span class="op">=</span> <span class="st">'darkred'</span><span class="op">)</span></span></span>
 <span class="r-in"><span> <span class="op">}</span></span></span>
-<span class="r-plt img"><img src="mvgam-16.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="co"># }</span></span></span>
+<span class="r-in"><span><span class="op">}</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
@@ -1577,7 +518,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p></p><p>Developed by Nicholas Clark.</p>
+  <p></p><p>Developed by Nicholas J Clark.</p>
 </div>
 
 <div class="pkgdown-footer-right">

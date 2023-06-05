@@ -5,7 +5,8 @@
 #'There are currently two options for specifying the structures of the trends (either as latent
 #'dynamic factors to capture trend dependencies among series in a reduced dimension format, or as independent trends)
 #'
-#'
+#'@importFrom parallel clusterExport stopCluster setDefaultCluster
+#'@importFrom stats formula terms rnorm update.formula predict
 #'@param formula A \code{character} string specifying the GAM formula. These are exactly like the formula
 #'for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).
@@ -43,7 +44,7 @@
 #'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}
 #'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
 #''None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mcgv]{gam}}),
+#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}}),
 #''RW' (random walk with possible drift),
 #''AR1' (with possible drift),
 #''AR2' (with possible drift) or
@@ -54,7 +55,7 @@
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 #'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 #'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-#'predictor (which it is by default when calling \code{\link[mcgv]{jagam}}). Therefore this defaults to \code{FALSE}
+#'predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Therefore this defaults to \code{FALSE}
 #'@param chains \code{integer} specifying the number of parallel chains for the model
 #'@param burnin \code{integer} specifying the number of warmup iterations of the Markov chain to run
 #'to tune sampling algorithms
@@ -102,7 +103,7 @@
 #'in a Bayesian framework using Markov Chain Monte Carlo.
 #'\cr
 #'\cr
-#'*Priors*: A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include any latent
+#'*Priors*: A \code{\link[mgcv]{jagam}} model file is generated from \code{formula} and modified to include any latent
 #'temporal processes. Prior distributions for most important model parameters can be altered by the user to inspect model
 #'sensitivities to given priors (see \code{\link{get_mvgam_priors}} for details). Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 #'accordingly. However more control over the model specification can be accomplished by first using `mvgam` as a
@@ -113,11 +114,11 @@
 #'parameterisation; but use `normal` for normal densities in `Stan`, with the mean and standard deviation parameterisation)
 #'\cr
 #'\cr
-#'*Random effects*: For any smooth terms using the random effect basis (\code{\link[mcgv]{smooth.construct.re.smooth.spec}}),
+#'*Random effects*: For any smooth terms using the random effect basis (\code{\link[mgcv]{smooth.construct.re.smooth.spec}}),
 #'a non-centred parameterisation is automatically employed to avoid degeneracies that are common in hierarchical models.
 #'Note however that centred versions may perform better for series that are particularly informative, so as with any
 #'foray into Bayesian modelling, it is worth building an understanding of the model's assumptions and limitations by following a
-#'principled workflow. Also note that models are parameterised using `drop.unused.levels = FALSE` in \code{\link[mcgv]{jagam}}
+#'principled workflow. Also note that models are parameterised using `drop.unused.levels = FALSE` in \code{\link[mgcv]{jagam}}
 #'to ensure predictions can be made for all levels of the supplied factor variable
 #'\cr
 #'\cr
@@ -157,7 +158,7 @@
 #'@author Nicholas J Clark
 #'@references Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series
 #'Methods in Ecology and Evolution. 14:3, 771-784.
-#'@seealso \code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
+#'@seealso \code{\link[mgcv]{jagam}}, \code{\link[mgcv]{gam}}
 #'@return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
 #'unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
@@ -395,7 +396,7 @@ mvgam = function(formula,
   }
 
   # Validate the family argument
-  family <- mvgam:::evaluate_family(family)
+  family <- evaluate_family(family)
   family_char <- match.arg(arg = family$family,
                            choices = c('negative binomial',
                                        "poisson",
@@ -407,7 +408,7 @@ mvgam = function(formula,
                                        "Gamma"))
 
   # Validate the trend argument
-  trend_model <- mvgam:::evaluate_trend_model(trend_model)
+  trend_model <- evaluate_trend_model(trend_model)
 
   if(sign(chains) != 1){
     stop('argument "chains" must be a positive integer',
@@ -466,7 +467,7 @@ mvgam = function(formula,
   if(!use_stan){
     if(run_model){
       if(missing(jags_path)){
-        require(runjags)
+        requireNamespace('runjags', quietly = TRUE)
         jags_path <- runjags::findjags()
       }
 
@@ -580,7 +581,7 @@ mvgam = function(formula,
 
   # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
   orig_formula <- formula
-  formula <- mvgam:::interpret_mvgam(formula, N = max(data_train$time))
+  formula <- interpret_mvgam(formula, N = max(data_train$time))
   form_terms <- terms(formula(formula))
   if(terms(formula(formula))[[2]] != 'y'){
 
@@ -610,8 +611,8 @@ mvgam = function(formula,
 
   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the Bayesian model later on;
-  ss_gam <- mvgam:::mvgam_setup(formula = formula,
-                                family = mvgam:::family_to_mgcvfam(family),
+  ss_gam <- mvgam_setup(formula = formula,
+                                family = family_to_mgcvfam(family),
                                 data = data_train,
                                 drop.unused.levels = FALSE,
                                 maxit = 30)
@@ -646,7 +647,7 @@ mvgam = function(formula,
     # If no smooth terms are included, jagam will fail; so add a fake one and remove
     # it from the model and data structures later
     data_train$fakery <- rnorm(length(data_train$y))
-    form_fake <- update(formula, ~ . + s(fakery))
+    form_fake <- update.formula(formula, ~ . + s(fakery))
     fakery_names <- names(suppressWarnings(mgcv::gam(form_fake,
                                                      data = data_train,
                                                      family = family_to_mgcvfam(family),
@@ -689,7 +690,7 @@ mvgam = function(formula,
   } else {
     ss_jagam <- mgcv::jagam(formula,
                             data = data_train,
-                            family = mvgam:::family_to_jagamfam(family_char),
+                            family = family_to_jagamfam(family_char),
                             file = 'base_gam.txt',
                             sp.prior = 'gamma',
                             diagonalize = FALSE,
@@ -746,7 +747,7 @@ mvgam = function(formula,
     ss_jagam$jags.data$p_coefs <- coef(ss_gam)[1:n_terms]
 
     rmvn <- function(n,mu,sig) {
-      L <- mroot(sig);m <- ncol(L);
+      L <- mgcv::mroot(sig); m <- ncol(L);
       t(mu + L%*%matrix(rnorm(m*n),m,n))
     }
 
@@ -821,17 +822,17 @@ mvgam = function(formula,
 
   # Add replacement lines for priors, trends and the linear predictor
   fil <- tempfile(fileext = ".xt")
-  modification <- mvgam:::add_base_dgam_lines(use_lv)
+  modification <- add_base_dgam_lines(use_lv)
   cat(c(readLines(textConnection(modification)), base_model), file = fil,
       sep = "\n")
   model_file <- trimws(readLines(fil, n = -1))
 
   # Modify observation distribution lines
   if(family_char == 'tweedie'){
-    model_file <- mvgam:::add_tweedie_lines(model_file, upper_bounds = upper_bounds)
+    model_file <- add_tweedie_lines(model_file, upper_bounds = upper_bounds)
 
   } else if(family_char == 'poisson'){
-    model_file <- mvgam:::add_poisson_lines(model_file, upper_bounds = upper_bounds)
+    model_file <- add_poisson_lines(model_file, upper_bounds = upper_bounds)
 
   } else {
     if(missing(upper_bounds)){
@@ -841,7 +842,7 @@ mvgam = function(formula,
   }
 
   # Modify lines needed for the specified trend model
-  model_file <- mvgam:::add_trend_lines(model_file, stan = FALSE,
+  model_file <- add_trend_lines(model_file, stan = FALSE,
                                 use_lv = use_lv,
                                 trend_model = if(trend_model %in% c('RW', 'VAR1')){'RW'} else {trend_model},
                                 drift = drift)
@@ -1162,8 +1163,8 @@ mvgam = function(formula,
 
   # Get names of smoothing parameters
   if(smooths_included){
-    name_starts <- unlist(purrr:::map(ss_jagam$pregam$smooth, 'first.sp'))
-    name_ends <- unlist(purrr:::map(ss_jagam$pregam$smooth, 'last.sp'))
+    name_starts <- unlist(purrr::map(ss_jagam$pregam$smooth, 'first.sp'))
+    name_ends <- unlist(purrr::map(ss_jagam$pregam$smooth, 'last.sp'))
 
     rho_names <- unlist(lapply(seq(1:length(ss_gam$smooth)), function(i){
 
@@ -1184,14 +1185,14 @@ mvgam = function(formula,
     unlink('base_gam.txt')
     if(use_stan){
       # Import the base Stan model file
-      modification <- mvgam:::add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
+      modification <- add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
       unlink('base_gam_stan.txt')
       cat(modification, file = 'base_gam_stan.txt', sep = '\n', append = T)
       base_stan_model <- trimws(suppressWarnings(readLines('base_gam_stan.txt')))
       unlink('base_gam_stan.txt')
 
       # Add necessary trend structure
-      base_stan_model <- mvgam:::add_trend_lines(model_file = base_stan_model,
+      base_stan_model <- add_trend_lines(model_file = base_stan_model,
                                          use_lv = use_lv,
                                          stan = TRUE,
                                          trend_model = if(trend_model %in% c('RW', 'VAR1')){'RW'} else {trend_model},
@@ -1199,7 +1200,7 @@ mvgam = function(formula,
 
       # Add remaining data, model and parameters blocks to the Stan model file;
       # gather Stan data structure
-      stan_objects <- mvgam:::add_stan_data(jags_file = trimws(model_file),
+      stan_objects <- add_stan_data(jags_file = trimws(model_file),
                                             stan_file = base_stan_model,
                                             use_lv = use_lv,
                                             n_lv = n_lv,
@@ -1369,11 +1370,11 @@ mvgam = function(formula,
       model_data <- vectorised$model_data
 
       # Check if cmdstan is accessible; if not, use rstan
-      if(!require(cmdstanr, quietly = TRUE)){
+      if(!requireNamespace('cmdstanr', quietly = TRUE)){
         use_cmdstan <- FALSE
       } else {
         use_cmdstan <- TRUE
-        if(is.null(cmdstan_version(error_on_NA = FALSE))){
+        if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE))){
           use_cmdstan <- FALSE
         }
       }
@@ -1384,22 +1385,22 @@ mvgam = function(formula,
 
         if(cmdstanr::cmdstan_version() >= "2.29.0"){
           if(threads > 1){
-            cmd_mod <- cmdstan_model(write_stan_file(vectorised$model_file),
-                                     stanc_options = list('O1',
-                                                          'canonicalize=deprecations,braces,parentheses'),
-                                     cpp_options = list(stan_threads = TRUE))
+            cmd_mod <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(vectorised$model_file),
+                                               stanc_options = list('O1',
+                                                                    'canonicalize=deprecations,braces,parentheses'),
+                                               cpp_options = list(stan_threads = TRUE))
           } else {
-            cmd_mod <- cmdstan_model(write_stan_file(vectorised$model_file),
-                                     stanc_options = list('O1',
-                                                          'canonicalize=deprecations,braces,parentheses'))
+            cmd_mod <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(vectorised$model_file),
+                                               stanc_options = list('O1',
+                                                                    'canonicalize=deprecations,braces,parentheses'))
           }
 
         } else {
           if(threads > 1){
-            cmd_mod <- cmdstan_model(write_stan_file(vectorised$model_file),
-                                     cpp_options = list(stan_threads = TRUE))
+            cmd_mod <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(vectorised$model_file),
+                                               cpp_options = list(stan_threads = TRUE))
           } else {
-            cmd_mod <- cmdstan_model(write_stan_file(vectorised$model_file))
+            cmd_mod <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(vectorised$model_file))
           }
         }
 
@@ -1443,7 +1444,7 @@ mvgam = function(formula,
         out_gam_mod <- repair_stanfit(out_gam_mod)
 
       } else {
-        require(rstan)
+        requireNamespace('rstan', quietly = TRUE)
         message('Using rstan as the backend')
         message()
         options(mc.cores = parallel::detectCores())
@@ -1472,18 +1473,18 @@ mvgam = function(formula,
         stan_control <- list(max_treedepth = max_treedepth,
                              adapt_delta = adapt_delta)
 
-        fit1 <- stan(model_code = vectorised$model_file,
-                     iter = samples,
-                     warmup = burnin,
-                     chains = chains,
-                     data = model_data,
-                     cores = min(c(chains, parallel::detectCores() - 1)),
-                     init = inits,
-                     verbose = FALSE,
-                     thin = thin,
-                     control = stan_control,
-                     pars = param,
-                     refresh = 100)
+        fit1 <- rstan::stan(model_code = vectorised$model_file,
+                            iter = samples,
+                            warmup = burnin,
+                            chains = chains,
+                            data = model_data,
+                            cores = min(c(chains, parallel::detectCores() - 1)),
+                            init = inits,
+                            verbose = FALSE,
+                            thin = thin,
+                            control = stan_control,
+                            pars = param,
+                            refresh = 100)
 
         out_gam_mod <- fit1
       }
@@ -1491,7 +1492,7 @@ mvgam = function(formula,
     }
 
     if(!use_stan){
-      require(runjags)
+      requireNamespace('runjags', quietly = TRUE)
 
       if(!missing(priors)){
         model_file <- update_priors(model_file, priors, use_stan = FALSE)
@@ -1594,7 +1595,11 @@ mvgam = function(formula,
       family = family_char,
       obs_data = data_train,
       ytimes = ytimes),
-      n_cores = min(c(chains, parallel::detectCores() - 1)))
+      n_cores = if(parallel){
+        min(c(chains, parallel::detectCores() - 1))
+        } else {
+          1
+        })
   }
 
   if(use_stan){

@@ -2,6 +2,8 @@
 #'
 #'This function takes a fitted \code{mvgam} object and returns various residual diagnostic plots
 #'
+#'@importFrom graphics layout title
+#'@importFrom stats complete.cases qqnorm qqline acf pacf na.pass
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param n_bins \code{integer} specifying the number of bins to use for binning fitted values
@@ -72,7 +74,7 @@ c_dark_highlight <- c("#7C0000")
 
 # Prediction indices for the particular series
 data_train <- object$obs_data
-ends <- seq(0, dim(mvgam:::mcmc_chains(object$model_output, 'ypred'))[2],
+ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
             length.out = NCOL(object$ytimes) + 1)
 starts <- ends + 1
 starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
@@ -108,12 +110,12 @@ if(missing(data_test)){
   if(object$fit_engine == 'stan'){
 
     # For stan objects, mus is stored as a vector in column-major order
-    linkfun <- mvgam:::family_invlinks(object$family)
-    preds <- linkfun(mvgam:::mcmc_chains(object$model_output, 'mus')[,seq(series,
-                                                                    dim(mvgam:::mcmc_chains(object$model_output, 'mus'))[2],
+    linkfun <- family_invlinks(object$family)
+    preds <- linkfun(mcmc_chains(object$model_output, 'mus')[,seq(series,
+                                                                    dim(mcmc_chains(object$model_output, 'mus'))[2],
                                                                     by = NCOL(object$ytimes))][, 1:obs_length])
   } else {
-    preds <- mvgam:::mcmc_chains(object$model_output, 'mus')[,starts[series]:ends[series]][, 1:obs_length]
+    preds <- mcmc_chains(object$model_output, 'mus')[,starts[series]:ends[series]][, 1:obs_length]
   }
 
 } else {
@@ -190,7 +192,7 @@ if(missing(data_test)){
 
     if(dim(preds)[2] != length(all_obs)){
       linkfun <- family_invlinks(object$family)
-      fc_preds <- linkfun(mvgam:::forecast.mvgam(object, series = series,
+      fc_preds <- linkfun(forecast.mvgam(object, series = series,
                                              data_test = data_test,
                                  type = 'link'))
       preds <- cbind(preds, fc_preds)

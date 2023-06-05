@@ -6,6 +6,9 @@
 #'according to their state space dynamics. The forecast is a weighted ensemble, with weights determined by
 #'each particle's proposal likelihood prior to the most recent assimilation step
 #'
+#'@importFrom parallel clusterExport stopCluster setDefaultCluster
+#'@importFrom graphics points legend
+#'@importFrom stats terms formula predict
 #'@param newdata A \code{dataframe} or \code{list} of test data containing at least 'series' and time',
 #'in addition to any other variables included in the linear predictor of \code{formula}
 #'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
@@ -164,9 +167,9 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
   particle_fcs <- pbapply::pblapply(fc_samples, function(x){
     use_lv <- particles[[x]]$use_lv
 
-    if(use_lv || trend_model == 'VAR1'){
+    if(use_lv || particles[[x]]$trend_model == 'VAR1'){
       # Run the latent variables forward fc_horizon timesteps
-      lv_preds <- mvgam:::forecast_trend(trend_model = particles[[x]]$trend_model,
+      lv_preds <- forecast_trend(trend_model = particles[[x]]$trend_model,
                                     use_lv = TRUE,
                                     trend_pars = particles[[x]]$trend_pars,
                                     h = fc_horizon)
@@ -179,7 +182,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                                       particles[[x]]$trend_pars$lv_coefs[[series]])
         }
 
-        if(trend_model == 'VAR1'){
+        if(particles[[x]]$trend_model == 'VAR1'){
           trend_preds <- lv_preds
         }
 
@@ -192,7 +195,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
         })
         names(par_extracts) <- names(particles[[x]]$family_pars)
 
-        mvgam:::mvgam_predict(family = particles[[x]]$family,
+        mvgam_predict(family = particles[[x]]$family,
                               Xp = Xpmat,
                               type = 'response',
                               betas = c(particles[[x]]$betas, 1),
@@ -219,7 +222,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                                       names(trend_extracts) <- names(particles[[x]]$trend_pars)
 
                                       # Propagate the series-specific trends forward
-                                      out <- mvgam:::forecast_trend(trend_model = particles[[x]]$trend_model,
+                                      out <- forecast_trend(trend_model = particles[[x]]$trend_model,
                                                                     use_lv = FALSE,
                                                                     trend_pars = trend_extracts,
                                                                     h = fc_horizon)
@@ -240,7 +243,7 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
         })
         names(par_extracts) <- names(particles[[x]]$family_pars)
 
-        mvgam:::mvgam_predict(family = particles[[x]]$family,
+        mvgam_predict(family = particles[[x]]$family,
                               Xp = Xpmat,
                               type = 'response',
                               betas = c(particles[[x]]$betas, 1),

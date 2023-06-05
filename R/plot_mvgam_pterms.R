@@ -2,6 +2,8 @@
 #'
 #'This function plots posterior empirical quantiles for partial effects of parametric terms
 #'
+#'@importFrom graphics layout title rug bxp
+#'@importFrom stats coef predict
 #'@param object \code{list} object returned from \code{mvgam}
 #'@details Posterior empirical quantiles of each parametric term's partial effect estimates
 #'(on the link scale) are calculated and visualised as ribbon plots. These effects can
@@ -56,14 +58,14 @@ if(length(pterms) > 0){
     Xp[,!betas_keep] <- 0
 
     # X-axis values
-    if(class(object$obs_data)[1] == 'list'){
+    if(inherits(object$obs_data, 'list')){
       pred_vals_orig <- sort(object$obs_data[[pterms[i]]])
     } else {
       pred_vals_orig <- sort(object$obs_data %>%
                                dplyr::pull(pterms[i]))
     }
 
-    if(class(object$obs_data[[pterms[i]]]) == 'factor'){
+    if(inherits(object$obs_data[[pterms[i]]], 'factor')){
 
       # Use a simple Boxplot for factor terms for now
       beta_creds <- apply(betas, 2, function(x)

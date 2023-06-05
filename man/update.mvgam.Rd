@@ -7,6 +7,8 @@
 \method{update}{mvgam}(object, formula, data, newdata, trend_model, use_lv, n_lv, family, ...)
 }
 \arguments{
+\item{object}{A fitted \code{mvgam} model}
+
 \item{formula}{A new \code{formula} object. Note, \code{mvgam} currently does not support dynamic formula
 updates such as removal of specific terms with \code{- term}. When updating, the entire formula needs
 to be supplied}
@@ -21,6 +23,26 @@ Any other variables to be included in the linear predictor of \code{formula} mus
 in addition to any other variables included in the linear predictor of \code{formula}. If included, the
 observations in variable \code{y} will be set to \code{NA} when fitting the model so that posterior
 simulations can be obtained}
+
+\item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
+'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}}),
+'RW' (random walk with possible drift),
+'AR1' (with possible drift),
+'AR2' (with possible drift) or
+'AR3' (with possible drift) or
+'VAR1' (with possible drift; only available in \code{Stan}) or
+'GP' (Gaussian Process with squared exponential kernel;
+only available in \code{stan})}
+
+\item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
+latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series}
+
+\item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
+Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
+
+\item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
+families are: \code{nb()}, \code{poisson()}, \code{tweedie()}, \code{gaussian()}, \code{betar()}, \code{lognormal()}, \code{student_t()} and \code{Gamma()}}
 
 \item{...}{Other arguments to be passed to \code{\link{mvgam}}}
 }

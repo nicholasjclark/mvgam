@@ -21,23 +21,23 @@ knitr::opts_chunk$set(
 *mvgam*
 ================
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models (DGAMs) for time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/), [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/) and [Emily Fox](https://emilybfox.su.domains/), among many others. 
+The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Generalized Additive Models (DGAMs) for time series with dynamic trend components. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974){target="_blank"} (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling to quantify uncertainty and advise principled decision making coming from [Michael Betancourt](https://betanalpha.github.io/writing/){target="_blank"}, [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/){target="_blank"} and [Emily Fox](https://emilybfox.su.domains/){target="_blank"}, among many others. 
 
 ## Resources
 A number of case studies have been compiled to highlight how DGAMs can be estimated using MCMC sampling. These are hosted currently on `RPubs` at the following links:
   
-* [mvgam case study 1: model comparison and data assimilation](https://rpubs.com/NickClark47/mvgam)
-* [mvgam case study 2: multivariate models](https://rpubs.com/NickClark47/mvgam2)
-* [mvgam case study 3: distributed lag models](https://rpubs.com/NickClark47/mvgam3)
+* [mvgam case study 1: model comparison and data assimilation](https://rpubs.com/NickClark47/mvgam){target="_blank"}
+* [mvgam case study 2: multivariate models](https://rpubs.com/NickClark47/mvgam2){target="_blank"}
+* [mvgam case study 3: distributed lag models](https://rpubs.com/NickClark47/mvgam3){target="_blank"}
   
 The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan` or `JAGS`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The following resources can be helpful to troubleshoot:
   
-* [Stan Discourse](https://discourse.mc-stan.org/)
-* [JAGS Discourse](https://sourceforge.net/projects/mcmc-jags/)
+* [Stan Discourse](https://discourse.mc-stan.org/){target="_blank"}
+* [JAGS Discourse](https://sourceforge.net/projects/mcmc-jags/){target="_blank"}
   
 ## Installation
 Install the development version from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`. Note that to actually condition models with MCMC sampling, either the `JAGS` software must be installed (along with the `R` packages `rjags` and `runjags`) or the `Stan` software must be installed (along with either `rstan` and/or `cmdstanr`). Only `rstan` is listed as a dependency of `mvgam` to ensure that installation is less difficult. If users wish to fit the models using `mvgam`, please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/), for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan), or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/). You will need a fairly recent version of `Stan` to ensure all the model syntax is recognized. If you see warnings such as `variable "array" does not exist`, this is usually a sign that you need to update your version of `Stan`. We highly recommend you use `Cmdstan` through the `cmdstanr` interface as the backend. This is because `Cmdstan` is easier to install, is more up to date with new features, and uses less memory than `Rstan`. See [this documentation from the `Cmdstan` team for more information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan). 
+`devtools::install_github("nicholasjclark/mvgam")`. Note that to actually condition models with MCMC sampling, either the `JAGS` software must be installed (along with the `R` packages `rjags` and `runjags`) or the `Stan` software must be installed (along with either `rstan` and/or `cmdstanr`). Only `rstan` is listed as a dependency of `mvgam` to ensure that installation is less difficult. If users wish to fit the models using `mvgam`, please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/){target="_blank"}, for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}. You will need a fairly recent version of `Stan` to ensure all the model syntax is recognized. If you see warnings such as `variable "array" does not exist`, this is usually a sign that you need to update your version of `Stan`. We highly recommend you use `Cmdstan` through the `cmdstanr` interface as the backend. This is because `Cmdstan` is easier to install, is more up to date with new features, and uses less memory than `Rstan`. See [this documentation from the `Cmdstan` team for more information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan){target="_blank"}. 
 
 ## Citing mvgam and related software
 When using open source software (or software in general), please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work, so we highly encourage you to cite any packages that you rely on for your research.
@@ -69,7 +69,7 @@ some features of `mvgam` which specifically rely on certain packages. The most i
 * `GP` Squared exponential Gaussian Process 
 * `None` No latent trend is fitted
   
-When using `Stan` as the back-end, all of these trend models (apart from `VAR1`) can be estimated using a set of dimension-reduced dynamic factors. Please see [mvgam case study 2: multivariate models](https://rpubs.com/NickClark47/mvgam2) for more information
+When using `Stan` as the back-end, all of these trend models (apart from `VAR1`) can be estimated using a set of dimension-reduced dynamic factors. Please see [mvgam case study 2: multivariate models](https://rpubs.com/NickClark47/mvgam2){target="_blank"} for more information
 
 ## A brief introduction to the package
 We can explore the model’s primary functions using a test dataset that
@@ -194,7 +194,7 @@ test_priors <- get_mvgam_priors(population ~ s(season, bs = 'cc', k = 12),
 test_priors
 ```
 
-Any of the above priors can be changed by modifying the `prior` column and supplying the resulting `data.frame` to the `priors` argument in `mvgam()`. But for now, we will proceed with the defaults by conditioning the model on observed data in `Stan` using MCMC sampling with the `Cmdstan` interface (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan) and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html)).
+Any of the above priors can be changed by modifying the `prior` column and supplying the resulting `data.frame` to the `priors` argument in `mvgam()`. But for now, we will proceed with the defaults by conditioning the model on observed data in `Stan` using MCMC sampling with the `Cmdstan` interface (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"} and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html){target="_blank"}).
 ```{r, message=FALSE, warning=FALSE}
 lynx_mvgam <- mvgam(data = lynx_train,
                newdata = lynx_test,
@@ -225,7 +225,7 @@ Next examine simulated empirical Cumulative Distribution Functions (CDF) for pos
 ppc(lynx_mvgam, series = 1, type = 'cdf')
 ```
 
-Rootograms are becoming [popular graphical tools for checking a discrete model's ability to capture dispersion properties of the response variable](https://arxiv.org/pdf/1605.01311.pdf). Posterior predictive hanging rootograms can be displayed using the `ppc()` function in `mvgam`. In the plot below, we bin the unique observed values into `25` bins to prevent overplotting and help with interpretation. This plot compares the frequencies of observed vs predicted values for each bin, which can help to identify aspects of poor model fit. For example, if the gray bars (representing observed frequencies) tend to stretch below zero, this suggests the model's simulations predict the values in that particular bin less frequently than they are observed in the data. A well-fitting model that can generate realistic simulated data will provide a rootogram in which the lower boundaries of the grey bars are generally near zero
+Rootograms are becoming [popular graphical tools for checking a discrete model's ability to capture dispersion properties of the response variable](https://arxiv.org/pdf/1605.01311.pdf){target="_blank"}. Posterior predictive hanging rootograms can be displayed using the `ppc()` function in `mvgam`. In the plot below, we bin the unique observed values into `25` bins to prevent overplotting and help with interpretation. This plot compares the frequencies of observed vs predicted values for each bin, which can help to identify aspects of poor model fit. For example, if the gray bars (representing observed frequencies) tend to stretch below zero, this suggests the model's simulations predict the values in that particular bin less frequently than they are observed in the data. A well-fitting model that can generate realistic simulated data will provide a rootogram in which the lower boundaries of the grey bars are generally near zero
 ```{r}
 ppc(lynx_mvgam, series = 1, type = 'rootogram', n_bins = 25)
 ```
@@ -298,7 +298,7 @@ ppc(lynx_mvgam, series = 1, type = 'cdf', newdata = lynx_test)
 ppc(lynx_mvgam, series = 1, type = 'pit', newdata = lynx_test)
 ```
 
-A key aspect of ecological forecasting is to understand [how different components of a model contribute to forecast uncertainty](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589). We can estimate relative contributions to forecast uncertainty for the GAM component and the latent trend component using `mvgam`
+A key aspect of ecological forecasting is to understand [how different components of a model contribute to forecast uncertainty](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589){target="_blank"}. We can estimate relative contributions to forecast uncertainty for the GAM component and the latent trend component using `mvgam`
 ```{r}
 plot_mvgam_uncertainty(lynx_mvgam, newdata = lynx_test, legend_position = 'none')
 text(1, 0.2, cex = 1.5, label="GAM component", 

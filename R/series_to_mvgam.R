@@ -3,6 +3,8 @@
 #'This function converts univariate or multivariate time series (\code{xts} or \code{ts} objects)
 #'to the format necessary for \code{\link{mvgam}}
 #'
+#'@importFrom stats is.ts ts start time frequency
+#'@importFrom utils head
 #'@param series \code{\link[xts]{xts}} or \code{\link[stats]{ts}} object to be converted to \code{\link{mvgam}} format
 #'@param freq \code{integer}. The seasonal frequency of the series
 #'@param train_prop \code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.95}
@@ -11,13 +13,14 @@
 #'
 #'@examples
 #'# A ts object example
-#'library(forecast)
-#'data("AirPassengers")
-#'series <- cbind(AirPassengers, AirPassengers)
+#'data("sunspots")
+#'series <- cbind(sunspots, sunspots)
 #'colnames(series) <- c('blood', 'bone')
+#'head(series)
 #'series_to_mvgam(series, frequency(series), 0.85)
 #'
 #'# An xts object example
+#'library(xts)
 #'dates <- seq(as.Date("2001-05-01"), length=30, by="quarter")
 #'data  <- cbind(c(gas = rpois(30, cumprod(1+rnorm(30, mean = 0.01, sd = 0.001)))),
 #'c(oil = rpois(30, cumprod(1+rnorm(30, mean = 0.01, sd = 0.001)))))
@@ -58,7 +61,7 @@ series_to_mvgam <- function(series, freq, train_prop = 0.85){
                                    freq, 0)), 1)
     ts(as.numeric(x),
        start = c(lubridate::year(start(x)),
-                 start_time), freq = freq)
+                 start_time), frequency = freq)
   }
 
   if(type == 'xts'){
@@ -78,14 +81,14 @@ series_to_mvgam <- function(series, freq, train_prop = 0.85){
   }
 
   mvgam_data = data.frame(y = as.vector(series),
-                        season = rep(seasons, n_series),
-                        year = rep(years, n_series),
-                        date = rep(dates, n_series),
-                        series = as.factor(sort(rep(series_names, T)))) %>%
+                          season = rep(seasons, n_series),
+                          year = rep(years, n_series),
+                          date = rep(dates, n_series),
+                          series = as.factor(sort(rep(series_names, T)))) %>%
     dplyr::arrange(year, season, series)
 
 
- mvgam_data %>%
+  mvgam_data %>%
     dplyr::left_join(mvgam_data %>%
                        dplyr::select(year, season) %>%
                        dplyr::distinct() %>%
@@ -93,8 +96,8 @@ series_to_mvgam <- function(series, freq, train_prop = 0.85){
                        dplyr::mutate(time = dplyr::row_number()),
                      by = c('season', 'year')) -> mvgam_data
 
- # Split into training and testing and return
- last_time <- floor(max(mvgam_data$time) * train_prop)
+  # Split into training and testing and return
+  last_time <- floor(max(mvgam_data$time) * train_prop)
 
   return(list(data_train = mvgam_data %>%
                 dplyr::filter(time <= last_time),

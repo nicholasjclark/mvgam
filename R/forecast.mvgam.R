@@ -1,5 +1,7 @@
 #'@title Compute out of sample forecasts for a fitted \code{mvgam} object
 #'@name forecast.mvgam
+#'@importFrom parallel clusterExport stopCluster setDefaultCluster
+#'@importFrom stats predict
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 #'in addition to any other variables included in the linear predictor of the original \code{formula}. If included, the
@@ -205,13 +207,13 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
   }
 
   # Beta coefficients for GAM component
-  betas <- mvgam:::mcmc_chains(object$model_output, 'b')
+  betas <- mcmc_chains(object$model_output, 'b')
 
   # Family of model
   family <- object$family
 
   # Family-specific parameters
-  family_pars <- mvgam:::extract_family_pars(object = object)
+  family_pars <- extract_family_pars(object = object)
 
   # Trend model
   trend_model <- object$trend_model
@@ -222,10 +224,10 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
   # trends, we have to keep all estimates through time
 
   if(object$trend_model == 'VAR1'){
-    trend_pars <- mvgam:::extract_trend_pars(object = object,
+    trend_pars <- extract_trend_pars(object = object,
                                              keep_all_estimates = FALSE,
                                              ending_time = max(object$obs_data$time))
-    all_trends <- mvgam:::propagate_var_fcs(trend_pars,
+    all_trends <- propagate_var_fcs(trend_pars,
                                     n_samples = 500,
                                     sample_seq = 1:500,
                                     eval_timepoint = max(object$obs_data$time),
@@ -233,7 +235,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
                                     fc_horizon = fc_horizon)
     sample_seq <- sample(1:500, dim(betas)[1], TRUE)
   } else {
-    trend_pars <- mvgam:::extract_trend_pars(object = object,
+    trend_pars <- extract_trend_pars(object = object,
                                              keep_all_estimates = FALSE)
     all_trends <- NULL
     sample_seq <- NULL
@@ -273,12 +275,12 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
     if(series == 'all'){
 
       # Sample general trend-specific parameters
-      general_trend_pars <- mvgam:::extract_general_trend_pars(trend_pars = trend_pars,
+      general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
                                                                samp_index = samp_index)
 
       if(use_lv){
         # Propagate the lvs forward using the sampled trend parameters
-        trends <- mvgam:::forecast_trend(trend_model = trend_model,
+        trends <- forecast_trend(trend_model = trend_model,
                                          use_lv = use_lv,
                                          trend_pars = general_trend_pars,
                                          h = fc_horizon)
@@ -288,7 +290,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
       trend_states <- lapply(seq_len(n_series), function(series){
 
         # Sample series- and trend-specific parameters
-        trend_extracts <- mvgam:::extract_series_trend_pars(series = series,
+        trend_extracts <- extract_series_trend_pars(series = series,
                                                             samp_index = samp_index,
                                                             trend_pars = trend_pars,
                                                             use_lv = use_lv)
@@ -305,7 +307,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
 
         } else {
           # Propagate the series-specific trends forward
-          out <- mvgam:::forecast_trend(trend_model = trend_model,
+          out <- forecast_trend(trend_model = trend_model,
                                         use_lv = FALSE,
                                         trend_pars = trend_extracts,
                                         h = fc_horizon)
@@ -333,7 +335,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
           })
           names(family_extracts) <- names(family_pars)
 
-          mvgam:::mvgam_predict(family = family,
+          mvgam_predict(family = family,
                                 Xp = Xpmat,
                                 type = 'response',
                                 betas = c(betas, 1),
@@ -347,13 +349,13 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
         trends <- all_trends[sample_seq[i], , series]
       } else {
         # Sample series- and trend-specific parameters
-        trend_extracts <- mvgam:::extract_series_trend_pars(series = series,
+        trend_extracts <- extract_series_trend_pars(series = series,
                                                             samp_index = samp_index,
                                                             trend_pars = trend_pars,
                                                             use_lv = use_lv)
 
         # Propagate the series' trend forward using the sampled trend parameters
-        trends <- mvgam:::forecast_trend(trend_model = trend_model,
+        trends <- forecast_trend(trend_model = trend_model,
                                          use_lv = use_lv,
                                          trend_pars = trend_extracts,
                                          h = fc_horizon)
@@ -381,7 +383,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
         # Generate predictions
         Xpmat <- cbind(Xp, trends)
         attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
-        out <- mvgam:::mvgam_predict(family = family,
+        out <- mvgam_predict(family = family,
                                      Xp = Xpmat,
                                      type = type,
                                      betas = c(betas, 1),

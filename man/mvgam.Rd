@@ -84,7 +84,7 @@ Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series 
 
 \item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
 'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-and the observation process is the only source of error; similarly to what is estimated by \code{\link[mcgv]{gam}}),
+and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}}),
 'RW' (random walk with possible drift),
 'AR1' (with possible drift),
 'AR2' (with possible drift) or
@@ -96,7 +96,7 @@ only available in \code{stan})}
 \item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-predictor (which it is by default when calling \code{\link[mcgv]{jagam}}). Therefore this defaults to \code{FALSE}}
+predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Therefore this defaults to \code{FALSE}}
 
 \item{chains}{\code{integer} specifying the number of parallel chains for the model}
 
@@ -171,7 +171,7 @@ must model time series that show complex distributional features and missing dat
 in a Bayesian framework using Markov Chain Monte Carlo.
 \cr
 \cr
-\emph{Priors}: A \code{\link[mcgv]{jagam}} model file is generated from \code{formula} and modified to include any latent
+\emph{Priors}: A \code{\link[mgcv]{jagam}} model file is generated from \code{formula} and modified to include any latent
 temporal processes. Prior distributions for most important model parameters can be altered by the user to inspect model
 sensitivities to given priors (see \code{\link{get_mvgam_priors}} for details). Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
 accordingly. However more control over the model specification can be accomplished by first using \code{mvgam} as a
@@ -182,11 +182,11 @@ up to the user to ensure these are correct (i.e. use \code{dnorm} for normal den
 parameterisation; but use \code{normal} for normal densities in \code{Stan}, with the mean and standard deviation parameterisation)
 \cr
 \cr
-\emph{Random effects}: For any smooth terms using the random effect basis (\code{\link[mcgv]{smooth.construct.re.smooth.spec}}),
+\emph{Random effects}: For any smooth terms using the random effect basis (\code{\link[mgcv]{smooth.construct.re.smooth.spec}}),
 a non-centred parameterisation is automatically employed to avoid degeneracies that are common in hierarchical models.
 Note however that centred versions may perform better for series that are particularly informative, so as with any
 foray into Bayesian modelling, it is worth building an understanding of the model's assumptions and limitations by following a
-principled workflow. Also note that models are parameterised using \code{drop.unused.levels = FALSE} in \code{\link[mcgv]{jagam}}
+principled workflow. Also note that models are parameterised using \code{drop.unused.levels = FALSE} in \code{\link[mgcv]{jagam}}
 to ensure predictions can be made for all levels of the supplied factor variable
 \cr
 \cr
@@ -407,7 +407,7 @@ Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (D
 Methods in Ecology and Evolution. 14:3, 771-784.
 }
 \seealso{
-\code{\link[mcgv]{jagam}}, \code{\link[mcgv]{gam}}
+\code{\link[mgcv]{jagam}}, \code{\link[mgcv]{gam}}
 }
 \author{
 Nicholas J Clark

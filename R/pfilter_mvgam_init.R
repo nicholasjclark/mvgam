@@ -5,6 +5,8 @@
 #'and particles are weighted by their proposal's multivariate composite likelihood to update the model's
 #'forecast distribution
 #'
+#'@importFrom parallel clusterExport stopCluster setDefaultCluster
+#'@importFrom stats predict
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param newdata A \code{dataframe} or \code{list} of test data containing at least one more observation per series
 #'(beyond the last observation seen by the model in \code{object}) to be assimilated by the particle filter.
@@ -223,7 +225,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
   trend_states <- do.call(cbind, (lapply(seq_len(n_series), function(series){
 
     # Sample series- and trend-specific parameters
-    trend_extracts <- mvgam:::extract_series_trend_pars(series = series,
+    trend_extracts <- extract_series_trend_pars(series = series,
                                                         samp_index = samp_index,
                                                         trend_pars = trend_pars,
                                                         use_lv = use_lv)
@@ -240,7 +242,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
 
     } else {
       # Propagate the series-specific trends forward
-      out <- mvgam:::forecast_trend(trend_model = trend_model,
+      out <- forecast_trend(trend_model = trend_model,
                                     use_lv = FALSE,
                                     trend_pars = trend_extracts,
                                     h = 1)
@@ -291,7 +293,7 @@ particles <- pbapply::pblapply(sample_seq, function(x){
       attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
 
       # Likelihood
-      weight <- exp(mvgam:::mvgam_predict(family = family,
+      weight <- exp(mvgam_predict(family = family,
                                       family_pars = family_extracts,
                                       truth = truth[series],
                                       Xp = Xpmat,

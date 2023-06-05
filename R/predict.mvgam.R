@@ -1,4 +1,6 @@
 #'Predict from the GAM component of an mvgam model
+#'@importFrom parallel clusterExport stopCluster setDefaultCluster
+#'@importFrom stats predict
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing the
 #'variables included in the linear predictor of \code{formula}. If not supplied,
@@ -63,13 +65,13 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
   }
 
   # Beta coefficients for GAM component
-  betas <- mvgam:::mcmc_chains(object$model_output, 'b')
+  betas <- mcmc_chains(object$model_output, 'b')
 
   # Family of model
   family <- object$family
 
   # Family-specific parameters
-  family_pars <- mvgam:::extract_family_pars(object = object)
+  family_pars <- extract_family_pars(object = object)
 
   # Determine which series each observation belongs to
   series_ind <- as.numeric(newdata$series)
@@ -95,7 +97,7 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
       }
     })
     names(par_extracts) <- names(family_pars)
-    mvgam:::mvgam_predict(family = family,
+    mvgam_predict(family = family,
                   Xp = Xp,
                   type = type,
                   betas = betas[x,],

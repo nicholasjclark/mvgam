@@ -2,6 +2,8 @@
 #'
 #'This function allows a previously fitted `mvgam` model to be updated
 #'@name update.mvgam
+#'@importFrom mgcv nb betar
+#'@param object A fitted `mvgam` model
 #'@param formula A new `formula` object. Note, `mvgam` currently does not support dynamic formula
 #'updates such as removal of specific terms with `- term`. When updating, the entire formula needs
 #'to be supplied
@@ -14,6 +16,22 @@
 #'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
 #'observations in variable \code{y} will be set to \code{NA} when fitting the model so that posterior
 #'simulations can be obtained
+#'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
+#''None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}}),
+#''RW' (random walk with possible drift),
+#''AR1' (with possible drift),
+#''AR2' (with possible drift) or
+#''AR3' (with possible drift) or
+#''VAR1' (with possible drift; only available in \code{Stan}) or
+#''GP' (Gaussian Process with squared exponential kernel;
+#'only available in \code{stan})
+#'@param family \code{family} specifying the exponential observation family for the series. Currently supported
+#'families are: `nb()`, `poisson()`, `tweedie()`, `gaussian()`, `betar()`, `lognormal()`, `student_t()` and `Gamma()`
+#'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
+#'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
+#'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
+#'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}
 #'@param ... Other arguments to be passed to \code{\link{mvgam}}
 #'@export
 update.mvgam = function(object, formula,

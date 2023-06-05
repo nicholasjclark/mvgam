@@ -73,7 +73,7 @@ mcmc_summary = function(object,
 
   if (methods::is(object, 'matrix'))
   {
-    object2 <- MCMCchains(object, params, excl, ISB, exact = exact, mcmc.list = FALSE)
+    object2 <- mcmc_chains(object, params, excl, ISB, exact = exact, mcmc.list = FALSE)
   } else {
     if (methods::is(object, 'stanfit'))
     {
@@ -92,9 +92,9 @@ mcmc_summary = function(object,
           #jagsUI
           if (methods::is(object, 'jagsUI'))
           {
-            object2 <- MCMCchains(object)
+            object2 <- mcmc_chains(object)
           } else {
-            object2 <- MCMCchains(object, params, excl, ISB, exact = exact, mcmc.list = TRUE)
+            object2 <- mcmc_chains(object, params, excl, ISB, exact = exact, mcmc.list = TRUE)
           }
         }
       }
@@ -506,7 +506,7 @@ mcmc_summary = function(object,
       }
       if (methods::is(object, 'jagsUI'))
       {
-        ch_bind <- MCMCchains(object, params, excl, ISB)
+        ch_bind <- mcmc_chains(object, params, excl, ISB)
       }
     }
 
@@ -711,18 +711,163 @@ mcmc_summary = function(object,
 }
 
 #' @noRd
-mcmc_chains = function(object, params = 'all', ISB = TRUE,
-                       excl = NULL, exact = TRUE, mcmc.list = FALSE,
+mcmc_chains = function(object,
+                       params = 'all',
+                       excl = NULL,
+                       ISB = TRUE,
+                       exact = TRUE,
+                       mcmc.list = FALSE,
                        chain_num = NULL){
-  temp_in <- As.mcmc.list(object)
+  #for rstanarm/brms obejcts - set to NULL by default
+  sp_names <- NULL
 
-  if (ISB == TRUE)
+  #if from R2jags::jags.parallel
+  if (methods::is(object, 'rjags.parallel'))
   {
-    names <- vapply(strsplit(colnames(temp_in[[1]]),
-                             split = '[', fixed = TRUE), `[`, 1, FUN.VALUE=character(1))
-  } else {
-    names <- colnames(temp_in[[1]])
+    x <- object$BUGSoutput
+    mclist <- vector('list', x$n.chains)
+    mclis <- vector('list', x$n.chains)
+    ord <- dimnames(x$sims.array)[[3]]
+    for (i in 1:x$n.chains)
+    {
+      tmp1 <- x$sims.array[, i, ord]
+      mclis[[i]] <- coda::mcmc(tmp1, thin = x$n.thin)
+    }
+    object <- coda::as.mcmc.list(mclis)
   }
+
+  #if mcmc object (from nimble) - convert to mcmc.list
+  if (methods::is(object, 'mcmc'))
+  {
+    object <- coda::mcmc.list(object)
+  }
+
+  #if list object of matrices (from nimble) - convert to mcmc.list
+  if (methods::is(object, 'list'))
+  {
+    object <- coda::mcmc.list(lapply(object, function(x) coda::mcmc(x)))
+  }
+
+  #if from rstanarm::stan_glm
+  if (methods::is(object, 'stanreg'))
+  {
+    object <- object$stanfit
+    sp_names <- object@sim$fnames_oi
+  }
+
+  if (coda::is.mcmc.list(object) != TRUE &
+      !methods::is(object, 'matrix') &
+      !methods::is(object, 'mcmc') &
+      !methods::is(object, 'list') &
+      !methods::is(object, 'rjags') &
+      !methods::is(object, 'stanfit') &
+      !methods::is(object, 'brmsfit') &
+      !methods::is(object, 'jagsUI') &
+      !methods::is(object, 'CmdStanMCMC'))
+  {
+    stop('Invalid object type. Input must be stanfit object (rstan), CmdStanMCMC object (cmdstanr), stanreg object (rstanarm), brmsfit object (brms), mcmc.list object (coda/rjags), mcmc object (coda/nimble), list object (nimble), rjags object (R2jags), jagsUI object (jagsUI), or matrix with MCMC chains.')
+  }
+
+  #if from brms::brm
+  if (methods::is(object, 'brmsfit'))
+  {
+    #extract stanfit portion of object
+    object <- object$fit
+    #Stan names
+    sp_names_p <- names(object@sim$samples[[1]])
+    #remove b_ and r_
+    st_nm <- substr(sp_names_p, start = 1, stop = 2)
+    sp_names <- rep(NA, length(sp_names_p))
+    b_idx <- which(st_nm == 'b_')
+    r_idx <- which(st_nm == 'r_')
+    ot_idx <- which(st_nm != 'b_' & st_nm != 'r_')
+    #fill names vec with b_ and r_ removed
+    sp_names[b_idx] <- gsub('b_', '', sp_names_p[b_idx])
+    sp_names[r_idx] <- gsub('r_', '', sp_names_p[r_idx])
+    sp_names[ot_idx] <- sp_names_p[ot_idx]
+  }
+
+  #NAME SORTING BLOCK
+  if (methods::is(object, 'stanfit'))
+  {
+    #convert to mcmc.list
+    temp_in <- rstan::As.mcmc.list(object)
+
+    #assign new colnames for mcmc.list object if object exists (for stanreg and brms objs so parameter names are interpretable) - do not rename params for model fit directly with Stan
+    if (!is.null(sp_names))
+    {
+      coda::varnames(temp_in) <- sp_names
+    }
+
+    if (ISB == TRUE)
+    {
+      names <- vapply(strsplit(colnames(temp_in[[1]]),
+                               split = '[', fixed = TRUE), `[`, 1, FUN.VALUE=character(1))
+    } else {
+      names <- colnames(temp_in[[1]])
+    }
+  }
+
+  if (methods::is(object, 'jagsUI'))
+  {
+    object <- object$samples
+  }
+
+  if (methods::is(object, 'CmdStanMCMC'))
+  {
+    object <- cmdstanr::as_mcmc.list(object)
+  }
+
+  if (coda::is.mcmc.list(object) == TRUE)
+  {
+    temp_in <- object
+    if (is.null(colnames(temp_in[[1]])))
+    {
+      warning('No parameter names provided. Assigning arbitrary names.')
+      sub_cn <- paste0('Param_', 1:NCOL(temp_in[[1]]))
+      colnames(temp_in[[1]]) <- sub_cn
+    }
+
+    if (ISB == TRUE)
+    {
+      names <- vapply(strsplit(colnames(temp_in[[1]]),
+                               split = "[", fixed = TRUE), `[`, 1, FUN.VALUE=character(1))
+    } else {
+      names <- colnames(temp_in[[1]])
+    }
+  }
+
+  if (methods::is(object, 'matrix'))
+  {
+    temp_in <- object
+    if (is.null(colnames(temp_in)))
+    {
+      warning('No parameter names (column names) provided. Assigning arbitrary names.')
+      sub_cn <- paste0('Param_', 1:NCOL(temp_in))
+      colnames(temp_in) <- sub_cn
+    }
+
+    if (ISB == TRUE)
+    {
+      names <- vapply(strsplit(colnames(temp_in),
+                               split = "[", fixed = TRUE), `[`, 1, FUN.VALUE=character(1))
+    } else {
+      names <- colnames(temp_in)
+    }
+  }
+
+  if (methods::is(object, 'rjags'))
+  {
+    temp_in <- object$BUGSoutput$sims.matrix
+    if (ISB == TRUE)
+    {
+      names <- vapply(strsplit(rownames(object$BUGSoutput$summary),
+                               split = "[", fixed = TRUE), `[`, 1, FUN.VALUE=character(1))
+    } else {
+      names <- rownames(object$BUGSoutput$summary)
+    }
+  }
+
   #INDEX BLOCK
   #exclusions
   if (!is.null(excl))
@@ -1900,6 +2045,7 @@ repair_stanfit <- function(x) {
   x
 }
 
+#' @importFrom methods new
 #' @noRd
 read_csv_as_stanfit <- function(files, variables = NULL,
                                 sampler_diagnostics = NULL) {
@@ -1958,9 +2104,9 @@ read_csv_as_stanfit <- function(files, variables = NULL,
     n_iter_warmup <- posterior::niterations(csfit$warmup_draws)
     n_iter_sample <- posterior::niterations(csfit$post_warmup_draws)
     if (n_iter_warmup > 0) {
-      csfit$warmup_draws <- as_draws_df(csfit$warmup_draws)
+      csfit$warmup_draws <- posterior::as_draws_df(csfit$warmup_draws)
       csfit$warmup_sampler_diagnostics <-
-        as_draws_df(csfit$warmup_sampler_diagnostics)
+        posterior::as_draws_df(csfit$warmup_sampler_diagnostics)
     }
     if (n_iter_sample > 0) {
       csfit$post_warmup_draws <- posterior::as_draws_df(csfit$post_warmup_draws)
@@ -1989,9 +2135,9 @@ read_csv_as_stanfit <- function(files, variables = NULL,
     # for variational inference "samplers"
     n_chains <- 1
     n_iter_warmup <- 0
-    n_iter_sample <- niterations(csfit$draws)
+    n_iter_sample <- posterior::niterations(csfit$draws)
     if (n_iter_sample > 0) {
-      csfit$draws <- as_draws_df(csfit$draws)
+      csfit$draws <- posterior::as_draws_df(csfit$draws)
     }
 
     # called 'samples' for consistency with rstan
@@ -2008,6 +2154,11 @@ read_csv_as_stanfit <- function(files, variables = NULL,
   samples <- as.data.frame(samples)
   chain_ids <- samples$.chain
   samples[res_vars] <- NULL
+
+  move2end <- function(x, last) {
+    x[c(setdiff(names(x), last), last)]
+  }
+
   if ("lp__" %in% colnames(samples)) {
     samples <- move2end(samples, "lp__")
   }
@@ -2262,6 +2413,7 @@ check_treedepth <- function(fit, max_depth = 10, quiet=FALSE,
 }
 
 #' Check the energy fraction of missing information (E-FMI)
+#' @importFrom stats var
 #' @param fit A stanfit object
 #' @param quiet Logical (verbose or not?)
 #' @details Utility function written by Michael Betancourt (https://betanalpha.github.io/)
@@ -2306,7 +2458,7 @@ check_n_eff <- function(fit, quiet=FALSE, fit_summary) {
   }
   N <- dim(fit_summary)[[1]]
 
-  iter <- dim(rstan:::extract(fit)[[1]])[[1]]
+  iter <- dim(rstan::extract(fit)[[1]])[[1]]
 
   neffs <- fit_summary[,'n_eff']
   ratios <- neffs / iter
@@ -2412,11 +2564,11 @@ parse_warning_code <- function(warning_code) {
 #' @details Utility function written by Michael Betancourt (https://betanalpha.github.io/)
 #' @noRd
 partition_div <- function(fit) {
-  nom_params <- rstan:::extract(fit, permuted=FALSE)
+  nom_params <- rstan::extract(fit, permuted=FALSE)
   n_chains <- dim(nom_params)[2]
   params <- as.data.frame(do.call(rbind, lapply(1:n_chains, function(n) nom_params[,n,])))
 
-  sampler_params <- get_sampler_params(fit, inc_warmup=FALSE)
+  sampler_params <- rstan::get_sampler_params(fit, inc_warmup=FALSE)
   divergent <- do.call(rbind, sampler_params)[,'divergent__']
   params$divergent <- divergent
 

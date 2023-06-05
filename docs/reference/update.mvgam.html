@@ -54,7 +54,11 @@
 
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
-    <dl><dt>formula</dt>
+    <dl><dt>object</dt>
+<dd><p>A fitted <code>mvgam</code> model</p></dd>
+
+
+<dt>formula</dt>
 <dd><p>A new <code>formula</code> object. Note, <code>mvgam</code> currently does not support dynamic formula
 updates such as removal of specific terms with <code>- term</code>. When updating, the entire formula needs
 to be supplied</p></dd>
@@ -75,6 +79,34 @@ observations in variable <code>y</code> will be set to <code>NA</code> when fitt
 simulations can be obtained</p></dd>
 
 
+<dt>trend_model</dt>
+<dd><p><code>character</code> specifying the time series dynamics for the latent trend. Options are:
+'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>),
+'RW' (random walk with possible drift),
+'AR1' (with possible drift),
+'AR2' (with possible drift) or
+'AR3' (with possible drift) or
+'VAR1' (with possible drift; only available in <code>Stan</code>) or
+'GP' (Gaussian Process with squared exponential kernel;
+only available in <code>stan</code>)</p></dd>
+
+
+<dt>use_lv</dt>
+<dd><p><code>logical</code>. If <code>TRUE</code>, use dynamic factors to estimate series'
+latent trends in a reduced dimension format. If <code>FALSE</code>, estimate independent latent trends for each series</p></dd>
+
+
+<dt>n_lv</dt>
+<dd><p><code>integer</code> the number of latent dynamic factors to use if <code>use_lv == TRUE</code>.
+Cannot be <code>&gt;n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
+
+
+<dt>family</dt>
+<dd><p><code>family</code> specifying the exponential observation family for the series. Currently supported
+families are: <code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code>, <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code><a href="mvgam_families.html">tweedie()</a></code>, <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar()</a></code>, <code><a href="mvgam_families.html">lognormal()</a></code>, <code><a href="mvgam_families.html">student_t()</a></code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code></p></dd>
+
+
 <dt>...</dt>
 <dd><p>Other arguments to be passed to <code><a href="mvgam.html">mvgam</a></code></p></dd>
 
@@ -85,7 +117,7 @@ simulations can be obtained</p></dd>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p></p><p>Developed by Nicholas Clark.</p>
+  <p></p><p>Developed by Nicholas J Clark.</p>
 </div>
 
 <div class="pkgdown-footer-right">

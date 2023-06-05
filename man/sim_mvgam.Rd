@@ -88,3 +88,12 @@ This function simulates discrete time series data for fitting a multivariate GAM
 shared seasonality and dependence on state-space latent dynamic factors. Random dependencies among series, i.e.
 correlations in their long-term trends, are included in the form of correlated loadings on the latent dynamic factors
 }
+\examples{
+#Simulate series with observations bounded at 0 and 1 (Beta responses)
+sim_data <- sim_mvgam(family = betar(), trend_model = 'GP', trend_rel = 0.6)
+plot_mvgam_series(data = sim_data$data_train, series = 'all')
+
+#Now simulate series with overdispersed discrete observations
+sim_data <- sim_mvgam(family = nb(), trend_model = 'GP', trend_rel = 0.6, phi = 10)
+plot_mvgam_series(data = sim_data$data_train, series = 'all')
+}

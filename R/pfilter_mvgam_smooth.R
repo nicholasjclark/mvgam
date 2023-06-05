@@ -7,6 +7,8 @@
 #'given for using resampling of high weight particles when Effective Sample Size falls below a
 #'user-specified threshold
 #'
+#'@importFrom parallel clusterExport stopCluster setDefaultCluster clusterEvalQ makePSOCKcluster
+#'@importFrom stats predict
 #'@param particles A \code{list} of particles that have been run up to one observation prior to the observation
 #'in \code{next_assim}
 #'@param mgcv_model A \code{\link[mgcv]{gam}} model returned through a call to \code{link{mvgam}}
@@ -27,7 +29,6 @@
 #'\code{FALSE}
 #'@param kernel_lambda \code{proportional numeric} specifying the strength of smoothing to use when
 #'pulling low weight particles toward the high likelihood state space. Should be between \code{0} and \code{1}
-#'@param file_path \code{character} string specifying the file path for locating the particles
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
 #'@return A \code{list} object of \code{length = n_particles} containing information on parameters and
 #'current state estimates for each particle
@@ -36,7 +37,7 @@ pfilter_mvgam_smooth = function(particles,
                                 mgcv_model,
                                 next_assim,
                                 threshold = 0.25,
-                                n_cores = parallel::detectCores() - 1,
+                                n_cores = 1,
                                 use_resampling = FALSE,
                                 kernel_lambda = 0.5){
 
@@ -113,7 +114,7 @@ pfilter_mvgam_smooth = function(particles,
     if(use_lv){
 
       # Run the latent variables forward one timestep
-      lvs <- mvgam:::forecast_trend(trend_model = particles[[x]]$trend_model,
+      lvs <- forecast_trend(trend_model = particles[[x]]$trend_model,
                                        use_lv = TRUE,
                                        trend_pars = particles[[x]]$trend_pars,
                                        h = 1)
@@ -160,7 +161,7 @@ pfilter_mvgam_smooth = function(particles,
         names(trend_extracts) <- names(particles[[x]]$trend_pars)
 
         # Propagate the series-specific trends forward
-        out <- mvgam:::forecast_trend(trend_model = particles[[x]]$trend_model,
+        out <- forecast_trend(trend_model = particles[[x]]$trend_model,
                                         use_lv = FALSE,
                                         trend_pars = trend_extracts,
                                         h = 1)
@@ -211,7 +212,7 @@ pfilter_mvgam_smooth = function(particles,
       names(family_extracts) <- names(particles[[x]]$family_pars)
 
       # Likelihood
-      series_weight <- exp(mvgam:::mvgam_predict(family = particles[[x]]$family,
+      series_weight <- exp(mvgam_predict(family = particles[[x]]$family,
                                              family_pars = family_extracts,
                                              truth = next_assim$y[series],
                                              Xp = Xpmat,
@@ -297,7 +298,7 @@ pfilter_mvgam_smooth = function(particles,
     xstar <- x[floor(N / 4 + 0.5)] # first quartile of sample
     theta <- 1 / x[N] + (1 - sqrt(M / (jj - 0.5))) / prior / xstar
     l_theta <- N * lx(theta, x) # profile log-lik
-    w_theta <- exp(l_theta - matrixStats::logSumExp(l_theta)) # normalize
+    w_theta <- exp(l_theta - log_sum_exp(l_theta)) # normalize
     theta_hat <- sum(theta * w_theta)
     k <- mean.default(log1p(-theta_hat * x))
     sigma <- -k / theta_hat
@@ -476,7 +477,6 @@ pfilter_mvgam_smooth = function(particles,
     re_weight <- FALSE
   }
 
-  library(parallel)
   cl <- makePSOCKcluster(n_cores)
   setDefaultCluster(cl)
   clusterExport(NULL, c('use_smoothing',

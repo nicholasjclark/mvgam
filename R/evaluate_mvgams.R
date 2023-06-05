@@ -1,5 +1,9 @@
 #'Evaluate forecasts from fitted mvgam objects
 #'
+#'@importFrom graphics barplot boxplot axis
+#'@importFrom stats quantile ecdf median predict
+#'@importFrom parallel clusterExport stopCluster setDefaultCluster
+#'@importFrom grDevices devAskNewPage
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param n_samples \code{integer} specifying the number of samples to generate from the model's
 #'posterior distribution
@@ -194,11 +198,11 @@ eval_mvgam = function(object,
   }
 
   # Beta coefficients for GAM component
-  betas <- mvgam:::mcmc_chains(object$model_output, 'b')
+  betas <- mcmc_chains(object$model_output, 'b')
 
   # Family-specific parameters
   family <- object$family
-  family_pars <- mvgam:::extract_family_pars(object = object)
+  family_pars <- extract_family_pars(object = object)
 
   # Trend model
   trend_model <- object$trend_model
@@ -206,7 +210,7 @@ eval_mvgam = function(object,
 
   # Trend-specific parameters; keep only the trend / lv estimates
   # up to the specific evaluation timepoint
-  trend_pars <- mvgam:::extract_trend_pars(object = object,
+  trend_pars <- extract_trend_pars(object = object,
                                            keep_all_estimates = FALSE,
                                            ending_time = eval_timepoint)
 
@@ -266,12 +270,12 @@ eval_mvgam = function(object,
       betas <- betas[samp_index, ]
 
       # Sample general trend-specific parameters
-      general_trend_pars <- mvgam:::extract_general_trend_pars(trend_pars = trend_pars,
+      general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
                                                                samp_index = samp_index)
 
       if(use_lv){
         # Propagate the lvs forward using the sampled trend parameters
-        trends <- mvgam:::forecast_trend(trend_model = trend_model,
+        trends <- forecast_trend(trend_model = trend_model,
                                          use_lv = use_lv,
                                          trend_pars = general_trend_pars,
                                          h = fc_horizon)
@@ -281,7 +285,7 @@ eval_mvgam = function(object,
       trend_states <- do.call(cbind, (lapply(seq_len(n_series), function(series){
 
         # Sample series- and trend-specific parameters
-        trend_extracts <- mvgam:::extract_series_trend_pars(series = series,
+        trend_extracts <- extract_series_trend_pars(series = series,
                                                             samp_index = samp_index,
                                                             trend_pars = trend_pars,
                                                             use_lv = use_lv)
@@ -298,7 +302,7 @@ eval_mvgam = function(object,
 
         } else {
           # Propagate the series-specific trends forward
-          out <- mvgam:::forecast_trend(trend_model = trend_model,
+          out <- forecast_trend(trend_model = trend_model,
                                         use_lv = FALSE,
                                         trend_pars = trend_extracts,
                                         h = fc_horizon)
@@ -323,7 +327,7 @@ eval_mvgam = function(object,
         })
         names(family_extracts) <- names(family_pars)
 
-        mvgam:::mvgam_predict(family = family,
+        mvgam_predict(family = family,
                       Xp = Xpmat,
                       type = 'response',
                       betas = c(betas, 1),
@@ -344,12 +348,12 @@ eval_mvgam = function(object,
       betas <- betas[samp_index, ]
 
       # Sample general trend-specific parameters
-      general_trend_pars <- mvgam:::extract_general_trend_pars(trend_pars = trend_pars,
+      general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
                                                        samp_index = samp_index)
 
       if(use_lv){
         # Propagate the lvs forward using the sampled trend parameters
-        trends <- mvgam:::forecast_trend(trend_model = trend_model,
+        trends <- forecast_trend(trend_model = trend_model,
                                  use_lv = use_lv,
                                  trend_pars = general_trend_pars,
                                  h = fc_horizon)
@@ -359,7 +363,7 @@ eval_mvgam = function(object,
       trend_states <- do.call(cbind, (lapply(seq_len(n_series), function(series){
 
         # Sample series- and trend-specific parameters
-        trend_extracts <- mvgam:::extract_series_trend_pars(series = series,
+        trend_extracts <- extract_series_trend_pars(series = series,
                                                             samp_index = samp_index,
                                                             trend_pars = trend_pars,
                                                             use_lv = use_lv)
@@ -376,7 +380,7 @@ eval_mvgam = function(object,
 
         } else {
           # Propagate the series-specific trends forward
-          out <- mvgam:::forecast_trend(trend_model = trend_model,
+          out <- forecast_trend(trend_model = trend_model,
                                 use_lv = FALSE,
                                 trend_pars = trend_extracts,
                                 h = fc_horizon)
@@ -401,7 +405,7 @@ eval_mvgam = function(object,
         })
         names(family_extracts) <- names(family_pars)
 
-        mvgam:::mvgam_predict(family = family,
+        mvgam_predict(family = family,
                       Xp = Xpmat,
                       type = 'response',
                       betas = c(betas, 1),
@@ -437,7 +441,7 @@ eval_mvgam = function(object,
         dplyr::pull(y)
     }))
 
-    series_score <- mvgam:::variogram_mcmc_object(truths = truths,
+    series_score <- variogram_mcmc_object(truths = truths,
                                                     fcs = series_fcs,
                                                     log = log,
                                                   weights = weights)
@@ -855,7 +859,7 @@ crps_score <- function(truth, fc, method = "edf", w = NULL,
     score <- crps_edf(truth, fc, w)
   } else {
     score <- sapply(seq_along(truth),
-                    function(i) crps_edf(y[i], fc[i, ], w[i, ]))
+                    function(i) crps_edf(truth[i], fc[i, ], w[i, ]))
   }
 
   # Is value within empirical interval?
@@ -1079,10 +1083,10 @@ stan_data <- list(n = eval_timepoint + fc_horizon,
 
 # Compile and run the stan code
 if(backend == 'cmdstanr'){
-  require(cmdstanr)
-  cmd_mod <- cmdstan_model(write_stan_file(var1_forecast_all,
-                                           dir = tools::R_user_dir("mvgam", which = "cache")),
-                           stanc_options = list('canonicalize=deprecations,braces,parentheses'))
+  requireNamespace('cmdstanr', quietly = TRUE)
+  cmd_mod <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(var1_forecast_all,
+                                                               dir = tools::R_user_dir("mvgam", which = "cache")),
+                                     stanc_options = list('canonicalize=deprecations,braces,parentheses'))
   fit <- cmd_mod$optimize(data = stan_data)
   post_trends <- fit$draws("fc", format = 'draws_matrix')
   draw_names <- dimnames(post_trends)$variable
@@ -1112,7 +1116,7 @@ if(backend == 'cmdstanr'){
   }
 
   } else {
-  require(rstan)
+  requireNamespace('rstan', quietly = TRUE)
   options(mc.cores = parallel::detectCores())
   dir.create(paste0(tools::R_user_dir("mvgam", which = "cache")),
              showWarnings = FALSE)
@@ -1121,9 +1125,9 @@ if(backend == 'cmdstanr'){
   m <- rstan::stan_model(file = paste0(tools::R_user_dir("mvgam", which = "cache"),
                                        '/var1_forecast_all.stan'),
                          auto_write = TRUE)
-  fit <- optimizing(object = m,
-                     data = stan_data,
-                    as_vector = FALSE)
+  fit <- rstan::optimizing(object = m,
+                           data = stan_data,
+                           as_vector = FALSE)
   post_trends <- fit$par$fc
 
   # Store each sample's trend forecasts as an array

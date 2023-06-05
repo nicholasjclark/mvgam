@@ -11,7 +11,7 @@ pfilter_mvgam_online(
   threshold = 0.5,
   use_resampling = FALSE,
   kernel_lambda = 0.25,
-  n_cores = parallel::detectCores() - 1
+  n_cores = 1
 )
 }
 \arguments{

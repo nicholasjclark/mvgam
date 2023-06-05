@@ -1,4 +1,6 @@
 #'Plot mvgam latent trend for a specified series
+#'@importFrom graphics par lines polygon box abline
+#'@importFrom stats sd quantile
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'

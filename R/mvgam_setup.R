@@ -17,7 +17,6 @@ mvgam_setup <- function(formula,
                              method = "REML",
                              family = family,
                              knots = knots,
-                             control = list(nthreads = min(4, parallel::detectCores() - 1),
-                                            maxit = maxit),
+                             control = list(maxit = maxit),
                              drop.unused.levels = FALSE))
 }

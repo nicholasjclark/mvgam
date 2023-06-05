@@ -3,7 +3,7 @@
 #'This function uses samples of latent trends for each series from a fitted
 #'mvgam model to calculates correlations among series' trends
 #'
-#'
+#'@importFrom stats cov2cor cov
 #'@param object \code{list} object returned from \code{mvgam}
 #'@return A \code{list} object containing the mean posterior correlations and the full array of posterior correlations
 #'@export
@@ -24,9 +24,10 @@ lv_correlations = function(object){
 
   # Total number of MCMC samples
   n_preds <- dim(mcmc_chains(object$model_output, 'trend')[,starts[1]:ends[1]])[1]
+  data_train <- object$obs_data
 
   # Total number of observations per series
-  if(class(data_train)[1] == 'list'){
+  if(inherits(data_train, 'list')){
     n_obs <- length(data_train$y) / NCOL(object$ytimes)
   } else {
     n_obs <- NROW(data_train) / NCOL(object$ytimes)
@@ -38,8 +39,8 @@ lv_correlations = function(object){
 
       # For stan objects, trend is stored as a vector in column-major order
       mcmc_chains(object$model_output, 'trend')[,seq(y,
-                                                             dim(mcmc_chains(object$model_output, 'trend'))[2],
-                                                             by = NCOL(object$ytimes))]
+                                                     dim(mcmc_chains(object$model_output, 'trend'))[2],
+                                                     by = NCOL(object$ytimes))]
     } else {
       mcmc_chains(object$model_output, 'trend')[,starts[y]:ends[y]][,1:n_obs]
     }

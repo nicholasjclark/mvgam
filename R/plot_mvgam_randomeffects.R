@@ -2,6 +2,7 @@
 #'
 #'This function plots posterior empirical quantiles for random effect smooths (bs = re)
 #'
+#'@importFrom graphics layout title
 #'@param object \code{list} object returned from \code{mvgam}
 #'@details Posterior empirical quantiles of random effect coefficient estimates
 #'(on the link scale) are calculated and visualised as ribbon plots.

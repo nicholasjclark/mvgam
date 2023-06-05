@@ -4,7 +4,7 @@
 #'shared seasonality and dependence on state-space latent dynamic factors. Random dependencies among series, i.e.
 #'correlations in their long-term trends, are included in the form of correlated loadings on the latent dynamic factors
 #'
-#'
+#'@importFrom stats rnorm rbeta rpois rlnorm rgamma cor cov2cor cov stl ts
 #'@param T \code{integer}. Number of observations (timepoints)
 #'@param n_series \code{integer}. Number of discrete time series
 #'@param seasonality \code{character}. Either \code{shared}, meaning that all series share the exact same seasonal pattern,
@@ -44,6 +44,14 @@
 #'@param train_prop \code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}
 #'@return A \code{list} object containing outputs needed for \code{\link{mvgam}}, including 'data_train' and 'data_test',
 #'as well as some additional information about the simulated seasonality and trend dependencies
+#'@examples
+#'#Simulate series with observations bounded at 0 and 1 (Beta responses)
+#'sim_data <- sim_mvgam(family = betar(), trend_model = 'GP', trend_rel = 0.6)
+#'plot_mvgam_series(data = sim_data$data_train, series = 'all')
+#'
+#'#Now simulate series with overdispersed discrete observations
+#'sim_data <- sim_mvgam(family = nb(), trend_model = 'GP', trend_rel = 0.6, phi = 10)
+#'plot_mvgam_series(data = sim_data$data_train, series = 'all')
 #'@export
 
 sim_mvgam = function(T = 100,
@@ -65,7 +73,7 @@ sim_mvgam = function(T = 100,
                      train_prop = 0.85){
 
   # Validate the family argument
-  family <- mvgam:::evaluate_family(family)
+  family <- evaluate_family(family)
   family_char <- match.arg(arg = family$family,
                            choices = c('negative binomial',
                                        "poisson",
@@ -77,7 +85,7 @@ sim_mvgam = function(T = 100,
                                        "Gamma"))
 
   # Validate the trend arguments
-  trend_model <- mvgam:::evaluate_trend_model(trend_model)
+  trend_model <- evaluate_trend_model(trend_model)
   if(trend_model == 'VAR1'){
     use_lv <- FALSE
   }
@@ -244,7 +252,7 @@ sim_mvgam = function(T = 100,
     # Simulate latent trends
     if(trend_model != 'VAR1'){
       trends <- do.call(cbind, lapply(seq_len(n_lv), function(x){
-        mvgam:::sim_ar3(drift = trend_alphas[x],
+        sim_ar3(drift = trend_alphas[x],
                 ar1 = ar1s[x],
                 ar2 = ar2s[x],
                 ar3 = ar3s[x],
@@ -267,7 +275,7 @@ sim_mvgam = function(T = 100,
       # Diagonals represent AR coefficients
       diag(A) <- rbeta(n_lv, 8, 5)
 
-      trends <- mvgam:::sim_var1(drift = trend_alphas,
+      trends <- sim_var1(drift = trend_alphas,
                          A = A,
                          Sigma = Sigma,
                          last_trends = rnorm(n_lv),
@@ -371,7 +379,7 @@ sim_mvgam = function(T = 100,
     if(family_char == 'lognormal'){
       out <- rlnorm(length(dynamics),
                    meanlog = mu[x] + (dynamics * 0.3),
-                   sd = sigma[x])
+                   sdlog = sigma[x])
     }
 
     if(family_char == 'Gamma'){

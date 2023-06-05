@@ -4,15 +4,16 @@
 #' low-rank Gaussian Process smooths are available for estimating the dynamics of the
 #' time-varying coefficient.
 #'
+#' @importFrom stats terms formula reformulate
 #' @param variable The variable that the dynamic smooth will be a function of
 #' @param stationary logical. If \code{TRUE} (the default), the latent Gaussian Process
 #' smooth will not have a linear trend component. If \code{FALSE},
 #' a linear trend in the covariate is added to the Gaussian Process smooth. Leave at \code{TRUE}
 #' if you do not believe the coefficient is evolving with much trend, as the linear component of the
 #' basis functions can be hard to penalize to zero. This sometimes causes divergence issues in `Stan`.
-#' See \code{\link[mcgv]{gp.smooth}} for details
+#' See \code{\link[mgcv]{gp.smooth}} for details
 #' @param rho Positive numeric stating the length scale to be used for approximating the
-#' squared exponential Gaussian Process smooth. See \code{\link[mcgv]{gp.smooth}} for details
+#' squared exponential Gaussian Process smooth. See \code{\link[mgcv]{gp.smooth}} for details
 #' @details \code{mvgam} currently sets up dynamic coefficients as low-rank
 #' squared exponential Gaussian Process smooths via
 #' the call \code{s(time, by = variable, bs = "gp", m = c(2, rho, 2))}. These smooths, if specified with
@@ -48,6 +49,7 @@ dynamic = function(variable, rho = 5, stationary = TRUE){
 
 #' Interpret the formula specified to mvgam and replace any dynamic terms
 #' with the correct Gaussian Process smooth specification
+#' @importFrom stats formula terms as.formula terms.formula
 #' @noRd
 interpret_mvgam = function(formula, N){
 

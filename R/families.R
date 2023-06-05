@@ -1,5 +1,5 @@
 #' Supported mvgam families
-#' @importFrom stats make.link
+#' @importFrom stats make.link qnorm plnorm runif pbeta dlnorm dpois pnorm ppois plogis gaussian poisson Gamma dnbinom rnbinom dnorm dbeta
 #' @param link a specification for the family link function. At present these cannot
 #' be changed
 #' @details \code{mvgam} currently supports the following standard observation families:
@@ -57,7 +57,7 @@ student_t = function(link = 'identity'){
 }
 
 #### Non-exported functions for performing family-specific tasks ####
-# Evaluate family argument
+#' Evaluate family argument
 #' @noRd
 evaluate_family = function(family){
 
@@ -136,6 +136,7 @@ rstudent_t = function(n, df, mu = 0, sigma = 1) {
 }
 
 #' Generic prediction function
+#' @importFrom stats predict
 #' @param Xp A `mgcv` linear predictor matrix
 #' @param family \code{character}. The `family` slot of the model's family argument
 #' @param betas Vector of regression coefficients of length `NCOL(Xp)`
@@ -314,13 +315,13 @@ mvgam_predict = function(Xp, family, betas,
 #' @noRd
 family_to_mgcvfam = function(family){
   if(family$family == 'beta'){
-    betar()
+    mgcv::betar()
   } else if(family$family == 'student'){
     gaussian()
   } else if(family$family == 'lognormal'){
     Gamma()
   } else if(family$family == 'tweedie'){
-    Tweedie(p=1.5)
+    mgcv::Tweedie(p=1.5)
   } else {
     family
   }
@@ -699,7 +700,7 @@ ds_resids_lnorm = function(truth, fitted, sigma, draw){
                  sdlog = sigma)
   b_obs <- plnorm(as.vector(truth[!na_obs]),
                  meanlog = fitted[!na_obs],
-                 sd = sigma)
+                 sdlog = sigma)
   u_obs <- runif(n = length(draw[!na_obs]),
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
@@ -822,7 +823,7 @@ get_forecast_resids = function(object, series, truth, preds, family,
 
 
 #'Residual calculations for a fitted mvgam object
-#'
+#' @importFrom parallel clusterExport stopCluster setDefaultCluster clusterEvalQ
 #' @param object \code{list} object returned from \code{mvgam}
 #' @param n_cores \code{integer} specifying number of cores for generating residual distributions in parallel
 #' @author Nicholas J Clark
@@ -864,7 +865,7 @@ get_mvgam_resids = function(object, n_cores = 1){
   draw_seq <- sample(sample_seq, length(sample_seq), replace = FALSE)
 
   # Family-specific parameters
-  family_pars <- mvgam:::extract_family_pars(object = object)
+  family_pars <- extract_family_pars(object = object)
 
   # Pull out starting and ending indices for each series in the object
   ends <- seq(0, dim(preds)[2],

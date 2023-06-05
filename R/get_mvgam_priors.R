@@ -22,7 +22,7 @@
 #'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}
 #'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
 #''None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mcgv]{gam}}),
+#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}}),
 #''RW' (random walk with possible drift),
 #''AR1' (AR1 model with intercept),
 #''AR2' (AR2 model with intercept) or
@@ -33,7 +33,7 @@
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 #'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 #'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-#'predictor (which it is by default when calling \code{\link[mcgv]{jagam}}). Therefore this defaults to \code{FALSE}
+#'predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Therefore this defaults to \code{FALSE}
 #'@param use_stan Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
 #'the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if `cmdstanr` is not available,
 #'a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
@@ -78,38 +78,43 @@
 #'
 #'# Look at which priors can be updated in mvgam
 #'test_priors <- get_mvgam_priors(y ~ s(series, bs = 're') +
-#'                                 s(season, bs = 'cc') - 1,
-#'                                 family = 'nb',
-#'                                 data = dat$data_train,
-#'                                 trend_model = 'AR2')
+#'                               s(season, bs = 'cc') - 1,
+#'                               family = 'nb',
+#'                               data = dat$data_train,
+#'                               trend_model = 'AR2')
 #'test_priors
 #'
 #'# Make a few changes; first, change the population mean for the series-level
 #'# random intercepts
-#'test_priors$prior[1] <- 'mu_raw1 ~ dnorm(-1, 2)'
+#'test_priors$prior[2] <- 'mu_raw ~ normal(0.2, 0.5);'
 #'
 #'# Now use stronger regularisation for the series-level AR2 coefficients
-#'test_priors$prior[4] <- 'ar2[s] ~ dnorm(0, 20)'
+#'test_priors$prior[5] <- 'ar2 ~ normal(0, 0.25);'
 #'
-#'# Check whether the notation in the 'prior' column is correct (note, this function
-#'# will not check that densities are correctly spelled and parameterised, that is up
-#'# to the user!)
-#'update_priors(model_file = mod_default$model_file,
-#'               priors = test_priors)
+#'# Check that the changes are made to the model file without any warnings by
+#'# setting 'run_model = FALSE'
+#'mod <- mvgam(y ~ s(series, bs = 're') +
+#'             s(season, bs = 'cc') - 1,
+#'             family = 'nb',
+#'             data = dat$data_train,
+#'             trend_model = 'AR2',
+#'             priors = test_priors,
+#'             run_model = FALSE)
+#'             code(mod)
 #'
 #'# No warnings, the model is ready for fitting now in the usual way with the addition
-#'# of the 'priors' argument:
-#'# mod <- mvgam(y ~ s(series, bs = 're') +
-#'#                s(season, bs = 'cc') - 1,
-#'#              family = 'nb',
-#'#              data = dat$data_train,
-#'#              trend_model = 'AR2',
-#'#              priors = test_priors)
+#'# of the 'priors' argument
 #'
 #'# Look at what is returned when an incorrect spelling is used
-#'test_priors$prior[4] <- 'ar2_bananas ~ dnorm(0, 20)'
-#'update_priors(model_file = mod_default$model_file,
-#'               priors = test_priors)
+#'test_priors$prior[5] <- 'ar2_bananas ~ normal(0, 0.25);'
+#'mod <- mvgam(y ~ s(series, bs = 're') +
+#'             s(season, bs = 'cc') - 1,
+#'             family = 'nb',
+#'             data = dat$data_train,
+#'             trend_model = 'AR2',
+#'             priors = test_priors,
+#'             run_model = FALSE)
+#'code(mod)
 #'
 #'@export
 get_mvgam_priors = function(formula,

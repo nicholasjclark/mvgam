@@ -14,6 +14,15 @@
 #'trend,
 #'uncertainty,
 #'factors
+#'@param residuals \code{logical}. If \code{TRUE} and `type = residuals`, posterior quantiles of partial residuals are added
+#'to plots of 1-D smooths as a series of ribbon rectangles.
+#'Partial residuals for a smooth term are the median Dunn-Smyth residuals that would be obtained by dropping the term
+#'concerned from the model, while leaving all other estimates fixed (i.e. the
+#'estimates for the term plus the original median Dunn-Smyth residuals). Note that because \code{mvgam} works with
+#'Dunn-Smyth residuals and not working residuals, which are used by \code{mgcv}, the magnitudes of
+#'partial residuals will be different to what you would expect from \code{\link[mgcv]{plot.gam}}. Interpretation
+#'is similar though, as these partial residuals should be evenly scattered
+#'around the smooth function if the function is well estimated
 #'@param series \code{integer} specifying which series in the set is to be plotted. This is ignored
 #'if \code{type == 're'}
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'

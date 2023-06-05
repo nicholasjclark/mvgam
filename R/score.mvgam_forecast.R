@@ -56,7 +56,7 @@ score.mvgam_forecast = function(object, score, log = FALSE, weights,
 
     # Calculate coverage using one of the univariate scores
     series_score <- lapply(seq_len(n_series), function(series){
-      DRPS <- data.frame(mvgam:::drps_mcmc_object(truths[series,],
+      DRPS <- data.frame(drps_mcmc_object(truths[series,],
                                                   object$forecasts[[series]],
                                                   log = log,
                                                   interval_width = interval_width))
@@ -67,7 +67,7 @@ score.mvgam_forecast = function(object, score, log = FALSE, weights,
     })
     names(series_score) <- object$series_names
 
-    var_score <- mvgam:::variogram_mcmc_object(truths = truths,
+    var_score <- variogram_mcmc_object(truths = truths,
                                                   fcs = object$forecasts,
                                                   log = log,
                                                   weights = weights)
@@ -78,7 +78,7 @@ score.mvgam_forecast = function(object, score, log = FALSE, weights,
 
   if(score == 'drps'){
     series_score <- lapply(seq_len(n_series), function(series){
-      DRPS <- data.frame(mvgam:::drps_mcmc_object(truths[series,],
+      DRPS <- data.frame(drps_mcmc_object(truths[series,],
                                           object$forecasts[[series]],
                                           log = log,
                                           interval_width = interval_width))
@@ -97,7 +97,7 @@ score.mvgam_forecast = function(object, score, log = FALSE, weights,
 
   if(score == 'crps'){
     series_score <- lapply(seq_len(n_series), function(series){
-      CRPS <- data.frame(mvgam:::crps_mcmc_object(truths[series,],
+      CRPS <- data.frame(crps_mcmc_object(truths[series,],
                                                   object$forecasts[[series]],
                                                   log = log,
                                                   interval_width = interval_width))
