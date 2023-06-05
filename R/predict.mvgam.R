@@ -10,7 +10,8 @@
 #'@param n_cores \code{integer} specifying number of cores for generating predictions in parallel
 #'@param type When this has the value \code{link} (default) the linear predictor is calculated on the log link scale.
 #'When \code{response} is used, the predictions take uncertainty in the observation process into account to return
-#'predictions on the outcome (discrete) scale.
+#'predictions on the outcome (discrete) scale
+#'@param ... Ignored
 #'@details Note that for both sets of predictions, the temporal
 #'dynamics of any fitted latent trends will be ignored. This function is therefore more
 #'suited to posterior simulation from the GAM component of a \code{mvgam} model,
@@ -21,7 +22,7 @@
 #'posterior samples from the fitted object and \code{n_obs} is the number of test observations in \code{newdata}
 #'@export
 predict.mvgam = function(object, newdata, data_test, type = 'link',
-                         n_cores = 1){
+                         n_cores = 1, ...){
 
   # Argument checks
   if (!(inherits(object, "mvgam"))) {

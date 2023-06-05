@@ -2,8 +2,11 @@
 % Please edit documentation in R/ppc.mvgam.R
 \name{ppc.mvgam}
 \alias{ppc.mvgam}
+\alias{ppc}
 \title{Plot mvgam posterior predictive checks for a specified series}
 \usage{
+ppc(object, ...)
+
 \method{ppc}{mvgam}(
   object,
   newdata,
@@ -18,7 +21,9 @@
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}}
+\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+
+\item{...}{further \code{\link[graphics]{par}} graphical parameters.}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
@@ -48,8 +53,6 @@ use "none" to hide the legend.}
 \item{xlab}{label for x axis.}
 
 \item{ylab}{label for y axis.}
-
-\item{...}{further \code{\link[graphics]{par}} graphical parameters.}
 }
 \value{
 A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram'}),

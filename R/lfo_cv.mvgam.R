@@ -1,7 +1,7 @@
 #'@title Approximate leave-future-out cross-validation of fitted `mvgam` objects
 #'@name lfo_cv.mvgam
 #'@importFrom stats update logLik
-#'@param object \code{list} object returned from \code{mvgam}
+#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
 #''series' (character or factor index of the series IDs)
@@ -14,6 +14,7 @@
 #'@param pareto_k_threshold Proportion specifying the threshold over which the Pareto shape parameter
 #'is considered unstable, triggering a model refit. Default is `0.7`
 #'@param n_cores \code{integer} specifying number of cores for calculating likelihoods in parallel
+#'@param ... Ignored
 #'@details Approximate leave-future-out cross-validation uses an expanding training window scheme
 #' to evaluate a model on its forecasting ability. The steps used in this function mirror those laid out
 #' in the [lfo vignette from the `loo` package](https://mc-stan.org/loo/articles/loo2-lfo.html),
@@ -38,10 +39,9 @@
 #'@references Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-future-out cross-validation for Bayesian time series models
 #'Journal of Statistical Computation and Simulation. 90:14, 2499-2523.
 #'@author Nicholas J Clark
-NULL
 #'@export
-lfo_cv <- function(x, what, ...){
-  UseMethod("lfo_cv")
+lfo_cv <- function(object, ...){
+  UseMethod("lfo_cv", object)
 }
 
 #'@rdname lfo_cv.mvgam
@@ -52,7 +52,8 @@ lfo_cv.mvgam = function(object,
                         min_t,
                         fc_horizon = 1,
                         pareto_k_threshold = 0.7,
-                        n_cores = 1){
+                        n_cores = 1,
+                        ...){
 
   if(pareto_k_threshold < 0 || pareto_k_threshold > 1){
     stop('Argument "pareto_k_threshold" must be a proportion ranging from 0 to 1, inclusive',
@@ -197,14 +198,17 @@ lfo_cv.mvgam = function(object,
 #' This function takes an object of class `mvgam_lfo` and create several
 #' informative diagnostic plots
 #' @importFrom graphics layout axis lines abline polygon points
-#' @param object An object of class `mvgam_lfo`
+#' @param x An object of class `mvgam_lfo`
+#' @param ... Ignored
 #' @return A base `R` plot of Pareto-k and ELPD values over the
 #' evaluation timepoints. For the Pareto-k plot, a dashed red line indicates the
 #' specified threshold chosen for triggering model refits. For the ELPD plot,
 #' a dashed red line indicated the bottom 10% quantile of ELPD values. Points below
 #' this threshold may represent outliers that were more difficult to forecast
 #' @export
-plot.mvgam_lfo = function(object){
+plot.mvgam_lfo = function(x, ...){
+
+  object <- x
 
   # Graphical parameters
   layout(matrix(1:2, nrow = 2))

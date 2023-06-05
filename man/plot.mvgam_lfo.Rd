@@ -4,10 +4,12 @@
 \alias{plot.mvgam_lfo}
 \title{Plot Pareto-k and ELPD values from a leave-future-out object}
 \usage{
-\method{plot}{mvgam_lfo}(object)
+\method{plot}{mvgam_lfo}(x, ...)
 }
 \arguments{
-\item{object}{An object of class \code{mvgam_lfo}}
+\item{x}{An object of class \code{mvgam_lfo}}
+
+\item{...}{Ignored}
 }
 \value{
 A base \code{R} plot of Pareto-k and ELPD values over the

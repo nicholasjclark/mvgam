@@ -6,14 +6,16 @@
 \alias{coef.mvgam}
 \title{Summary for a fitted mvgam object}
 \usage{
-\method{summary}{mvgam}(object)
+\method{summary}{mvgam}(object, ...)
 
-\method{summary}{mvgam_prefit}(object)
+\method{summary}{mvgam_prefit}(object, ...)
 
-\method{coef}{mvgam}(object, summarise = TRUE)
+\method{coef}{mvgam}(object, summarise = TRUE, ...)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
+
+\item{...}{Ignored}
 
 \item{summarise}{\code{logical}. Summaries of coefficients will be returned
 if \code{TRUE}. Otherwise the full posterior distribution will be returned}

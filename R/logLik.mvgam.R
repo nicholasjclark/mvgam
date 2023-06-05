@@ -3,12 +3,13 @@
 #'@importFrom parallel setDefaultCluster stopCluster
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param n_cores \code{integer} specifying number of cores for calculating likelihoods in parallel
+#'@param ... Ignored
 #'@return A `matrix` of dimension `n_samples x n_observations` containing the pointwise
 #'log-likelihood draws for all observations (training observations and, if supplied to the
 #'original model via the `newdata` argument in \code{\link{mvgam}},
 #'testing observations)
 #'@export
-logLik.mvgam = function(object, n_cores = 1){
+logLik.mvgam = function(object, n_cores = 1, ...){
 
   if(sign(n_cores) != 1){
     stop('argument "n_cores" must be a positive integer',

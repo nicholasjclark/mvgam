@@ -4,7 +4,7 @@
 \alias{predict.mvgam}
 \title{Predict from the GAM component of an mvgam model}
 \usage{
-\method{predict}{mvgam}(object, newdata, data_test, type = "link", n_cores = 1)
+\method{predict}{mvgam}(object, newdata, data_test, type = "link", n_cores = 1, ...)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
@@ -18,9 +18,11 @@ predictions are generated for the original observations used for the model fit.}
 
 \item{type}{When this has the value \code{link} (default) the linear predictor is calculated on the log link scale.
 When \code{response} is used, the predictions take uncertainty in the observation process into account to return
-predictions on the outcome (discrete) scale.}
+predictions on the outcome (discrete) scale}
 
 \item{n_cores}{\code{integer} specifying number of cores for generating predictions in parallel}
+
+\item{...}{Ignored}
 }
 \value{
 A \code{matrix} of dimension \code{n_samples x new_obs}, where \code{n_samples} is the number of

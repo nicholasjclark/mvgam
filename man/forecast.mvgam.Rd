@@ -2,19 +2,25 @@
 % Please edit documentation in R/forecast.mvgam.R
 \name{forecast.mvgam}
 \alias{forecast.mvgam}
+\alias{forecast}
 \title{Compute out of sample forecasts for a fitted \code{mvgam} object}
 \usage{
+forecast(object, ...)
+
 \method{forecast}{mvgam}(
   object,
   newdata,
   data_test,
   series = "all",
   n_cores = 1,
-  type = "response"
+  type = "response",
+  ...
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}}
+\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+
+\item{...}{Ignored}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 in addition to any other variables included in the linear predictor of the original \code{formula}. If included, the
@@ -38,7 +44,7 @@ as it saves recomputing the full set of trends for each series individually}
 \item{type}{When this has the value \code{link}, the linear predictor is calculated on the log link scale.
 When \code{response} is used, the predictions take uncertainty in the observation process into account to return
 predictions on the outcome (discrete) scale (default). When \code{trend} is used, only the forecast distribution for the
-latent trend is returned.}
+latent trend is returned}
 }
 \value{
 An object of class \code{mvgam_forecast} containing hindcast and forecast distributions

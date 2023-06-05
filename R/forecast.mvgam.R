@@ -2,7 +2,7 @@
 #'@name forecast.mvgam
 #'@importFrom parallel clusterExport stopCluster setDefaultCluster
 #'@importFrom stats predict
-#'@param object \code{list} object returned from \code{mvgam}
+#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 #'in addition to any other variables included in the linear predictor of the original \code{formula}. If included, the
 #'covariate information in \code{newdata} will be used to generate forecasts from the fitted model equations. If
@@ -21,15 +21,15 @@
 #'@param type When this has the value \code{link}, the linear predictor is calculated on the log link scale.
 #'When \code{response} is used, the predictions take uncertainty in the observation process into account to return
 #'predictions on the outcome (discrete) scale (default). When \code{trend} is used, only the forecast distribution for the
-#'latent trend is returned.
+#'latent trend is returned
+#'@param ... Ignored
 #'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to simulate a forecast distribution
 #'@return An object of class \code{mvgam_forecast} containing hindcast and forecast distributions
 #'for the required series
 #'
-NULL
 #'@export
-forecast <- function(x, what, ...){
-  UseMethod("forecast")
+forecast <- function(object, ...){
+  UseMethod("forecast", object)
 }
 
 #'@rdname forecast.mvgam
@@ -37,7 +37,8 @@ forecast <- function(x, what, ...){
 #'@export
 forecast.mvgam = function(object, newdata, data_test, series = 'all',
                           n_cores = 1,
-                          type = 'response'){
+                          type = 'response',
+                          ...){
   # Check arguments
   if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')

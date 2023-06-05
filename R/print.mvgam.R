@@ -2,12 +2,15 @@
 #'
 #'This function takes a fitted \code{mvgam} object and prints a quick summary
 #'
-#'@param object \code{list} object returned from \code{mvgam}
+#'@param x \code{list} object returned from \code{mvgam}
+#'@param ... Ignored
 #'@author Nicholas J Clark
 #'@details A brief summary of the model's call is printed
 #'@return A \code{list} is printed on-screen
 #'@export
-print.mvgam = function(object){
+print.mvgam = function(x, ...){
+
+object <- x
 
 message("GAM formula:")
 print(object$call)
@@ -65,7 +68,9 @@ if(object$fit_engine == 'stan'){
 
 
 #'@export
-print.mvgam_prefit = function(object){
+print.mvgam_prefit = function(x, ...){
+
+  object <- x
 
   message("GAM formula:")
   print(object$call)

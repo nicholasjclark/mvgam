@@ -4,10 +4,12 @@
 \alias{print.mvgam}
 \title{Summary for a fitted mvgam object}
 \usage{
-\method{print}{mvgam}(object)
+\method{print}{mvgam}(x, ...)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}}
+\item{x}{\code{list} object returned from \code{mvgam}}
+
+\item{...}{Ignored}
 }
 \value{
 A \code{list} is printed on-screen

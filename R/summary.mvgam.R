@@ -2,6 +2,7 @@
 #'
 #'These functions take a fitted \code{mvgam} object and return various useful summaries
 #'@param object \code{list} object returned from \code{mvgam}
+#'@param ... Ignored
 #'@author Nicholas J Clark
 #'@details `summary.mvgam` and `summary.mvgam_prefit` return brief summaries of the model's call is printed, along with posterior intervals for
 #'some of the key parameters in the model. Note that some smooths have extra penalties on the null space,
@@ -16,7 +17,7 @@
 #'For `coef.mvgam`, either a \code{matrix} of posterior coefficient distributions
 #'(if \code{summarise == FALSE} or \code{data.frame} of coefficient summaries)
 #'@export
-summary.mvgam = function(object){
+summary.mvgam = function(object, ...){
 
 #### Standard summary of formula and model arguments ####
 message("GAM formula:")
@@ -321,7 +322,7 @@ if(object$fit_engine == 'jags'){
 
 #' @rdname summary.mvgam
 #' @export
-summary.mvgam_prefit = function(object){
+summary.mvgam_prefit = function(object, ...){
   message("GAM formula:")
   print(object$call)
   message()
@@ -366,7 +367,7 @@ summary.mvgam_prefit = function(object){
 #'
 #'@method coef mvgam
 #'@export
-coef.mvgam = function(object, summarise = TRUE){
+coef.mvgam = function(object, summarise = TRUE, ...){
   coef_names <- names(object$mgcv_model$coefficients)
 
   if(summarise){

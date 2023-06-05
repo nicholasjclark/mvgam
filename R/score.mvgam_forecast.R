@@ -1,8 +1,9 @@
 #'@title Compute probabilistic forecast scores for mvgam objects
-#'@name score.mvgam_forecast
-#'@param object \code{list} object returned from \code{forecast.mvgam}. If the test data
+#'@param object `mvgam_forecast` object. See [forecast.mvgam()].
+#'If the test data
 #'supplied to \code{forecast.mvgam} contained out of sample test observations, the calibration
 #'of probabilistic forecasts can be scored using proper scoring rules
+#'@param ... Ignored
 #'@param score \code{character} specifying the type of ranked probability score to use for evaluation. Options are:
 #'`variogram`, `drps` or `crps`
 #'@param log \code{logical}. Should the forecasts and truths be logged prior to scoring?
@@ -14,6 +15,7 @@
 #'are of less interest when forecasting. Ignored if \code{score != 'variogram'}
 #'@param interval_width proportional value on `[0.05,0.95]` defining the forecast interval
 #'for calculating coverage
+#'@param ... Ignored
 #'@return a \code{list} containing scores and 90% interval coverages per forecast horizon.
 #'If \code{score %in% c('drps', 'crps')},
 #'the list will also contain return the sum of all series-level scores per horizon. If
@@ -21,17 +23,28 @@
 #'will be for all series. For all scores, the `in_interval` column in each series-level
 #'slot is a binary indicator of whether or not the true value was within the forecast's corresponding
 #'posterior empirical quantiles
-NULL
-#'@export
-score <- function(x, what, ...){
-  UseMethod("score")
-}
-
-#'@rdname score.mvgam_forecast
+#'@examples
+#'\dontrun{
+#'#Simulate observations for three count-valued time series
+#'data <- sim_mvgam()
+#'#Fit a dynamic model using 'newdata' to automatically produce forecasts
+#'mod <- mvgam(y ~ 1,
+#'             trend_model = 'RW',
+#'             data = data$data_train,
+#'             newdata = data$data_test)
+#'
+#'#Extract forecasts into a 'mvgam_forecast' object
+#'fc <- forecast(mod)
+#'
+#'#Score forecasts
+#'score(fc, score = 'drps')
+#'}
 #'@method score mvgam_forecast
 #'@export
-score.mvgam_forecast = function(object, score, log = FALSE, weights,
-                                interval_width = 0.9){
+score.mvgam_forecast = function(object, score = 'crps',
+                                log = FALSE, weights,
+                                interval_width = 0.9,
+                                ...){
 
   if(object$type == 'trend'){
     stop('cannot evaluate accuracy of latent trend forecasts. Use "type == response" when forecasting instead',
@@ -116,3 +129,9 @@ score.mvgam_forecast = function(object, score, log = FALSE, weights,
 
   series_score
 }
+
+#'@name score.mvgam_forecast
+#'@param object `mvgam_forecast` object. See [forecast.mvgam()].
+#'@param ... Ignored
+#'@export
+score = function(object, ...) UseMethod("score", object)

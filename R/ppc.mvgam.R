@@ -3,7 +3,7 @@
 #'@importFrom graphics hist abline box rect lines polygon par
 #'@importFrom grDevices rgb
 #'@name ppc.mvgam
-#'@param object \code{list} object returned from \code{mvgam}
+#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 #'for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
 #'included, the observed values in the test data are compared to the model's forecast distribution for exploring
@@ -40,10 +40,9 @@
 #'posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
 #'Integral Transform histogram (for \code{type == 'pit'}).
 #'
-NULL
 #'@export
-ppc <- function(x, what, ...){
-  UseMethod("ppc")
+ppc <- function(object, ...){
+  UseMethod("ppc", object)
 }
 
 #'@rdname ppc.mvgam

@@ -2,14 +2,15 @@
 % Please edit documentation in R/score.mvgam_forecast.R
 \name{score.mvgam_forecast}
 \alias{score.mvgam_forecast}
+\alias{score}
 \title{Compute probabilistic forecast scores for mvgam objects}
 \usage{
-\method{score}{mvgam_forecast}(object, score, log = FALSE, weights, interval_width = 0.9)
+\method{score}{mvgam_forecast}(object, score = "crps", log = FALSE, weights, interval_width = 0.9, ...)
+
+score(object, ...)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{forecast.mvgam}. If the test data
-supplied to \code{forecast.mvgam} contained out of sample test observations, the calibration
-of probabilistic forecasts can be scored using proper scoring rules}
+\item{object}{\code{mvgam_forecast} object. See \code{\link[=forecast.mvgam]{forecast.mvgam()}}.}
 
 \item{score}{\code{character} specifying the type of ranked probability score to use for evaluation. Options are:
 \code{variogram}, \code{drps} or \code{crps}}
@@ -25,6 +26,8 @@ are of less interest when forecasting. Ignored if \code{score != 'variogram'}}
 
 \item{interval_width}{proportional value on \verb{[0.05,0.95]} defining the forecast interval
 for calculating coverage}
+
+\item{...}{Ignored}
 }
 \value{
 a \code{list} containing scores and 90\% interval coverages per forecast horizon.
@@ -37,4 +40,21 @@ posterior empirical quantiles
 }
 \description{
 Compute probabilistic forecast scores for mvgam objects
+}
+\examples{
+\dontrun{
+#Simulate observations for three count-valued time series
+data <- sim_mvgam()
+#Fit a dynamic model using 'newdata' to automatically produce forecasts
+mod <- mvgam(y ~ 1,
+            trend_model = 'RW',
+            data = data$data_train,
+            newdata = data$data_test)
+
+#Extract forecasts into a 'mvgam_forecast' object
+fc <- forecast(mod)
+
+#Score forecasts
+score(fc, score = 'drps')
+}
 }

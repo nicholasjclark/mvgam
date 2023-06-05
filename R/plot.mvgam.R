@@ -3,7 +3,7 @@
 #'This function takes a fitted \code{mvgam} object and produces plots of smooth functions, forecasts, trends and
 #'uncertainty components
 #'
-#'@param object \code{list} object returned from \code{mvgam}
+#'@param x \code{list} object returned from \code{mvgam}. See [mvgam()]
 #'@param type \code{character} specifying which type of plot to return. Options are:
 #''series,
 #'residuals,
@@ -42,10 +42,11 @@
 #'@author Nicholas J Clark
 #'@return A base R plot or set of plots
 #'@export
-plot.mvgam = function(object, type = 'residuals',
+plot.mvgam = function(x, type = 'residuals',
                       series = 1, residuals = FALSE,
                       newdata, data_test, ...){
 
+  object <- x
   # Argument checks
   type <- match.arg(arg = type, choices = c("residuals", "smooths", "re",
                                             "pterms", "forecast", "trend",

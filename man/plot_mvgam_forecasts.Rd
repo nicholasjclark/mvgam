@@ -24,7 +24,7 @@ plot_mvgam_fc(
 )
 
 \method{plot}{mvgam_forecast}(
-  object,
+  x,
   series = 1,
   realisations = FALSE,
   n_realisations = 15,
@@ -83,6 +83,8 @@ use the Discrete Rank Probability Score. Other families use the Continuous Rank 
 returned is the \code{sum} of all scores within the out of sample forecast horizon}
 
 \item{...}{further \code{\link[graphics]{par}} graphical parameters.}
+
+\item{x}{Object of class \code{mvgam_forecast}}
 }
 \value{
 A base \code{R} graphics plot and an optional \code{list} containing the forecast distribution

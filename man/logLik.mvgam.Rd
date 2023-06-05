@@ -4,12 +4,14 @@
 \alias{logLik.mvgam}
 \title{Compute pointwise Log-Likelihoods from fitted \code{mvgam} objects}
 \usage{
-\method{logLik}{mvgam}(object, n_cores = 1)
+\method{logLik}{mvgam}(object, n_cores = 1, ...)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{n_cores}{\code{integer} specifying number of cores for calculating likelihoods in parallel}
+
+\item{...}{Ignored}
 }
 \value{
 A \code{matrix} of dimension \verb{n_samples x n_observations} containing the pointwise

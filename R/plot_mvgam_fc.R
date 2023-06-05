@@ -421,9 +421,10 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
 }
 
 #' @rdname plot_mvgam_forecasts
+#' @param x Object of class `mvgam_forecast`
 #' @method plot mvgam_forecast
 #' @export
-plot.mvgam_forecast = function(object, series = 1,
+plot.mvgam_forecast = function(x, series = 1,
                                realisations = FALSE,
                                n_realisations = 15,
                                hide_xlabels = FALSE,
@@ -431,6 +432,7 @@ plot.mvgam_forecast = function(object, series = 1,
                                return_score = FALSE,
                                ...){
 
+  object <- x
   if(sign(series) != 1){
     stop('argument "series" must be a positive integer',
          call. = FALSE)

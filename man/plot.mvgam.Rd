@@ -5,7 +5,7 @@
 \title{Default mvgam plots}
 \usage{
 \method{plot}{mvgam}(
-  object,
+  x,
   type = "residuals",
   series = 1,
   residuals = FALSE,
@@ -15,7 +15,7 @@
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}}
+\item{x}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{type}{\code{character} specifying which type of plot to return. Options are:
 'series,

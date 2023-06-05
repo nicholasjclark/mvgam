@@ -2,19 +2,25 @@
 % Please edit documentation in R/lfo_cv.mvgam.R
 \name{lfo_cv.mvgam}
 \alias{lfo_cv.mvgam}
+\alias{lfo_cv}
 \title{Approximate leave-future-out cross-validation of fitted \code{mvgam} objects}
 \usage{
+lfo_cv(object, ...)
+
 \method{lfo_cv}{mvgam}(
   object,
   data,
   min_t,
   fc_horizon = 1,
   pareto_k_threshold = 0.7,
-  n_cores = 1
+  n_cores = 1,
+  ...
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}}
+\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+
+\item{...}{Ignored}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
