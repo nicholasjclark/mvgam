@@ -33,6 +33,9 @@ jobs:
           extra-packages: |
               knitr
               rmarkdown
+              rjags
+              coda
+              runjags
               stan-dev/cmdstanr
               testthat
               rcmdcheck
@@ -41,7 +44,7 @@ jobs:
       - name: Build Cmdstan
         run: |
           cmdstanr::check_cmdstan_toolchain(fix = TRUE)
-          cmdstanr::install_cmdstan(cores = parallel::detectCores())
+          cmdstanr::install_cmdstan()
         shell: Rscript {0}
 
       - name: Test coverage
