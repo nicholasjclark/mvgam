@@ -172,7 +172,7 @@ lfo_cv.mvgam = function(object,
       fc_indices <- which(c(data_splits$data_train$time,
                             data_splits$data_test$time) %in%
                             (i + 1):(i + fc_horizon))
-      loglik_past <- logLik.mvgam(fit_past, n_cores = n_cores)
+      loglik_past <- logLik(fit_past, n_cores = n_cores)
       approx_elpds[i + 1] <- log_mean_exp(sum_rows(loglik_past[,fc_indices]))
     } else {
       # If k below threshold, calculate log likelihoods for the

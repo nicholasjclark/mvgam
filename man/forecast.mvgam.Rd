@@ -3,7 +3,7 @@
 \name{forecast.mvgam}
 \alias{forecast.mvgam}
 \alias{forecast}
-\title{Compute out of sample forecasts for a fitted \code{mvgam} object}
+\title{Extract or compute hindcasts and forecasts for a fitted \code{mvgam} object}
 \usage{
 forecast(object, ...)
 
@@ -29,7 +29,7 @@ this same \code{newdata} was originally included in the call to \code{mvgam}, th
 produced by the generative model and these will simply be extracted and plotted. However if no \code{newdata} was
 supplied to the original model call, an assumption is made that the \code{newdata} supplied here comes sequentially
 after the data supplied as \code{data} in the original model (i.e. we assume there is no time gap between the last
-observation of series 1 in \code{data} and the first observation for series 1 in \code{newdata}).}
+observation of series 1 in \code{data} and the first observation for series 1 in \code{newdata})}
 
 \item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
 \code{newdata} instead for more seamless integration into \code{R} workflows}
@@ -51,7 +51,7 @@ An object of class \code{mvgam_forecast} containing hindcast and forecast distri
 for the required series
 }
 \description{
-Compute out of sample forecasts for a fitted \code{mvgam} object
+Extract or compute hindcasts and forecasts for a fitted \code{mvgam} object
 }
 \details{
 Posterior predictions are drawn from the fitted \code{mvgam} and used to simulate a forecast distribution

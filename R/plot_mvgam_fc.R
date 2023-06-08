@@ -479,10 +479,17 @@ plot.mvgam_forecast = function(x, series = 1,
     if(missing(ylab)){
       ylab <- paste0('Estimated trend for ', s_name)
     }
-
     ylim <- range(cred)
+  }
 
-  } else {
+  if(type == 'link'){
+    if(missing(ylab)){
+      ylab <- paste0('linear predictions for ', s_name)
+    }
+    ylim <- range(cred)
+  }
+
+  if(type == 'response'){
 
     if(missing(ylim)){
       ytrain <- object$train_observations[[which(names(object$train_observations) ==
@@ -546,8 +553,9 @@ plot.mvgam_forecast = function(x, series = 1,
 
   last_train <- length(object$train_observations[[s_name]])
 
-  # Show historical (hindcast) distribution in grey
-  if(type == 'response'){
+  # Show historical (hindcast) distribution in grey if this object
+  # contains forecasts
+  if(type == 'response' & !is.null(object$forecasts)){
     if(!realisations){
       polygon(c(pred_vals[1:last_train],
                 rev(pred_vals[1:last_train])),
@@ -566,8 +574,6 @@ plot.mvgam_forecast = function(x, series = 1,
              object$test_observations[[s_name]]), pch = 16, col = "white", cex = 0.8)
     points(c(object$train_observations[[s_name]],
              object$test_observations[[s_name]]), pch = 16, col = "black", cex = 0.65)
-    abline(v = last_train, col = '#FFFFFF60', lwd = 2.85)
-    abline(v = last_train, col = 'black', lwd = 2.5, lty = 'dashed')
 
     # Calculate out of sample probabilistic score
     fc <- object$forecasts[[s_name]]
@@ -592,7 +598,9 @@ plot.mvgam_forecast = function(x, series = 1,
         message()
       }
     }
-  } else {
+  }
+
+  if(!is.null(object$forecasts)){
     abline(v = last_train, col = '#FFFFFF60', lwd = 2.85)
     abline(v = last_train, col = 'black', lwd = 2.5, lty = 'dashed')
   }

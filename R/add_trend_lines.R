@@ -59,7 +59,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    'real<lower=0> boundary;\n',
                    'int<lower=1> num_gp_basis;\n',
                    'num_gp_basis = min(20, n);\n',
-                   'matrix[n, num_gp_basis] gp_drift;\n\n',
+                   'matrix[n, num_gp_basis] gp_phi;\n\n',
                    'for (t in 1:n){\n',
                    'times[t] = t;\n',
                    '}\n\n',
@@ -67,7 +67,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    'times_cent = times - mean_times;\n',
                    'boundary = (5.0/4) * (max(times_cent) - min(times_cent));\n',
                    'for (m in 1:num_gp_basis){\n',
-                   'gp_drift[,m] = drift_SE(boundary, m, times_cent);\n',
+                   'gp_phi[,m] = phi_SE(boundary, m, times_cent);\n',
                    '}\n')
 
           model_file[grep('##insert data', model_file)-1] <-
@@ -77,7 +77,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    'lam = ((m*pi())/(2*L))^2;\n',
                    'return lam;\n',
                    '}\n\n',
-                   'vector drift_SE(real L, int m, vector x) {\n',
+                   'vector phi_SE(real L, int m, vector x) {\n',
                    'vector[rows(x)] fi;\n',
                    'fi = 1/sqrt(L) * sin(m*pi()/(2*L) * (x+L));\n',
                    'return fi;\n',
@@ -110,7 +110,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    'diag_SPD[m, s] = sqrt(spd_SE(0.25, rho_gp[s], sqrt(lambda_gp(boundary, m))));\n',
                    '}\n}\n',
                    'SPD_beta = diag_SPD .* b_gp;\n',
-                   'LV_raw = gp_drift * SPD_beta;\n}\n')
+                   'LV_raw = gp_phi * SPD_beta;\n}\n')
 
           rho_line <- 'rho_gp ~ inv_gamma(1.499007, 5.670433);\n'
 
@@ -133,8 +133,8 @@ add_trend_lines = function(model_file, stan = FALSE,
           model_file <- model_file[-c((grep('// derived latent trends', model_file)):
                                         (grep('// derived latent trends', model_file) + 5))]
 
-          model_file[grep('LV_raw = gp_drift * SPD_beta;', model_file, fixed = TRUE)] <-
-            paste0('LV_raw = gp_drift * SPD_beta;\n',
+          model_file[grep('LV_raw = gp_phi * SPD_beta;', model_file, fixed = TRUE)] <-
+            paste0('LV_raw = gp_phi * SPD_beta;\n',
                    '// derived latent trends\n',
                    'for (i in 1:n){;\n',
                    'for (s in 1:n_series){\n',
@@ -167,7 +167,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    'real<lower=0> boundary;\n',
                    'int<lower=1> num_gp_basis;\n',
                    'num_gp_basis = min(20, n);\n',
-                   'matrix[n, num_gp_basis] gp_drift;\n\n',
+                   'matrix[n, num_gp_basis] gp_phi;\n\n',
                    'for (t in 1:n){\n',
                    'times[t] = t;\n',
                    '}\n\n',
@@ -175,7 +175,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    'times_cent = times - mean_times;\n',
                    'boundary = (5.0/4) * (max(times_cent) - min(times_cent));\n',
                    'for (m in 1:num_gp_basis){\n',
-                   'gp_drift[,m] = drift_SE(boundary, m, times_cent);\n',
+                   'gp_phi[,m] = phi_SE(boundary, m, times_cent);\n',
                    '}\n}\n\n',
                    'parameters {')
 
@@ -186,7 +186,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    'lam = ((m*pi())/(2*L))^2;\n',
                    'return lam;\n',
                    '}\n\n',
-                   'vector drift_SE(real L, int m, vector x) {\n',
+                   'vector phi_SE(real L, int m, vector x) {\n',
                    'vector[rows(x)] fi;\n',
                    'fi = 1/sqrt(L) * sin(m*pi()/(2*L) * (x+L));\n',
                    'return fi;\n',
@@ -220,7 +220,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    'diag_SPD[m, s] = sqrt(spd_SE(alpha_gp[s], rho_gp[s], sqrt(lambda_gp(boundary, m))));\n',
                    '}\n}\n',
                    'SPD_beta = diag_SPD .* b_gp;\n',
-                   'trend = gp_drift * SPD_beta;\n}\n')
+                   'trend = gp_phi * SPD_beta;\n}\n')
 
           rho_line <- 'rho_gp ~ inv_gamma(1.499007, 5.670433);\n'
           alpha_line <- 'alpha_gp ~ normal(0, 0.5);\n'
@@ -295,7 +295,7 @@ add_trend_lines = function(model_file, stan = FALSE,
           model_file[grep('// raw basis', model_file) + 1] <-
             paste0('row_vector[num_basis] b_raw;\n\n// latent factor drift terms\nvector[n_lv] drift;\n')
           model_file[grep('LV_raw[1, j] ~ ', model_file, fixed = T)] <-
-            "LV_raw[1, j] ~ normal(drift[j], 0.1);"
+            "LV_raw[1, j] ~ normal(0, 0.1);"
 
           model_file[grep('// dynamic factor estimates', model_file) + 6] <-
             paste0('LV_raw[2:n, j] ~ normal(drift[j] + LV_raw[1:(n - 1), j], 0.1);')
@@ -304,7 +304,7 @@ add_trend_lines = function(model_file, stan = FALSE,
           model_file[grep('// raw basis', model_file) + 1] <-
             paste0('row_vector[num_basis] b_raw;\n\n// latent trend drift terms\nvector[n_series] drift;\n')
           model_file[grep('trend[1, s] ~ ', model_file, fixed = T)] <-
-            "trend[1, s] ~ normal(drift[s], sigma[s]);"
+            "trend[1, s] ~ normal(0, sigma[s]);"
 
           model_file[grep('// trend estimates', model_file) + 6] <-
             paste0('trend[2:n, s] ~ normal(drift[s] + trend[1:(n - 1), s], sigma[s]);')
@@ -328,7 +328,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    '// latent factor drift terms\nvector[n_lv] drift;')
 
           model_file[grep('LV_raw[1, j] ~ ', model_file, fixed = T)] <-
-            "LV_raw[1, j] ~ normal(drift[j], 0.1);"
+            "LV_raw[1, j] ~ normal(0, 0.1);"
 
           model_file[grep('// dynamic factor estimates', model_file) + 6] <-
             paste0('LV_raw[2:n, j] ~ normal(drift[j] + ar1[j] * LV_raw[1:(n - 1), j], 0.1);')
@@ -339,7 +339,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    '// latent trend drift terms\nvector[n_series] drift;')
 
           model_file[grep('trend[1, s] ~ ', model_file, fixed = T)] <-
-            "trend[1, s] ~ normal(drift[s], sigma[s]);"
+            "trend[1, s] ~ normal(0, sigma[s]);"
 
           model_file[grep('// trend estimates', model_file) + 6] <-
             paste0('trend[2:n, s] ~ normal(drift[s] + ar1[s] * trend[1:(n - 1), s], sigma[s]);')
@@ -385,7 +385,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    '// latent factor drift terms\nvector[n_lv] drift;')
 
           model_file[grep('LV_raw[1, j] ~ ', model_file, fixed = T)] <-
-            "LV_raw[1, j] ~ normal(drift[j], 0.1);"
+            "LV_raw[1, j] ~ normal(0, 0.1);"
 
           model_file <- model_file[-(grep('// dynamic factor estimates', model_file) + 5:7)]
           model_file[grep('// dynamic factor estimates', model_file) + 5] <-
@@ -403,7 +403,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    '// latent trend drift terms\nvector[n_series] drift;')
 
           model_file[grep('trend[1, s] ~ ', model_file, fixed = T)] <-
-            "trend[1, s] ~ normal(drift[s], sigma[s]);"
+            "trend[1, s] ~ normal(0, sigma[s]);"
 
           model_file <- model_file[-(grep('// trend estimates', model_file) + 5:7)]
           model_file[grep('// trend estimates', model_file) + 5] <-
@@ -473,7 +473,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    '// latent factor drift terms\nvector[n_lv] drift;')
 
           model_file[grep('LV_raw[1, s] ~ ', model_file, fixed = T)] <-
-            "LV_raw[1, s] ~ normal(drift[s], 0.1);"
+            "LV_raw[1, s] ~ normal(0, 0.1);"
 
           model_file <- model_file[-(grep('// dynamic factor estimates', model_file) + 5:7)]
           model_file[grep('// dynamic factor estimates', model_file) + 5] <-
@@ -497,7 +497,7 @@ add_trend_lines = function(model_file, stan = FALSE,
                    '// latent trend drift terms\nvector[n_series] drift;')
 
           model_file[grep('trend[1, s] ~ ', model_file, fixed = T)] <-
-            "trend[1, s] ~ normal(drift[s], sigma[s]);"
+            "trend[1, s] ~ normal(0, sigma[s]);"
 
           model_file <- model_file[-(grep('// trend estimates', model_file) + 5:7)]
           model_file[grep('// trend estimates', model_file) + 5] <-

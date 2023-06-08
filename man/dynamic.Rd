@@ -38,3 +38,6 @@ Values of \code{k} are
 set automatically to ensure enough basis functions are used to approximate the expected
 wiggliness of the underlying dynamic function (\code{k} will increase as \code{rho} decreases)
 }
+\author{
+Nicholas J Clark
+}

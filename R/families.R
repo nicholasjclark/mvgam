@@ -24,6 +24,7 @@
 #'using `JAGS`. All families, apart from `tweedie()`, are supported if
 #'using `Stan`.
 #' @name mvgam_families
+#' @author Nicholas J Clark
 NULL
 
 #' @rdname mvgam_families

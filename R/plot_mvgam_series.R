@@ -77,7 +77,7 @@ plot_mvgam_series = function(object,
 
   if(!missing(data_train)){
     # Add series factor variable if missing
-    if(class(data_train)[1] != 'list'){
+    if(!inherits(data_train, 'list')){
       if(!'series' %in% colnames(data_train)){
         data_train$series <- factor('series1')
       }
@@ -89,7 +89,7 @@ plot_mvgam_series = function(object,
       }
     }
 
-    if(class(data_train)[1] == 'list'){
+    if(inherits(data_train, 'list')){
       if(!'series' %in% names(data_train)){
         data_train$series <- factor('series1')
       }
@@ -114,7 +114,7 @@ plot_mvgam_series = function(object,
 
   if(!missing(data_test)){
     # Add series factor variable if missing
-    if(class(data_test)[1] != 'list'){
+    if(!inherits(data_test, 'list')){
       if(!'series' %in% colnames(data_test)){
         data_test$series <- factor('series1')
       }
@@ -126,7 +126,7 @@ plot_mvgam_series = function(object,
       }
     }
 
-    if(class(data_test)[1] == 'list'){
+    if(inherits(data_test, 'list')){
       if(!'series' %in% names(data_test)){
         data_test$series <- factor('series1')
       }

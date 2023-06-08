@@ -43,3 +43,6 @@ Note that only \code{poisson()}, \code{nb()}, and \code{tweedie()} are available
 using \code{JAGS}. All families, apart from \code{tweedie()}, are supported if
 using \code{Stan}.
 }
+\author{
+Nicholas J Clark
+}

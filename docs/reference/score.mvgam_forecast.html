@@ -49,15 +49,15 @@
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for mvgam_forecast</span></span>
-<span><span class="fu">score</span><span class="op">(</span><span class="va">object</span>, <span class="va">score</span>, log <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">weights</span>, interval_width <span class="op">=</span> <span class="fl">0.9</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">score</span><span class="op">(</span><span class="va">object</span>, score <span class="op">=</span> <span class="st">"crps"</span>, log <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">weights</span>, interval_width <span class="op">=</span> <span class="fl">0.9</span>, <span class="va">...</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">score</span><span class="op">(</span><span class="va">object</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>object</dt>
-<dd><p><code>list</code> object returned from <code>forecast.mvgam</code>. If the test data
-supplied to <code>forecast.mvgam</code> contained out of sample test observations, the calibration
-of probabilistic forecasts can be scored using proper scoring rules</p></dd>
+<dd><p><code>mvgam_forecast</code> object. See <code><a href="forecast.mvgam.html">forecast.mvgam()</a></code>.</p></dd>
 
 
 <dt>score</dt>
@@ -82,6 +82,10 @@ are of less interest when forecasting. Ignored if <code>score != 'variogram'</co
 <dd><p>proportional value on <code>[0.05,0.95]</code> defining the forecast interval
 for calculating coverage</p></dd>
 
+
+<dt>...</dt>
+<dd><p>Ignored</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -96,6 +100,25 @@ slot is a binary indicator of whether or not the true value was within the forec
 posterior empirical quantiles</p>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
+<span class="r-in"><span><span class="co">#Simulate observations for three count-valued time series</span></span></span>
+<span class="r-in"><span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co">#Fit a dynamic model using 'newdata' to automatically produce forecasts</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>            trend_model <span class="op">=</span> <span class="st">'RW'</span>,</span></span>
+<span class="r-in"><span>            data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>            newdata <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co">#Extract forecasts into a 'mvgam_forecast' object</span></span></span>
+<span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co">#Score forecasts</span></span></span>
+<span class="r-in"><span><span class="fu">score</span><span class="op">(</span><span class="va">fc</span>, score <span class="op">=</span> <span class="st">'drps'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">}</span></span></span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside></div>
 

@@ -154,7 +154,7 @@ for modelling if \code{use_stan == FALSE}. If missing, the path will be recovere
 A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
 the mgcv model output (for easily generating simulations at
 unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
-for other functions in the package
+for other functions in the package. See \code{\link{mvgam-class}} for details.
 }
 \description{
 This function estimates the posterior distribution for Generalised Additive Models (GAMs) that can include

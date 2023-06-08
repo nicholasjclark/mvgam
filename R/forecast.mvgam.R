@@ -1,4 +1,4 @@
-#'@title Compute out of sample forecasts for a fitted \code{mvgam} object
+#'@title Extract or compute hindcasts and forecasts for a fitted \code{mvgam} object
 #'@name forecast.mvgam
 #'@importFrom parallel clusterExport stopCluster setDefaultCluster
 #'@importFrom stats predict
@@ -10,7 +10,7 @@
 #'produced by the generative model and these will simply be extracted and plotted. However if no \code{newdata} was
 #'supplied to the original model call, an assumption is made that the \code{newdata} supplied here comes sequentially
 #'after the data supplied as \code{data} in the original model (i.e. we assume there is no time gap between the last
-#'observation of series 1 in \code{data} and the first observation for series 1 in \code{newdata}).
+#'observation of series 1 in \code{data} and the first observation for series 1 in \code{newdata})
 #'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
 #'\code{newdata} instead for more seamless integration into `R` workflows
 #'@param series Either a \code{integer} specifying which series in the set is to be forecast,
@@ -138,7 +138,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
   }
 
   # Generate the linear predictor matrix
-  if(class(data_test)[1] == 'list'){
+  if(inherits(data_test, 'list')){
     suppressWarnings(Xp  <- try(predict(object$mgcv_model,
                                              newdata = data_test,
                                              type = 'lpmatrix'),
@@ -414,7 +414,10 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
     ends <- ends[-1]
 
     series_hcs <- lapply(seq_len(n_series), function(series){
-      to_extract <- ifelse(type == 'trend', 'trend', 'ypred')
+      to_extract <- switch(type,
+                           'link' = 'mus',
+                           'response' = 'ypred',
+                           'trend' = 'trend')
     if(object$fit_engine == 'stan'){
 
       preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
@@ -460,7 +463,10 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
     starts <- ends + 1
     starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
     ends <- ends[-1]
-    to_extract <- ifelse(type == 'trend', 'trend', 'ypred')
+    to_extract <- switch(type,
+                         'link' = 'mus',
+                         'response' = 'ypred',
+                         'trend' = 'trend')
     if(object$fit_engine == 'stan'){
       preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
                                                               dim(mcmc_chains(object$model_output, 'ypred'))[2],
@@ -501,7 +507,10 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
       ends <- ends[-1]
 
       series_fcs <- lapply(seq_len(n_series), function(series){
-        to_extract <- ifelse(type == 'trend', 'trend', 'ypred')
+        to_extract <- switch(type,
+                             'link' = 'mus',
+                             'response' = 'ypred',
+                             'trend' = 'trend')
         if(object$fit_engine == 'stan'){
 
           preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
@@ -516,7 +525,10 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
 
       # Extract hindcasts for storing in the returned object
       series_hcs <- lapply(seq_len(n_series), function(series){
-        to_extract <- ifelse(type == 'trend', 'trend', 'ypred')
+        to_extract <- switch(type,
+                             'link' = 'mus',
+                             'response' = 'ypred',
+                             'trend' = 'trend')
         if(object$fit_engine == 'stan'){
 
           preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
@@ -558,7 +570,10 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
       starts <- ends + 1
       starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
       ends <- ends[-1]
-      to_extract <- ifelse(type == 'trend', 'trend', 'ypred')
+      to_extract <- switch(type,
+                           'link' = 'mus',
+                           'response' = 'ypred',
+                           'trend' = 'trend')
 
       # Extract forecasts
       if(object$fit_engine == 'stan'){
@@ -569,7 +584,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
         preds <- mcmc_chains(object$model_output, to_extract)[,starts[series]:ends[series]]
       }
       series_fcs <- list(preds[,(last_train+1):NCOL(preds)])
-      names(series_hcs) <- s_name
+      names(series_fcs) <- s_name
 
       # Extract hindcasts
       series_hcs <- list(preds[,1:last_train])

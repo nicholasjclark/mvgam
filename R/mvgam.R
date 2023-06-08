@@ -162,7 +162,7 @@
 #'@return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
 #'unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
-#'for other functions in the package
+#'for other functions in the package. See \code{\link{mvgam-class}} for details.
 #'
 #'@examples
 #'\dontrun{
@@ -393,6 +393,11 @@ mvgam = function(formula,
   if(chains%%1 != 0){
     stop('Argument "chains" must be a positive integer',
          .call = FALSE)
+  }
+
+  if(drift && use_lv){
+    warning('Cannot identify drift terms in latent factor models; setting "drift = FALSE"')
+    drift <- FALSE
   }
 
   # Validate the family argument
@@ -718,6 +723,7 @@ mvgam = function(formula,
   } else {
     data_train$y <- orig_y
   }
+  data_train[[terms(formula(formula))[[2]]]] <- orig_y
 
   # Read in the base (unmodified) jags model file
   base_model <- suppressWarnings(readLines('base_gam.txt'))
@@ -1179,184 +1185,148 @@ mvgam = function(formula,
     rho_names <- NA
   }
 
-  if(!run_model){
-    # Return only the model file and all data / inits needed to run the model
-    # outside of mvgam
-    unlink('base_gam.txt')
-    if(use_stan){
-      # Import the base Stan model file
-      modification <- add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
-      unlink('base_gam_stan.txt')
-      cat(modification, file = 'base_gam_stan.txt', sep = '\n', append = T)
-      base_stan_model <- trimws(suppressWarnings(readLines('base_gam_stan.txt')))
-      unlink('base_gam_stan.txt')
+  #### Set up model file and modelling data ####
+  if(use_stan){
+    fit_engine <- 'stan'
+    use_cmdstan <- FALSE
 
-      # Add necessary trend structure
-      base_stan_model <- add_trend_lines(model_file = base_stan_model,
-                                         use_lv = use_lv,
-                                         stan = TRUE,
-                                         trend_model = if(trend_model %in% c('RW', 'VAR1')){'RW'} else {trend_model},
-                                         drift = drift)
+    # Import the base Stan model file
+    modification <- add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
+    unlink('base_gam_stan.txt')
+    cat(modification, file = 'base_gam_stan.txt', sep = '\n', append = T)
+    base_stan_model <- trimws(suppressWarnings(readLines('base_gam_stan.txt')))
+    unlink('base_gam_stan.txt')
 
-      # Add remaining data, model and parameters blocks to the Stan model file;
-      # gather Stan data structure
-      stan_objects <- add_stan_data(jags_file = trimws(model_file),
-                                            stan_file = base_stan_model,
-                                            use_lv = use_lv,
-                                            n_lv = n_lv,
-                                            jags_data = ss_jagam$jags.data,
-                                            family = family_char,
-                                            upper_bounds = upper_bounds)
+    # Add necessary trend structure
+    base_stan_model <- add_trend_lines(model_file = base_stan_model,
+                                       stan = TRUE,
+                                       trend_model = if(trend_model %in% c('RW', 'VAR1')){'RW'} else {trend_model},
+                                       use_lv = use_lv,
+                                       drift = drift)
 
-      if(use_lv){
-        stan_objects$model_data$n_lv <- n_lv
-      }
-
-      # Sensible inits needed for the betas, sigmas and overdispersion parameters
-      inits <- family_inits(family = family_char,
-                            trend_model,
-                            smooths_included, model_data)
-
-      vectorised <- vectorise_stan_lik(model_file = stan_objects$stan_file,
-                                  model_data = stan_objects$model_data,
+    # Add remaining data, model and parameters blocks to the Stan model file;
+    # gather Stan data structure
+    stan_objects <- add_stan_data(jags_file = trimws(model_file),
+                                  stan_file = base_stan_model,
+                                  use_lv = use_lv,
+                                  n_lv = n_lv,
+                                  jags_data = ss_jagam$jags.data,
                                   family = family_char,
-                                  threads = threads,
-                                  trend_model = trend_model,
-                                  offset = offset)
+                                  upper_bounds = upper_bounds)
 
-      if(!missing(priors)){
-        vectorised$model_file <- update_priors(vectorised$model_file,
-                                                priors, use_stan = TRUE)
-      } else {
-        priors <- NULL
-      }
+    if(use_lv){
+      stan_objects$model_data$n_lv <- n_lv
+    }
+
+    # Set monitor parameters
+    param <- get_monitor_pars(family = family_char,
+                              use_lv = use_lv,
+                              trend_model = trend_model,
+                              smooths_included = stan_objects$smooths_included,
+                              drift = drift)
+    if(any(smooth_labs$class == 'random.effect')){
+      param <- c(param, 'mu_raw', 'sigma_raw')
+    }
+
+    # Sensible inits needed for the betas, sigmas and overdispersion parameters
+    inits <- family_inits(family = family_char, trend_model,
+                          smooths_included, model_data)
 
 
-      output <- structure(list(call = orig_formula,
-                               family = family_char,
-                               trend_model = trend_model,
-                               drift = drift,
-                               priors = priors,
-                               model_file = vectorised$model_file,
-                               model_data = vectorised$model_data,
-                               inits = inits,
-                               mgcv_model = ss_gam,
-                               sp_names = rho_names,
-                               ytimes = ytimes,
-                               use_lv = use_lv,
-                               n_lv = n_lv,
-                               upper_bounds = upper_bounds,
-                               obs_data = data_train,
-                               test_data = data_test,
-                               fit_engine = 'stan',
-                               max_treedepth = 12,
-                               adapt_delta = 0.85),
-                          class = 'mvgam_prefit')
+    # Vectorise likelihoods
+    vectorised <- vectorise_stan_lik(model_file = stan_objects$stan_file,
+                                     model_data = stan_objects$model_data,
+                                     family = family_char,
+                                     threads = threads,
+                                     trend_model = trend_model,
+                                     offset = offset,
+                                     drift = drift)
+
+    if(!missing(priors)){
+      vectorised$model_file <- update_priors(vectorised$model_file, priors,
+                                             use_stan = TRUE)
     } else {
-
-      if(!smooths_included){
-        inits <- NULL
-      } else {
-        inits <- ss_jagam$jags.ini
-      }
-      initlist <- replicate(chains, inits,
-                            simplify = FALSE)
-      inits <- initlist
-
-      if(!missing(priors)){
-        model_file <- update_priors(model_file, priors, use_stan = FALSE)
-      } else {
-        priors <- NULL
-      }
-
-      output <- structure(list(call = orig_formula,
-                               family = family_char,
-                               trend_model = trend_model,
-                               drift = drift,
-                               priors = priors,
-                               model_file = trimws(model_file),
-                               model_data = ss_jagam$jags.data,
-                               inits = inits,
-                               mgcv_model = ss_gam,
-                               sp_names = rho_names,
-                               ytimes = ytimes,
-                               use_lv = use_lv,
-                               n_lv = n_lv,
-                               upper_bounds = upper_bounds,
-                               obs_data = data_train,
-                               test_data = data_test,
-                               fit_engine = 'jags',
-                               max_treedepth = NULL,
-                               adapt_delta = NULL),
-                          class = 'mvgam_prefit')
+      priors <- NULL
     }
 
   } else {
+    # Set up data and model file for JAGS
+    if(!smooths_included){
+      inits <- NULL
+    } else {
+      inits <- ss_jagam$jags.ini
+    }
+    initlist <- replicate(chains, inits,
+                          simplify = FALSE)
+    inits <- initlist
 
+    if(!missing(priors)){
+      model_file <- update_priors(model_file, priors, use_stan = FALSE)
+    } else {
+      priors <- NULL
+    }
+
+    # Set monitor parameters and initial values
+    param <- get_monitor_pars(family_char,
+                              smooths_included = smooths_included,
+                              use_lv, trend_model, drift)
+
+    # Add random effect parameters for monitoring
+    if(any(smooth_labs$class == 'random.effect')){
+      param <- c(param, paste0('mu_raw', 1:length(re_smooths)))
+      param <- c(param, paste0('sigma_raw', 1:length(re_smooths)))
+    }
+
+  }
+
+  #### Return only the model file and all data / inits needed to run the model
+  # outside of mvgam ####
+  if(!run_model){
+      output <- structure(list(call = orig_formula,
+                               family = family_char,
+                               trend_model = trend_model,
+                               drift = drift,
+                               priors = priors,
+                               model_file = if(use_stan){
+                                 vectorised$model_file
+                               } else {
+                                 trimws(model_file)
+                               },
+                               model_data = if(use_stan){
+                                 vectorised$model_data
+                               } else {
+                                 ss_jagam$jags.data
+                               },
+                               inits = inits,
+                               monitor_pars = param,
+                               mgcv_model = ss_gam,
+                               sp_names = rho_names,
+                               ytimes = ytimes,
+                               use_lv = use_lv,
+                               n_lv = n_lv,
+                               upper_bounds = upper_bounds,
+                               obs_data = data_train,
+                               test_data = data_test,
+                               fit_engine = if(use_stan){
+                                 'stan'
+                               } else {
+                                 'jags'
+                               },
+                               max_treedepth = if(use_stan){
+                                 12
+                               } else {
+                                 NULL
+                               },
+                               adapt_delta = if(use_stan){
+                                 0.85
+                               } else {
+                                 NULL
+                               }),
+                          class = 'mvgam_prefit')
+
+  #### Else if running the model, complete the setup for fitting ####
+  } else {
     if(use_stan){
-      fit_engine <- 'stan'
-      use_cmdstan <- FALSE
-
-      # Import the base Stan model file
-      modification <- add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
-      unlink('base_gam_stan.txt')
-      cat(modification, file = 'base_gam_stan.txt', sep = '\n', append = T)
-      base_stan_model <- trimws(suppressWarnings(readLines('base_gam_stan.txt')))
-      unlink('base_gam_stan.txt')
-
-      # Add necessary trend structure
-      base_stan_model <- add_trend_lines(model_file = base_stan_model,
-                                         stan = TRUE,
-                                         trend_model = if(trend_model %in% c('RW', 'VAR1')){'RW'} else {trend_model},
-                                         use_lv = use_lv,
-                                         drift = drift)
-
-      # Add remaining data, model and parameters blocks to the Stan model file;
-      # gather Stan data structure
-      stan_objects <- add_stan_data(jags_file = trimws(model_file),
-                                    stan_file = base_stan_model,
-                                    use_lv = use_lv,
-                                    n_lv = n_lv,
-                                    jags_data = ss_jagam$jags.data,
-                                    family = family_char,
-                                    upper_bounds = upper_bounds)
-
-      # Set monitor parameters
-      param <- get_monitor_pars(family = family_char,
-                                use_lv = use_lv,
-                                trend_model = trend_model,
-                                smooths_included = stan_objects$smooths_included,
-                                drift = drift)
-      if(any(smooth_labs$class == 'random.effect')){
-        param <- c(param, 'mu_raw', 'sigma_raw')
-      }
-
-      model_data <- stan_objects$model_data
-      if(use_lv){
-        model_data$n_lv <- n_lv
-      }
-
-      # Sensible inits needed for the betas, sigmas and overdispersion parameters
-      inits <- family_inits(family = family_char, trend_model,
-                            smooths_included, model_data)
-
-
-      # Vectorise likelihoods
-      vectorised <- vectorise_stan_lik(model_file = stan_objects$stan_file,
-                                       model_data = stan_objects$model_data,
-                                       family = family_char,
-                                       threads = threads,
-                                       trend_model = trend_model,
-                                       offset = offset)
-
-      if(!missing(priors)){
-        vectorised$model_file <- update_priors(vectorised$model_file, priors,
-                                               use_stan = TRUE)
-      } else {
-        priors <- NULL
-      }
-
-
       # Remove data likelihood if this is a prior sampling run
       if(prior_simulation){
         vectorised$model_file <- vectorised$model_file[-c((grep('// likelihood functions',
@@ -1453,6 +1423,7 @@ mvgam = function(formula,
         if(missing(max_treedepth)){
           max_treedepth <- 12
         }
+
         if(missing(adapt_delta)){
           adapt_delta <- 0.85
         }
@@ -1472,7 +1443,6 @@ mvgam = function(formula,
 
         stan_control <- list(max_treedepth = max_treedepth,
                              adapt_delta = adapt_delta)
-
         fit1 <- rstan::stan(model_code = vectorised$model_file,
                             iter = samples,
                             warmup = burnin,
@@ -1493,36 +1463,8 @@ mvgam = function(formula,
 
     if(!use_stan){
       requireNamespace('runjags', quietly = TRUE)
-
-      if(!missing(priors)){
-        model_file <- update_priors(model_file, priors, use_stan = FALSE)
-      } else {
-        priors <- NULL
-      }
-
       fit_engine <- 'jags'
       model_data <- ss_jagam$jags.data
-
-      # Set monitor parameters and initial values
-      param <- get_monitor_pars(family_char,
-                                smooths_included = smooths_included,
-                                use_lv, trend_model, drift)
-
-      # Add random effect parameters for monitoring
-      if(any(smooth_labs$class == 'random.effect')){
-        param <- c(param, paste0('mu_raw', 1:length(re_smooths)))
-        param <- c(param, paste0('sigma_raw', 1:length(re_smooths)))
-      }
-
-      if(!smooths_included){
-        inits <- NULL
-      } else {
-        inits <- ss_jagam$jags.ini
-      }
-      initlist <- replicate(chains, inits,
-                            simplify = FALSE)
-      inits <- initlist
-
       runjags::runjags.options(silent.jags = TRUE, silent.runjags = TRUE)
 
       # Initiate adaptation of the model for the full burnin period. This is necessary as JAGS
@@ -1602,14 +1544,6 @@ mvgam = function(formula,
         })
   }
 
-  if(use_stan){
-    model_file <- vectorised$model_file
-  } else {
-    model_file <- trimws(model_file)
-    max_treedepth <- NULL
-    adapt_delta <- NULL
-  }
-
   if(prior_simulation){
     data_train$y <- orig_y
   }
@@ -1621,62 +1555,63 @@ mvgam = function(formula,
   if(run_model){
     # Use the empirical covariance matrix from the fitted coefficients
     V <- cov(mcmc_chains(out_gam_mod, 'b'))
-    ss_gam$Ve <- V
-    ss_gam$Vp <- V
-    ss_gam$Vc <- V
+    ss_gam$Ve <- ss_gam$Vp <- ss_gam$Vc <- V
 
     # Add the posterior median coefficients
     p <- mcmc_summary(out_gam_mod, 'b')[,c(4)]
-    coef_names <- names(ss_gam$coefficients)
-    names(p) <- coef_names
+    names(p) <- names(ss_gam$coefficients)
     ss_gam$coefficients <- p
   }
 
-  if(return_model_data){
-    output <- structure(list(call = orig_formula,
-                             family = family_char,
-                             trend_model = trend_model,
-                             drift = drift,
-                             priors = priors,
-                             model_output = out_gam_mod,
-                             model_file = model_file,
-                             model_data = model_data,
-                             sp_names = rho_names,
-                             inits = inits,
-                             mgcv_model = ss_gam,
-                             ytimes = ytimes,
-                             resids = series_resids,
-                             use_lv = use_lv,
-                             n_lv = n_lv,
-                             upper_bounds = upper_bounds,
-                             obs_data = data_train,
-                             test_data = data_test,
-                             fit_engine = fit_engine,
-                             max_treedepth = max_treedepth,
-                             adapt_delta = adapt_delta),
-                        class = 'mvgam')
-  } else {
-    output <- structure(list(call = orig_formula,
-                             family = family_char,
-                             trend_model = trend_model,
-                             drift = drift,
-                             priors = priors,
-                             model_output = out_gam_mod,
-                             model_file = model_file,
-                             sp_names = rho_names,
-                             mgcv_model = ss_gam,
-                             ytimes = ytimes,
-                             resids = series_resids,
-                             use_lv = use_lv,
-                             n_lv = n_lv,
-                             upper_bounds = upper_bounds,
-                             obs_data = data_train,
-                             test_data = data_test,
-                             fit_engine = fit_engine,
-                             max_treedepth = max_treedepth,
-                             adapt_delta = adapt_delta),
-                        class = 'mvgam')
-  }
+  #### Return the output as class mvgam ####
+  output <- structure(list(call = orig_formula,
+                           family = family_char,
+                           trend_model = trend_model,
+                           drift = drift,
+                           priors = priors,
+                           model_output = out_gam_mod,
+                           model_file = if(use_stan){
+                             vectorised$model_file
+                           } else {
+                             trimws(model_file)
+                           },
+                           model_data = if(return_model_data){
+                             model_data
+                           } else {
+                             NULL
+                           },
+                           inits = if(return_model_data){
+                             inits
+                           } else {
+                             NULL
+                           },
+                           monitor_pars = if(return_model_data){
+                             param
+                           } else {
+                             NULL
+                           },
+                           sp_names = rho_names,
+                           mgcv_model = ss_gam,
+                           ytimes = ytimes,
+                           resids = series_resids,
+                           use_lv = use_lv,
+                           n_lv = n_lv,
+                           upper_bounds = upper_bounds,
+                           obs_data = data_train,
+                           test_data = data_test,
+                           fit_engine = fit_engine,
+                           max_treedepth = if(use_stan){
+                             max_treedepth
+                           } else {
+                             NULL
+                           },
+                           adapt_delta = if(use_stan){
+                             adapt_delta
+                           } else {
+                             NULL
+                           }),
+                      class = 'mvgam')
+
   }
 
   return(output)

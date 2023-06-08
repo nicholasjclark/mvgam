@@ -155,7 +155,7 @@ plot_mvgam_smooth = function(object,
   } else {
 
     # Use posterior predictions to generate univariate smooth plots
-    if(missing(newdata) && class(object$obs_data)[1] != 'list'){
+    if(missing(newdata) && !inherits(data_train, 'list')){
       data_train %>%
         dplyr::select(c(series, smooth_terms)) %>%
         dplyr::filter(series == s_name) %>%
@@ -164,14 +164,14 @@ plot_mvgam_smooth = function(object,
       # Use a larger sample size when estimating derivatives so they can be better approximated
       if(derivatives){
         pred_dat %>% dplyr::select(-smooth) %>% dplyr::distinct() %>%
-          dplyr::slice_head(n = 1) %>%
-          dplyr::bind_cols(smooth.var = seq(min(pred_dat[,smooth]),
-                                            max(pred_dat[,smooth]),
-                                            length.out = 1000)) -> pred_dat
+          dplyr::slice_head(n = 1) %>% slice(rep(1:n(), each = 1000)) %>%
+          dplyr::mutate(smooth.var = seq(min(pred_dat[,smooth]),
+                                         max(pred_dat[,smooth]),
+                                         length.out = 1000)) -> pred_dat
       } else {
         pred_dat %>% dplyr::select(-smooth) %>% dplyr::distinct() %>%
-          dplyr::slice_head(n = 1) %>%
-          dplyr::bind_cols(smooth.var = seq(min(pred_dat[,smooth]),
+          dplyr::slice_head(n = 1) %>% slice(rep(1:n(), each = 500)) %>%
+          dplyr::mutate(smooth.var = seq(min(pred_dat[,smooth]),
                                             max(pred_dat[,smooth]),
                                             length.out = 500)) -> pred_dat
       }

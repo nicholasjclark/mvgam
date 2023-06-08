@@ -27,6 +27,8 @@
 #' set automatically to ensure enough basis functions are used to approximate the expected
 #' wiggliness of the underlying dynamic function (\code{k} will increase as \code{rho} decreases)
 #' @rdname dynamic
+#' @author Nicholas J Clark
+#' @export
 dynamic = function(variable, rho = 5, stationary = TRUE){
   # Check that only one variable is supplied
   vars <- as.list(substitute(list(variable)))[-1]
