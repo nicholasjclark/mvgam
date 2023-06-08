@@ -10,3 +10,4 @@
 ^index.Rmd
 ^index.md
 ^tests/testthat/Rplots\.pdf$
+^base_gam.txt

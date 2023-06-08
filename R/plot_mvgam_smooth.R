@@ -164,13 +164,15 @@ plot_mvgam_smooth = function(object,
       # Use a larger sample size when estimating derivatives so they can be better approximated
       if(derivatives){
         pred_dat %>% dplyr::select(-smooth) %>% dplyr::distinct() %>%
-          dplyr::slice_head(n = 1) %>% slice(rep(1:n(), each = 1000)) %>%
+          dplyr::slice_head(n = 1) %>%
+          dplyr::slice(rep(1:dplyr::n(), each = 1000)) %>%
           dplyr::mutate(smooth.var = seq(min(pred_dat[,smooth]),
                                          max(pred_dat[,smooth]),
                                          length.out = 1000)) -> pred_dat
       } else {
         pred_dat %>% dplyr::select(-smooth) %>% dplyr::distinct() %>%
-          dplyr::slice_head(n = 1) %>% slice(rep(1:n(), each = 500)) %>%
+          dplyr::slice_head(n = 1) %>%
+          dplyr::slice(rep(1:dplyr::n(), each = 500)) %>%
           dplyr::mutate(smooth.var = seq(min(pred_dat[,smooth]),
                                             max(pred_dat[,smooth]),
                                             length.out = 500)) -> pred_dat

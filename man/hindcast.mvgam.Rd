@@ -7,7 +7,7 @@
 \usage{
 hindcast(object, ...)
 
-\method{hindcast}{mvgam}(object, series = "all", n_cores = 1, type = "response", ...)
+\method{hindcast}{mvgam}(object, series = "all", type = "response", ...)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}

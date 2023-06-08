@@ -25,7 +25,6 @@ hindcast <- function(object, ...){
 #'@method hindcast mvgam
 #'@export
 hindcast.mvgam = function(object, series = 'all',
-                          n_cores = 1,
                           type = 'response',
                           ...){
 
