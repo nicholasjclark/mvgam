@@ -1,7 +1,7 @@
 #' Fitted `mvgam` object description
 #'
 #' A fitted \code{mvgam} object returned by function \code{\link{mvgam}}.
-#' Method functions `code`, `coef`, `forecast`, `hindcast`, `lfo_cv`,
+#' Method functions `as.data.frame`, `code`, `coef`, `forecast`, `hindcast`, `lfo_cv`,
 #' `logLik`, `plot`, `ppc`, `predict`,
 #' `print`, `score`, `summary` and `update` exist for this class.
 #' @details A `mvgam` object contains the following elements:

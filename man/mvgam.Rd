@@ -17,6 +17,7 @@ mvgam(
   family = "poisson",
   use_lv = FALSE,
   n_lv,
+  trend_map,
   trend_model = "None",
   drift = FALSE,
   chains = 4,
@@ -46,8 +47,8 @@ unless they share a covariate.}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
-'series' (character or factor index of the series IDs)
-'time' (numeric index of the time point for each observation).
+\code{series} (character or factor index of the series IDs)
+\code{time} (numeric index of the time point for each observation).
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
 \item{data_train}{Deprecated. Still works in place of \code{data} but users are recommended to use
@@ -74,7 +75,17 @@ other stochastic elements that are not currently avaiable in \code{mvgam}. Defau
 the size of the returned object, unless \code{run_model == FALSE}}
 
 \item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
-families are: \code{nb()}, \code{poisson()}, \code{tweedie()}, \code{gaussian()}, \code{betar()}, \code{lognormal()}, \code{student_t()} and \code{Gamma()}}
+families are:
+\itemize{
+\item\code{nb()} for count data
+\item\code{poisson()} for count data
+\item\code{tweedie()} for count data (power parameter \code{p} fixed at \code{1.5})
+\item\code{gaussian()} for real-valued data
+\item\code{betar()} for proportional data on \verb{(0,1)}
+\item\code{lognormal()} for non-negative real-valued data
+\item\code{student_t()} for real-valued data
+\item\code{Gamma()} for non-negative real-valued data}
+See \code{\link{mvgam_families}} for more details}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series}
@@ -82,21 +93,32 @@ latent trends in a reduced dimension format. If \code{FALSE}, estimate independe
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
 Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
 
+\item{trend_map}{Optional \code{data.frame} specifying which series should depend on which latent
+trends. Useful for allowing multiple series to depend on the same latent trend process, but with
+different observation processes. If supplied, a latent factor model is set up by setting
+\code{use_lv = TRUE} and using the mapping to set up the shared trends. Needs to have column names
+\code{series} and \code{trend}, with integer values in the \code{trend} column to state which trend each series
+should depend on. The \code{series} column should have a single unique entry for each series in the
+data (names should perfectly match factor levels of the \code{series} variable in \code{data}). See examples
+for details}
+
 \item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
-'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}}),
-'RW' (random walk with possible drift),
-'AR1' (with possible drift),
-'AR2' (with possible drift) or
-'AR3' (with possible drift) or
-'VAR1' (with possible drift; only available in \code{Stan}) or
-'GP' (Gaussian Process with squared exponential kernel;
-only available in \code{stan})}
+\itemize{
+\item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+\item \code{RW} (random walk with possible drift)
+\item \code{AR1} (with possible drift)
+\item \code{AR2} (with possible drift)
+\item \code{AR3} (with possible drift)
+\item \code{VAR1} (with possible drift; only available in \code{Stan})
+\item \code{GP} (Gaussian Process with squared exponential kernel;
+only available in \code{Stan})}}
 
 \item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Therefore this defaults to \code{FALSE}}
+predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift parameters will also likely
+be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}}
 
 \item{chains}{\code{integer} specifying the number of parallel chains for the model}
 
@@ -124,7 +146,8 @@ definitions (in JAGS or Stan syntax). See \code{\link{get_mvgam_priors}} and
 \item{upper_bounds}{Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
-truncation entirely (i.e. there is no upper bound for each series)}
+truncation entirely (i.e. there is no upper bound for each series). Currently not implemented
+in \code{Stan}}
 
 \item{refit}{Logical indicating whether this is a refit, called using \code{\link{update.mvgam}}. Users should leave
 as \code{FALSE}}
@@ -191,11 +214,9 @@ to ensure predictions can be made for all levels of the supplied factor variable
 \cr
 \cr
 \emph{Overdispersion parameters}: When more than one series is included in \code{data_train} and an overdispersed
-exponential family is used, by default the overdispersion parameters (\code{r} for Negative Binomial, \code{twdis} for Tweedie) are
-estimated independently for each series. Note that for Tweedie
-models, estimating the power parameter \code{p} alongside the overdispersion parameter
-\code{twdis} and the smooth coefficients is very challenging for noisy data, introducing some difficult posterior geometries.
-The \code{p} parameter is therefore fixed at \code{1.5} (i.e. a so-called Geometric Poisson model).
+exponential family is used, additional observation family parameters
+(i.e. \code{phi} for \code{nb()} or \code{sigma} for \code{gaussian()}) are
+estimated independently for each series.
 \cr
 \cr
 \emph{Factor regularisation}: When using a dynamic factor model for the trends with \code{JAGS} factor precisions are given
@@ -248,6 +269,7 @@ mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
 
 # View the model code in Stan language
 code(mod1)
+
 
 # Inspect the data objects needed to condition the model
 str(mod1$model_data)
@@ -305,6 +327,37 @@ plot(mod1, type = 'smooths', residuals = TRUE)
 
 # Plot posterior realisations for the smooth
 plot(mod1, type = 'smooths', realisations = TRUE)
+
+# Extract observation model beta coefficient draws as a data.frame
+beta_draws_df <- as.data.frame(mod1, variable = 'betas')
+head(beta_draws_df)
+str(beta_draws_df)
+
+# Example of supplying a trend_map so that some series can share
+# latent trend processes
+sim <- sim_mvgam(n_series = 3)
+mod_data <- sim$data_train
+
+# Here, we specify only two latent trends; series 1 and 2 share a trend,
+# while series 3 has it's own unique latent trend
+trend_map <- data.frame(series = unique(mod_data$series),
+                       trend = c(1,1,2))
+
+# Fit the model using AR1 trends
+mod1 <- mvgam(y ~ s(season, bs = 'cc'),
+              trend_map = trend_map,
+              trend_model = 'AR1',
+              data = mod_data,
+              return_model_data = TRUE)
+
+# The mapping matrix is now supplied as data to the model in the 'Z' element
+mod1$model_data$Z
+code(mod1)
+
+# The first two series share an identical latent trend; the third is different
+plot(mod1, type = 'trend', series = 1)
+plot(mod1, type = 'trend', series = 2)
+plot(mod1, type = 'trend', series = 3)
 
 # Example of how to use dynamic coefficients
 # Simulate a time-varying coefficient for the effect of temperature

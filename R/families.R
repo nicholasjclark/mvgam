@@ -1,16 +1,17 @@
 #' Supported mvgam families
-#' @importFrom stats make.link qnorm plnorm runif pbeta dlnorm dpois pnorm ppois plogis gaussian poisson Gamma dnbinom rnbinom dnorm dbeta
+#' @importFrom stats make.link dgamma pgamma rgamma qnorm plnorm runif pbeta dlnorm dpois pnorm ppois plogis gaussian poisson Gamma dnbinom rnbinom dnorm dbeta
 #' @param link a specification for the family link function. At present these cannot
 #' be changed
 #' @details \code{mvgam} currently supports the following standard observation families:
 #'\itemize{
 #'   \item \code{\link[stats]{gaussian}} for real-valued data
 #'   \item \code{\link[stats]{poisson}} for count data
+#'   \item \code{\link[stats]{Gamma}} for non-negative real-valued data
 #'   }
 #'
 #'In addition, the following extended families from the \code{mgcv} package are supported:
 #'\itemize{
-#'   \item \code{\link[mgcv]{betar}} for proportional data on (0,1)
+#'   \item \code{\link[mgcv]{betar}} for proportional data on `(0,1)`
 #'   \item \code{\link[mgcv]{nb}} for count data
 #'   }
 #'
@@ -283,6 +284,26 @@ mvgam_predict = function(Xp, family, betas,
     }
   }
 
+  # Gamma observations (requires argument 'shape')
+  if(family == 'Gamma'){
+    if(type ==  'link'){
+      out <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                          betas) + attr(Xp, 'model.offset'))
+
+      if(density){
+        out <- dgamma(truth,
+                      rate = family_pars$shape / exp(out),
+                      shape = family_pars$shape,
+                      log = TRUE)
+      }
+
+    } else {
+      out <- rgamma(n = NROW(Xp),
+                    rate = family_pars$shape / exp(out),
+                    shape = family_pars$shape)
+    }
+  }
+
   # Tweedie observations (requires argument 'phi')
   if(family == 'tweedie'){
     if(type ==  'link'){
@@ -511,6 +532,21 @@ family_prior_info = function(family, use_stan, data){
                              )))
   }
 
+  if(family == 'Gamma'){
+    prior_df <- data.frame(param_name = c('vector<lower=0>[n_series] shape;'),
+                           param_length = length(unique(data$series)),
+                           param_info = c('Gamma shape parameter'),
+                           prior = c('shape ~ gamma(0.01, 0.01);'),
+                           example_change = c(
+                             paste0(
+                               'shape ~ normal(',
+                               round(runif(min = -1, max = 1, n = 1), 2),
+                               ', ',
+                               round(runif(min = 0.1, max = 1, n = 1), 2),
+                               ');'
+                             )))
+  }
+
   if(family == 'negative binomial'){
     if(use_stan){
       prior_df <- data.frame(param_name = c('vector<lower=0>[n_series] phi_inv;'),
@@ -720,6 +756,32 @@ ds_resids_lnorm = function(truth, fitted, sigma, draw){
 }
 
 #' @noRd
+ds_resids_gamma = function(truth, fitted, shape, draw){
+  na_obs <- is.na(truth)
+  a_obs <- pgamma(as.vector(truth[!na_obs]) - 1.e-6,
+                  shape = shape,
+                  rate = shape / fitted[!na_obs])
+  b_obs <- pgamma(as.vector(truth[!na_obs]) - 1.e-6,
+                  shape = shape,
+                  rate = shape / fitted[!na_obs])
+  u_obs <- runif(n = length(draw[!na_obs]),
+                 min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
+
+  if(any(is.na(truth))){
+    u_na <- runif(n = length(draw[na_obs]),
+                  min = 0, max = 1)
+    u <- vector(length = length(truth))
+    u[na_obs] <- u_na
+    u[!na_obs] <- u_obs
+  } else {
+    u <- u_obs
+  }
+  dsres_out <- qnorm(u)
+  dsres_out[is.infinite(dsres_out)] <- NaN
+  dsres_out
+}
+
+#' @noRd
 ds_resids_student = function(truth, fitted, sigma, nu, draw){
   na_obs <- is.na(truth)
   a_obs <- pstudent_t(as.vector(truth[!na_obs]) - 1,
@@ -808,6 +870,16 @@ get_forecast_resids = function(object, series, truth, preds, family,
                                        fitted = preds[x, ],
                                        draw = preds[x, ],
                                        precision = precision[x]))
+    }))
+  }
+
+  if(family == 'Gamma'){
+    shapes <- mcmc_chains(object$model_output, 'shape')[,series]
+    series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
+      suppressWarnings(ds_resids_gamma(truth = truth,
+                                      fitted = preds[x, ],
+                                      draw = preds[x, ],
+                                      shape = shapes[x]))
     }))
   }
 
@@ -941,7 +1013,7 @@ get_mvgam_resids = function(object, n_cores = 1){
       resids <- matrix(ds_resids_gaus(truth = as.vector(truth_mat),
                                       fitted = as.vector(preds),
                                       draw = as.vector(preds[draw_seq,]),
-                                      sigma= as.vector(sigma_mat)),
+                                      sigma = as.vector(sigma_mat)),
                        nrow = NROW(preds))
     }
 
@@ -991,6 +1063,17 @@ get_mvgam_resids = function(object, n_cores = 1){
                                     fitted = as.vector(preds),
                                     draw = as.vector(preds[draw_seq,]),
                                     precision = as.vector(precision_mat)),
+                       nrow = NROW(preds))
+    }
+
+    if(family == 'Gamma'){
+      shape <- family_pars$shape[,series]
+      shape_mat <- matrix(rep(shape, NCOL(preds)),
+                              ncol = NCOL(preds))
+      resids <- matrix(ds_resids_gamma(truth = as.vector(truth_mat),
+                                      fitted = as.vector(preds),
+                                      draw = as.vector(preds[draw_seq,]),
+                                      shape = as.vector(shape_mat)),
                        nrow = NROW(preds))
     }
 

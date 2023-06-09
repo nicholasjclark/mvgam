@@ -5,7 +5,7 @@
 \title{Fitted \code{mvgam} object description}
 \description{
 A fitted \code{mvgam} object returned by function \code{\link{mvgam}}.
-Method functions \code{code}, \code{coef}, \code{forecast}, \code{hindcast}, \code{lfo_cv},
+Method functions \code{as.data.frame}, \code{code}, \code{coef}, \code{forecast}, \code{hindcast}, \code{lfo_cv},
 \code{logLik}, \code{plot}, \code{ppc}, \code{predict},
 \code{print}, \code{score}, \code{summary} and \code{update} exist for this class.
 }

@@ -16,8 +16,8 @@
 #'unless they share a covariate.
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
-#''series' (character or factor index of the series IDs)
-#''time' (numeric index of the time point for each observation).
+#'`series` (character or factor index of the series IDs)
+#'`time` (numeric index of the time point for each observation).
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
 #'@param data_train Deprecated. Still works in place of \code{data} but users are recommended to use
 #'\code{data} instead for more seamless integration into `R` workflows
@@ -37,25 +37,45 @@
 #'other stochastic elements that are not currently avaiable in \code{mvgam}. Default is \code{FALSE} to reduce
 #'the size of the returned object, unless \code{run_model == FALSE}
 #'@param family \code{family} specifying the exponential observation family for the series. Currently supported
-#'families are: `nb()`, `poisson()`, `tweedie()`, `gaussian()`, `betar()`, `lognormal()`, `student_t()` and `Gamma()`
+#'families are:
+#'\itemize{
+#'   \item`nb()` for count data
+#'   \item`poisson()` for count data
+#'   \item`tweedie()` for count data (power parameter `p` fixed at `1.5`)
+#'   \item`gaussian()` for real-valued data
+#'   \item`betar()` for proportional data on `(0,1)`
+#'   \item`lognormal()` for non-negative real-valued data
+#'   \item`student_t()` for real-valued data
+#'   \item`Gamma()` for non-negative real-valued data}
+#'See \code{\link{mvgam_families}} for more details
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
 #'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}
 #'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
-#''None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}}),
-#''RW' (random walk with possible drift),
-#''AR1' (with possible drift),
-#''AR2' (with possible drift) or
-#''AR3' (with possible drift) or
-#''VAR1' (with possible drift; only available in \code{Stan}) or
-#''GP' (Gaussian Process with squared exponential kernel;
-#'only available in \code{stan})
+#'\itemize{
+#'   \item `None` (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+#'   \item `RW` (random walk with possible drift)
+#'   \item `AR1` (with possible drift)
+#'   \item `AR2` (with possible drift)
+#'   \item `AR3` (with possible drift)
+#'   \item `VAR1` (with possible drift; only available in \code{Stan})
+#'   \item `GP` (Gaussian Process with squared exponential kernel;
+#'only available in \code{Stan})}
+#'@param trend_map Optional `data.frame` specifying which series should depend on which latent
+#'trends. Useful for allowing multiple series to depend on the same latent trend process, but with
+#'different observation processes. If supplied, a latent factor model is set up by setting
+#'`use_lv = TRUE` and using the mapping to set up the shared trends. Needs to have column names
+#'`series` and `trend`, with integer values in the `trend` column to state which trend each series
+#'should depend on. The `series` column should have a single unique entry for each series in the
+#'data (names should perfectly match factor levels of the `series` variable in `data`). See examples
+#'for details
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 #'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 #'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-#'predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Therefore this defaults to \code{FALSE}
+#'predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift parameters will also likely
+#'be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}
 #'@param chains \code{integer} specifying the number of parallel chains for the model
 #'@param burnin \code{integer} specifying the number of warmup iterations of the Markov chain to run
 #'to tune sampling algorithms
@@ -77,7 +97,8 @@
 #'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 #'this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
-#'truncation entirely (i.e. there is no upper bound for each series)
+#'truncation entirely (i.e. there is no upper bound for each series). Currently not implemented
+#'in `Stan`
 #'@param use_stan Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
 #'the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if `cmdstanr` is not available,
 #'a call to \code{\link[rstan]{stan}}. Note that
@@ -123,11 +144,9 @@
 #'\cr
 #'\cr
 #'*Overdispersion parameters*: When more than one series is included in \code{data_train} and an overdispersed
-#'exponential family is used, by default the overdispersion parameters (`r` for Negative Binomial, `twdis` for Tweedie) are
-#'estimated independently for each series. Note that for Tweedie
-#'models, estimating the power parameter `p` alongside the overdispersion parameter
-#'`twdis` and the smooth coefficients is very challenging for noisy data, introducing some difficult posterior geometries.
-#'The `p` parameter is therefore fixed at `1.5` (i.e. a so-called Geometric Poisson model).
+#'exponential family is used, additional observation family parameters
+#'(i.e. `phi` for `nb()` or `sigma` for `gaussian()`) are
+#'estimated independently for each series.
 #'\cr
 #'\cr
 #'*Factor regularisation*: When using a dynamic factor model for the trends with `JAGS` factor precisions are given
@@ -190,6 +209,7 @@
 #'# View the model code in Stan language
 #' code(mod1)
 #'
+#'
 #' # Inspect the data objects needed to condition the model
 #' str(mod1$model_data)
 #'
@@ -246,6 +266,37 @@
 #'
 #' # Plot posterior realisations for the smooth
 #' plot(mod1, type = 'smooths', realisations = TRUE)
+#'
+#' # Extract observation model beta coefficient draws as a data.frame
+#' beta_draws_df <- as.data.frame(mod1, variable = 'betas')
+#' head(beta_draws_df)
+#' str(beta_draws_df)
+#'
+#' # Example of supplying a trend_map so that some series can share
+#' # latent trend processes
+#' sim <- sim_mvgam(n_series = 3)
+#' mod_data <- sim$data_train
+#'
+#' # Here, we specify only two latent trends; series 1 and 2 share a trend,
+#' # while series 3 has it's own unique latent trend
+#' trend_map <- data.frame(series = unique(mod_data$series),
+#'                        trend = c(1,1,2))
+#'
+#' # Fit the model using AR1 trends
+#' mod1 <- mvgam(y ~ s(season, bs = 'cc'),
+#'               trend_map = trend_map,
+#'               trend_model = 'AR1',
+#'               data = mod_data,
+#'               return_model_data = TRUE)
+#'
+#' # The mapping matrix is now supplied as data to the model in the 'Z' element
+#' mod1$model_data$Z
+#' code(mod1)
+#'
+#' # The first two series share an identical latent trend; the third is different
+#' plot(mod1, type = 'trend', series = 1)
+#' plot(mod1, type = 'trend', series = 2)
+#' plot(mod1, type = 'trend', series = 3)
 #'
 #' # Example of how to use dynamic coefficients
 #' # Simulate a time-varying coefficient for the effect of temperature
@@ -356,6 +407,7 @@ mvgam = function(formula,
                  family = 'poisson',
                  use_lv = FALSE,
                  n_lv,
+                 trend_map,
                  trend_model = 'None',
                  drift = FALSE,
                  chains = 4,
@@ -412,9 +464,49 @@ mvgam = function(formula,
                                        "student",
                                        "Gamma"))
 
-  # Validate the trend argument
+  # Validate the trend arguments
   trend_model <- evaluate_trend_model(trend_model)
 
+  # Check trend_map is correctly specified
+  if(!missing(trend_map)){
+
+    # No point in trend mapping if trend model is 'None'
+    if(trend_model == 'None'){
+      stop('cannot set up latent trends when "trend_model = None"',
+           call. = FALSE)
+    }
+
+    # Trend mapping not supported by JAGS
+    if(!use_stan){
+      stop('trend mapping not available for JAGS',
+           call. = FALSE)
+    }
+
+    # trend_map must have an entry for each unique time series
+    if(!all(sort(trend_map$series) == sort(unique(data_train$series)))){
+      stop('argument "trend_map" must have an entry for every unique time series in "data"',
+           call. = FALSE)
+    }
+
+    # trend_map must not specify a greater number of trends than there are series
+    if(max(trend_map$trend) > length(unique(data_train$series))){
+      stop('argument "trend_map" specifies more latent trends than there are series in "data"',
+           call. = FALSE)
+    }
+
+    # trend_map must not skip any trends
+    if(!all(sort(unique(trend_map$trend)) == seq(1:max(trend_map$trend)))){
+      stop('argument "trend_map" must link at least one series to each latent trend')
+    }
+
+    # If trend_map correctly specified, set use_lv to TRUE
+    use_lv <- TRUE
+
+    # Model should be set up using dynamic factors of the correct length
+    n_lv <- max(trend_map$trend)
+  }
+
+  # Check MCMC arguments
   if(sign(chains) != 1){
     stop('argument "chains" must be a positive integer',
          call. = FALSE)
@@ -1247,6 +1339,17 @@ mvgam = function(formula,
                                              use_stan = TRUE)
     } else {
       priors <- NULL
+    }
+
+    if(!missing(trend_map)){
+      trend_map_setup <- trend_map_mods(model_file = vectorised$model_file,
+                                        model_data = vectorised$model_data,
+                                        trend_map = trend_map,
+                                        data_train = data_train,
+                                        ytimes = ytimes,
+                                        n_lv = n_lv)
+      vectorised$model_file <- trend_map_setup$model_file
+      vectorised$model_data <- trend_map_setup$model_data
     }
 
   } else {

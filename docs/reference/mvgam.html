@@ -70,6 +70,7 @@ dynamic factors to capture trend dependencies among series in a reduced dimensio
 <span>  family <span class="op">=</span> <span class="st">"poisson"</span>,</span>
 <span>  use_lv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">n_lv</span>,</span>
+<span>  <span class="va">trend_map</span>,</span>
 <span>  trend_model <span class="op">=</span> <span class="st">"None"</span>,</span>
 <span>  drift <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  chains <span class="op">=</span> <span class="fl">4</span>,</span>
@@ -106,8 +107,8 @@ unless they share a covariate.</p></dd>
 <dt>data</dt>
 <dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable and covariates
 required by the GAM <code>formula</code>. Should include columns:
-'series' (character or factor index of the series IDs)
-'time' (numeric index of the time point for each observation).
+<code>series</code> (character or factor index of the series IDs)
+<code>time</code> (numeric index of the time point for each observation).
 Any other variables to be included in the linear predictor of <code>formula</code> must also be present</p></dd>
 
 
@@ -148,7 +149,15 @@ the size of the returned object, unless <code>run_model == FALSE</code></p></dd>
 
 <dt>family</dt>
 <dd><p><code>family</code> specifying the exponential observation family for the series. Currently supported
-families are: <code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code>, <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code><a href="mvgam_families.html">tweedie()</a></code>, <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar()</a></code>, <code><a href="mvgam_families.html">lognormal()</a></code>, <code><a href="mvgam_families.html">student_t()</a></code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code></p></dd>
+families are:</p><ul><li><p><code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code> for count data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</p></li>
+<li><p><code><a href="mvgam_families.html">tweedie()</a></code> for count data (power parameter <code>p</code> fixed at <code>1.5</code>)</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> for real-valued data</p></li>
+<li><p><code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar()</a></code> for proportional data on <code>(0,1)</code></p></li>
+<li><p><code><a href="mvgam_families.html">lognormal()</a></code> for non-negative real-valued data</p></li>
+<li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
+</ul><p>See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
 
 
 <dt>use_lv</dt>
@@ -161,24 +170,36 @@ latent trends in a reduced dimension format. If <code>FALSE</code>, estimate ind
 Cannot be <code>&gt;n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
 
 
+<dt>trend_map</dt>
+<dd><p>Optional <code>data.frame</code> specifying which series should depend on which latent
+trends. Useful for allowing multiple series to depend on the same latent trend process, but with
+different observation processes. If supplied, a latent factor model is set up by setting
+<code>use_lv = TRUE</code> and using the mapping to set up the shared trends. Needs to have column names
+<code>series</code> and <code>trend</code>, with integer values in the <code>trend</code> column to state which trend each series
+should depend on. The <code>series</code> column should have a single unique entry for each series in the
+data (names should perfectly match factor levels of the <code>series</code> variable in <code>data</code>). See examples
+for details</p></dd>
+
+
 <dt>trend_model</dt>
-<dd><p><code>character</code> specifying the time series dynamics for the latent trend. Options are:
-'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>),
-'RW' (random walk with possible drift),
-'AR1' (with possible drift),
-'AR2' (with possible drift) or
-'AR3' (with possible drift) or
-'VAR1' (with possible drift; only available in <code>Stan</code>) or
-'GP' (Gaussian Process with squared exponential kernel;
-only available in <code>stan</code>)</p></dd>
+<dd><p><code>character</code> specifying the time series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
+<li><p><code>RW</code> (random walk with possible drift)</p></li>
+<li><p><code>AR1</code> (with possible drift)</p></li>
+<li><p><code>AR2</code> (with possible drift)</p></li>
+<li><p><code>AR3</code> (with possible drift)</p></li>
+<li><p><code>VAR1</code> (with possible drift; only available in <code>Stan</code>)</p></li>
+<li><p><code>GP</code> (Gaussian Process with squared exponential kernel;
+only available in <code>Stan</code>)</p></li>
+</ul></dd>
 
 
 <dt>drift</dt>
 <dd><p><code>logical</code> estimate a drift parameter in the latent trend components. Useful if the latent
 trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-predictor (which it is by default when calling <code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>). Therefore this defaults to <code>FALSE</code></p></dd>
+predictor (which it is by default when calling <code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>). Drift parameters will also likely
+be unidentifiable if using dynamic factor models. Therefore this defaults to <code>FALSE</code></p></dd>
 
 
 <dt>chains</dt>
@@ -222,7 +243,8 @@ definitions (in JAGS or Stan syntax). See <code><a href="get_mvgam_priors.html">
 <dd><p>Optional <code>vector</code> of <code>integer</code> values specifying upper limits for each series. If supplied,
 this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 is computationally expensive in <code>JAGS</code> but can lead to better estimates when true bounds exist. Default is to remove
-truncation entirely (i.e. there is no upper bound for each series)</p></dd>
+truncation entirely (i.e. there is no upper bound for each series). Currently not implemented
+in <code>Stan</code></p></dd>
 
 
 <dt>refit</dt>
@@ -292,11 +314,9 @@ foray into Bayesian modelling, it is worth building an understanding of the mode
 principled workflow. Also note that models are parameterised using <code>drop.unused.levels = FALSE</code> in <code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>
 to ensure predictions can be made for all levels of the supplied factor variable
 <br><br><em>Overdispersion parameters</em>: When more than one series is included in <code>data_train</code> and an overdispersed
-exponential family is used, by default the overdispersion parameters (<code>r</code> for Negative Binomial, <code>twdis</code> for Tweedie) are
-estimated independently for each series. Note that for Tweedie
-models, estimating the power parameter <code>p</code> alongside the overdispersion parameter
-<code>twdis</code> and the smooth coefficients is very challenging for noisy data, introducing some difficult posterior geometries.
-The <code>p</code> parameter is therefore fixed at <code>1.5</code> (i.e. a so-called Geometric Poisson model).
+exponential family is used, additional observation family parameters
+(i.e. <code>phi</code> for <code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code> or <code>sigma</code> for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>) are
+estimated independently for each series.
 <br><br><em>Factor regularisation</em>: When using a dynamic factor model for the trends with <code>JAGS</code> factor precisions are given
 regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
 factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
@@ -359,6 +379,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="co"># View the model code in Stan language</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
+<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the data objects needed to condition the model</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">$</span><span class="va">model_data</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
@@ -415,6 +436,37 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot posterior realisations for the smooth</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, realisations <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Extract observation model beta coefficient draws as a data.frame</span></span></span>
+<span class="r-in"><span><span class="va">beta_draws_df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">mod1</span>, variable <span class="op">=</span> <span class="st">'betas'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">beta_draws_df</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">beta_draws_df</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Example of supplying a trend_map so that some series can share</span></span></span>
+<span class="r-in"><span><span class="co"># latent trend processes</span></span></span>
+<span class="r-in"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">mod_data</span> <span class="op">&lt;-</span> <span class="va">sim</span><span class="op">$</span><span class="va">data_train</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Here, we specify only two latent trends; series 1 and 2 share a trend,</span></span></span>
+<span class="r-in"><span><span class="co"># while series 3 has it's own unique latent trend</span></span></span>
+<span class="r-in"><span><span class="va">trend_map</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">mod_data</span><span class="op">$</span><span class="va">series</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                       trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>,<span class="fl">1</span>,<span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Fit the model using AR1 trends</span></span></span>
+<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span></span>
+<span class="r-in"><span>              trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span></span>
+<span class="r-in"><span>              data <span class="op">=</span> <span class="va">mod_data</span>,</span></span>
+<span class="r-in"><span>              return_model_data <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># The mapping matrix is now supplied as data to the model in the 'Z' element</span></span></span>
+<span class="r-in"><span><span class="va">mod1</span><span class="op">$</span><span class="va">model_data</span><span class="op">$</span><span class="va">Z</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># The first two series share an identical latent trend; the third is different</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Example of how to use dynamic coefficients</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate a time-varying coefficient for the effect of temperature</span></span></span>

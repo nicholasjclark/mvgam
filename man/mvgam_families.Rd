@@ -25,11 +25,12 @@ Supported mvgam families
 \itemize{
 \item \code{\link[stats]{gaussian}} for real-valued data
 \item \code{\link[stats]{poisson}} for count data
+\item \code{\link[stats]{Gamma}} for non-negative real-valued data
 }
 
 In addition, the following extended families from the \code{mgcv} package are supported:
 \itemize{
-\item \code{\link[mgcv]{betar}} for proportional data on (0,1)
+\item \code{\link[mgcv]{betar}} for proportional data on \verb{(0,1)}
 \item \code{\link[mgcv]{nb}} for count data
 }
 
