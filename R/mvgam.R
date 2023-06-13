@@ -1007,7 +1007,7 @@ mvgam = function(formula,
     X <- data.frame(rbind(ss_jagam$jags.data$X, lp_test))
 
     # Add a time variable
-    if(class(data_train)[1] == 'list'){
+    if(inherits(data_train, 'list')){
       temp_dat_train <- data.frame(time = data_train$time,
                                    series = data_train$series)
       temp_dat_test <- data.frame(time = data_test$time,

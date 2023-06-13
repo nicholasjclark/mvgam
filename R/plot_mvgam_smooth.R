@@ -340,7 +340,8 @@ plot_mvgam_smooth = function(object,
   probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
   cred <- sapply(1:NCOL(preds),
                  function(n) quantile(preds[,n],
-                                      probs = probs))
+                                      probs = probs,
+                                      na.rm = TRUE))
 
   c_light <- c("#DCBCBC")
   c_light_highlight <- c("#C79999")
@@ -421,16 +422,19 @@ plot_mvgam_smooth = function(object,
           resid_probs <- do.call(rbind, lapply(2:n_resid_bins, function(i){
             quantile(as.vector(partial_resids[,which(obs_x <= sorted_x[i] &
                                                        obs_x > sorted_x[i-1])]),
-                     probs = probs)
+                     probs = probs,
+                     na.rm = TRUE)
           }))
           resid_probs <- rbind(quantile(as.vector(partial_resids[,which(obs_x == sorted_x[1])]),
-                                        probs = probs),
+                                        probs = probs,
+                                        na.rm = TRUE),
                                resid_probs)
 
         } else {
           resid_probs <- do.call(rbind, lapply(sorted_x, function(i){
             quantile(as.vector(partial_resids[,which(obs_x == i)]),
-                     probs = probs)
+                     probs = probs,
+                     na.rm = TRUE)
           }))
         }
 
@@ -588,16 +592,19 @@ plot_mvgam_smooth = function(object,
         resid_probs <- do.call(rbind, lapply(2:n_resid_bins, function(i){
           quantile(as.vector(partial_resids[,which(obs_x <= sorted_x[i] &
                                                      obs_x > sorted_x[i-1])]),
-                   probs = probs)
+                   probs = probs,
+                   na.rm = TRUE)
         }))
         resid_probs <- rbind(quantile(as.vector(partial_resids[,which(obs_x == sorted_x[1])]),
                                                 probs = probs),
-                             resid_probs)
+                             resid_probs,
+                             na.rm = TRUE)
 
       } else {
         resid_probs <- do.call(rbind, lapply(sorted_x, function(i){
           quantile(as.vector(partial_resids[,which(obs_x == i)]),
-                   probs = probs)
+                   probs = probs,
+                   na.rm = TRUE)
         }))
       }
 
