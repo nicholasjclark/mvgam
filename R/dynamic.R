@@ -55,9 +55,26 @@ dynamic = function(variable, rho = 5, stationary = TRUE){
 #' @noRd
 interpret_mvgam = function(formula, N){
 
+  facs <- colnames(attr(terms.formula(formula), 'factors'))
+
+  # Re-arrange so that random effects always come last
+  if(any(grepl('bs = \"re\"', facs, fixed = TRUE))){
+    newfacs <- facs[!grepl('bs = \"re\"', facs, fixed = TRUE)]
+    refacs <- facs[grepl('bs = \"re\"', facs, fixed = TRUE)]
+    int <- attr(terms.formula(formula), 'intercept')
+    newformula <- as.formula(paste(terms.formula(formula)[[2]], '~',paste(paste(newfacs, collapse = '+'),
+                                                                 '+',
+                                                                 paste(refacs, collapse = '+'),
+                                                                 collapse = '+'),
+                                   ifelse(int == 0, ' - 1', '')))
+  } else {
+    newformula <- formula
+  }
+  attr(newformula, '.Environment') <- attr(formula, '.Environment')
+
   # Check if any terms use the dynamic wrapper
-  response <- terms.formula(formula)[[2]]
-  tf <- terms.formula(formula, specials = c("dynamic"))
+  response <- terms.formula(newformula)[[2]]
+  tf <- terms.formula(newformula, specials = c("dynamic"))
   which_dynamics <- attr(tf,"specials")$dynamic
 
   # Update the formula to the correct Gaussian Process spline
@@ -96,7 +113,7 @@ interpret_mvgam = function(formula, N){
 
     # Replace dynamic terms with the correct specification
     update_terms <- vector(length = length(which_dynamics))
-    old_rhs <- as.character(formula)[3]
+    old_rhs <- as.character(newformula)[3]
     old_rhs <- gsub(" ", "", (old_rhs), fixed = TRUE)
     old_rhs <- gsub(',stationary=TRUE|,stationary=FALSE', '',
          old_rhs)
@@ -114,10 +131,10 @@ interpret_mvgam = function(formula, N){
 
     # Return the updated formula for passing to mgcv
     updated_formula <- as.formula(paste(response, '~', old_rhs))
-    attr(updated_formula, '.Environment') <- attr(formula, '.Environment')
+    attr(updated_formula, '.Environment') <- attr(newformula, '.Environment')
 
   } else {
-    updated_formula <- formula
+    updated_formula <- newformula
   }
 
   return(updated_formula)

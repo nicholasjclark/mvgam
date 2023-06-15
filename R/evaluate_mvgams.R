@@ -920,7 +920,7 @@ variogram_score = function(truth, fc, log = FALSE, weights){
       if(i == j){
         out[i,j] <- 0
       } else {
-        v_fc <- quantile(abs(fc[i,] - fc[j,]) ^ 0.5, 0.5)
+        v_fc <- quantile(abs(fc[i,] - fc[j,]) ^ 0.5, 0.5, na.rm = TRUE)
         v_dat <- abs(truth[i] - truth[j]) ^ 0.5
         out[i,j] <- 2 * weights[i, j] * ((v_dat - v_fc) ^ 2)
       }

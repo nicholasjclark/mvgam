@@ -112,7 +112,8 @@ lfo_cv.mvgam = function(object,
 
   # Initialize the process for i = min_t, generating a
   # conditional forecast for all of the future data
-  data_splits <- cv_split(all_data, last_train = min_t)
+  data_splits <- cv_split(all_data, last_train = min_t,
+                          fc_horizon = fc_horizon)
 
   # Fit model to training and forecast the testing
   fit_past <- update(object,
@@ -161,7 +162,8 @@ lfo_cv.mvgam = function(object,
       refits <- c(refits, i)
 
       # Subset the data to now include the last set of training observations
-      data_splits <- cv_split(all_data, last_train = i)
+      data_splits <- cv_split(all_data, last_train = i,
+                              fc_horizon = fc_horizon)
 
       # Re-fit the model
       fit_past <- update(fit_past,
@@ -279,16 +281,22 @@ plot.mvgam_lfo = function(x, ...){
 
 #' Function to generate training and testing splits
 #' @noRd
-cv_split = function(data, last_train){
-  if(class(data)[1] == 'list'){
+cv_split = function(data, last_train, fc_horizon = 1){
+  if(inherits(data, 'list')){
 
     # Find indices of training and testing splits
     temp_dat = data.frame(time = data$time,
                           series = data$series) %>%
       dplyr::mutate(index = dplyr::row_number()) %>%
       dplyr::arrange(time, series)
+
     indices_train <- temp_dat %>%
       dplyr::filter(time <= last_train) %>%
+      dplyr::pull(index)
+
+    indices_test <- temp_dat %>%
+      dplyr::filter(time > last_train &
+                      time <= (last_train + fc_horizon)) %>%
       dplyr::pull(index)
 
     # Split
@@ -302,9 +310,9 @@ cv_split = function(data, last_train){
 
     data_test <- lapply(data, function(x){
       if(is.matrix(x)){
-        matrix(x[-indices_train,], ncol = NCOL(x))
+        matrix(x[indices_test,], ncol = NCOL(x))
       } else {
-        x[-indices_train]
+        x[indices_test]
       }
     })
 
@@ -312,8 +320,10 @@ cv_split = function(data, last_train){
     data_train <- data %>%
       dplyr::filter(time <= last_train) %>%
       dplyr::arrange(time, series)
+
     data_test <- data %>%
-      dplyr::filter(time > last_train) %>%
+      dplyr::filter(time > last_train &
+                      time <= (last_train + fc_horizon)) %>%
       dplyr::arrange(time, series)
   }
 

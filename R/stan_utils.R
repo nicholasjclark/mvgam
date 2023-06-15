@@ -2185,6 +2185,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
 trend_map_mods = function(model_file,
                           model_data,
                           trend_map,
+                          trend_model,
                           n_lv,
                           data_train,
                           ytimes){
@@ -2227,6 +2228,35 @@ trend_map_mods = function(model_file,
     paste0('// derived latent trends\n',
            'lv_coefs = Z;')
   model_file <- readLines(textConnection(model_file), n = -1)
+
+  # We can estimate the variance parameters if a trend map is supplied
+  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+    model_file <- model_file[-grep('vector[num_basis] b_raw;',
+                                   model_file, fixed = TRUE)]
+    model_file[grep("// raw basis coefficients",
+                    model_file, fixed = TRUE)] <-
+      paste0('// raw basis coefficients\n',
+             'vector[num_basis] b_raw;\n\n',
+             '// latent factor SD terms\n',
+             'vector<lower=0>[n_lv] sigma;')
+
+    model_file[grep("// dynamic factor estimates",
+                    model_file, fixed = TRUE)] <-
+      paste0('// priors for factor SD parameters\n',
+             'sigma ~ exponential(2);\n',
+             '// dynamic factor estimates')
+
+    model_file[grep("penalty = rep_vector(100.0, n_lv);",
+                    model_file, fixed = TRUE)] <-
+      "penalty = 1.0 / (sigma .* sigma);"
+
+    model_file[grep("LV[1, 1:n_lv] ~ normal(0, 0.1);",
+                    model_file, fixed = TRUE)] <-
+      'LV[1, 1:n_lv] ~ normal(0, sigma);'
+
+    model_file <- readLines(textConnection(model_file), n = -1)
+    model_file <- gsub('j], 0.1', 'j], sigma[j]', model_file)
+  }
 
   # Need to formulate the lv_coefs matrix and
   # supply it as data

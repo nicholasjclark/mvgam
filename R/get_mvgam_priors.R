@@ -15,21 +15,41 @@
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
 #'@param data_train Deprecated. Still works in place of \code{data} but users are recommended to use
 #'\code{data} instead for more seamless integration into `R` workflows
-#'@param family \code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'
+#'@param family \code{family} specifying the exponential observation family for the series. Currently supported
+#'families are:
+#'\itemize{
+#'   \item`nb()` for count data
+#'   \item`poisson()` for count data
+#'   \item`tweedie()` for count data (power parameter `p` fixed at `1.5`)
+#'   \item`gaussian()` for real-valued data
+#'   \item`betar()` for proportional data on `(0,1)`
+#'   \item`lognormal()` for non-negative real-valued data
+#'   \item`student_t()` for real-valued data
+#'   \item`Gamma()` for non-negative real-valued data}
+#'See \code{\link{mvgam_families}} for more details
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
 #'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}
 #'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
-#''None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}}),
-#''RW' (random walk with possible drift),
-#''AR1' (AR1 model with intercept),
-#''AR2' (AR2 model with intercept) or
-#''AR3' (AR3 model with intercept) or
-#''VAR1' (with possible drift; only available in \code{Stan}) or
-#''GP' (Gaussian Process with squared exponential kernel;
-#'only available for estimation in \code{Stan})
+#'\itemize{
+#'   \item `None` (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+#'   \item `RW` (random walk with possible drift)
+#'   \item `AR1` (with possible drift)
+#'   \item `AR2` (with possible drift)
+#'   \item `AR3` (with possible drift)
+#'   \item `VAR1` (with possible drift; only available in \code{Stan})
+#'   \item `GP` (Gaussian Process with squared exponential kernel;
+#'only available in \code{Stan})}
+#'@param trend_map Optional `data.frame` specifying which series should depend on which latent
+#'trends. Useful for allowing multiple series to depend on the same latent trend process, but with
+#'different observation processes. If supplied, a latent factor model is set up by setting
+#'`use_lv = TRUE` and using the mapping to set up the shared trends. Needs to have column names
+#'`series` and `trend`, with integer values in the `trend` column to state which trend each series
+#'should depend on. The `series` column should have a single unique entry for each series in the
+#'data (names should perfectly match factor levels of the `series` variable in `data`). See examples
+#'in \code{\link{mvgam}} for details
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 #'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 #'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
@@ -125,6 +145,7 @@ get_mvgam_priors = function(formula,
                             n_lv,
                             use_stan = TRUE,
                             trend_model = 'None',
+                            trend_map,
                             drift = FALSE){
 
   # Validate the family argument
@@ -139,15 +160,54 @@ get_mvgam_priors = function(formula,
                                        "student",
                                        "Gamma"))
 
-  # Validate the trend argument
-  trend_model <- evaluate_trend_model(trend_model)
-
   if(missing("data") & missing("data_train")){
     stop('Argument "data" is missing with no default')
   }
 
   if(!missing("data")){
     data_train <- data
+  }
+
+  # Validate the trend argument
+  trend_model <- evaluate_trend_model(trend_model)
+
+  # Check trend_map is correctly specified
+  if(!missing(trend_map)){
+
+    # No point in trend mapping if trend model is 'None'
+    if(trend_model == 'None'){
+      stop('cannot set up latent trends when "trend_model = None"',
+           call. = FALSE)
+    }
+
+    # Trend mapping not supported by JAGS
+    if(!use_stan){
+      stop('trend mapping not available for JAGS',
+           call. = FALSE)
+    }
+
+    # trend_map must have an entry for each unique time series
+    if(!all(sort(trend_map$series) == sort(unique(data_train$series)))){
+      stop('argument "trend_map" must have an entry for every unique time series in "data"',
+           call. = FALSE)
+    }
+
+    # trend_map must not specify a greater number of trends than there are series
+    if(max(trend_map$trend) > length(unique(data_train$series))){
+      stop('argument "trend_map" specifies more latent trends than there are series in "data"',
+           call. = FALSE)
+    }
+
+    # trend_map must not skip any trends
+    if(!all(sort(unique(trend_map$trend)) == seq(1:max(trend_map$trend)))){
+      stop('argument "trend_map" must link at least one series to each latent trend')
+    }
+
+    # If trend_map correctly specified, set use_lv to TRUE
+    use_lv <- TRUE
+
+    # Model should be set up using dynamic factors of the correct length
+    n_lv <- max(trend_map$trend)
   }
 
   # JAGS cannot support latent GP or VAR trends
@@ -442,27 +502,19 @@ get_mvgam_priors = function(formula,
 
   if(trend_model == 'RW'){
     if(use_stan){
-      if(use_lv){
-        trend_df <- data.frame(param_name = c('vector<lower=0>[n_lv] sigma;'),
-                               param_length = n_lv,
-                               param_info = c('trend sd'),
-                               prior = c('sigma ~ exponential(1);'),
-                               example_change = c(
-                                 paste0('sigma ~ exponential(',
-                                        round(runif(min = 0.01, max = 1, n = 1), 2),
-                                        ');'
-                                 )))
-      } else {
-        trend_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma;'),
-                               param_length = length(unique(data_train$series)),
-                               param_info = c('trend sd'),
-                               prior = c('sigma ~ exponential(1);'),
-                               example_change = c(
-                                 paste0('sigma ~ exponential(',
-                                        round(runif(min = 0.01, max = 1, n = 1), 2),
-                                        ');'
-                                 )))
-      }
+      trend_df <- data.frame(param_name = c(paste0('vector<lower=0>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] sigma;')),
+                             param_length = ifelse(use_lv,
+                                                   n_lv,
+                                                   length(unique(data_train$series))),
+                             param_info = c('trend sd'),
+                             prior = c('sigma ~ exponential(2);'),
+                             example_change = c(
+                             paste0('sigma ~ exponential(',
+                                    round(runif(min = 0.01, max = 1, n = 1), 2),
+                                    ');'
+                             )))
 
     } else {
       trend_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma'),
@@ -736,18 +788,23 @@ get_mvgam_priors = function(formula,
 
   # Remove options for trend variance priors if using a dynamic factor model
   if(use_lv){
-    trend_df %>%
-      dplyr::filter(!grepl(paste0('vector<lower=0>[',
-                                  ifelse(use_lv, 'n_lv', 'n_series'),
-                                  '] sigma;'), param_name)) -> trend_df
+    if(missing(trend_map)){
+      trend_df %>%
+        dplyr::filter(!grepl(paste0('vector<lower=0>[',
+                                    ifelse(use_lv, 'n_lv', 'n_series'),
+                                    '] sigma;'), param_name,
+                             fixed = TRUE)) -> trend_df
+    }
 
     if(use_stan){
-      trend_df <- rbind(trend_df,
-                        data.frame(param_name = c('vector[M] L;'),
-                                   param_length = n_lv * length(unique(data_train$series)),
-                                   param_info = c('factor loadings'),
-                                   prior = c('L ~ student_t(5, 0, 1);'),
-                                   example_change = 'L ~ std_normal();'))
+      if(missing(trend_map)){
+        trend_df <- rbind(trend_df,
+                          data.frame(param_name = c('vector[M] L;'),
+                                     param_length = n_lv * length(unique(data_train$series)),
+                                     param_info = c('factor loadings'),
+                                     prior = c('L ~ student_t(5, 0, 1);'),
+                                     example_change = 'L ~ std_normal();'))
+      }
     }
   }
 

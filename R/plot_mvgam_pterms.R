@@ -68,31 +68,51 @@ if(length(pterms) > 0){
     if(inherits(object$obs_data[[pterms[i]]], 'factor')){
 
       # Use a simple Boxplot for factor terms for now
-      beta_creds <- apply(betas, 2, function(x)
-        quantile(x, probs = c(0, 0.05, 0.5, 0.95, 1)))
+      if(is.matrix(betas)){
+        beta_creds <- apply(betas, 2, function(x)
+          quantile(x, probs = c(0, 0.05, 0.5, 0.95, 1)))
+      } else {
+        beta_creds <- matrix(quantile(betas, probs = c(0, 0.05, 0.5, 0.95, 1)))
+      }
+
       colnames(beta_creds) <-
-      substr(names(coef(object$mgcv_model))[grepl(paste0('^(?=.*',
-                                                         pterms[i], ')(?!.*s\\()'),
-                                                  colnames(predict(object$mgcv_model, type = 'lpmatrix')),
-                                                  perl = TRUE)], nchar(pterms[i]) + 1, 1000000L)
+        substr(names(coef(object$mgcv_model))[grepl(paste0('^(?=.*',
+                                                           pterms[i], ')(?!.*s\\()'),
+                                                    colnames(predict(object$mgcv_model, type = 'lpmatrix')),
+                                                    perl = TRUE)], nchar(pterms[i]) + 1, 1000000L)
 
       bp <- boxplot(beta_creds, range=0, plot=FALSE)
       bxp(bp, whisklty=0, staplelty=0,
           boxfill = c_light, boxcol = c_light, medcol = c_dark,
           frame.plot = FALSE, ylab = paste0('Partial effect'))
 
-      bp$stats <- apply(betas, 2, function(x)
-        quantile(x, probs = c(0, 0.3, 0.5, 0.7, 1)))
+      if(is.matrix(betas)){
+        bp$stats <- apply(betas, 2, function(x)
+          quantile(x, probs = c(0, 0.3, 0.5, 0.7, 1)))
+      } else {
+        bp$stats <- matrix(quantile(betas, probs = c(0, 0.3, 0.5, 0.7, 1)))
+      }
+
       bxp(bp, whisklty=0, staplelty=0, add=TRUE, frame.plot = FALSE,
           boxcol = c_light_highlight, medcol = c_dark, boxfill = c_light_highlight)
 
-      bp$stats <- apply(betas, 2, function(x)
-        quantile(x, probs = c(0, 0.2, 0.5, 0.8, 1)))
+      if(is.matrix(betas)){
+        bp$stats <- apply(betas, 2, function(x)
+          quantile(x, probs = c(0, 0.2, 0.5, 0.8, 1)))
+      } else {
+        bp$stats <- matrix(quantile(betas, probs = c(0, 0.2, 0.5, 0.8, 1)))
+      }
+
       bxp(bp, whisklty=0, staplelty=0, add=TRUE, frame.plot = FALSE,
           boxcol = c_mid, medcol = c_dark, boxfill = c_mid)
 
-      bp$stats <- apply(betas, 2, function(x)
-        quantile(x, probs = c(0, 0.4, 0.5, 0.6, 1)))
+      if(is.matrix(betas)){
+        bp$stats <- apply(betas, 2, function(x)
+          quantile(x, probs = c(0, 0.4, 0.5, 0.6, 1)))
+      } else {
+        bp$stats <- matrix(quantile(betas, probs = c(0, 0.4, 0.5, 0.6, 1)))
+      }
+
       bxp(bp, whisklty=0, staplelty=0, add=TRUE, frame.plot = FALSE,
           boxcol = c_mid_highlight, medcol = c_dark, boxfill = c_mid_highlight)
 

@@ -13,6 +13,7 @@ get_mvgam_priors(
   n_lv,
   use_stan = TRUE,
   trend_model = "None",
+  trend_map,
   drift = FALSE
 )
 }
@@ -31,7 +32,18 @@ Any other variables to be included in the linear predictor of \code{formula} mus
 \item{data_train}{Deprecated. Still works in place of \code{data} but users are recommended to use
 \code{data} instead for more seamless integration into \code{R} workflows}
 
-\item{family}{\code{character}. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'}
+\item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
+families are:
+\itemize{
+\item\code{nb()} for count data
+\item\code{poisson()} for count data
+\item\code{tweedie()} for count data (power parameter \code{p} fixed at \code{1.5})
+\item\code{gaussian()} for real-valued data
+\item\code{betar()} for proportional data on \verb{(0,1)}
+\item\code{lognormal()} for non-negative real-valued data
+\item\code{student_t()} for real-valued data
+\item\code{Gamma()} for non-negative real-valued data}
+See \code{\link{mvgam_families}} for more details}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series}
@@ -48,15 +60,25 @@ are much more computationally tractable than full GPs for time series with \verb
 in \code{Stan} can support latent GP trends while estimation in \code{JAGS} cannot}
 
 \item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
-'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}}),
-'RW' (random walk with possible drift),
-'AR1' (AR1 model with intercept),
-'AR2' (AR2 model with intercept) or
-'AR3' (AR3 model with intercept) or
-'VAR1' (with possible drift; only available in \code{Stan}) or
-'GP' (Gaussian Process with squared exponential kernel;
-only available for estimation in \code{Stan})}
+\itemize{
+\item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+\item \code{RW} (random walk with possible drift)
+\item \code{AR1} (with possible drift)
+\item \code{AR2} (with possible drift)
+\item \code{AR3} (with possible drift)
+\item \code{VAR1} (with possible drift; only available in \code{Stan})
+\item \code{GP} (Gaussian Process with squared exponential kernel;
+only available in \code{Stan})}}
+
+\item{trend_map}{Optional \code{data.frame} specifying which series should depend on which latent
+trends. Useful for allowing multiple series to depend on the same latent trend process, but with
+different observation processes. If supplied, a latent factor model is set up by setting
+\code{use_lv = TRUE} and using the mapping to set up the shared trends. Needs to have column names
+\code{series} and \code{trend}, with integer values in the \code{trend} column to state which trend each series
+should depend on. The \code{series} column should have a single unique entry for each series in the
+data (names should perfectly match factor levels of the \code{series} variable in \code{data}). See examples
+in \code{\link{mvgam}} for details}
 
 \item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,

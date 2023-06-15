@@ -1347,7 +1347,8 @@ mvgam = function(formula,
                                         trend_map = trend_map,
                                         data_train = data_train,
                                         ytimes = ytimes,
-                                        n_lv = n_lv)
+                                        n_lv = n_lv,
+                                        trend_model = trend_model)
       vectorised$model_file <- trend_map_setup$model_file
       vectorised$model_data <- trend_map_setup$model_data
     }
@@ -1385,6 +1386,7 @@ mvgam = function(formula,
   #### Return only the model file and all data / inits needed to run the model
   # outside of mvgam ####
   if(!run_model){
+    unlink('base_gam.txt')
       output <- structure(list(call = orig_formula,
                                family = family_char,
                                trend_model = trend_model,
