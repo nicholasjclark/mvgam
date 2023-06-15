@@ -4,13 +4,15 @@
 #'
 #'@importFrom graphics layout title
 #'@param object \code{list} object returned from \code{mvgam}
+#'@param trend_effects logical. If `TRUE` and a `trend_formula` was used in model
+#'fitting, terms from the trend (i.e. process) model will be plotted
 #'@details Posterior empirical quantiles of random effect coefficient estimates
 #'(on the link scale) are calculated and visualised as ribbon plots.
 #'Labels for coefficients are taken from the levels of the original factor variable
 #'that was used to specify the smooth in the model's formula
 #'@return A base \code{R} graphics plot
 #'@export
-plot_mvgam_randomeffects = function(object){
+plot_mvgam_randomeffects = function(object, trend_effects = FALSE){
 
 # General plotting colours and empirical quantile probabilities
 c_light <- c("#DCBCBC")
@@ -23,18 +25,32 @@ c_dark <- c("#8F2727")
 c_dark_highlight <- c("#7C0000")
 probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
 
+object2 <- object
+
+if(trend_effects){
+  if(is.null(object$trend_call)){
+    stop('no trend_formula exists so there no trend-level smooths to plot')
+  }
+
+  object2$mgcv_model <- object2$trend_mgcv_model
+}
+
 # Labels of smooths in formula
-smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
-  data.frame(label = object$mgcv_model$smooth[[x]]$label,
-             class = class(object$mgcv_model$smooth[[x]])[1])
+smooth_labs <- do.call(rbind, lapply(seq_along(object2$mgcv_model$smooth), function(x){
+  data.frame(label = object2$mgcv_model$smooth[[x]]$label,
+             class = class(object2$mgcv_model$smooth[[x]])[1])
 }))
 
-# Check if any smooths were bs = "re"; if not, return an error
+# Check if any smooths were bs = "re"; if not, return a message
 if(any(smooth_labs$class == 'random.effect')){
   re_smooths <- smooth_labs %>%
     dplyr::mutate(smooth_num = dplyr::row_number()) %>%
     dplyr::filter(class == 'random.effect') %>%
     dplyr::pull(label)
+
+  if(trend_effects){
+    re_smooths <- gsub('series', 'trend', re_smooths, fixed = TRUE)
+  }
 
   .pardefault <- par(no.readonly=T)
   par(.pardefault)
@@ -59,9 +75,14 @@ if(any(smooth_labs$class == 'random.effect')){
       dplyr::filter(class == 'random.effect') %>%
       dplyr::pull(smooth_num))[i] -> smooth_number
 
-    betas_keep <- object$mgcv_model$smooth[[smooth_number]]$first.para:
-      object$mgcv_model$smooth[[smooth_number]]$last.para
-    betas <- mcmc_chains(object$model_output, 'b')[ ,betas_keep]
+    betas_keep <- object2$mgcv_model$smooth[[smooth_number]]$first.para:
+      object2$mgcv_model$smooth[[smooth_number]]$last.para
+
+    if(trend_effects){
+      betas <- mcmc_chains(object2$model_output, 'b_trend')[ ,betas_keep]
+    } else {
+      betas <- mcmc_chains(object2$model_output, 'b')[ ,betas_keep]
+    }
 
     # Plot the random effect estimates
     beta_creds <- sapply(1:NCOL(betas),
@@ -119,13 +140,19 @@ if(any(smooth_labs$class == 'random.effect')){
     factor_var_name <- tail(strsplit(gsub('\\)', '',
                                           gsub('s\\(', '',
                                                re_smooths[i])), ',')[[1]], 1)
-    if(class(object$obs_data)[1] == 'list'){
+    if(trend_effects & factor_var_name == 'trend'){
+      # Just use trend labels
       axis(side = 1, at = 1:N,
-           labels = levels(object$obs_data[[factor_var_name]]))
+           labels = paste0('trend_', 1:N))
     } else {
-      axis(side = 1, at = 1:N,
-           labels = levels(object$obs_data %>%
-                             dplyr::pull(factor_var_name)))
+      if(inherits(object2$obs_data, 'list')){
+        axis(side = 1, at = 1:N,
+             labels = levels(object2$obs_data[[factor_var_name]]))
+      } else {
+        axis(side = 1, at = 1:N,
+             labels = levels(object2$obs_data %>%
+                               dplyr::pull(factor_var_name)))
+      }
     }
 
   }

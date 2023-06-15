@@ -7,9 +7,13 @@
 #'
 #'@importFrom parallel clusterExport stopCluster setDefaultCluster
 #'@importFrom stats formula terms rnorm update.formula predict
-#'@param formula A \code{character} string specifying the GAM formula. These are exactly like the formula
+#'@param formula A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
 #'for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).
+#'@param trend_formula An optional \code{character} string specifying the GAM process model formula. If
+#'supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
+#'separately from the observation model. Should not have a response variable specified on the left-hand side
+#'of the formula (i.e. a valid option would be `~ season + s(year)`)
 #'@param knots An optional \code{list} containing user specified knot values to be used for basis construction.
 #'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
 #'(note that the number of knots is not always just k). Different terms can use different numbers of knots,
@@ -396,6 +400,7 @@
 #'@export
 
 mvgam = function(formula,
+                 trend_formula,
                  knots,
                  data,
                  data_train,
@@ -466,6 +471,18 @@ mvgam = function(formula,
 
   # Validate the trend arguments
   trend_model <- evaluate_trend_model(trend_model)
+
+  if(!missing(trend_formula)){
+    if(missing(trend_map)){
+      trend_map <- data.frame(series = unique(data_train$series),
+                              trend = 1:length(unique(data_train$series)))
+    }
+
+    if(trend_model != 'RW'){
+      stop('only random walk trends currently supported for trend predictor models',
+           call. = FALSE)
+    }
+  }
 
   # Check trend_map is correctly specified
   if(!missing(trend_map)){
@@ -1351,6 +1368,42 @@ mvgam = function(formula,
                                         trend_model = trend_model)
       vectorised$model_file <- trend_map_setup$model_file
       vectorised$model_data <- trend_map_setup$model_data
+
+      if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+        param <- c(param, 'sigma')
+      }
+
+      # If trend formula specified, add the predictors for the trend models
+      if(!missing(trend_formula)){
+        trend_pred_setup <- add_trend_predictors(
+          trend_formula = trend_formula,
+          trend_map = trend_map,
+          trend_model = trend_model,
+          data_train = data_train,
+          data_test = if(missing(data_test)){
+            NULL
+          } else {
+            data_test
+          },
+          model_file = vectorised$model_file,
+          model_data = vectorised$model_data,
+          drift = drift)
+
+        vectorised$model_file <- trend_pred_setup$model_file
+        vectorised$model_data <- trend_pred_setup$model_data
+        trend_mgcv_model <- trend_pred_setup$trend_mgcv_model
+
+        param <- c(param, 'b_trend')
+
+        if(trend_pred_setup$trend_smooths_included){
+          param <- c(param, 'rho_trend')
+        }
+
+        if(trend_pred_setup$trend_random_included){
+          param <- c(param, 'mu_raw_trend', 'sigma_raw_trend')
+        }
+
+      }
     }
 
   } else {
@@ -1388,6 +1441,11 @@ mvgam = function(formula,
   if(!run_model){
     unlink('base_gam.txt')
       output <- structure(list(call = orig_formula,
+                               trend_call = if(!missing(trend_formula)){
+                                 trend_formula
+                               } else {
+                                 NULL
+                               },
                                family = family_char,
                                trend_model = trend_model,
                                drift = drift,
@@ -1405,6 +1463,11 @@ mvgam = function(formula,
                                inits = inits,
                                monitor_pars = param,
                                mgcv_model = ss_gam,
+                               trend_mgcv_model = if(!missing(trend_formula)){
+                                 trend_mgcv_model
+                               } else {
+                                 NULL
+                               },
                                sp_names = rho_names,
                                ytimes = ytimes,
                                use_lv = use_lv,
@@ -1666,10 +1729,24 @@ mvgam = function(formula,
     p <- mcmc_summary(out_gam_mod, 'b')[,c(4)]
     names(p) <- names(ss_gam$coefficients)
     ss_gam$coefficients <- p
+
+    if(!missing(trend_formula)){
+      V <- cov(mcmc_chains(out_gam_mod, 'b_trend'))
+      trend_mgcv_model$Ve <- trend_mgcv_model$Vp <- trend_mgcv_model$Vc <- V
+
+      p <- mcmc_summary(out_gam_mod, 'b_trend')[,c(4)]
+      names(p) <- names(trend_mgcv_model$coefficients)
+      trend_mgcv_model$coefficients <- p
+    }
   }
 
   #### Return the output as class mvgam ####
   output <- structure(list(call = orig_formula,
+                           trend_call = if(!missing(trend_formula)){
+                             trend_formula
+                           } else {
+                             NULL
+                           },
                            family = family_char,
                            trend_model = trend_model,
                            drift = drift,
@@ -1697,6 +1774,11 @@ mvgam = function(formula,
                            },
                            sp_names = rho_names,
                            mgcv_model = ss_gam,
+                           trend_mgcv_model = if(!missing(trend_formula)){
+                             trend_mgcv_model
+                           } else {
+                             NULL
+                           },
                            ytimes = ytimes,
                            resids = series_resids,
                            use_lv = use_lv,

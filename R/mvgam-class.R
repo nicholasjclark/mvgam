@@ -6,7 +6,9 @@
 #' `print`, `score`, `summary` and `update` exist for this class.
 #' @details A `mvgam` object contains the following elements:
 #'\itemize{
-#'   \item `call` the original model formula
+#'   \item `call` the original observation model formula
+#'   \item `trend_call` If a `trend_formula was supplied`, the original trend model formula is
+#'   returned. Otherwise `NULL`
 #'   \item `family` \code{character} description of the observation distribution
 #'   \item `trend_model` \code{character} description of the latent trend model
 #'   \item `drift` Logical specifying whether a drift term was used in the trend model
@@ -32,6 +34,8 @@
 #' but these are only used if generating plots of smooth functions that `mvgam` currently cannot handle
 #' (such as plots for three-dimensional smooths). This model therefore should not be used for inference.
 #' See \code{\link[mgcv]{gamObject}} for details.
+#'   \item `trend_mgcv_model` If a `trend_formula was supplied`, an object of class `gam` containing
+#'   the `mgcv` version of the trend model. Otherwise `NULL`
 #'   \item `ytimes` The `matrix` object used in model fitting for indexing which series and timepoints
 #'   were observed in each row of the supplied data. Used internally by some downstream plotting
 #'   and prediction functions

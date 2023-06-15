@@ -2277,6 +2277,372 @@ trend_map_mods = function(model_file,
               model_data = model_data))
 }
 
+#### Modifications to Stan code for adding predictors to trend models ####
+#' @noRd
+add_trend_predictors = function(trend_formula,
+                                trend_map,
+                                trend_model,
+                                data_train,
+                                data_test,
+                                model_file,
+                                model_data,
+                                drift = FALSE){
+
+  #### Creating the trend mvgam model file and data structures ####
+  # Replace any terms labelled 'trend' with 'series' for creating the necessary
+  # structures
+  trend_formula <- formula(paste(gsub('trend', 'series',
+                                      as.character(trend_formula),
+                                      fixed = TRUE),
+                collapse = " "))
+
+  # Drop any intercept from the formula
+  if(attr(terms(trend_formula), 'intercept') == 1){
+    trend_formula <- update(trend_formula, trend_y  ~ . -1)
+  } else {
+    trend_formula <- update(trend_formula, trend_y  ~ .)
+  }
+
+  trend_train <- data_train
+  trend_train$trend_y <- rnorm(length(trend_train$time))
+
+  # Add indicators of trend names as factor levels using the trend_map
+  trend_indicators <- vector(length = length(trend_train$time))
+  for(i in 1:length(trend_train$time)){
+    trend_indicators[i] <- trend_map$trend[which(trend_map$series ==
+                                                   trend_train$series[i])]
+  }
+  trend_indicators <- as.factor(paste0('trend', trend_indicators))
+  trend_train$series <- trend_indicators
+  trend_train$y <- NULL
+
+  # Only keep one time observation per trend
+  trend_train %>%
+    dplyr::group_by(series, time) %>%
+    dplyr::slice_head(n = 1) %>%
+    dplyr::ungroup() -> trend_train
+
+  if(!is.null(data_test)){
+    # If newdata supplied, also create a fake design matrix
+    # for the test data
+    trend_test <- data_test
+    trend_test$trend_y <- rnorm(length(trend_test$time))
+    trend_indicators <- vector(length = length(trend_test$time))
+    for(i in 1:length(trend_test$time)){
+      trend_indicators[i] <- trend_map$trend[which(trend_map$series == trend_test$series[i])]
+    }
+    trend_indicators <- as.factor(paste0('trend', trend_indicators))
+    trend_test$series <- trend_indicators
+    trend_test$y <- NULL
+
+    trend_test %>%
+      dplyr::group_by(series, time) %>%
+      dplyr::slice_head(n = 1) %>%
+      dplyr::ungroup() -> trend_test
+
+    # Construct the model file and data structures for testing and training
+    trend_mvgam <- mvgam(trend_formula,
+                         data = trend_train,
+                         newdata = trend_test,
+                         family = gaussian(),
+                         trend_model = 'None',
+                         return_model_data = TRUE,
+                         run_model = FALSE)
+  } else {
+    # Construct the model file and data structures for training only
+    trend_mvgam <- mvgam(trend_formula,
+                         data = trend_train,
+                         family = gaussian(),
+                         trend_model = 'None',
+                         return_model_data = TRUE,
+                         run_model = FALSE)
+  }
+
+  trend_model_file <- trend_mvgam$model_file
+
+  #### Modifying the model_file and model_data ####
+  # Add lines for the raw trend basis coefficients
+  model_file[grep("vector[num_basis] b_raw;", model_file, fixed = TRUE)] <-
+    paste0("vector[num_basis] b_raw;\n",
+           "vector[num_basis_trend] b_raw_trend;")
+
+  # Add lines to data declarations for trend design matrix
+  model_file[grep("matrix[total_obs, num_basis] X; // mgcv GAM design matrix",
+                  model_file, fixed = TRUE)] <-
+    paste0("matrix[total_obs, num_basis] X; // mgcv GAM design matrix\n",
+           "matrix[n * n_lv, num_basis_trend] X_trend; // trend model design matrix")
+
+  model_file[grep("int<lower=0> num_basis; // total number of basis coefficients",
+                  model_file, fixed = TRUE)] <-
+    paste0("int<lower=0> num_basis; // total number of basis coefficients\n",
+           "int<lower=0> num_basis_trend; // number of trend basis coefficients")
+
+  model_file[grep("int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)",
+                  model_file, fixed = TRUE)] <-
+    paste0("int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)\n",
+           "int<lower=0> ytimes_trend[n, n_lv]; // time-ordered matrix for latent trends")
+
+  model_data$ytimes_trend <- trend_mvgam$model_data$ytimes
+  model_data$num_basis_trend <- trend_mvgam$model_data$num_basis
+  model_data$X_trend <- trend_mvgam$model_data$X
+
+  # Update names to reflect process models rather than latent factors
+  model_file[grep("// trends and dynamic factor loading matrix",
+                  model_file, fixed = TRUE)] <-
+    "// latent states and loading matrix"
+
+  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+    model_file[grep("// latent factor SD terms",
+                    model_file, fixed = TRUE)] <-
+      "// latent state SD terms"
+    model_file[grep("// priors for factor SD parameters",
+                    model_file, fixed = TRUE)] <-
+      "// priors for latent state SD parameters"
+  }
+
+  model_file[grep("// derived latent trends",
+                  model_file, fixed = TRUE)] <- "// derived latent states"
+
+  # Add beta_trend lines
+  b_trend_lines <- trend_model_file[grep('b[',
+                                         trend_model_file, fixed = TRUE)]
+  b_trend_lines <- gsub('\\bb\\b', 'b_trend', b_trend_lines)
+  b_trend_lines <- gsub('raw', 'raw_trend', b_trend_lines)
+  b_trend_lines <- gsub('num_basis', 'num_basis_trend', b_trend_lines)
+  model_file[grep("// derived latent states", model_file, fixed = TRUE)] <-
+    paste0(paste(b_trend_lines, collapse = '\n'),
+           '\n\n// derived latent states')
+  model_file[grep("vector[num_basis] b;", model_file, fixed = TRUE)] <-
+    paste0("vector[num_basis] b;\n",
+           "vector[num_basis_trend] b_trend;")
+
+  model_file <- readLines(textConnection(model_file), n = -1)
+
+  # Add any parametric effect beta lines
+  if(any(grepl('// parametric effect', trend_model_file))){
+    trend_parametrics <- TRUE
+    pstart <- as.numeric(sub('.*(?=.$)', '',
+                             sub("\\:.*", "",
+                                 trend_model_file[grep('// parametric effect',
+                                                       trend_model_file) + 1]), perl = T))
+    pend <- as.numeric(substr(sub(".*\\:", "",
+                                  trend_model_file[grep('// parametric effect',
+                                                        trend_model_file) + 1]),
+                              1, 1))
+    model_file[grep("// dynamic factor estimates", model_file, fixed = TRUE)] <-
+      paste0('// dynamic process models\n',
+             paste0('b_raw_trend[', pstart, ':', pend, '] ~ std_normal();'))
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
+
+  trend_smooths_included <- FALSE
+
+  # Add any multinormal smooth lines
+  if(any(grepl('multi_normal_prec', trend_model_file))){
+    trend_smooths_included <- TRUE
+
+    if(any(grepl("int<lower=0> n_sp; // number of smoothing parameters",
+                 model_file, fixed = TRUE))){
+      model_file[grep("int<lower=0> n_sp; // number of smoothing parameters",
+                      model_file, fixed = TRUE)] <-
+        paste0("int<lower=0> n_sp; // number of smoothing parameters\n",
+               "int<lower=0> n_sp_trend; // number of trend smoothing parameters")
+    } else {
+      model_file[grep("int<lower=0> n; // number of timepoints per series",
+                      model_file, fixed = TRUE)] <-
+        paste0("int<lower=0> n; // number of timepoints per series\n",
+               "int<lower=0> n_sp_trend; // number of trend smoothing parameters")
+    }
+    model_data$n_sp_trend <- trend_mvgam$model_data$n_sp
+
+    spline_coef_lines <- trend_model_file[grepl('multi_normal_prec',
+                                                trend_model_file)]
+    spline_coef_lines <- gsub('_raw', '_raw_trend', spline_coef_lines)
+    spline_coef_lines <- gsub('lambda', 'lambda_trend', spline_coef_lines)
+    spline_coef_lines <- gsub('zero', 'zero_trend', spline_coef_lines)
+    spline_coef_lines <- gsub('S', 'S_trend', spline_coef_lines, fixed = TRUE)
+
+    lambda_prior_line <- sub('lambda', 'lambda_trend',
+                             trend_model_file[grep('lambda ~', trend_model_file, fixed = TRUE)])
+    lambda_param_line <- sub('lambda', 'lambda_trend',
+                             trend_model_file[grep('vector<lower=0>[n_sp] lambda;',
+                                                   trend_model_file, fixed = TRUE)])
+    lambda_param_line <- sub('n_sp', 'n_sp_trend', lambda_param_line)
+
+    if(any(grepl('// dynamic process models', model_file, fixed = TRUE))){
+      model_file[grep('// dynamic process models', model_file, fixed = TRUE) + 1] <-
+        paste0(model_file[grep('// dynamic process models', model_file, fixed = TRUE) + 1],
+               '\n',
+               paste(spline_coef_lines, collapse = '\n'),
+               '\n',
+               lambda_prior_line,
+               '\n')
+
+    } else {
+      model_file[grep("// dynamic factor estimates", model_file, fixed = TRUE)] <-
+        paste0('// dynamic process models\n',
+               paste(spline_coef_lines, collapse = '\n'),
+               '\n',
+               lambda_prior_line)
+    }
+    if(any(grepl("vector<lower=0>[n_sp] lambda;", model_file, fixed = TRUE))){
+      model_file[grep("// dynamic factors", model_file, fixed = TRUE)] <-
+        "// latent states"
+      model_file[grep("vector<lower=0>[n_sp] lambda;", model_file, fixed = TRUE)] <-
+        paste0("vector<lower=0>[n_sp] lambda;\n",
+               "vector<lower=0>[n_sp_trend] lambda_trend;")
+    } else {
+      model_file <- model_file[-grep("matrix[n, n_lv] LV;",
+                                     model_file, fixed = TRUE)]
+      model_file[grep("// dynamic factors", model_file, fixed = TRUE)] <-
+        paste0("// latent states\n",
+               "matrix[n, n_lv] LV;\n\n",
+               "// smoothing parameters\n",
+               "vector<lower=0>[n_sp_trend] lambda_trend;")
+    }
+
+    S_lines <- trend_model_file[grep('mgcv smooth penalty matrix',
+                                     trend_model_file, fixed = TRUE)]
+    S_lines <- gsub('S', 'S_trend', S_lines, fixed = TRUE)
+    model_file[grep("int<lower=0> n_nonmissing; // number of nonmissing observations",
+                    model_file, fixed = TRUE)] <-
+      paste0("int<lower=0> n_nonmissing; // number of nonmissing observations\n",
+             paste(S_lines, collapse = '\n'))
+
+    S_mats <- trend_mvgam$model_data[paste0('S', 1:length(S_lines))]
+    names(S_mats) <- gsub('S', 'S_trend', names(S_mats))
+    model_data <- append(model_data, S_mats)
+
+    model_file[grep("int<lower=0> num_basis_trend; // number of trend basis coefficients",
+                    model_file, fixed = TRUE)] <-
+      paste0("int<lower=0> num_basis_trend; // number of trend basis coefficients\n",
+             "vector[num_basis_trend] zero_trend; // prior locations for trend basis coefficients")
+    model_data$zero_trend <- trend_mvgam$model_data$zero
+
+    if(any(grepl("vector[n_sp] rho;", model_file, fixed = TRUE))){
+      model_file[grep("vector[n_sp] rho;", model_file, fixed = TRUE)] <-
+        paste0("vector[n_sp] rho;\n",
+               "vector[n_sp_trend] rho_trend;")
+
+      model_file[grep("rho = log(lambda);", model_file, fixed = TRUE)] <-
+        paste0("rho = log(lambda);\n",
+               "rho_trend = log(lambda_trend);")
+    } else {
+      model_file[grep("matrix[n, n_series] mus;", model_file, fixed = TRUE)] <-
+        paste0("matrix[n, n_series] mus;\n",
+               "vector[n_sp_trend] rho_trend;")
+
+      model_file[grep("// posterior predictions", model_file, fixed = TRUE)] <-
+        paste0("rho_trend = log(lambda_trend);\n\n",
+               "// posterior predictions")
+    }
+
+
+    model_file <- readLines(textConnection(model_file), n = -1)
+
+  }
+
+  trend_random_included <- FALSE
+
+  # Add any random effect beta lines
+  if(any(grepl('mu_raw[', trend_model_file, fixed = TRUE))){
+    trend_random_included <- TRUE
+    smooth_labs <- do.call(rbind,
+                           lapply(seq_along(trend_mvgam$mgcv_model$smooth),
+                                  function(x){
+                                    data.frame(label = trend_mvgam$mgcv_model$smooth[[x]]$label,
+                                               first.para = trend_mvgam$mgcv_model$smooth[[x]]$first.para,
+                                               last.para = trend_mvgam$mgcv_model$smooth[[x]]$last.para,
+                                               class = class(trend_mvgam$mgcv_model$smooth[[x]])[1])
+                                  }))
+    random_inds <- vector()
+    for(i in 1:NROW(smooth_labs)){
+      if(smooth_labs$class[i] == 'random.effect'){
+        random_inds[i] <- paste0(smooth_labs$first.para[i],
+                                 ':',
+                                 smooth_labs$last.para[i])
+      }
+    }
+    random_inds <- random_inds[!is.na(random_inds)]
+    trend_rand_idxs <- unlist(lapply(seq_along(random_inds), function(x){
+      seq(as.numeric(sub("\\:.*", "", random_inds[x])),
+          sub(".*\\:", "", random_inds[x]))
+    }))
+    model_data$trend_rand_idxs <- trend_rand_idxs
+
+    model_file[grep("int<lower=0> obs_ind[n_nonmissing]; // indices of nonmissing observations",
+                    model_file, fixed = TRUE)] <-
+      paste0("int<lower=0> obs_ind[n_nonmissing]; // indices of nonmissing observations\n",
+             paste0("int trend_rand_idxs[", length(trend_rand_idxs),']; // trend random effect indices'))
+
+    random_param_lines <- trend_model_file[c(grep("// random effect variances",
+                                                  trend_model_file, fixed = TRUE) + 1,
+                                             grep("// random effect means",
+                                                  trend_model_file, fixed = TRUE) + 1)]
+    random_param_lines <- gsub('raw', 'raw_trend', random_param_lines)
+    model_file[grep("vector[num_basis_trend] b_raw_trend;",
+                    model_file, fixed = TRUE)] <-
+      paste0("vector[num_basis_trend] b_raw_trend;\n\n",
+             "// trend random effects\n",
+             paste(random_param_lines, collapse = '\n'))
+
+    if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+      model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);", model_file,
+                      fixed = TRUE)] <- paste0(
+                        "sigma_raw_trend ~ exponential(0.5);\n",
+                        "mu_raw_trend ~ std_normal();\n",
+                        paste0("b_raw_trend[", 'trend_rand_idxs',
+                               "] ~ std_normal();\n"),
+                        "LV[1, 1:n_lv] ~ normal(0, sigma);")
+    }
+
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
+
+  # Update the trend model statements
+  model_file[grep("// latent states and loading matrix",
+                  model_file, fixed = TRUE)] <-
+    paste0("// latent states and loading matrix\n",
+           "vector[n * n_lv] trend_mus;")
+  model_file[grep("// derived latent states",
+                  model_file, fixed = TRUE)] <-
+    paste0("// latent state linear predictors\n",
+           "trend_mus = X_trend * b_trend;\n\n",
+           "// derived latent states")
+  model_file <- readLines(textConnection(model_file), n = -1)
+
+  if(trend_model == 'RW'){
+    model_file <- model_file[-c(grep("for(j in 1:n_lv){", model_file, fixed = TRUE):
+                                  (grep("for(j in 1:n_lv){", model_file, fixed = TRUE) + 2))]
+
+    if(drift){
+      model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);",
+                      model_file, fixed = TRUE)] <-
+        paste0("for(j in 1:n_lv){\n",
+               "LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
+               "for(i in 2:n){\n",
+               "LV[i, j] ~ normal(drift[j] + trend_mus[ytimes_trend[i, j]] + LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]], sigma[j]);\n",
+               "}\n}")
+    } else {
+      model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);",
+                      model_file, fixed = TRUE)] <-
+        paste0("for(j in 1:n_lv){\n",
+               "LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
+               "for(i in 2:n){\n",
+               "LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]] + LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]], sigma[j]);\n",
+               "}\n}")
+    }
+
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
+
+  return(list(model_file = model_file,
+              model_data = model_data,
+              trend_mgcv_model = trend_mvgam$mgcv_model,
+              trend_smooths_included = trend_smooths_included,
+              trend_random_included = trend_random_included))
+}
+
 #### Helper functions for extracting parameter estimates from cmdstan objects ####
 #' All functions were directly copied from `brms` and so all credit must
 #' go to the `brms` development team

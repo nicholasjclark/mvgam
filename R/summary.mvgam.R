@@ -20,9 +20,19 @@
 summary.mvgam = function(object, ...){
 
 #### Standard summary of formula and model arguments ####
-message("GAM formula:")
-print(object$call)
-message()
+  if(!is.null(object$trend_call)){
+    message("GAM observation formula:")
+    print(object$call)
+    message()
+
+    message("GAM process formula:")
+    print(object$trend_call)
+    message()
+  } else {
+    message("GAM formula:")
+    print(object$call)
+    message()
+  }
 
 message("Family:")
 cat(paste0(object$family, '\n'))
@@ -37,9 +47,16 @@ cat(paste0(object$trend_model, '\n'))
 message()
 
 if(object$use_lv){
-  message("N latent factors:")
-  cat(object$n_lv, '\n')
-  message()
+  if(!is.null(object$trend_call)){
+    message("N process models:")
+    cat(object$n_lv, '\n')
+    message()
+  } else {
+    message("N latent factors:")
+    cat(object$n_lv, '\n')
+    message()
+  }
+
 }
 
 message('N series:')
@@ -108,12 +125,23 @@ if(object$family == 'lognormal'){
   message()
 }
 
-message("GAM coefficient (beta) estimates:")
-coef_names <- names(object$mgcv_model$coefficients)
-mvgam_coefs <- mcmc_summary(object$model_output, 'b')[,c(3:7)]
-rownames(mvgam_coefs) <- coef_names
-print(mvgam_coefs)
-message()
+if(!is.null(object$trend_call)){
+  message("GAM observation coefficient (beta) estimates:")
+  coef_names <- names(object$mgcv_model$coefficients)
+  mvgam_coefs <- mcmc_summary(object$model_output, 'b')[,c(3:7)]
+  rownames(mvgam_coefs) <- coef_names
+  print(mvgam_coefs)
+  message()
+
+} else {
+  message("GAM coefficient (beta) estimates:")
+  coef_names <- names(object$mgcv_model$coefficients)
+  mvgam_coefs <- mcmc_summary(object$model_output, 'b')[,c(3:7)]
+  rownames(mvgam_coefs) <- coef_names
+  print(mvgam_coefs)
+  message()
+}
+
 
 smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
   data.frame(label = object$mgcv_model$smooth[[x]]$label,
@@ -143,17 +171,31 @@ if(any(smooth_labs$class == 'random.effect')){
 
   rownames(re_sds) <- rownames(re_mus) <- re_smooths
 
-  message("GAM random effect population mean estimates:")
-  print(re_mus)
-  message()
+  if(!is.null(object$trend_call)){
+    message("GAM random effect population mean estimates:")
+    print(re_mus)
+    message()
 
-  message("GAM random effect population SD estimates:")
-  print(re_sds)
-  message()
+    message("GAM random effect population SD estimates:")
+    print(re_sds)
+    message()
+  } else {
+    message("GAM observation random effect population mean estimates:")
+    print(re_mus)
+    message()
+
+    message("GAM observation random effect population SD estimates:")
+    print(re_sds)
+    message()
+  }
 }
 
 if(any(!is.na(object$sp_names)) & !all(smooth_labs$class == 'random.effect')){
-  message("GAM smoothing parameter (rho) estimates:")
+  if(!is.null(object$trend_call)){
+    message("GAM smoothing parameter (rho) estimates:")
+  } else {
+    message("GAM observation smoothing parameter (rho) estimates:")
+  }
   rho_coefs <- mcmc_summary(object$model_output, 'rho')[,c(3:7)]
   rownames(rho_coefs) <- object$sp_names
 
@@ -175,10 +217,19 @@ if(object$use_lv){
   if(object$trend_model != 'None'){
     if(object$trend_model == 'RW'){
       if(object$drift){
-        message("Latent trend drift estimates:")
+        if(!is.null(object$trend_call)){
+          message("Process model drift estimates:")
+        } else {
+          message("Latent trend drift estimates:")
+        }
         print(mcmc_summary(object$model_output, c('drift'))[,c(3:7)])
         message()
       } else {
+        if(!is.null(object$trend_call)){
+          message("Process error parameter estimates:")
+          print(mcmc_summary(object$model_output, c('sigma'))[,c(3:7)])
+          message()
+        }
       }
     }
 
@@ -297,6 +348,64 @@ if(!object$use_lv){
   }
 }
 
+if(!is.null(object$trend_call)){
+  message("GAM process coefficient (beta) estimates:")
+  coef_names <- names(object$trend_mgcv_model$coefficients)
+  mvgam_coefs <- mcmc_summary(object$model_output, 'b_trend')[,c(3:7)]
+  rownames(mvgam_coefs) <- gsub('series', 'trend',
+                                coef_names, fixed = TRUE)
+  print(mvgam_coefs)
+  message()
+
+  process_rhos <- try(mcmc_summary(object$model_output, 'rho_trend')[,c(3:7)],
+                      silent = TRUE)
+  if(inherits(process_rhos, 'try-error')){
+
+  } else {
+    message("GAM process smoothing parameter (rho) estimates:")
+    rho_coefs <- mcmc_summary(object$model_output, 'rho_trend')[,c(3:7)]
+    rownames(rho_coefs) <- gsub('series', 'trend',
+                                unlist(purrr::map(object$trend_mgcv_model$smooth,
+                                                  'label')),
+                                fixed = TRUE)
+
+    # Don't print random effect lambdas as they follow the prior distribution
+    to_print <- vector(length = length(object$trend_mgcv_model$smooth))
+    for(i in 1:length(object$trend_mgcv_model$smooth)){
+      if(inherits(object$trend_mgcv_model$smooth[[i]], 'random.effect')){
+        to_print[i] <- FALSE
+      } else {
+        to_print[i] <- TRUE
+      }
+    }
+
+    print(rho_coefs[to_print,])
+    message()
+
+    if(any(to_print == FALSE)){
+      re_sds <- mcmc_summary(object$model_output, 'sigma_raw_trend',
+                             ISB = TRUE)[,c(3:7)]
+
+      re_mus <- mcmc_summary(object$model_output, 'mu_raw_trend',
+                             ISB = TRUE)[,c(3:7)]
+
+      rownames(re_sds) <- rownames(re_mus) <-
+        gsub('series', 'trend', rownames(rho_coefs)[to_print == FALSE],
+             fixed = TRUE)
+
+
+      message("GAM process random effect population mean estimates:")
+      print(re_mus)
+      message()
+
+      message("GAM process random effect population SD estimates:")
+      print(re_sds)
+      message()
+    }
+  }
+
+}
+
 if(object$fit_engine == 'stan'){
   message('Stan MCMC diagnostics')
   check_all_diagnostics(object$model_output,
@@ -323,9 +432,20 @@ if(object$fit_engine == 'jags'){
 #' @rdname summary.mvgam
 #' @export
 summary.mvgam_prefit = function(object, ...){
-  message("GAM formula:")
-  print(object$call)
-  message()
+
+  if(!is.null(object$trend_call)){
+    message("GAM observation formula:")
+    print(object$call)
+    message()
+
+    message("GAM process formula:")
+    print(object$trend_call)
+    message()
+  } else {
+    message("GAM formula:")
+    print(object$call)
+    message()
+  }
 
   message("Family:")
   cat(paste0(object$family, '\n'))
@@ -340,9 +460,16 @@ summary.mvgam_prefit = function(object, ...){
   message()
 
   if(object$use_lv){
-    message("N latent factors:")
-    cat(object$n_lv, '\n')
-    message()
+    if(!is.null(object$trend_call)){
+      message("N process models:")
+      cat(object$n_lv, '\n')
+      message()
+    } else {
+      message("N latent factors:")
+      cat(object$n_lv, '\n')
+      message()
+    }
+
   }
 
   message('N series:')

@@ -30,6 +30,8 @@
 #'This argument is optional when plotting out of sample forecast period observations
 #'(when \code{type = forecast}) and required when plotting
 #'uncertainty components (\code{type = uncertainty}).
+#'@param trend_effects logical. If `TRUE` and a `trend_formula` was used in model
+#'fitting, terms from the trend (i.e. process) model will be plotted
 #'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
 #'\code{newdata} instead for more seamless integration into `R` workflows
 #'@param ... Additional arguments for each individual plotting function.
@@ -44,9 +46,11 @@
 #'@export
 plot.mvgam = function(x, type = 'residuals',
                       series = 1, residuals = FALSE,
-                      newdata, data_test, ...){
+                      newdata, data_test, trend_effects = FALSE,
+                      ...){
 
   object <- x
+
   # Argument checks
   type <- match.arg(arg = type, choices = c("residuals", "smooths", "re",
                                             "pterms", "forecast", "trend",
@@ -66,11 +70,13 @@ plot.mvgam = function(x, type = 'residuals',
   }
 
   if(type == 're'){
-    plot_mvgam_randomeffects(object, ...)
+    plot_mvgam_randomeffects(object, trend_effects = trend_effects,
+                             ...)
   }
 
   if(type == 'pterms'){
-    plot_mvgam_pterms(object, ...)
+    plot_mvgam_pterms(object, trend_effects = trend_effects,
+                      ...)
   }
 
   if(type == 'residuals'){
@@ -111,11 +117,21 @@ plot.mvgam = function(x, type = 'residuals',
 
   if(type == 'smooths'){
 
-    # Get labels of all included smooths from the object
-    smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
-      data.frame(label = object$mgcv_model$smooth[[x]]$label,
-                 class = class(object$mgcv_model$smooth[[x]])[1],
-                 mgcv_plottable = object$mgcv_model$smooth[[x]]$plot.me)
+    object2 <- object
+
+    if(trend_effects){
+      if(is.null(object$trend_call)){
+        stop('no trend_formula exists so there no trend-level smooths to plot')
+      }
+
+      object2$mgcv_model <- object2$trend_mgcv_model
+    }
+
+    # Get labels of all included smooths from the object2
+    smooth_labs <- do.call(rbind, lapply(seq_along(object2$mgcv_model$smooth), function(x){
+      data.frame(label = object2$mgcv_model$smooth[[x]]$label,
+                 class = class(object2$mgcv_model$smooth[[x]])[1],
+                 mgcv_plottable = object2$mgcv_model$smooth[[x]]$plot.me)
     }))
     n_smooths <- NROW(smooth_labs)
     smooth_labs$smooth_index <- 1:NROW(smooth_labs)
@@ -169,8 +185,9 @@ plot.mvgam = function(x, type = 'residuals',
 
     # Plot the smooths
     for(i in which_to_plot){
-      plot_mvgam_smooth(object = object, smooth = i, series = series,
-                        residuals = residuals, ...)
+      plot_mvgam_smooth(object = object2, smooth = i, series = series,
+                        residuals = residuals, trend_effects = trend_effects,
+                        ...)
     }
 
     invisible()
