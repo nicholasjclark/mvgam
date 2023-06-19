@@ -1501,7 +1501,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
                                      'target += reduce_sum(partial_log_lik, seq,\n',
                                      'grainsize,\n',
                                      'flat_ys,\n',
-                                     ifelse(offset,'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)) + offset[obs_ind],\n',
+                                     ifelse(offset,'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0) + offset[obs_ind]),\n',
                                             'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)),\n'),
                                      'flat_phis);\n}\n}\n')
     } else {
