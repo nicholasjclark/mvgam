@@ -1426,7 +1426,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
                                      'flat_ys ~ beta(\n',
                                      ifelse(offset,'inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0) + offset[obs_ind]) .* flat_phis,\n',
                                             'inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0)) .* flat_phis,\n'),
-                                     ifelse(offset,'(1 - append_col(flat_xs, flat_trends) * append_row(b, 1.0) + offset[obs_ind]) .* flat_phis,\n',
+                                     ifelse(offset,'(1 - inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0) + offset[obs_ind])) .* flat_phis);\n}\n}\n',
                                             '(1 - inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0))) .* flat_phis);\n}\n}\n'))
     }
     model_file <- readLines(textConnection(model_file), n = -1)
@@ -1511,7 +1511,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
                                      'flat_trends = (to_vector(trend))[obs_ind];\n',
                                      'flat_phis = to_array_1d(rep_each(phi_inv, n)[obs_ind]);\n',
                                      'flat_ys ~ neg_binomial_2(\n',
-                                     ifelse(offset,'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)) + offset[obs_ind],\n',
+                                     ifelse(offset,'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0) + offset[obs_ind]),\n',
                                             'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)),\n'),
                                      'inv(flat_phis));\n}\n}\n')
     }

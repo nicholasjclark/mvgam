@@ -1,9 +1,5 @@
 context("mvgam_priors")
 
-expect_match2 <- function(object, regexp) {
-  any(grepl(regexp, object, fixed = TRUE))
-}
-
 test_that("family must be correctly specified", {
   expect_error(get_mvgam_priors(y ~ s(season),
                                 trend_model = 'AR1',
