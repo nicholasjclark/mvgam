@@ -404,7 +404,7 @@ abline(v = 180, lty = 'dashed', lwd = 2)
 # Example showing how to incorporate an offset; simulate some count data
 # with different means per series
 set.seed(100)
-dat <- sim_mvgam(trend_rel = 0, mu_obs = c(4, 8, 8), seasonality = 'hierarchical')
+dat <- sim_mvgam(trend_rel = 0, mu = c(0, 2, 2), seasonality = 'hierarchical')
 
 # Add offset terms to the training and testing data
 dat$data_train$offset <- 0.5 * as.numeric(dat$data_train$series)
@@ -413,7 +413,8 @@ dat$data_test$offset <- 0.5 * as.numeric(dat$data_test$series)
 # Fit a model that includes the offset in the linear predictor as well as
 # hierarchical seasonal smooths
 mod1 <- mvgam(formula = y ~ offset(offset) +
-         s(season, bs = 'cc')  +
+         s(series, bs = 're') +
+         s(season, bs = 'cc') +
          s(season, by = series, m = 1, k = 5),
          data = dat$data_train,
          trend_model = 'None',
@@ -426,9 +427,9 @@ mod1$model_file
 # Forecasts for the first two series will differ in magnitude
 layout(matrix(1:2, ncol = 2))
 plot(mod1, type = 'forecast', series = 1, newdata = dat$data_test,
-     ylim = c(0, 70))
+     ylim = c(0, 75))
 plot(mod1, type = 'forecast', series = 2, newdata = dat$data_test,
-     ylim = c(0, 70))
+     ylim = c(0, 75))
 layout(1)
 
 # Changing the offset for the testing data should lead to changes in

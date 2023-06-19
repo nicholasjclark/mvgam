@@ -62,14 +62,32 @@ interpret_mvgam = function(formula, N){
     newfacs <- facs[!grepl('bs = \"re\"', facs, fixed = TRUE)]
     refacs <- facs[grepl('bs = \"re\"', facs, fixed = TRUE)]
     int <- attr(terms.formula(formula), 'intercept')
-    newformula <- as.formula(paste(terms.formula(formula)[[2]], '~',paste(paste(newfacs, collapse = '+'),
-                                                                 '+',
-                                                                 paste(refacs, collapse = '+'),
-                                                                 collapse = '+'),
-                                   ifelse(int == 0, ' - 1', '')))
+
+    # Preserve offset if included
+    if(!is.null(attr(terms(formula(formula)), 'offset'))){
+      newformula <- as.formula(paste(terms.formula(formula)[[2]], '~',
+                                     grep('offset', rownames(attr(terms.formula(formula), 'factors')),
+                                          value = TRUE),
+                                     '+',
+                                     paste(paste(newfacs, collapse = '+'),
+                                           '+',
+                                           paste(refacs, collapse = '+'),
+                                           collapse = '+'),
+                                     ifelse(int == 0, ' - 1', '')))
+
+    } else {
+      newformula <- as.formula(paste(terms.formula(formula)[[2]], '~',
+                                     paste(paste(newfacs, collapse = '+'),
+                                           '+',
+                                           paste(refacs, collapse = '+'),
+                                           collapse = '+'),
+                                     ifelse(int == 0, ' - 1', '')))
+    }
+
   } else {
     newformula <- formula
   }
+
   attr(newformula, '.Environment') <- attr(formula, '.Environment')
 
   # Check if any terms use the dynamic wrapper

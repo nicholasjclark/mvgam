@@ -341,7 +341,7 @@
 #' # Example showing how to incorporate an offset; simulate some count data
 #' # with different means per series
 #' set.seed(100)
-#' dat <- sim_mvgam(trend_rel = 0, mu_obs = c(4, 8, 8), seasonality = 'hierarchical')
+#' dat <- sim_mvgam(trend_rel = 0, mu = c(0, 2, 2), seasonality = 'hierarchical')
 #'
 #' # Add offset terms to the training and testing data
 #' dat$data_train$offset <- 0.5 * as.numeric(dat$data_train$series)
@@ -350,7 +350,8 @@
 #' # Fit a model that includes the offset in the linear predictor as well as
 #' # hierarchical seasonal smooths
 #' mod1 <- mvgam(formula = y ~ offset(offset) +
-#'          s(season, bs = 'cc')  +
+#'          s(series, bs = 're') +
+#'          s(season, bs = 'cc') +
 #'          s(season, by = series, m = 1, k = 5),
 #'          data = dat$data_train,
 #'          trend_model = 'None',
@@ -363,9 +364,9 @@
 #' # Forecasts for the first two series will differ in magnitude
 #' layout(matrix(1:2, ncol = 2))
 #' plot(mod1, type = 'forecast', series = 1, newdata = dat$data_test,
-#'      ylim = c(0, 70))
+#'      ylim = c(0, 75))
 #' plot(mod1, type = 'forecast', series = 2, newdata = dat$data_test,
-#'      ylim = c(0, 70))
+#'      ylim = c(0, 75))
 #' layout(1)
 #'
 #' # Changing the offset for the testing data should lead to changes in
@@ -693,6 +694,13 @@ mvgam = function(formula,
     warning('No point in latent variables if trend model is None; changing use_lv to FALSE')
   }
 
+  # Check if there is an offset variable included
+  if(is.null(attr(terms(formula(formula)), 'offset'))){
+    offset <- FALSE
+  } else {
+    offset <- TRUE
+  }
+
   # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
   orig_formula <- formula
   formula <- interpret_mvgam(formula, N = max(data_train$time))
@@ -712,13 +720,6 @@ mvgam = function(formula,
     }
   }
 
-  # Check if there is an offset variable included
-  if(is.null(attr(terms(formula(formula)), 'offset'))){
-    offset <- FALSE
-  } else {
-    offset <- TRUE
-  }
-
   # If there are missing values in y, use predictions from an initial mgcv model to fill
   # these in so that initial values to maintain the true size of the training dataset
   orig_y <- data_train$y
@@ -726,10 +727,10 @@ mvgam = function(formula,
   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the Bayesian model later on;
   ss_gam <- mvgam_setup(formula = formula,
-                                family = family_to_mgcvfam(family),
-                                data = data_train,
-                                drop.unused.levels = FALSE,
-                                maxit = 30)
+                        family = family_to_mgcvfam(family),
+                        data = data_train,
+                        drop.unused.levels = FALSE,
+                        maxit = 30)
 
   # Fill in missing observations in data_train so the size of the dataset is correct when
   # building the initial JAGS model.
@@ -983,7 +984,19 @@ mvgam = function(formula,
     model_file[grep('eta <- X %*% b', model_file, fixed = TRUE)] <-
       "eta <- X %*% b + offset"
     if(!missing(data_test) & !prior_simulation){
-      ss_jagam$jags.data$offset <- c(ss_jagam$jags.data$offset, data_test$offset)
+
+      get_offset <- function(model) {
+        nm1 <- names(attributes(model$terms)$dataClasses)
+        if('(offset)' %in% nm1) {
+          deparse(as.list(model$call)$offset)
+        } else {
+
+          sub("offset\\((.*)\\)$", "\\1", grep('offset', nm1, value = TRUE))
+        }
+      }
+
+      ss_jagam$jags.data$offset <- c(ss_jagam$jags.data$offset,
+                                     data_test[[get_offset(ss_gam)]])
     }
   }
 
