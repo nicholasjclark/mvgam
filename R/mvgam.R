@@ -439,6 +439,11 @@ mvgam = function(formula,
     data_train <- data
   }
 
+  if(attr(terms(formula), "response") == 0L){
+    stop('response variable is missing from formula',
+         call. = FALSE)
+  }
+
   if(!as.character(terms(formula(formula))[[2]]) %in% names(data_train)){
     stop(paste0('variable ', terms(formula(formula))[[2]], ' not found in data'),
          call. = FALSE)
