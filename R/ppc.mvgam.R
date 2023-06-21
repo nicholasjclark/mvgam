@@ -489,7 +489,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
 
     if(object$family == 'beta'){
       xlimits <- c(0, 1)
-    } else if(object$family %in% c('poisson', 'negative binomial', 'lognormal')){
+    } else if(object$family %in% c('poisson', 'negative binomial', 'lognormal', 'Gamma')){
       xlimits <- c(0, max_x)
     } else {
       xlimits <- c(min_x, max_x)
@@ -557,13 +557,16 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
 
     if(object$family == 'beta'){
       xlim <- c(0, 1)
-    } else if(object$family %in% c('poisson', 'negative binomial', 'lognormal')){
+    } else if(object$family %in% c('poisson', 'negative binomial', 'lognormal', 'Gamma')){
       xlim <- c(0, xlim[2])
     } else {
       xlim <- xlim
     }
 
     breaks <- seq(xlim[1], xlim[2], length.out = n_bins)
+    breaks <- c(min(c(truths, as.vector(preds))),
+                breaks,
+                max(c(truths, as.vector(preds))))
 
     ylim <- c(0, max(c(max(hist(truths, breaks = breaks, plot = F)$density, na.rm = TRUE),
                        max(hist(preds, breaks = breaks, plot = F)$density, na.rm = TRUE))))
