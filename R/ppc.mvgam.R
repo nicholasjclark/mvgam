@@ -564,12 +564,14 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
     }
 
     breaks <- seq(xlim[1], xlim[2], length.out = n_bins)
-    breaks <- sort(c(min(c(truths, as.vector(preds))),
-                     breaks,
-                     max(c(truths, as.vector(preds)))))
+    truths <- truths[truths<=xlim[2]]
+    truths <- truths[truths>=xlim[1]]
+    preds <- preds[preds<=xlim[2]]
+    preds <- preds[preds>=xlim[1]]
 
     ylim <- c(0, max(c(max(hist(truths, breaks = breaks, plot = F)$density, na.rm = TRUE),
-                       max(hist(preds, breaks = breaks, plot = F)$density, na.rm = TRUE))))
+                       max(hist(preds, breaks = breaks, plot = F)$density, na.rm = TRUE)),
+                     na.rm = TRUE))
 
     if(missing(xlab)){
       xlab <- paste0('Count')
