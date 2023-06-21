@@ -564,9 +564,9 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
     }
 
     breaks <- seq(xlim[1], xlim[2], length.out = n_bins)
-    breaks <- c(min(c(truths, as.vector(preds))),
-                breaks,
-                max(c(truths, as.vector(preds))))
+    breaks <- sort(c(min(c(truths, as.vector(preds))),
+                     breaks,
+                     max(c(truths, as.vector(preds)))))
 
     ylim <- c(0, max(c(max(hist(truths, breaks = breaks, plot = F)$density, na.rm = TRUE),
                        max(hist(preds, breaks = breaks, plot = F)$density, na.rm = TRUE))))
