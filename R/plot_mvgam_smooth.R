@@ -391,8 +391,8 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(min(partial_resids, min(cred) - 0.8 * sd(preds), na.rm = T)),
-                    max(max(partial_resids, max(cred) + 0.8 * sd(preds), na.rm = T))))
+           ylim = c(min(min(partial_resids, min(cred) - 0.9 * sd(preds), na.rm = T)),
+                    max(max(partial_resids, max(cred) + 0.9 * sd(preds), na.rm = T))))
 
       if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
         if(trend_effects){
@@ -419,8 +419,8 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(cred) - 0.8 * sd(preds),
-                    max(cred) + 0.8 * sd(preds)))
+           ylim = c(min(cred) - 0.9 * sd(preds),
+                    max(cred) + 0.9 * sd(preds)))
       if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
         if(trend_effects){
           title(sub('series', 'trend',
@@ -444,12 +444,13 @@ plot_mvgam_smooth = function(object,
 
     if(realisations){
       for(i in 1:n_realisations){
+        index <- sample(1:NROW(preds), 1, replace = TRUE)
         lines(x = pred_vals,
-              y = preds[i,],
+              y = preds[index,],
               col = 'white',
               lwd = 2.5)
         lines(x = pred_vals,
-              y = preds[i,],
+              y = preds[index,],
               col = sample(c("#DCBCBC",
                              "#C79999",
                              "#B97C7C",
@@ -583,12 +584,13 @@ plot_mvgam_smooth = function(object,
 
     if(realisations){
       for(i in 1:n_realisations){
+        index <- sample(1:NROW(first_derivs), 1, replace = TRUE)
         lines(x = pred_vals,
-              y = first_derivs[i,],
+              y = first_derivs[index,],
               col = 'white',
               lwd = 2.5)
         lines(x = pred_vals,
-              y = first_derivs[i,],
+              y = first_derivs[index,],
               col = sample(c("#DCBCBC",
                              "#C79999",
                              "#B97C7C",
@@ -621,8 +623,8 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(min(partial_resids, min(cred) - 0.8 * sd(preds), na.rm = T)),
-                    max(max(partial_resids, max(cred) + 0.8 * sd(preds), na.rm = T))))
+           ylim = c(min(min(partial_resids, min(cred) - 0.9 * sd(preds), na.rm = T)),
+                    max(max(partial_resids, max(cred) + 0.9 * sd(preds), na.rm = T))))
       if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
         if(trend_effects){
           title(sub('series', 'trend',
@@ -729,8 +731,8 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(cred) - 0.8 * sd(preds),
-                    max(cred) + 0.8 * sd(preds)))
+           ylim = c(min(cred) - 0.9 * sd(preds),
+                    max(cred) + 0.9 * sd(preds)))
       if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
         if(trend_effects){
           title(sub('series', 'trend',
@@ -753,12 +755,13 @@ plot_mvgam_smooth = function(object,
 
       if(realisations){
         for(i in 1:n_realisations){
+          index <- sample(1:NROW(preds), 1, replace = TRUE)
           lines(x = pred_vals,
-                y = preds[i,],
+                y = preds[index,],
                 col = 'white',
                 lwd = 2.5)
           lines(x = pred_vals,
-                y = preds[i,],
+                y = preds[index,],
                 col = sample(c("#DCBCBC",
                                "#C79999",
                                "#B97C7C",

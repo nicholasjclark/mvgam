@@ -550,9 +550,6 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
       }
     }
 
-    bin_lims <- range(c(truths, as.vector(preds)), na.rm = TRUE)
-    #delta <- diff(range(preds)) / n_bins
-    breaks <- seq(bin_lims[1], bin_lims[2], length.out = n_bins)
     xlim <- c(min(min(density(preds[1,], na.rm = TRUE)$x),
                   min(density(truths, na.rm = TRUE)$x)),
               max(max(density(preds[1,], na.rm = TRUE)$x),
@@ -565,6 +562,8 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
     } else {
       xlim <- xlim
     }
+
+    breaks <- seq(xlim[1], xlim[2], length.out = n_bins)
 
     ylim <- c(0, max(c(max(hist(truths, breaks = breaks, plot = F)$density, na.rm = TRUE),
                        max(hist(preds, breaks = breaks, plot = F)$density, na.rm = TRUE))))
