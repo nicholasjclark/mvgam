@@ -5,6 +5,8 @@
 #'@importFrom grDevices hcl.colors
 #'@importFrom stats quantile predict
 #'@param object \code{list} object returned from \code{mvgam}
+#'@param trend_effects logical. If `TRUE` and a `trend_formula` was used in model
+#'fitting, terms from the trend (i.e. process) model will be plotted
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param smooth either a \code{character} or \code{integer} specifying which smooth term to be plotted
 #'@param residuals \code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added
@@ -39,6 +41,7 @@
 #'@seealso \code{\link[mgcv]{plot.gam}}
 #'@export
 plot_mvgam_smooth = function(object,
+                             trend_effects = FALSE,
                              series = 1,
                              smooth,
                              residuals = FALSE,
@@ -53,6 +56,17 @@ plot_mvgam_smooth = function(object,
     stop('argument "object" must be of class "mvgam"')
   }
 
+  object2 <- object
+
+  if(trend_effects){
+    if(is.null(object$trend_call)){
+      stop('no trend_formula exists so there no trend-level smooths to plot')
+    }
+
+    residuals <- FALSE
+    object2$mgcv_model <- object2$trend_mgcv_model
+  }
+
   if(sign(series) != 1){
     stop('argument "series" must be a positive integer',
          call. = FALSE)
@@ -63,9 +77,9 @@ plot_mvgam_smooth = function(object,
     }
   }
 
-  if(series > NCOL(object$ytimes)){
-    stop(paste0('object only contains data / predictions for ',
-                NCOL(object$ytimes), ' series'),
+  if(series > NCOL(object2$ytimes)){
+    stop(paste0('object2 only contains data / predictions for ',
+                NCOL(object2$ytimes), ' series'),
          call. = FALSE)
   }
 
@@ -79,17 +93,21 @@ plot_mvgam_smooth = function(object,
     }
   }
 
+  if(missing(smooth)){
+    smooth <- 1
+  }
+
   # Get smooth term names
-  s_name <- levels(object$obs_data$series)[series]
-  data_train <- object$obs_data
-  smooth_terms <- unlist(purrr::map(object$mgcv_model$smooth, 'label'))
+  s_name <- levels(object2$obs_data$series)[series]
+  data_train <- object2$obs_data
+  smooth_terms <- unlist(purrr::map(object2$mgcv_model$smooth, 'label'))
 
   if(is.character(smooth)){
     if(!grepl('\\(', smooth)){
       smooth <- paste0('s(', smooth, ')')
     }
     if(!smooth %in% smooth_terms){
-      stop(smooth, ' not found in smooth terms of object\nAppropriate names are: ',
+      stop(smooth, ' not found in smooth terms of object2\nAppropriate names are: ',
            paste(smooth_terms, collapse = ', '))
     }
     smooth_int <- which(smooth_terms == smooth)
@@ -98,15 +116,15 @@ plot_mvgam_smooth = function(object,
   }
 
   # Check whether this type of smooth is even plottable
-  if(!object$mgcv_model$smooth[[smooth_int]]$plot.me){
-    stop(paste0('unable to plot ', object$mgcv_model$smooth[[smooth_int]]$label,
-                ' (class = ', attr(object$mgcv_model$smooth[[smooth_int]], 'class')[1]),
+  if(!object2$mgcv_model$smooth[[smooth_int]]$plot.me){
+    stop(paste0('unable to plot ', object2$mgcv_model$smooth[[smooth_int]]$label,
+                ' (class = ', attr(object2$mgcv_model$smooth[[smooth_int]], 'class')[1]),
          ')')
   }
 
   if(is.numeric(smooth)){
     if(!smooth %in% seq_along(smooth_terms)){
-      stop(smooth, ' not found in smooth terms of object')
+      stop(smooth, ' not found in smooth terms of object2')
     }
     smooth_int <- smooth
     smooth <- smooth_terms[smooth]
@@ -117,9 +135,9 @@ plot_mvgam_smooth = function(object,
   }
 
   # Check that this is not a random effect smooth
-  smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
-    data.frame(label = object$mgcv_model$smooth[[x]]$label,
-               class = class(object$mgcv_model$smooth[[x]])[1])
+  smooth_labs <- do.call(rbind, lapply(seq_along(object2$mgcv_model$smooth), function(x){
+    data.frame(label = object2$mgcv_model$smooth[[x]]$label,
+               class = class(object2$mgcv_model$smooth[[x]])[1])
   }))
 
   if(smooth_labs$class[smooth_int] == 'random.effect'){
@@ -128,19 +146,19 @@ plot_mvgam_smooth = function(object,
 
   # Be sure that parametric and by variables are included in newdata
   smooth_terms <- unique(trimws(strsplit(gsub('\\+', ',',
-                                              as.character(object$mgcv_model$pred.formula)[2]), ',')[[1]]))
+                                              as.character(object2$mgcv_model$pred.formula)[2]), ',')[[1]]))
 
   # Remove comma separated names as these won't match the column names in data
   smooth_terms[!grepl(',', smooth_terms)] -> smooth_terms
 
   # Change smooth name to the covariate that needs a sequence of prediction values
-  smooth <- object$mgcv_model$smooth[[smooth_int]]$term
+  smooth <- object2$mgcv_model$smooth[[smooth_int]]$term
 
   # Predictions and plots for multi-dimensional smooths
   if(length(unlist(strsplit(smooth, ','))) >= 2){
 
     # Use default mgcv plotting for bivariate smooths as it is quicker
-    suppressWarnings(plot(object$mgcv_model, select = smooth_int,
+    suppressWarnings(plot(object2$mgcv_model, select = smooth_int,
                           residuals = residuals,
                           scheme = 2,
                           main = '', too.far = 0,
@@ -149,8 +167,15 @@ plot_mvgam_smooth = function(object,
                                                palette = 'Reds 2'),
                           lwd = 1,
                           seWithMean = TRUE))
-    title(object$mgcv_model$smooth[[smooth_int]]$label,
-          adj = 0)
+    if(trend_effects){
+      title(sub('series', 'trend', object2$mgcv_model$smooth[[smooth_int]]$label,
+                fixed = TRUE),
+            adj = 0)
+    } else {
+      title(object2$mgcv_model$smooth[[smooth_int]]$label,
+            adj = 0)
+    }
+
 
   } else {
 
@@ -179,7 +204,7 @@ plot_mvgam_smooth = function(object,
       }
       colnames(pred_dat) <- gsub('smooth.var', smooth, colnames(pred_dat))
 
-    } else if(missing(newdata) && class(object$obs_data)[1] == 'list'){
+    } else if(missing(newdata) && inherits(object2$obs_data, 'list')){
       # Make fake data by zeroing all other terms apart from the selected smooth
       # and the series indicator
       pred_dat <- vector(mode = 'list')
@@ -190,7 +215,7 @@ plot_mvgam_smooth = function(object,
           pred_dat[[x]] <- rep(0, 500)
         }
       }
-      names(pred_dat) <- names(object$obs_data)
+      names(pred_dat) <- names(object2$obs_data)
       pred_dat$series <- rep((levels(data_train$series)[series]), 500)
 
       if(!is.matrix(pred_dat[[smooth]])){
@@ -226,7 +251,7 @@ plot_mvgam_smooth = function(object,
     }
 
     # Generate linear predictor matrix from fitted mgcv model
-    suppressWarnings(Xp  <- try(predict(object$mgcv_model,
+    suppressWarnings(Xp  <- try(predict(object2$mgcv_model,
                                         newdata = pred_dat,
                                         type = 'lpmatrix'),
                                 silent = TRUE))
@@ -234,7 +259,7 @@ plot_mvgam_smooth = function(object,
     if(inherits(Xp, 'try-error')){
       testdat <- data.frame(series = pred_dat$series)
 
-      terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients)
+      terms_include <- names(object2$mgcv_model$coefficients)[which(!names(object2$mgcv_model$coefficients)
                                                                    %in% '(Intercept)')]
       if(length(terms_include) > 0){
         newnames <- vector()
@@ -246,14 +271,14 @@ plot_mvgam_smooth = function(object,
         colnames(testdat) <- newnames
       }
 
-      suppressWarnings(Xp  <- predict(object$mgcv_model,
+      suppressWarnings(Xp  <- predict(object2$mgcv_model,
                                       newdata = testdat,
                                       type = 'lpmatrix'))
     }
 
     # Zero out all other columns in Xp
-    keeps <- object$mgcv_model$smooth[[smooth_int]]$first.para:
-      object$mgcv_model$smooth[[smooth_int]]$last.para
+    keeps <- object2$mgcv_model$smooth[[smooth_int]]$first.para:
+      object2$mgcv_model$smooth[[smooth_int]]$last.para
     Xp[, ! seq_len(length.out = NCOL(Xp)) %in% keeps] <- 0
 
     # Prediction x-axis values
@@ -268,20 +293,24 @@ plot_mvgam_smooth = function(object,
     }
 
     # If this term has a by variable, need to use mgcv's plotting utilities
-    if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
+    if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
 
       # Deal with by variables
       by <- rep(1,length(pred_vals)); dat <- data.frame(x = pred_vals, by = by)
-      names(dat) <- c(object$mgcv_model$smooth[[smooth_int]]$term,
-                      object$mgcv_model$smooth[[smooth_int]]$by)
+      names(dat) <- c(object2$mgcv_model$smooth[[smooth_int]]$term,
+                      object2$mgcv_model$smooth[[smooth_int]]$by)
 
-      Xp_term <- mgcv::PredictMat(object$mgcv_model$smooth[[smooth_int]], dat)
-      Xp[,object$mgcv_model$smooth[[smooth_int]]$first.para:
-           object$mgcv_model$smooth[[smooth_int]]$last.para] <- Xp_term
+      Xp_term <- mgcv::PredictMat(object2$mgcv_model$smooth[[smooth_int]], dat)
+      Xp[,object2$mgcv_model$smooth[[smooth_int]]$first.para:
+           object2$mgcv_model$smooth[[smooth_int]]$last.para] <- Xp_term
     }
 
     # Extract GAM coefficients
-    betas <- mcmc_chains(object$model_output, 'b')
+    if(trend_effects){
+      betas <- mcmc_chains(object2$model_output, 'b_trend')
+    } else {
+      betas <- mcmc_chains(object2$model_output, 'b')
+    }
 
     # Calculate posterior marginal predictions
     preds <- matrix(NA, nrow = NROW(betas), ncol = NROW(Xp))
@@ -292,42 +321,42 @@ plot_mvgam_smooth = function(object,
   if(residuals){
     # Need to predict from a reduced set that zeroes out all terms apart from the
     # smooth of interest
-    suppressWarnings(Xp2 <- predict(object$mgcv_model,
-                                    newdata = object$obs_data, type = 'lpmatrix'))
+    suppressWarnings(Xp2 <- predict(object2$mgcv_model,
+                                    newdata = object2$obs_data, type = 'lpmatrix'))
 
     if(!missing(newdata)){
       stop('Partial residual plots not available when using newdata')
     }
 
-    if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
-      by <- rep(1,length(object$obs_data$series))
-      dat <- data.frame(x = object$obs_data[[object$mgcv_model$smooth[[smooth_int]]$term]],
+    if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
+      by <- rep(1,length(object2$obs_data$series))
+      dat <- data.frame(x = object2$obs_data[[object2$mgcv_model$smooth[[smooth_int]]$term]],
                         by = by)
-      names(dat) <- c(object$mgcv_model$smooth[[smooth_int]]$term,
-                      object$mgcv_model$smooth[[smooth_int]]$by)
+      names(dat) <- c(object2$mgcv_model$smooth[[smooth_int]]$term,
+                      object2$mgcv_model$smooth[[smooth_int]]$by)
 
-      Xp_term <- mgcv::PredictMat(object$mgcv_model$smooth[[smooth_int]], dat)
-      Xp2[,object$mgcv_model$smooth[[smooth_int]]$first.para:
-            object$mgcv_model$smooth[[smooth_int]]$last.para] <- Xp_term
+      Xp_term <- mgcv::PredictMat(object2$mgcv_model$smooth[[smooth_int]], dat)
+      Xp2[,object2$mgcv_model$smooth[[smooth_int]]$first.para:
+            object2$mgcv_model$smooth[[smooth_int]]$last.para] <- Xp_term
     }
 
     # Find index for the end of training for this series and keep only those training
     # observations for the particular series
     if(class(pred_dat)[1] == 'list'){
-      end_train <- length(which(object$obs_data[['series']] == (levels(data_train$series)[series])))
+      end_train <- length(which(object2$obs_data[['series']] == (levels(data_train$series)[series])))
     } else {
-      end_train <- object$obs_data %>%
+      end_train <- object2$obs_data %>%
         dplyr::filter(series == s_name) %>%
         NROW()
     }
 
-    Xp2 <- Xp2[object$ytimes[,series][1:end_train], ]
+    Xp2 <- Xp2[object2$ytimes[,series][1:end_train], ]
 
     # # Zero out all other columns in Xp2
     Xp2[,!grepl(paste0('(', smooth, ')'), colnames(Xp), fixed = T)] <- 0
 
     # Calculate residuals from full prediction set
-    all_resids <- object$resids[[series]][,1:end_train]
+    all_resids <- object2$resids[[series]][,1:end_train]
 
     partial_resids <- matrix(NA, nrow = nrow(betas), ncol = NCOL(all_resids))
     for(i in 1:NROW(betas)){
@@ -362,15 +391,27 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(min(partial_resids, min(cred) - 0.8 * sd(preds), na.rm = T)),
-                    max(max(partial_resids, max(cred) + 0.8 * sd(preds), na.rm = T))))
+           ylim = c(min(min(partial_resids, min(cred) - 0.9 * sd(preds), na.rm = T)),
+                    max(max(partial_resids, max(cred) + 0.9 * sd(preds), na.rm = T))))
 
-      if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
-        title(object$mgcv_model$smooth[[smooth_int]]$label,
-              adj = 0)
+      if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
+        if(trend_effects){
+          title(sub('series', 'trend',
+                    object2$mgcv_model$smooth[[smooth_int]]$label,
+                    fixed = TRUE),
+                adj = 0)
+        } else {
+          title(object2$mgcv_model$smooth[[smooth_int]]$label,
+                adj = 0)
+        }
       } else {
-        title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
-              adj = 0)
+        if(trend_effects){
+          title(paste0('s(', smooth, ')'),
+                adj = 0)
+        } else {
+          title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+                adj = 0)
+        }
       }
 
     } else {
@@ -378,25 +419,38 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(cred) - 0.8 * sd(preds),
-                    max(cred) + 0.8 * sd(preds)))
-      if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
-        title(object$mgcv_model$smooth[[smooth_int]]$label,
-              adj = 0)
+           ylim = c(min(cred) - 0.9 * sd(preds),
+                    max(cred) + 0.9 * sd(preds)))
+      if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
+        if(trend_effects){
+          title(sub('series', 'trend',
+                    object2$mgcv_model$smooth[[smooth_int]]$label,
+                    fixed = TRUE),
+                adj = 0)
+        } else {
+          title(object2$mgcv_model$smooth[[smooth_int]]$label,
+                adj = 0)
+        }
       } else {
-        title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
-              adj = 0)
+        if(trend_effects){
+          title(paste0('s(', smooth, ')'),
+                adj = 0)
+        } else {
+          title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+                adj = 0)
+        }
       }
     }
 
     if(realisations){
       for(i in 1:n_realisations){
+        index <- sample(1:NROW(preds), 1, replace = TRUE)
         lines(x = pred_vals,
-              y = preds[i,],
+              y = preds[index,],
               col = 'white',
               lwd = 2.5)
         lines(x = pred_vals,
-              y = preds[i,],
+              y = preds[index,],
               col = sample(c("#DCBCBC",
                              "#C79999",
                              "#B97C7C",
@@ -409,11 +463,11 @@ plot_mvgam_smooth = function(object,
       if(residuals){
 
         # Get x-axis values and bin if necessary to prevent overplotting
-        sorted_x <- sort(unique(round(object$obs_data[[smooth]], 6)))
+        sorted_x <- sort(unique(round(object2$obs_data[[smooth]], 6)))
 
-        s_name <- levels(object$obs_data$series)[series]
-        obs_x <- round(data.frame(series = object$obs_data$series,
-                                  smooth_vals = object$obs_data[[smooth]]) %>%
+        s_name <- levels(object2$obs_data$series)[series]
+        obs_x <- round(data.frame(series = object2$obs_data$series,
+                                  smooth_vals = object2$obs_data[[smooth]]) %>%
                          dplyr::filter(series == s_name) %>%
                          dplyr::pull(smooth_vals), 6)
 
@@ -506,7 +560,7 @@ plot_mvgam_smooth = function(object,
     box(bty = 'L', lwd = 2)
 
     # Show observed values of the smooth as a rug
-    if(class(object$obs_data)[1] == 'list'){
+    if(class(object2$obs_data)[1] == 'list'){
       rug((as.vector(as.matrix(pred_dat[[smooth]])))[which(pred_dat[['series']] ==
                                                              levels(pred_dat[['series']])[series])],
           lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)
@@ -530,12 +584,13 @@ plot_mvgam_smooth = function(object,
 
     if(realisations){
       for(i in 1:n_realisations){
+        index <- sample(1:NROW(first_derivs), 1, replace = TRUE)
         lines(x = pred_vals,
-              y = first_derivs[i,],
+              y = first_derivs[index,],
               col = 'white',
               lwd = 2.5)
         lines(x = pred_vals,
-              y = first_derivs[i,],
+              y = first_derivs[index,],
               col = sample(c("#DCBCBC",
                              "#C79999",
                              "#B97C7C",
@@ -568,22 +623,34 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(min(partial_resids, min(cred) - 0.8 * sd(preds), na.rm = T)),
-                    max(max(partial_resids, max(cred) + 0.8 * sd(preds), na.rm = T))))
-      if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
-        title(object$mgcv_model$smooth[[smooth_int]]$label,
-              adj = 0)
+           ylim = c(min(min(partial_resids, min(cred) - 0.9 * sd(preds), na.rm = T)),
+                    max(max(partial_resids, max(cred) + 0.9 * sd(preds), na.rm = T))))
+      if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
+        if(trend_effects){
+          title(sub('series', 'trend',
+                    object2$mgcv_model$smooth[[smooth_int]]$label,
+                    fixed = TRUE),
+                adj = 0)
+        } else {
+          title(object2$mgcv_model$smooth[[smooth_int]]$label,
+                adj = 0)
+        }
       } else {
-        title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
-              adj = 0)
+        if(trend_effects){
+          title(paste0('s(', smooth, ')'),
+                adj = 0)
+        } else {
+          title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+                adj = 0)
+        }
       }
 
       # Get x-axis values and bin if necessary to prevent overplotting
-      sorted_x <- sort(unique(round(object$obs_data[[smooth]], 6)))
+      sorted_x <- sort(unique(round(object2$obs_data[[smooth]], 6)))
 
-      s_name <- levels(object$obs_data$series)[series]
-      obs_x <- round(data.frame(series = object$obs_data$series,
-                                smooth_vals = object$obs_data[[smooth]]) %>%
+      s_name <- levels(object2$obs_data$series)[series]
+      obs_x <- round(data.frame(series = object2$obs_data$series,
+                                smooth_vals = object2$obs_data[[smooth]]) %>%
                        dplyr::filter(series == s_name) %>%
                        dplyr::pull(smooth_vals), 6)
 
@@ -664,24 +731,37 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(cred) - 0.8 * sd(preds),
-                    max(cred) + 0.8 * sd(preds)))
-      if(object$mgcv_model$smooth[[smooth_int]]$by != "NA"){
-        title(object$mgcv_model$smooth[[smooth_int]]$label,
-              adj = 0)
+           ylim = c(min(cred) - 0.9 * sd(preds),
+                    max(cred) + 0.9 * sd(preds)))
+      if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
+        if(trend_effects){
+          title(sub('series', 'trend',
+                    object2$mgcv_model$smooth[[smooth_int]]$label,
+                    fixed = TRUE),
+                adj = 0)
+        } else {
+          title(object2$mgcv_model$smooth[[smooth_int]]$label,
+                adj = 0)
+        }
       } else {
-        title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
-              adj = 0)
+        if(trend_effects){
+          title(paste0('s(', smooth, ')'),
+                adj = 0)
+        } else {
+          title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+                adj = 0)
+        }
       }
 
       if(realisations){
         for(i in 1:n_realisations){
+          index <- sample(1:NROW(preds), 1, replace = TRUE)
           lines(x = pred_vals,
-                y = preds[i,],
+                y = preds[index,],
                 col = 'white',
                 lwd = 2.5)
           lines(x = pred_vals,
-                y = preds[i,],
+                y = preds[index,],
                 col = sample(c("#DCBCBC",
                                "#C79999",
                                "#B97C7C",
@@ -705,7 +785,7 @@ plot_mvgam_smooth = function(object,
     }
 
     # Show observed values of the smooth as a rug
-    if(class(object$obs_data)[1] == 'list'){
+    if(class(object2$obs_data)[1] == 'list'){
        rug((as.vector(as.matrix(data_train[[smooth]])))[which(data_train$series ==
                                                               levels(data_train$series)[series])],
           lwd = 1.75, ticksize = 0.025, col = c_mid_highlight)

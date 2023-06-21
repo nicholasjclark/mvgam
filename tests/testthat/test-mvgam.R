@@ -9,6 +9,15 @@ test_that("family must be correctly specified", {
                'family not recognized')
 })
 
+test_that("response variable must be specified", {
+expect_error(mod <- mvgam( ~ s(season),
+                          trend_model = 'AR1',
+                          data = beta_data$data_train,
+                          family = 'besta',
+                          run_model = FALSE),
+             'response variable is missing from formula')
+})
+
 test_that("trend_model must be correctly specified", {
   expect_error(mod <- mvgam(y ~ s(season),
                             trend_model = 'AR11',

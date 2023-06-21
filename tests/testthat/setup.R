@@ -2,6 +2,10 @@
 library("testthat")
 library("mvgam")
 
+expect_match2 <- function(object, regexp) {
+  any(grepl(regexp, object, fixed = TRUE))
+}
+
 #### Fit two models for each testing combination to ensure
 # Stan-based forecasts and mvgam-based forecasts are similar;
 # use 1000 posterior samples for each chain so out of sample forecast

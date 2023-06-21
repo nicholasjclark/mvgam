@@ -148,6 +148,12 @@ get_mvgam_priors = function(formula,
                             trend_map,
                             drift = FALSE){
 
+  # Check formula
+  if(attr(terms(formula), "response") == 0L){
+    stop('response variable is missing from formula',
+         call. = FALSE)
+  }
+
   # Validate the family argument
   family <- evaluate_family(family)
   family_char <- match.arg(arg = family$family,

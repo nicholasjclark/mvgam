@@ -12,7 +12,9 @@ Method functions \code{as.data.frame}, \code{code}, \code{coef}, \code{forecast}
 \details{
 A \code{mvgam} object contains the following elements:
 \itemize{
-\item \code{call} the original model formula
+\item \code{call} the original observation model formula
+\item \code{trend_call} If a \verb{trend_formula was supplied}, the original trend model formula is
+returned. Otherwise \code{NULL}
 \item \code{family} \code{character} description of the observation distribution
 \item \code{trend_model} \code{character} description of the latent trend model
 \item \code{drift} Logical specifying whether a drift term was used in the trend model
@@ -38,6 +40,8 @@ coefficients in this model object will contain the posterior median coefficients
 but these are only used if generating plots of smooth functions that \code{mvgam} currently cannot handle
 (such as plots for three-dimensional smooths). This model therefore should not be used for inference.
 See \code{\link[mgcv]{gamObject}} for details.
+\item \code{trend_mgcv_model} If a \verb{trend_formula was supplied}, an object of class \code{gam} containing
+the \code{mgcv} version of the trend model. Otherwise \code{NULL}
 \item \code{ytimes} The \code{matrix} object used in model fitting for indexing which series and timepoints
 were observed in each row of the supplied data. Used internally by some downstream plotting
 and prediction functions

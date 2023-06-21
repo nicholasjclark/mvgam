@@ -489,7 +489,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
 
     if(object$family == 'beta'){
       xlimits <- c(0, 1)
-    } else if(object$family %in% c('poisson', 'negative binomial', 'lognormal')){
+    } else if(object$family %in% c('poisson', 'negative binomial', 'lognormal', 'Gamma')){
       xlimits <- c(0, max_x)
     } else {
       xlimits <- c(min_x, max_x)
@@ -550,9 +550,6 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
       }
     }
 
-    bin_lims <- range(c(truths, as.vector(preds)), na.rm = TRUE)
-    #delta <- diff(range(preds)) / n_bins
-    breaks <- seq(bin_lims[1], bin_lims[2], length.out = n_bins)
     xlim <- c(min(min(density(preds[1,], na.rm = TRUE)$x),
                   min(density(truths, na.rm = TRUE)$x)),
               max(max(density(preds[1,], na.rm = TRUE)$x),
@@ -560,14 +557,21 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
 
     if(object$family == 'beta'){
       xlim <- c(0, 1)
-    } else if(object$family %in% c('poisson', 'negative binomial', 'lognormal')){
+    } else if(object$family %in% c('poisson', 'negative binomial', 'lognormal', 'Gamma')){
       xlim <- c(0, xlim[2])
     } else {
       xlim <- xlim
     }
 
+    breaks <- seq(xlim[1], xlim[2], length.out = n_bins)
+    truths <- truths[truths<=xlim[2]]
+    truths <- truths[truths>=xlim[1]]
+    preds <- preds[preds<=xlim[2]]
+    preds <- preds[preds>=xlim[1]]
+
     ylim <- c(0, max(c(max(hist(truths, breaks = breaks, plot = F)$density, na.rm = TRUE),
-                       max(hist(preds, breaks = breaks, plot = F)$density, na.rm = TRUE))))
+                       max(hist(preds, breaks = breaks, plot = F)$density, na.rm = TRUE)),
+                     na.rm = TRUE))
 
     if(missing(xlab)){
       xlab <- paste0('Count')

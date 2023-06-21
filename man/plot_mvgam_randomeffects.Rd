@@ -4,10 +4,13 @@
 \alias{plot_mvgam_randomeffects}
 \title{Plot mvgam random effect terms}
 \usage{
-plot_mvgam_randomeffects(object)
+plot_mvgam_randomeffects(object, trend_effects = FALSE)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
+
+\item{trend_effects}{logical. If \code{TRUE} and a \code{trend_formula} was used in model
+fitting, terms from the trend (i.e. process) model will be plotted}
 }
 \value{
 A base \code{R} graphics plot

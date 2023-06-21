@@ -5,13 +5,16 @@
 #'@importFrom graphics layout title rug bxp
 #'@importFrom stats coef predict
 #'@param object \code{list} object returned from \code{mvgam}
+#'@param trend_effects logical. If `TRUE` and a `trend_formula` was used in model
+#'fitting, terms from the trend (i.e. process) model will be plotted
 #'@details Posterior empirical quantiles of each parametric term's partial effect estimates
 #'(on the link scale) are calculated and visualised as ribbon plots. These effects can
 #'be interpreted as the partial effect that a parametric term contributes when all other
 #'terms in the model have been set to \code{0}
 #'@return A base \code{R} graphics plot
 #'@export
-plot_mvgam_pterms = function(object){
+plot_mvgam_pterms = function(object, trend_effects = FALSE){
+
 # General plotting colours and empirical quantile probabilities
 c_light <- c("#DCBCBC")
 c_light_trans <- c("#DCBCBC70")
@@ -23,8 +26,23 @@ c_dark <- c("#8F2727")
 c_dark_highlight <- c("#7C0000")
 probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
 
+# Check arguments
+if (!(inherits(object, "mvgam"))) {
+  stop('argument "object" must be of class "mvgam"')
+}
+
+object2 <- object
+
+if(trend_effects){
+  if(is.null(object$trend_call)){
+    stop('no trend_formula exists so there no trend-level smooths to plot')
+  }
+
+  object2$mgcv_model <- object2$trend_mgcv_model
+}
+
 # Look for parametric terms in the model
-pterms <- attr(object$mgcv_model$pterms, 'term.labels')
+pterms <- attr(object2$mgcv_model$pterms, 'term.labels')
 
 if(length(pterms) > 0){
   # Graphical parameters
@@ -47,25 +65,29 @@ if(length(pterms) > 0){
   for(i in 1:length(pterms)){
     # Find out which beta corresponds to the associated parametric term
     betas_keep <- grepl(paste0('^(?=.*',pterms[i], ')(?!.*s\\()'),
-                        colnames(predict(object$mgcv_model, type = 'lpmatrix')),
+                        colnames(predict(object2$mgcv_model, type = 'lpmatrix')),
                         perl = TRUE)
-    betas <- mcmc_chains(object$model_output, 'b')[ ,betas_keep]
+    if(trend_effects){
+      betas <- mcmc_chains(object2$model_output, 'b_trend')[ ,betas_keep]
+    } else {
+      betas <- mcmc_chains(object2$model_output, 'b')[ ,betas_keep]
+    }
 
     # Generate linear predictor matrix from fitted mgcv model
-    Xp <- predict(object$mgcv_model, newdata = object$obs_data, type = 'lpmatrix')
+    Xp <- predict(object2$mgcv_model, newdata = object2$obs_data, type = 'lpmatrix')
 
     # Zero out all other columns in Xp
     Xp[,!betas_keep] <- 0
 
     # X-axis values
-    if(inherits(object$obs_data, 'list')){
-      pred_vals_orig <- sort(object$obs_data[[pterms[i]]])
+    if(inherits(object2$obs_data, 'list')){
+      pred_vals_orig <- sort(object2$obs_data[[pterms[i]]])
     } else {
-      pred_vals_orig <- sort(object$obs_data %>%
+      pred_vals_orig <- sort(object2$obs_data %>%
                                dplyr::pull(pterms[i]))
     }
 
-    if(inherits(object$obs_data[[pterms[i]]], 'factor')){
+    if(inherits(object2$obs_data[[pterms[i]]], 'factor')){
 
       # Use a simple Boxplot for factor terms for now
       if(is.matrix(betas)){
@@ -76,9 +98,9 @@ if(length(pterms) > 0){
       }
 
       colnames(beta_creds) <-
-        substr(names(coef(object$mgcv_model))[grepl(paste0('^(?=.*',
+        substr(names(coef(object2$mgcv_model))[grepl(paste0('^(?=.*',
                                                            pterms[i], ')(?!.*s\\()'),
-                                                    colnames(predict(object$mgcv_model, type = 'lpmatrix')),
+                                                    colnames(predict(object2$mgcv_model, type = 'lpmatrix')),
                                                     perl = TRUE)], nchar(pterms[i]) + 1, 1000000L)
 
       bp <- boxplot(beta_creds, range=0, plot=FALSE)
@@ -151,6 +173,6 @@ if(length(pterms) > 0){
   par(.pardefault)
   layout(1)
 } else {
-  stop('No parametric terms (apart from intercept) found in model')
+  message('No parametric terms found in model')
 }
 }
