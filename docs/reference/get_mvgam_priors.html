@@ -53,6 +53,7 @@ changed for a given <code>mvgam</code> model, as well listing their default dist
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">get_mvgam_priors</span><span class="op">(</span></span>
 <span>  <span class="va">formula</span>,</span>
+<span>  <span class="va">trend_formula</span>,</span>
 <span>  <span class="va">data</span>,</span>
 <span>  <span class="va">data_train</span>,</span>
 <span>  family <span class="op">=</span> <span class="st">"poisson"</span>,</span>
@@ -60,6 +61,7 @@ changed for a given <code>mvgam</code> model, as well listing their default dist
 <span>  <span class="va">n_lv</span>,</span>
 <span>  use_stan <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  trend_model <span class="op">=</span> <span class="st">"None"</span>,</span>
+<span>  <span class="va">trend_map</span>,</span>
 <span>  drift <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -70,6 +72,14 @@ changed for a given <code>mvgam</code> model, as well listing their default dist
 <dd><p>A <code>character</code> string specifying the GAM formula. These are exactly like the formula
 for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these)</p></dd>
+
+
+<dt>trend_formula</dt>
+<dd><p>An optional <code>character</code> string specifying the GAM process model formula. If
+supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
+separately from the observation model. Should not have a response variable specified on the left-hand side
+of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). This feature is experimental, and is only
+currently available for Random Walk trend models.</p></dd>
 
 
 <dt>data</dt>
@@ -87,7 +97,16 @@ Any other variables to be included in the linear predictor of <code>formula</cod
 
 
 <dt>family</dt>
-<dd><p><code>character</code>. Must be either 'nb' (for Negative Binomial), 'tw' (for Tweedie) or 'poisson'</p></dd>
+<dd><p><code>family</code> specifying the exponential observation family for the series. Currently supported
+families are:</p><ul><li><p><code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code> for count data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</p></li>
+<li><p><code><a href="mvgam_families.html">tweedie()</a></code> for count data (power parameter <code>p</code> fixed at <code>1.5</code>)</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> for real-valued data</p></li>
+<li><p><code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar()</a></code> for proportional data on <code>(0,1)</code></p></li>
+<li><p><code><a href="mvgam_families.html">lognormal()</a></code> for non-negative real-valued data</p></li>
+<li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
+</ul><p>See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
 
 
 <dt>use_lv</dt>
@@ -111,16 +130,27 @@ in <code>Stan</code> can support latent GP trends while estimation in <code>JAGS
 
 
 <dt>trend_model</dt>
-<dd><p><code>character</code> specifying the time series dynamics for the latent trend. Options are:
-'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>),
-'RW' (random walk with possible drift),
-'AR1' (AR1 model with intercept),
-'AR2' (AR2 model with intercept) or
-'AR3' (AR3 model with intercept) or
-'VAR1' (with possible drift; only available in <code>Stan</code>) or
-'GP' (Gaussian Process with squared exponential kernel;
-only available for estimation in <code>Stan</code>)</p></dd>
+<dd><p><code>character</code> specifying the time series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
+<li><p><code>RW</code> (random walk with possible drift)</p></li>
+<li><p><code>AR1</code> (with possible drift)</p></li>
+<li><p><code>AR2</code> (with possible drift)</p></li>
+<li><p><code>AR3</code> (with possible drift)</p></li>
+<li><p><code>VAR1</code> (with possible drift; only available in <code>Stan</code>)</p></li>
+<li><p><code>GP</code> (Gaussian Process with squared exponential kernel;
+only available in <code>Stan</code>)</p></li>
+</ul></dd>
+
+
+<dt>trend_map</dt>
+<dd><p>Optional <code>data.frame</code> specifying which series should depend on which latent
+trends. Useful for allowing multiple series to depend on the same latent trend process, but with
+different observation processes. If supplied, a latent factor model is set up by setting
+<code>use_lv = TRUE</code> and using the mapping to set up the shared trends. Needs to have column names
+<code>series</code> and <code>trend</code>, with integer values in the <code>trend</code> column to state which trend each series
+should depend on. The <code>series</code> column should have a single unique entry for each series in the
+data (names should perfectly match factor levels of the <code>series</code> variable in <code>data</code>). See examples
+in <code><a href="mvgam.html">mvgam</a></code> for details</p></dd>
 
 
 <dt>drift</dt>
@@ -207,7 +237,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [23] "vector[num_basis] zero; // prior locations for basis coefficients"                                                    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [24] "matrix[total_obs, num_basis] X; // mgcv GAM design matrix"                                                            </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [25] "int&lt;lower=0&gt; ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)"</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [26] "matrix[8,8] S2; // mgcv smooth penalty matrix S2"                                                                     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [26] "matrix[8,8] S1; // mgcv smooth penalty matrix S1"                                                                     </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [27] "int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations"                                                      </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [28] "int&lt;lower=0&gt; flat_ys[n_nonmissing]; // flattened nonmissing observations"                                             </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [29] "matrix[n_nonmissing, num_basis] flat_xs; // X values for nonmissing observations"                                     </span>
@@ -245,9 +275,9 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [61] "transformed parameters {"                                                                                             </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [62] "// basis coefficients"                                                                                                </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [63] "vector[num_basis] b;"                                                                                                 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [64] "b[1:3] = mu_raw[1] + b_raw[1:3] * sigma_raw[1];"                                                                      </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [65] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [66] "b[4:num_basis] = b_raw[4:num_basis];"                                                                                 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [64] ""                                                                                                                     </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [65] "b[1:8] = b_raw[1:8];"                                                                                                 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [66] "b[9:11] = mu_raw[1] + b_raw[9:11] * sigma_raw[1];"                                                                    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [67] ""                                                                                                                     </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [68] "}"                                                                                                                    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [69] ""                                                                                                                     </span>
@@ -258,11 +288,11 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [74] "// prior for random effect population means"                                                                          </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [75] "mu_raw ~ std_normal();"                                                                                               </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [76] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [77] "// prior (non-centred) for s(series)..."                                                                              </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [78] "b_raw[1:3] ~ std_normal();"                                                                                           </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [77] "// prior for s(season)..."                                                                                            </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [78] "b_raw[1:8] ~ multi_normal_prec(zero[1:8],S1[1:8,1:8] * lambda[1]);"                                                   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [79] ""                                                                                                                     </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [80] "// prior for s(season)..."                                                                                            </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  [81] "b_raw[4:11] ~ multi_normal_prec(zero[4:11],S2[1:8,1:8] * lambda[2]);"                                                 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [80] "// prior (non-centred) for s(series)..."                                                                              </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [81] "b_raw[9:11] ~ std_normal();"                                                                                          </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [82] ""                                                                                                                     </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [83] "// priors for AR parameters"                                                                                          </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  [84] "ar1 ~ std_normal();"                                                                                                  </span>
@@ -348,13 +378,13 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd         sigma ~ exponential(2);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.52);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2   mu_raw ~ normal(-0.25, 0.8);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.25);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.94, 0.31);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(-0.11, 0.6);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.97);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.61, 0.51);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.47);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(-0.13, 0.53);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.33);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.14, 0.96);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5       ar2 ~ normal(0.4, 0.15);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.47);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7   phi_inv ~ normal(0.3, 0.63);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>
@@ -397,7 +427,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] zero; // prior locations for basis coefficients</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[total_obs, num_basis] X; // mgcv GAM design matrix</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[8,8] S2; // mgcv smooth penalty matrix S2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[8,8] S1; // mgcv smooth penalty matrix S1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; flat_ys[n_nonmissing]; // flattened nonmissing observations</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n_nonmissing, num_basis] flat_xs; // X values for nonmissing observations</span>
@@ -426,18 +456,18 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> transformed parameters {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // basis coefficients</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] b;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b[1:3] = mu_raw[1] + b_raw[1:3] * sigma_raw[1];</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b[4:num_basis] = b_raw[4:num_basis];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b[1:8] = b_raw[1:8];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b[9:11] = mu_raw[1] + b_raw[9:11] * sigma_raw[1];</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population variances</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ exponential(0.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population means</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   mu_raw ~ normal(0.2, 0.5);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior (non-centred) for s(series)...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[1:3] ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(season)...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[4:11] ~ multi_normal_prec(zero[4:11],S2[1:8,1:8] * lambda[2]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[1:8] ~ multi_normal_prec(zero[1:8],S1[1:8,1:8] * lambda[1]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior (non-centred) for s(series)...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[9:11] ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for AR parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar1 ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar2 ~ normal(0, 0.25);</span>
@@ -526,7 +556,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] zero; // prior locations for basis coefficients</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[total_obs, num_basis] X; // mgcv GAM design matrix</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[8,8] S2; // mgcv smooth penalty matrix S2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[8,8] S1; // mgcv smooth penalty matrix S1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; flat_ys[n_nonmissing]; // flattened nonmissing observations</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n_nonmissing, num_basis] flat_xs; // X values for nonmissing observations</span>
@@ -555,18 +585,18 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> transformed parameters {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // basis coefficients</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] b;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b[1:3] = mu_raw[1] + b_raw[1:3] * sigma_raw[1];</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b[4:num_basis] = b_raw[4:num_basis];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b[1:8] = b_raw[1:8];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b[9:11] = mu_raw[1] + b_raw[9:11] * sigma_raw[1];</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population variances</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ exponential(0.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population means</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   mu_raw ~ normal(0.2, 0.5);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior (non-centred) for s(series)...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[1:3] ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(season)...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[4:11] ~ multi_normal_prec(zero[4:11],S2[1:8,1:8] * lambda[2]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[1:8] ~ multi_normal_prec(zero[1:8],S1[1:8,1:8] * lambda[1]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior (non-centred) for s(series)...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[9:11] ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for AR parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar1 ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar2 ~ std_normal();</span>

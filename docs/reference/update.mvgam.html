@@ -49,7 +49,20 @@
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">object</span>, <span class="va">formula</span>, <span class="va">data</span>, <span class="va">newdata</span>, <span class="va">trend_model</span>, <span class="va">use_lv</span>, <span class="va">n_lv</span>, <span class="va">family</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span></span>
+<span>  <span class="va">object</span>,</span>
+<span>  <span class="va">formula</span>,</span>
+<span>  <span class="va">trend_formula</span>,</span>
+<span>  <span class="va">data</span>,</span>
+<span>  <span class="va">newdata</span>,</span>
+<span>  <span class="va">trend_model</span>,</span>
+<span>  <span class="va">trend_map</span>,</span>
+<span>  <span class="va">use_lv</span>,</span>
+<span>  <span class="va">n_lv</span>,</span>
+<span>  <span class="va">family</span>,</span>
+<span>  <span class="va">priors</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -59,9 +72,17 @@
 
 
 <dt>formula</dt>
-<dd><p>A new <code>formula</code> object. Note, <code>mvgam</code> currently does not support dynamic formula
+<dd><p>Optional new <code>formula</code> object. Note, <code>mvgam</code> currently does not support dynamic formula
 updates such as removal of specific terms with <code>- term</code>. When updating, the entire formula needs
 to be supplied</p></dd>
+
+
+<dt>trend_formula</dt>
+<dd><p>An optional <code>character</code> string specifying the GAM process model formula. If
+supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
+separately from the observation model. Should not have a response variable specified on the left-hand side
+of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). This feature is experimental, and is only
+currently available for Random Walk trend models.</p></dd>
 
 
 <dt>data</dt>
@@ -80,16 +101,27 @@ simulations can be obtained</p></dd>
 
 
 <dt>trend_model</dt>
-<dd><p><code>character</code> specifying the time series dynamics for the latent trend. Options are:
-'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>),
-'RW' (random walk with possible drift),
-'AR1' (with possible drift),
-'AR2' (with possible drift) or
-'AR3' (with possible drift) or
-'VAR1' (with possible drift; only available in <code>Stan</code>) or
-'GP' (Gaussian Process with squared exponential kernel;
-only available in <code>stan</code>)</p></dd>
+<dd><p><code>character</code> specifying the time series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
+<li><p><code>RW</code> (random walk with possible drift)</p></li>
+<li><p><code>AR1</code> (with possible drift)</p></li>
+<li><p><code>AR2</code> (with possible drift)</p></li>
+<li><p><code>AR3</code> (with possible drift)</p></li>
+<li><p><code>VAR1</code> (with possible drift; only available in <code>Stan</code>)</p></li>
+<li><p><code>GP</code> (Gaussian Process with squared exponential kernel;
+only available in <code>Stan</code>)</p></li>
+</ul></dd>
+
+
+<dt>trend_map</dt>
+<dd><p>Optional <code>data.frame</code> specifying which series should depend on which latent
+trends. Useful for allowing multiple series to depend on the same latent trend process, but with
+different observation processes. If supplied, a latent factor model is set up by setting
+<code>use_lv = TRUE</code> and using the mapping to set up the shared trends. Needs to have column names
+<code>series</code> and <code>trend</code>, with integer values in the <code>trend</code> column to state which trend each series
+should depend on. The <code>series</code> column should have a single unique entry for each series in the
+data (names should perfectly match factor levels of the <code>series</code> variable in <code>data</code>). See examples
+in <code><a href="mvgam.html">mvgam</a></code> for details</p></dd>
 
 
 <dt>use_lv</dt>
@@ -105,6 +137,12 @@ Cannot be <code>&gt;n_series</code>. Defaults arbitrarily to <code>min(2, floor(
 <dt>family</dt>
 <dd><p><code>family</code> specifying the exponential observation family for the series. Currently supported
 families are: <code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code>, <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code><a href="mvgam_families.html">tweedie()</a></code>, <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar()</a></code>, <code><a href="mvgam_families.html">lognormal()</a></code>, <code><a href="mvgam_families.html">student_t()</a></code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code></p></dd>
+
+
+<dt>priors</dt>
+<dd><p>An optional <code>data.frame</code> with prior
+definitions. See <code><a href="get_mvgam_priors.html">get_mvgam_priors</a></code> and
+<a href="mvgam.html">mvgam</a> for more information on changing default prior distributions</p></dd>
 
 
 <dt>...</dt>

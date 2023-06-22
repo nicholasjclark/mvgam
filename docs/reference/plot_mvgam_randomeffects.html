@@ -48,13 +48,18 @@
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">plot_mvgam_randomeffects</span><span class="op">(</span><span class="va">object</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">plot_mvgam_randomeffects</span><span class="op">(</span><span class="va">object</span>, trend_effects <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>object</dt>
 <dd><p><code>list</code> object returned from <code>mvgam</code></p></dd>
+
+
+<dt>trend_effects</dt>
+<dd><p>logical. If <code>TRUE</code> and a <code>trend_formula</code> was used in model
+fitting, terms from the trend (i.e. process) model will be plotted</p></dd>
 
 </dl></div>
     <div class="section level2">
