@@ -21,12 +21,12 @@ as it saves recomputing the full set of trends for each series individually}
 
 \item{type}{When this has the value \code{link}, the linear predictor is calculated on the log link scale.
 When \code{response} is used, the predictions take uncertainty in the observation process into account to return
-predictions on the outcome (discrete) scale (default). When \code{trend} is used, only the forecast distribution for the
+predictions on the outcome (discrete) scale (default). When \code{trend} is used, only the hindcast distribution for the
 latent trend is returned}
 }
 \value{
-An object of class \code{mvgam_forecast} containing hindcast distributions
-for the required series
+An object of class \code{mvgam_forecast} containing hindcast distributions.
+See \code{\link{mvgam_forecast-class}} for details.
 }
 \description{
 Extract hindcasts for a fitted \code{mvgam} object

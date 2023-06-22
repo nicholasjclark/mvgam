@@ -241,12 +241,32 @@ if(object$use_lv){
 
     if(object$trend_model == 'AR1'){
       if(object$drift){
-        message("Latent trend drift and AR parameter estimates:")
-        print(mcmc_summary(object$model_output, c('drift', 'ar1'))[,c(3:7)])
-        message()
+        if(!is.null(object$trend_call)){
+          message("Process model drift and AR parameter estimates:")
+          print(mcmc_summary(object$model_output, c('drift', 'ar1'))[,c(3:7)])
+          message()
+        } else {
+          message("Latent trend drift and AR parameter estimates:")
+          print(mcmc_summary(object$model_output, c('drift', 'ar1'))[,c(3:7)])
+          message()
+        }
+
       } else {
-        message("Latent trend AR parameter estimates:")
-        print(mcmc_summary(object$model_output, c('ar1'))[,c(3:7)])
+        if(!is.null(object$trend_call)){
+          message("Process model AR parameter estimates:")
+          print(mcmc_summary(object$model_output, c('ar1'))[,c(3:7)])
+          message()
+        } else {
+          message("Latent trend AR parameter estimates:")
+          print(mcmc_summary(object$model_output, c('ar1'))[,c(3:7)])
+          message()
+        }
+
+      }
+
+      if(!is.null(object$trend_call)){
+        message("Process error parameter estimates:")
+        print(mcmc_summary(object$model_output, c('sigma'))[,c(3:7)])
         message()
       }
     }

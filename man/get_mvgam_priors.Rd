@@ -6,6 +6,7 @@
 \usage{
 get_mvgam_priors(
   formula,
+  trend_formula,
   data,
   data_train,
   family = "poisson",
@@ -21,6 +22,12 @@ get_mvgam_priors(
 \item{formula}{A \code{character} string specifying the GAM formula. These are exactly like the formula
 for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these)}
+
+\item{trend_formula}{An optional \code{character} string specifying the GAM process model formula. If
+supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
+separately from the observation model. Should not have a response variable specified on the left-hand side
+of the formula (i.e. a valid option would be \code{~ season + s(year)}). This feature is experimental, and is only
+currently available for Random Walk trend models.}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:

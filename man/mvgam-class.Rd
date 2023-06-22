@@ -5,9 +5,7 @@
 \title{Fitted \code{mvgam} object description}
 \description{
 A fitted \code{mvgam} object returned by function \code{\link{mvgam}}.
-Method functions \code{as.data.frame}, \code{code}, \code{coef}, \code{forecast}, \code{hindcast}, \code{lfo_cv},
-\code{logLik}, \code{plot}, \code{ppc}, \code{predict},
-\code{print}, \code{score}, \code{summary} and \code{update} exist for this class.
+Run \code{methods(class = "mvgam")} to see an overview of available methods.
 }
 \details{
 A \code{mvgam} object contains the following elements:
@@ -17,6 +15,8 @@ A \code{mvgam} object contains the following elements:
 returned. Otherwise \code{NULL}
 \item \code{family} \code{character} description of the observation distribution
 \item \code{trend_model} \code{character} description of the latent trend model
+\item \code{trend_map} \code{data.frame} describing the mapping of trend states to
+observations, if supplied in the original model. Otherwise \code{NULL}
 \item \code{drift} Logical specifying whether a drift term was used in the trend model
 \item \code{priors} If the model priors were updated from their defaults, the prior \code{dataframe}
 will be returned. Otherwise \code{NULL}

@@ -13,7 +13,8 @@
 #'@param trend_formula An optional \code{character} string specifying the GAM process model formula. If
 #'supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
 #'separately from the observation model. Should not have a response variable specified on the left-hand side
-#'of the formula (i.e. a valid option would be `~ season + s(year)`)
+#'of the formula (i.e. a valid option would be `~ season + s(year)`). This feature is experimental, and is only
+#'currently available for Random Walk trend models.
 #'@param knots An optional \code{list} containing user specified knot values to be used for basis construction.
 #'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
 #'(note that the number of knots is not always just k). Different terms can use different numbers of knots,
@@ -260,7 +261,7 @@
 #'      series = 1)
 #'
 #' # Plot the estimated seasonal smooth function
-#'plot(mod1, type = 'smooths')
+#' plot(mod1, type = 'smooths')
 #'
 #' # Plot estimated first derivatives of the smooth
 #' plot(mod1, type = 'smooths', derivatives = TRUE)
@@ -484,8 +485,8 @@ mvgam = function(formula,
                               trend = 1:length(unique(data_train$series)))
     }
 
-    if(trend_model != 'RW'){
-      stop('only random walk trends currently supported for trend predictor models',
+    if(!trend_model %in% c('RW', 'AR1')){
+      stop('only RW and AR1 trends currently supported for trend predictor models',
            call. = FALSE)
     }
   }
@@ -1369,13 +1370,6 @@ mvgam = function(formula,
                                      offset = offset,
                                      drift = drift)
 
-    if(!missing(priors)){
-      vectorised$model_file <- update_priors(vectorised$model_file, priors,
-                                             use_stan = TRUE)
-    } else {
-      priors <- NULL
-    }
-
     if(!missing(trend_map)){
       trend_map_setup <- trend_map_mods(model_file = vectorised$model_file,
                                         model_data = vectorised$model_data,
@@ -1424,6 +1418,14 @@ mvgam = function(formula,
       }
     }
 
+    # Update priors
+    if(!missing(priors)){
+      vectorised$model_file <- update_priors(vectorised$model_file, priors,
+                                             use_stan = TRUE)
+    } else {
+      priors <- NULL
+    }
+
   } else {
     # Set up data and model file for JAGS
     if(!smooths_included){
@@ -1466,6 +1468,11 @@ mvgam = function(formula,
                                },
                                family = family_char,
                                trend_model = trend_model,
+                               trend_map = if(!missing(trend_map)){
+                                 trend_map
+                               } else {
+                                 NULL
+                               },
                                drift = drift,
                                priors = priors,
                                model_file = if(use_stan){
@@ -1767,6 +1774,11 @@ mvgam = function(formula,
                            },
                            family = family_char,
                            trend_model = trend_model,
+                           trend_map = if(!missing(trend_map)){
+                             trend_map
+                           } else {
+                             NULL
+                           },
                            drift = drift,
                            priors = priors,
                            model_output = out_gam_mod,

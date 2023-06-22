@@ -44,7 +44,8 @@ to specify that the linear predictor depends on smooth functions of predictors (
 \item{trend_formula}{An optional \code{character} string specifying the GAM process model formula. If
 supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
 separately from the observation model. Should not have a response variable specified on the left-hand side
-of the formula (i.e. a valid option would be \code{~ season + s(year)})}
+of the formula (i.e. a valid option would be \code{~ season + s(year)}). This feature is experimental, and is only
+currently available for Random Walk trend models.}
 
 \item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
 For most bases the user simply supplies the knots to be used, which must match up with the k value supplied

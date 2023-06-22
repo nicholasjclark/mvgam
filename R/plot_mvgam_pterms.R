@@ -173,6 +173,6 @@ if(length(pterms) > 0){
   par(.pardefault)
   layout(1)
 } else {
-  message('No parametric terms found in model')
+  message('No parametric terms in model formula')
 }
 }

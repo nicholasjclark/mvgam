@@ -2636,6 +2636,33 @@ add_trend_predictors = function(trend_formula,
     model_file <- readLines(textConnection(model_file), n = -1)
   }
 
+  if(trend_model == 'AR1'){
+    model_file[grep('// latent factor AR1 terms', model_file, fixed = TRUE)] <-
+      '// latent state AR1 terms'
+    model_file <- model_file[-c(grep("for(j in 1:n_lv){", model_file, fixed = TRUE):
+                                  (grep("for(j in 1:n_lv){", model_file, fixed = TRUE) + 2))]
+
+    if(drift){
+      model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);",
+                      model_file, fixed = TRUE)] <-
+        paste0("for(j in 1:n_lv){\n",
+               "LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
+               "for(i in 2:n){\n",
+               "LV[i, j] ~ normal(drift[j] + trend_mus[ytimes_trend[i, j]] + ar1[j] * LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]], sigma[j]);\n",
+               "}\n}")
+    } else {
+      model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);",
+                      model_file, fixed = TRUE)] <-
+        paste0("for(j in 1:n_lv){\n",
+               "LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
+               "for(i in 2:n){\n",
+               "LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]] + ar1[j] * LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]], sigma[j]);\n",
+               "}\n}")
+    }
+
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
+
   return(list(model_file = model_file,
               model_data = model_data,
               trend_mgcv_model = trend_mvgam$mgcv_model,
