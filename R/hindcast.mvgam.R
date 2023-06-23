@@ -79,7 +79,6 @@ if(series == 'all'){
                          'response' = 'ypred',
                          'trend' = 'trend')
     if(object$fit_engine == 'stan'){
-
       preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
                                                                  dim(mcmc_chains(object$model_output, 'ypred'))[2],
                                                                  by = NCOL(object$ytimes))][,1:last_train]

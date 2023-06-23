@@ -142,9 +142,7 @@ rstudent_t = function(n, df, mu = 0, sigma = 1) {
 #' @param Xp A `mgcv` linear predictor matrix
 #' @param family \code{character}. The `family` slot of the model's family argument
 #' @param betas Vector of regression coefficients of length `NCOL(Xp)`
-#' @param type When this has the value \code{link} (default) the linear predictor is calculated on the log link scale.
-#' When \code{response} is used, the predictions take uncertainty in the observation process into account to return
-#' predictions on the outcome scale
+#' @param type Either `link`, `expected` or `response`
 #' @param family_pars Additional arguments for each specific observation process (i.e.
 #' overdispersion parameter if `family == "nb"`)
 #' @param density logical. Rather than calculating a prediction, evaluate the log-likelihood.
@@ -161,7 +159,7 @@ mvgam_predict = function(Xp, family, betas,
 
   # Gaussian observations (requires family parameter 'sigma_obs')
   if(family == 'gaussian'){
-    if(type ==  'link'){
+    if(type %in% c('link', 'expected')){
       out <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                           betas) + attr(Xp, 'model.offset'))
       if(density){
@@ -190,18 +188,22 @@ mvgam_predict = function(Xp, family, betas,
                       log = TRUE)
       }
 
-    } else {
+    } else if(type == 'response'){
       out <- rlnorm(n = NROW(Xp),
                     meanlog = ((matrix(Xp, ncol = NCOL(Xp)) %*%
                                       betas)) +
                                     attr(Xp, 'model.offset'),
                     sdlog = family_pars$sigma_obs)
+    } else {
+      mu <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                              betas) + attr(Xp, 'model.offset'))
+      out <- exp(mu + (family_pars$sigma_obs^2 / 2))
     }
   }
 
   # Student-T observations (requires family parameters 'nu', 'sigma_obs')
   if(family == 'student'){
-    if(type ==  'link'){
+    if(type %in%  c('link', 'expected')){
       out <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                           betas) + attr(Xp, 'model.offset'))
       if(density){
@@ -232,11 +234,15 @@ mvgam_predict = function(Xp, family, betas,
                      log = TRUE)
       }
 
-    } else {
+    } else if(type == 'response'){
       out <- rpois(n = NROW(Xp),
                    lambda = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                                     betas)) +
                                   attr(Xp, 'model.offset')))
+    } else {
+      out <- exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
+                     betas)) +
+                   attr(Xp, 'model.offset'))
     }
   }
 
@@ -252,12 +258,16 @@ mvgam_predict = function(Xp, family, betas,
                        log = TRUE)
       }
 
-    } else {
+    } else if(type == 'response'){
       out <- rnbinom(n = NROW(Xp),
                      mu = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                                   betas)) +
                                 attr(Xp, 'model.offset')),
                      size = family_pars$phi)
+    } else {
+      out <- exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
+                     betas)) +
+                   attr(Xp, 'model.offset'))
     }
   }
 
@@ -266,7 +276,7 @@ mvgam_predict = function(Xp, family, betas,
     shape_pars <- beta_shapes(mu = plogis(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                                                        betas) + attr(Xp, 'model.offset'))),
                               phi = family_pars$phi)
-    if(type ==  'link'){
+    if(type == 'link'){
       out <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                           betas) + attr(Xp, 'model.offset'))
 
@@ -277,10 +287,13 @@ mvgam_predict = function(Xp, family, betas,
                      log = TRUE)
       }
 
-    } else {
+    } else if(type == 'response'){
       out <- rbeta(n = NROW(Xp),
                    shape1 = shape_pars$shape1,
                    shape2 = shape_pars$shape2)
+    } else {
+     out <- plogis(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                          betas) + attr(Xp, 'model.offset')))
     }
   }
 
@@ -297,10 +310,16 @@ mvgam_predict = function(Xp, family, betas,
                       log = TRUE)
       }
 
-    } else {
+    } else if(type == 'response'){
       out <- rgamma(n = NROW(Xp),
-                    rate = family_pars$shape / exp(out),
+                    rate = family_pars$shape /
+                      exp(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                                       betas) + attr(Xp, 'model.offset'))),
                     shape = family_pars$shape)
+    } else {
+      out <- family_pars$shape /
+        (family_pars$shape / exp(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                                              betas) + attr(Xp, 'model.offset'))))
     }
   }
 
@@ -319,7 +338,7 @@ mvgam_predict = function(Xp, family, betas,
                                    all.derivs = F)[,1]
       }
 
-    } else {
+    } else if(type == 'response'){
       out <- rpois(n = NROW(Xp),
                    lambda = mgcv::rTweedie(
                      mu = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
@@ -328,6 +347,10 @@ mvgam_predict = function(Xp, family, betas,
                      # Power parameter is fixed
                      p = 1.5,
                      phi = family_pars$phi))
+    } else {
+      out <- exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
+                     betas)) +
+                   attr(Xp, 'model.offset'))
     }
   }
   return(out)

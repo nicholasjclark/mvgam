@@ -30,17 +30,15 @@ test_that("logLik has reasonable ouputs", {
 })
 
 test_that("predict has reasonable outputs", {
-  gaus_preds <- predict(gaus_ar1, n_cores = 1)
+  gaus_preds <- predict(gaus_ar1, n_cores = 1, type = 'link')
   expect_equal(dim(gaus_preds),
                c(3000, NROW(gaus_data$data_train)))
-  expect_lt(max(gaus_preds), 2)
-  expect_gt(max(gaus_preds), -2)
 
   beta_preds <- predict(beta_gp, n_cores = 1, type = 'response')
   expect_equal(dim(beta_preds),
                c(3000, NROW(beta_data$data_train)))
-  expect_lt(max(beta_preds), 1)
-  expect_gt(max(gaus_preds), 0)
+  expect_lt(max(beta_preds), 1.00000001)
+  expect_gt(max(beta_preds), -0.0000001)
 })
 
 test_that("forecast and friends have reasonable outputs", {

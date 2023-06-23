@@ -16,9 +16,10 @@ predictions are generated for the original observations used for the model fit.}
 \item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
 \code{newdata} instead for more seamless integration into \code{R} workflows}
 
-\item{type}{When this has the value \code{link} (default) the linear predictor is calculated on the log link scale.
-When \code{response} is used, the predictions take uncertainty in the observation process into account to return
-predictions on the outcome (discrete) scale}
+\item{type}{When this has the value \code{link} (default) the linear predictor is calculated on the link scale.
+If \code{expected} is used, predictions reflect the expectation of the response (the mean)
+but ignore uncertainty in the observation process. When \code{response} is used, the predictions take uncertainty in the observation process into account to return
+predictions on the outcome scale}
 
 \item{n_cores}{\code{integer} specifying number of cores for generating predictions in parallel}
 
@@ -32,10 +33,15 @@ posterior samples from the fitted object and \code{n_obs} is the number of test 
 Predict from the GAM component of an mvgam model
 }
 \details{
-Note that for both sets of predictions, the temporal
-dynamics of any fitted latent trends will be ignored. This function is therefore more
-suited to posterior simulation from the GAM component of a \code{mvgam} model,
-while the forecasting functions
+Note that for all types of predictions, expected uncertainty in the process model is
+accounted for only by using draws from the trend  SD parameters. If a \code{trend_formula}
+was supplied in the model, predictions for this component will
+also be incorporated. But the trend predictions will ignore autocorrelation
+coefficients or GP length scale coefficients, ultimately assuming the process is stationary.
+This method is similar to the types of posterior predictions returned from \code{brms} models
+when using autocorrelated error predictions for newdata.
+This function is therefore more suited to posterior simulation from the GAM components
+of a \code{mvgam} model, while the forecasting functions
 \code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better suited to generate h-step ahead forecasts
 that respect the temporal dynamics of estimated latent trends.
 }
