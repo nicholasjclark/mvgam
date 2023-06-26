@@ -92,7 +92,7 @@ families are:
 \item\code{lognormal()} for non-negative real-valued data
 \item\code{student_t()} for real-valued data
 \item\code{Gamma()} for non-negative real-valued data}
-See \code{\link{mvgam_families}} for more details}
+See \link{mvgam_families} for more details}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series}
@@ -117,9 +117,10 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{AR1} (with possible drift)
 \item \code{AR2} (with possible drift)
 \item \code{AR3} (with possible drift)
-\item \code{VAR1} (with possible drift; only available in \code{Stan})
+\item \code{VAR1} (contemporaneously uncorrelated VAR1; only available in \code{Stan})
+\item \code{VAR1cor} (contemporaneously correlated VAR1; only available in \code{Stan})
 \item \code{GP} (Gaussian Process with squared exponential kernel;
-only available in \code{Stan})}}
+only available in \code{Stan})} See \link{mvgam_trends} for more details}
 
 \item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
@@ -147,7 +148,7 @@ parallelisation in \code{Stan}. We recommend its use only if you are experienced
 up by any other means. Only available when using \code{Cmdstan} as the backend}
 
 \item{priors}{An optional \code{data.frame} with prior
-definitions (in JAGS or Stan syntax). See \code{\link{get_mvgam_priors}} and
+definitions (in JAGS or Stan syntax). See \link{get_mvgam_priors} and
 'Details' for more information on changing default prior distributions}
 
 \item{upper_bounds}{Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
@@ -156,7 +157,7 @@ is computationally expensive in \code{JAGS} but can lead to better estimates whe
 truncation entirely (i.e. there is no upper bound for each series). Currently not implemented
 in \code{Stan}}
 
-\item{refit}{Logical indicating whether this is a refit, called using \code{\link{update.mvgam}}. Users should leave
+\item{refit}{Logical indicating whether this is a refit, called using \link{update.mvgam}. Users should leave
 as \code{FALSE}}
 
 \item{use_stan}{Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
@@ -464,7 +465,7 @@ layout(1)
 }
 }
 \references{
-Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series
+Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 Methods in Ecology and Evolution. 14:3, 771-784.
 }
 \seealso{

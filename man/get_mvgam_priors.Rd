@@ -74,9 +74,10 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{AR1} (with possible drift)
 \item \code{AR2} (with possible drift)
 \item \code{AR3} (with possible drift)
-\item \code{VAR1} (with possible drift; only available in \code{Stan})
+\item \code{VAR1} (contemporaneously uncorrelated VAR1; only available in \code{Stan})
+\item \code{VAR1cor} (contemporaneously correlated VAR1; only available in \code{Stan})
 \item \code{GP} (Gaussian Process with squared exponential kernel;
-only available in \code{Stan})}}
+only available in \code{Stan})} See \link{mvgam_trends} for more details}
 
 \item{trend_map}{Optional \code{data.frame} specifying which series should depend on which latent
 trends. Useful for allowing multiple series to depend on the same latent trend process, but with

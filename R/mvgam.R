@@ -52,7 +52,7 @@
 #'   \item`lognormal()` for non-negative real-valued data
 #'   \item`student_t()` for real-valued data
 #'   \item`Gamma()` for non-negative real-valued data}
-#'See \code{\link{mvgam_families}} for more details
+#'See [mvgam_families] for more details
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
@@ -65,9 +65,10 @@
 #'   \item `AR1` (with possible drift)
 #'   \item `AR2` (with possible drift)
 #'   \item `AR3` (with possible drift)
-#'   \item `VAR1` (with possible drift; only available in \code{Stan})
+#'   \item `VAR1` (contemporaneously uncorrelated VAR1; only available in \code{Stan})
+#'   \item `VAR1cor` (contemporaneously correlated VAR1; only available in \code{Stan})
 #'   \item `GP` (Gaussian Process with squared exponential kernel;
-#'only available in \code{Stan})}
+#'only available in \code{Stan})} See [mvgam_trends] for more details
 #'@param trend_map Optional `data.frame` specifying which series should depend on which latent
 #'trends. Useful for allowing multiple series to depend on the same latent trend process, but with
 #'different observation processes. If supplied, a latent factor model is set up by setting
@@ -95,9 +96,9 @@
 #'\code{Stan}'s `reduce_sum` function and have a slow running model that cannot be sped
 #'up by any other means. Only available when using \code{Cmdstan} as the backend
 #'@param priors An optional \code{data.frame} with prior
-#'definitions (in JAGS or Stan syntax). See \code{\link{get_mvgam_priors}} and
+#'definitions (in JAGS or Stan syntax). See [get_mvgam_priors] and
 #''Details' for more information on changing default prior distributions
-#'@param refit Logical indicating whether this is a refit, called using \code{\link{update.mvgam}}. Users should leave
+#'@param refit Logical indicating whether this is a refit, called using [update.mvgam]. Users should leave
 #'as `FALSE`
 #'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 #'this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
@@ -180,7 +181,7 @@
 #'of more response distributions, plans to handle zero-inflation, and plans to incorporate a greater
 #'variety of trend models. Users are strongly encouraged to opt for `Stan` over `JAGS` in any proceeding workflows
 #'@author Nicholas J Clark
-#'@references Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series
+#'@references Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 #'Methods in Ecology and Evolution. 14:3, 771-784.
 #'@seealso \code{\link[mgcv]{jagam}}, \code{\link[mgcv]{gam}}
 #'@return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
@@ -478,6 +479,14 @@ mvgam = function(formula,
 
   # Validate the trend arguments
   trend_model <- evaluate_trend_model(trend_model)
+  use_var1 <- FALSE; use_var1cor <- FALSE
+  if(trend_model == 'VAR1'){
+    use_var1 <- TRUE
+  }
+  if(trend_model == 'VAR1cor'){
+    use_var1cor <- TRUE
+    trend_model <- 'VAR1'
+  }
 
   if(!missing(trend_formula)){
     if(missing(trend_map)){
@@ -1370,6 +1379,8 @@ mvgam = function(formula,
                                      offset = offset,
                                      drift = drift)
 
+    # Add modifications for trend mapping and trend predictors, if
+    # supplied
     if(!missing(trend_map)){
       trend_map_setup <- trend_map_mods(model_file = vectorised$model_file,
                                         model_data = vectorised$model_data,
@@ -1416,6 +1427,16 @@ mvgam = function(formula,
         }
 
       }
+    }
+
+    # If a VAR model is used, enforce stationarity using methods described by
+    # Heaps 2022 (Enforcing stationarity through the prior in vector autoregressions)
+    if(use_var1){
+      vectorised$model_file <- stationarise_VAR(vectorised$model_file)
+    }
+
+    if(use_var1cor){
+      vectorised$model_file <- stationarise_VARcor(vectorised$model_file)
     }
 
     # Update priors

@@ -44,9 +44,10 @@
 #'   \item `AR1` (with possible drift)
 #'   \item `AR2` (with possible drift)
 #'   \item `AR3` (with possible drift)
-#'   \item `VAR1` (with possible drift; only available in \code{Stan})
+#'   \item `VAR1` (contemporaneously uncorrelated VAR1; only available in \code{Stan})
+#'   \item `VAR1cor` (contemporaneously correlated VAR1; only available in \code{Stan})
 #'   \item `GP` (Gaussian Process with squared exponential kernel;
-#'only available in \code{Stan})}
+#'only available in \code{Stan})} See [mvgam_trends] for more details
 #'@param trend_map Optional `data.frame` specifying which series should depend on which latent
 #'trends. Useful for allowing multiple series to depend on the same latent trend process, but with
 #'different observation processes. If supplied, a latent factor model is set up by setting
@@ -310,7 +311,7 @@ get_mvgam_priors = function(formula,
   } else {
 
     # JAGS cannot support latent GP or VAR trends
-    if(!use_stan & trend_model %in%c ('GP', 'VAR1')){
+    if(!use_stan & trend_model %in%c ('GP', 'VAR1', 'VAR1cor')){
       warning('gaussian process and VAR trends not yet supported for JAGS; reverting to Stan')
       use_stan <- TRUE
     }
@@ -630,22 +631,85 @@ get_mvgam_priors = function(formula,
     }
 
     if(trend_model == 'VAR1'){
-      trend_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma;',
-                                            'matrix<lower=-1,upper=1>[n_series, n_series] A;'),
-                             param_length = c(length(unique(data_train$series)),
-                                              length(unique(data_train$series))^2),
-                             param_info = c('trend sd', 'VAR1 coefficients'),
-                             prior = c('sigma ~ inv_gamma(2.3693353, 0.7311319);',
-                                       'to_vector(A) ~ normal(0, 0.5);'),
+      trend_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma;'),
+                             param_length = c(length(unique(data_train$series))),
+                             param_info = c('trend sd'),
+                             prior = c('sigma ~ inv_gamma(2.3693353, 0.7311319);'),
                              example_change = c(
                                paste0('sigma ~ exponential(',
                                       round(runif(min = 0.01, max = 1, n = 1), 2),
                                       ');'
-                               ),
-                               paste0('to_vector(A) ~ normal(0, ',
-                                      round(runif(min = 0.01, max = 1, n = 1), 2),
-                                      ');'
                                )))
+      trend_df <- rbind(trend_df,
+                        data.frame(param_name = c("real es[1];",
+                                                  "real es[2];",
+                                                  "real<lower=0> fs[1];",
+                                                  "real<lower=0> fs[2];",
+                                                  "real<lower=0> gs[1];",
+                                                  "real<lower=0> gs[2];",
+                                                  "real<lower=0> hs[1];",
+                                                  "real<lower=0> hs[2];"),
+                                   param_length = 1,
+                                   param_info = c('diagonal autocorrelation population mean',
+                                                  'off-diagonal autocorrelation population mean',
+                                                  'diagonal autocorrelation population variance',
+                                                  'off-diagonal autocorrelation population variance',
+                                                  'shape1 for diagonal autocorrelation precision',
+                                                  'shape1 for off-diagonal autocorrelation precision',
+                                                  'shape2 for diagonal autocorrelation precision',
+                                                  'shape2 for off-diagonal autocorrelation precision'),
+                                   prior = c("es[1] = 0;",
+                                             "es[2] = 0;",
+                                             "fs[1] = sqrt(0.455);",
+                                             "fs[2] = sqrt(0.455);",
+                                             "gs[1] = 1.365;",
+                                             "gs[2] = 1.365;",
+                                             "hs[1] = 0.071175;" ,
+                                             "hs[2] = 0.071175;"),
+                                   example_change = c("es[1] = 0.5;",
+                                                      "es[2] = 0.1;",
+                                                      "fs[1] = 0.6;",
+                                                      "fs[2] = 0.3;",
+                                                      "gs[1] = 1.1;",
+                                                      "gs[2] = 1.07;",
+                                                      "hs[1] = 0.08;",
+                                                      "hs[2] = 0.1;")))
+    }
+
+    if(trend_model == 'VAR1cor'){
+      trend_df <- data.frame(param_name = c("real es[1];",
+                                            "real es[2];",
+                                            "real<lower=0> fs[1];",
+                                            "real<lower=0> fs[2];",
+                                            "real<lower=0> gs[1];",
+                                            "real<lower=0> gs[2];",
+                                            "real<lower=0> hs[1];",
+                                            "real<lower=0> hs[2];"),
+                                   param_length = 1,
+                                   param_info = c('diagonal autocorrelation population mean',
+                                                  'off-diagonal autocorrelation population mean',
+                                                  'diagonal autocorrelation population variance',
+                                                  'off-diagonal autocorrelation population variance',
+                                                  'shape1 for diagonal autocorrelation precision',
+                                                  'shape1 for off-diagonal autocorrelation precision',
+                                                  'shape2 for diagonal autocorrelation precision',
+                                                  'shape2 for off-diagonal autocorrelation precision'),
+                                   prior = c("es[1] = 0;",
+                                             "es[2] = 0;",
+                                             "fs[1] = sqrt(0.455);",
+                                             "fs[2] = sqrt(0.455);",
+                                             "gs[1] = 1.365;",
+                                             "gs[2] = 1.365;",
+                                             "hs[1] = 0.071175;" ,
+                                             "hs[2] = 0.071175;"),
+                                   example_change = c("es[1] = 0.5;",
+                                                      "es[2] = 0.1;",
+                                                      "fs[1] = 0.6;",
+                                                      "fs[2] = 0.3;",
+                                                      "gs[1] = 1.1;",
+                                                      "gs[2] = 1.07;",
+                                                      "hs[1] = 0.08;" ,
+                                                      "hs[2] = 0.1;"))
     }
 
     if(trend_model == 'AR1'){
