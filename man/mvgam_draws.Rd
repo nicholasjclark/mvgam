@@ -6,9 +6,9 @@
 \alias{as.matrix.mvgam}
 \title{Extract posterior draws from fitted \code{mvgam} objects}
 \usage{
-\method{as.data.frame}{mvgam}(x, row.names = NULL, optional = TRUE, variable, ...)
+\method{as.data.frame}{mvgam}(x, row.names = NULL, optional = TRUE, variable = "betas", ...)
 
-\method{as.matrix}{mvgam}(x, variable, ...)
+\method{as.matrix}{mvgam}(x, variable = "betas", ...)
 }
 \arguments{
 \item{x}{\code{list} object of class \code{mvgam}}
@@ -22,8 +22,8 @@
 \item \code{betas} (beta coefficients from the GAM observation model linear predictor; default)
 \item \code{trend_params} (parameters governing the trend dynamics, such as AR parameters,
 trend SD parameters or Gaussian Process parameters)
-\item \code{trend_betas} (beta coefficients from the GAM latent trend model linear predictor;
-currently ignored)
+\item \code{trend_betas} (beta coefficients from the GAM latent process model linear predictor;
+only available if a \code{trend_formula} was supplied in the original model)
 \item \code{obs_params} (other parameters specific to the observation model, such as overdispsersions
 for negative binomial models or observation error SD for gaussian / student-t models)}}
 

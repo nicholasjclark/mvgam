@@ -24,8 +24,8 @@
 #'latent trend is returned
 #'@param ... Ignored
 #'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to simulate a forecast distribution
-#'@return An object of class \code{mvgam_forecast} containing hindcast and forecast distributions
-#'for the required series
+#'@return An object of class \code{mvgam_forecast} containing hindcast and forecast distributions.
+#'See \code{\link{mvgam_forecast-class}} for details.
 #'
 #'@export
 forecast <- function(object, ...){
@@ -611,8 +611,10 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
   }
 
   series_fcs <- structure(list(call = object$call,
+                               trend_call = object$trend_call,
                                family = object$family,
                                trend_model = object$trend_model,
+                               drift = object$drift,
                                use_lv = object$use_lv,
                                fit_engine = object$fit_engine,
                                type = type,

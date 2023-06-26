@@ -59,6 +59,7 @@ uncertainty components</p>
 <span>  residuals <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">newdata</span>,</span>
 <span>  <span class="va">data_test</span>,</span>
+<span>  trend_effects <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -110,6 +111,11 @@ uncertainty components (<code>type = uncertainty</code>).</p></dd>
 <dt>data_test</dt>
 <dd><p>Deprecated. Still works in place of <code>newdata</code> but users are recommended to use
 <code>newdata</code> instead for more seamless integration into <code>R</code> workflows</p></dd>
+
+
+<dt>trend_effects</dt>
+<dd><p>logical. If <code>TRUE</code> and a <code>trend_formula</code> was used in model
+fitting, terms from the trend (i.e. process) model will be plotted</p></dd>
 
 
 <dt>...</dt>

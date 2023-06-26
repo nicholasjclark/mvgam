@@ -47,8 +47,8 @@ predictions on the outcome (discrete) scale (default). When \code{trend} is used
 latent trend is returned}
 }
 \value{
-An object of class \code{mvgam_forecast} containing hindcast and forecast distributions
-for the required series
+An object of class \code{mvgam_forecast} containing hindcast and forecast distributions.
+See \code{\link{mvgam_forecast-class}} for details.
 }
 \description{
 Extract or compute hindcasts and forecasts for a fitted \code{mvgam} object

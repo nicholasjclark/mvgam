@@ -7,8 +7,8 @@
 #'   \item `betas` (beta coefficients from the GAM observation model linear predictor; default)
 #'   \item `trend_params` (parameters governing the trend dynamics, such as AR parameters,
 #'trend SD parameters or Gaussian Process parameters)
-#'   \item `trend_betas` (beta coefficients from the GAM latent trend model linear predictor;
-#'currently ignored)
+#'   \item `trend_betas` (beta coefficients from the GAM latent process model linear predictor;
+#'   only available if a `trend_formula` was supplied in the original model)
 #'   \item `obs_params` (other parameters specific to the observation model, such as overdispsersions
 #'for negative binomial models or observation error SD for gaussian / student-t models)}
 #'@param row.names Ignored
@@ -36,7 +36,7 @@ NULL
 as.data.frame.mvgam = function(x,
                                row.names = NULL,
                                optional = TRUE,
-                               variable,
+                               variable = 'betas',
                                ...){
 
   variable <- match.arg(arg = variable,
@@ -54,7 +54,12 @@ as.data.frame.mvgam = function(x,
     to_extract <- trend_par_names(x$trend_model,
                                           x$use_lv,
                                           x$drift)
-    to_extract <- to_extract[!to_extract %in% c('tau','trend')]
+    to_extract <- to_extract[!to_extract %in% c('tau','trend',
+                                                'LV', 'penalty', 'lv_coefs')]
+    if(!is.null(x$trend_call) & x$trend_model %in% c('RW', 'AR1',
+                                                   'AR2', 'AR3')){
+      to_extract <- c(to_extract, 'sigma')
+    }
     post <- data.frame(mcmc_chains(x$model_output,
                                            params = to_extract))
     newnames <- gsub("\\.(?=[^.]*\\.)", "[", colnames(post), perl = TRUE)
@@ -63,7 +68,13 @@ as.data.frame.mvgam = function(x,
   }
 
   if(variable == 'trend_betas'){
-    post <- NULL
+    if(is.null(x$trend_call)){
+      stop('No trend_formula supplied to model; no trend_betas to extract',
+           call. = FALSE)
+    } else {
+      post <- data.frame(mcmc_chains(x$model_output, params = 'b_trend'))
+      colnames(post) <- names(coef(x$trend_mgcv_model))
+    }
   }
 
   if(variable == 'obs_params'){
@@ -82,7 +93,7 @@ as.data.frame.mvgam = function(x,
 #'@rdname mvgam_draws
 #'@export
 as.matrix.mvgam = function(x,
-                           variable,
+                           variable = 'betas',
                            ...){
 
   variable <- match.arg(arg = variable,
@@ -100,7 +111,12 @@ as.matrix.mvgam = function(x,
     to_extract <- trend_par_names(x$trend_model,
                                   x$use_lv,
                                   x$drift)
-    to_extract <- to_extract[!to_extract %in% c('tau','trend')]
+    to_extract <- to_extract[!to_extract %in% c('tau','trend',
+                                                'LV', 'penalty', 'lv_coefs')]
+    if(!is.null(x$trend_call) & x$trend_model %in% c('RW', 'AR1',
+                                                   'AR2', 'AR3')){
+      to_extract <- c(to_extract, 'sigma')
+    }
     post <- as.matrix(data.frame(mcmc_chains(x$model_output,
                                    params = to_extract)))
     newnames <- gsub("\\.(?=[^.]*\\.)", "[", colnames(post), perl = TRUE)
@@ -109,7 +125,13 @@ as.matrix.mvgam = function(x,
   }
 
   if(variable == 'trend_betas'){
-    post <- NULL
+    if(is.null(x$trend_call)){
+      stop('No trend_formula supplied to model; no trend_betas to extract',
+           call. = FALSE)
+    } else {
+      post <- as.matrix(data.frame(mcmc_chains(x$model_output, params = 'b_trend')))
+      colnames(post) <- names(coef(x$trend_mgcv_model))
+    }
   }
 
   if(variable == 'obs_params'){

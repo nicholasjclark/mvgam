@@ -4,14 +4,33 @@
 \alias{update.mvgam}
 \title{Update an existing \code{mvgam} object}
 \usage{
-\method{update}{mvgam}(object, formula, data, newdata, trend_model, use_lv, n_lv, family, ...)
+\method{update}{mvgam}(
+  object,
+  formula,
+  trend_formula,
+  data,
+  newdata,
+  trend_model,
+  trend_map,
+  use_lv,
+  n_lv,
+  family,
+  priors,
+  ...
+)
 }
 \arguments{
 \item{object}{A fitted \code{mvgam} model}
 
-\item{formula}{A new \code{formula} object. Note, \code{mvgam} currently does not support dynamic formula
+\item{formula}{Optional new \code{formula} object. Note, \code{mvgam} currently does not support dynamic formula
 updates such as removal of specific terms with \code{- term}. When updating, the entire formula needs
 to be supplied}
+
+\item{trend_formula}{An optional \code{character} string specifying the GAM process model formula. If
+supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
+separately from the observation model. Should not have a response variable specified on the left-hand side
+of the formula (i.e. a valid option would be \code{~ season + s(year)}). This feature is experimental, and is only
+currently available for Random Walk trend models.}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
@@ -25,15 +44,25 @@ observations in variable \code{y} will be set to \code{NA} when fitting the mode
 simulations can be obtained}
 
 \item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
-'None' (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}}),
-'RW' (random walk with possible drift),
-'AR1' (with possible drift),
-'AR2' (with possible drift) or
-'AR3' (with possible drift) or
-'VAR1' (with possible drift; only available in \code{Stan}) or
-'GP' (Gaussian Process with squared exponential kernel;
-only available in \code{stan})}
+\itemize{
+\item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+\item \code{RW} (random walk with possible drift)
+\item \code{AR1} (with possible drift)
+\item \code{AR2} (with possible drift)
+\item \code{AR3} (with possible drift)
+\item \code{VAR1} (with possible drift; only available in \code{Stan})
+\item \code{GP} (Gaussian Process with squared exponential kernel;
+only available in \code{Stan})}}
+
+\item{trend_map}{Optional \code{data.frame} specifying which series should depend on which latent
+trends. Useful for allowing multiple series to depend on the same latent trend process, but with
+different observation processes. If supplied, a latent factor model is set up by setting
+\code{use_lv = TRUE} and using the mapping to set up the shared trends. Needs to have column names
+\code{series} and \code{trend}, with integer values in the \code{trend} column to state which trend each series
+should depend on. The \code{series} column should have a single unique entry for each series in the
+data (names should perfectly match factor levels of the \code{series} variable in \code{data}). See examples
+in \code{\link{mvgam}} for details}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series}
@@ -43,6 +72,10 @@ Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series 
 
 \item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
 families are: \code{nb()}, \code{poisson()}, \code{tweedie()}, \code{gaussian()}, \code{betar()}, \code{lognormal()}, \code{student_t()} and \code{Gamma()}}
+
+\item{priors}{An optional \code{data.frame} with prior
+definitions. See \code{\link{get_mvgam_priors}} and
+\link{mvgam} for more information on changing default prior distributions}
 
 \item{...}{Other arguments to be passed to \code{\link{mvgam}}}
 }

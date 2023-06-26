@@ -7,7 +7,8 @@
 #'   \item \code{AR1} Autoregressive model with AR coefficient for lag 1
 #'   \item \code{AR2} Autoregressive model with AR coefficients for lags 1 and 2
 #'   \item \code{AR3} Autoregressive model with AR coefficients for lags 1, 2 and 3
-#'   \item \code{VAR1} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated errors
+#'   \item \code{VAR1} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated process errors
+#'   \item \code{VAR1cor} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously correlated process errors
 #'   \item \code{GP} Squared exponential Gaussian Process
 #'   \item \code{None} No latent trend is fitted
 #'   }
@@ -15,7 +16,17 @@
 #'
 #'Dynamic factor models can be used in which the latent factors evolve as either
 #'`RW`, `AR1`, `AR2`, `AR3` or `GP`. Note that only `RW`, `AR1`, `AR2` and `AR3` are available if
-#'using `JAGS`. All trend models are supported if using `Stan`.
+#'using `JAGS`. All trend models are supported if using `Stan`. For multivariate trend models
+#'(i.e. `VAR` and `VARcor` models), users can either fix the trend error covariances to be `0`
+#'(using `VAR`) or estimate them and potentially allow for contemporaneously correlated errors using
+#'`VARcor`. For all `VAR` models, stationarity of
+#'the latent process is enforced through the prior using the parameterisation given by
+#'Heaps (2022). Stationarity is not enforced when using `AR1`, `AR2` or `AR3` models,
+#'though this can be changed by the user by specifying lower and upper bounds on autoregressive
+#'parameters using functionality in [get_mvgam_priors] and the `priors` argument in
+#'[mvgam]
+#' @references Sarah E. Heaps (2022) Enforcing stationarity through the prior in Vector Autoregressions.
+#' Journal of Computational and Graphical Statistics. 32:1, 1-10.
 #' @name mvgam_trends
 NULL
 
@@ -29,6 +40,7 @@ evaluate_trend_model = function(trend_model){
                                        'AR2',
                                        'AR3',
                                        'VAR1',
+                                       'VAR1cor',
                                        'None'))
   return(trend_model)
 }

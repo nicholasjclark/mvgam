@@ -1,9 +1,7 @@
 #' Fitted `mvgam` object description
 #'
 #' A fitted \code{mvgam} object returned by function \code{\link{mvgam}}.
-#' Method functions `as.data.frame`, `code`, `coef`, `forecast`, `hindcast`, `lfo_cv`,
-#' `logLik`, `plot`, `ppc`, `predict`,
-#' `print`, `score`, `summary` and `update` exist for this class.
+#' Run `methods(class = "mvgam")` to see an overview of available methods.
 #' @details A `mvgam` object contains the following elements:
 #'\itemize{
 #'   \item `call` the original observation model formula
@@ -11,6 +9,8 @@
 #'   returned. Otherwise `NULL`
 #'   \item `family` \code{character} description of the observation distribution
 #'   \item `trend_model` \code{character} description of the latent trend model
+#'   \item `trend_map` \code{data.frame} describing the mapping of trend states to
+#'   observations, if supplied in the original model. Otherwise `NULL`
 #'   \item `drift` Logical specifying whether a drift term was used in the trend model
 #'   \item `priors` If the model priors were updated from their defaults, the prior `dataframe`
 #'   will be returned. Otherwise `NULL`

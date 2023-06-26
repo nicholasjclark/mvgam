@@ -13,12 +13,25 @@ Supported mvgam trend models
 \item \code{AR1} Autoregressive model with AR coefficient for lag 1
 \item \code{AR2} Autoregressive model with AR coefficients for lags 1 and 2
 \item \code{AR3} Autoregressive model with AR coefficients for lags 1, 2 and 3
-\item \code{VAR1} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated errors
+\item \code{VAR1} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated process errors
+\item \code{VAR1cor} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously correlated process errors
 \item \code{GP} Squared exponential Gaussian Process
 \item \code{None} No latent trend is fitted
 }
 
 Dynamic factor models can be used in which the latent factors evolve as either
 \code{RW}, \code{AR1}, \code{AR2}, \code{AR3} or \code{GP}. Note that only \code{RW}, \code{AR1}, \code{AR2} and \code{AR3} are available if
-using \code{JAGS}. All trend models are supported if using \code{Stan}.
+using \code{JAGS}. All trend models are supported if using \code{Stan}. For multivariate trend models
+(i.e. \code{VAR} and \code{VARcor} models), users can either fix the trend error covariances to be \code{0}
+(using \code{VAR}) or estimate them and potentially allow for contemporaneously correlated errors using
+\code{VARcor}. For all \code{VAR} models, stationarity of
+the latent process is enforced through the prior using the parameterisation given by
+Heaps (2022). Stationarity is not enforced when using \code{AR1}, \code{AR2} or \code{AR3} models,
+though this can be changed by the user by specifying lower and upper bounds on autoregressive
+parameters using functionality in \link{get_mvgam_priors} and the \code{priors} argument in
+\link{mvgam}
+}
+\references{
+Sarah E. Heaps (2022) Enforcing stationarity through the prior in Vector Autoregressions.
+Journal of Computational and Graphical Statistics. 32:1, 1-10.
 }

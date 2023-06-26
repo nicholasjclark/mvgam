@@ -6,6 +6,7 @@
 \usage{
 get_mvgam_priors(
   formula,
+  trend_formula,
   data,
   data_train,
   family = "poisson",
@@ -21,6 +22,12 @@ get_mvgam_priors(
 \item{formula}{A \code{character} string specifying the GAM formula. These are exactly like the formula
 for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these)}
+
+\item{trend_formula}{An optional \code{character} string specifying the GAM process model formula. If
+supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
+separately from the observation model. Should not have a response variable specified on the left-hand side
+of the formula (i.e. a valid option would be \code{~ season + s(year)}). This feature is experimental, and is only
+currently available for Random Walk trend models.}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
@@ -67,9 +74,10 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{AR1} (with possible drift)
 \item \code{AR2} (with possible drift)
 \item \code{AR3} (with possible drift)
-\item \code{VAR1} (with possible drift; only available in \code{Stan})
+\item \code{VAR1} (contemporaneously uncorrelated VAR1; only available in \code{Stan})
+\item \code{VAR1cor} (contemporaneously correlated VAR1; only available in \code{Stan})
 \item \code{GP} (Gaussian Process with squared exponential kernel;
-only available in \code{Stan})}}
+only available in \code{Stan})} See \link{mvgam_trends} for more details}
 
 \item{trend_map}{Optional \code{data.frame} specifying which series should depend on which latent
 trends. Useful for allowing multiple series to depend on the same latent trend process, but with

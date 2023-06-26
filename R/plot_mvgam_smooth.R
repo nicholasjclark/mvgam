@@ -409,7 +409,7 @@ plot_mvgam_smooth = function(object,
           title(paste0('s(', smooth, ')'),
                 adj = 0)
         } else {
-          title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+          title(paste0('s(', smooth, ')'),
                 adj = 0)
         }
       }
@@ -436,7 +436,7 @@ plot_mvgam_smooth = function(object,
           title(paste0('s(', smooth, ')'),
                 adj = 0)
         } else {
-          title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+          title(paste0('s(', smooth, ')'),
                 adj = 0)
         }
       }
@@ -640,7 +640,7 @@ plot_mvgam_smooth = function(object,
           title(paste0('s(', smooth, ')'),
                 adj = 0)
         } else {
-          title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+          title(paste0('s(', smooth, ')'),
                 adj = 0)
         }
       }
@@ -748,7 +748,7 @@ plot_mvgam_smooth = function(object,
           title(paste0('s(', smooth, ')'),
                 adj = 0)
         } else {
-          title(paste0('s(', smooth, ') for ', unique(pred_dat$series)),
+          title(paste0('s(', smooth, ')'),
                 adj = 0)
         }
       }

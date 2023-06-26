@@ -8,13 +8,13 @@
 #'as it saves recomputing the full set of trends for each series individually
 #'@param type When this has the value \code{link}, the linear predictor is calculated on the log link scale.
 #'When \code{response} is used, the predictions take uncertainty in the observation process into account to return
-#'predictions on the outcome (discrete) scale (default). When \code{trend} is used, only the forecast distribution for the
+#'predictions on the outcome (discrete) scale (default). When \code{trend} is used, only the hindcast distribution for the
 #'latent trend is returned
 #'@param ... Ignored
 #'@details Posterior retrodictions are drawn from the fitted \code{mvgam} and
 #'organized into a convenient format
-#'@return An object of class \code{mvgam_forecast} containing hindcast distributions
-#'for the required series
+#'@return An object of class \code{mvgam_forecast} containing hindcast distributions.
+#'See \code{\link{mvgam_forecast-class}} for details.
 #'
 #'@export
 hindcast <- function(object, ...){
@@ -79,7 +79,6 @@ if(series == 'all'){
                          'response' = 'ypred',
                          'trend' = 'trend')
     if(object$fit_engine == 'stan'){
-
       preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
                                                                  dim(mcmc_chains(object$model_output, 'ypred'))[2],
                                                                  by = NCOL(object$ytimes))][,1:last_train]
@@ -137,8 +136,10 @@ if(series == 'all'){
 }
 
 series_fcs <- structure(list(call = object$call,
+                             trend_call = object$trend_call,
                              family = object$family,
                              trend_model = object$trend_model,
+                             drift = object$drift,
                              use_lv = object$use_lv,
                              fit_engine = object$fit_engine,
                              type = type,
