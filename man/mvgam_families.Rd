@@ -2,13 +2,10 @@
 % Please edit documentation in R/families.R
 \name{mvgam_families}
 \alias{mvgam_families}
-\alias{lognormal}
 \alias{tweedie}
 \alias{student_t}
 \title{Supported mvgam families}
 \usage{
-lognormal(link = "identity")
-
 tweedie(link = "log")
 
 student_t(link = "identity")

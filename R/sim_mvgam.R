@@ -5,6 +5,7 @@
 #'correlations in their long-term trends, are included in the form of correlated loadings on the latent dynamic factors
 #'
 #'@importFrom stats rnorm rbeta rpois rlnorm rgamma cor cov2cor cov stl ts
+#'@importFrom brms lognormal
 #'@param T \code{integer}. Number of observations (timepoints)
 #'@param n_series \code{integer}. Number of discrete time series
 #'@param seasonality \code{character}. Either \code{shared}, meaning that all series share the exact same seasonal pattern,
@@ -292,10 +293,13 @@ sim_mvgam = function(T = 100,
 
     # Generate latent GP trends
     trends <- do.call(cbind, lapply(seq_len(n_lv), function(lv){
-      sim_gp(h = T,
-             last_trends = rnorm(3),
-             alpha_gp = trend_alphas[lv],
-             rho_gp = trend_rhos[lv])
+
+      Sigma <- trend_alphas[lv]^2 *
+        exp(-0.5 * ((outer(1:T, 1:T, "-") / trend_rhos[lv]) ^ 2)) +
+        diag(1e-4, T)
+      MASS::mvrnorm(1,
+                    mu = rep(0, T),
+                    Sigma = Sigma)
     }))
 
   }
