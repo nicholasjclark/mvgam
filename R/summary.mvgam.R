@@ -1,7 +1,7 @@
 #'Summary for a fitted mvgam object
 #'
 #'These functions take a fitted \code{mvgam} object and return various useful summaries
-#'@param object \code{list} object returned from \code{mvgam}
+#'@param object \code{list} object of class `mvgam`
 #'@param ... Ignored
 #'@author Nicholas J Clark
 #'@details `summary.mvgam` and `summary.mvgam_prefit` return brief summaries of the model's call is printed, along with posterior intervals for
@@ -132,7 +132,7 @@ if(object$family == 'Gamma'){
 }
 
 if(!is.null(object$trend_call)){
-  message("GAM observation coefficient (beta) estimates:")
+  message("GAM observation model coefficient (beta) estimates:")
   coef_names <- names(object$mgcv_model$coefficients)
   mvgam_coefs <- mcmc_summary(object$model_output, 'b')[,c(3:7)]
   rownames(mvgam_coefs) <- coef_names
@@ -151,13 +151,14 @@ if(!is.null(object$trend_call)){
 
 smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
   data.frame(label = object$mgcv_model$smooth[[x]]$label,
+             term = object$mgcv_model$smooth[[x]]$term,
              class = class(object$mgcv_model$smooth[[x]])[1])
 }))
 
 if(any(smooth_labs$class == 'random.effect')){
   re_smooths <- smooth_labs %>%
     dplyr::filter(class == 'random.effect') %>%
-    dplyr::pull(label)
+    dplyr::pull(term)
 
   if(object$fit_engine == 'jags'){
     re_sds <- mcmc_summary(object$model_output,
@@ -175,23 +176,16 @@ if(any(smooth_labs$class == 'random.effect')){
                                    ISB = TRUE)[,c(3:7)]
   }
 
-  rownames(re_sds) <- rownames(re_mus) <- re_smooths
+  rownames(re_sds) <- paste0('sd(',re_smooths,')')
+  rownames(re_mus) <- paste0('mean(',re_smooths,')')
 
   if(!is.null(object$trend_call)){
-    message("GAM random effect population mean estimates:")
-    print(re_mus)
-    message()
-
-    message("GAM random effect population SD estimates:")
-    print(re_sds)
+    message("GAM observation model group-level estimates:")
+    print(rbind(re_mus, re_sds))
     message()
   } else {
-    message("GAM observation random effect population mean estimates:")
-    print(re_mus)
-    message()
-
-    message("GAM observation random effect population SD estimates:")
-    print(re_sds)
+    message("GAM group-level estimates:")
+    print(rbind(re_mus, re_sds))
     message()
   }
 }
@@ -375,61 +369,53 @@ if(!object$use_lv){
 }
 
 if(!is.null(object$trend_call)){
-  message("GAM process coefficient (beta) estimates:")
-  coef_names <- names(object$trend_mgcv_model$coefficients)
+  message("GAM process model coefficient (beta) estimates:")
+  coef_names <- paste0(names(object$trend_mgcv_model$coefficients), '_trend')
   mvgam_coefs <- mcmc_summary(object$model_output, 'b_trend')[,c(3:7)]
   rownames(mvgam_coefs) <- gsub('series', 'trend',
                                 coef_names, fixed = TRUE)
   print(mvgam_coefs)
   message()
 
-  process_rhos <- try(mcmc_summary(object$model_output, 'rho_trend')[,c(3:7)],
-                      silent = TRUE)
-  if(inherits(process_rhos, 'try-error')){
+  if(is.na(object$trend_sp_names)){
 
   } else {
-    message("GAM process smoothing parameter (rho) estimates:")
-    rho_coefs <- mcmc_summary(object$model_output, 'rho_trend')[,c(3:7)]
-    rownames(rho_coefs) <- gsub('series', 'trend',
-                                unlist(purrr::map(object$trend_mgcv_model$smooth,
-                                                  'label')),
-                                fixed = TRUE)
-
-    # Don't print random effect lambdas as they follow the prior distribution
-    to_print <- vector(length = length(object$trend_mgcv_model$smooth))
-    for(i in 1:length(object$trend_mgcv_model$smooth)){
-      if(inherits(object$trend_mgcv_model$smooth[[i]], 'random.effect')){
-        to_print[i] <- FALSE
-      } else {
-        to_print[i] <- TRUE
+      to_print <- vector(length = length(object$trend_mgcv_model$smooth))
+      for(i in 1:length(object$trend_mgcv_model$smooth)){
+        if(inherits(object$trend_mgcv_model$smooth[[i]], 'random.effect')){
+          to_print[i] <- FALSE
+        } else {
+          to_print[i] <- TRUE
+        }
       }
-    }
 
-    print(rho_coefs[to_print,])
-    message()
+      if(all(to_print == FALSE)){
 
-    if(any(to_print == FALSE)){
-      re_sds <- mcmc_summary(object$model_output, 'sigma_raw_trend',
-                             ISB = TRUE)[,c(3:7)]
+      } else {
+        message("GAM process smoothing parameter (rho) estimates:")
+        rho_coefs <- mcmc_summary(object$model_output, 'rho_trend')[,c(3:7)]
+        rownames(rho_coefs) <- paste0(object$trend_sp_names, '_trend')
+        print(rho_coefs[to_print,])
+        message()
+      }
 
-      re_mus <- mcmc_summary(object$model_output, 'mu_raw_trend',
-                             ISB = TRUE)[,c(3:7)]
+      if(any(to_print == FALSE)){
+        re_labs <- unlist(purrr::map(object$trend_mgcv_model$smooth, 'term'))[
+          unlist(purrr::map(object$trend_mgcv_model$smooth, inherits, 'random.effect'))]
+        re_sds <- mcmc_summary(object$model_output, 'sigma_raw_trend',
+                               ISB = TRUE)[,c(3:7)]
 
-      rownames(re_sds) <- rownames(re_mus) <-
-        gsub('series', 'trend', rownames(rho_coefs)[to_print == FALSE],
-             fixed = TRUE)
+        re_mus <- mcmc_summary(object$model_output, 'mu_raw_trend',
+                               ISB = TRUE)[,c(3:7)]
 
+        rownames(re_sds) <- paste0('sd(',re_labs,')_trend')
+        rownames(re_mus) <- paste0('mean(',re_labs,')_trend')
 
-      message("GAM process random effect population mean estimates:")
-      print(re_mus)
-      message()
-
-      message("GAM process random effect population SD estimates:")
-      print(re_sds)
-      message()
-    }
+        message("GAM process model group-level estimates:")
+        print(rbind(re_mus, re_sds))
+        message()
+      }
   }
-
 }
 
 if(object$fit_engine == 'stan'){

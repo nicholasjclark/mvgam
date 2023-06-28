@@ -25,15 +25,15 @@
 #' in detail at the top of the `model_file`. Otherwise `NULL`
 #'   \item `inits` If `return_model_data` was set to `TRUE` when fitting the model, the initial value
 #' functions used to initialise the MCMC chains will be returned. Otherwise `NULL`
-#'   \item `monitor_pars` If `return_model_data` was set to `TRUE` when fitting the model, the parameters
-#' that were monitored during MCMC sampling are returned as a `character vector`. Otherwise `NULL`
+#'   \item `monitor_pars` The parameters
+#' that were monitored during MCMC sampling are returned as a `character vector`
 #'   \item `sp_names` A `character vector` specifying the names for each smoothing parameter
 #'   \item `mgcv_model` An object of class `gam` containing the `mgcv` version of the observation model.
 #' This object is used for generating the linear predictor matrix when making predictions for new data. The
 #' coefficients in this model object will contain the posterior median coefficients from the GAM linear predictor,
 #' but these are only used if generating plots of smooth functions that `mvgam` currently cannot handle
 #' (such as plots for three-dimensional smooths). This model therefore should not be used for inference.
-#' See \code{\link[mgcv]{gamObject}} for details.
+#' See \code{\link[mgcv]{gamObject}} for details
 #'   \item `trend_mgcv_model` If a `trend_formula was supplied`, an object of class `gam` containing
 #'   the `mgcv` version of the trend model. Otherwise `NULL`
 #'   \item `ytimes` The `matrix` object used in model fitting for indexing which series and timepoints

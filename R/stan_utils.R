@@ -2666,6 +2666,7 @@ add_trend_predictors = function(trend_formula,
   return(list(model_file = model_file,
               model_data = model_data,
               trend_mgcv_model = trend_mvgam$mgcv_model,
+              trend_sp_names = trend_mvgam$sp_names,
               trend_smooths_included = trend_smooths_included,
               trend_random_included = trend_random_included))
 }

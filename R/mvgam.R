@@ -1381,6 +1381,7 @@ mvgam = function(formula,
 
     # Add modifications for trend mapping and trend predictors, if
     # supplied
+    trend_sp_names <- NA
     if(!missing(trend_map)){
       trend_map_setup <- trend_map_mods(model_file = vectorised$model_file,
                                         model_data = vectorised$model_data,
@@ -1416,7 +1417,7 @@ mvgam = function(formula,
         vectorised$model_data <- trend_pred_setup$model_data
         trend_mgcv_model <- trend_pred_setup$trend_mgcv_model
 
-        param <- c(param, 'b_trend')
+        param <- c(param, 'b_trend', 'trend_mus')
 
         if(trend_pred_setup$trend_smooths_included){
           param <- c(param, 'rho_trend')
@@ -1426,6 +1427,8 @@ mvgam = function(formula,
           param <- c(param, 'mu_raw_trend', 'sigma_raw_trend')
         }
 
+        trend_sp_names <- trend_pred_setup$trend_sp_names
+      } else {
       }
     }
 
@@ -1515,6 +1518,7 @@ mvgam = function(formula,
                                  NULL
                                },
                                sp_names = rho_names,
+                               trend_sp_names = trend_sp_names,
                                ytimes = ytimes,
                                use_lv = use_lv,
                                n_lv = n_lv,
@@ -1818,12 +1822,9 @@ mvgam = function(formula,
                            } else {
                              NULL
                            },
-                           monitor_pars = if(return_model_data){
-                             param
-                           } else {
-                             NULL
-                           },
+                           monitor_pars = param,
                            sp_names = rho_names,
+                           trend_sp_names = trend_sp_names,
                            mgcv_model = ss_gam,
                            trend_mgcv_model = if(!missing(trend_formula)){
                              trend_mgcv_model

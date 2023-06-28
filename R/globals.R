@@ -6,4 +6,5 @@ utils::globalVariables(c("y", "year", "smooth_vals", "smooth_num",
                          "nsp", "last_assim", "index", "in_interval",
                          "assimilated", "eval_horizon", "label",
                          "mod_call", "particles", "obs", "mgcv_model",
-                         "param_name", "outcome", "mgcv_plottable"))
+                         "param_name", "outcome", "mgcv_plottable",
+                         "term"))

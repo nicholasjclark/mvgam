@@ -31,15 +31,15 @@ containing all data objects needed to condition the model is returned. Each item
 in detail at the top of the \code{model_file}. Otherwise \code{NULL}
 \item \code{inits} If \code{return_model_data} was set to \code{TRUE} when fitting the model, the initial value
 functions used to initialise the MCMC chains will be returned. Otherwise \code{NULL}
-\item \code{monitor_pars} If \code{return_model_data} was set to \code{TRUE} when fitting the model, the parameters
-that were monitored during MCMC sampling are returned as a \verb{character vector}. Otherwise \code{NULL}
+\item \code{monitor_pars} The parameters
+that were monitored during MCMC sampling are returned as a \verb{character vector}
 \item \code{sp_names} A \verb{character vector} specifying the names for each smoothing parameter
 \item \code{mgcv_model} An object of class \code{gam} containing the \code{mgcv} version of the observation model.
 This object is used for generating the linear predictor matrix when making predictions for new data. The
 coefficients in this model object will contain the posterior median coefficients from the GAM linear predictor,
 but these are only used if generating plots of smooth functions that \code{mvgam} currently cannot handle
 (such as plots for three-dimensional smooths). This model therefore should not be used for inference.
-See \code{\link[mgcv]{gamObject}} for details.
+See \code{\link[mgcv]{gamObject}} for details
 \item \code{trend_mgcv_model} If a \verb{trend_formula was supplied}, an object of class \code{gam} containing
 the \code{mgcv} version of the trend model. Otherwise \code{NULL}
 \item \code{ytimes} The \code{matrix} object used in model fitting for indexing which series and timepoints

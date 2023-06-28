@@ -6,9 +6,16 @@
 \alias{as.matrix.mvgam}
 \title{Extract posterior draws from fitted \code{mvgam} objects}
 \usage{
-\method{as.data.frame}{mvgam}(x, row.names = NULL, optional = TRUE, variable = "betas", ...)
+\method{as.data.frame}{mvgam}(
+  x,
+  row.names = NULL,
+  optional = TRUE,
+  variable = "betas",
+  regex = FALSE,
+  ...
+)
 
-\method{as.matrix}{mvgam}(x, variable = "betas", ...)
+\method{as.matrix}{mvgam}(x, variable = "betas", regex = FALSE, ...)
 }
 \arguments{
 \item{x}{\code{list} object of class \code{mvgam}}
@@ -17,15 +24,28 @@
 
 \item{optional}{Ignored}
 
-\item{variable}{A character specifying which parameters to extract. Options are:
+\item{variable}{A character specifying which parameters to extract. Can either be one of the
+following options:
 \itemize{
+\item \code{obs_params} (other parameters specific to the observation model, such as overdispsersions
+for negative binomial models or observation error SD for gaussian / student-t models)
 \item \code{betas} (beta coefficients from the GAM observation model linear predictor; default)
+\item \code{smooth_params} (smoothing parameters from the GAM observation model)
+\item \code{linpreds} (estimated linear predictors on whatever link scale was used in the model)
 \item \code{trend_params} (parameters governing the trend dynamics, such as AR parameters,
 trend SD parameters or Gaussian Process parameters)
 \item \code{trend_betas} (beta coefficients from the GAM latent process model linear predictor;
 only available if a \code{trend_formula} was supplied in the original model)
-\item \code{obs_params} (other parameters specific to the observation model, such as overdispsersions
-for negative binomial models or observation error SD for gaussian / student-t models)}}
+\item \code{trend_smooth_params} (process model GAM smoothing parameters;
+only available if a \code{trend_formula} was supplied in the original model)
+\item \code{trend_linpreds} (process model linear predictors on the identity scale;
+only available if a \code{trend_formula} was supplied in the original model)} OR can be a character vector
+providing the variables to extract}
+
+\item{regex}{Logical. If not using one of the prespecified options for extractions,
+should \code{variable} be treated as a (vector of)
+regular expressions? Any variable in x matching at least one of the regular expressions
+will be selected. Defaults to \code{FALSE}.}
 
 \item{...}{Ignored}
 }

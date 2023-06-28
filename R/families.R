@@ -1,5 +1,6 @@
 #' Supported mvgam families
 #' @importFrom stats make.link dgamma pgamma rgamma qnorm plnorm runif pbeta dlnorm dpois pnorm ppois plogis gaussian poisson Gamma dnbinom rnbinom dnorm dbeta
+#' @importFrom brms lognormal
 #' @param link a specification for the family link function. At present these cannot
 #' be changed
 #' @details \code{mvgam} currently supports the following standard observation families:
@@ -27,16 +28,6 @@
 #' @name mvgam_families
 #' @author Nicholas J Clark
 NULL
-
-#' @rdname mvgam_families
-#' @export
-lognormal = function(link = 'identity'){
-  linktemp <- make.link('identity')
-  structure(list(family = "lognormal", link = 'identity', linkfun = linktemp$linkfun,
-                 linkinv = linktemp$linkinv, mu.eta = linktemp$mu.eta,
-                 valideta = linktemp$valideta),
-            class = c("extended.family","family"))
-}
 
 #' @rdname mvgam_families
 #' @export

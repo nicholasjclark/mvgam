@@ -21,6 +21,7 @@ Depends:
     methods
 Imports: 
     rstan (>= 2.19.2),
+    brms (>= 2.17),
     posterior (>= 1.0.0),
     loo (>= 2.3.1),
     parallel,
