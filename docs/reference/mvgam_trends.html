@@ -53,15 +53,30 @@
 <li><p><code>AR1</code> Autoregressive model with AR coefficient for lag 1</p></li>
 <li><p><code>AR2</code> Autoregressive model with AR coefficients for lags 1 and 2</p></li>
 <li><p><code>AR3</code> Autoregressive model with AR coefficients for lags 1, 2 and 3</p></li>
-<li><p><code>VAR1</code> Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated errors</p></li>
+<li><p><code>VAR1</code> Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated process errors</p></li>
+<li><p><code>VAR1cor</code> Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously correlated process errors</p></li>
 <li><p><code>GP</code> Squared exponential Gaussian Process</p></li>
 <li><p><code>None</code> No latent trend is fitted</p></li>
 </ul><p>Dynamic factor models can be used in which the latent factors evolve as either
 <code>RW</code>, <code>AR1</code>, <code>AR2</code>, <code>AR3</code> or <code>GP</code>. Note that only <code>RW</code>, <code>AR1</code>, <code>AR2</code> and <code>AR3</code> are available if
-using <code>JAGS</code>. All trend models are supported if using <code>Stan</code>.</p>
+using <code>JAGS</code>. All trend models are supported if using <code>Stan</code>. For multivariate trend models
+(i.e. <code>VAR</code> and <code>VARcor</code> models), users can either fix the trend error covariances to be <code>0</code>
+(using <code>VAR</code>) or estimate them and potentially allow for contemporaneously correlated errors using
+<code>VARcor</code>. For all <code>VAR</code> models, stationarity of
+the latent process is enforced through the prior using the parameterisation given by
+Heaps (2022). Stationarity is not enforced when using <code>AR1</code>, <code>AR2</code> or <code>AR3</code> models,
+though this can be changed by the user by specifying lower and upper bounds on autoregressive
+parameters using functionality in <a href="get_mvgam_priors.html">get_mvgam_priors</a> and the <code>priors</code> argument in
+<a href="mvgam.html">mvgam</a></p>
+    </div>
+    <div class="section level2">
+    <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
+    <p>Sarah E. Heaps (2022) Enforcing stationarity through the prior in Vector Autoregressions.
+Journal of Computational and Graphical Statistics. 32:1, 1-10.</p>
     </div>
 
-  </main></div>
+  </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">

@@ -49,10 +49,17 @@
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">x</span>, row.names <span class="op">=</span> <span class="cn">NULL</span>, optional <span class="op">=</span> <span class="cn">TRUE</span>, variable <span class="op">=</span> <span class="st">"betas"</span>, <span class="va">...</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span></span>
+<span>  <span class="va">x</span>,</span>
+<span>  row.names <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  optional <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  variable <span class="op">=</span> <span class="st">"betas"</span>,</span>
+<span>  regex <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">x</span>, variable <span class="op">=</span> <span class="st">"betas"</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">x</span>, variable <span class="op">=</span> <span class="st">"betas"</span>, regex <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -70,14 +77,29 @@
 
 
 <dt>variable</dt>
-<dd><p>A character specifying which parameters to extract. Options are:</p><ul><li><p><code>betas</code> (beta coefficients from the GAM observation model linear predictor; default)</p></li>
+<dd><p>A character specifying which parameters to extract. Can either be one of the
+following options:</p><ul><li><p><code>obs_params</code> (other parameters specific to the observation model, such as overdispsersions
+for negative binomial models or observation error SD for gaussian / student-t models)</p></li>
+<li><p><code>betas</code> (beta coefficients from the GAM observation model linear predictor; default)</p></li>
+<li><p><code>smooth_params</code> (smoothing parameters from the GAM observation model)</p></li>
+<li><p><code>linpreds</code> (estimated linear predictors on whatever link scale was used in the model)</p></li>
 <li><p><code>trend_params</code> (parameters governing the trend dynamics, such as AR parameters,
 trend SD parameters or Gaussian Process parameters)</p></li>
 <li><p><code>trend_betas</code> (beta coefficients from the GAM latent process model linear predictor;
 only available if a <code>trend_formula</code> was supplied in the original model)</p></li>
-<li><p><code>obs_params</code> (other parameters specific to the observation model, such as overdispsersions
-for negative binomial models or observation error SD for gaussian / student-t models)</p></li>
-</ul></dd>
+<li><p><code>trend_smooth_params</code> (process model GAM smoothing parameters;
+only available if a <code>trend_formula</code> was supplied in the original model)</p></li>
+<li><p><code>trend_linpreds</code> (process model linear predictors on the identity scale;
+only available if a <code>trend_formula</code> was supplied in the original model)</p></li>
+</ul><p>OR can be a character vector
+providing the variables to extract</p></dd>
+
+
+<dt>regex</dt>
+<dd><p>Logical. If not using one of the prespecified options for extractions,
+should <code>variable</code> be treated as a (vector of)
+regular expressions? Any variable in x matching at least one of the regular expressions
+will be selected. Defaults to <code>FALSE</code>.</p></dd>
 
 
 <dt>...</dt>

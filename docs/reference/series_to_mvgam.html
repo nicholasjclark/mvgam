@@ -5756,78 +5756,78 @@ including 'data_train' and 'data_test'</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'gas'</span>, <span class="st">'oil'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>            gas oil</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2001-05-01   3   1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2001-08-01   1   1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2001-11-01   2   6</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2002-02-01   0   1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2002-05-01   2   0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2002-08-01   1   1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2001-05-01   2   0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2001-08-01   3   0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2001-11-01   0   1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2002-02-01   1   0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2002-05-01   0   1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2002-08-01   0   0</span>
 <span class="r-in"><span><span class="fu">series_to_mvgam</span><span class="op">(</span><span class="va">series</span>, freq <span class="op">=</span> <span class="fl">4</span>, train_prop <span class="op">=</span> <span class="fl">0.85</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $data_train</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    y season year       date series time</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  3      2 2001 2001-05-01    gas    1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  1      2 2001 2001-05-01    oil    1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  1      3 2001 2001-08-01    gas    2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1      3 2001 2001-08-01    oil    2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5  2      4 2001 2001-11-01    gas    3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  6      4 2001 2001-11-01    oil    3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  0      1 2002 2002-02-01    gas    4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 8  1      1 2002 2002-02-01    oil    4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  2      2 2002 2002-05-01    gas    5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 0      2 2002 2002-05-01    oil    5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 11 1      3 2002 2002-08-01    gas    6</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 12 1      3 2002 2002-08-01    oil    6</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 13 1      4 2002 2002-11-01    gas    7</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 14 0      4 2002 2002-11-01    oil    7</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 15 2      1 2003 2003-02-01    gas    8</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  2      2 2001 2001-05-01    gas    1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  0      2 2001 2001-05-01    oil    1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3      3 2001 2001-08-01    gas    2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  0      3 2001 2001-08-01    oil    2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5  0      4 2001 2001-11-01    gas    3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1      4 2001 2001-11-01    oil    3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  1      1 2002 2002-02-01    gas    4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8  0      1 2002 2002-02-01    oil    4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  0      2 2002 2002-05-01    gas    5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1      2 2002 2002-05-01    oil    5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11 0      3 2002 2002-08-01    gas    6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12 0      3 2002 2002-08-01    oil    6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 13 0      4 2002 2002-11-01    gas    7</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 14 2      4 2002 2002-11-01    oil    7</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 15 1      1 2003 2003-02-01    gas    8</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 16 1      1 2003 2003-02-01    oil    8</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 17 1      2 2003 2003-05-01    gas    9</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 18 1      2 2003 2003-05-01    oil    9</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 19 2      3 2003 2003-08-01    gas   10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 20 0      3 2003 2003-08-01    oil   10</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 21 1      4 2003 2003-11-01    gas   11</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 22 1      4 2003 2003-11-01    oil   11</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 23 1      1 2004 2004-02-01    gas   12</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 24 2      1 2004 2004-02-01    oil   12</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 19 0      3 2003 2003-08-01    gas   10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 20 1      3 2003 2003-08-01    oil   10</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 21 0      4 2003 2003-11-01    gas   11</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 22 0      4 2003 2003-11-01    oil   11</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 23 0      1 2004 2004-02-01    gas   12</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 24 0      1 2004 2004-02-01    oil   12</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 25 1      2 2004 2004-05-01    gas   13</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 26 2      2 2004 2004-05-01    oil   13</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 27 0      3 2004 2004-08-01    gas   14</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 26 0      2 2004 2004-05-01    oil   13</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 27 1      3 2004 2004-08-01    gas   14</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 28 0      3 2004 2004-08-01    oil   14</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 29 0      4 2004 2004-11-01    gas   15</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 30 1      4 2004 2004-11-01    oil   15</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 31 2      1 2005 2005-02-01    gas   16</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 31 0      1 2005 2005-02-01    gas   16</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 32 1      1 2005 2005-02-01    oil   16</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 33 0      2 2005 2005-05-01    gas   17</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 34 2      2 2005 2005-05-01    oil   17</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 34 0      2 2005 2005-05-01    oil   17</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 35 2      3 2005 2005-08-01    gas   18</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 36 1      3 2005 2005-08-01    oil   18</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 36 0      3 2005 2005-08-01    oil   18</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 37 0      4 2005 2005-11-01    gas   19</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 38 4      4 2005 2005-11-01    oil   19</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 39 1      1 2006 2006-02-01    gas   20</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 40 2      1 2006 2006-02-01    oil   20</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 41 0      2 2006 2006-05-01    gas   21</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 42 1      2 2006 2006-05-01    oil   21</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 38 0      4 2005 2005-11-01    oil   19</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 39 3      1 2006 2006-02-01    gas   20</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 40 1      1 2006 2006-02-01    oil   20</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 41 2      2 2006 2006-05-01    gas   21</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 42 0      2 2006 2006-05-01    oil   21</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 43 1      3 2006 2006-08-01    gas   22</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 44 0      3 2006 2006-08-01    oil   22</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 45 1      4 2006 2006-11-01    gas   23</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 44 3      3 2006 2006-08-01    oil   22</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 45 0      4 2006 2006-11-01    gas   23</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 46 1      4 2006 2006-11-01    oil   23</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 47 1      1 2007 2007-02-01    gas   24</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 48 2      1 2007 2007-02-01    oil   24</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 49 0      2 2007 2007-05-01    gas   25</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 48 0      1 2007 2007-02-01    oil   24</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 49 1      2 2007 2007-05-01    gas   25</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 50 0      2 2007 2007-05-01    oil   25</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $data_test</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    y season year       date series time</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1  1      3 2007 2007-08-01    gas   26</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2  1      3 2007 2007-08-01    oil   26</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3  3      4 2007 2007-11-01    gas   27</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4  1      4 2007 2007-11-01    oil   27</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  2      4 2007 2007-11-01    gas   27</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4  2      4 2007 2007-11-01    oil   27</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5  1      1 2008 2008-02-01    gas   28</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6  1      1 2008 2008-02-01    oil   28</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6  2      1 2008 2008-02-01    oil   28</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7  1      2 2008 2008-05-01    gas   29</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 8  2      2 2008 2008-05-01    oil   29</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 9  5      3 2008 2008-08-01    gas   30</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 10 1      3 2008 2008-08-01    oil   30</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9  3      3 2008 2008-08-01    gas   30</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 2      3 2008 2008-08-01    oil   30</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

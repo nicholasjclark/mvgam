@@ -163,10 +163,10 @@ families are:</p><ul><li><p><code><a href="https://rdrr.io/pkg/mgcv/man/negbin.h
 <li><p><code><a href="mvgam_families.html">tweedie()</a></code> for count data (power parameter <code>p</code> fixed at <code>1.5</code>)</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> for real-valued data</p></li>
 <li><p><code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar()</a></code> for proportional data on <code>(0,1)</code></p></li>
-<li><p><code><a href="mvgam_families.html">lognormal()</a></code> for non-negative real-valued data</p></li>
+<li><p><code>lognormal()</code> for non-negative real-valued data</p></li>
 <li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
-</ul><p>See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
+</ul><p>See <a href="mvgam_families.html">mvgam_families</a> for more details</p></dd>
 
 
 <dt>use_lv</dt>
@@ -197,10 +197,11 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>AR1</code> (with possible drift)</p></li>
 <li><p><code>AR2</code> (with possible drift)</p></li>
 <li><p><code>AR3</code> (with possible drift)</p></li>
-<li><p><code>VAR1</code> (with possible drift; only available in <code>Stan</code>)</p></li>
+<li><p><code>VAR1</code> (contemporaneously uncorrelated VAR1; only available in <code>Stan</code>)</p></li>
+<li><p><code>VAR1cor</code> (contemporaneously correlated VAR1; only available in <code>Stan</code>)</p></li>
 <li><p><code>GP</code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul></dd>
+</ul><p>See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
 
 
 <dt>drift</dt>
@@ -244,7 +245,7 @@ up by any other means. Only available when using <code>Cmdstan</code> as the bac
 
 <dt>priors</dt>
 <dd><p>An optional <code>data.frame</code> with prior
-definitions (in JAGS or Stan syntax). See <code><a href="get_mvgam_priors.html">get_mvgam_priors</a></code> and
+definitions (in JAGS or Stan syntax). See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and
 'Details' for more information on changing default prior distributions</p></dd>
 
 
@@ -257,7 +258,7 @@ in <code>Stan</code></p></dd>
 
 
 <dt>refit</dt>
-<dd><p>Logical indicating whether this is a refit, called using <code><a href="update.mvgam.html">update.mvgam</a></code>. Users should leave
+<dd><p>Logical indicating whether this is a refit, called using <a href="update.mvgam.html">update.mvgam</a>. Users should leave
 as <code>FALSE</code></p></dd>
 
 
@@ -350,7 +351,7 @@ variety of trend models. Users are strongly encouraged to opt for <code>Stan</co
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
-    <p>Nicholas J Clark &amp; Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series
+    <p>Nicholas J Clark &amp; Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 Methods in Ecology and Evolution. 14:3, 771-784.</p>
     </div>
     <div class="section level2">
