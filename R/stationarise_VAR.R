@@ -418,17 +418,12 @@ stationarise_VARcor = function(model_file){
                     fixed = TRUE)] <- paste0(
                       'transformed data {\n',
                       'vector[n_series] trend_zeros = rep_vector(0.0, n_series);\n',
-                      '// inverse Wishart hyperparameters\n',
-                      'matrix[n_series, n_series] scale_mat;\n',
-                      'real<lower=n_series+3> df;\n',
                       '// exchangeable partial autocorrelation hyperparameters\n',
                       '// see Heaps 2022 for details (https://doi.org/10.1080/10618600.2022.2079648)\n',
                       'vector[2] es;\n',
                       'vector<lower=0>[2] fs;\n',
                       'vector<lower=0>[2] gs;\n',
                       'vector<lower=0>[2] hs;\n',
-                      'scale_mat = diag_matrix(rep_vector(1.0, n_series));\n',
-                      'df = n_series + 4;\n',
                       'es[1] = 0;\nes[2] = 0;\n',
                       'fs[1] = sqrt(0.455);\nfs[2] = sqrt(0.455);\n',
                       'gs[1] = 1.365;\ngs[2] = 1.365;\n',
@@ -440,17 +435,12 @@ stationarise_VARcor = function(model_file){
     model_file[params_line] <- paste0(
       'transformed data {\n',
       'vector[n_series] trend_zeros = rep_vector(0.0, n_series);\n',
-      '// inverse Wishart hyperparameters\n',
-      'matrix[n_series, n_series] scale_mat;\n',
-      'real<lower=n_series+3> df;\n',
       '// exchangeable partial autocorrelation hyperparameters\n',
       '// see Heaps 2022 for details (https://doi.org/10.1080/10618600.2022.2079648)\n',
       'vector[2] es;\n',
       'vector<lower=0>[2] fs;\n',
       'vector<lower=0>[2] gs;\n',
       'vector<lower=0>[2] hs;\n',
-      'scale_mat = diag_matrix(rep_vector(1.0, n_series));\n',
-      'df = n_series + 4;',
       'es[1] = 0;\nes[2] = 0;\n',
       'fs[1] = sqrt(0.455);\nfs[2] = sqrt(0.455);\n',
       'gs[1] = 1.365;\ngs[2] = 1.365;\n',
@@ -462,7 +452,8 @@ stationarise_VARcor = function(model_file){
   # Add parameters for real-valued partial autocorrelations
   model_file[grep("vector<lower=0>[n_series] sigma;",
                   model_file, fixed = TRUE)] <- paste0(
-                    "cov_matrix[n_series] Sigma;\n\n",
+                    "cholesky_factor_corr[n_series] L_Omega;\n",
+                    "vector<lower=0>[n_series] sigma;\n\n",
                     '// unconstrained VAR1 partial autocorrelations\n',
                     'matrix[n_series, n_series] P_real;\n',
                     '// partial autocorrelation hyperparameters\n',
@@ -476,12 +467,18 @@ stationarise_VARcor = function(model_file){
                     'transformed parameters {\n',
                     "// latent trend VAR1 autoregressive terms\n",
                     "matrix[n_series, n_series] A;\n",
+                    '// LKJ form of covariance matrix\n',
+                    "matrix[n_series, n_series] L_Sigma;\n",
+                    '// computed error covariance matrix\n',
+                    'cov_matrix[n_series] Sigma;',
                     '// initial trend covariance\n',
                     'cov_matrix[n_series] Gamma;')
   model_file[grep('trend[i, 1:n_series] = to_row_vector(trend_raw[i]);',
                   model_file,
                   fixed = TRUE) + 1] <- paste0(
                     '}\n\n',
+                    'L_Sigma = diag_pre_multiply(sigma, L_Omega);',
+                    'Sigma = multiply_lower_tri_self_transpose(L_Sigma);\n',
                     '// stationary VAR reparameterisation\n',
                     '{\n',
                     'matrix[n_series, n_series] P[1];\n',
@@ -497,6 +494,8 @@ stationarise_VARcor = function(model_file){
   model_file[grep("// trend means",
                   model_file,
                   fixed = TRUE)] <- paste0(
+                    '// LKJ error correlation prior\n',
+                    'L_Omega ~ lkj_corr_cholesky(4);\n',
                     '// partial autocorrelation hyperpriors\n',
                     'Pmu ~ normal(es, fs);\n',
                     'Pomega ~ gamma(gs, hs);\n',
@@ -510,22 +509,24 @@ stationarise_VARcor = function(model_file){
                     "// trend means")
   model_file <- readLines(textConnection(model_file), n = -1)
 
-  # Update prior for Sigma
+  # Update prior for error SD parameters sigma
   model_file[grep("// priors for latent trend variance parameters",
                   model_file,
                   fixed = TRUE)+1] <- paste0(
-                    'Sigma ~ inv_wishart(df, scale_mat);')
+                    'sigma ~ inv_gamma(2.3693353, 0.7311319);')
   model_file <- readLines(textConnection(model_file), n = -1)
 
   # Update trend model to use multinormal
   model_file[grep("trend_raw[1] ~ normal(0, sigma);",
                   model_file, fixed = TRUE)] <- "trend_raw[1] ~ multi_normal(trend_zeros, Gamma);"
   model_file[grep("trend_raw[i] ~ normal(mu[i - 1], sigma);",
-                  model_file, fixed = TRUE)] <- "trend_raw[i] ~ multi_normal(mu[i - 1], Sigma);"
+                  model_file, fixed = TRUE)] <- "trend_raw[i] ~ multi_normal_cholesky(mu[i - 1], L_Sigma);"
 
   model_file <- gsub('contemporaneously uncorrelated',
                      'contemporaneously correlated',
                      model_file)
+  model_file <- readLines(textConnection(model_file), n = -1)
+
   # Return the updated model file
   return(model_file)
 }

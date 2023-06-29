@@ -377,7 +377,7 @@ if(!is.null(object$trend_call)){
   print(mvgam_coefs)
   message()
 
-  if(is.na(object$trend_sp_names)){
+  if(all(is.na(object$trend_sp_names))){
 
   } else {
       to_print <- vector(length = length(object$trend_mgcv_model$smooth))

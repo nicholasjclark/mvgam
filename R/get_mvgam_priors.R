@@ -677,14 +677,24 @@ get_mvgam_priors = function(formula,
     }
 
     if(trend_model == 'VAR1cor'){
-      trend_df <- data.frame(param_name = c("real es[1];",
+      trend_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma;'),
+                             param_length = c(length(unique(data_train$series))),
+                             param_info = c('trend sd'),
+                             prior = c('sigma ~ inv_gamma(2.3693353, 0.7311319);'),
+                             example_change = c(
+                               paste0('sigma ~ exponential(',
+                                      round(runif(min = 0.01, max = 1, n = 1), 2),
+                                      ');'
+                               )))
+      trend_df <- rbind(trend_df,data.frame(param_name = c("real es[1];",
                                             "real es[2];",
                                             "real<lower=0> fs[1];",
                                             "real<lower=0> fs[2];",
                                             "real<lower=0> gs[1];",
                                             "real<lower=0> gs[2];",
                                             "real<lower=0> hs[1];",
-                                            "real<lower=0> hs[2];"),
+                                            "real<lower=0> hs[2];",
+                                            "real<lower=0> L_Omega;"),
                                    param_length = 1,
                                    param_info = c('diagonal autocorrelation population mean',
                                                   'off-diagonal autocorrelation population mean',
@@ -693,7 +703,8 @@ get_mvgam_priors = function(formula,
                                                   'shape1 for diagonal autocorrelation precision',
                                                   'shape1 for off-diagonal autocorrelation precision',
                                                   'shape2 for diagonal autocorrelation precision',
-                                                  'shape2 for off-diagonal autocorrelation precision'),
+                                                  'shape2 for off-diagonal autocorrelation precision',
+                                                  'LKJ prior on trend error correlations'),
                                    prior = c("es[1] = 0;",
                                              "es[2] = 0;",
                                              "fs[1] = sqrt(0.455);",
@@ -701,7 +712,8 @@ get_mvgam_priors = function(formula,
                                              "gs[1] = 1.365;",
                                              "gs[2] = 1.365;",
                                              "hs[1] = 0.071175;" ,
-                                             "hs[2] = 0.071175;"),
+                                             "hs[2] = 0.071175;",
+                                             "L_Omega ~ lkj_corr_cholesky(4);"),
                                    example_change = c("es[1] = 0.5;",
                                                       "es[2] = 0.1;",
                                                       "fs[1] = 0.6;",
@@ -709,7 +721,8 @@ get_mvgam_priors = function(formula,
                                                       "gs[1] = 1.1;",
                                                       "gs[2] = 1.07;",
                                                       "hs[1] = 0.08;" ,
-                                                      "hs[2] = 0.1;"))
+                                                      "hs[2] = 0.1;",
+                                                      "L_Omega ~ lkj_corr_cholesky(1);")))
     }
 
     if(trend_model == 'AR1'){
