@@ -66,7 +66,7 @@ update.mvgam = function(object, formula,
 
   if(missing(trend_formula)){
     if(is.null(object$trend_call)){
-      trend_formula <- NULL
+      trend_formula <- rlang::missing_arg()
     } else {
       trend_formula <- object$trend_call
     }
@@ -74,7 +74,7 @@ update.mvgam = function(object, formula,
 
   if(missing(trend_map)){
     if(is.null(object$trend_map)){
-      trend_map <- NULL
+      trend_map <- rlang::missing_arg()
     } else {
       trend_map <- object$trend_map
     }
