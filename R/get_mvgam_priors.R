@@ -713,7 +713,7 @@ get_mvgam_priors = function(formula,
                                              "gs[2] = 1.365;",
                                              "hs[1] = 0.071175;" ,
                                              "hs[2] = 0.071175;",
-                                             "L_Omega ~ lkj_corr_cholesky(4);"),
+                                             "L_Omega ~ lkj_corr_cholesky(2);"),
                                    example_change = c("es[1] = 0.5;",
                                                       "es[2] = 0.1;",
                                                       "fs[1] = 0.6;",
@@ -722,7 +722,7 @@ get_mvgam_priors = function(formula,
                                                       "gs[2] = 1.07;",
                                                       "hs[1] = 0.08;" ,
                                                       "hs[2] = 0.1;",
-                                                      "L_Omega ~ lkj_corr_cholesky(1);")))
+                                                      "L_Omega ~ lkj_corr_cholesky(4);")))
     }
 
     if(trend_model == 'AR1'){

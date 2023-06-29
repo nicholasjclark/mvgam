@@ -13,13 +13,17 @@
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
 #'@param n_lv \code{integer}. Number of latent dynamic factors for generating the series' trends
-#'@param trend_model \code{character} specifying the time series dynamics for the latent trends. Options are:
-#''RW' (random walk with possible drift),
-#''AR1' (AR1 model with intercept),
-#''AR2' (AR2 model with intercept) or
-#''AR3' (AR3 model with intercept) or
-#''VAR1' (with possible drift; only available in \code{Stan}) or
-#''GP' (Gaussian process with squared exponential kernel
+#'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
+#'\itemize{
+#'   \item `None` (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+#'   \item `RW` (random walk with possible drift)
+#'   \item `AR1` (with possible drift)
+#'   \item `AR2` (with possible drift)
+#'   \item `AR3` (with possible drift)
+#'   \item `VAR1` (contemporaneously uncorrelated VAR1)
+#'   \item `VAR1cor` (contemporaneously correlated VAR1)
+#'   \item `GP` (Gaussian Process with squared exponential kernel)} See [mvgam_trends] for more details
 #'@param drift \code{logical}, simulate a drift term for each trend
 #'@param trend_rel \code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}
 #'@param freq \code{integer}. The seasonal frequency of the series
@@ -87,7 +91,7 @@ sim_mvgam = function(T = 100,
 
   # Validate the trend arguments
   trend_model <- evaluate_trend_model(trend_model)
-  if(trend_model == 'VAR1'){
+  if(trend_model %in% c('VAR1', 'VAR1cor')){
     use_lv <- FALSE
   }
 
@@ -242,7 +246,7 @@ sim_mvgam = function(T = 100,
     ar3s <- rnorm(n_lv, sd = 0.5)
   }
 
-  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'VAR1')){
+  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'VAR1cor')){
     # Sample trend drift terms so they are (hopefully) not too correlated
     if(drift){
       trend_alphas <- rnorm(n_lv, sd = 0.15)
@@ -251,7 +255,7 @@ sim_mvgam = function(T = 100,
     }
 
     # Simulate latent trends
-    if(trend_model != 'VAR1'){
+    if(!trend_model %in% c('VAR1', 'VAR1cor')){
       trends <- do.call(cbind, lapply(seq_len(n_lv), function(x){
         sim_ar3(drift = trend_alphas[x],
                 ar1 = ar1s[x],
@@ -261,17 +265,44 @@ sim_mvgam = function(T = 100,
                 last_trends = rnorm(3),
                 h = T)
       }))
-    } else {
-      # Simulate the Sigma matrix (contemporaneously uncorrelated)
-      Sigma <- matrix(0, nrow = n_lv, ncol = n_lv)
-      diag(Sigma) <- sigma
+    }
+
+    if(trend_model %in% c('VAR1', 'VAR1cor')){
+      if(trend_model == 'VAR1'){
+        # Simulate the Sigma matrix (contemporaneously uncorrelated)
+        Sigma <- matrix(0, nrow = n_lv, ncol = n_lv)
+        diag(Sigma) <- sigma
+      }
+
+      if(trend_model == 'VAR1cor'){
+        # Use the LKJ distribution to sample correlation matrices
+        # with nice properties
+        lkj_corr <- function(n_series, eta = 0.8) {
+          alpha <- eta + (n_series - 2)/2
+          r12 <- 2 * rbeta(1, alpha, alpha) - 1
+          R <- matrix(0, n_series, n_series)
+          R[1,1] <- 1; R[1,2] <- r12; R[2,2] <- sqrt(1 - r12^2)
+          if(n_series > 2) for (m in 2:(n_series - 1)){
+            alpha <- alpha - 0.5
+            y <- rbeta(1, m / 2, alpha)
+            z <- rnorm(m, 0, 1)
+            z <- z / sqrt(crossprod(z)[1])
+            R[1:m,m+1] <- sqrt(y) * z
+            R[m+1,m+1] <- sqrt(1 - y)
+          }
+          return(crossprod(R))
+        }
+        # Sample trend SD parameters and construct Sigma
+        sigma <- 1/rgamma(n_lv, 2.3693353, 0.7311319)
+        Sigma <- outer(sigma, sigma) * lkj_corr(n_series = n_lv)
+      }
 
       # Create the VAR coefficient matrix
       A <- matrix(NA, nrow = n_lv, ncol = n_lv)
 
       # Off-diagonals represent VAR coefficients (need not be symmetric)
-      A[lower.tri(A)] <- rnorm(length(A[lower.tri(A)]), 0, 0.15)
-      A[upper.tri(A)] <- rnorm(length(A[upper.tri(A)]), 0, 0.15)
+      A[lower.tri(A)] <- rnorm(length(A[lower.tri(A)]), 0, 0.1)
+      A[upper.tri(A)] <- rnorm(length(A[upper.tri(A)]), 0, 0.1)
 
       # Diagonals represent AR coefficients
       diag(A) <- rbeta(n_lv, 8, 5)
@@ -438,8 +469,9 @@ sim_mvgam = function(T = 100,
                           ar3 = ar3s)
     }
 
-    if(trend_model == 'VAR1'){
-      trend_params = list(var1 = A)
+    if(trend_model %in% c('VAR1', 'VAR1cor')){
+      trend_params = list(var1 = A,
+                          Sigma = Sigma)
     }
 
     if(trend_model == 'GP'){

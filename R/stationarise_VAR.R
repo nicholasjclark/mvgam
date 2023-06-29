@@ -495,7 +495,7 @@ stationarise_VARcor = function(model_file){
                   model_file,
                   fixed = TRUE)] <- paste0(
                     '// LKJ error correlation prior\n',
-                    'L_Omega ~ lkj_corr_cholesky(4);\n',
+                    'L_Omega ~ lkj_corr_cholesky(2);\n',
                     '// partial autocorrelation hyperpriors\n',
                     'Pmu ~ normal(es, fs);\n',
                     'Pomega ~ gamma(gs, hs);\n',
