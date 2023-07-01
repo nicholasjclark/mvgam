@@ -142,7 +142,7 @@ add_trend_lines = function(model_file, stan = FALSE,
           model_file[grep('LV_raw = gp_phi * SPD_beta;', model_file, fixed = TRUE)] <-
             paste0('LV_raw = gp_phi * SPD_beta;\n',
                    '// derived latent trends\n',
-                   'for (i in 1:n){;\n',
+                   'for (i in 1:n){\n',
                    'for (s in 1:n_series){\n',
                    'trend[i, s] = dot_product(lv_coefs_raw[s,], LV_raw[i,1:n_lv]);\n',
                    '}\n}\n')

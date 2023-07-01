@@ -1,5 +1,4 @@
 #' Index \code{mvgam} objects
-#'
 #' @aliases variables
 #'
 #' Index variables and their `mgcv` coefficient names
@@ -16,6 +15,7 @@ NULL
 #' @param x \code{list} object of class `mvgam`
 #' @method variables mvgam
 #' @export
+#' @export variables
 variables.mvgam = function(x, ...){
   parnames <- dimnames(x$model_output)$parameters
 
@@ -60,7 +60,8 @@ variables.mvgam = function(x, ...){
 
   if(!is.null(x$trend_call)){
     b_names <- colnames(mcmc_chains(x$model_output, 'b_trend'))
-    mgcv_names <- paste0(names(coef(x$trend_mgcv_model)), '_trend')
+    mgcv_names <- gsub('series', 'trend',
+                       paste0(names(coef(x$trend_mgcv_model)), '_trend'))
     trend_betas <- data.frame(orig_name = b_names, alias = mgcv_names)
   } else {
     trend_betas <- NULL
@@ -68,7 +69,8 @@ variables.mvgam = function(x, ...){
 
   # Population parameters from hierarchical (random) effects
   if(any(unlist(purrr::map(x$mgcv_model$smooth, inherits, 'random.effect')))){
-    re_labs <- unlist(purrr::map(x$mgcv_model$smooth, 'term'))[
+    re_labs <- unlist(lapply(purrr::map(object$mgcv_model$smooth, 'term'),
+                             paste, collapse = ','))[
       unlist(purrr::map(x$mgcv_model$smooth, inherits, 'random.effect'))]
     observation_re_params  <- data.frame(orig_name = c(
       rownames(mcmc_summary(x$model_output, 'mu_raw',
@@ -84,15 +86,17 @@ variables.mvgam = function(x, ...){
   trend_re_params <- NULL
   if(!is.null(x$trend_call)){
     if(any(unlist(purrr::map(x$trend_mgcv_model$smooth, inherits, 'random.effect')))){
-      re_labs <- unlist(purrr::map(x$trend_mgcv_model$smooth, 'term'))[
+      re_labs <- unlist(lapply(purrr::map(object$trend_mgcv_model$smooth, 'term'),
+                               paste, collapse = ','))[
         unlist(purrr::map(x$trend_mgcv_model$smooth, inherits, 'random.effect'))]
-      observation_re_params  <- data.frame(orig_name = c(
+      re_labs <- gsub('series', 'trend', re_labs)
+      trend_re_params  <- data.frame(orig_name = c(
         rownames(mcmc_summary(x$model_output, 'mu_raw_trend',
                               ISB = TRUE)),
         rownames(mcmc_summary(x$model_output, 'sigma_raw_trend',
                               ISB = TRUE))),
-        alias = c(paste0('mean(',re_labs,'_trend)'),
-                  paste0('sd(',re_labs,'_trend)')))
+        alias = c(paste0('mean(',re_labs,')_trend'),
+                  paste0('sd(',re_labs,')_trend')))
     } else {
       trend_re_params <- NULL
     }

@@ -270,7 +270,8 @@ sim_mvgam = function(T = 100,
     if(trend_model %in% c('VAR1', 'VAR1cor')){
       if(trend_model == 'VAR1'){
         # Simulate the Sigma matrix (contemporaneously uncorrelated)
-        Sigma <- matrix(0, nrow = n_lv, ncol = n_lv)
+        Sigma <- matrix(0, n_lv, n_lv)
+        sigma <- 1/rgamma(n_lv, 2.3693353, 0.7311319)
         diag(Sigma) <- sigma
       }
 

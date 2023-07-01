@@ -3,6 +3,7 @@
 #'This function allows a previously fitted `mvgam` model to be updated
 #'@name update.mvgam
 #'@importFrom mgcv nb betar
+#'@importFrom rlang missing_arg
 #'@param object A fitted `mvgam` model
 #'@param formula Optional new `formula` object. Note, `mvgam` currently does not support dynamic formula
 #'updates such as removal of specific terms with `- term`. When updating, the entire formula needs
@@ -66,7 +67,7 @@ update.mvgam = function(object, formula,
 
   if(missing(trend_formula)){
     if(is.null(object$trend_call)){
-      trend_formula <- rlang::missing_arg()
+      trend_formula <- missing_arg()
     } else {
       trend_formula <- object$trend_call
     }
@@ -74,7 +75,7 @@ update.mvgam = function(object, formula,
 
   if(missing(trend_map)){
     if(is.null(object$trend_map)){
-      trend_map <- rlang::missing_arg()
+      trend_map <- missing_arg()
     } else {
       trend_map <- object$trend_map
     }

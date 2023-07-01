@@ -37,13 +37,17 @@ latent trends in a reduced dimension format. If \code{FALSE}, estimate independe
 
 \item{n_lv}{\code{integer}. Number of latent dynamic factors for generating the series' trends}
 
-\item{trend_model}{\code{character} specifying the time series dynamics for the latent trends. Options are:
-'RW' (random walk with possible drift),
-'AR1' (AR1 model with intercept),
-'AR2' (AR2 model with intercept) or
-'AR3' (AR3 model with intercept) or
-'VAR1' (with possible drift; only available in \code{Stan}) or
-'GP' (Gaussian process with squared exponential kernel}
+\item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
+\itemize{
+\item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+\item \code{RW} (random walk with possible drift)
+\item \code{AR1} (with possible drift)
+\item \code{AR2} (with possible drift)
+\item \code{AR3} (with possible drift)
+\item \code{VAR1} (contemporaneously uncorrelated VAR1)
+\item \code{VAR1cor} (contemporaneously correlated VAR1)
+\item \code{GP} (Gaussian Process with squared exponential kernel)} See \link{mvgam_trends} for more details}
 
 \item{drift}{\code{logical}, simulate a drift term for each trend}
 

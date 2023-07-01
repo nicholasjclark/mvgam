@@ -26,7 +26,8 @@ get_monitor_pars = function(family, smooths_included = TRUE,
   param <- c(param, family_par_names(family))
 
   # Trend-specific parameters
-  param <- c(param, trend_par_names(trend_model, use_lv, drift))
+  param <- c(param, trend_par_names(trend_model = trend_model,
+                                    use_lv = use_lv, drift = drift))
 
   return(param)
 }

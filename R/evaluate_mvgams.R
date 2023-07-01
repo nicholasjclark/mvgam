@@ -197,8 +197,26 @@ eval_mvgam = function(object,
                                     type = 'lpmatrix'))
   }
 
+  # Generate linear predictor matrix from trend mgcv model
+  if(!is.null(object$trend_call)){
+    Xp_trend <- trend_pred_data(data_test = data_test,
+                                trend_map = object$trend_map,
+                                series = 'all',
+                                mgcv_model = object$trend_mgcv_model)
+
+  } else {
+    Xp_trend <- NULL
+  }
+
   # Beta coefficients for GAM component
   betas <- mcmc_chains(object$model_output, 'b')
+
+  # Beta coefficients for GAM trend component
+  if(!is.null(object$trend_call)){
+    betas_trend <- mcmc_chains(object$model_output, 'b_trend')
+  } else {
+    betas_trend <- NULL
+  }
 
   # Family-specific parameters
   family <- object$family
@@ -219,17 +237,6 @@ eval_mvgam = function(object,
     sample_seq <- sample(seq_len(dim(betas)[1]), size = n_samples, replace = F)
   } else {
     sample_seq <- sample(seq_len(dim(betas)[1]), size = n_samples, replace = T)
-  }
-
-  if(object$trend_model == 'VAR1'){
-    all_trends <- propagate_var_fcs(trend_pars,
-                                    n_samples,
-                                    sample_seq,
-                                    eval_timepoint,
-                                    n_series,
-                                    fc_horizon = fc_horizon)
-  } else {
-    all_trends <- NULL
   }
 
   #### 2. Run trends forward fc_horizon steps to generate the forecast distribution ####
@@ -256,9 +263,10 @@ eval_mvgam = function(object,
                           'family_pars',
                           'n_series',
                           'upper_bounds',
-                          'all_trends',
                           'sample_seq',
-                          'weights'),
+                          'weights',
+                          'betas_trend',
+                          'Xp_trend'),
                   envir = environment())
 
     pbapply::pboptions(type = "none")
@@ -269,16 +277,22 @@ eval_mvgam = function(object,
       # Sample beta coefs
       betas <- betas[samp_index, ]
 
+      if(!is.null(betas_trend)){
+        betas_trend <- betas_trend[samp_index, ]
+      }
+
       # Sample general trend-specific parameters
       general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
                                                                samp_index = samp_index)
 
-      if(use_lv){
-        # Propagate the lvs forward using the sampled trend parameters
+      if(use_lv || trend_model == 'VAR1'){
+        # Propagate the lvs / VARs forward using the sampled trend parameters
         trends <- forecast_trend(trend_model = trend_model,
-                                         use_lv = use_lv,
-                                         trend_pars = general_trend_pars,
-                                         h = fc_horizon)
+                                 use_lv = use_lv,
+                                 trend_pars = general_trend_pars,
+                                 h = fc_horizon,
+                                 betas_trend = betas_trend,
+                                 Xp_trend = Xp_trend)
       }
 
       # Loop across series and produce the next trend estimate
@@ -294,18 +308,18 @@ eval_mvgam = function(object,
           if(use_lv){
             # Multiply lv states with loadings to generate the series' forecast trend state
             out <- as.numeric(trends %*% trend_extracts$lv_coefs)
-          }
-
-          if(trend_model == 'VAR1'){
-            out <- all_trends[which(sample_seq == x), , series]
+          } else if(trend_model == 'VAR1'){
+            out <- trends[, series]
           }
 
         } else {
           # Propagate the series-specific trends forward
           out <- forecast_trend(trend_model = trend_model,
-                                        use_lv = FALSE,
-                                        trend_pars = trend_extracts,
-                                        h = fc_horizon)
+                                use_lv = FALSE,
+                                trend_pars = trend_extracts,
+                                h = fc_horizon,
+                                betas_trend = betas_trend,
+                                Xp_trend = Xp_trend)
         }
 
         out
@@ -347,16 +361,22 @@ eval_mvgam = function(object,
       # Sample beta coefs
       betas <- betas[samp_index, ]
 
+      if(!is.null(betas_trend)){
+        betas_trend <- betas_trend[samp_index, ]
+      }
+
       # Sample general trend-specific parameters
       general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
                                                        samp_index = samp_index)
 
-      if(use_lv){
+      if(use_lv || trend_model == 'VAR1'){
         # Propagate the lvs forward using the sampled trend parameters
         trends <- forecast_trend(trend_model = trend_model,
                                  use_lv = use_lv,
                                  trend_pars = general_trend_pars,
-                                 h = fc_horizon)
+                                 h = fc_horizon,
+                                 betas_trend = betas_trend,
+                                 Xp_trend = Xp_trend)
       }
 
       # Loop across series and produce the next trend estimate
@@ -372,10 +392,8 @@ eval_mvgam = function(object,
           if(use_lv){
             # Multiply lv states with loadings to generate the series' forecast trend state
             out <- as.numeric(trends %*% trend_extracts$lv_coefs)
-          }
-
-          if(trend_model == 'VAR1'){
-            out <- all_trends[which(sample_seq == x), , series]
+          } else if(trend_model == 'VAR1'){
+            out <- trends[,series]
           }
 
         } else {
@@ -383,7 +401,9 @@ eval_mvgam = function(object,
           out <- forecast_trend(trend_model = trend_model,
                                 use_lv = FALSE,
                                 trend_pars = trend_extracts,
-                                h = fc_horizon)
+                                h = fc_horizon,
+                                betas_trend = betas_trend,
+                                Xp_trend = Xp_trend)
         }
 
         out

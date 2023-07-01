@@ -151,7 +151,7 @@ if(!is.null(object$trend_call)){
 
 smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
   data.frame(label = object$mgcv_model$smooth[[x]]$label,
-             term = object$mgcv_model$smooth[[x]]$term,
+             term = paste(object$mgcv_model$smooth[[x]]$term, collapse = ','),
              class = class(object$mgcv_model$smooth[[x]])[1])
 }))
 
@@ -400,8 +400,10 @@ if(!is.null(object$trend_call)){
       }
 
       if(any(to_print == FALSE)){
-        re_labs <- unlist(purrr::map(object$trend_mgcv_model$smooth, 'term'))[
+        re_labs <- unlist(lapply(purrr::map(object$trend_mgcv_model$smooth, 'term'),
+                                 paste, collapse = ','))[
           unlist(purrr::map(object$trend_mgcv_model$smooth, inherits, 'random.effect'))]
+        re_labs <- gsub('series', 'trend', re_labs)
         re_sds <- mcmc_summary(object$model_output, 'sigma_raw_trend',
                                ISB = TRUE)[,c(3:7)]
 

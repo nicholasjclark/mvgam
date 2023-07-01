@@ -77,24 +77,52 @@ sim_gp = function(last_trends, h, rho_gp, alpha_gp){
 #' @param ar2 AR2 parameter
 #' @param ar3 AR3 parameter
 #' @param tau precision parameter
+#' @param Xp_trend optional linear predictor matrix
+#' @param betas_trend optional coefficients associated with lp matrix
 #' @noRd
-sim_ar3 = function(drift, ar1, ar2, ar3, tau, last_trends, h){
+sim_ar3 = function(drift = 0,
+                   ar1 = 1,
+                   ar2 = 0,
+                   ar3 = 0,
+                   tau = 1,
+                   Xp_trend = NULL,
+                   betas_trend = NULL,
+                   last_trends = rnorm(3),
+                   h = 50){
   states <- rep(NA, length = h + 3)
   last_trends <- tail(last_trends, 3)
   states[1] <- last_trends[1]
   states[2] <- last_trends[2]
   states[3] <- last_trends[3]
+
+  errors <- rnorm(h + 3, sd = sqrt(1 / tau))
+
+  if(!is.null(Xp_trend)){
+    linpreds <- c(rep(0, 3), as.vector(((matrix(Xp_trend, ncol = NCOL(Xp_trend)) %*%
+                    betas_trend)) +
+      attr(Xp_trend, 'model.offset')))
+  } else {
+    linpreds <- rep(0, h + 3)
+  }
+
   for (t in 4:(h + 3)) {
-    states[t] <- rnorm(1, drift + ar1*states[t - 1] +
-                         ar2*states[t - 2] +
-                         ar3*states[t - 3], sqrt(1 / tau))
+    states[t] <- drift +
+      ar1*states[t - 1] +
+      ar2*states[t - 2] +
+      ar3*states[t - 3] +
+      linpreds[t] - linpreds[t -1] +
+      errors[t]
   }
   states[-c(1:3)]
 }
 
 #' VAR1 simulation function
 #' @noRd
-sim_var1 = function(drift, A, Sigma, last_trends, h){
+sim_var1 = function(drift, A, Sigma,
+                    last_trends,
+                    Xp_trend = NULL,
+                    betas_trend = NULL,
+                    h){
 
   if(NCOL(A) != NCOL(Sigma)){
     stop('VAR coefficient matrix "A" and error matrix "Sigma" must have equal dimensions',
@@ -115,6 +143,20 @@ sim_var1 = function(drift, A, Sigma, last_trends, h){
          call. = FALSE)
   }
 
+  # Linear predictor, if supplied
+  if(!is.null(Xp_trend)){
+    linpreds <- as.vector(((matrix(Xp_trend,
+                                   ncol = NCOL(Xp_trend)) %*%
+                              betas_trend)) +
+                            attr(Xp_trend, 'model.offset'))
+    linpreds <- matrix(linpreds, ncol = NROW(A),
+                       byrow = TRUE)
+    linpreds <- rbind(rep(0, NROW(A)),
+                      linpreds)
+  } else {
+    linpreds <- matrix(0, nrow = h + 1, ncol = NROW(A))
+  }
+
   # Last estimate in time is where the series will start
   states <- matrix(NA, nrow = h + 1, ncol = NCOL(A))
   states[1, ] <- last_trends
@@ -123,7 +165,10 @@ sim_var1 = function(drift, A, Sigma, last_trends, h){
 
   # Stochastic realisations
   for (t in 2:(h + 1)) {
-    states[t, ] <- A %*% states[t-1,] + drift + errors[t, ]
+    states[t, ] <- A %*% states[t-1,] +
+      drift +
+      linpreds[t, ] - linpreds[t - 1, ]
+      errors[t, ]
   }
 
   # Return state estimates
@@ -132,7 +177,9 @@ sim_var1 = function(drift, A, Sigma, last_trends, h){
 
 #' Parameters to monitor / extract
 #' @noRd
-trend_par_names = function(trend_model, use_lv = FALSE,
+trend_par_names = function(trend_model,
+                           trend_map,
+                           use_lv = FALSE,
                            drift = FALSE){
 
   # Check arguments
@@ -160,6 +207,11 @@ trend_par_names = function(trend_model, use_lv = FALSE,
     if(trend_model == 'GP'){
       param <- c('trend', 'alpha_gp', 'rho_gp',
                  'LV', 'lv_coefs')
+    }
+
+    if(trend_model == 'VAR1'){
+      param <- c('trend', 'A', 'Sigma',
+                 'lv_coefs', 'LV')
     }
 
   }
@@ -211,6 +263,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
 
   # Get names of parameters to extract
   pars_to_extract <- trend_par_names(trend_model = object$trend_model,
+                                     trend_map = object$trend_map,
                                      use_lv = object$use_lv,
                                      drift = object$drift)
 
@@ -268,7 +321,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
           inds_lv <- seq(lv, dim(out$LV)[2], by = n_lv)
           lv_estimates <- out$LV[,inds_lv]
           # Need to only use estimates from the training period
-          if(class(object$obs_data)[1] == 'list'){
+          if(inherits(object$obs_data, 'list')){
             end_train <- data.frame(y = object$obs_data$y,
                                     series = object$obs_data$series,
                                     time = object$obs_data$time) %>%
@@ -472,7 +525,9 @@ extract_series_trend_pars = function(series, samp_index, trend_pars,
 
 #' Wrapper function to forecast trends
 #' @noRd
-forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
+forecast_trend = function(trend_model, use_lv, trend_pars,
+                          Xp_trend = NULL, betas_trend = NULL,
+                          h = 1){
 
   # Check arguments
   trend_model <- evaluate_trend_model(trend_model)
@@ -490,19 +545,29 @@ forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
           ar1 <- 1
         }
 
+        if(!is.null(Xp_trend)){
+          inds_keep <- seq(lv, NROW(Xp_trend), by = n_lv)
+          Xp_trend_sub = Xp_trend[inds_keep, ]
+          attr(Xp_trend_sub, 'model.offset') <- attr(Xp_trend, 'model.offset')
+        } else {
+          Xp_trend_sub <- NULL
+        }
+
         sim_ar3(drift = ifelse('drift' %in% names(trend_pars),
-                                       trend_pars$drift[lv],
-                                       0),
-                        ar1 = ar1,
-                        ar2 = ifelse('ar2' %in% names(trend_pars),
-                                     trend_pars$ar2[lv],
-                                     0),
-                        ar3 = ifelse('ar3' %in% names(trend_pars),
-                                     trend_pars$ar3[lv],
-                                     0),
-                        tau = trend_pars$tau[lv],
-                        last_trends = tail(trend_pars$last_lvs[[lv]], 3),
-                        h = h)
+                               trend_pars$drift[lv],
+                               0),
+                ar1 = ar1,
+                ar2 = ifelse('ar2' %in% names(trend_pars),
+                             trend_pars$ar2[lv],
+                             0),
+                ar3 = ifelse('ar3' %in% names(trend_pars),
+                             trend_pars$ar3[lv],
+                             0),
+                tau = trend_pars$tau[lv],
+                Xp_trend = Xp_trend_sub,
+                betas_trend = betas_trend,
+                last_trends = tail(trend_pars$last_lvs[[lv]], 3),
+                h = h)
       }))
     }
 
@@ -513,6 +578,25 @@ forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
                        last_trends = trend_pars$last_lvs[[lv]],
                        h = h)
       }))
+    }
+
+    if(trend_model == 'VAR1'){
+      # Reconstruct the A and Sigma matrices
+      Amat <- matrix(trend_pars$A, nrow = length(trend_pars$last_lvs),
+                     ncol = length(trend_pars$last_lvs))
+      Sigmamat <- matrix(trend_pars$Sigma, nrow = length(trend_pars$last_lvs),
+                         ncol = length(trend_pars$last_lvs))
+
+      # Reconstruct the last trend vector
+      last_trendvec <- unlist(lapply(trend_pars$last_lvs,
+                                     function(x) tail(x, 1)))
+
+      next_lvs <- sim_var1(A = Amat,
+                           Sigma = Sigmamat,
+                           last_trends = last_trendvec,
+                           Xp_trend = Xp_trend,
+                           betas_trend = betas_trend,
+                           h = h)
     }
 
     trend_fc <- next_lvs
@@ -531,18 +615,20 @@ forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
       }
 
       trend_fc <-  sim_ar3(drift = ifelse('drift' %in% names(trend_pars),
-                                                  trend_pars$drift,
-                                                  0),
-                                   ar1 = ar1,
-                                   ar2 = ifelse('ar2' %in% names(trend_pars),
-                                                trend_pars$ar2,
-                                                0),
-                                   ar3 = ifelse('ar3' %in% names(trend_pars),
-                                                trend_pars$ar3,
-                                                0),
-                                   tau = trend_pars$tau,
-                                   last_trends = tail(trend_pars$last_trends, 3),
-                                   h = h)
+                                          trend_pars$drift,
+                                          0),
+                           ar1 = ar1,
+                           ar2 = ifelse('ar2' %in% names(trend_pars),
+                                        trend_pars$ar2,
+                                        0),
+                           ar3 = ifelse('ar3' %in% names(trend_pars),
+                                        trend_pars$ar3,
+                                        0),
+                           tau = trend_pars$tau,
+                           Xp_trend = Xp_trend,
+                           betas_trend = betas_trend,
+                           last_trends = tail(trend_pars$last_trends, 3),
+                           h = h)
     }
 
     if(trend_model == 'GP'){
@@ -564,12 +650,103 @@ forecast_trend = function(trend_model, use_lv, trend_pars, h = 1){
                                      function(x) tail(x, 1)))
 
       trend_fc <- sim_var1(A = Amat,
-                                   Sigma = Sigmamat,
-                                   last_trends = last_trendvec,
-                                   h = h)
+                           Sigma = Sigmamat,
+                           last_trends = last_trendvec,
+                           Xp_trend = Xp_trend,
+                           betas_trend = betas_trend,
+                           h = h)
     }
 
   }
   return(trend_fc)
+}
+
+#' Function to prepare trend linear predictor matrix, ensuring ordering and
+#' indexing is correct with respect to the model structure
+#' @noRd
+trend_pred_data = function(data_test, trend_map, series = 'all',
+                           mgcv_model){
+
+  trend_test <- data_test
+  trend_indicators <- vector(length = length(trend_test$time))
+  for(i in 1:length(trend_test$time)){
+    trend_indicators[i] <- trend_map$trend[which(trend_map$series ==
+                                                          trend_test$series[i])]
+  }
+  trend_indicators <- as.factor(paste0('trend', trend_indicators))
+  trend_test$series <- trend_indicators
+  trend_test$y <- NULL
+
+  # Because these are set up inherently as dynamic factor models,
+  # we ALWAYS need to forecast the full set of trends, regardless of
+  # which series (or set of series) is being forecast
+
+  # if(series != 'all'){
+  #   s_name <- levels(data_test$series)[series]
+  #
+  #   data.frame(series = trend_test$series,
+  #              old_series = data_test$series,
+  #              time = trend_test$time,
+  #              row_num = 1:length(trend_test$time)) %>%
+  #     dplyr::filter(old_series == s_name) %>%
+  #     dplyr::arrange(time) %>%
+  #     dplyr::pull(row_num) -> inds_keep
+  #
+  # } else {
+  #   data.frame(series = trend_test$series,
+  #              time = trend_test$time,
+  #              row_num = 1:length(trend_test$time)) %>%
+  #     dplyr::group_by(series, time) %>%
+  #     dplyr::slice_head(n = 1) %>%
+  #     dplyr::pull(row_num) -> inds_keep
+  # }
+
+  data.frame(series = trend_test$series,
+             time = trend_test$time,
+             row_num = 1:length(trend_test$time)) %>%
+    dplyr::group_by(series, time) %>%
+    dplyr::slice_head(n = 1) %>%
+    dplyr::ungroup() %>%
+    dplyr::arrange(time, series) %>%
+    dplyr::pull(row_num) -> inds_keep
+
+  if(inherits(data_test, 'list')){
+    trend_test <- lapply(trend_test, function(x){
+      if(is.matrix(x)){
+        matrix(x[inds_keep,], ncol = NCOL(x))
+      } else {
+        x[inds_keep]
+      }
+
+    })
+  } else {
+    trend_test <- trend_test[inds_keep, ]
+  }
+
+  suppressWarnings(Xp_trend  <- try(predict(mgcv_model,
+                                            newdata = trend_test,
+                                            type = 'lpmatrix'),
+                                    silent = TRUE))
+
+  if(inherits(Xp_trend, 'try-error')){
+    testdat <- data.frame(series = trends_test$series)
+
+    terms_include <- names(mgcv_model$coefficients)[which(!names(mgcv_model$coefficients)
+                                                          %in% '(Intercept)')]
+    if(length(terms_include) > 0){
+      newnames <- vector()
+      newnames[1] <- 'series'
+      for(i in 1:length(terms_include)){
+        testdat <- cbind(testdat, data.frame(trends_test[[terms_include[i]]]))
+        newnames[i+1] <- terms_include[i]
+      }
+      colnames(testdat) <- newnames
+    }
+
+    suppressWarnings(Xp_trend  <- predict(mgcv_model,
+                                          newdata = testdat,
+                                          type = 'lpmatrix'))
+  }
+  return(Xp_trend)
 }
 

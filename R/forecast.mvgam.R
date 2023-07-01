@@ -2,6 +2,7 @@
 #'@name forecast.mvgam
 #'@importFrom parallel clusterExport stopCluster setDefaultCluster
 #'@importFrom stats predict
+#'@importFrom rlang missing_arg
 #'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 #'in addition to any other variables included in the linear predictor of the original \code{formula}. If included, the
@@ -106,227 +107,282 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
   # Only compute forecasts if they don't already exist!
   if(!forecasts_exist){
 
-  # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
-  if(terms(formula(object$call))[[2]] != 'y'){
-    data_test$y <- data_test[[terms(formula(object$call))[[2]]]]
-  }
-
-  if(!missing(data_test)){
-
-    if(!'y' %in% names(data_test)){
-      data_test$y <- rep(NA, NROW(data_test))
+    # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
+    if(terms(formula(object$call))[[2]] != 'y'){
+      data_test$y <- data_test[[terms(formula(object$call))[[2]]]]
     }
 
-    if(class(data_test)[1] == 'list'){
-      if(!'time' %in% names(data_test)){
-        stop('data_test does not contain a "time" column')
+    if(!missing(data_test)){
+
+      if(!'y' %in% names(data_test)){
+        data_test$y <- rep(NA, NROW(data_test))
       }
 
-      if(!'series' %in% names(data_test)){
-        data_test$series <- factor('series1')
-      }
-
-    } else {
-      if(!'time' %in% colnames(data_test)){
-        stop('data_test does not contain a "time" column')
-      }
-
-      if(!'series' %in% colnames(data_test)){
-        data_test$series <- factor('series1')
-      }
-    }
-  }
-
-  # Generate the linear predictor matrix
-  if(inherits(data_test, 'list')){
-    suppressWarnings(Xp  <- try(predict(object$mgcv_model,
-                                             newdata = data_test,
-                                             type = 'lpmatrix'),
-                                     silent = TRUE))
-
-    if(inherits(Xp, 'try-error')){
-      testdat <- data.frame(time = data_test$time)
-
-      terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients)
-                                                                   %in% '(Intercept)')]
-      if(length(terms_include) > 0){
-        newnames <- vector()
-        newnames[1] <- 'time'
-        for(i in 1:length(terms_include)){
-          testdat <- cbind(testdat, data.frame(data_test[[terms_include[i]]]))
-          newnames[i+1] <- terms_include[i]
+      if(class(data_test)[1] == 'list'){
+        if(!'time' %in% names(data_test)){
+          stop('data_test does not contain a "time" column')
         }
-        colnames(testdat) <- newnames
+
+        if(!'series' %in% names(data_test)){
+          data_test$series <- factor('series1')
+        }
+
+      } else {
+        if(!'time' %in% colnames(data_test)){
+          stop('data_test does not contain a "time" column')
+        }
+
+        if(!'series' %in% colnames(data_test)){
+          data_test$series <- factor('series1')
+        }
+      }
+    }
+
+    # Generate the observation model linear predictor matrix
+    if(inherits(data_test, 'list')){
+      suppressWarnings(Xp  <- try(predict(object$mgcv_model,
+                                          newdata = data_test,
+                                          type = 'lpmatrix'),
+                                  silent = TRUE))
+
+      if(inherits(Xp, 'try-error')){
+        testdat <- data.frame(time = data_test$time)
+
+        terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients)
+                                                                     %in% '(Intercept)')]
+        if(length(terms_include) > 0){
+          newnames <- vector()
+          newnames[1] <- 'time'
+          for(i in 1:length(terms_include)){
+            testdat <- cbind(testdat, data.frame(data_test[[terms_include[i]]]))
+            newnames[i+1] <- terms_include[i]
+          }
+          colnames(testdat) <- newnames
+        }
+
+        suppressWarnings(Xp  <- predict(object$mgcv_model,
+                                        newdata = testdat,
+                                        type = 'lpmatrix'))
       }
 
-      suppressWarnings(Xp  <- predict(object$mgcv_model,
-                                           newdata = testdat,
-                                           type = 'lpmatrix'))
-    }
-
-    if(series != 'all'){
-      obs_keep <- data.frame(y = data_test$y,
-                             series = data_test$series,
-                             time = data_test$time,
-                             rowid = 1:length(data_test$y)) %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::arrange(time) %>%
-        dplyr::pull(rowid)
-      series_test <- data.frame(y = data_test$y,
-                                series = data_test$series,
-                                time = data_test$time,
-                                rowid = 1:length(data_test$y)) %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::arrange(time)
-      Xp <- Xp[obs_keep, ]
-    } else {
-      series_test <- NULL
-    }
-
-
-  } else {
-    if(series != 'all'){
-      series_test <- data_test %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::arrange(time)
-      Xp <- predict(object$mgcv_model,
-                    newdata = series_test,
-                    type = 'lpmatrix')
-    } else {
-      Xp <- predict(object$mgcv_model,
-                    newdata = data_test,
-                    type = 'lpmatrix')
-      series_test <- NULL
-    }
-
-  }
-
-  if(series != 'all'){
-    fc_horizon <- NROW(series_test)
-  } else {
-    fc_horizon <- length(unique(data_test$time))
-  }
-
-  # Beta coefficients for GAM component
-  betas <- mcmc_chains(object$model_output, 'b')
-
-  # Family of model
-  family <- object$family
-
-  # Family-specific parameters
-  family_pars <- extract_family_pars(object = object)
-
-  # Trend model
-  trend_model <- object$trend_model
-  use_lv <- object$use_lv
-
-  # Trend-specific parameters; keep only the last 3 estimates for RW / AR trends
-  # as we don't need any prior to that for propagating the trends forward. For GP
-  # trends, we have to keep all estimates through time
-
-  if(object$trend_model == 'VAR1'){
-    trend_pars <- extract_trend_pars(object = object,
-                                             keep_all_estimates = FALSE,
-                                             ending_time = max(object$obs_data$time))
-    all_trends <- propagate_var_fcs(trend_pars,
-                                    n_samples = 500,
-                                    sample_seq = 1:500,
-                                    eval_timepoint = max(object$obs_data$time),
-                                    n_series = n_series,
-                                    fc_horizon = fc_horizon)
-    sample_seq <- sample(1:500, dim(betas)[1], TRUE)
-  } else {
-    trend_pars <- extract_trend_pars(object = object,
-                                             keep_all_estimates = FALSE)
-    all_trends <- NULL
-    sample_seq <- NULL
-  }
-
-  # Produce forecasts
-  use_lv <- object$use_lv
-  cl <- parallel::makePSOCKcluster(n_cores)
-  setDefaultCluster(cl)
-  clusterExport(NULL, c('family',
-                        'family_pars',
-                        'trend_model',
-                        'trend_pars',
-                        'type',
-                        'use_lv',
-                        'betas',
-                        'n_series',
-                        'data_test',
-                        'series',
-                        'series_test',
-                        'Xp',
-                        'fc_horizon',
-                        'all_trends',
-                        'sample_seq'),
-                envir = environment())
-
-  pbapply::pboptions(type = "none")
-
-  fc_preds <- pbapply::pblapply(seq_len(dim(betas)[1]), function(i){
-    # Sample index
-    samp_index <- i
-
-    # Sample beta coefs
-    betas <- betas[samp_index, ]
-
-    # Return predictions
-    if(series == 'all'){
-
-      # Sample general trend-specific parameters
-      general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
-                                                               samp_index = samp_index)
-
-      if(use_lv){
-        # Propagate the lvs forward using the sampled trend parameters
-        trends <- forecast_trend(trend_model = trend_model,
-                                         use_lv = use_lv,
-                                         trend_pars = general_trend_pars,
-                                         h = fc_horizon)
+      if(series != 'all'){
+        obs_keep <- data.frame(y = data_test$y,
+                               series = data_test$series,
+                               time = data_test$time,
+                               rowid = 1:length(data_test$y)) %>%
+          dplyr::filter(series == s_name) %>%
+          dplyr::arrange(time) %>%
+          dplyr::pull(rowid)
+        series_test <- data.frame(y = data_test$y,
+                                  series = data_test$series,
+                                  time = data_test$time,
+                                  rowid = 1:length(data_test$y)) %>%
+          dplyr::filter(series == s_name) %>%
+          dplyr::arrange(time)
+        Xp <- Xp[obs_keep, ]
+      } else {
+        series_test <- NULL
       }
 
-      # Loop across series and produce the next trend estimate
-      trend_states <- lapply(seq_len(n_series), function(series){
 
-        # Sample series- and trend-specific parameters
-        trend_extracts <- extract_series_trend_pars(series = series,
-                                                            samp_index = samp_index,
-                                                            trend_pars = trend_pars,
-                                                            use_lv = use_lv)
+    } else {
+      if(series != 'all'){
+        series_test <- data_test %>%
+          dplyr::filter(series == s_name) %>%
+          dplyr::arrange(time)
+        Xp <- predict(object$mgcv_model,
+                      newdata = series_test,
+                      type = 'lpmatrix')
+      } else {
+        Xp <- predict(object$mgcv_model,
+                      newdata = data_test,
+                      type = 'lpmatrix')
+        series_test <- NULL
+      }
+
+    }
+
+    # Generate linear predictor matrix from trend mgcv model
+    if(!is.null(object$trend_call)){
+      Xp_trend <- trend_pred_data(data_test = data_test,
+                                  trend_map = object$trend_map,
+                                  series = series,
+                                  mgcv_model = object$trend_mgcv_model)
+
+    } else {
+      Xp_trend <- NULL
+    }
+
+    # Set forecast horizon
+    if(series != 'all'){
+      fc_horizon <- NROW(series_test)
+    } else {
+      fc_horizon <- length(unique(data_test$time))
+    }
+
+    # Beta coefficients for GAM observation component
+    betas <- mcmc_chains(object$model_output, 'b')
+
+    # Beta coefficients for GAM trend component
+    if(!is.null(object$trend_call)){
+      betas_trend <- mcmc_chains(object$model_output, 'b_trend')
+    } else {
+      betas_trend <- NULL
+    }
+
+    # Family of model
+    family <- object$family
+
+    # Family-specific parameters
+    family_pars <- extract_family_pars(object = object)
+
+    # Trend model
+    trend_model <- object$trend_model
+    use_lv <- object$use_lv
+
+    # Trend-specific parameters; keep only the last 3 estimates for RW / AR trends
+    # as we don't need any prior to that for propagating the trends forward. For GP
+    # trends, we have to keep all estimates through time
+    trend_pars <- extract_trend_pars(object = object,
+                                     keep_all_estimates = FALSE)
+
+    # Produce forecasts
+    use_lv <- object$use_lv
+    cl <- parallel::makePSOCKcluster(n_cores)
+    setDefaultCluster(cl)
+    clusterExport(NULL, c('family',
+                          'family_pars',
+                          'trend_model',
+                          'trend_pars',
+                          'type',
+                          'use_lv',
+                          'betas',
+                          'n_series',
+                          'data_test',
+                          'series',
+                          'series_test',
+                          'Xp',
+                          'fc_horizon',
+                          'betas_trend',
+                          'Xp_trend'),
+                  envir = environment())
+
+    pbapply::pboptions(type = "none")
+
+    fc_preds <- pbapply::pblapply(seq_len(dim(betas)[1]), function(i){
+      # Sample index
+      samp_index <- i
+
+      # Sample beta coefs
+      betas <- betas[samp_index, ]
+
+      if(!is.null(betas_trend)){
+        betas_trend <- betas_trend[samp_index, ]
+      }
+
+      # Return predictions
+      if(series == 'all'){
+
+        # Sample general trend-specific parameters
+        general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
+                                                         samp_index = samp_index)
 
         if(use_lv || trend_model == 'VAR1'){
+          # Propagate all trends / lvs forward jointly using sampled trend parameters
+          trends <- forecast_trend(trend_model = trend_model,
+                                   use_lv = use_lv,
+                                   trend_pars = general_trend_pars,
+                                   h = fc_horizon,
+                                   betas_trend = betas_trend,
+                                   Xp_trend = Xp_trend)
+        }
+
+        # Loop across series and produce the next trend estimate
+        trend_states <- lapply(seq_len(n_series), function(series){
+
+          # Sample series- and trend-specific parameters
+          trend_extracts <- extract_series_trend_pars(series = series,
+                                                      samp_index = samp_index,
+                                                      trend_pars = trend_pars,
+                                                      use_lv = use_lv)
+
+          if(use_lv || trend_model == 'VAR1'){
+            if(use_lv){
+              # Multiply lv states with loadings to generate the series' forecast trend state
+              out <- as.numeric(trends %*% trend_extracts$lv_coefs)
+            } else if(trend_model == 'VAR1'){
+              out <- trends[,series]
+            }
+
+          } else {
+            # Propagate the series-specific trends forward
+            out <- forecast_trend(trend_model = trend_model,
+                                  use_lv = FALSE,
+                                  trend_pars = trend_extracts,
+                                  h = fc_horizon,
+                                  betas_trend = betas_trend,
+                                  Xp_trend = Xp_trend)
+          }
+          out
+        })
+
+        if(type == 'trend'){
+          out <- trend_states
+        } else {
+          trend_states <- do.call(cbind, trend_states)
+          out <- lapply(seq_len(n_series), function(series){
+
+            Xpmat <- cbind(Xp[which(as.numeric(data_test$series) == series),],
+                           trend_states[, series])
+            attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
+
+            # Family-specific parameters
+            family_extracts <- lapply(seq_along(family_pars), function(x){
+              if(is.matrix(family_pars[[x]])){
+                family_pars[[x]][samp_index, series]
+              } else {
+                family_pars[[x]][samp_index]
+              }
+            })
+            names(family_extracts) <- names(family_pars)
+
+            mvgam_predict(family = family,
+                          Xp = Xpmat,
+                          type = 'response',
+                          betas = c(betas, 1),
+                          family_pars = family_extracts)
+          })
+        }
+
+      } else {
+
+          # Sample series- and trend-specific parameters
+          trend_extracts <- extract_series_trend_pars(series = series,
+                                                      samp_index = samp_index,
+                                                      trend_pars = trend_pars,
+                                                      use_lv = use_lv)
+
+          # Propagate the series' trend forward using the sampled trend parameters
+          trends <- forecast_trend(trend_model = trend_model,
+                                   use_lv = use_lv,
+                                   trend_pars = trend_extracts,
+                                   h = fc_horizon,
+                                   betas_trend = betas_trend,
+                                   Xp_trend = Xp_trend)
+
           if(use_lv){
             # Multiply lv states with loadings to generate the series' forecast trend state
-            out <- as.numeric(trends %*% trend_extracts$lv_coefs)
+            trends <- as.numeric(trends %*% trend_extracts$lv_coefs)
+          } else if(trend_model == 'VAR1'){
+            trends <- trends[, series]
           }
 
-          if(trend_model == 'VAR1'){
-            out <- all_trends[sample_seq[i], , series]
-          }
 
+        if(type == 'trend'){
+          out <- trends
         } else {
-          # Propagate the series-specific trends forward
-          out <- forecast_trend(trend_model = trend_model,
-                                        use_lv = FALSE,
-                                        trend_pars = trend_extracts,
-                                        h = fc_horizon)
-        }
-        out
-      })
 
-      if(type == 'trend'){
-        out <- trend_states
-      } else {
-        trend_states <- do.call(cbind, trend_states)
-        out <- lapply(seq_len(n_series), function(series){
-
-          Xpmat <- cbind(Xp[which(as.numeric(data_test$series) == series),],
-                         trend_states[, series])
-          attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
-
-          # Family-specific parameters
+          # Sample the series' family-specific parameters
           family_extracts <- lapply(seq_along(family_pars), function(x){
             if(is.matrix(family_pars[[x]])){
               family_pars[[x]][samp_index, series]
@@ -336,163 +392,118 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
           })
           names(family_extracts) <- names(family_pars)
 
-          mvgam_predict(family = family,
-                                Xp = Xpmat,
-                                type = 'response',
-                                betas = c(betas, 1),
-                                family_pars = family_extracts)
-        })
-      }
-
-    } else {
-
-      if(trend_model == 'VAR1'){
-        trends <- all_trends[sample_seq[i], , series]
-      } else {
-        # Sample series- and trend-specific parameters
-        trend_extracts <- extract_series_trend_pars(series = series,
-                                                            samp_index = samp_index,
-                                                            trend_pars = trend_pars,
-                                                            use_lv = use_lv)
-
-        # Propagate the series' trend forward using the sampled trend parameters
-        trends <- forecast_trend(trend_model = trend_model,
-                                         use_lv = use_lv,
-                                         trend_pars = trend_extracts,
-                                         h = fc_horizon)
-
-        if(use_lv){
-          # Multiply lv states with loadings to generate the series' forecast trend state
-          trends <- as.numeric(trends %*% trend_extracts$lv_coefs)
+          # Generate predictions
+          Xpmat <- cbind(Xp, trends)
+          attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
+          out <- mvgam_predict(family = family,
+                               Xp = Xpmat,
+                               type = type,
+                               betas = c(betas, 1),
+                               family_pars = family_extracts)
         }
       }
 
-      if(type == 'trend'){
-        out <- trends
-      } else {
+      out
+    }, cl = cl)
+    stopCluster(cl)
 
-        # Sample the series' family-specific parameters
-        family_extracts <- lapply(seq_along(family_pars), function(x){
-          if(is.matrix(family_pars[[x]])){
-            family_pars[[x]][samp_index, series]
-          } else {
-            family_pars[[x]][samp_index]
-          }
-        })
-        names(family_extracts) <- names(family_pars)
+    if(series == 'all'){
+      series_fcs <- lapply(seq_len(n_series), function(series){
+        indexed_forecasts <- do.call(rbind, lapply(seq_along(fc_preds), function(x){
+          fc_preds[[x]][[series]]
+        }))
+        indexed_forecasts
+      })
+      names(series_fcs) <- levels(data_test$series)
 
-        # Generate predictions
-        Xpmat <- cbind(Xp, trends)
-        attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
-        out <- mvgam_predict(family = family,
-                                     Xp = Xpmat,
-                                     type = type,
-                                     betas = c(betas, 1),
-                                     family_pars = family_extracts)
-      }
-    }
+      # Extract hindcasts for storing in the returned object
+      data_train <- object$obs_data
+      ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
+                  length.out = NCOL(object$ytimes) + 1)
+      starts <- ends + 1
+      starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
+      ends <- ends[-1]
 
-    out
-  }, cl = cl)
-  stopCluster(cl)
+      series_hcs <- lapply(seq_len(n_series), function(series){
+        to_extract <- switch(type,
+                             'link' = 'mus',
+                             'response' = 'ypred',
+                             'trend' = 'trend')
+        if(object$fit_engine == 'stan'){
 
-  if(series == 'all'){
-    series_fcs <- lapply(seq_len(n_series), function(series){
-      indexed_forecasts <- do.call(rbind, lapply(seq_along(fc_preds), function(x){
-        fc_preds[[x]][[series]]
-      }))
-      indexed_forecasts
-    })
-    names(series_fcs) <- levels(data_test$series)
+          preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
+                                                                     dim(mcmc_chains(object$model_output, 'ypred'))[2],
+                                                                     by = NCOL(object$ytimes))]
+        } else {
+          preds <- mcmc_chains(object$model_output, to_extract)[,starts[series]:ends[series]]
+        }
+        preds
+      })
+      names(series_hcs) <- levels(data_test$series)
 
-    # Extract hindcasts for storing in the returned object
-    data_train <- object$obs_data
-    ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
-                length.out = NCOL(object$ytimes) + 1)
-    starts <- ends + 1
-    starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
-    ends <- ends[-1]
+      series_obs <- lapply(seq_len(n_series), function(series){
+        s_name <- levels(object$obs_data$series)[series]
+        data.frame(series = object$obs_data$series,
+                   time = object$obs_data$time,
+                   y = object$obs_data$y) %>%
+          dplyr::filter(series == s_name) %>%
+          dplyr::arrange(time) %>%
+          dplyr::pull(y)
+      })
+      names(series_obs) <- levels(data_test$series)
 
-    series_hcs <- lapply(seq_len(n_series), function(series){
+      series_test <- lapply(seq_len(n_series), function(series){
+        s_name <- levels(object$obs_data$series)[series]
+        data.frame(series = data_test$series,
+                   time = data_test$time,
+                   y = data_test$y) %>%
+          dplyr::filter(series == s_name) %>%
+          dplyr::arrange(time) %>%
+          dplyr::pull(y)
+      })
+      names(series_test) <- levels(data_test$series)
+
+    } else {
+      series_fcs <- list(do.call(rbind, fc_preds))
+      names(series_fcs) <- s_name
+
+      # Extract hindcasts for storing in the returned object
+      data_train <- object$obs_data
+      ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
+                  length.out = NCOL(object$ytimes) + 1)
+      starts <- ends + 1
+      starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
+      ends <- ends[-1]
       to_extract <- switch(type,
                            'link' = 'mus',
                            'response' = 'ypred',
                            'trend' = 'trend')
-    if(object$fit_engine == 'stan'){
+      if(object$fit_engine == 'stan'){
+        preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
+                                                                   dim(mcmc_chains(object$model_output, 'ypred'))[2],
+                                                                   by = NCOL(object$ytimes))]
+      } else {
+        preds <- mcmc_chains(object$model_output, to_extract)[,starts[series]:ends[series]]
+      }
+      series_hcs <- list(preds)
+      names(series_hcs) <- s_name
 
-      preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
-                                                              dim(mcmc_chains(object$model_output, 'ypred'))[2],
-                                                              by = NCOL(object$ytimes))]
-    } else {
-      preds <- mcmc_chains(object$model_output, to_extract)[,starts[series]:ends[series]]
+      series_obs <- list(data.frame(series = object$obs_data$series,
+                                    time = object$obs_data$time,
+                                    y = object$obs_data$y) %>%
+                           dplyr::filter(series == s_name) %>%
+                           dplyr::arrange(time) %>%
+                           dplyr::pull(y))
+      names(series_obs) <- s_name
+
+      series_test <- list(data.frame(series = data_test$series,
+                                     time = data_test$time,
+                                     y = data_test$y) %>%
+                            dplyr::filter(series == s_name) %>%
+                            dplyr::arrange(time) %>%
+                            dplyr::pull(y))
+      names(series_test) <- s_name
     }
-      preds
-    })
-    names(series_hcs) <- levels(data_test$series)
-
-    series_obs <- lapply(seq_len(n_series), function(series){
-      s_name <- levels(object$obs_data$series)[series]
-      data.frame(series = object$obs_data$series,
-                 time = object$obs_data$time,
-                 y = object$obs_data$y) %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::arrange(time) %>%
-        dplyr::pull(y)
-    })
-    names(series_obs) <- levels(data_test$series)
-
-    series_test <- lapply(seq_len(n_series), function(series){
-      s_name <- levels(object$obs_data$series)[series]
-      data.frame(series = data_test$series,
-                 time = data_test$time,
-                 y = data_test$y) %>%
-        dplyr::filter(series == s_name) %>%
-        dplyr::arrange(time) %>%
-        dplyr::pull(y)
-    })
-    names(series_test) <- levels(data_test$series)
-
-  } else {
-    series_fcs <- list(do.call(rbind, fc_preds))
-    names(series_fcs) <- s_name
-
-    # Extract hindcasts for storing in the returned object
-    data_train <- object$obs_data
-    ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
-                length.out = NCOL(object$ytimes) + 1)
-    starts <- ends + 1
-    starts <- c(1, starts[-c(1, (NCOL(object$ytimes)+1))])
-    ends <- ends[-1]
-    to_extract <- switch(type,
-                         'link' = 'mus',
-                         'response' = 'ypred',
-                         'trend' = 'trend')
-    if(object$fit_engine == 'stan'){
-      preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
-                                                              dim(mcmc_chains(object$model_output, 'ypred'))[2],
-                                                              by = NCOL(object$ytimes))]
-    } else {
-      preds <- mcmc_chains(object$model_output, to_extract)[,starts[series]:ends[series]]
-    }
-    series_hcs <- list(preds)
-    names(series_hcs) <- s_name
-
-    series_obs <- list(data.frame(series = object$obs_data$series,
-               time = object$obs_data$time,
-               y = object$obs_data$y) %>%
-      dplyr::filter(series == s_name) %>%
-      dplyr::arrange(time) %>%
-      dplyr::pull(y))
-    names(series_obs) <- s_name
-
-    series_test <- list(data.frame(series = data_test$series,
-                                  time = data_test$time,
-                                  y = data_test$y) %>%
-                         dplyr::filter(series == s_name) %>%
-                         dplyr::arrange(time) %>%
-                         dplyr::pull(y))
-    names(series_test) <- s_name
-  }
 
   } else {
     # If forecasts already exist, simply extract them

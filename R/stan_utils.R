@@ -1131,7 +1131,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
   trend_model <- evaluate_trend_model(trend_model)
 
   # Hack for adding VAR1 models
-  if(trend_model == 'VAR1'){
+  if(trend_model %in% c('VAR1', 'VAR1cor')){
     VAR1 <- TRUE
     trend_model <- 'RW'
   } else {
@@ -2190,6 +2190,7 @@ trend_map_mods = function(model_file,
                           data_train,
                           ytimes){
 
+if(trend_model != 'VAR1'){
   # Model code should be modified to remove any priors and modelling for the
   # latent variable coefficients and sign corrections
   model_file <- model_file[-c(grep('// dynamic factor lower triangle loading coefficients',
@@ -2256,6 +2257,107 @@ trend_map_mods = function(model_file,
 
     model_file <- readLines(textConnection(model_file), n = -1)
     model_file <- gsub('j], 0.1', 'j], sigma[j]', model_file)
+  }
+
+}
+  if(trend_model == 'VAR1'){
+    model_file[grep("// raw latent trends",
+                    model_file, fixed = TRUE)] <-
+      "// dynamic factors"
+    model_file[grep("vector[n_series] trend_raw[n];",
+                    model_file, fixed = TRUE)] <-
+      "vector[n_lv] LV[n];"
+
+    model_file[grep("// trend estimates in matrix-form",
+                    model_file, fixed = TRUE)] <-
+      "// trends and dynamic factor loading matrix"
+    model_file[grep("matrix[n, n_series] trend;",
+                    model_file, fixed = TRUE)] <-
+      paste0("matrix[n, n_series] trend;\n",
+             "matrix[n_series, n_lv] lv_coefs;")
+    model_file <- readLines(textConnection(model_file), n = -1)
+
+    model_file <- model_file[-c((grep("trend[i, 1:n_series] = to_row_vector(trend_raw[i]);",
+                                     model_file, fixed = TRUE) - 1):
+                                  (grep("trend[i, 1:n_series] = to_row_vector(trend_raw[i]);",
+                                        model_file, fixed = TRUE) + 1))]
+
+    model_file[grep("matrix[n_series, n_lv] lv_coefs;",
+                    model_file, fixed = TRUE)] <-
+      paste0("matrix[n_series, n_lv] lv_coefs;\n",
+             "// derived latent trends\n",
+             "lv_coefs = Z;\n",
+             "for (i in 1:n){\n",
+             "for (s in 1:n_series){\n",
+             "trend[i, s] = dot_product(lv_coefs[s,], LV[i]);\n",
+             "}\n",
+             "}\n")
+    model_file <- readLines(textConnection(model_file), n = -1)
+
+    model_file <- gsub('trend_raw', 'LV', model_file)
+
+    model_file[grep("vector<lower=0>[n_series] sigma;",
+                    model_file, fixed = TRUE)] <-
+      "vector<lower=0>[n_lv] sigma;"
+
+    model_file[grep("matrix[n_series, n_series] P_real;",
+                    model_file, fixed = TRUE)] <-
+      "matrix[n_lv, n_lv] P_real;"
+
+    model_file[grep("matrix[n_series, n_series] A;",
+                    model_file, fixed = TRUE)] <-
+      "matrix[n_lv, n_lv] A;"
+
+    model_file[grep("matrix[n_series, n_series] Sigma;",
+                    model_file, fixed = TRUE)] <-
+      "matrix[n_lv, n_lv] Sigma;"
+
+    model_file[grep("matrix[n_series, n_series] P[1];" ,
+                    model_file, fixed = TRUE)] <-
+      "matrix[n_lv, n_lv] P[1];"
+
+    model_file[grep("matrix[n_series, n_series] phiGamma[2, 1];" ,
+                    model_file, fixed = TRUE)] <-
+      "matrix[n_lv, n_lv] phiGamma[2, 1];"
+
+    model_file[grep("diagonal(P_real) ~ normal(Pmu[1], 1 / sqrt(Pomega[1]));" ,
+                    model_file, fixed = TRUE)+1] <-
+      "for(i in 1:n_lv) {"
+
+    model_file[grep("diagonal(P_real) ~ normal(Pmu[1], 1 / sqrt(Pomega[1]));" ,
+                    model_file, fixed = TRUE)+2] <-
+      "for(j in 1:n_lv) {"
+
+    model_file[grep("int<lower=0> n; // number of timepoints per series",
+                    model_file, fixed = TRUE)] <-
+    paste0("int<lower=0> n; // number of timepoints per series\n",
+           "int<lower=0> n_lv; // number of dynamic factors")
+    model_file <- readLines(textConnection(model_file), n = -1)
+
+    if(any(grepl("matrix[n_series, n_series] L_Sigma;",
+                 model_file, fixed = TRUE))){
+      model_file[grep("matrix[n_series, n_series] L_Sigma;" ,
+                      model_file, fixed = TRUE)] <-
+        "matrix[n_lv, n_lv] L_Sigma;"
+
+      model_file[grep("cov_matrix[n_series] Sigma;" ,
+                      model_file, fixed = TRUE)] <-
+        "cov_matrix[n_lv] Sigma;"
+
+      model_file[grep("cov_matrix[n_series] Gamma;" ,
+                      model_file, fixed = TRUE)] <-
+        "cov_matrix[n_lv] Gamma;"
+
+      model_file[grep("cholesky_factor_corr[n_series] L_Omega;" ,
+                      model_file, fixed = TRUE)] <-
+        "cholesky_factor_corr[n_lv] L_Omega;"
+
+      model_file[grep("vector[n_series] trend_zeros = rep_vector(0.0, n_series);" ,
+                      model_file, fixed = TRUE)] <-
+        "vector[n_lv] trend_zeros = rep_vector(0.0, n_lv);"
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+    }
   }
 
   # Need to formulate the lv_coefs matrix and
@@ -2410,11 +2512,17 @@ add_trend_predictors = function(trend_formula,
   b_trend_lines <- gsub('raw', 'raw_trend', b_trend_lines)
   b_trend_lines <- gsub('num_basis', 'num_basis_trend', b_trend_lines)
   model_file[grep("// derived latent states", model_file, fixed = TRUE)] <-
-    paste0(paste(b_trend_lines, collapse = '\n'),
+    paste0('// process model basis coefficients\n',
+           paste(b_trend_lines, collapse = '\n'),
            '\n\n// derived latent states')
   model_file[grep("vector[num_basis] b;", model_file, fixed = TRUE)] <-
     paste0("vector[num_basis] b;\n",
            "vector[num_basis_trend] b_trend;")
+
+  b1_lines <- model_file[min(grep('b[1', model_file, fixed = TRUE))]
+  model_file[min(grep('b[1', model_file, fixed = TRUE))] <-
+    paste0('// observation model basis coefficients\n',
+           b1_lines)
 
   model_file <- readLines(textConnection(model_file), n = -1)
 
@@ -2479,11 +2587,20 @@ add_trend_predictors = function(trend_formula,
                '\n')
 
     } else {
-      model_file[grep("// dynamic factor estimates", model_file, fixed = TRUE)] <-
-        paste0('// dynamic process models\n',
-               paste(spline_coef_lines, collapse = '\n'),
-               '\n',
-               lambda_prior_line)
+      if(trend_model != 'VAR1'){
+        model_file[grep("// dynamic factor estimates", model_file, fixed = TRUE)] <-
+          paste0('// dynamic process models\n',
+                 paste(spline_coef_lines, collapse = '\n'),
+                 '\n',
+                 lambda_prior_line)
+      } else {
+        model_file[grep('// stochastic latent trends', model_file, fixed = TRUE)] <-
+          paste0('// dynamic process models\n',
+                 paste(spline_coef_lines, collapse = '\n'),
+                 '\n',
+                 lambda_prior_line)
+      }
+
     }
     if(any(grepl("vector<lower=0>[n_sp] lambda;", model_file, fixed = TRUE))){
       model_file[grep("// dynamic factors", model_file, fixed = TRUE)] <-
@@ -2492,13 +2609,24 @@ add_trend_predictors = function(trend_formula,
         paste0("vector<lower=0>[n_sp] lambda;\n",
                "vector<lower=0>[n_sp_trend] lambda_trend;")
     } else {
-      model_file <- model_file[-grep("matrix[n, n_lv] LV;",
-                                     model_file, fixed = TRUE)]
-      model_file[grep("// dynamic factors", model_file, fixed = TRUE)] <-
-        paste0("// latent states\n",
-               "matrix[n, n_lv] LV;\n\n",
-               "// smoothing parameters\n",
-               "vector<lower=0>[n_sp_trend] lambda_trend;")
+      if(trend_model != 'VAR1'){
+        model_file <- model_file[-grep("matrix[n, n_lv] LV;",
+                                       model_file, fixed = TRUE)]
+        model_file[grep("// dynamic factors", model_file, fixed = TRUE)] <-
+          paste0("// latent states\n",
+                 "matrix[n, n_lv] LV;\n\n",
+                 "// smoothing parameters\n",
+                 "vector<lower=0>[n_sp_trend] lambda_trend;")
+      } else {
+        model_file <- model_file[-grep("vector[n_lv] LV[n];",
+                                       model_file, fixed = TRUE)]
+        model_file[grep("// dynamic factors", model_file, fixed = TRUE)] <-
+          paste0("// latent states\n",
+                 "vector[n_lv] LV[n];\n\n",
+                 "// smoothing parameters\n",
+                 "vector<lower=0>[n_sp_trend] lambda_trend;")
+      }
+
     }
 
     S_lines <- trend_model_file[grep('mgcv smooth penalty matrix',
@@ -2606,11 +2734,12 @@ add_trend_predictors = function(trend_formula,
            "vector[n * n_lv] trend_mus;")
   model_file[grep("// derived latent states",
                   model_file, fixed = TRUE)] <-
-    paste0("// latent state linear predictors\n",
+    paste0("// latent process linear predictors\n",
            "trend_mus = X_trend * b_trend;\n\n",
            "// derived latent states")
   model_file <- readLines(textConnection(model_file), n = -1)
 
+  #### Trend model specific updates ####
   if(trend_model == 'RW'){
     model_file <- model_file[-c(grep("for(j in 1:n_lv){", model_file, fixed = TRUE):
                                   (grep("for(j in 1:n_lv){", model_file, fixed = TRUE) + 2))]
@@ -2662,6 +2791,75 @@ add_trend_predictors = function(trend_formula,
 
     model_file <- readLines(textConnection(model_file), n = -1)
   }
+
+  if(trend_model == 'AR2'){
+    model_file[grep('// latent factor AR1 terms', model_file, fixed = TRUE)] <-
+      '// latent state AR1 terms'
+    model_file[grep('// latent factor AR2 terms', model_file, fixed = TRUE)] <-
+      '// latent state AR2 terms'
+    model_file <- model_file[-c(grep("for(j in 1:n_lv){", model_file, fixed = TRUE):
+                                  (grep("for(j in 1:n_lv){", model_file, fixed = TRUE) + 2))]
+
+    if(drift){
+      model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);",
+                      model_file, fixed = TRUE)] <-
+        paste0("for(j in 1:n_lv){\n",
+               "LV[1, j] ~ normal(drift[j] + [ytimes_trend[1, j]], sigma[j]);\n",
+               "LV[2, j] ~ normal(drift[j] + trend_mus[ytimes_trend[1, j]] + LV[1, j] * ar1[j]- trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
+               "for(i in 3:n){\n",
+               "LV[i, j] ~ normal(drift[j] + trend_mus[ytimes_trend[i, j]] + ar1[j] * LV[i - 1, j] + ar2[j] * LV[i - 2, j] - trend_mus[ytimes_trend[i - 1, j]], sigma[j]);\n",
+               "}\n}")
+      model_file <- model_file[-grep("LV[2, 1:n_lv] ~ normal(drift + LV[1, 1:n_lv] * ar1, 0.1);",
+                                     model_file, fixed = TRUE)]
+    } else {
+      model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);",
+                      model_file, fixed = TRUE)] <-
+        paste0("for(j in 1:n_lv){\n",
+               "LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
+               "LV[2, j] ~ normal(trend_mus[ytimes_trend[1, j]] + LV[1, j] * ar1[j]- trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
+               "for(i in 3:n){\n",
+               "LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]] + ar1[j] * LV[i - 1, j] + ar2[j] * LV[i - 2, j] - trend_mus[ytimes_trend[i - 1, j]], sigma[j]);\n",
+               "}\n}")
+      model_file <- model_file[-grep("LV[2, 1:n_lv] ~ normal(LV[1, 1:n_lv] * ar1, 0.1);",
+                                     model_file, fixed = TRUE)]
+    }
+
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
+
+  if(trend_model == 'VAR1'){
+
+    model_file <- gsub('trend means', 'latent state means',
+                       model_file)
+
+    if(any(grepl("cholesky_factor_corr[n_lv] L_Omega;",
+                 model_file, fixed = TRUE))){
+
+      model_file <- model_file[-grep("vector[n_lv] trend_zeros = rep_vector(0.0, n_lv);",
+                                     model_file, fixed = TRUE)]
+
+      model_file[grep("LV[1] ~ multi_normal(trend_zeros, Gamma);",
+                      model_file, fixed = TRUE)] <-
+        "LV[1] ~ multi_normal(trend_mus[ytimes_trend[1, 1:n_lv]], Gamma);"
+
+      model_file[grep("LV[i] ~ multi_normal_cholesky(mu[i - 1], L_Sigma);",
+                      model_file, fixed = TRUE)] <-
+        "LV[i] ~ multi_normal_cholesky(trend_mus[ytimes_trend[i, 1:n_lv]] + mu[i - 1] - trend_mus[ytimes_trend[i - 1, 1:n_lv]], L_Sigma);"
+
+    } else {
+      model_file[grep("LV[1] ~ normal(0, sigma);",
+                      model_file, fixed = TRUE)] <-
+        "LV[1] ~ normal(trend_mus[ytimes_trend[1, 1:n_lv]], sigma);"
+
+      model_file[grep("LV[i] ~ normal(mu[i - 1], sigma);",
+                      model_file, fixed = TRUE)] <-
+        "LV[i] ~ normal(trend_mus[ytimes_trend[i, 1:n_lv]] + mu[i - 1] - trend_mus[ytimes_trend[i - 1, 1:n_lv]], sigma);"
+    }
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
+
+  model_file <- gsub('latent trend', 'latent state',
+                     model_file)
 
   return(list(model_file = model_file,
               model_data = model_data,

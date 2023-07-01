@@ -470,7 +470,7 @@ stationarise_VARcor = function(model_file){
                     '// LKJ form of covariance matrix\n',
                     "matrix[n_series, n_series] L_Sigma;\n",
                     '// computed error covariance matrix\n',
-                    'cov_matrix[n_series] Sigma;',
+                    'cov_matrix[n_series] Sigma;\n',
                     '// initial trend covariance\n',
                     'cov_matrix[n_series] Gamma;')
   model_file[grep('trend[i, 1:n_series] = to_row_vector(trend_raw[i]);',

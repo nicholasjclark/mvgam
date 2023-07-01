@@ -35,7 +35,8 @@ Imports:
     smooth,
     dplyr,
     magrittr,
-    Matrix
+    Matrix,
+    rlang
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)

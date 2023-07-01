@@ -480,12 +480,19 @@ mvgam = function(formula,
   # Validate the trend arguments
   trend_model <- evaluate_trend_model(trend_model)
   use_var1 <- FALSE; use_var1cor <- FALSE
-  if(trend_model == 'VAR1'){
+
+   if(trend_model == 'VAR1'){
     use_var1 <- TRUE
-  }
+   }
+
   if(trend_model == 'VAR1cor'){
     use_var1cor <- TRUE
     trend_model <- 'VAR1'
+  }
+
+  if(trend_model %in% c('VAR1', 'GP') & drift){
+    warning('drift terms not allowed for VAR or GP models; setting drift = FALSE')
+    drift <- FALSE
   }
 
   if(!missing(trend_formula)){
@@ -494,8 +501,8 @@ mvgam = function(formula,
                               trend = 1:length(unique(data_train$series)))
     }
 
-    if(!trend_model %in% c('RW', 'AR1')){
-      stop('only RW and AR1 trends currently supported for trend predictor models',
+    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'VAR1')){
+      stop('only RW, AR1, AR2 and VAR trends currently supported for trend predictor models',
            call. = FALSE)
     }
   }
@@ -532,8 +539,14 @@ mvgam = function(formula,
       stop('argument "trend_map" must link at least one series to each latent trend')
     }
 
-    # If trend_map correctly specified, set use_lv to TRUE
-    use_lv <- TRUE
+    # If trend_map correctly specified, set use_lv to TRUE for
+    # most models (but not yet for VAR models, which require additional
+    # modifications)
+    if(trend_model == 'VAR1'){
+      use_lv <- FALSE
+    } else {
+      use_lv <- TRUE
+    }
 
     # Model should be set up using dynamic factors of the correct length
     n_lv <- max(trend_map$trend)
@@ -1185,7 +1198,9 @@ mvgam = function(formula,
   if(use_lv){
     n_lv <- ss_jagam$jags.data$n_lv
   } else {
-    n_lv <- NULL
+    if(missing(trend_map)){
+      n_lv <- NULL
+    }
   }
 
   if(missing(data_test)){
@@ -1351,7 +1366,7 @@ mvgam = function(formula,
                                   family = family_char,
                                   upper_bounds = upper_bounds)
 
-    if(use_lv){
+    if(use_lv || !missing(trend_map)){
       stan_objects$model_data$n_lv <- n_lv
     }
 
@@ -1378,6 +1393,16 @@ mvgam = function(formula,
                                      trend_model = trend_model,
                                      offset = offset,
                                      drift = drift)
+
+    # If a VAR model is used, enforce stationarity using methods described by
+    # Heaps 2022 (Enforcing stationarity through the prior in vector autoregressions)
+    if(use_var1){
+      vectorised$model_file <- stationarise_VAR(vectorised$model_file)
+    }
+
+    if(use_var1cor){
+      vectorised$model_file <- stationarise_VARcor(vectorised$model_file)
+    }
 
     # Add modifications for trend mapping and trend predictors, if
     # supplied
@@ -1430,16 +1455,11 @@ mvgam = function(formula,
         trend_sp_names <- trend_pred_setup$trend_sp_names
       } else {
       }
-    }
 
-    # If a VAR model is used, enforce stationarity using methods described by
-    # Heaps 2022 (Enforcing stationarity through the prior in vector autoregressions)
-    if(use_var1){
-      vectorised$model_file <- stationarise_VAR(vectorised$model_file)
-    }
-
-    if(use_var1cor){
-      vectorised$model_file <- stationarise_VARcor(vectorised$model_file)
+      if(trend_model == 'VAR1'){
+        param <- c(param, 'lv_coefs', 'LV')
+        use_lv <- TRUE
+      }
     }
 
     # Update priors
@@ -1449,6 +1469,14 @@ mvgam = function(formula,
     } else {
       priors <- NULL
     }
+
+    clean_up <- vector()
+    for(x in 1:length(vectorised$model_file)){
+      clean_up[x] <- vectorised$model_file[x-1] == "" &
+        vectorised$model_file[x] == ""
+    }
+    clean_up[is.na(clean_up)] <- FALSE
+    vectorised$model_file <- vectorised$model_file[!clean_up]
 
   } else {
     # Set up data and model file for JAGS

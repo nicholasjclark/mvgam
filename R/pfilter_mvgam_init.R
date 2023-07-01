@@ -80,7 +80,7 @@ if(class(object$obs_data)[1] == 'list'){
 }
 
 # Next observation for assimilation (ensure data_assim is arranged correctly)
-if(class(object$obs_data)[1] == 'list'){
+if(inherits(object$obs_data, 'list')){
 
   # Find indices of next observation
   temp_dat = data.frame(time = data_assim$time,

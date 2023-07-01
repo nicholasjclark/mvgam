@@ -62,7 +62,7 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
     }
 
     // derived latent trends
-    for (i in 1:n){;
+    for (i in 1:n){
     for (s in 1:n_series){
     trend[i, s] = dot_product(lv_coefs_raw[s,], LV_raw[i,]);
     }
