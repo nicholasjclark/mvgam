@@ -268,7 +268,9 @@ layout(1)
 
 First derivatives of smooth functions can be plotted to inspect how the slope of the function changes across its length. To plot these we use the more flexible `plot_mvgam_smooth()` function
 ```{r}
-plot_mvgam_smooth(lynx_mvgam, 1, 'season', derivatives = TRUE)
+plot_mvgam_smooth(lynx_mvgam, series = 1, 
+                  smooth = 'season', 
+                  derivatives = TRUE)
 ```
 
 We can also view the mvgam's posterior retrodictions and predictions for the entire series (testing and training)

@@ -8,6 +8,7 @@ mvgam(
   formula,
   trend_formula,
   knots,
+  trend_knots,
   data,
   data_train,
   newdata,
@@ -49,8 +50,11 @@ currently available for Random Walk trend models.}
 
 \item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
 For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
-(note that the number of knots is not always just k). Different terms can use different numbers of knots,
+(note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
 unless they share a covariate.}
+
+\item{trend_knots}{As for \code{knots} above, this is an optional \code{list} of knot values for smooth
+functions within the \code{trend_formula}}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:

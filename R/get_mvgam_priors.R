@@ -155,24 +155,7 @@ get_mvgam_priors = function(formula,
                             trend_map,
                             drift = FALSE){
 
-  # Check formula
-  if(attr(terms(formula), "response") == 0L){
-    stop('response variable is missing from formula',
-         call. = FALSE)
-  }
-
-  # Validate the family argument
-  family <- evaluate_family(family)
-  family_char <- match.arg(arg = family$family,
-                           choices = c('negative binomial',
-                                       "poisson",
-                                       "tweedie",
-                                       "beta",
-                                       "gaussian",
-                                       "lognormal",
-                                       "student",
-                                       "Gamma"))
-
+  # Validate the data
   if(missing("data") & missing("data_train")){
     stop('Argument "data" is missing with no default')
   }
@@ -181,57 +164,48 @@ get_mvgam_priors = function(formula,
     data_train <- data
   }
 
-  # Validate the trend argument
-  trend_model <- evaluate_trend_model(trend_model)
+  # Ensure series and time variables are present
+  data_train <- validate_series_time(data_train, name = 'data')
 
+  # Validate observation formula
+  orig_formula <- formula
+  formula <- interpret_mvgam(formula, N = max(data_train$time))
+  data_train <- validate_obs_formula(formula, data = data_train, refit = FALSE)
+
+  # Validate the family argument
+  family <- validate_family(family)
+  family_char <- match.arg(arg = family$family,
+                           choices = family_char_choices())
+
+  # Validate the trend argument
+  trend_model <- validate_trend_model(trend_model, drift = drift)
+
+  # Check trend formula
   if(!missing(trend_formula)){
     if(missing(trend_map)){
       trend_map <- data.frame(series = unique(data_train$series),
                               trend = 1:length(unique(data_train$series)))
     }
 
-    if(!trend_model %in% c('RW', 'AR1')){
-      stop('only RW and AR1 trends currently supported for trend predictor models',
+    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'VAR1')){
+      stop('only RW, AR1, AR2 and VAR trends currently supported for trend predictor models',
            call. = FALSE)
     }
   }
 
   # Check trend_map is correctly specified
   if(!missing(trend_map)){
+    validate_trendmap(trend_map = trend_map, data_train = data_train,
+                      trend_model = trend_model, use_stan = use_stan)
 
-    # No point in trend mapping if trend model is 'None'
-    if(trend_model == 'None'){
-      stop('cannot set up latent trends when "trend_model = None"',
-           call. = FALSE)
+    # If trend_map correctly specified, set use_lv to TRUE for
+    # most models (but not yet for VAR models, which require additional
+    # modifications)
+    if(trend_model == 'VAR1'){
+      use_lv <- FALSE
+    } else {
+      use_lv <- TRUE
     }
-
-    # Trend mapping not supported by JAGS
-    if(!use_stan){
-      stop('trend mapping not available for JAGS',
-           call. = FALSE)
-    }
-
-    # trend_map must have an entry for each unique time series
-    if(!all(sort(trend_map$series) == sort(unique(data_train$series)))){
-      stop('argument "trend_map" must have an entry for every unique time series in "data"',
-           call. = FALSE)
-    }
-
-    # trend_map must not specify a greater number of trends than there are series
-    if(max(trend_map$trend) > length(unique(data_train$series))){
-      stop('argument "trend_map" specifies more latent trends than there are series in "data"',
-           call. = FALSE)
-    }
-
-    # trend_map must not skip any trends
-    if(!all(sort(unique(trend_map$trend)) == seq(1:max(trend_map$trend)))){
-      stop('argument "trend_map" must link at least one series to each latent trend')
-    }
-
-    # If trend_map correctly specified, set use_lv to TRUE
-    use_lv <- TRUE
-
-    # Model should be set up using dynamic factors of the correct length
     n_lv <- max(trend_map$trend)
   }
 
@@ -321,50 +295,6 @@ get_mvgam_priors = function(formula,
       use_stan <- FALSE
     }
 
-    # Add series factor variable if missing
-    if(class(data_train)[1] != 'list'){
-      if(!'series' %in% colnames(data_train)){
-        data_train$series <- factor('series1')
-      }
-
-      # Must be able to index by time; it is too dangerous to 'guess' as this could make a huge
-      # impact on resulting estimates / inferences
-      if(!'time' %in% colnames(data_train)){
-        stop('data does not contain a "time" column',
-             call. = FALSE)
-      }
-    }
-
-    if(class(data_train)[1] == 'list'){
-      if(!'series' %in% names(data_train)){
-        data_train$series <- factor('series1')
-      }
-
-      if(!'time' %in% names(data_train)){
-        stop('data does not contain a "time" column',
-             call. = FALSE)
-      }
-    }
-
-    # Ensure each series has an observation, even if NA, for each
-    # unique timepoint
-    all_times_avail = function(time, min_time, max_time){
-      identical(as.numeric(sort(time)),
-                as.numeric(seq.int(from = min_time, to = max_time)))
-    }
-    min_time <- min(data_train$time)
-    max_time <- max(data_train$time)
-    data.frame(series = data_train$series,
-               time = data_train$time) %>%
-      dplyr::group_by(series) %>%
-      dplyr::summarise(all_there = all_times_avail(time,
-                                                   min_time,
-                                                   max_time)) -> checked_times
-    if(any(checked_times$all_there == FALSE)){
-      stop('One or more series in "data" is missing observations for one or more timepoints',
-           call. = FALSE)
-    }
-
     # Number of latent variables cannot be greater than number of series
     if(use_lv){
       if(missing(n_lv)){
@@ -382,25 +312,13 @@ get_mvgam_priors = function(formula,
       warning('No point in latent variables if trend model is None; changing use_lv to FALSE')
     }
 
-    # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
-    form_terms <- terms(formula(formula))
-    if(terms(formula(formula))[[2]] != 'y'){
-      if('y' %in% names(data_train)){
-        stop('variable "y" found in data but not used as outcome. mvgam uses the name "y" when modeling so this variable should be re-named',
-             call. = FALSE)
-      }
-      data_train$y <- data_train[[terms(formula(formula))[[2]]]]
-    }
-
     # Use a small fit from mgcv to extract relevant information on smooths included
     # in the model
-    ss_gam <- mgcv::gam(formula(formula),
-                        data = data_train,
-                        method = "REML",
-                        family = family_to_mgcvfam(family),
-                        drop.unused.levels = FALSE,
-                        control = list(nthreads = min(4, parallel::detectCores()-1),
-                                       maxit = 30))
+    ss_gam <- mvgam_setup(formula = formula,
+                          family = family_to_mgcvfam(family),
+                          data = data_train,
+                          drop.unused.levels = FALSE,
+                          maxit = 30)
 
     # Check if smooth terms are included in the formula
     if(length(ss_gam$smooth) == 0){

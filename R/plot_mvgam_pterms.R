@@ -74,7 +74,8 @@ if(length(pterms) > 0){
     }
 
     # Generate linear predictor matrix from fitted mgcv model
-    Xp <- predict(object2$mgcv_model, newdata = object2$obs_data, type = 'lpmatrix')
+    Xp <- obs_Xp_matrix(newdata = object2$obs_data,
+                        mgcv_model = object2$mgcv_model)
 
     # Zero out all other columns in Xp
     Xp[,!betas_keep] <- 0

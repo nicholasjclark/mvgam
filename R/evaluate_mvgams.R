@@ -68,7 +68,7 @@ eval_mvgam = function(object,
                       fc_horizon = 3,
                       n_cores = 2,
                       score = 'drps',
-                      log = TRUE,
+                      log = FALSE,
                       weights){
 
   # Check arguments
@@ -81,39 +81,14 @@ eval_mvgam = function(object,
          call. = FALSE)
   }
 
-  if(sign(fc_horizon) != 1){
-    stop('argument "fc_horizon" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(fc_horizon%%1 != 0){
-      stop('argument "fc_horizon" must be a positive integer',
-           call. = FALSE)
-    }
-  }
-
-  if(sign(eval_timepoint) != 1){
-    stop('argument "eval_timepoint" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(eval_timepoint%%1 != 0){
-      stop('argument "eval_timepoint" must be a positive integer',
-           call. = FALSE)
-    }
-  }
+  validate_pos_integer(fc_horizon)
+  validate_pos_integer(eval_timepoint)
+  validate_pos_integer(n_cores)
+  validate_pos_integer(n_samples)
 
   if(eval_timepoint < 3){
     stop('argument "eval_timepoint" must be >= 3',
          call. = FALSE)
-  }
-
-  if(sign(n_cores) != 1){
-    stop('argument "n_cores" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(n_cores%%1 != 0){
-      stop('argument "n_cores" must be a positive integer',
-           call. = FALSE)
-    }
   }
 
   #### 1. Generate linear predictor matrix for covariates and extract trend estimates at timepoint
@@ -121,7 +96,7 @@ eval_mvgam = function(object,
   n_series <- NCOL(object$ytimes)
 
   # Check evaluation timepoint
-  if(class(object$obs_data)[1] == 'list'){
+  if(inherits(object$obs_data, 'list')){
     all_times <- (data.frame(time = object$obs_data$time)  %>%
                          dplyr::select(time) %>%
                          dplyr::distinct() %>%
@@ -154,8 +129,7 @@ eval_mvgam = function(object,
                     time <= (eval_timepoint + fc_horizon)) %>%
     dplyr::pull(row_number) -> assim_rows
 
-  if(class(object$obs_data)[1] == 'list'){
-
+  if(inherits(object$obs_data, 'list')){
     data_assim <- lapply(object$obs_data, function(x){
       if(is.matrix(x)){
         matrix(x[assim_rows, ],
@@ -166,274 +140,22 @@ eval_mvgam = function(object,
 
     })
 
-
   } else {
     object$obs_data[assim_rows, ] -> data_assim
   }
 
-  # Generate linear predictor matrix from fitted mgcv model
-  suppressWarnings(Xp  <- try(predict(object$mgcv_model,
-                                      newdata = data_assim,
-                                      type = 'lpmatrix'),
-                              silent = TRUE))
 
-  if(inherits(Xp, 'try-error')){
-    testdat <- data.frame(series = data_assim$series)
-
-    terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients)
-                                                                 %in% '(Intercept)')]
-    if(length(terms_include) > 0){
-      newnames <- vector()
-      newnames[1] <- 'series'
-      for(i in 1:length(terms_include)){
-        testdat <- cbind(testdat, data.frame(data_assim[[terms_include[i]]]))
-        newnames[i+1] <- terms_include[i]
-      }
-      colnames(testdat) <- newnames
-    }
-
-    suppressWarnings(Xp  <- predict(object$mgcv_model,
-                                    newdata = testdat,
-                                    type = 'lpmatrix'))
-  }
-
-  # Generate linear predictor matrix from trend mgcv model
-  if(!is.null(object$trend_call)){
-    Xp_trend <- trend_pred_data(data_test = data_test,
-                                trend_map = object$trend_map,
-                                series = 'all',
-                                mgcv_model = object$trend_mgcv_model)
-
-  } else {
-    Xp_trend <- NULL
-  }
-
-  # Beta coefficients for GAM component
-  betas <- mcmc_chains(object$model_output, 'b')
-
-  # Beta coefficients for GAM trend component
-  if(!is.null(object$trend_call)){
-    betas_trend <- mcmc_chains(object$model_output, 'b_trend')
-  } else {
-    betas_trend <- NULL
-  }
-
-  # Family-specific parameters
-  family <- object$family
-  family_pars <- extract_family_pars(object = object)
-
-  # Trend model
-  trend_model <- object$trend_model
-  use_lv <- object$use_lv
-
-  # Trend-specific parameters; keep only the trend / lv estimates
-  # up to the specific evaluation timepoint
-  trend_pars <- extract_trend_pars(object = object,
-                                           keep_all_estimates = FALSE,
-                                           ending_time = eval_timepoint)
-
-  # Generate sample sequence for n_samples
-  if(n_samples < dim(betas)[1]){
-    sample_seq <- sample(seq_len(dim(betas)[1]), size = n_samples, replace = F)
-  } else {
-    sample_seq <- sample(seq_len(dim(betas)[1]), size = n_samples, replace = T)
-  }
-
-  #### 2. Run trends forward fc_horizon steps to generate the forecast distribution ####
-  use_lv <- object$use_lv
-  upper_bounds <- object$upper_bounds
-  trend_model <- object$trend_model
+  #### 2. Generate the forecast distribution ####
+  draw_fcs <- forecast_draws(object = object,
+                             type = 'response',
+                             series = 'all',
+                             data_test = data_assim,
+                             n_samples = n_samples,
+                             ending_time = eval_timepoint,
+                             n_cores = n_cores)
 
   if(missing(weights)){
     weights <- rep(1, NCOL(object$ytimes))
-  }
-
-  # Run particles forward in time to generate their forecasts
-  if(n_cores > 1){
-    cl <- parallel::makePSOCKcluster(n_cores)
-    setDefaultCluster(cl)
-    clusterExport(NULL, c('use_lv',
-                          'family',
-                          'fc_horizon',
-                          'data_assim',
-                          'Xp',
-                          'betas',
-                          'trend_model',
-                          'trend_pars',
-                          'family_pars',
-                          'n_series',
-                          'upper_bounds',
-                          'sample_seq',
-                          'weights',
-                          'betas_trend',
-                          'Xp_trend'),
-                  envir = environment())
-
-    pbapply::pboptions(type = "none")
-    draw_fcs <- pbapply::pblapply(sample_seq, function(x){
-
-      samp_index <- x
-
-      # Sample beta coefs
-      betas <- betas[samp_index, ]
-
-      if(!is.null(betas_trend)){
-        betas_trend <- betas_trend[samp_index, ]
-      }
-
-      # Sample general trend-specific parameters
-      general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
-                                                               samp_index = samp_index)
-
-      if(use_lv || trend_model == 'VAR1'){
-        # Propagate the lvs / VARs forward using the sampled trend parameters
-        trends <- forecast_trend(trend_model = trend_model,
-                                 use_lv = use_lv,
-                                 trend_pars = general_trend_pars,
-                                 h = fc_horizon,
-                                 betas_trend = betas_trend,
-                                 Xp_trend = Xp_trend)
-      }
-
-      # Loop across series and produce the next trend estimate
-      trend_states <- do.call(cbind, (lapply(seq_len(n_series), function(series){
-
-        # Sample series- and trend-specific parameters
-        trend_extracts <- extract_series_trend_pars(series = series,
-                                                            samp_index = samp_index,
-                                                            trend_pars = trend_pars,
-                                                            use_lv = use_lv)
-
-        if(use_lv || trend_model == 'VAR1'){
-          if(use_lv){
-            # Multiply lv states with loadings to generate the series' forecast trend state
-            out <- as.numeric(trends %*% trend_extracts$lv_coefs)
-          } else if(trend_model == 'VAR1'){
-            out <- trends[, series]
-          }
-
-        } else {
-          # Propagate the series-specific trends forward
-          out <- forecast_trend(trend_model = trend_model,
-                                use_lv = FALSE,
-                                trend_pars = trend_extracts,
-                                h = fc_horizon,
-                                betas_trend = betas_trend,
-                                Xp_trend = Xp_trend)
-        }
-
-        out
-      })))
-
-      series_fcs <- lapply(seq_len(n_series), function(series){
-
-        Xpmat <- cbind(Xp[which(as.numeric(data_assim$series) == series),],
-                       trend_states[, series])
-        attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
-
-        # Family-specific parameters
-        family_extracts <- lapply(seq_along(family_pars), function(x){
-          if(is.matrix(family_pars[[x]])){
-            family_pars[[x]][samp_index, series]
-          } else {
-            family_pars[[x]][samp_index]
-          }
-        })
-        names(family_extracts) <- names(family_pars)
-
-        mvgam_predict(family = family,
-                      Xp = Xpmat,
-                      type = 'response',
-                      betas = c(betas, 1),
-                      family_pars = family_extracts)
-      })
-
-      series_fcs
-    }, cl = cl)
-    stopCluster(cl)
-
-  } else {
-    #### For operating on a single core ####
-    draw_fcs <- pbapply::pblapply(sample_seq, function(x){
-
-      samp_index <- x
-
-      # Sample beta coefs
-      betas <- betas[samp_index, ]
-
-      if(!is.null(betas_trend)){
-        betas_trend <- betas_trend[samp_index, ]
-      }
-
-      # Sample general trend-specific parameters
-      general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
-                                                       samp_index = samp_index)
-
-      if(use_lv || trend_model == 'VAR1'){
-        # Propagate the lvs forward using the sampled trend parameters
-        trends <- forecast_trend(trend_model = trend_model,
-                                 use_lv = use_lv,
-                                 trend_pars = general_trend_pars,
-                                 h = fc_horizon,
-                                 betas_trend = betas_trend,
-                                 Xp_trend = Xp_trend)
-      }
-
-      # Loop across series and produce the next trend estimate
-      trend_states <- do.call(cbind, (lapply(seq_len(n_series), function(series){
-
-        # Sample series- and trend-specific parameters
-        trend_extracts <- extract_series_trend_pars(series = series,
-                                                            samp_index = samp_index,
-                                                            trend_pars = trend_pars,
-                                                            use_lv = use_lv)
-
-        if(use_lv || trend_model == 'VAR1'){
-          if(use_lv){
-            # Multiply lv states with loadings to generate the series' forecast trend state
-            out <- as.numeric(trends %*% trend_extracts$lv_coefs)
-          } else if(trend_model == 'VAR1'){
-            out <- trends[,series]
-          }
-
-        } else {
-          # Propagate the series-specific trends forward
-          out <- forecast_trend(trend_model = trend_model,
-                                use_lv = FALSE,
-                                trend_pars = trend_extracts,
-                                h = fc_horizon,
-                                betas_trend = betas_trend,
-                                Xp_trend = Xp_trend)
-        }
-
-        out
-      })))
-
-      series_fcs <- lapply(seq_len(n_series), function(series){
-
-        Xpmat <- cbind(Xp[which(as.numeric(data_assim$series) == series),],
-                       trend_states[, series])
-        attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
-
-        # Family-specific parameters
-        family_extracts <- lapply(seq_along(family_pars), function(x){
-          if(is.matrix(family_pars[[x]])){
-            family_pars[[x]][samp_index, series]
-          } else {
-            family_pars[[x]][samp_index]
-          }
-        })
-        names(family_extracts) <- names(family_pars)
-
-        mvgam_predict(family = family,
-                      Xp = Xpmat,
-                      type = 'response',
-                      betas = c(betas, 1),
-                      family_pars = family_extracts)
-      })
-
-      series_fcs
-    })
   }
 
   # Final forecast distribution
@@ -530,7 +252,7 @@ roll_eval_mvgam = function(object,
                            fc_horizon = 3,
                            n_cores = 2,
                            score = 'drps',
-                           log = TRUE,
+                           log = FALSE,
                            weights){
 
   # Check arguments
@@ -542,16 +264,10 @@ roll_eval_mvgam = function(object,
     stop('cannot compute rolling forecasts for mvgams that have no trend model',
          call. = FALSE)
   }
-
-  if(sign(n_cores) != 1){
-    stop('argument "n_cores" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(n_cores%%1 != 0){
-      stop('argument "n_cores" must be a positive integer',
-           call. = FALSE)
-    }
-  }
+  validate_pos_integer(n_cores)
+  validate_pos_integer(n_evaluations)
+  validate_pos_integer(n_samples)
+  validate_pos_integer(fc_horizon)
 
   # Generate time variable from training data
   if(class(object$obs_data)[1] == 'list'){
@@ -707,7 +423,7 @@ compare_mvgams = function(model1,
                           n_evaluations = 10,
                           n_cores = 2,
                           score = 'drps',
-                          log = TRUE,
+                          log = FALSE,
                           weights){
 
   # Check arguments
@@ -729,35 +445,10 @@ compare_mvgams = function(model1,
          call. = FALSE)
   }
 
-  if(sign(fc_horizon) != 1){
-    stop('argument "fc_horizon" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(fc_horizon%%1 != 0){
-      stop('argument "fc_horizon" must be a positive integer',
-           call. = FALSE)
-    }
-  }
-
-  if(sign(n_evaluations) != 1){
-    stop('argument "n_evaluations" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(n_evaluations%%1 != 0){
-      stop('argument "n_evaluations" must be a positive integer',
-           call. = FALSE)
-    }
-  }
-
-  if(sign(n_cores) != 1){
-    stop('argument "n_cores" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(n_cores%%1 != 0){
-      stop('argument "n_cores" must be a positive integer',
-           call. = FALSE)
-    }
-  }
+  validate_pos_integer(n_evaluations)
+  validate_pos_integer(fc_horizon)
+  validate_pos_integer(n_cores)
+  validate_pos_integer(n_samples)
 
   # Evaluate the two models
   if(missing(weights)){

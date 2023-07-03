@@ -7,6 +7,7 @@
 #'
 #'@importFrom parallel clusterExport stopCluster setDefaultCluster
 #'@importFrom stats formula terms rnorm update.formula predict
+#'@importFrom rlang missing_arg
 #'@param formula A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
 #'for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).
@@ -17,8 +18,10 @@
 #'currently available for Random Walk trend models.
 #'@param knots An optional \code{list} containing user specified knot values to be used for basis construction.
 #'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
-#'(note that the number of knots is not always just k). Different terms can use different numbers of knots,
+#'(note that the number of knots is not always just `k`). Different terms can use different numbers of knots,
 #'unless they share a covariate.
+#'@param trend_knots As for `knots` above, this is an optional \code{list} of knot values for smooth
+#'functions within the `trend_formula`
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
 #'`series` (character or factor index of the series IDs)
@@ -405,6 +408,7 @@
 mvgam = function(formula,
                  trend_formula,
                  knots,
+                 trend_knots,
                  data,
                  data_train,
                  newdata,
@@ -436,28 +440,60 @@ mvgam = function(formula,
   if(missing("data") & missing("data_train")){
     stop('Argument "data" is missing with no default')
   }
+  validate_pos_integer(chains)
+  validate_pos_integer(burnin)
+  validate_pos_integer(samples)
+  validate_pos_integer(thin)
 
+  # Check data and ensure terms are found in data
   if(!missing("data")){
     data_train <- data
   }
-
-  if(attr(terms(formula), "response") == 0L){
-    stop('response variable is missing from formula',
-         call. = FALSE)
-  }
-
-  if(!as.character(terms(formula(formula))[[2]]) %in% names(data_train)){
-    stop(paste0('variable ', terms(formula(formula))[[2]], ' not found in data'),
-         call. = FALSE)
-  }
-
   if(!missing("newdata")){
     data_test <- newdata
   }
 
-  if(chains%%1 != 0){
-    stop('Argument "chains" must be a positive integer',
-         .call = FALSE)
+  # Ensure series and time variables are present
+  data_train <- validate_series_time(data_train, name = 'data')
+  if(!missing(data_test)){
+    data_test <- validate_series_time(data_test, name = 'newdata')
+  }
+
+  # Validate observation formula
+  orig_formula <- formula
+  formula <- interpret_mvgam(formula, N = max(data_train$time))
+  data_train <- validate_obs_formula(formula, data = data_train, refit = refit)
+  if(!missing(data_test)){
+    data_test <- validate_obs_formula(formula, data = data_test, refit = refit)
+  }
+  if(is.null(attr(terms(formula(formula)), 'offset'))){
+    offset <- FALSE
+  } else {
+    offset <- TRUE
+  }
+
+  # Ensure fitting software can be located
+  if(!use_stan & run_model){
+    find_jags(jags_path = jags_path)
+  }
+  if(use_stan & run_model){
+    find_stan()
+  }
+
+  # Validate the family argument
+  family <- validate_family(family)
+  family_char <- match.arg(arg = family$family,
+                           choices = family_char_choices())
+
+  # Validate the trend arguments
+  trend_model <- validate_trend_model(trend_model)
+  use_var1 <- FALSE; use_var1cor <- FALSE
+  if(trend_model == 'VAR1'){
+    use_var1 <- TRUE
+  }
+  if(trend_model == 'VAR1cor'){
+    use_var1cor <- TRUE
+    trend_model <- 'VAR1'
   }
 
   if(drift && use_lv){
@@ -465,36 +501,19 @@ mvgam = function(formula,
     drift <- FALSE
   }
 
-  # Validate the family argument
-  family <- evaluate_family(family)
-  family_char <- match.arg(arg = family$family,
-                           choices = c('negative binomial',
-                                       "poisson",
-                                       "tweedie",
-                                       "beta",
-                                       "gaussian",
-                                       "lognormal",
-                                       "student",
-                                       "Gamma"))
-
-  # Validate the trend arguments
-  trend_model <- evaluate_trend_model(trend_model)
-  use_var1 <- FALSE; use_var1cor <- FALSE
-
-   if(trend_model == 'VAR1'){
-    use_var1 <- TRUE
-   }
-
-  if(trend_model == 'VAR1cor'){
-    use_var1cor <- TRUE
-    trend_model <- 'VAR1'
+  # JAGS cannot support latent GP or VAR trends
+  if(!use_stan & trend_model %in% c('GP', 'VAR1')){
+    stop('gaussian process and VAR trends not supported for JAGS',
+         call. = FALSE)
   }
 
-  if(trend_model %in% c('VAR1', 'GP') & drift){
-    warning('drift terms not allowed for VAR or GP models; setting drift = FALSE')
-    drift <- FALSE
+  # Stan cannot support Tweedie
+  if(use_stan & family_char == 'tweedie'){
+    stop('Tweedie family not supported for stan',
+         call. = FALSE)
   }
 
+  # Check trend formula
   if(!missing(trend_formula)){
     if(missing(trend_map)){
       trend_map <- data.frame(series = unique(data_train$series),
@@ -509,35 +528,8 @@ mvgam = function(formula,
 
   # Check trend_map is correctly specified
   if(!missing(trend_map)){
-
-    # No point in trend mapping if trend model is 'None'
-    if(trend_model == 'None'){
-      stop('cannot set up latent trends when "trend_model = None"',
-           call. = FALSE)
-    }
-
-    # Trend mapping not supported by JAGS
-    if(!use_stan){
-      stop('trend mapping not available for JAGS',
-           call. = FALSE)
-    }
-
-    # trend_map must have an entry for each unique time series
-    if(!all(sort(trend_map$series) == sort(unique(data_train$series)))){
-      stop('argument "trend_map" must have an entry for every unique time series in "data"',
-           call. = FALSE)
-    }
-
-    # trend_map must not specify a greater number of trends than there are series
-    if(max(trend_map$trend) > length(unique(data_train$series))){
-      stop('argument "trend_map" specifies more latent trends than there are series in "data"',
-           call. = FALSE)
-    }
-
-    # trend_map must not skip any trends
-    if(!all(sort(unique(trend_map$trend)) == seq(1:max(trend_map$trend)))){
-      stop('argument "trend_map" must link at least one series to each latent trend')
-    }
+    validate_trendmap(trend_map = trend_map, data_train = data_train,
+                      trend_model = trend_model, use_stan = use_stan)
 
     # If trend_map correctly specified, set use_lv to TRUE for
     # most models (but not yet for VAR models, which require additional
@@ -547,155 +539,7 @@ mvgam = function(formula,
     } else {
       use_lv <- TRUE
     }
-
-    # Model should be set up using dynamic factors of the correct length
     n_lv <- max(trend_map$trend)
-  }
-
-  # Check MCMC arguments
-  if(sign(chains) != 1){
-    stop('argument "chains" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(chains%%1 != 0){
-      stop('argument "chains" must be a positive integer',
-           call. = FALSE)
-    }
-  }
-
-  if(sign(burnin) != 1){
-    stop('argument "burnin" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(burnin%%1 != 0){
-      stop('argument "burnin" must be a positive integer',
-           call. = FALSE)
-    }
-  }
-
-  # If Stan is to be used, make sure it is installed
-  if(use_stan & run_model){
-    if(!requireNamespace('rstan', quietly = TRUE)){
-      warning('rstan library not found; checking for cmdstanr library')
-
-      if(!requireNamespace('cmdstanr', quietly = TRUE)){
-        warning('cmdstanr library not found; setting run_model = FALSE')
-        run_model <- FALSE
-      }
-    }
-
-    }
-
-  # JAGS cannot support latent GP or VAR trends
-  if(!use_stan & trend_model %in%c ('GP', 'VAR1')){
-    warning('gaussian process and VAR trends not yet supported for JAGS; reverting to Stan')
-    use_stan <- TRUE
-  }
-
-  if(use_stan & family_char == 'tweedie'){
-    warning('Tweedie family not supported for stan; reverting to JAGS')
-    use_stan <- FALSE
-  }
-
-  # If the model is to be run in JAGS, make sure the JAGS software can be located
-  if(!use_stan){
-    if(run_model){
-      if(!requireNamespace('runjags', quietly = TRUE)){
-        warning('runjags library is required but not found; setting run_model = FALSE')
-        run_model <- FALSE
-      }
-    }
-  }
-
-  if(!use_stan){
-    if(run_model){
-      if(missing(jags_path)){
-        requireNamespace('runjags', quietly = TRUE)
-        jags_path <- runjags::findjags()
-      }
-
-      # Code borrowed from the runjags package
-      jags_status <- runjags::testjags(jags_path, silent = TRUE)
-      if(!jags_status$JAGS.available){
-        if(jags_status$os == "windows"){
-          # Try it again - sometimes this helps
-          Sys.sleep(0.2)
-          jags_status <- runjags::testjags(jags_path, silent = TRUE)
-        }
-
-        if(!jags_status$JAGS.available){
-          cat("Unable to call JAGS using '", jags_path,
-              "'\nTry specifying the path to the JAGS binary as jags_path argument, or re-installing the rjags package.\nUse the runjags::testjags() function for more detailed diagnostics.\n", sep="")
-          stop("Unable to call JAGS.\nEither use the Stan backend or follow examples in ?mvgam to generate data / model files and run outside of mvgam", call. = FALSE)
-        }
-      }
-    }
-  }
-
-  # Add series factor variable if missing
-  if(class(data_train)[1] != 'list'){
-  if(!'series' %in% colnames(data_train)){
-    data_train$series <- factor('series1')
-    if(!missing(data_test)){
-      data_test$series <- factor('series1')
-    }
-  }
-
-  # Must be able to index by time; it is too dangerous to 'guess' as this could make a huge
-    # impact on resulting estimates / inferences
-  if(!'time' %in% colnames(data_train)){
-    stop('data does not contain a "time" column')
-  }
-    }
-
-  if(class(data_train)[1] == 'list'){
-    if(!'series' %in% names(data_train)){
-      data_train$series <- factor('series1')
-      if(!missing(data_test)){
-        data_test$series <- factor('series1')
-      }
-    }
-
-    if(!'time' %in% names(data_train)){
-      stop('data does not contain a "time" column')
-    }
-  }
-
-  # Ensure each series has an observation, even if NA, for each
-  # unique timepoint
-  all_times_avail = function(time, min_time, max_time){
-    identical(as.numeric(sort(time)),
-              as.numeric(seq.int(from = min_time, to = max_time)))
-  }
-  min_time <- min(data_train$time)
-  max_time <- max(data_train$time)
-  data.frame(series = data_train$series,
-             time = data_train$time) %>%
-    dplyr::group_by(series) %>%
-    dplyr::summarise(all_there = all_times_avail(time,
-                                                 min_time,
-                                                 max_time)) -> checked_times
-  if(any(checked_times$all_there == FALSE)){
-    stop('One or more series in "data" is missing observations for one or more timepoints',
-         call. = FALSE)
-  }
-
-  if(!missing(data_test)){
-
-    # Repeat the check that each series has an observation for each
-    # unique timepoint
-    min_time <- min(data_test$time)
-    max_time <- max(data_test$time)
-    data.frame(series = data_test$series,
-               time = data_test$time) %>%
-      dplyr::group_by(series) %>%
-      dplyr::summarise(all_there = all_times_avail(time,
-                                                   min_time,
-                                                   max_time)) -> checked_times
-    if(any(checked_times$all_there == FALSE)){
-      stop('One or more series in "newdata" is missing observations for one or more timepoints',
-           call. = FALSE)
-    }
   }
 
   # Upper bounds needs to be same length as number of series
@@ -722,32 +566,6 @@ mvgam = function(formula,
     warning('No point in latent variables if trend model is None; changing use_lv to FALSE')
   }
 
-  # Check if there is an offset variable included
-  if(is.null(attr(terms(formula(formula)), 'offset'))){
-    offset <- FALSE
-  } else {
-    offset <- TRUE
-  }
-
-  # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
-  orig_formula <- formula
-  formula <- interpret_mvgam(formula, N = max(data_train$time))
-  form_terms <- terms(formula(formula))
-  if(terms(formula(formula))[[2]] != 'y'){
-
-    # Check if 'y' is in names, but only if this is not a refit
-    if(!refit){
-      if('y' %in% names(data_train)){
-        stop('variable "y" found in data but not used as outcome. mvgam uses the name "y" when modeling so this variable should be re-named',
-             call. = FALSE)
-      }
-    }
-    data_train$y <- data_train[[terms(formula(formula))[[2]]]]
-    if(!missing(data_test)){
-      data_test$y <- data_test[[terms(formula(formula))[[2]]]]
-    }
-  }
-
   # If there are missing values in y, use predictions from an initial mgcv model to fill
   # these in so that initial values to maintain the true size of the training dataset
   orig_y <- data_train$y
@@ -755,6 +573,7 @@ mvgam = function(formula,
   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the Bayesian model later on;
   ss_gam <- mvgam_setup(formula = formula,
+                        knots = knots,
                         family = family_to_mgcvfam(family),
                         data = data_train,
                         drop.unused.levels = FALSE,
@@ -1424,8 +1243,14 @@ mvgam = function(formula,
 
       # If trend formula specified, add the predictors for the trend models
       if(!missing(trend_formula)){
+
+        if(missing(trend_knots)){
+          trend_knots <- missing_arg()
+        }
+
         trend_pred_setup <- add_trend_predictors(
           trend_formula = trend_formula,
+          trend_knots = trend_knots,
           trend_map = trend_map,
           trend_model = trend_model,
           data_train = data_train,
@@ -1580,7 +1405,7 @@ mvgam = function(formula,
                                                                  fixed = TRUE) - 1):
                                                               (grep('generated quantities {',
                                                                     vectorised$model_file,
-                                                                    fixed = TRUE) - 4))]
+                                                                    fixed = TRUE) - 3))]
       }
 
       model_data <- vectorised$model_data

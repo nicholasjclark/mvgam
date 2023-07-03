@@ -17,7 +17,7 @@ test_that("trend_model must be correctly specified", {
 
 test_that("specified priors appear in the Stan code", {
 
-  priors <- get_mvgam_priors(y ~ s(season, bs = 'cc'),
+  priors <- get_mvgam_priors(formula = y ~ s(season, bs = 'cc'),
                              trend_model = 'GP',
                              data = beta_data$data_train,
                              family = betar())

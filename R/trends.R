@@ -32,17 +32,15 @@ NULL
 
 #### Generic trend information ####
 #' @noRd
-evaluate_trend_model = function(trend_model){
-  trend_model <- match.arg(arg = trend_model,
-                           choices = c("RW",
-                                       "GP",
-                                       'AR1',
-                                       'AR2',
-                                       'AR3',
-                                       'VAR1',
-                                       'VAR1cor',
-                                       'None'))
-  return(trend_model)
+trend_model_choices = function(){
+  c("RW",
+    "GP",
+    'AR1',
+    'AR2',
+    'AR3',
+    'VAR1',
+    'VAR1cor',
+    'None')
 }
 
 #' Squared exponential GP simulation function
@@ -165,7 +163,7 @@ sim_var1 = function(drift, A, Sigma,
 
   # Stochastic realisations
   for (t in 2:(h + 1)) {
-    states[t, ] <- A %*% states[t-1,] +
+    states[t, ] <- A %*% states[t - 1,] +
       drift +
       linpreds[t, ] - linpreds[t - 1, ]
       errors[t, ]
@@ -173,6 +171,64 @@ sim_var1 = function(drift, A, Sigma,
 
   # Return state estimates
   states[-1, ]
+}
+
+#' Simulate stationary VAR(p) phi matrices using the algorithm proposed by
+#' Ansley and Kohn (1986)
+#' @noRd
+stationary_VAR_phi <- function(p = 1, n_series = 3, ar_scale = 1) {
+  stopifnot(ar_scale > 0)
+  Id <- diag(nrow = n_series)
+  all_P <- array(dim=c(n_series, n_series, p))
+  for(i1 in 1:p) {
+    A <- matrix(rnorm(n_series*n_series, sd = ar_scale),
+                nrow = n_series)
+    B <- t(chol(Id + tcrossprod(A, A)))
+    all_P[, , i1] <- solve(B, A)
+  }
+
+  all_phi <- array(dim = c(n_series, n_series, p, p))
+  all_phi_star <- array(dim = c(n_series, n_series, p, p))
+
+  # Set initial values
+  L <- L_star <- Sigma <- Sigma_star <- Gamma <- Id
+
+  # Recursion algorithm (Ansley and Kohn 1986, lemma 2.1)
+  for(s in 0:(p - 1)) {
+    all_phi[, , s+1, s+1] <- L %*%
+      all_P[, , s+1] %*%
+      solve(L_star)
+    all_phi_star[, , s+1, s+1] <- tcrossprod(L_star, all_P[, , s+1]) %*%
+      solve(L)
+
+    if(s >= 1) {
+      for(k in 1:s) {
+        all_phi[, , s+1, k] <- all_phi[, , s, k] - all_phi[, , s+1, s+1] %*%
+          all_phi_star[, , s, s-k+1]
+        all_phi_star[, , s+1, k] <- all_phi_star[, , s, k] - all_phi_star[, , s+1, s+1] %*%
+          all_phi[, , s, s-k+1]
+      }
+    }
+
+    if(s < p - 1) {
+      Sigma_next <- Sigma - all_phi[, , s+1, s+1] %*%
+        tcrossprod(Sigma_star, all_phi[, , s+1, s+1])
+      if(s < p + 1) {
+        Sigma_star <- Sigma_star - all_phi_star[, , s+1, s+1] %*%
+          tcrossprod(Sigma, all_phi_star[, , s+1, s+1])
+        L_star <- t(chol(Sigma_star))
+      }
+      Sigma <- Sigma_next
+      L <- t(chol(Sigma))
+    }
+  }
+
+  out <- vector(mode = 'list')
+  for(i in 1:p){
+    out[[i]] <- all_phi[,,i,i]
+  }
+
+  return(out)
 }
 
 #' Parameters to monitor / extract
@@ -183,7 +239,7 @@ trend_par_names = function(trend_model,
                            drift = FALSE){
 
   # Check arguments
-  trend_model <- evaluate_trend_model(trend_model)
+  trend_model <- validate_trend_model(trend_model, drift = drift)
 
   if(use_lv){
     if(trend_model == 'RW'){
@@ -529,9 +585,6 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                           Xp_trend = NULL, betas_trend = NULL,
                           h = 1){
 
-  # Check arguments
-  trend_model <- evaluate_trend_model(trend_model)
-
   # Propagate dynamic factors forward
   if(use_lv){
     n_lv <- length(trend_pars$last_lvs)
@@ -660,93 +713,3 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
   }
   return(trend_fc)
 }
-
-#' Function to prepare trend linear predictor matrix, ensuring ordering and
-#' indexing is correct with respect to the model structure
-#' @noRd
-trend_pred_data = function(data_test, trend_map, series = 'all',
-                           mgcv_model){
-
-  trend_test <- data_test
-  trend_indicators <- vector(length = length(trend_test$time))
-  for(i in 1:length(trend_test$time)){
-    trend_indicators[i] <- trend_map$trend[which(trend_map$series ==
-                                                          trend_test$series[i])]
-  }
-  trend_indicators <- as.factor(paste0('trend', trend_indicators))
-  trend_test$series <- trend_indicators
-  trend_test$y <- NULL
-
-  # Because these are set up inherently as dynamic factor models,
-  # we ALWAYS need to forecast the full set of trends, regardless of
-  # which series (or set of series) is being forecast
-
-  # if(series != 'all'){
-  #   s_name <- levels(data_test$series)[series]
-  #
-  #   data.frame(series = trend_test$series,
-  #              old_series = data_test$series,
-  #              time = trend_test$time,
-  #              row_num = 1:length(trend_test$time)) %>%
-  #     dplyr::filter(old_series == s_name) %>%
-  #     dplyr::arrange(time) %>%
-  #     dplyr::pull(row_num) -> inds_keep
-  #
-  # } else {
-  #   data.frame(series = trend_test$series,
-  #              time = trend_test$time,
-  #              row_num = 1:length(trend_test$time)) %>%
-  #     dplyr::group_by(series, time) %>%
-  #     dplyr::slice_head(n = 1) %>%
-  #     dplyr::pull(row_num) -> inds_keep
-  # }
-
-  data.frame(series = trend_test$series,
-             time = trend_test$time,
-             row_num = 1:length(trend_test$time)) %>%
-    dplyr::group_by(series, time) %>%
-    dplyr::slice_head(n = 1) %>%
-    dplyr::ungroup() %>%
-    dplyr::arrange(time, series) %>%
-    dplyr::pull(row_num) -> inds_keep
-
-  if(inherits(data_test, 'list')){
-    trend_test <- lapply(trend_test, function(x){
-      if(is.matrix(x)){
-        matrix(x[inds_keep,], ncol = NCOL(x))
-      } else {
-        x[inds_keep]
-      }
-
-    })
-  } else {
-    trend_test <- trend_test[inds_keep, ]
-  }
-
-  suppressWarnings(Xp_trend  <- try(predict(mgcv_model,
-                                            newdata = trend_test,
-                                            type = 'lpmatrix'),
-                                    silent = TRUE))
-
-  if(inherits(Xp_trend, 'try-error')){
-    testdat <- data.frame(series = trends_test$series)
-
-    terms_include <- names(mgcv_model$coefficients)[which(!names(mgcv_model$coefficients)
-                                                          %in% '(Intercept)')]
-    if(length(terms_include) > 0){
-      newnames <- vector()
-      newnames[1] <- 'series'
-      for(i in 1:length(terms_include)){
-        testdat <- cbind(testdat, data.frame(trends_test[[terms_include[i]]]))
-        newnames[i+1] <- terms_include[i]
-      }
-      colnames(testdat) <- newnames
-    }
-
-    suppressWarnings(Xp_trend  <- predict(mgcv_model,
-                                          newdata = testdat,
-                                          type = 'lpmatrix'))
-  }
-  return(Xp_trend)
-}
-

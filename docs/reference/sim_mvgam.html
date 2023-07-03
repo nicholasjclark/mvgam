@@ -100,13 +100,16 @@ latent trends in a reduced dimension format. If <code>FALSE</code>, estimate ind
 
 
 <dt>trend_model</dt>
-<dd><p><code>character</code> specifying the time series dynamics for the latent trends. Options are:
-'RW' (random walk with possible drift),
-'AR1' (AR1 model with intercept),
-'AR2' (AR2 model with intercept) or
-'AR3' (AR3 model with intercept) or
-'VAR1' (with possible drift; only available in <code>Stan</code>) or
-'GP' (Gaussian process with squared exponential kernel</p></dd>
+<dd><p><code>character</code> specifying the time series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
+<li><p><code>RW</code> (random walk with possible drift)</p></li>
+<li><p><code>AR1</code> (with possible drift)</p></li>
+<li><p><code>AR2</code> (with possible drift)</p></li>
+<li><p><code>AR3</code> (with possible drift)</p></li>
+<li><p><code>VAR1</code> (contemporaneously uncorrelated VAR1)</p></li>
+<li><p><code>VAR1cor</code> (contemporaneously correlated VAR1)</p></li>
+<li><p><code>GP</code> (Gaussian Process with squared exponential kernel)</p></li>
+</ul><p>See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
 
 
 <dt>drift</dt>

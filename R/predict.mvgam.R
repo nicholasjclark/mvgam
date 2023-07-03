@@ -31,18 +31,13 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
                          n_cores = 1, ...){
 
   # Argument checks
-  if (!(inherits(object, "mvgam"))) {
-    stop('argument "object" must be of class "mvgam"')
-  }
-
   if(!missing("data_test")){
     newdata <- data_test
   }
-
   if(missing(newdata)){
     newdata <- object$obs_data
   }
-
+  validate_pos_integer(n_cores)
   type <- match.arg(arg = type, choices = c("link",
                                             "expected",
                                             "response"))
@@ -53,14 +48,15 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
   if(!is.null(object$trend_call)){
 
     # Linear predictor matrix for the latent process models
-    Xp <- predict(object$trend_mgcv_model,
-                  newdata = newdata,
-                  type = 'lpmatrix')
+    Xp <- trend_Xp_matrix(newdata = data_test,
+                          trend_map = object$trend_map,
+                          series = 'all',
+                          mgcv_model = object$trend_mgcv_model)
 
     # Extract process error estimates
     if(object$trend_model %in% c('RW','AR1','AR2','AR3')){
       family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
-                                                          'sigma'))
+                                                  'sigma'))
     }
 
     # Indicators of which trend to use for each observation
@@ -86,21 +82,21 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
     trend_predictions <- do.call(rbind, pbapply::pblapply(seq_len(dim(betas)[1]),
                                                           function(x){
 
-      # Trend-specific SD parameters
-      par_extracts <- lapply(seq_along(family_pars), function(j){
-        if(is.matrix(family_pars[[j]])){
-          family_pars[[j]][x, trend_ind]
-        } else {
-          family_pars[[j]][x]
-        }
-      })
-      names(par_extracts) <- names(family_pars)
-      mvgam_predict(family = 'gaussian',
-                    Xp = Xp,
-                    type = 'response',
-                    betas = betas[x,],
-                    family_pars = par_extracts)
-    }, cl = cl))
+                                                            # Trend-specific SD parameters
+                                                            par_extracts <- lapply(seq_along(family_pars), function(j){
+                                                              if(is.matrix(family_pars[[j]])){
+                                                                family_pars[[j]][x, trend_ind]
+                                                              } else {
+                                                                family_pars[[j]][x]
+                                                              }
+                                                            })
+                                                            names(par_extracts) <- names(family_pars)
+                                                            mvgam_predict(family = 'gaussian',
+                                                                          Xp = Xp,
+                                                                          type = 'response',
+                                                                          betas = betas[x,],
+                                                                          family_pars = par_extracts)
+                                                          }, cl = cl))
     stopCluster(cl)
 
   } else if(object$trend_model != 'None'){
@@ -179,21 +175,21 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
                                    pbapply::pblapply(seq_len(dim(betas)[1]),
                                                      function(x){
 
-         # Trend-specific SD parameters
-         par_extracts <- lapply(seq_along(family_pars), function(j){
-         if(is.matrix(family_pars[[j]])){
-           family_pars[[j]][x, trend_ind]
-         } else {
-          family_pars[[j]][x]
-          }
-        })
-       names(par_extracts) <- names(family_pars)
-        mvgam_predict(family = 'gaussian',
-                      Xp = Xp,
-                      type = 'response',
-                      betas = betas[x,],
-                      family_pars = par_extracts)
-        }, cl = cl))
+                                                       # Trend-specific SD parameters
+                                                       par_extracts <- lapply(seq_along(family_pars), function(j){
+                                                         if(is.matrix(family_pars[[j]])){
+                                                           family_pars[[j]][x, trend_ind]
+                                                         } else {
+                                                           family_pars[[j]][x]
+                                                         }
+                                                       })
+                                                       names(par_extracts) <- names(family_pars)
+                                                       mvgam_predict(family = 'gaussian',
+                                                                     Xp = Xp,
+                                                                     type = 'response',
+                                                                     betas = betas[x,],
+                                                                     family_pars = par_extracts)
+                                                     }, cl = cl))
       stopCluster(cl)
     }
   } else {
@@ -202,29 +198,8 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
 
   #### Once trend predictions are made, calculate observation predictions ####
   # Generate linear predictor matrix from the mgcv observation model
-  suppressWarnings(Xp  <- try(predict(object$mgcv_model,
-                                      newdata = newdata,
-                                      type = 'lpmatrix'),
-                              silent = TRUE))
-
-  if(inherits(Xp, 'try-error')){
-    testdat <- data.frame(time = newdata$time)
-    terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients)
-                                                                 %in% '(Intercept)')]
-    if(length(terms_include) > 0){
-      newnames <- vector()
-      newnames[1] <- 'time'
-      for(i in 1:length(terms_include)){
-        testdat <- cbind(testdat, data.frame(newdata[[terms_include[i]]]))
-        newnames[i+1] <- terms_include[i]
-      }
-      colnames(testdat) <- newnames
-    }
-
-    suppressWarnings(Xp  <- predict(object$mgcv_model,
-                                    newdata = testdat,
-                                    type = 'lpmatrix'))
-  }
+  Xp <- obs_Xp_matrix(newdata = newdata,
+                      mgcv_model = object$mgcv_model)
 
   # Beta coefficients for GAM component
   betas <- mcmc_chains(object$model_output, 'b')
@@ -272,7 +247,7 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
     # if necessary
     if(trend_model != 'None'){
       Xpmat <- cbind(as.matrix(Xp),
-                       trend_predictions[x,])
+                     trend_predictions[x,])
       attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
       betas_pred <- c(betas[x,], 1)
     } else {

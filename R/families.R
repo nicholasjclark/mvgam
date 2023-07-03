@@ -50,36 +50,17 @@ student_t = function(link = 'identity'){
 }
 
 #### Non-exported functions for performing family-specific tasks ####
-#' Evaluate family argument
+#' Family options in character format
 #' @noRd
-evaluate_family = function(family){
-
-  if(is.character(family)){
-    if(family == 'beta')
-      family <- betar()
-
-    family <- try(eval(parse(text = family)), silent = TRUE)
-
-    if(inherits(family, 'try-error'))
-      stop("family not recognized",
-           call. = FALSE)
-  }
-
-  if(is.function(family))
-    family <- family()
-
-  if(is.null(family$family))
-    stop("family not recognized",
-         call. = FALSE)
-
-  if(!inherits(family, 'family'))
-    stop('family not recognized',
-         call. = FALSE)
-
-  if(family$family == 'Beta regression')
-    family$family <- 'beta'
-
-  return(family)
+family_char_choices = function(){
+  c('negative binomial',
+    "poisson",
+    "tweedie",
+    "beta",
+    "gaussian",
+    "lognormal",
+    "student",
+    "Gamma")
 }
 
 # Convert location / precision parameters to shape parameters for the beta distribution

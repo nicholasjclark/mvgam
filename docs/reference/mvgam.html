@@ -61,6 +61,7 @@ dynamic factors to capture trend dependencies among series in a reduced dimensio
 <span>  <span class="va">formula</span>,</span>
 <span>  <span class="va">trend_formula</span>,</span>
 <span>  <span class="va">knots</span>,</span>
+<span>  <span class="va">trend_knots</span>,</span>
 <span>  <span class="va">data</span>,</span>
 <span>  <span class="va">data_train</span>,</span>
 <span>  <span class="va">newdata</span>,</span>
@@ -109,8 +110,13 @@ currently available for Random Walk trend models.</p></dd>
 <dt>knots</dt>
 <dd><p>An optional <code>list</code> containing user specified knot values to be used for basis construction.
 For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
-(note that the number of knots is not always just k). Different terms can use different numbers of knots,
+(note that the number of knots is not always just <code>k</code>). Different terms can use different numbers of knots,
 unless they share a covariate.</p></dd>
+
+
+<dt>trend_knots</dt>
+<dd><p>As for <code>knots</code> above, this is an optional <code>list</code> of knot values for smooth
+functions within the <code>trend_formula</code></p></dd>
 
 
 <dt>data</dt>

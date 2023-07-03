@@ -41,25 +41,9 @@ pfilter_mvgam_smooth = function(particles,
                                 use_resampling = FALSE,
                                 kernel_lambda = 0.5){
 
-  if(threshold < 0 || threshold > 1){
-    stop('Argument "threshold" must be a proportion ranging from 0 to 1, inclusive',
-         call. = FALSE)
-  }
-
-  if(kernel_lambda < 0 || kernel_lambda > 1){
-    stop('Argument "kernel_lambda" must be a proportion ranging from 0 to 1, inclusive',
-         call. = FALSE)
-  }
-
-  if(sign(n_cores) != 1){
-    stop('argument "n_cores" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(n_cores%%1 != 0){
-      stop('argument "n_cores" must be a positive integer',
-           call. = FALSE)
-    }
-  }
+  validate_proportional(threshold)
+  validate_proportional(kernel_lambda)
+  validate_pos_integer(n_cores)
 
   # GP models smooth towards the entire state history, so they are more likely
   # to 'overreact' to changing conditions than are AR or RW trend models. Set the
@@ -69,33 +53,11 @@ pfilter_mvgam_smooth = function(particles,
   }
 
   # Linear predictor matrix for the next observation
-  suppressWarnings(Xp  <- try(predict(mgcv_model,
-                                      newdata = next_assim,
-                                      type = 'lpmatrix'),
-                              silent = TRUE))
-
-  if(inherits(Xp, 'try-error')){
-    testdat <- data.frame(time = next_assim$time)
-
-    terms_include <- names(mgcv_model$coefficients)[which(!names(mgcv_model$coefficients) %in% '(Intercept)')]
-    if(length(terms_include) > 0){
-      newnames <- vector()
-      newnames[1] <- 'time'
-      for(i in 1:length(terms_include)){
-        testdat <- cbind(testdat, data.frame(next_assim[[terms_include[i]]]))
-        newnames[i+1] <- terms_include[i]
-      }
-      colnames(testdat) <- newnames
-    }
-
-    suppressWarnings(Xp  <- predict(mgcv_model,
-                                    newdata = testdat,
-                                    type = 'lpmatrix'))
-  }
-
+  Xp <- obs_Xp_matrix(newdata = next_assim,
+                      mgcv_model = object$mgcv_model)
 
   use_lv <- particles[[1]]$use_lv
-  last_assim = unique(next_assim$time)
+  last_assim <- unique(next_assim$time)
 
   # Update importance weights in light of most recent observation by running particles
   # up to the current timepoint

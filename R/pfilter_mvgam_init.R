@@ -38,15 +38,8 @@ pfilter_mvgam_init = function(object,
     data_assim <- newdata
   }
 
-  if(sign(n_cores) != 1){
-    stop('argument "n_cores" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(n_cores%%1 != 0){
-      stop('argument "n_cores" must be a positive integer',
-           call. = FALSE)
-    }
-  }
+  validate_pos_integer(n_cores)
+  validate_pos_integer(n_particles)
 
   # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
   mod_call <- object$call
@@ -60,24 +53,7 @@ data_train <- object$obs_data
 n_series <- NCOL(object$ytimes)
 
 # Variable name checks
-if(class(object$obs_data)[1] == 'list'){
-  if(!'time' %in% names(data_assim)){
-    stop('data_assim does not contain a "time" column')
-  }
-
-  if(!'series' %in% names(data_assim)){
-    data_assim$series <- factor('series1')
-  }
-
-} else {
-  if(!'time' %in% colnames(data_assim)){
-    stop('data_assim does not contain a "time" column')
-  }
-
-  if(!'series' %in% colnames(data_assim)){
-    data_assim$series <- factor('series1')
-  }
-}
+data_assim <- validate_series_time(data_assim, name = 'data_assim')
 
 # Next observation for assimilation (ensure data_assim is arranged correctly)
 if(inherits(object$obs_data, 'list')){
@@ -111,32 +87,29 @@ if(length(unique(series_test$time)) > 1){
 }
 
 # Linear predictor matrix for the next observation
-suppressWarnings(Xp  <- try(predict(object$mgcv_model,
-                                    newdata = series_test,
-                                    type = 'lpmatrix'),
-                                 silent = TRUE))
-
-if(inherits(Xp, 'try-error')){
-  testdat <- data.frame(time = series_test$time)
-
-  terms_include <- names(object$mgcv_model$coefficients)[which(!names(object$mgcv_model$coefficients) %in% '(Intercept)')]
-  if(length(terms_include) > 0){
-    newnames <- vector()
-    newnames[1] <- 'time'
-    for(i in 1:length(terms_include)){
-      testdat <- cbind(testdat, data.frame(series_test[[terms_include[i]]]))
-      newnames[i+1] <- terms_include[i]
-    }
-    colnames(testdat) <- newnames
-  }
-
-  suppressWarnings(Xp  <- predict(object$mgcv_model,
-                                       newdata = testdat,
-                                       type = 'lpmatrix'))
-}
+Xp <- obs_Xp_matrix(newdata = series_test,
+                    mgcv_model = object$mgcv_model)
 
 # Beta coefficients for GAM component
 betas <- mcmc_chains(object$model_output, 'b')
+
+# Generate linear predictor matrix from trend mgcv model
+if(!is.null(object$trend_call)){
+  Xp_trend <- trend_Xp_matrix(newdata = data_test,
+                              trend_map = object$trend_map,
+                              series = series,
+                              mgcv_model = object$trend_mgcv_model)
+
+} else {
+  Xp_trend <- NULL
+}
+
+# Beta coefficients for GAM trend component
+if(!is.null(object$trend_call)){
+  betas_trend <- mcmc_chains(object$model_output, 'b_trend')
+} else {
+  betas_trend <- NULL
+}
 
 # Family-specific parameters
 family <- object$family
@@ -171,7 +144,9 @@ clusterExport(NULL, c('use_lv',
                       'trend_model',
                       'trend_pars',
                       'Xp',
+                      'Xp_trend',
                       'betas',
+                      'betas_trend',
                       'series_test',
                       'truth',
                       'last_assim',
@@ -200,7 +175,9 @@ particles <- pbapply::pblapply(sample_seq, function(x){
     trends <- forecast_trend(trend_model = trend_model,
                              use_lv = use_lv,
                              trend_pars = general_trend_pars,
-                             h = 1)
+                             h = 1,
+                             betas_trend = betas_trend,
+                             Xp_trend = Xp_trend)
 
     # Include previous states for each lv
     if(trend_model != 'GP'){
@@ -226,26 +203,26 @@ particles <- pbapply::pblapply(sample_seq, function(x){
 
     # Sample series- and trend-specific parameters
     trend_extracts <- extract_series_trend_pars(series = series,
-                                                        samp_index = samp_index,
-                                                        trend_pars = trend_pars,
-                                                        use_lv = use_lv)
+                                                samp_index = samp_index,
+                                                trend_pars = trend_pars,
+                                                use_lv = use_lv)
 
     if(use_lv || trend_model == 'VAR1'){
       if(use_lv){
         # Multiply lv states with loadings to generate the series' forecast trend state
         out <- as.numeric(trends %*% trend_extracts$lv_coefs)
-      }
-
-      if(trend_model == 'VAR1'){
+      } else if(trend_model == 'VAR1'){
         out <- trends[, series]
       }
 
     } else {
       # Propagate the series-specific trends forward
       out <- forecast_trend(trend_model = trend_model,
-                                    use_lv = FALSE,
-                                    trend_pars = trend_extracts,
-                                    h = 1)
+                            use_lv = FALSE,
+                            trend_pars = trend_extracts,
+                            h = 1,
+                            betas_trend = betas_trend,
+                            Xp_trend = Xp_trend)
     }
 
     out

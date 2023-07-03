@@ -1128,8 +1128,6 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
                               drift = FALSE,
                               threads = 1){
 
-  trend_model <- evaluate_trend_model(trend_model)
-
   # Hack for adding VAR1 models
   if(trend_model %in% c('VAR1', 'VAR1cor')){
     VAR1 <- TRUE
@@ -2382,6 +2380,7 @@ if(trend_model != 'VAR1'){
 #### Modifications to Stan code for adding predictors to trend models ####
 #' @noRd
 add_trend_predictors = function(trend_formula,
+                                trend_knots,
                                 trend_map,
                                 trend_model,
                                 data_train,
@@ -2397,6 +2396,10 @@ add_trend_predictors = function(trend_formula,
                                       as.character(trend_formula),
                                       fixed = TRUE),
                 collapse = " "))
+
+  if(missing(trend_knots)){
+    trend_knots <- rlang::missing_arg()
+  }
 
   # Drop any intercept from the formula
   if(attr(terms(trend_formula), 'intercept') == 1){
@@ -2444,6 +2447,7 @@ add_trend_predictors = function(trend_formula,
 
     # Construct the model file and data structures for testing and training
     trend_mvgam <- mvgam(trend_formula,
+                         knots = trend_knots,
                          data = trend_train,
                          newdata = trend_test,
                          family = gaussian(),
@@ -2453,6 +2457,7 @@ add_trend_predictors = function(trend_formula,
   } else {
     # Construct the model file and data structures for training only
     trend_mvgam <- mvgam(trend_formula,
+                         knots = trend_knots,
                          data = trend_train,
                          family = gaussian(),
                          trend_model = 'None',

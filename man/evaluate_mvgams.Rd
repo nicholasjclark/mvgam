@@ -14,7 +14,7 @@ eval_mvgam(
   fc_horizon = 3,
   n_cores = 2,
   score = "drps",
-  log = TRUE,
+  log = FALSE,
   weights
 )
 
@@ -26,7 +26,7 @@ roll_eval_mvgam(
   fc_horizon = 3,
   n_cores = 2,
   score = "drps",
-  log = TRUE,
+  log = FALSE,
   weights
 )
 
@@ -38,7 +38,7 @@ compare_mvgams(
   n_evaluations = 10,
   n_cores = 2,
   score = "drps",
-  log = TRUE,
+  log = FALSE,
   weights
 )
 }

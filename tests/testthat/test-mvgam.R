@@ -29,8 +29,8 @@ test_that("trend_model must be correctly specified", {
 test_that("outcome variable must be present in data", {
   data = data.frame(out = rnorm(100),
                     temp = rnorm(100),
-                    time = rnorm(100))
-  expect_error(mod <- mvgam(formula = y ~ dynamic(temp, rho = 120),
+                    time = 1:100)
+  expect_error(mod <- mvgam(formula = y ~ dynamic(temp, rho = 20),
                             data = data,
                             family = gaussian(),
                             run_model = FALSE),
@@ -57,7 +57,7 @@ test_that("all series must have observations for all unique timepoints", {
                             data = data$data_train,
                             family = poisson(),
                             run_model = FALSE),
-               'One or more series in "data" is missing observations for one or more timepoints')
+               'One or more series in data is missing observations for one or more timepoints')
 
   data <- sim_mvgam()
   data$data_test <- data$data_test[-2,]
@@ -67,5 +67,5 @@ test_that("all series must have observations for all unique timepoints", {
                             newdata = data$data_test,
                             family = poisson(),
                             run_model = FALSE),
-               'One or more series in "newdata" is missing observations for one or more timepoints')
+               'One or more series in newdata is missing observations for one or more timepoints')
 })

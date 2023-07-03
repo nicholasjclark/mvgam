@@ -78,7 +78,7 @@ sim_mvgam = function(T = 100,
                      train_prop = 0.85){
 
   # Validate the family argument
-  family <- evaluate_family(family)
+  family <- validate_family(family)
   family_char <- match.arg(arg = family$family,
                            choices = c('negative binomial',
                                        "poisson",
@@ -90,7 +90,7 @@ sim_mvgam = function(T = 100,
                                        "Gamma"))
 
   # Validate the trend arguments
-  trend_model <- evaluate_trend_model(trend_model)
+  trend_model <- validate_trend_model(trend_model, drift = drift)
   if(trend_model %in% c('VAR1', 'VAR1cor')){
     use_lv <- FALSE
   }
@@ -271,7 +271,7 @@ sim_mvgam = function(T = 100,
       if(trend_model == 'VAR1'){
         # Simulate the Sigma matrix (contemporaneously uncorrelated)
         Sigma <- matrix(0, n_lv, n_lv)
-        sigma <- 1/rgamma(n_lv, 2.3693353, 0.7311319)
+        sigma <- runif(n_lv, 0.4, 1.2)
         diag(Sigma) <- sigma
       }
 
@@ -294,24 +294,20 @@ sim_mvgam = function(T = 100,
           return(crossprod(R))
         }
         # Sample trend SD parameters and construct Sigma
-        sigma <- 1/rgamma(n_lv, 2.3693353, 0.7311319)
+        sigma <- runif(n_lv, 0.4, 1.2)
         Sigma <- outer(sigma, sigma) * lkj_corr(n_series = n_lv)
       }
 
-      # Create the VAR coefficient matrix
-      A <- matrix(NA, nrow = n_lv, ncol = n_lv)
+      # Create a stationary VAR coefficient matrix
+      A <- stationary_VAR_phi(p = 1, n_series = n_lv)[[1]]
 
-      # Off-diagonals represent VAR coefficients (need not be symmetric)
-      A[lower.tri(A)] <- rnorm(length(A[lower.tri(A)]), 0, 0.1)
-      A[upper.tri(A)] <- rnorm(length(A[upper.tri(A)]), 0, 0.1)
-
-      # Diagonals represent AR coefficients
-      diag(A) <- rbeta(n_lv, 8, 5)
-
+      # Simulate the VAR trends
       trends <- sim_var1(drift = trend_alphas,
                          A = A,
                          Sigma = Sigma,
-                         last_trends = rnorm(n_lv),
+                         last_trends = MASS::mvrnorm(n = 1,
+                                                     mu = rep(0, n_lv),
+                                                     Sigma = Sigma),
                          h = T)
     }
 

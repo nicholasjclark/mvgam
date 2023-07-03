@@ -55,30 +55,9 @@ lfo_cv.mvgam = function(object,
                         n_cores = 1,
                         ...){
 
-  if(pareto_k_threshold < 0 || pareto_k_threshold > 1){
-    stop('Argument "pareto_k_threshold" must be a proportion ranging from 0 to 1, inclusive',
-         call. = FALSE)
-  }
-
-  if(sign(fc_horizon) != 1){
-    stop('argument "fc_horizon" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(fc_horizon%%1 != 0){
-      stop('argument "fc_horizon" must be a positive integer',
-           call. = FALSE)
-    }
-  }
-
-  if(sign(n_cores) != 1){
-    stop('argument "n_cores" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(n_cores%%1 != 0){
-      stop('argument "n_cores" must be a positive integer',
-           call. = FALSE)
-    }
-  }
+  validate_proportional(pareto_k_threshold)
+  validate_pos_integer(fc_horizon)
+  validate_pos_integer(n_cores)
 
   if(missing(data)){
     all_data <- object$obs_data
@@ -96,16 +75,7 @@ lfo_cv.mvgam = function(object,
   if(min_t < 0){
     min_t <- 1
   }
-
-  if(sign(min_t) != 1){
-    stop('argument "min_t" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(min_t%%1 != 0){
-      stop('argument "min_t" must be a positive integer',
-           call. = FALSE)
-    }
-  }
+  validate_pos_integer(min_t)
 
   # Store the Expected Log Predictive Density (EPLD) at each time point
   approx_elpds <- rep(NA, N)
@@ -115,7 +85,7 @@ lfo_cv.mvgam = function(object,
   data_splits <- cv_split(all_data, last_train = min_t,
                           fc_horizon = fc_horizon)
 
-  # Fit model to training and forecast the testing
+  # Fit model to training and forecast all remaining testing observations
   fit_past <- update(object,
                     data = data_splits$data_train,
                     newdata = data_splits$data_test)
@@ -295,8 +265,7 @@ cv_split = function(data, last_train, fc_horizon = 1){
       dplyr::pull(index)
 
     indices_test <- temp_dat %>%
-      dplyr::filter(time > last_train &
-                      time <= (last_train + fc_horizon)) %>%
+      dplyr::filter(time > last_train) %>%
       dplyr::pull(index)
 
     # Split
@@ -322,9 +291,9 @@ cv_split = function(data, last_train, fc_horizon = 1){
       dplyr::arrange(time, series)
 
     data_test <- data %>%
-      dplyr::filter(time > last_train &
-                      time <= (last_train + fc_horizon)) %>%
+      dplyr::filter(time > last_train) %>%
       dplyr::arrange(time, series)
+
   }
 
   return(list(data_train = data_train,

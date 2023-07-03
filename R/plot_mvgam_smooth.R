@@ -60,7 +60,7 @@ plot_mvgam_smooth = function(object,
 
   if(trend_effects){
     if(is.null(object$trend_call)){
-      stop('no trend_formula exists so there no trend-level smooths to plot')
+      stop('no trend_formula exists so there are no trend-level smooths to plot')
     }
 
     residuals <- FALSE
@@ -251,30 +251,8 @@ plot_mvgam_smooth = function(object,
     }
 
     # Generate linear predictor matrix from fitted mgcv model
-    suppressWarnings(Xp  <- try(predict(object2$mgcv_model,
-                                        newdata = pred_dat,
-                                        type = 'lpmatrix'),
-                                silent = TRUE))
-
-    if(inherits(Xp, 'try-error')){
-      testdat <- data.frame(series = pred_dat$series)
-
-      terms_include <- names(object2$mgcv_model$coefficients)[which(!names(object2$mgcv_model$coefficients)
-                                                                   %in% '(Intercept)')]
-      if(length(terms_include) > 0){
-        newnames <- vector()
-        newnames[1] <- 'series'
-        for(i in 1:length(terms_include)){
-          testdat <- cbind(testdat, data.frame(pred_dat[[terms_include[i]]]))
-          newnames[i+1] <- terms_include[i]
-        }
-        colnames(testdat) <- newnames
-      }
-
-      suppressWarnings(Xp  <- predict(object2$mgcv_model,
-                                      newdata = testdat,
-                                      type = 'lpmatrix'))
-    }
+    Xp <- obs_Xp_matrix(newdata = pred_dat,
+                        mgcv_model = object2$mgcv_model)
 
     # Zero out all other columns in Xp
     keeps <- object2$mgcv_model$smooth[[smooth_int]]$first.para:
@@ -321,8 +299,8 @@ plot_mvgam_smooth = function(object,
   if(residuals){
     # Need to predict from a reduced set that zeroes out all terms apart from the
     # smooth of interest
-    suppressWarnings(Xp2 <- predict(object2$mgcv_model,
-                                    newdata = object2$obs_data, type = 'lpmatrix'))
+    Xp2 <- obs_Xp_matrix(newdata = object2$obs_data,
+                        mgcv_model = object2$mgcv_model)
 
     if(!missing(newdata)){
       stop('Partial residual plots not available when using newdata')
