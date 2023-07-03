@@ -33,8 +33,12 @@ update_priors = function(model_file,
           priors$prior[i]
 
       } else if(grepl('=', priors$prior[i])){
-        model_file[grep(trimws(strsplit(priors$prior[i], "[=]")[[1]][1]),
-                        model_file, fixed = TRUE)] <-
+        tomatch <- trimws(strsplit(paste0('\\b',
+                                          gsub(']', '\\]',
+                                               gsub('[', '\\[',
+                                                    priors$prior[i], fixed = TRUE),
+                                               fixed = TRUE)), "[=]")[[1]][1])
+        model_file[grep(tomatch, model_file, fixed = TRUE)] <-
           priors$prior[i]
       } else {
         warning('no match found in model_file for parameter: ',

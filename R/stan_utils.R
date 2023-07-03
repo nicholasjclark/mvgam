@@ -2422,10 +2422,25 @@ add_trend_predictors = function(trend_formula,
   trend_train$y <- NULL
 
   # Only keep one time observation per trend
-  trend_train %>%
+  data.frame(series = trend_train$series,
+             time = trend_train$time,
+             row_num = 1:length(trend_train$time)) %>%
     dplyr::group_by(series, time) %>%
     dplyr::slice_head(n = 1) %>%
-    dplyr::ungroup() -> trend_train
+    dplyr::pull(row_num) -> inds_keep
+
+  if(inherits(trend_train, 'list')){
+    trend_train <- lapply(trend_train, function(x){
+      if(is.matrix(x)){
+        matrix(x[inds_keep,], ncol = NCOL(x))
+      } else {
+        x[inds_keep]
+      }
+
+    })
+  } else {
+    trend_train <- trend_train[inds_keep, ]
+  }
 
   if(!is.null(data_test)){
     # If newdata supplied, also create a fake design matrix
@@ -2440,10 +2455,25 @@ add_trend_predictors = function(trend_formula,
     trend_test$series <- trend_indicators
     trend_test$y <- NULL
 
-    trend_test %>%
+    data.frame(series = trend_test$series,
+               time = trend_test$time,
+               row_num = 1:length(trend_test$time)) %>%
       dplyr::group_by(series, time) %>%
       dplyr::slice_head(n = 1) %>%
-      dplyr::ungroup() -> trend_test
+      dplyr::pull(row_num) -> inds_keep
+
+    if(inherits(trend_test, 'list')){
+      trend_test <- lapply(trend_test, function(x){
+        if(is.matrix(x)){
+          matrix(x[inds_keep,], ncol = NCOL(x))
+        } else {
+          x[inds_keep]
+        }
+
+      })
+    } else {
+      trend_test <- trend_test[inds_keep, ]
+    }
 
     # Construct the model file and data structures for testing and training
     trend_mvgam <- mvgam(trend_formula,
@@ -2727,6 +2757,30 @@ add_trend_predictors = function(trend_formula,
                         paste0("b_raw_trend[", 'trend_rand_idxs',
                                "] ~ std_normal();\n"),
                         "LV[1, 1:n_lv] ~ normal(0, sigma);")
+    }
+
+    if(trend_model == 'VAR1'){
+      if(any(grepl("cholesky_factor_corr[n_lv] L_Omega;",
+                   model_file, fixed = TRUE))){
+        model_file[grep("LV[1] ~ multi_normal(trend_zeros, Gamma);",
+                        model_file, fixed = TRUE)] <-
+          paste0(
+            "sigma_raw_trend ~ exponential(0.5);\n",
+            "mu_raw_trend ~ std_normal();\n",
+            paste0("b_raw_trend[", 'trend_rand_idxs',
+                   "] ~ std_normal();\n"),
+            "LV[1] ~ multi_normal(trend_zeros, Gamma);")
+
+      } else {
+        model_file[grep("LV[1] ~ normal(0, sigma);",
+                        model_file, fixed = TRUE)] <-
+          paste0(
+            "sigma_raw_trend ~ exponential(0.5);\n",
+            "mu_raw_trend ~ std_normal();\n",
+            paste0("b_raw_trend[", 'trend_rand_idxs',
+                   "] ~ std_normal();\n"),
+            "LV[1] ~ normal(0, sigma);")
+      }
     }
 
     model_file <- readLines(textConnection(model_file), n = -1)

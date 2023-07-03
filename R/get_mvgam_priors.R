@@ -187,7 +187,7 @@ get_mvgam_priors = function(formula,
                               trend = 1:length(unique(data_train$series)))
     }
 
-    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'VAR1')){
+    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'VAR1', 'VAR1cor')){
       stop('only RW, AR1, AR2 and VAR trends currently supported for trend predictor models',
            call. = FALSE)
     }
@@ -250,10 +250,25 @@ get_mvgam_priors = function(formula,
     trend_train$y <- NULL
 
     # Only keep one time observation per trend
-    trend_train %>%
+    data.frame(series = trend_train$series,
+               time = trend_train$time,
+               row_num = 1:length(trend_train$time)) %>%
       dplyr::group_by(series, time) %>%
       dplyr::slice_head(n = 1) %>%
-      dplyr::ungroup() -> trend_train
+      dplyr::pull(row_num) -> inds_keep
+
+    if(inherits(trend_train, 'list')){
+      trend_train <- lapply(trend_train, function(x){
+        if(is.matrix(x)){
+          matrix(x[inds_keep,], ncol = NCOL(x))
+        } else {
+          x[inds_keep]
+        }
+
+      })
+    } else {
+      trend_train <- trend_train[inds_keep, ]
+    }
 
     # Now get the priors related to the trend model
     trend_prior_df <- get_mvgam_priors(trend_formula,
@@ -267,7 +282,13 @@ get_mvgam_priors = function(formula,
     trend_prior_df[] <- lapply(trend_prior_df, function(x)
       gsub("n_sp", "n_sp_trend", x))
     trend_prior_df[] <- lapply(trend_prior_df, function(x)
+      gsub("mu_raw", "mu_raw_trend", x))
+    trend_prior_df[] <- lapply(trend_prior_df, function(x)
+      gsub("sigma_raw", "sigma_raw_trend", x))
+    trend_prior_df[] <- lapply(trend_prior_df, function(x)
       gsub("n_series", "n_lv", x))
+    trend_prior_df[] <- lapply(trend_prior_df, function(x)
+      gsub("series", "trend", x))
     trend_prior_df <- trend_prior_df[!trend_prior_df$param_info ==
                                        'observation error sd',]
     out <- rbind(prior_df, trend_prior_df)
@@ -281,6 +302,9 @@ get_mvgam_priors = function(formula,
       gsub("trend AR3", "process model AR3", x))
     out[] <- lapply(out, function(x)
       gsub("trend drift", "process model drift", x))
+    out[] <- lapply(out, function(x)
+      gsub("vector<lower=0>[n_series] sigma;", "vector<lower=0>[n_lv] sigma;", x,
+           fixed = TRUE))
 
   } else {
 
