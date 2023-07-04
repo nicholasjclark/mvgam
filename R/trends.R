@@ -165,7 +165,7 @@ sim_var1 = function(drift, A, Sigma,
   for (t in 2:(h + 1)) {
     states[t, ] <- A %*% states[t - 1,] +
       drift +
-      linpreds[t, ] - linpreds[t - 1, ]
+      linpreds[t, ] - linpreds[t - 1, ] +
       errors[t, ]
   }
 
@@ -180,11 +180,15 @@ stationary_VAR_phi <- function(p = 1, n_series = 3, ar_scale = 1) {
   stopifnot(ar_scale > 0)
   Id <- diag(nrow = n_series)
   all_P <- array(dim=c(n_series, n_series, p))
-  for(i1 in 1:p) {
+  for(i in 1:p) {
     A <- matrix(rnorm(n_series*n_series, sd = ar_scale),
                 nrow = n_series)
+
+    # Enforce diagonal AR terms to be positive if this is
+    # the first phi matrix
+    if(i == 1) diag(A) <- abs(diag(A))
     B <- t(chol(Id + tcrossprod(A, A)))
-    all_P[, , i1] <- solve(B, A)
+    all_P[, , i] <- solve(B, A)
   }
 
   all_phi <- array(dim = c(n_series, n_series, p, p))
