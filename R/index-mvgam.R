@@ -69,7 +69,7 @@ variables.mvgam = function(x, ...){
 
   # Population parameters from hierarchical (random) effects
   if(any(unlist(purrr::map(x$mgcv_model$smooth, inherits, 'random.effect')))){
-    re_labs <- unlist(lapply(purrr::map(object$mgcv_model$smooth, 'term'),
+    re_labs <- unlist(lapply(purrr::map(x$mgcv_model$smooth, 'term'),
                              paste, collapse = ','))[
       unlist(purrr::map(x$mgcv_model$smooth, inherits, 'random.effect'))]
     observation_re_params  <- data.frame(orig_name = c(
@@ -86,7 +86,7 @@ variables.mvgam = function(x, ...){
   trend_re_params <- NULL
   if(!is.null(x$trend_call)){
     if(any(unlist(purrr::map(x$trend_mgcv_model$smooth, inherits, 'random.effect')))){
-      re_labs <- unlist(lapply(purrr::map(object$trend_mgcv_model$smooth, 'term'),
+      re_labs <- unlist(lapply(purrr::map(x$trend_mgcv_model$smooth, 'term'),
                                paste, collapse = ','))[
         unlist(purrr::map(x$trend_mgcv_model$smooth, inherits, 'random.effect'))]
       re_labs <- gsub('series', 'trend', re_labs)

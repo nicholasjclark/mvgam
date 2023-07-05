@@ -70,7 +70,7 @@ as.data.frame.mvgam = function(x,
                       all_orig_vars,
                       all_alias_vars)
 
-  if(variable == 'obs_params'){
+  if(variable[1] == 'obs_params'){
     to_extract <- family_par_names(x$family)
     post <- data.frame(mcmc_chains(x$model_output,
                                    params = to_extract))
@@ -79,12 +79,12 @@ as.data.frame.mvgam = function(x,
     colnames(post) <- newnames
   }
 
-  if(variable == 'betas'){
+  if(variable[1] == 'betas'){
     post <- data.frame(mcmc_chains(x$model_output, params = 'b'))
     colnames(post) <- names(coef(x$mgcv_model))
   }
 
-  if(variable == 'smooth_params'){
+  if(variable[1] == 'smooth_params'){
     if(is.null(all_vars$observation_smoothpars)){
       stop('No observation-level smooth parameters in model; no smooth_params to extract',
            call. = FALSE)
@@ -93,14 +93,14 @@ as.data.frame.mvgam = function(x,
     colnames(post) <- x$sp_names
   }
 
-  if(variable == 'linpreds'){
+  if(variable[1] == 'linpreds'){
     post <- mcmc_chains(x$model_output, params = 'mus')
     varnames <- dimnames(post)[[2]]
     post <- as.data.frame(post)
     colnames(post) <- varnames
   }
 
-  if(variable == 'trend_params'){
+  if(variable[1] == 'trend_params'){
     to_extract <- trend_par_names(x$trend_model,
                                           x$use_lv,
                                           x$drift)
@@ -116,7 +116,7 @@ as.data.frame.mvgam = function(x,
     colnames(post) <- varnames
   }
 
-  if(variable == 'trend_betas'){
+  if(variable[1] == 'trend_betas'){
     if(is.null(x$trend_call)){
       stop('No trend_formula supplied to model; no trend_betas to extract',
            call. = FALSE)
@@ -125,7 +125,7 @@ as.data.frame.mvgam = function(x,
     colnames(post) <- paste0(names(coef(x$trend_mgcv_model)), '_trend')
   }
 
-  if(variable == "trend_smooth_params"){
+  if(variable[1] == "trend_smooth_params"){
     if(is.null(all_vars$trend_smoothpars)){
       stop('No smoothing parameters included in trend-level model',
            call. = FALSE)
@@ -136,7 +136,7 @@ as.data.frame.mvgam = function(x,
                                                'label')), '_trend')
   }
 
-  if(variable == 'trend_linpreds'){
+  if(variable[1] == 'trend_linpreds'){
     if(is.null(x$trend_call)){
       stop('No trend_formula supplied to model; no trend_linpreds to extract',
            call. = FALSE)
@@ -148,7 +148,7 @@ as.data.frame.mvgam = function(x,
   }
 
   # If not one of the standard subsets, extract the chosen variable(s)
-  if(!variable %in% c("obs_params",
+  if(!variable[1] %in% c("obs_params",
                      "betas",
                      "smooth_params",
                      "linpreds",

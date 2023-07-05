@@ -324,7 +324,7 @@ sim_mvgam = function(T = 100,
 
       Sigma <- trend_alphas[lv]^2 *
         exp(-0.5 * ((outer(1:T, 1:T, "-") / trend_rhos[lv]) ^ 2)) +
-        diag(1e-4, T)
+        diag(1e-9, T)
       MASS::mvrnorm(1,
                     mu = rep(0, T),
                     Sigma = Sigma)
