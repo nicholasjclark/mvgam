@@ -51,25 +51,25 @@ if(object$use_lv){
 
 }
 
-cat('N series:\n')
+cat('\nN series:\n')
 cat(NCOL(object$ytimes), '\n')
 
 if(!is.null(object$upper_bounds)){
-  cat('Upper bounds:\n')
+  cat('\nUpper bounds:\n')
   cat(object$upper_bounds, '\n')
 }
 
-cat('N timepoints:\n')
+cat('\nN timepoints:\n')
 cat(max(object$obs_data$time), '\n')
 
 if(object$fit_engine == 'jags'){
-  cat('Status:\n')
-  cat('Fitted using JAGS', '\n')
+  cat('\nStatus:\n')
+  cat('\nFitted using JAGS', '\n')
 }
 
 if(object$fit_engine == 'stan'){
-  cat('Status:\n')
-  cat('Fitted using Stan', '\n')
+  cat('\nStatus:\n')
+  cat('\nFitted using Stan', '\n')
 }
 
 if(object$family == 'negative binomial'){
@@ -460,21 +460,21 @@ if(!is.null(object$trend_call)){
 }
 
 if(object$fit_engine == 'stan'){
-  cat('Stan MCMC diagnostics:\n')
+  cat('\nStan MCMC diagnostics:\n')
   check_all_diagnostics(object$model_output,
                         max_treedepth = object$max_treedepth)
 
 }
 
 if(object$fit_engine == 'jags'){
-  cat('JAGS MCMC diagnostics:\n')
+  cat('\nJAGS MCMC diagnostics:\n')
   rhats <- mcmc_summary(object$model_output)[,6]
   if(any(rhats > 1.05)){
-    cat('Rhats above 1.05 found for',
+    cat('\nRhats above 1.05 found for',
         length(which(rhats > 1.05)),
         'parameters\n*Diagnose further to investigate why the chains have not mixed\n')
   } else {
-    cat('Rhat looks reasonable for all parameters\n')
+    cat('\nRhat looks reasonable for all parameters\n')
   }
 
 
@@ -525,16 +525,16 @@ summary.mvgam_prefit = function(object, ...){
 
   }
 
-  cat('N series:')
+  cat('\nN series:')
   cat(NCOL(object$ytimes), '\n')
 
 
-  cat('N timepoints:')
+  cat('\nN timepoints:')
   cat(max(object$obs_data$time), '\n')
 
 
-  cat('Status:')
-  cat('Not fitted', '\n')
+  cat('\nStatus:')
+  cat('\nNot fitted', '\n')
 
 }
 
