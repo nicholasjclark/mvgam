@@ -64,12 +64,12 @@ cat(max(object$obs_data$time), '\n')
 
 if(object$fit_engine == 'jags'){
   cat('\nStatus:\n')
-  cat('\nFitted using JAGS', '\n')
+  cat('Fitted using JAGS', '\n')
 }
 
 if(object$fit_engine == 'stan'){
   cat('\nStatus:\n')
-  cat('\nFitted using Stan', '\n')
+  cat('Fitted using Stan', '\n')
 }
 
 if(object$family == 'negative binomial'){
@@ -534,7 +534,7 @@ summary.mvgam_prefit = function(object, ...){
 
 
   cat('\nStatus:')
-  cat('\nNot fitted', '\n')
+  cat('Not fitted', '\n')
 
 }
 
