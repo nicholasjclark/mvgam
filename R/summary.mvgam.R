@@ -31,21 +31,21 @@ summary.mvgam = function(object, ...){
     print(object$call)
   }
 
-cat("Family:\n")
+cat("\nFamily:\n")
 cat(paste0(object$family, '\n'))
 
-cat("Link function:\n")
+cat("\nLink function:\n")
 cat(paste0(family_links(object$family), '\n'))
 
-cat("Trend model:\n")
+cat("\nTrend model:\n")
 cat(paste0(object$trend_model, '\n'))
 
 if(object$use_lv){
   if(!is.null(object$trend_call)){
-    cat("N process models:\n")
+    cat("\nN process models:\n")
     cat(object$n_lv, '\n')
   } else {
-    cat("N latent factors:\n")
+    cat("\nN latent factors:\n")
     cat(object$n_lv, '\n')
   }
 
@@ -73,52 +73,52 @@ if(object$fit_engine == 'stan'){
 }
 
 if(object$family == 'negative binomial'){
-  cat("Observation dispersion parameter estimates:\n")
+  cat("\nObservation dispersion parameter estimates:\n")
   print(mcmc_summary(object$model_output, 'phi')[,c(3:7)])
 }
 
 if(object$family == 'beta'){
-  cat("Observation precision parameter estimates:\n")
+  cat("\nObservation precision parameter estimates:\n")
   print(mcmc_summary(object$model_output, 'phi')[,c(3:7)])
 }
 
 if(object$family == 'tweedie'){
-  cat("Observation dispersion parameter estimates:\n")
+  cat("\nObservation dispersion parameter estimates:\n")
   print(mcmc_summary(object$model_output, 'phi')[,c(3:7)])
 }
 
 if(object$family == 'gaussian'){
-  cat("Observation error parameter estimates:\n")
+  cat("\nObservation error parameter estimates:\n")
   print(mcmc_summary(object$model_output, 'sigma_obs')[,c(3:7)])
 }
 
 if(object$family == 'student'){
-  cat("Observation error parameter estimates:\n")
+  cat("\nObservation error parameter estimates:\n")
   print(mcmc_summary(object$model_output, 'sigma_obs')[,c(3:7)])
 
-  cat("Observation df parameter estimates:\n")
+  cat("\nObservation df parameter estimates:\n")
   print(mcmc_summary(object$model_output, 'nu')[,c(3:7)])
 }
 
 if(object$family == 'lognormal'){
-  cat("log(observation error) parameter estimates:\n")
+  cat("\nlog(observation error) parameter estimates:\n")
   print(mcmc_summary(object$model_output, 'sigma_obs')[,c(3:7)])
 }
 
 if(object$family == 'Gamma'){
-  cat("Observation shape parameter estimates:\n")
+  cat("\nObservation shape parameter estimates:\n")
   print(mcmc_summary(object$model_output, 'shape')[,c(3:7)])
 }
 
 if(!is.null(object$trend_call)){
-  cat("GAM observation model coefficient (beta) estimates:\n")
+  cat("\nGAM observation model coefficient (beta) estimates:\n")
   coef_names <- names(object$mgcv_model$coefficients)
   mvgam_coefs <- mcmc_summary(object$model_output, 'b')[,c(3:7)]
   rownames(mvgam_coefs) <- coef_names
   print(mvgam_coefs)
 
 } else {
-  cat("GAM coefficient (beta) estimates:\n")
+  cat("\nGAM coefficient (beta) estimates:\n")
   coef_names <- names(object$mgcv_model$coefficients)
   mvgam_coefs <- mcmc_summary(object$model_output, 'b')[,c(3:7)]
   rownames(mvgam_coefs) <- coef_names
@@ -157,19 +157,19 @@ if(any(smooth_labs$class == 'random.effect')){
   rownames(re_mus) <- paste0('mean(',re_smooths,')')
 
   if(!is.null(object$trend_call)){
-    cat("GAM observation model group-level estimates:\n")
+    cat("\nGAM observation model group-level estimates:\n")
     print(rbind(re_mus, re_sds))
   } else {
-    cat("GAM group-level estimates:\n")
+    cat("\nGAM group-level estimates:\n")
     print(rbind(re_mus, re_sds))
   }
 }
 
 if(any(!is.na(object$sp_names)) & !all(smooth_labs$class == 'random.effect')){
   if(!is.null(object$trend_call)){
-    cat("GAM smoothing parameter (rho) estimates:\n")
+    cat("\nGAM smoothing parameter (rho) estimates:\n")
   } else {
-    cat("GAM observation smoothing parameter (rho) estimates:\n")
+    cat("\nGAM observation smoothing parameter (rho) estimates:\n")
   }
   rho_coefs <- mcmc_summary(object$model_output, 'rho')[,c(3:7)]
   rownames(rho_coefs) <- object$sp_names
@@ -192,47 +192,47 @@ if(object$use_lv){
     if(object$trend_model == 'RW'){
       if(object$drift){
         if(!is.null(object$trend_call)){
-          cat("Process model drift estimates:\n")
+          cat("\nProcess model drift estimates:\n")
         } else {
-          cat("Latent trend drift estimates:\n")
+          cat("\nLatent trend drift estimates:\n")
         }
         print(mcmc_summary(object$model_output, c('drift'))[,c(3:7)])
       } else {
         if(!is.null(object$trend_call)){
-          cat("Process error parameter estimates:\n")
+          cat("\nProcess error parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('sigma'))[,c(3:7)])
         }
       }
     }
 
     if(object$trend_model == 'GP'){
-      cat("Latent trend length scale (rho) estimates:\n")
+      cat("\nLatent trend length scale (rho) estimates:\n")
       print(mcmc_summary(object$model_output, c('rho_gp'))[,c(3:7)])
     }
 
     if(object$trend_model == 'AR1'){
       if(object$drift){
         if(!is.null(object$trend_call)){
-          cat("Process model drift and AR parameter estimates:\n")
+          cat("\nProcess model drift and AR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('drift', 'ar1'))[,c(3:7)])
         } else {
-          cat("Latent trend drift and AR parameter estimates:\n")
+          cat("\nLatent trend drift and AR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('drift', 'ar1'))[,c(3:7)])
         }
 
       } else {
         if(!is.null(object$trend_call)){
-          cat("Process model AR parameter estimates:\n")
+          cat("\nProcess model AR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('ar1'))[,c(3:7)])
         } else {
-          cat("Latent trend AR parameter estimates:\n")
+          cat("\nLatent trend AR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('ar1'))[,c(3:7)])
         }
 
       }
 
       if(!is.null(object$trend_call)){
-        cat("Process error parameter estimates:\n")
+        cat("\nProcess error parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('sigma'))[,c(3:7)])
 
       }
@@ -241,22 +241,22 @@ if(object$use_lv){
     if(object$trend_model == 'AR2'){
       if(object$drift){
         if(!is.null(object$trend_call)){
-          cat("Process model drift and AR parameter estimates:\n")
+          cat("\nProcess model drift and AR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2'))[,c(3:7)])
 
         } else {
-          cat("Latent trend drift and AR parameter estimates:\n")
+          cat("\nLatent trend drift and AR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2'))[,c(3:7)])
 
         }
 
       } else {
         if(!is.null(object$trend_call)){
-          cat("Process model AR parameter estimates:\n")
+          cat("\nProcess model AR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('ar1', 'ar2'))[,c(3:7)])
 
         } else {
-          cat("Latent trend AR parameter estimates:\n")
+          cat("\nLatent trend AR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('ar1', 'ar2'))[,c(3:7)])
 
         }
@@ -264,7 +264,7 @@ if(object$use_lv){
       }
 
       if(!is.null(object$trend_call)){
-        cat("Process error parameter estimates:\n")
+        cat("\nProcess error parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('sigma'))[,c(3:7)])
 
       }
@@ -273,22 +273,22 @@ if(object$use_lv){
     if(object$trend_model == 'AR3'){
       if(object$drift){
         if(!is.null(object$trend_call)){
-          cat("Process model drift and AR parameter estimates:\n")
+          cat("\nProcess model drift and AR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'ar3'))[,c(3:7)])
 
         } else {
-          cat("Latent trend drift and AR parameter estimates:\n")
+          cat("\nLatent trend drift and AR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'ar3'))[,c(3:7)])
 
         }
 
       } else {
         if(!is.null(object$trend_call)){
-          cat("Process model AR parameter estimates:\n")
+          cat("\nProcess model AR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('ar1', 'ar2', 'ar3'))[,c(3:7)])
 
         } else {
-          cat("Latent trend AR parameter estimates:\n")
+          cat("\nLatent trend AR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('ar1', 'ar2', 'ar3'))[,c(3:7)])
 
         }
@@ -296,7 +296,7 @@ if(object$use_lv){
       }
 
       if(!is.null(object$trend_call)){
-        cat("Process error parameter estimates:\n")
+        cat("\nProcess error parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('sigma'))[,c(3:7)])
 
       }
@@ -305,22 +305,22 @@ if(object$use_lv){
     if(object$trend_model == 'VAR1'){
       if(object$drift){
         if(!is.null(object$trend_call)){
-          cat("Process model drift and VAR parameter estimates:\n")
+          cat("\nProcess model drift and VAR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('drift', 'A'))[,c(3:7)])
 
         } else {
-          cat("Latent trend drift and VAR parameter estimates:\n")
+          cat("\nLatent trend drift and VAR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('drift', 'A'))[,c(3:7)])
 
         }
 
       } else {
         if(!is.null(object$trend_call)){
-          cat("Process model VAR parameter estimates:\n")
+          cat("\nProcess model VAR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('A'))[,c(3:7)])
 
         } else {
-          cat("Latent trend VAR parameter estimates:\n")
+          cat("\nLatent trend VAR parameter estimates:\n")
           print(mcmc_summary(object$model_output, c('A'))[,c(3:7)])
 
         }
@@ -328,7 +328,7 @@ if(object$use_lv){
       }
 
       if(!is.null(object$trend_call)){
-        cat("Process error parameter estimates:\n")
+        cat("\nProcess error parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('Sigma'))[,c(3:7)])
 
       }
@@ -340,11 +340,11 @@ if(!object$use_lv){
   if(object$trend_model != 'None'){
     if(object$trend_model == 'RW'){
       if(object$drift){
-        cat("Latent trend drift and sigma estimates:\n")
+        cat("\nLatent trend drift and sigma estimates:\n")
         print(mcmc_summary(object$model_output, c('drift', 'sigma'))[,c(3:7)])
 
       } else {
-        cat("Latent trend variance estimates:\n")
+        cat("\nLatent trend variance estimates:\n")
         print(mcmc_summary(object$model_output, c('sigma'))[,c(3:7)])
 
       }
@@ -352,11 +352,11 @@ if(!object$use_lv){
 
     if(object$trend_model == 'VAR1'){
       if(object$drift){
-        cat("Latent trend drift and VAR parameter estimates:\n")
+        cat("\nLatent trend drift and VAR parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('drift', 'A', 'Sigma'))[,c(3:7)])
 
       } else {
-        cat("Latent trend VAR parameter estimates:\n")
+        cat("\nLatent trend VAR parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('A', 'Sigma'))[,c(3:7)])
 
       }
@@ -364,11 +364,11 @@ if(!object$use_lv){
 
     if(object$trend_model == 'AR1'){
       if(object$drift){
-        cat("Latent trend drift and AR parameter estimates:\n")
+        cat("\nLatent trend drift and AR parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('drift', 'ar1', 'sigma'))[,c(3:7)])
 
       } else {
-        cat("Latent trend parameter AR estimates:\n")
+        cat("\nLatent trend parameter AR estimates:\n")
         print(mcmc_summary(object$model_output, c('ar1', 'sigma'))[,c(3:7)])
 
       }
@@ -376,11 +376,11 @@ if(!object$use_lv){
 
     if(object$trend_model == 'AR2'){
       if(object$drift){
-        cat("Latent trend drift and AR parameter estimates:\n")
+        cat("\nLatent trend drift and AR parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'sigma'))[,c(3:7)])
 
       } else {
-        cat("Latent trend AR parameter estimates:\n")
+        cat("\nLatent trend AR parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('ar1', 'ar2', 'sigma'))[,c(3:7)])
 
       }
@@ -388,18 +388,18 @@ if(!object$use_lv){
 
     if(object$trend_model == 'AR3'){
       if(object$drift){
-        cat("Latent trend drift and AR parameter estimates:\n")
+        cat("\nLatent trend drift and AR parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
 
       } else {
-        cat("Latent trend AR parameter estimates:\n")
+        cat("\nLatent trend AR parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('ar1', 'ar2', 'ar3', 'sigma'))[,c(3:7)])
 
       }
     }
 
     if(object$trend_model == 'GP'){
-        cat("Latent trend marginal deviation (alpha) and length scale (rho) estimates:\n")
+        cat("\nLatent trend marginal deviation (alpha) and length scale (rho) estimates:\n")
         print(mcmc_summary(object$model_output, c('alpha_gp', 'rho_gp'))[,c(3:7)])
 
 
@@ -408,7 +408,7 @@ if(!object$use_lv){
 }
 
 if(!is.null(object$trend_call)){
-  cat("GAM process model coefficient (beta) estimates:\n")
+  cat("\nGAM process model coefficient (beta) estimates:\n")
   coef_names <- paste0(names(object$trend_mgcv_model$coefficients), '_trend')
   mvgam_coefs <- mcmc_summary(object$model_output, 'b_trend')[,c(3:7)]
   rownames(mvgam_coefs) <- gsub('series', 'trend',
@@ -431,7 +431,7 @@ if(!is.null(object$trend_call)){
       if(all(to_print == FALSE)){
 
       } else {
-        cat("GAM process smoothing parameter (rho) estimates:\n")
+        cat("\nGAM process smoothing parameter (rho) estimates:\n")
         rho_coefs <- mcmc_summary(object$model_output, 'rho_trend')[,c(3:7)]
         rownames(rho_coefs) <- paste0(object$trend_sp_names, '_trend')
         print(rho_coefs[to_print,])
@@ -452,7 +452,7 @@ if(!is.null(object$trend_call)){
         rownames(re_sds) <- paste0('sd(',re_labs,')_trend')
         rownames(re_mus) <- paste0('mean(',re_labs,')_trend')
 
-        cat("GAM process model group-level estimates:\n")
+        cat("\nGAM process model group-level estimates:\n")
         print(rbind(re_mus, re_sds))
 
       }
@@ -460,14 +460,14 @@ if(!is.null(object$trend_call)){
 }
 
 if(object$fit_engine == 'stan'){
-  cat('Stan MCMC diagnostics')
+  cat('Stan MCMC diagnostics:\n')
   check_all_diagnostics(object$model_output,
                         max_treedepth = object$max_treedepth)
 
 }
 
 if(object$fit_engine == 'jags'){
-  cat('JAGS MCMC diagnostics')
+  cat('JAGS MCMC diagnostics:\n')
   rhats <- mcmc_summary(object$model_output)[,6]
   if(any(rhats > 1.05)){
     cat('Rhats above 1.05 found for',
@@ -487,38 +487,38 @@ if(object$fit_engine == 'jags'){
 summary.mvgam_prefit = function(object, ...){
 
   if(!is.null(object$trend_call)){
-    cat("GAM observation formula:\n")
+    cat("\nGAM observation formula:\n")
     print(object$call)
 
 
-    cat("GAM process formula:\n")
+    cat("\nGAM process formula:\n")
     print(object$trend_call)
 
   } else {
-    cat("GAM formula:\n")
+    cat("\nGAM formula:\n")
     print(object$call)
 
   }
 
-  cat("Family:\n")
+  cat("\nFamily:\n")
   cat(paste0(object$family, '\n'))
 
 
-  cat("Link function:\n")
+  cat("\nLink function:\n")
   cat(paste0(family_links(object$family), '\n'))
 
 
-  cat("Trend model:\n")
+  cat("\nTrend model:\n")
   cat(paste0(object$trend_model, '\n'))
 
 
   if(object$use_lv){
     if(!is.null(object$trend_call)){
-      cat("N process models:\n")
+      cat("\nN process models:\n")
       cat(object$n_lv, '\n')
 
     } else {
-      cat("N latent factors:\n")
+      cat("\nN latent factors:\n")
       cat(object$n_lv, '\n')
 
     }
