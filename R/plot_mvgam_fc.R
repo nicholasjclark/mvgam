@@ -367,15 +367,14 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
       if(object$family %in% c('poisson', 'negative binomial', 'tweedie')){
         score <- sum(drps_mcmc_object(as.vector(truth),
                                       fc)[,1], na.rm = TRUE)
-        message('Out of sample DRPS:')
+        cat('Out of sample DRPS:\n')
         print(score)
-        message()
+
       } else {
         score <- sum(crps_mcmc_object(as.vector(truth),
                                       fc)[,1], na.rm = TRUE)
-        message('Out of sample CRPS:')
+        cat('Out of sample CRPS:\n')
         print(score)
-        message()
       }
     }
 
@@ -581,21 +580,18 @@ plot.mvgam_forecast = function(x, series = 1,
 
     if(all(is.na(truth))){
       score <- NULL
-      message('No non-missing values in test_observations; cannot calculate forecast score')
-      message()
+      cat('No non-missing values in test_observations; cannot calculate forecast score\n')
     } else {
       if(object$family %in% c('poisson', 'negative binomial', 'tweedie')){
         score <- sum(drps_mcmc_object(as.vector(truth),
                                       fc)[,1], na.rm = TRUE)
-        message('Out of sample DRPS:')
+        cat('Out of sample DRPS:\n')
         print(score)
-        message()
       } else {
         score <- sum(crps_mcmc_object(as.vector(truth),
                                       fc)[,1], na.rm = TRUE)
-        message('Out of sample CRPS:')
+        cat('Out of sample CRPS:\n')
         print(score)
-        message()
       }
     }
   }
