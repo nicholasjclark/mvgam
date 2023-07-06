@@ -92,17 +92,31 @@ update.mvgam = function(object, formula,
   }
 
   if(!missing(newdata)){
+    # If new  testing data supplied, include as the test data
     data_test <- newdata
     include_fc <- TRUE
   } else if(!is.null(object$test_data)){
-    data_test <- object$test_data
-    include_fc <- TRUE
+    # only include test data when no new training data is supplied
+    if(missing(data)){
+      include_fc <- TRUE
+      data_test <- object$test_data
+    } else {
+      include_fc <- FALSE
+    }
   } else {
     include_fc <- FALSE
   }
 
   if(missing(trend_model)){
     trend_model <- object$trend_model
+
+    if(trend_model == 'VAR1'){
+      if(any(is.na(mvgam:::mcmc_summary(object$model_output, 'Sigma')[,6]))){
+        trend_model <- 'VAR1'
+      } else {
+        trend_model <- 'VAR1cor'
+      }
+    }
   }
 
   if(missing(use_lv)){
