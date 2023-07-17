@@ -48,7 +48,7 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
   if(!is.null(object$trend_call)){
 
     # Linear predictor matrix for the latent process models
-    Xp <- trend_Xp_matrix(newdata = data_test,
+    Xp <- trend_Xp_matrix(newdata = newdata,
                           trend_map = object$trend_map,
                           series = 'all',
                           mgcv_model = object$trend_mgcv_model)
@@ -59,10 +59,28 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
                                                   'sigma'))
     }
 
+    if(object$trend_model %in% c('VAR1')){
+      family_pars <- list(sigma_obs =
+                            mcmc_chains(object$model_output, 'Sigma')[ ,
+                               seq(1, NCOL(object$ytimes)^2,
+                                   by = NCOL(object$ytimes)+1)])
+    }
+
+
     # Indicators of which trend to use for each observation
-    newdata %>%
-      dplyr::left_join(object$trend_map,
-                       by = 'series') -> newdata_trend
+    if(inherits(newdata, 'list')){
+      data.frame(series = newdata$series) %>%
+        dplyr::left_join(object$trend_map,
+                         by = 'series') %>%
+        dplyr::pull(trend) -> trend_inds
+      newdata_trend <- newdata
+      newdata_trend$trend <- trend_inds
+    } else {
+      newdata %>%
+        dplyr::left_join(object$trend_map,
+                         by = 'series') -> newdata_trend
+    }
+
     trend_ind <- as.numeric(newdata_trend$trend)
 
     # Beta coefficients for GAM process model component

@@ -49,27 +49,27 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
   # Because these are set up inherently as dynamic factor models,
   # we ALWAYS need to forecast the full set of trends, regardless of
   # which series (or set of series) is being forecast
-  data.frame(series = trend_test$series,
-             time = trend_test$time,
-             row_num = 1:length(trend_test$time)) %>%
-    dplyr::group_by(series, time) %>%
-    dplyr::slice_head(n = 1) %>%
-    dplyr::ungroup() %>%
-    dplyr::arrange(time, series) %>%
-    dplyr::pull(row_num) -> inds_keep
-
-  if(inherits(newdata, 'list')){
-    trend_test <- lapply(trend_test, function(x){
-      if(is.matrix(x)){
-        matrix(x[inds_keep,], ncol = NCOL(x))
-      } else {
-        x[inds_keep]
-      }
-
-    })
-  } else {
-    trend_test <- trend_test[inds_keep, ]
-  }
+  # data.frame(series = trend_test$series,
+  #            time = trend_test$time,
+  #            row_num = 1:length(trend_test$time)) %>%
+  #   dplyr::group_by(series, time) %>%
+  #   dplyr::slice_head(n = 1) %>%
+  #   dplyr::ungroup() %>%
+  #   dplyr::arrange(time, series) %>%
+  #   dplyr::pull(row_num) -> inds_keep
+  #
+  # if(inherits(newdata, 'list')){
+  #   trend_test <- lapply(trend_test, function(x){
+  #     if(is.matrix(x)){
+  #       matrix(x[inds_keep,], ncol = NCOL(x))
+  #     } else {
+  #       x[inds_keep]
+  #     }
+  #
+  #   })
+  # } else {
+  #   trend_test <- trend_test[inds_keep, ]
+  # }
 
   suppressWarnings(Xp_trend  <- try(predict(mgcv_model,
                                             newdata = trend_test,
