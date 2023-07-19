@@ -24,7 +24,7 @@ summary.mvgam = function(object, ...){
     cat("GAM observation formula:\n")
     print(object$call)
 
-    cat("GAM process formula:\n")
+    cat("\nGAM process formula:\n")
     print(object$trend_call)
   } else {
     cat("GAM formula:\n")

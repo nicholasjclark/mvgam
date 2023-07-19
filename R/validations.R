@@ -183,9 +183,26 @@ validate_trendmap = function(trend_map,
          call. = FALSE)
   }
 
-  # trend_map must not skip any trends
-  if(!all(sort(unique(trend_map$trend)) == seq(1:max(trend_map$trend)))){
-    stop('argument "trend_map" must link at least one series to each latent trend')
+  # trend_map must not skip any trends, but can have zeros for some entries
+  drop_zero = function(x) {
+    x[x!=0]
+  }
+
+  if(!all(drop_zero(sort(unique(trend_map$trend))) == seq(1:max(trend_map$trend)))){
+    stop('argument "trend_map" must link at least one series to each latent trend',
+         call. = FALSE)
+  }
+
+  # series variable must be a factor with same levels as the series variable
+  # in the data
+  if(!is.factor(trend_map$series)){
+    stop('trend_map$series must be a factor with levels matching levels of data$series',
+        call. = FALSE)
+  }
+
+  if(!all(levels(trend_map$series) == levels(data_train$series))){
+    stop('trend_map$series must be a factor with levels matching levels of data$series',
+         call. = FALSE)
   }
 }
 
