@@ -2836,7 +2836,7 @@ add_trend_predictors = function(trend_formula,
         paste0("for(j in 1:n_lv){\n",
                "LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
                "for(i in 2:n){\n",
-               "LV[i, j] ~ normal(drift[j] + trend_mus[ytimes_trend[i, j]] + ar1[j] * LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]], sigma[j]);\n",
+               "LV[i, j] ~ normal(drift[j] + trend_mus[ytimes_trend[i, j]] + ar1[j] * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]), sigma[j]);\n",
                "}\n}")
     } else {
       model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);",
@@ -2844,7 +2844,7 @@ add_trend_predictors = function(trend_formula,
         paste0("for(j in 1:n_lv){\n",
                "LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
                "for(i in 2:n){\n",
-               "LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]] + ar1[j] * LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]], sigma[j]);\n",
+               "LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]] + ar1[j] * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]), sigma[j]);\n",
                "}\n}")
     }
 
@@ -2864,9 +2864,9 @@ add_trend_predictors = function(trend_formula,
                       model_file, fixed = TRUE)] <-
         paste0("for(j in 1:n_lv){\n",
                "LV[1, j] ~ normal(drift[j] + [ytimes_trend[1, j]], sigma[j]);\n",
-               "LV[2, j] ~ normal(drift[j] + trend_mus[ytimes_trend[1, j]] + LV[1, j] * ar1[j]- trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
+               "LV[2, j] ~ normal(drift[j] + trend_mus[ytimes_trend[1, j]] + ar1[j] * (LV[1, j] - trend_mus[ytimes_trend[1, j]]), sigma[j]);\n",
                "for(i in 3:n){\n",
-               "LV[i, j] ~ normal(drift[j] + trend_mus[ytimes_trend[i, j]] + ar1[j] * LV[i - 1, j] + ar2[j] * LV[i - 2, j] - trend_mus[ytimes_trend[i - 1, j]], sigma[j]);\n",
+               "LV[i, j] ~ normal(drift[j] + trend_mus[ytimes_trend[i, j]] + ar1[j] * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]) + ar2[j] * (LV[i - 2, j] - trend_mus[ytimes_trend[i - 2, j]]), sigma[j]);\n",
                "}\n}")
       model_file <- model_file[-grep("LV[2, 1:n_lv] ~ normal(drift + LV[1, 1:n_lv] * ar1, 0.1);",
                                      model_file, fixed = TRUE)]
@@ -2875,9 +2875,9 @@ add_trend_predictors = function(trend_formula,
                       model_file, fixed = TRUE)] <-
         paste0("for(j in 1:n_lv){\n",
                "LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
-               "LV[2, j] ~ normal(trend_mus[ytimes_trend[1, j]] + LV[1, j] * ar1[j]- trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
+               "LV[2, j] ~ normal(trend_mus[ytimes_trend[1, j]] + ar1[j] * (LV[1, j] - trend_mus[ytimes_trend[1, j]]), sigma[j]);\n",
                "for(i in 3:n){\n",
-               "LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]] + ar1[j] * LV[i - 1, j] + ar2[j] * LV[i - 2, j] - trend_mus[ytimes_trend[i - 1, j]], sigma[j]);\n",
+               "LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]] + ar1[j] * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]) + ar2[j] * (LV[i - 2, j] - trend_mus[ytimes_trend[i - 2, j]]), sigma[j]);\n",
                "}\n}")
       model_file <- model_file[-grep("LV[2, 1:n_lv] ~ normal(LV[1, 1:n_lv] * ar1, 0.1);",
                                      model_file, fixed = TRUE)]
@@ -2891,6 +2891,12 @@ add_trend_predictors = function(trend_formula,
     model_file <- gsub('trend means', 'latent state means',
                        model_file)
 
+    model_file[grep('mu[i - 1] = A * LV[i - 1];', model_file, fixed = TRUE)] <-
+      'mu[i] = A * (LV[i - 1] - trend_mus[ytimes_trend[i - 1, 1:n_lv]]);'
+
+    model_file[grep('vector[n_series] mu[n - 1];', model_file, fixed = TRUE)] <-
+      "vector[n_series] mu[n];"
+
     if(any(grepl("cholesky_factor_corr[n_lv] L_Omega;",
                  model_file, fixed = TRUE))){
 
@@ -2903,7 +2909,7 @@ add_trend_predictors = function(trend_formula,
 
       model_file[grep("LV[i] ~ multi_normal_cholesky(mu[i - 1], L_Sigma);",
                       model_file, fixed = TRUE)] <-
-        "LV[i] ~ multi_normal_cholesky(trend_mus[ytimes_trend[i, 1:n_lv]] + mu[i - 1] - trend_mus[ytimes_trend[i - 1, 1:n_lv]], L_Sigma);"
+        "LV[i] ~ multi_normal_cholesky(trend_mus[ytimes_trend[i, 1:n_lv]] + mu[i], L_Sigma);"
 
     } else {
       model_file[grep("LV[1] ~ normal(0, sigma);",
@@ -2912,7 +2918,7 @@ add_trend_predictors = function(trend_formula,
 
       model_file[grep("LV[i] ~ normal(mu[i - 1], sigma);",
                       model_file, fixed = TRUE)] <-
-        "LV[i] ~ normal(trend_mus[ytimes_trend[i, 1:n_lv]] + mu[i - 1] - trend_mus[ytimes_trend[i - 1, 1:n_lv]], sigma);"
+        "LV[i] ~ normal(trend_mus[ytimes_trend[i, 1:n_lv]] + mu[i], sigma);"
     }
     model_file <- readLines(textConnection(model_file), n = -1)
   }

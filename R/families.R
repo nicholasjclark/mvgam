@@ -18,7 +18,7 @@
 #'
 #'Finally, \code{mvgam} supports the three extended families described here:
 #'\itemize{
-#'   \item \code{lognormal} for non-negative real-valued data
+#'   \item \code{\link[brms]{lognormal}} for non-negative real-valued data
 #'   \item \code{tweedie} for count data (power parameter `p` fixed at `1.5`)
 #'   \item \code{student-t} for real-valued data
 #'   }
