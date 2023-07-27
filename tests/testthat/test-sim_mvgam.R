@@ -18,7 +18,7 @@ test_that("trend_rel must be a valid proportion", {
   expect_error(sim_mvgam(family = gaussian(),
                          trend_model = 'AR2',
                          trend_rel = -0.1),
-               'Argument "trend_rel" must be a proportion ranging from 0 to 1, inclusive')
+               "Argument 'trend_rel' must be a proportion ranging from 0 to 1, inclusive")
 })
 
 test_that("n_lv must be a positive integer", {
@@ -26,5 +26,6 @@ test_that("n_lv must be a positive integer", {
                          trend_model = 'AR2',
                          trend_rel = 0.4,
                          n_lv = 0.5),
-               'Argument "n_lv" must be a positive integer')
+               "Argument 'n_lv' must be a positive integer")
 })
+

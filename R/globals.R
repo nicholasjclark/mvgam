@@ -7,4 +7,5 @@ utils::globalVariables(c("y", "year", "smooth_vals", "smooth_num",
                          "assimilated", "eval_horizon", "label",
                          "mod_call", "particles", "obs", "mgcv_model",
                          "param_name", "outcome", "mgcv_plottable",
-                         "term", "data_test", "object", "row_num", "trends_test"))
+                         "term", "data_test", "object", "row_num", "trends_test",
+                         "trend"))

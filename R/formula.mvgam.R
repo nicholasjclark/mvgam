@@ -1,7 +1,7 @@
 #'Extract model.frame from a fitted mvgam object
 #'
 #'
-#'@inheritParams stats::formula
+#'@param x `mvgam` object
 #'@param trend_effects \code{logical}, return the model.frame from the
 #'observation model (if \code{FALSE}) or from the underlying process
 #'model (if\code{TRUE})

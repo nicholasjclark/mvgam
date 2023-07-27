@@ -45,7 +45,7 @@ test_that("rho argument must be positive numeric", {
                             data = data,
                             family = gaussian(),
                             run_model = FALSE),
-               'argument "rho" in dynamic() must be a positive value',
+               'Argument "rho" in dynamic() must be a positive value',
                fixed = TRUE)
 })
 

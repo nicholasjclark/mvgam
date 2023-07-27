@@ -7,6 +7,8 @@
 \method{formula}{mvgam}(x, trend_effects = FALSE, ...)
 }
 \arguments{
+\item{x}{\code{mvgam} object}
+
 \item{trend_effects}{\code{logical}, return the model.frame from the
 observation model (if \code{FALSE}) or from the underlying process
 model (if\code{TRUE})}

@@ -28,7 +28,7 @@ test_that("rho argument must be positive numeric", {
                             data = data,
                             family = gaussian(),
                             run_model = FALSE),
-               'argument "rho" in dynamic() must be a positive value',
+               'Argument "rho" in dynamic() must be a positive value',
                fixed = TRUE)
 })
 
@@ -40,11 +40,11 @@ test_that("rho argument cannot be larger than N - 1", {
                             data = data,
                             family = gaussian(),
                             run_model = FALSE),
-               'argument "rho" in dynamic() cannot be larger than (max(time) - 1)',
+               'Argument "rho" in dynamic() cannot be larger than (max(time) - 1)',
                fixed = TRUE)
 
   expect_error(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate, rho = 120),
                                        N = 100),
-               'argument "rho" in dynamic() cannot be larger than (max(time) - 1)',
+               'Argument "rho" in dynamic() cannot be larger than (max(time) - 1)',
                fixed = TRUE)
 })

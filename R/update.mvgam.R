@@ -111,7 +111,7 @@ update.mvgam = function(object, formula,
     trend_model <- object$trend_model
 
     if(trend_model == 'VAR1'){
-      if(any(is.na(mvgam:::mcmc_summary(object$model_output, 'Sigma')[,6]))){
+      if(any(is.na(mcmc_summary(object$model_output, 'Sigma')[,6]))){
         trend_model <- 'VAR1'
       } else {
         trend_model <- 'VAR1cor'

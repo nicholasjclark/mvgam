@@ -38,7 +38,7 @@ dynamic = function(variable, rho = 5, stationary = TRUE){
 
   # Check rho
   if(rho <= 0){
-    stop('argument "rho" in dynamic() must be a positive value',
+    stop('Argument "rho" in dynamic() must be a positive value',
          call. = FALSE)
   }
 
@@ -112,7 +112,7 @@ interpret_mvgam = function(formula, N){
     dyn_to_gp = function(term, N){
 
       if(term$rho > N - 1){
-        stop('argument "rho" in dynamic() cannot be larger than (max(time) - 1)',
+        stop('Argument "rho" in dynamic() cannot be larger than (max(time) - 1)',
              call. = FALSE)
       }
 

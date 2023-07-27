@@ -1,5 +1,6 @@
 #'Predict from the GAM component of an mvgam model
 #'@importFrom parallel clusterExport stopCluster setDefaultCluster
+#'@importFrom utils lsf.str
 #'@importFrom stats predict
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing the

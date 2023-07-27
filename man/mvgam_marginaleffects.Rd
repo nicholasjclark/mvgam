@@ -40,6 +40,9 @@
 \arguments{
 \item{model}{Model object}
 
+\item{trend_effects}{\code{logical}, extract from the process model component
+(only applicable if a \code{trend_formula} was specified in the model)}
+
 \item{...}{Additional arguments are passed to the \code{predict()} method
 supplied by the modeling package.These arguments are particularly useful
 for mixed-effects or bayesian models (see the online vignettes on the

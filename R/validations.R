@@ -123,7 +123,7 @@ validate_proportional = function(x){
   s <- substitute(x)
   x <- base::suppressWarnings(as.numeric(x))
   if (length(x) != 1L || anyNA(x)) {
-    stop("argument '", s, "' must be a single numeric value",
+    stop("Argument '", s, "' must be a single numeric value",
          call. = FALSE)
   }
 
@@ -138,16 +138,16 @@ validate_pos_integer = function(x){
   s <- substitute(x)
   x <- base::suppressWarnings(as.numeric(x))
   if (length(x) != 1L || anyNA(x)) {
-    stop("argument '", s, "' must be a single numeric value",
+    stop("Argument '", s, "' must be a single numeric value",
          call. = FALSE)
   }
 
   if(sign(x) != 1){
-    stop("argument '", s, "' must be a positive integer",
+    stop("Argument '", s, "' must be a positive integer",
          call. = FALSE)
   } else {
     if(x%%1 != 0){
-      stop("argument '", s, "' must be a positive integer",
+      stop("Argument '", s, "' must be a positive integer",
            call. = FALSE)
     }
   }
@@ -173,13 +173,13 @@ validate_trendmap = function(trend_map,
 
   # trend_map must have an entry for each unique time series
   if(!all(sort(trend_map$series) == sort(unique(data_train$series)))){
-    stop('argument "trend_map" must have an entry for every unique time series in "data"',
+    stop('Argument "trend_map" must have an entry for every unique time series in "data"',
          call. = FALSE)
   }
 
   # trend_map must not specify a greater number of trends than there are series
   if(max(trend_map$trend) > length(unique(data_train$series))){
-    stop('argument "trend_map" specifies more latent trends than there are series in "data"',
+    stop('Argument "trend_map" specifies more latent trends than there are series in "data"',
          call. = FALSE)
   }
 
@@ -189,7 +189,7 @@ validate_trendmap = function(trend_map,
   }
 
   if(!all(drop_zero(sort(unique(trend_map$trend))) == seq(1:max(trend_map$trend)))){
-    stop('argument "trend_map" must link at least one series to each latent trend',
+    stop('Argument "trend_map" must link at least one series to each latent trend',
          call. = FALSE)
   }
 
