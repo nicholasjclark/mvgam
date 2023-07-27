@@ -2,7 +2,7 @@ pandoc: 3.1.1
 pkgdown: 2.0.7
 pkgdown_sha: ~
 articles: {}
-last_built: 2023-07-03T06:19Z
+last_built: 2023-07-27T10:37Z
 urls:
   reference: https://nicholasjclark.github.io/mvgam/reference
   article: https://nicholasjclark.github.io/mvgam/articles
