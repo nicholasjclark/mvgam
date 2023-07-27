@@ -570,15 +570,6 @@ mvgam = function(formula,
   # these in so that initial values to maintain the true size of the training dataset
   orig_y <- data_train$y
 
-  # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
-  # when simulating from the Bayesian model later on;
-  ss_gam <- mvgam_setup(formula = formula,
-                        knots = knots,
-                        family = family_to_mgcvfam(family),
-                        data = data_train,
-                        drop.unused.levels = FALSE,
-                        maxit = 30)
-
   # Fill in missing observations in data_train so the size of the dataset is correct when
   # building the initial JAGS model.
   replace_nas = function(var){
@@ -602,6 +593,16 @@ mvgam = function(formula,
 
   data_train[[terms(formula(formula))[[2]]]] <-
     replace_nas(data_train[[terms(formula(formula))[[2]]]])
+
+  # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
+  # when simulating from the Bayesian model later on;
+  ss_gam <- mvgam_setup(formula = formula,
+                        knots = knots,
+                        family = family_to_mgcvfam(family),
+                        data = data_train,
+                        drop.unused.levels = FALSE,
+                        maxit = 30)
+
 
   # Make JAGS file and appropriate data structures
   if(length(ss_gam$smooth) == 0){
