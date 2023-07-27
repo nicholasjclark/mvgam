@@ -467,28 +467,27 @@ forecast_draws = function(object,
   # Set up parallel environment for looping across posterior draws
   # to compute h-step ahead forecasts
   cl <- parallel::makePSOCKcluster(n_cores)
-  setDefaultCluster(cl)
-  clusterExport(NULL, c('family',
-                        'family_pars',
-                        'trend_model',
-                        'trend_pars',
-                        'type',
-                        'use_lv',
-                        'betas',
-                        'betas_trend',
-                        'n_series',
-                        'data_test',
-                        'series',
-                        'series_test',
-                        'Xp',
-                        'Xp_trend',
-                        'fc_horizon'),
-                envir = environment())
-  clusterExport(cl = cl,
+  parallel::setDefaultCluster(cl)
+  parallel::clusterExport(NULL, c('family',
+                                  'family_pars',
+                                  'trend_model',
+                                  'trend_pars',
+                                  'type',
+                                  'use_lv',
+                                  'betas',
+                                  'betas_trend',
+                                  'n_series',
+                                  'data_test',
+                                  'series',
+                                  'series_test',
+                                  'Xp',
+                                  'Xp_trend',
+                                  'fc_horizon'),
+                          envir = environment())
+  parallel::clusterExport(cl = cl,
                           unclass(lsf.str(envir = asNamespace("mvgam"),
                                           all = T)),
-                          envir = as.environment(asNamespace("mvgam"))
-  )
+                          envir = as.environment(asNamespace("mvgam")))
 
   pbapply::pboptions(type = "none")
 

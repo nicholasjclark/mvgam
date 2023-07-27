@@ -21,7 +21,7 @@ obs_Xp_matrix = function(newdata, mgcv_model){
       colnames(testdat) <- newnames
     }
 
-    suppressWarnings(Xp  <- predict(object$mgcv_model,
+    suppressWarnings(Xp  <- predict(mgcv_model,
                                     newdata = testdat,
                                     type = 'lpmatrix'))
   }

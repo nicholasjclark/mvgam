@@ -477,7 +477,7 @@ stationarise_VARcor = function(model_file){
                   model_file,
                   fixed = TRUE) + 1] <- paste0(
                     '}\n\n',
-                    'L_Sigma = diag_pre_multiply(sigma, L_Omega);',
+                    'L_Sigma = diag_pre_multiply(sigma, L_Omega);\n',
                     'Sigma = multiply_lower_tri_self_transpose(L_Sigma);\n',
                     '// stationary VAR reparameterisation\n',
                     '{\n',

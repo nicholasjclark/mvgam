@@ -113,6 +113,11 @@ predict.mvgam = function(object, newdata,
                           'Xp',
                           'trend_ind'),
                   envir = environment())
+    parallel::clusterExport(cl = cl,
+                            unclass(lsf.str(envir = asNamespace("mvgam"),
+                                            all = T)),
+                            envir = as.environment(asNamespace("mvgam"))
+    )
 
     pbapply::pboptions(type = "none")
     trend_predictions <- do.call(rbind, pbapply::pblapply(seq_len(dim(betas)[1]),

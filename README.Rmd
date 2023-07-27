@@ -359,7 +359,7 @@ lfo_poor <- lfo_cv(poor, min_t = 36,
 
 ```{r, include=FALSE}
 set.seed(12345)
-simdat <- sim_mvgam(T = 60, train_prop = 1, n_series = 1,
+simdat <- sim_mvgam(T = 60, prop_train = 1, n_series = 1,
                     mu = 2,
                     trend_model = 'AR1', trend_rel = 0.35)
 good <- mvgam(y ~ s(season, bs = 'cc', k = 8),

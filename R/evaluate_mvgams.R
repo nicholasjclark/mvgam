@@ -309,7 +309,7 @@ roll_eval_mvgam = function(object,
   }
 
   cl <- parallel::makePSOCKcluster(n_cores)
-  setDefaultCluster(cl)
+  parallel::setDefaultCluster(cl)
   clusterExport(NULL, c('all_timepoints',
                         'evaluation_seq',
                         'object',
