@@ -484,6 +484,11 @@ forecast_draws = function(object,
                         'Xp_trend',
                         'fc_horizon'),
                 envir = environment())
+  clusterExport(cl = cl,
+                          unclass(lsf.str(envir = asNamespace("mvgam"),
+                                          all = T)),
+                          envir = as.environment(asNamespace("mvgam"))
+  )
 
   pbapply::pboptions(type = "none")
 

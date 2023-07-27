@@ -10,13 +10,19 @@
 #'@param n_cores \code{integer} specifying number of cores for generating predictions in parallel
 #'@param type When this has the value \code{link} (default) the linear predictor is calculated on the link scale.
 #'If \code{expected} is used, predictions reflect the expectation of the response (the mean)
-#'but ignore uncertainty in the observation process. When \code{response} is used, the predictions take uncertainty in the observation process into account to return
+#'but ignore uncertainty in the observation process. When \code{response} is used,
+#'the predictions take uncertainty in the observation process into account to return
 #'predictions on the outcome scale
+#'@param process_error Logical. If \code{TRUE} and a dynamic trend model was fit,
+#'expected uncertainty in the process model is accounted for by using draws
+#'from the latent trend SD parameters. If \code{FALSE}, uncertainty in the latent trend
+#'component is ignored when calculating predictions
 #'@param ... Ignored
-#'@details Note that for all types of predictions, expected uncertainty in the process model is
-#'accounted for only by using draws from the trend  SD parameters. If a `trend_formula`
-#'was supplied in the model, predictions for this component will
-#'also be incorporated. But the trend predictions will ignore autocorrelation
+#'@details Note that for all types of predictions for models that did not include
+#'a `trend_formula`, uncertainty in the dynamic trend
+#'component can be ignored by setting \code{process_error = FALSE}. However,
+#'if a `trend_formula` was supplied in the model, predictions for this component cannot be
+#'ignored. If \code{process_error = TRUE}, trend predictions will ignore autocorrelation
 #'coefficients or GP length scale coefficients, ultimately assuming the process is stationary.
 #'This method is similar to the types of posterior predictions returned from `brms` models
 #'when using autocorrelated error predictions for newdata.
@@ -27,7 +33,10 @@
 #'@return A \code{matrix} of dimension \code{n_samples x new_obs}, where \code{n_samples} is the number of
 #'posterior samples from the fitted object and \code{n_obs} is the number of test observations in \code{newdata}
 #'@export
-predict.mvgam = function(object, newdata, data_test, type = 'link',
+predict.mvgam = function(object, newdata,
+                         data_test,
+                         type = 'link',
+                         process_error = TRUE,
                          n_cores = 1, ...){
 
   # Argument checks
@@ -37,6 +46,15 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
   if(missing(newdata)){
     newdata <- object$obs_data
   }
+
+  # newdata needs to have a 'series' indicator in it for integrating
+  # over the trend uncertainties
+  if(!'series' %in% names(newdata)){
+    newdata$series <- factor(rep(levels(object$obs_data$series)[1],
+                                 length(newdata[[1]])),
+                             levels = levels(object$obs_data$series))
+  }
+
   validate_pos_integer(n_cores)
   type <- match.arg(arg = type, choices = c("link",
                                             "expected",
@@ -117,9 +135,11 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
                                                           }, cl = cl))
     stopCluster(cl)
 
-  } else if(object$trend_model != 'None'){
+  } else if(object$trend_model != 'None' & process_error){
     # If no linear predictor for the trends but a dynamic trend model was used,
-    # simulate from stationary time series for the trends
+    # and the process_error flag is set to TRUE,
+    # simulate from stationary time series to capture uncertainty
+    # in the dynamic trend component
 
     n_draws <- dim(mcmc_chains(object$model_output, 'b'))[1]
     series_ind <- as.numeric(newdata$series)
@@ -187,6 +207,11 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
                             'Xp',
                             'trend_ind'),
                     envir = environment())
+      parallel::clusterExport(cl = cl,
+                              unclass(lsf.str(envir = asNamespace("mvgam"),
+                                              all = T)),
+                              envir = as.environment(asNamespace("mvgam"))
+      )
 
       pbapply::pboptions(type = "none")
       trend_predictions <- do.call(rbind,
@@ -211,6 +236,8 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
       stopCluster(cl)
     }
   } else {
+    # If no trend_model was used, or if process_error == FALSE,
+    # ignore uncertainty in any latent trend component
     trend_predictions <- NULL
   }
 
@@ -247,7 +274,11 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
                         'Xp',
                         'series_ind'),
                 envir = environment())
-
+  parallel::clusterExport(cl = cl,
+                          unclass(lsf.str(envir = asNamespace("mvgam"),
+                                          all = T)),
+                          envir = as.environment(asNamespace("mvgam"))
+  )
   pbapply::pboptions(type = "none")
   predictions <- do.call(rbind, pbapply::pblapply(seq_len(dim(betas)[1]), function(x){
 
@@ -263,7 +294,7 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
 
     # Set up Xp matrix to include the latent process predictions
     # if necessary
-    if(trend_model != 'None'){
+    if(trend_model != 'None' & !is.null(trend_predictions[x,])){
       Xpmat <- cbind(as.matrix(Xp),
                      trend_predictions[x,])
       attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
@@ -274,11 +305,11 @@ predict.mvgam = function(object, newdata, data_test, type = 'link',
     }
 
     # Calculate predictions
-    mvgam_predict(family = family,
+    as.vector(mvgam_predict(family = family,
                   Xp = Xpmat,
                   type = type,
                   betas = betas_pred,
-                  family_pars = par_extracts)
+                  family_pars = par_extracts))
   }, cl = cl))
   stopCluster(cl)
 

@@ -56,6 +56,12 @@ logLik.mvgam = function(object, n_cores = 1, ...){
                         'mus'),
                 envir = environment())
 
+  clusterExport(cl = cl,
+                unclass(lsf.str(envir = asNamespace("mvgam"),
+                                all = T)),
+                envir = as.environment(asNamespace("mvgam"))
+  )
+
   pbapply::pboptions(type = "none")
   log_lik_mat <- do.call(rbind, pbapply::pblapply(seq_len(dim(mus)[1]),
                                                   function(samp_index){

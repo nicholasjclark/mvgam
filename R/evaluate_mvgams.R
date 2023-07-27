@@ -2,7 +2,7 @@
 #'
 #'@importFrom graphics barplot boxplot axis
 #'@importFrom stats quantile ecdf median predict
-#'@importFrom parallel clusterExport stopCluster setDefaultCluster
+#'@importFrom parallel clusterExport stopCluster setDefaultCluster clusterEvalQ
 #'@importFrom grDevices devAskNewPage
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param n_samples \code{integer} specifying the number of samples to generate from the model's
@@ -320,8 +320,14 @@ roll_eval_mvgam = function(object,
                         'log',
                         'weights'),
                 envir = environment())
-  parallel::clusterEvalQ(cl, library(mgcv))
-  parallel::clusterEvalQ(cl, library(rstan))
+  clusterEvalQ(cl, library(mgcv))
+  clusterEvalQ(cl, library(rstan))
+  clusterEvalQ(cl, library(dplyr))
+  clusterExport(cl = cl,
+                          unclass(lsf.str(envir = asNamespace("mvgam"),
+                                          all = T)),
+                          envir = as.environment(asNamespace("mvgam"))
+  )
 
   pbapply::pboptions(type = "none")
   evals <- pbapply::pblapply(evaluation_seq, function(timepoint){

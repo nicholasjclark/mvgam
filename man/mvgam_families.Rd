@@ -33,7 +33,7 @@ In addition, the following extended families from the \code{mgcv} package are su
 
 Finally, \code{mvgam} supports the three extended families described here:
 \itemize{
-\item \code{lognormal} for non-negative real-valued data
+\item \code{\link[brms]{lognormal}} for non-negative real-valued data
 \item \code{tweedie} for count data (power parameter \code{p} fixed at \code{1.5})
 \item \code{student-t} for real-valued data
 }

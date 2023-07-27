@@ -12,56 +12,63 @@ print.mvgam = function(x, ...){
 
 object <- x
 
-message("GAM formula:")
-print(object$call)
-message()
+if(!is.null(object$trend_call)){
+  cat("GAM observation formula:\n")
+  print(object$call)
 
-message("Family:")
+  cat("\nGAM process formula:\n")
+  print(object$trend_call)
+} else {
+  cat("GAM formula:\n")
+  print(object$call)
+}
+
+cat("Family:\n")
 cat(paste0(object$family, '\n'))
-message()
 
-message("Link function:")
+
+cat("Link function:\n")
 cat(paste0(family_links(object$family), '\n'))
-message()
 
-message("Trend model:")
+
+cat("Trend model:\n")
 cat(paste0(object$trend_model, '\n'))
-message()
+
 
 if(object$use_lv){
-  message("N latent factors:")
+  cat("N latent factors:\n")
   cat(object$n_lv, '\n')
-  message()
+
 }
 
-message('N series:')
+cat('N series:\n')
 cat(NCOL(object$ytimes), '\n')
-message()
+
 
 if(!is.null(object$upper_bounds)){
-  message('Upper bounds:')
+  cat('Upper bounds:\n')
   cat(object$upper_bounds, '\n')
-  message()
+
 }
 
-message('N observations:')
+cat('N observations:\n')
 if(class(object$obs_data)[1] == 'list'){
   cat(length(object$obs_data$y), '\n')
 } else {
   cat(NROW(object$obs_data), '\n')
 }
-message()
+
 
 if(object$fit_engine == 'jags'){
-  message('Status:')
+  cat('Status:\n')
   cat('Fitted using JAGS', '\n')
-  message()
+
 }
 
 if(object$fit_engine == 'stan'){
-  message('Status:')
+  cat('Status:\n')
   cat('Fitted using Stan', '\n')
-  message()
+
 }
 
 }
@@ -72,41 +79,41 @@ print.mvgam_prefit = function(x, ...){
 
   object <- x
 
-  message("GAM formula:")
+  cat("GAM formula:\n")
   print(object$call)
-  message()
 
-  message("Family:")
+
+  cat("Family:\n")
   cat(paste0(object$family, '\n'))
-  message()
 
-  message("Link function:")
+
+  cat("Link function:\n")
   cat(paste0(family_links(object$family), '\n'))
-  message()
 
-  message("Trend model:")
+
+  cat("Trend model:\n")
   cat(paste0(object$trend_model, '\n'))
-  message()
+
 
   if(object$use_lv){
-    message("N latent factors:")
+    cat("N latent factors:\n")
     cat(object$n_lv, '\n')
-    message()
+
   }
 
-  message('N series:')
+  cat('N series:\n')
   cat(NCOL(object$ytimes), '\n')
-  message()
 
-  message('N observations:')
+
+  cat('N observations:\n')
   if(class(object$obs_data)[1] == 'list'){
     cat(length(object$obs_data$y), '\n')
   } else {
     cat(NROW(object$obs_data), '\n')
   }
-  message()
 
-  message('Status:')
+
+  cat('Status:\n')
   cat('Not fitted', '\n')
-  message()
+
 }

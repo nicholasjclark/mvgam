@@ -105,10 +105,10 @@ sim_ar3 = function(drift = 0,
 
   for (t in 4:(h + 3)) {
     states[t] <- drift +
-      ar1*states[t - 1] +
-      ar2*states[t - 2] +
-      ar3*states[t - 3] +
-      linpreds[t] - linpreds[t -1] +
+      ar1 * (states[t - 1] - linpreds[t - 1]) +
+      ar2 * (states[t - 2] - linpreds[t - 2]) +
+      ar3 * (states[t - 3] - linpreds[t - 3]) +
+      linpreds[t]  +
       errors[t]
   }
   states[-c(1:3)]
@@ -163,9 +163,9 @@ sim_var1 = function(drift, A, Sigma,
 
   # Stochastic realisations
   for (t in 2:(h + 1)) {
-    states[t, ] <- A %*% states[t - 1,] +
+    states[t, ] <- A %*% (states[t - 1,] - linpreds[t - 1, ]) +
       drift +
-      linpreds[t, ] - linpreds[t - 1, ] +
+      linpreds[t, ] +
       errors[t, ]
   }
 

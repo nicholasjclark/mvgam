@@ -156,6 +156,11 @@ clusterExport(NULL, c('use_lv',
                       'n_particles',
                       'upper_bounds'),
               envir = environment())
+clusterExport(cl = cl,
+              unclass(lsf.str(envir = asNamespace("mvgam"),
+                              all = T)),
+              envir = as.environment(asNamespace("mvgam"))
+)
 
 pbapply::pboptions(type = "none")
 

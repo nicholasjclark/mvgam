@@ -46,7 +46,7 @@
 #'be replicated `n_series` times. Defaults to small random values between `-0.5` and `0.5` on the link scale
 #'@param prop_missing \code{numeric} stating proportion of observations that are missing. Should be between
 #'\code{0} and \code{0.8}, inclusive
-#'@param train_prop \code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}
+#'@param prop_train \code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}
 #'@return A \code{list} object containing outputs needed for \code{\link{mvgam}}, including 'data_train' and 'data_test',
 #'as well as some additional information about the simulated seasonality and trend dependencies
 #'@examples
@@ -75,7 +75,7 @@ sim_mvgam = function(T = 100,
                      nu,
                      mu,
                      prop_missing = 0,
-                     train_prop = 0.85){
+                     prop_train = 0.85){
 
   # Validate the family argument
   family <- validate_family(family)
@@ -98,29 +98,16 @@ sim_mvgam = function(T = 100,
   if(missing(trend_rel)){
     trend_rel <- 0.2
   }
-
-  if(trend_rel < 0 || trend_rel > 1){
-    stop('Argument "trend_rel" must be a proportion ranging from 0 to 1, inclusive',
-         call. = FALSE)
-  }
+  validate_proportional(trend_rel)
 
   # Check n_series
-  if(n_series%%1 != 0){
-    stop('Argument "n_series" must be a positive integer',
-         call. = FALSE)
-  }
+  validate_pos_integer(n_series)
 
   # Check prop_missing
-  if(prop_missing < 0 || prop_missing > 0.8){
-    stop('Argument "prop_missing" must be a proportion ranging from 0 to 0.8, inclusive',
-         call. = FALSE)
-  }
+  validate_proportional(prop_missing)
 
   # Check n_lv
-  if(n_lv%%1 != 0){
-    stop('Argument "n_lv" must be a positive integer',
-         call. = FALSE)
-  }
+  validate_pos_integer(n_lv)
 
   if(n_lv == 1){
     use_lv <- FALSE
@@ -212,12 +199,11 @@ sim_mvgam = function(T = 100,
   }
 
   # Check data splitting
-  if(missing(train_prop)){
-    train_prop <- 0.75
+  if(missing(prop_train)){
+    prop_train <- 0.75
   }
-
-  if(train_prop < 0.2 || train_prop > 1){
-    stop('Argument "train_prop" must be a proportion ranging from 0.2 to 1, inclusive',
+  if(prop_train < 0.2 || prop_train > 1){
+    stop('Argument "prop_train" must be a proportion ranging from 0.2 to 1, inclusive',
          call. = FALSE)
   }
 
@@ -446,7 +432,7 @@ sim_mvgam = function(T = 100,
     dplyr::ungroup()
 
   data_train <- sim_data %>%
-    dplyr::filter(time <= floor(max(sim_data$time) * train_prop)) %>%
+    dplyr::filter(time <= floor(max(sim_data$time) * prop_train)) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(series) %>%
     dplyr::arrange(time)

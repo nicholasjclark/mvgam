@@ -4,7 +4,15 @@
 \alias{predict.mvgam}
 \title{Predict from the GAM component of an mvgam model}
 \usage{
-\method{predict}{mvgam}(object, newdata, data_test, type = "link", n_cores = 1, ...)
+\method{predict}{mvgam}(
+  object,
+  newdata,
+  data_test,
+  type = "link",
+  process_error = TRUE,
+  n_cores = 1,
+  ...
+)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
@@ -18,8 +26,14 @@ predictions are generated for the original observations used for the model fit.}
 
 \item{type}{When this has the value \code{link} (default) the linear predictor is calculated on the link scale.
 If \code{expected} is used, predictions reflect the expectation of the response (the mean)
-but ignore uncertainty in the observation process. When \code{response} is used, the predictions take uncertainty in the observation process into account to return
+but ignore uncertainty in the observation process. When \code{response} is used,
+the predictions take uncertainty in the observation process into account to return
 predictions on the outcome scale}
+
+\item{process_error}{Logical. If \code{TRUE} and a dynamic trend model was fit,
+expected uncertainty in the process model is accounted for by using draws
+from the latent trend SD parameters. If \code{FALSE}, uncertainty in the latent trend
+component is ignored when calculating predictions}
 
 \item{n_cores}{\code{integer} specifying number of cores for generating predictions in parallel}
 
@@ -33,10 +47,11 @@ posterior samples from the fitted object and \code{n_obs} is the number of test 
 Predict from the GAM component of an mvgam model
 }
 \details{
-Note that for all types of predictions, expected uncertainty in the process model is
-accounted for only by using draws from the trend  SD parameters. If a \code{trend_formula}
-was supplied in the model, predictions for this component will
-also be incorporated. But the trend predictions will ignore autocorrelation
+Note that for all types of predictions for models that did not include
+a \code{trend_formula}, uncertainty in the dynamic trend
+component can be ignored by setting \code{process_error = FALSE}. However,
+if a \code{trend_formula} was supplied in the model, predictions for this component cannot be
+ignored. If \code{process_error = TRUE}, trend predictions will ignore autocorrelation
 coefficients or GP length scale coefficients, ultimately assuming the process is stationary.
 This method is similar to the types of posterior predictions returned from \code{brms} models
 when using autocorrelated error predictions for newdata.

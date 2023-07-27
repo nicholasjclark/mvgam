@@ -162,6 +162,11 @@ pfilter_mvgam_fc = function(file_path = 'pfilter',
                         'fc_horizon',
                         'n_series'),
                 envir = environment())
+  clusterExport(cl = cl,
+                unclass(lsf.str(envir = asNamespace("mvgam"),
+                                all = T)),
+                envir = as.environment(asNamespace("mvgam"))
+  )
 
   pbapply::pboptions(type = "none")
   particle_fcs <- pbapply::pblapply(fc_samples, function(x){

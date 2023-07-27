@@ -21,7 +21,7 @@ sim_mvgam(
   nu,
   mu,
   prop_missing = 0,
-  train_prop = 0.85
+  prop_train = 0.85
 )
 }
 \arguments{
@@ -81,7 +81,7 @@ be replicated \code{n_series} times. Defaults to small random values between \co
 \item{prop_missing}{\code{numeric} stating proportion of observations that are missing. Should be between
 \code{0} and \code{0.8}, inclusive}
 
-\item{train_prop}{\code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}}
+\item{prop_train}{\code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}}
 }
 \value{
 A \code{list} object containing outputs needed for \code{\link{mvgam}}, including 'data_train' and 'data_test',

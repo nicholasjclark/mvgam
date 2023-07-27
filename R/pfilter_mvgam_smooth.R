@@ -68,6 +68,11 @@ pfilter_mvgam_smooth = function(particles,
                         'particles',
                         'next_assim'),
                 envir = environment())
+  clusterExport(cl = cl,
+                unclass(lsf.str(envir = asNamespace("mvgam"),
+                                all = T)),
+                envir = as.environment(asNamespace("mvgam"))
+  )
 
   pbapply::pboptions(type = "none")
   particles <- pbapply::pblapply(seq_along(particles), function(x){

@@ -18,7 +18,7 @@
 #'
 #'Finally, \code{mvgam} supports the three extended families described here:
 #'\itemize{
-#'   \item \code{lognormal} for non-negative real-valued data
+#'   \item \code{\link[brms]{lognormal}} for non-negative real-valued data
 #'   \item \code{tweedie} for count data (power parameter `p` fixed at `1.5`)
 #'   \item \code{student-t} for real-valued data
 #'   }
@@ -960,6 +960,11 @@ get_mvgam_resids = function(object, n_cores = 1){
                         'fit_engine'),
                 envir = environment())
   clusterEvalQ(cl, library(dplyr))
+  clusterExport(cl = cl,
+                          unclass(lsf.str(envir = asNamespace("mvgam"),
+                                          all = T)),
+                          envir = as.environment(asNamespace("mvgam"))
+  )
 
   pbapply::pboptions(type = "none")
   series_resids <- pbapply::pblapply(seq_len(n_series), function(series){

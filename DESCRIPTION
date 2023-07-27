@@ -18,6 +18,8 @@ License: MIT + file LICENSE
 Depends: 
     R (>= 3.6.0),
     mgcv (>= 1.8-13),
+    marginaleffects,
+    insight (>= 0.19.1),
     methods
 Imports: 
     rstan (>= 2.19.2),
