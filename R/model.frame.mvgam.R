@@ -19,6 +19,14 @@ model.frame.mvgam = function(formula, trend_effects = FALSE, ...){
     }
   } else {
     out <- stats::model.frame(formula$mgcv_model)
+
+    # Identify response variable
+    resp <- as.character(rlang::f_lhs(formula$call))
+
+    # Now add the observed response, in case there are any
+    # NAs there that need to be updated
+    out[,resp] <- formula$obs_data$y
   }
+
   return(out)
 }

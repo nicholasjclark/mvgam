@@ -152,11 +152,11 @@ get_data.mvgam = function (x, source = "environment", verbose = TRUE, ...) {
 
       # Now get the observed response, in case there are any
       # NAs there that need to be updated
-      #mf_data[,resp] <- x$obs_data$y
+      mf_data[,resp] <- x$obs_data$y
 
     } else {
       mf_data <- model.frame(x, trend_effects = FALSE)
-     #mf_data[,resp] <- x$obs_data[[resp]]
+     mf_data[,resp] <- x$obs_data[[resp]]
     }
     mf_data
   }, error = function(x) {

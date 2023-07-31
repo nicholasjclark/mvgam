@@ -66,10 +66,11 @@ some features of `mvgam` which specifically rely on certain packages. The most i
 * `AR2` Autoregressive model with AR coefficients for lags 1 and 2
 * `AR3` Autoregressive model with AR coefficients for lags 1, 2 and 3 
 * `VAR1` Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated errors 
+* `VAR1cor` Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously correlated (multivariate) errors 
 * `GP` Squared exponential Gaussian Process 
 * `None` No latent trend is fitted
   
-When using `Stan` as the back-end, all of these trend models (apart from `VAR1`) can be estimated using a set of dimension-reduced dynamic factors. Please see [mvgam case study 2: multivariate models](https://rpubs.com/NickClark47/mvgam2){target="_blank"} for more information
+When using `Stan` as the back-end, all of these trend models (apart from `VAR` models) can be estimated using a set of dimension-reduced dynamic factors. Please see [mvgam case study 2: multivariate models](https://rpubs.com/NickClark47/mvgam2){target="_blank"} for more information
 
 ## A brief introduction to the package
 We can explore the model’s primary functions using a test dataset that
@@ -272,8 +273,14 @@ plot_mvgam_smooth(lynx_mvgam, series = 1,
                   smooth = 'season', 
                   derivatives = TRUE)
 ```
+As for many types of regression models, it is often more useful and intuitive to plot model effects on the scale of the outcome. `mvgam` has support for the wonderful `marginaleffects` package, allowing a wide variety of posterior contrasts, averages, conditional and marginal predictions to be seamlessly calculated and plotted. Below is the conditional effect of season plotted on the outcome scale, for example:
+```{r}
+require(ggplot2)
+plot_predictions(lynx_mvgam, condition = 'season', points = 0.5) +
+  theme_classic()
+```
 
-We can also view the mvgam's posterior retrodictions and predictions for the entire series (testing and training)
+We can also view the `mvgam`'s posterior retrodictions and predictions for the entire series (testing and training)
 ```{r}
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 ```
@@ -407,6 +414,7 @@ As before, these metrics all favour the more complex model over the simpler "poo
 * `gaussian()` for real-valued data 
 * `student_t()` for heavy-tailed real-valued data
 * `lognormal()` for non-negative real-valued data
+* `Gamma()` for non-negative real-valued data
 * `betar()` for proportional data on `(0,1)`
 * `poisson()` for count data
 * `nb()` for overdispersed count data

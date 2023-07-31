@@ -118,11 +118,13 @@ the observation process. Available trend models are:
 - `AR3` Autoregressive model with AR coefficients for lags 1, 2 and 3
 - `VAR1` Vector Autoregressive model with VAR coefficients for lag 1;
   contemporaneously uncorrelated errors
+- `VAR1cor` Vector Autoregressive model with VAR coefficients for lag 1;
+  contemporaneously correlated (multivariate) errors
 - `GP` Squared exponential Gaussian Process
 - `None` No latent trend is fitted
 
 When using `Stan` as the back-end, all of these trend models (apart from
-`VAR1`) can be estimated using a set of dimension-reduced dynamic
+`VAR` models) can be estimated using a set of dimension-reduced dynamic
 factors. Please see
 <a href="https://rpubs.com/NickClark47/mvgam2" target="_blank">mvgam
 case study 2: multivariate models</a> for more information
@@ -327,11 +329,11 @@ test_priors
 #> 4       trend AR3 coefficient      ar3 ~ std_normal();
 #> 5                    trend sd  sigma ~ exponential(2);
 #>                example_change new_lowerbound new_upperbound
-#> 1 lambda ~ exponential(0.56);             NA             NA
-#> 2    ar1 ~ normal(0.8, 0.38);             NA             NA
-#> 3   ar2 ~ normal(0.31, 0.22);             NA             NA
-#> 4    ar3 ~ normal(0.88, 0.8);             NA             NA
-#> 5  sigma ~ exponential(0.22);             NA             NA
+#> 1 lambda ~ exponential(0.86);             NA             NA
+#> 2   ar1 ~ normal(0.36, 0.67);             NA             NA
+#> 3   ar2 ~ normal(0.81, 0.14);             NA             NA
+#> 4   ar3 ~ normal(-0.7, 0.91);             NA             NA
+#> 5  sigma ~ exponential(0.99);             NA             NA
 ```
 
 Any of the above priors can be changed by modifying the `prior` column
@@ -360,57 +362,57 @@ lynx_mvgam <- mvgam(data = lynx_train,
 #> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
-#> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) 
-#> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) 
-#> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) 
-#> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) 
 #> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) 
 #> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
 #> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
 #> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) 
 #> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) 
-#> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
-#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) 
-#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) 
-#> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 4 finished in 23.8 seconds.
-#> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 3 finished in 24.6 seconds.
-#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 2 finished in 25.1 seconds.
+#> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
 #> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) 
 #> Chain 1 finished in 26.0 seconds.
+#> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 4 finished in 26.5 seconds.
+#> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 3 finished in 27.2 seconds.
+#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 2 finished in 28.3 seconds.
 #> 
 #> All 4 chains finished successfully.
-#> Mean chain execution time: 24.9 seconds.
-#> Total execution time: 26.1 seconds.
+#> Mean chain execution time: 27.0 seconds.
+#> Total execution time: 28.4 seconds.
 ```
 
 Inspect the resulting model file, which is written in the `Stan`
@@ -599,29 +601,29 @@ summary(lynx_mvgam)
 #> Fitted using Stan 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                    2.5%         50%      97.5% Rhat n.eff
-#> (Intercept)   6.7754592  6.79833000  6.8219423 1.00  2444
-#> s(season).1  -0.5803319  0.05947365  0.7201600 1.01   519
-#> s(season).2  -0.2799870  0.77982900  1.7971710 1.02   352
-#> s(season).3  -0.0863262  1.17228500  2.4009568 1.03   224
-#> s(season).4  -0.4356029  0.43403400  1.3931500 1.01   746
-#> s(season).5  -1.1559492 -0.08843800  0.9545647 1.01   471
-#> s(season).6  -0.9775711  0.03207165  1.0962932 1.01   592
-#> s(season).7  -0.8158858  0.34918000  1.3929020 1.01   459
-#> s(season).8  -1.0529248  0.16735750  1.7215562 1.02   218
-#> s(season).9  -1.1810158 -0.37541550  0.5970411 1.01   306
-#> s(season).10 -1.3891067 -0.68591050 -0.0101438 1.01   502
+#>                     2.5%          50%       97.5% Rhat n.eff
+#> (Intercept)   6.77553825  6.798625000  6.82159025 1.00  2510
+#> s(season).1  -0.56987252  0.058678500  0.69993310 1.00   800
+#> s(season).2  -0.22794177  0.802511500  1.83384225 1.00   320
+#> s(season).3  -0.02880991  1.187900000  2.45974750 1.00   274
+#> s(season).4  -0.52695260  0.435967000  1.31273425 1.00   728
+#> s(season).5  -1.15109150 -0.114330500  0.98096142 1.01   369
+#> s(season).6  -1.01111050  0.004989565  1.09583825 1.01   425
+#> s(season).7  -0.67298565  0.368590500  1.36816900 1.00   562
+#> s(season).8  -0.99709282  0.185209500  1.79495750 1.00   257
+#> s(season).9  -1.20259625 -0.372599000  0.59993695 1.01   362
+#> s(season).10 -1.37199850 -0.691203500 -0.03623181 1.00   436
 #> 
 #> GAM observation smoothing parameter (rho) estimates:
 #>               2.5%      50%    97.5% Rhat n.eff
-#> s(season) 2.187481 3.435775 4.284128 1.01   393
+#> s(season) 2.082392 3.392625 4.264951    1   369
 #> 
 #> Latent trend AR parameter estimates:
 #>                2.5%        50%      97.5% Rhat n.eff
-#> ar1[1]    0.7405294  1.1297000 1.42807325 1.00   464
-#> ar2[1]   -0.8286932 -0.4004015 0.06952992 1.01  1422
-#> ar3[1]   -0.4864937 -0.1443680 0.28540942 1.03   187
-#> sigma[1]  0.4000665  0.4946315 0.62742000 1.00   991
+#> ar1[1]    0.7309469  1.1216950 1.42165350    1   527
+#> ar2[1]   -0.8288280 -0.4066000 0.05082151    1  1431
+#> ar3[1]   -0.4780412 -0.1362670 0.31519042    1   438
+#> sigma[1]  0.3964197  0.4939105 0.62026590    1   967
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -703,18 +705,33 @@ plot_mvgam_smooth(lynx_mvgam, series = 1,
 ```
 
 <img src="man/figures/README-unnamed-chunk-29-1.png" width="60%" style="display: block; margin: auto;" />
+As for many types of regression models, it is often more useful and
+intuitive to plot model effects on the scale of the outcome. `mvgam` has
+support for the wonderful `marginaleffects` package, allowing a wide
+variety of posterior contrasts, averages, conditional and marginal
+predictions to be seamlessly calculated and plotted. Below is the
+conditional effect of season plotted on the outcome scale, for example:
 
-We can also view the mvgam’s posterior retrodictions and predictions for
-the entire series (testing and training)
+``` r
+require(ggplot2)
+#> Loading required package: ggplot2
+plot_predictions(lynx_mvgam, condition = 'season', points = 0.5) +
+  theme_classic()
+```
+
+<img src="man/figures/README-unnamed-chunk-30-1.png" width="60%" style="display: block; margin: auto;" />
+
+We can also view the `mvgam`’s posterior retrodictions and predictions
+for the entire series (testing and training)
 
 ``` r
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 ```
 
-<img src="man/figures/README-unnamed-chunk-30-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-31-1.png" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample DRPS:
-    #> [1] 983.4537
+    #> [1] 969.5303
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -724,7 +741,7 @@ trend
 plot_mvgam_trend(lynx_mvgam, newdata = lynx_test, derivatives = TRUE)
 ```
 
-<img src="man/figures/README-unnamed-chunk-31-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-32-1.png" width="60%" style="display: block; margin: auto;" />
 
 We can also re-do the posterior predictive checks, but this time
 focusing only on the out of sample period. This will give us better
@@ -735,25 +752,25 @@ simulate realistic and unbiased future values
 ppc(lynx_mvgam, series = 1, type = 'rootogram', newdata = lynx_test)
 ```
 
-<img src="man/figures/README-unnamed-chunk-32-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-33-1.png" width="60%" style="display: block; margin: auto;" />
 
 ``` r
 ppc(lynx_mvgam, series = 1, type = 'mean', newdata = lynx_test)
 ```
 
-<img src="man/figures/README-unnamed-chunk-33-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-34-1.png" width="60%" style="display: block; margin: auto;" />
 
 ``` r
 ppc(lynx_mvgam, series = 1, type = 'cdf', newdata = lynx_test)
 ```
 
-<img src="man/figures/README-unnamed-chunk-34-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-35-1.png" width="60%" style="display: block; margin: auto;" />
 
 ``` r
 ppc(lynx_mvgam, series = 1, type = 'pit', newdata = lynx_test)
 ```
 
-<img src="man/figures/README-unnamed-chunk-35-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-36-1.png" width="60%" style="display: block; margin: auto;" />
 
 A key aspect of ecological forecasting is to understand <a
 href="https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589"
@@ -770,7 +787,7 @@ text(1, 0.8, cex = 1.5, label="Trend component",
      pos = 4, col="#7C0000", family = 'serif')
 ```
 
-<img src="man/figures/README-unnamed-chunk-36-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-37-1.png" width="60%" style="display: block; margin: auto;" />
 
 Both components contribute to forecast uncertainty, suggesting we would
 still need some more work to learn about factors driving the dynamics of
@@ -785,7 +802,7 @@ would suggest our AR3 model is appropriate for the latent trend
 plot(lynx_mvgam, type = 'residuals')
 ```
 
-<img src="man/figures/README-unnamed-chunk-37-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-38-1.png" width="60%" style="display: block; margin: auto;" />
 
 ## Comparing models based on forecasts
 
@@ -810,9 +827,22 @@ lynx_mvgam_poor <- mvgam(data = lynx_train,
 #> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) 
+#> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) 
-#> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) 
 #> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) 
@@ -822,46 +852,33 @@ lynx_mvgam_poor <- mvgam(data = lynx_train,
 #> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) 
 #> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) 
-#> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
-#> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
-#> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
-#> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
-#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
-#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
-#> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
-#> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
-#> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) 
-#> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) 
-#> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
-#> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) 
-#> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
-#> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 3 finished in 1.1 seconds.
-#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
-#> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
 #> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 1 finished in 1.1 seconds.
+#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
 #> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
 #> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 1 finished in 1.3 seconds.
 #> Chain 2 finished in 1.2 seconds.
+#> Chain 3 finished in 1.2 seconds.
 #> Chain 4 finished in 1.2 seconds.
 #> 
 #> All 4 chains finished successfully.
 #> Mean chain execution time: 1.2 seconds.
-#> Total execution time: 1.4 seconds.
+#> Total execution time: 1.3 seconds.
 ```
 
 The first approximator targets each model’s ability to simulate temporal
@@ -878,16 +895,16 @@ each competing model at the same set of timepoints.
 ``` r
 compare_mvgams(lynx_mvgam, lynx_mvgam_poor, fc_horizon = 10)
 #> RPS summaries per model (lower is better)
-#>              Min.   1st Qu.   Median     Mean  3rd Qu.     Max.
-#> Model 1  717.3057  977.0777 1005.961 1060.091 1180.483 1422.790
-#> Model 2 1376.5778 1623.3982 2192.101 2384.203 3172.600 3680.933
+#>              Min.   1st Qu.    Median     Mean  3rd Qu.     Max.
+#> Model 1  715.6817  983.1872  999.9234 1058.672 1176.271 1400.928
+#> Model 2 1346.9846 1622.1888 2219.2576 2391.485 3177.853 3730.506
 #> 
 #> 90% interval coverages per model (closer to 0.9 is better)
-#> Model 1 0.96 
+#> Model 1 0.95 
 #> Model 2 0.89
 ```
 
-<img src="man/figures/README-unnamed-chunk-39-1.png" width="60%" style="display: block; margin: auto;" /><img src="man/figures/README-unnamed-chunk-39-2.png" width="60%" style="display: block; margin: auto;" /><img src="man/figures/README-unnamed-chunk-39-3.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-40-1.png" width="60%" style="display: block; margin: auto;" /><img src="man/figures/README-unnamed-chunk-40-2.png" width="60%" style="display: block; margin: auto;" /><img src="man/figures/README-unnamed-chunk-40-3.png" width="60%" style="display: block; margin: auto;" />
 
 Summary statistics of the two models’ out of sample Discrete Rank
 Probability Score (DRPS) indicate that the well-specified model performs
@@ -972,14 +989,14 @@ par(mar = c(4,4, 1, 1))
 plot(lfo_good)
 ```
 
-<img src="man/figures/README-unnamed-chunk-42-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-43-1.png" width="60%" style="display: block; margin: auto;" />
 
 ``` r
 par(mar = c(4,4, 1, 1))
 plot(lfo_poor)
 ```
 
-<img src="man/figures/README-unnamed-chunk-43-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-44-1.png" width="60%" style="display: block; margin: auto;" />
 
 The model with the better ELPD values (higher values are better in this
 case) should be preferred. First we can calculate the proportion of
@@ -1022,6 +1039,7 @@ package can handle data for the following families:
 - `gaussian()` for real-valued data
 - `student_t()` for heavy-tailed real-valued data
 - `lognormal()` for non-negative real-valued data
+- `Gamma()` for non-negative real-valued data
 - `betar()` for proportional data on `(0,1)`
 - `poisson()` for count data
 - `nb()` for overdispersed count data
@@ -1078,39 +1096,39 @@ mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
 #> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) 
 #> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) 
-#> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) 
-#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) 
-#> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
 #> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 2 finished in 9.6 seconds.
-#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 2 finished in 9.5 seconds.
 #> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 3 finished in 9.9 seconds.
+#> Chain 3 finished in 9.7 seconds.
+#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 4 finished in 10.3 seconds.
+#> Chain 4 finished in 10.1 seconds.
 #> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
 #> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 1 finished in 12.2 seconds.
+#> Chain 1 finished in 12.0 seconds.
 #> 
 #> All 4 chains finished successfully.
-#> Mean chain execution time: 10.5 seconds.
-#> Total execution time: 12.2 seconds.
+#> Mean chain execution time: 10.3 seconds.
+#> Total execution time: 12.1 seconds.
 ```
 
 Inspect the summary to see that the posterior now also contains
@@ -1228,7 +1246,7 @@ plot(beta_temp, type = 'l', lwd = 3,
 box(bty = 'l', lwd = 2)
 ```
 
-<img src="man/figures/README-unnamed-chunk-48-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-49-1.png" width="60%" style="display: block; margin: auto;" />
 
 Now simulate the outcome, which is a Gaussian observation process (with
 observation error) over the time-varying effect of $temperature$
@@ -1244,7 +1262,7 @@ plot(out,  type = 'l', lwd = 3,
 box(bty = 'l', lwd = 2)
 ```
 
-<img src="man/figures/README-unnamed-chunk-49-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-50-1.png" width="60%" style="display: block; margin: auto;" />
 
 Gather the data into a `data.frame` and fit a model using the
 `dynamic()` formula wrapper to specify a low-rank Gaussian Process
@@ -1262,10 +1280,10 @@ mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
 #> Running MCMC with 4 parallel chains...
 #> 
 #> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) 
-#> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup) 
 #> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) 
+#> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) 
 #> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
 #> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) 
 #> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) 
@@ -1283,20 +1301,20 @@ mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
 #> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
-#> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
-#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) 
 #> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
 #> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
 #> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
-#> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
 #> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
 #> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
@@ -1306,17 +1324,17 @@ mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
 #> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
 #> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) 
 #> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
-#> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 1 finished in 1.2 seconds.
-#> Chain 4 finished in 1.2 seconds.
-#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
 #> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
-#> Chain 2 finished in 1.2 seconds.
-#> Chain 3 finished in 1.2 seconds.
+#> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 1 finished in 1.3 seconds.
+#> Chain 3 finished in 1.3 seconds.
+#> Chain 4 finished in 1.3 seconds.
+#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 2 finished in 1.4 seconds.
 #> 
 #> All 4 chains finished successfully.
-#> Mean chain execution time: 1.2 seconds.
-#> Total execution time: 1.4 seconds.
+#> Mean chain execution time: 1.3 seconds.
+#> Total execution time: 1.5 seconds.
 ```
 
 Inspect the model summary, which now contains estimates for the
@@ -1401,7 +1419,7 @@ period
 plot(mod, type = 'smooths')
 ```
 
-<img src="man/figures/README-unnamed-chunk-52-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-53-1.png" width="60%" style="display: block; margin: auto;" />
 
 Plot the estimates for the in-sample and out-of-sample periods to see
 how the Gaussian Process function produces sensible smooth forecasts.
@@ -1415,7 +1433,7 @@ lines(beta_temp, lwd = 2.5, col = 'white')
 lines(beta_temp, lwd = 2)
 ```
 
-<img src="man/figures/README-unnamed-chunk-53-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-54-1.png" width="60%" style="display: block; margin: auto;" />
 
 This results in sensible forecasts of the observations as well
 
@@ -1423,10 +1441,10 @@ This results in sensible forecasts of the observations as well
 plot(mod, type = 'forecast', newdata = data_test)
 ```
 
-<img src="man/figures/README-unnamed-chunk-54-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-55-1.png" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample CRPS:
-    #> [1] 1.748866
+    #> [1] 1.768885
 
 There are many more extended uses for `mvgam` models, including the
 ability to fit dynamic factor processes for analysing and forecasting

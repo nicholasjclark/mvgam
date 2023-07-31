@@ -49,6 +49,7 @@ package can handle data for the following families:
 - `gaussian()` for real-valued data
 - `student_t()` for heavy-tailed real-valued data
 - `lognormal()` for non-negative real-valued data
+- `Gamma()` for non-negative real-valued data
 - `betar()` for proportional data on `(0,1)`
 - `poisson()` for count data
 - `nb()` for overdispersed count data
