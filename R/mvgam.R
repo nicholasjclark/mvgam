@@ -1337,7 +1337,7 @@ mvgam = function(formula,
   # outside of mvgam ####
   if(!run_model){
     unlink('base_gam.txt')
-      output <- structure(list(call = orig_formula,
+      output <- structure(list(call = formula,
                                trend_call = if(!missing(trend_formula)){
                                  trend_formula
                                } else {
@@ -1602,12 +1602,14 @@ mvgam = function(formula,
   if(prior_simulation){
     series_resids <- NULL
   } else {
-    series_resids <- get_mvgam_resids(object = list(
+    object = list(
       model_output = out_gam_mod,
       fit_engine = fit_engine,
       family = family_char,
       obs_data = data_train,
-      ytimes = ytimes),
+      ytimes = ytimes)
+    class(object) <- 'mvgam'
+    series_resids <- get_mvgam_resids(object,
       n_cores = if(parallel){
         min(c(chains, parallel::detectCores() - 1))
         } else {
@@ -1644,7 +1646,7 @@ mvgam = function(formula,
   }
 
   #### Return the output as class mvgam ####
-  output <- structure(list(call = orig_formula,
+  output <- structure(list(call = formula,
                            trend_call = if(!missing(trend_formula)){
                              trend_formula
                            } else {

@@ -136,7 +136,7 @@ mvgam_predict = function(Xp, family, betas,
                           betas) + attr(Xp, 'model.offset'))
       if(density){
         out <- dnorm(truth, mean = out,
-                     sd = family_pars$sigma_obs,
+                     sd = as.vector(family_pars$sigma_obs),
                      log = TRUE)
       }
 
@@ -145,7 +145,7 @@ mvgam_predict = function(Xp, family, betas,
                    mean = ((matrix(Xp, ncol = NCOL(Xp)) %*%
                               betas)) +
                      attr(Xp, 'model.offset'),
-                   sd = family_pars$sigma_obs)
+                   sd = as.vector(family_pars$sigma_obs))
     }
   }
 
@@ -156,7 +156,7 @@ mvgam_predict = function(Xp, family, betas,
                           betas) + attr(Xp, 'model.offset'))
       if(density){
         out <- dlnorm(truth, meanlog = out,
-                      sdlog = family_pars$sigma_obs,
+                      sdlog = as.vector(family_pars$sigma_obs),
                       log = TRUE)
       }
 
@@ -165,11 +165,11 @@ mvgam_predict = function(Xp, family, betas,
                     meanlog = ((matrix(Xp, ncol = NCOL(Xp)) %*%
                                       betas)) +
                                     attr(Xp, 'model.offset'),
-                    sdlog = family_pars$sigma_obs)
+                    sdlog = as.vector(family_pars$sigma_obs))
     } else {
       mu <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                               betas) + attr(Xp, 'model.offset'))
-      out <- exp(mu + (family_pars$sigma_obs^2 / 2))
+      out <- exp(mu + (as.vector(family_pars$sigma_obs)^2 / 2))
     }
   }
 
@@ -182,7 +182,7 @@ mvgam_predict = function(Xp, family, betas,
         out <- dstudent_t(truth,
                           df = family_pars$nu,
                           mu = out,
-                          sigma = family_pars$sigma_obs,
+                          sigma = as.vector(family_pars$sigma_obs),
                           log = TRUE)
       }
 
@@ -192,7 +192,7 @@ mvgam_predict = function(Xp, family, betas,
                         mu = ((matrix(Xp, ncol = NCOL(Xp)) %*%
                                  betas)) +
                           attr(Xp, 'model.offset'),
-                        sigma = family_pars$sigma_obs)
+                        sigma = as.vector(family_pars$sigma_obs))
     }
   }
 
@@ -226,7 +226,7 @@ mvgam_predict = function(Xp, family, betas,
 
       if(density){
         out <- dnbinom(truth, mu = exp(out),
-                       size = family_pars$phi,
+                       size = as.vector(family_pars$phi),
                        log = TRUE)
       }
 
@@ -235,7 +235,7 @@ mvgam_predict = function(Xp, family, betas,
                      mu = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                                   betas)) +
                                 attr(Xp, 'model.offset')),
-                     size = family_pars$phi)
+                     size = as.vector(family_pars$phi))
     } else {
       out <- exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                      betas)) +
@@ -247,7 +247,7 @@ mvgam_predict = function(Xp, family, betas,
   if(family == 'beta'){
     shape_pars <- beta_shapes(mu = plogis(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                                                        betas) + attr(Xp, 'model.offset'))),
-                              phi = family_pars$phi)
+                              phi = as.vector(family_pars$phi))
     if(type == 'link'){
       out <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                           betas) + attr(Xp, 'model.offset'))
@@ -277,20 +277,20 @@ mvgam_predict = function(Xp, family, betas,
 
       if(density){
         out <- dgamma(truth,
-                      rate = family_pars$shape / exp(out),
-                      shape = family_pars$shape,
+                      rate = as.vector(family_pars$shape) / exp(out),
+                      shape = as.vector(family_pars$shape),
                       log = TRUE)
       }
 
     } else if(type == 'response'){
       out <- rgamma(n = NROW(Xp),
-                    rate = family_pars$shape /
+                    rate = as.vector(family_pars$shape) /
                       exp(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                                        betas) + attr(Xp, 'model.offset'))),
-                    shape = family_pars$shape)
+                    shape = as.vector(family_pars$shape))
     } else {
-      out <- family_pars$shape /
-        (family_pars$shape / exp(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+      out <- as.vector(family_pars$shape) /
+        (as.vector(family_pars$shape) / exp(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                                               betas) + attr(Xp, 'model.offset'))))
     }
   }
@@ -306,7 +306,7 @@ mvgam_predict = function(Xp, family, betas,
                                    mu = exp(out),
                                    # Power parameter is fixed
                                    p = 1.5,
-                                   phi = family_pars$phi,
+                                   phi = as.vector(family_pars$phi),
                                    all.derivs = F)[,1]
       }
 
@@ -318,7 +318,7 @@ mvgam_predict = function(Xp, family, betas,
                                 attr(Xp, 'model.offset')),
                      # Power parameter is fixed
                      p = 1.5,
-                     phi = family_pars$phi))
+                     phi = as.vector(family_pars$phi)))
     } else {
       out <- exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                      betas)) +
@@ -658,7 +658,8 @@ ds_resids_pois = function(truth, fitted, draw){
   b_obs <- ppois(as.vector(truth[!na_obs]),
                  lambda = fitted[!na_obs])
   u_obs <- runif(n = length(draw[!na_obs]),
-                 min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
+                 min = pmin(a_obs, b_obs),
+                 max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
     u_na <- runif(n = length(draw[na_obs]),
@@ -728,10 +729,10 @@ ds_resids_gaus = function(truth, fitted, sigma, draw){
 ds_resids_lnorm = function(truth, fitted, sigma, draw){
   na_obs <- is.na(truth)
   a_obs <- plnorm(as.vector(truth[!na_obs]) - 1.e-6,
-                 meanlog = fitted[!na_obs],
+                 meanlog = log(fitted[!na_obs]),
                  sdlog = sigma)
   b_obs <- plnorm(as.vector(truth[!na_obs]),
-                 meanlog = fitted[!na_obs],
+                 meanlog = log(fitted[!na_obs]),
                  sdlog = sigma)
   u_obs <- runif(n = length(draw[!na_obs]),
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
@@ -913,14 +914,7 @@ get_mvgam_resids = function(object, n_cores = 1){
 
   # Extract necessary model elements; for Stan models, expectations are
   # stored on the link scale
-  if(object$fit_engine == 'stan'){
-    linkfun <- family_invlinks(object$family)
-    preds <- linkfun(mcmc_chains(object$model_output, 'mus'))
-
-  } else {
-    preds <- mcmc_chains(object$model_output, 'mus')
-  }
-
+  preds <- hindcast(object, type = 'expected')
   n_series <- NCOL(object$ytimes)
   obs_series <- object$obs_data$series
   series_levels <- levels(obs_series)
@@ -929,18 +923,11 @@ get_mvgam_resids = function(object, n_cores = 1){
   fit_engine <- object$fit_engine
 
   # Create sequences of posterior draws for calculating residual distributions
-  sample_seq <- 1:NROW(preds)
+  sample_seq <- 1:NROW(preds$hindcast[[1]])
   draw_seq <- sample(sample_seq, length(sample_seq), replace = FALSE)
 
   # Family-specific parameters
   family_pars <- extract_family_pars(object = object)
-
-  # Pull out starting and ending indices for each series in the object
-  ends <- seq(0, dim(preds)[2],
-              length.out = n_series + 1)
-  starts <- ends + 1
-  starts <- c(1, starts[-c(1, (n_series+1))])
-  ends <- ends[-1]
 
   # Calculate DS residual distributions in parallel
   cl <- parallel::makePSOCKcluster(n_cores)
@@ -953,8 +940,6 @@ get_mvgam_resids = function(object, n_cores = 1){
                         'family',
                         'family_pars',
                         'preds',
-                        'ends',
-                        'starts',
                         'obs_series',
                         'obs_data',
                         'fit_engine'),
@@ -978,14 +963,7 @@ get_mvgam_resids = function(object, n_cores = 1){
         nrow()
     }
 
-    if(fit_engine == 'stan'){
-      preds <- preds[,seq(series,
-                          dim(preds)[2],
-                          by = n_series)]
-    } else {
-      preds <- preds[,starts[series]:ends[series]]
-    }
-
+    preds <- preds$hindcasts[[series]]
     s_name <- levels(obs_data$series)[series]
     truth <- data.frame(time = obs_data$time,
                         series = obs_data$series,

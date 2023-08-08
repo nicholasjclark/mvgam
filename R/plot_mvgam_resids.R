@@ -278,48 +278,77 @@ x <- sapply(1:length(idx),
                 repped_x[k] - min(diff(sorted_x))/2)
 
 # Plot
-plot(median_preds[1:length(series_residuals)],
-     xlim = range(sorted_x),
-     series_residuals,
+# plot(median_preds[1:length(series_residuals)],
+#      xlim = range(sorted_x),
+#      series_residuals,
+#      bty = 'L',
+#      xlab = 'Fitted values',
+#      ylab = 'DS residuals',
+#      pch = 16,
+#      col = 'white',
+#      cex = 1,
+#      ylim = range(resid_probs, na.rm = T))
+# title('Resids vs Fitted Values', line = 0)
+#
+# rect(xleft = x[seq(1, N*2, by = 2)],
+#      xright = x[seq(2, N*2, by = 2)],
+#      ytop =  resid_probs[,9],
+#      ybottom =  resid_probs[,1],
+#      col = c_light,
+#      border = 'transparent')
+# rect(xleft = x[seq(1, N*2, by = 2)],
+#      xright = x[seq(2, N*2, by = 2)],
+#      ytop =  resid_probs[,8],
+#      ybottom =  resid_probs[,2],
+#      col = c_light_highlight,
+#      border = 'transparent')
+# rect(xleft = x[seq(1, N*2, by = 2)],
+#      xright = x[seq(2, N*2, by = 2)],
+#      ytop =  resid_probs[,7],
+#      ybottom =  resid_probs[,3],
+#      col = c_mid,
+#      border = 'transparent')
+# rect(xleft = x[seq(1, N*2, by = 2)],
+#      xright = x[seq(2, N*2, by = 2)],
+#      ytop =  resid_probs[,6],
+#      ybottom =  resid_probs[,4],
+#      col = c_mid_highlight,
+#      border = 'transparent')
+#
+# for (k in 1:N) {
+#   lines(x = c(x[seq(1, N*2, by = 2)][k],x[seq(2, N*2, by = 2)][k]),
+#         y = c(resid_probs[k,5], resid_probs[k,5]),
+#         col = c_dark, lwd = 2)
+# }
+
+series_residuals <- object$resids[[series]]
+preds <- hindcast(object, type = 'expected')$hindcasts[[series]]
+
+plot(1,
+     xlim = c(min(apply(preds, 2, function(x) quantile(x, 0.05, na.rm = TRUE))),
+              max(apply(preds, 2, function(x) quantile(x, 0.95, na.rm = TRUE)))),
      bty = 'L',
      xlab = 'Fitted values',
      ylab = 'DS residuals',
      pch = 16,
      col = 'white',
      cex = 1,
-     ylim = range(resid_probs, na.rm = T))
-title('Resids vs Fitted Values', line = 0)
-
-rect(xleft = x[seq(1, N*2, by = 2)],
-     xright = x[seq(2, N*2, by = 2)],
-     ytop =  resid_probs[,9],
-     ybottom =  resid_probs[,1],
-     col = c_light,
-     border = 'transparent')
-rect(xleft = x[seq(1, N*2, by = 2)],
-     xright = x[seq(2, N*2, by = 2)],
-     ytop =  resid_probs[,8],
-     ybottom =  resid_probs[,2],
-     col = c_light_highlight,
-     border = 'transparent')
-rect(xleft = x[seq(1, N*2, by = 2)],
-     xright = x[seq(2, N*2, by = 2)],
-     ytop =  resid_probs[,7],
-     ybottom =  resid_probs[,3],
-     col = c_mid,
-     border = 'transparent')
-rect(xleft = x[seq(1, N*2, by = 2)],
-     xright = x[seq(2, N*2, by = 2)],
-     ytop =  resid_probs[,6],
-     ybottom =  resid_probs[,4],
-     col = c_mid_highlight,
-     border = 'transparent')
-
-for (k in 1:N) {
-  lines(x = c(x[seq(1, N*2, by = 2)][k],x[seq(2, N*2, by = 2)][k]),
-        y = c(resid_probs[k,5], resid_probs[k,5]),
-        col = c_dark, lwd = 2)
+     ylim = range(series_residuals, na.rm = T))
+draws <- sample(1:dim(preds)[1],
+                min(300, dim(preds)[1]),
+                replace = FALSE)
+for(i in draws){
+  points(x = preds[i,],
+         y = series_residuals[i,],
+         pch = 16,
+         cex = 0.8,
+         col = sample(c("#B97C7C60",
+                        "#A2505060",
+                        "#8F272760",
+                        "#7C000060"),
+                      1))
 }
+title('Resids vs Fitted', line = 0)
 abline(h = 0, col = '#FFFFFF60', lwd = 2.85)
 abline(h = 0, col = 'black', lwd = 2.5, lty = 'dashed')
 

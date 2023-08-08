@@ -488,17 +488,32 @@ plot.mvgam_forecast = function(x, series = 1,
     ylim <- range(cred)
   }
 
+  if(type == 'expected'){
+    if(missing(ylab)){
+      ylab <- paste0('Expectations for ', s_name)
+    }
+    ylim <- range(cred)
+  }
+
   if(type == 'response'){
 
     if(missing(ylim)){
       ytrain <- object$train_observations[[which(names(object$train_observations) ==
                                                    s_name)]]
       ylim <- c(min(cred, min(ytrain, na.rm = TRUE)),
-                max(cred, max(ytrain, na.rm = TRUE)) + 2)
+                max(cred, max(ytrain, na.rm = TRUE)) * 1.1)
+
+      if(object$family == 'beta'){
+        ylim <- c(0, 1)
+      }
+
+      if(object$family %in% c('lognormal', 'Gamma')){
+        ylim <- c(0, ylim[2])
+      }
     }
 
     if(missing(ylab)){
-      ylab <- paste0('Predicitons for ', s_name)
+      ylab <- paste0('Predictions for ', s_name)
     }
   }
 

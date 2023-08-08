@@ -91,7 +91,7 @@ eval_mvgam = function(object,
          call. = FALSE)
   }
 
-  #### 1. Generate linear predictor matrix for covariates and extract trend estimates at timepoint
+  #### 1. Prepare the data at the right timepoint ####
   data_train <- object$obs_data
   n_series <- NCOL(object$ytimes)
 
