@@ -162,8 +162,9 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
     .pardefault <- par(no.readonly=T)
     par(.pardefault)
     par(mfrow = c(2, 1),
-        mgp = c(2.5, 1, 0),
-        mai = c(0.8, 0.8, 0.4, 0.4))
+        mar=c(2.5, 2.3, 2, 2),
+        oma = c(1, 1, 0, 0),
+        mgp = c(1.5, 0.5, 0))
 
     plot(1, type = "n", bty = 'L',
            xlab = xlab,

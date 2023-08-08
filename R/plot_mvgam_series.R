@@ -156,8 +156,6 @@ plot_mvgam_series = function(object,
   if(series == 'all'){
     n_plots <- length(levels(data_train$series))
     pages <- 1
-    .pardefault <- par(no.readonly=T)
-    par(.pardefault)
 
     if (n_plots > 4) pages <- 2
     if (n_plots > 8) pages <- 3
@@ -175,7 +173,13 @@ plot_mvgam_series = function(object,
       if (c<1) r <- c <- 1
       if (c*r < ppp) c <- c + 1
       if (c*r < ppp) r <- r + 1
-      oldpar<-par(mfrow=c(r,c))
+
+      .pardefault <- par(no.readonly=T)
+      par(.pardefault)
+      oldpar<-par(mfrow=c(r,c),
+                  mar=c(2.5, 2.3, 2, 2),
+                  oma = c(1, 1, 0, 0),
+                  mgp = c(1.5, 0.5, 0))
 
     } else { ppp <- 1; oldpar <- par()}
 
@@ -266,6 +270,12 @@ plot_mvgam_series = function(object,
     }
 
     layout(matrix(1:4, nrow = 2, byrow = TRUE))
+    .pardefault <- par(no.readonly=T)
+    par(.pardefault)
+    oldpar <- par(mar=c(2.5, 2.3, 2, 2),
+                  oma = c(1, 1, 0, 0),
+                  mgp = c(2, 0.5, 0))
+
     if(!missing(data_test)){
       test <- data.frame(y = data_test$y,
                          series = data_test$series,
@@ -277,11 +287,13 @@ plot_mvgam_series = function(object,
         dplyr::pull(y)
 
       plot(1, type = "n", bty = 'L',
-           xlab = 'Time',
-           ylab = ylab,
+           xlab = '',
+           ylab = '',
            ylim = range(c(truth, test), na.rm = TRUE),
            xlim = c(0, length(c(truth, test))))
       title('Time series', line = 0)
+      title(ylab = ylab, line = 1.5)
+      title(xlab = "Time", line = 1.5)
 
       if(lines){
         lines(x = 1:length(truth), y = truth, lwd = 2, col = "#8F2727")
@@ -307,15 +319,17 @@ plot_mvgam_series = function(object,
            freq = FALSE,
            breaks = n_bins,
            col = "#C79999",
-           ylab = 'Density',
-           xlab = paste0(y),
+           ylab = '',
+           xlab = '',
            main = '')
       title('Histogram', line = 0)
+      title(ylab = 'Density', line = 1.5)
+      title(xlab = paste0(y), line = 1.5)
 
       acf(c(truth, test),
           na.action = na.pass, bty = 'L',
           lwd = 2.5, ci.col = 'black', col = "#8F2727",
-          main = '', ylab = 'Autocorrelation')
+          main = '', ylab = '', xlab = '')
       acf1 <- acf(c(truth, test), plot = F,
                   na.action = na.pass)
       clim <- qnorm((1 + .95)/2)/sqrt(acf1$n.used)
@@ -325,6 +339,8 @@ plot_mvgam_series = function(object,
       abline(h = -clim,  col = 'black', lwd = 2.5, lty = 'dashed')
       box(bty = 'L', lwd = 2)
       title('ACF', line = 0)
+      title(ylab = 'Autocorrelation', line = 1.5)
+      title(xlab = 'Lag', line = 1.5)
 
       ecdf_plotdat = function(vals, x){
         func <- ecdf(vals)
@@ -336,11 +352,13 @@ plot_mvgam_series = function(object,
                     length.out = 100)
 
       plot(1, type = "n", bty = 'L',
-           xlab = paste0(y),
-           ylab = 'Empirical CDF',
+           xlab = '',
+           ylab = '',
            xlim = c(min(plot_x), max(plot_x)),
            ylim = c(0, 1))
       title('CDF', line = 0)
+      title(ylab = 'Empirical CDF', line = 1.5)
+      title(xlab = paste0(y), line = 1.5)
       lines(x = plot_x,
             y = ecdf_plotdat(c(truth, test),
                              plot_x),
@@ -350,11 +368,13 @@ plot_mvgam_series = function(object,
 
     } else {
       plot(1, type = "n", bty = 'L',
-           xlab = 'Time',
-           ylab = ylab,
+           xlab = '',
+           ylab = '',
            ylim = range(c(truth), na.rm = TRUE),
            xlim = c(0, length(c(truth))))
       title('Time series', line = 0)
+      title(ylab = ylab, line = 1.5)
+      title(xlab = "Time", line = 1.5)
 
       if(lines){
         lines(x = 1:length(truth), y = truth, lwd = 2, col = "#8F2727")
@@ -374,16 +394,18 @@ plot_mvgam_series = function(object,
            freq = FALSE,
            breaks = n_bins,
            col = "#C79999",
-           ylab = 'Density',
-           xlab = paste0(y),
+           ylab = '',
+           xlab = '',
            main = '')
       title('Histogram', line = 0)
+      title(ylab = 'Density', line = 1.5)
+      title(xlab = paste0(y), line = 1.5)
 
 
       acf(c(truth),
           na.action = na.pass, bty = 'L',
           lwd = 2.5, ci.col = 'black', col = "#8F2727",
-          main = '', ylab = 'Autocorrelation')
+          main = '', ylab = '', xlab = '')
       acf1 <- acf(c(truth), plot = F,
                   na.action = na.pass)
       clim <- qnorm((1 + .95)/2)/sqrt(acf1$n.used)
@@ -393,6 +415,8 @@ plot_mvgam_series = function(object,
       abline(h = -clim,  col = 'black', lwd = 2.5, lty = 'dashed')
       box(bty = 'L', lwd = 2)
       title('ACF', line = 0)
+      title(ylab = 'Autocorrelation', line = 1.5)
+      title(xlab = 'Lag', line = 1.5)
 
 
       ecdf_plotdat = function(vals, x){
@@ -404,11 +428,13 @@ plot_mvgam_series = function(object,
                     to = max(truth, na.rm = T),
                     length.out = 100)
       plot(1, type = "n", bty = 'L',
-           xlab = paste0(y),
-           ylab = 'Empirical CDF',
+           xlab = '',
+           ylab = '',
            xlim = c(min(plot_x), max(plot_x)),
            ylim = c(0, 1))
       title('CDF', line = 0)
+      title(ylab = 'Empirical CDF', line = 1.5)
+      title(xlab = paste0(y), line = 1.5)
       lines(x = plot_x,
             y = ecdf_plotdat(truth,
                              plot_x),
@@ -418,5 +444,7 @@ plot_mvgam_series = function(object,
     }
 
   }
+  invisible()
+  par(.pardefault)
   layout(1)
 }

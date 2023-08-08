@@ -27,6 +27,7 @@ Imports:
     posterior (>= 1.0.0),
     loo (>= 2.3.1),
     parallel,
+    collapse,
     pbapply,
     tweedie,
     MASS,

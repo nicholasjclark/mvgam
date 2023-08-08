@@ -55,11 +55,17 @@ if(length(pterms) > 0){
   }
 
   if(length(pterms) == 2){
-    par(mfrow = c(2, 1))
+    par(mfrow = c(2, 1),
+        mar=c(2.5, 2.3, 2, 2),
+        oma = c(1, 1, 0, 0),
+        mgp = c(1.5, 0.5, 0))
   }
 
   if(length(pterms) %in% c(3, 4)){
-    par(mfrow = c(2, 2))
+    par(mfrow = c(2, 2),
+        mar=c(2.5, 2.3, 2, 2),
+        oma = c(1, 1, 0, 0),
+        mgp = c(1.5, 0.5, 0))
   }
 
   for(i in 1:length(pterms)){

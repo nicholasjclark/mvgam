@@ -46,11 +46,20 @@ plot_mvgam_factors = function(object, plot = TRUE){
     .pardefault <- par(no.readonly=T)
     par(.pardefault)
     if(object$n_lv <= 2){
-      par(mfrow = c(1, 2))
+      par(mfrow = c(1, 2),
+          mar=c(2.5, 2.3, 2, 2),
+          oma = c(1, 1, 0, 0),
+          mgp = c(1.5, 0.5, 0))
     } else if(object$n_lv <= 4){
-      par(mfrow = c(2, 2))
+      par(mfrow = c(2, 2),
+          mar=c(2.5, 2.3, 2, 2),
+          oma = c(1, 1, 0, 0),
+          mgp = c(1.5, 0.5, 0))
     } else {
-      par(mfrow = c(3, 2))
+      par(mfrow = c(3, 2),
+          mar=c(2.5, 2.3, 2, 2),
+          oma = c(1, 1, 0, 0),
+          mgp = c(1.5, 0.5, 0))
     }
   }
 

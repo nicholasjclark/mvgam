@@ -54,8 +54,10 @@ as.data.frame.mvgam = function(x,
 
   # Get a string of all possible variables to extract
   all_vars <- variables(x)
-  all_orig_vars <- unique(unlist(purrr::map(all_vars, 'orig_name')))
-  all_alias_vars <- unique(unlist(purrr::map(all_vars, 'alias')))
+  all_orig_vars <- unlist(purrr::map(all_vars, 'orig_name'))
+  all_alias_vars <- unlist(purrr::map(all_vars, 'alias'))
+
+  all_orig_walias <- all_orig_vars[!is.na(all_alias_vars)]
   all_alias_vars <- all_alias_vars[!is.na(all_alias_vars)]
 
   # All possible var sets to extract
@@ -191,7 +193,7 @@ as.data.frame.mvgam = function(x,
           names_to_use[[i]] <- NA
         } else {
           if(any(all_alias_vars == variable[i])){
-            vars_to_extract[[i]] <- unname(unlist(purrr::map(all_vars, 'orig_name'))[
+            vars_to_extract[[i]] <- unname(all_orig_walias[
               which(all_alias_vars == variable[i])])
             names_to_use[[i]] <- variable[i]
           } else {

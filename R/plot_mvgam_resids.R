@@ -6,7 +6,6 @@
 #'@importFrom stats complete.cases qqnorm qqline acf pacf na.pass
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param series \code{integer} specifying which series in the set is to be plotted
-#'@param n_bins \code{integer} specifying the number of bins to use for binning fitted values
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'y', and 'time'
 #'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
 #'covariate information in \code{newdata} will be used to generate forecasts from the fitted model equations. If
@@ -25,7 +24,7 @@
 #'Note, all plots use posterior medians of fitted values / residuals, so uncertainty is not represented.
 #'@return A series of base \code{R} plots
 #'@export
-plot_mvgam_resids = function(object, series = 1, n_bins = 15,
+plot_mvgam_resids = function(object, series = 1,
                              newdata, data_test){
 
   # Check arguments
@@ -33,15 +32,7 @@ plot_mvgam_resids = function(object, series = 1, n_bins = 15,
     stop('argument "object" must be of class "mvgam"')
   }
 
-  if(sign(series) != 1){
-    stop('argument "series" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(series%%1 != 0){
-      stop('argument "series" must be a positive integer',
-           call. = FALSE)
-    }
-  }
+  validate_pos_integer(series)
 
   if(series > NCOL(object$ytimes)){
     stop(paste0('object only contains data / predictions for ',
@@ -49,22 +40,12 @@ plot_mvgam_resids = function(object, series = 1, n_bins = 15,
          call. = FALSE)
   }
 
-  if(sign(n_bins) != 1){
-    stop('argument "n_bins" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(n_bins%%1 != 0){
-      stop('argument "n_bins" must be a positive integer',
-           call. = FALSE)
-    }
-  }
-
   if(!missing("newdata")){
     data_test <- newdata
   }
 
 # Plotting colours
-probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+probs <- c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
 c_light <- c("#DCBCBC")
 c_light_highlight <- c("#C79999")
 c_mid <- c("#B97C7C")
@@ -219,138 +200,61 @@ if(missing(data_test)){
   }
 }
 
-bottom_preds <- apply(preds, 2, function(x) quantile(x, 0.05, na.rm = TRUE))
-lower_preds <- apply(preds, 2, function(x) quantile(x, 0.1, na.rm = TRUE))
-median_preds <- apply(preds, 2, function(x) quantile(x, 0.5, na.rm = TRUE))
-upper_preds <- apply(preds, 2, function(x) quantile(x, 0.9, na.rm = TRUE))
-top_preds <- apply(preds, 2, function(x) quantile(x, 0.95, na.rm = TRUE))
-
 # Graphical parameters
+.pardefault <- par(no.readonly=T)
+par(.pardefault)
 layout(matrix(1:4, ncol = 2, nrow = 2, byrow = TRUE))
+oldpar <- par(mar=c(2.5, 2.3, 2, 2),
+              oma = c(1, 1, 0, 0),
+              mgp = c(2, 0.5, 0))
 
-# Fitted vs redisuals plot
-n_fitted_bins = n_bins
-
-# Get x-axis values and bin if necessary to prevent overplotting
-sorted_x <- sort(unique(round(c(bottom_preds,
-                                lower_preds,
-                                median_preds,
-                                upper_preds,
-                                top_preds), 6)))
-sorted_x <- seq(from = min(sorted_x),
-                to = max(sorted_x),
-                length.out = length(sorted_x))
-
-if(length(sorted_x) > n_fitted_bins){
-  sorted_x <- seq(min(sorted_x), max(sorted_x), length.out = n_fitted_bins)
-  resid_probs <- do.call(rbind, lapply(seq_along(sorted_x), function(i){
-    if(i == 1){
-      quantile(series_residuals[which(preds <= sorted_x[i])], probs = probs, na.rm = TRUE)
-    } else if(i == length(sorted_x)){
-      quantile(series_residuals[which(preds >= sorted_x[i])], probs = probs, na.rm = TRUE)
-    } else {
-      quantile(series_residuals[which(preds > sorted_x[i - 1] &
-                                        preds <= sorted_x[i])], probs = probs, na.rm = TRUE)
-    }
-  }))
-
-} else {
-  resid_probs <- do.call(rbind, lapply(seq_along(sorted_x), function(i){
-    if(i == 1){
-      quantile(series_residuals[which(preds <= sorted_x[i])], probs = probs, na.rm = TRUE)
-    } else if(i == length(sorted_x)){
-      quantile(series_residuals[which(preds >= sorted_x[i])], probs = probs, na.rm = TRUE)
-    } else {
-      quantile(series_residuals[which(preds > sorted_x[i - 1] &
-                                        preds <= sorted_x[i])], probs = probs, na.rm = TRUE)
-    }
-  }))
-}
-
-# Get polygon coordinates and plot
-N <- length(sorted_x)
-idx <- rep(1:N, each = 2)
-repped_x <- rep(sorted_x, each = 2)
-
-x <- sapply(1:length(idx),
-            function(k) if(k %% 2 == 0)
-              repped_x[k] + min(diff(sorted_x))/2 else
-                repped_x[k] - min(diff(sorted_x))/2)
-
-# Plot
-# plot(median_preds[1:length(series_residuals)],
-#      xlim = range(sorted_x),
-#      series_residuals,
-#      bty = 'L',
-#      xlab = 'Fitted values',
-#      ylab = 'DS residuals',
-#      pch = 16,
-#      col = 'white',
-#      cex = 1,
-#      ylim = range(resid_probs, na.rm = T))
-# title('Resids vs Fitted Values', line = 0)
-#
-# rect(xleft = x[seq(1, N*2, by = 2)],
-#      xright = x[seq(2, N*2, by = 2)],
-#      ytop =  resid_probs[,9],
-#      ybottom =  resid_probs[,1],
-#      col = c_light,
-#      border = 'transparent')
-# rect(xleft = x[seq(1, N*2, by = 2)],
-#      xright = x[seq(2, N*2, by = 2)],
-#      ytop =  resid_probs[,8],
-#      ybottom =  resid_probs[,2],
-#      col = c_light_highlight,
-#      border = 'transparent')
-# rect(xleft = x[seq(1, N*2, by = 2)],
-#      xright = x[seq(2, N*2, by = 2)],
-#      ytop =  resid_probs[,7],
-#      ybottom =  resid_probs[,3],
-#      col = c_mid,
-#      border = 'transparent')
-# rect(xleft = x[seq(1, N*2, by = 2)],
-#      xright = x[seq(2, N*2, by = 2)],
-#      ytop =  resid_probs[,6],
-#      ybottom =  resid_probs[,4],
-#      col = c_mid_highlight,
-#      border = 'transparent')
-#
-# for (k in 1:N) {
-#   lines(x = c(x[seq(1, N*2, by = 2)][k],x[seq(2, N*2, by = 2)][k]),
-#         y = c(resid_probs[k,5], resid_probs[k,5]),
-#         col = c_dark, lwd = 2)
-# }
-
-series_residuals <- object$resids[[series]]
+# Extract expectation (fitted) values
 preds <- hindcast(object, type = 'expected')$hindcasts[[series]]
 
+# Plot resids vs fitted
 plot(1,
      xlim = c(min(apply(preds, 2, function(x) quantile(x, 0.05, na.rm = TRUE))),
               max(apply(preds, 2, function(x) quantile(x, 0.95, na.rm = TRUE)))),
      bty = 'L',
-     xlab = 'Fitted values',
-     ylab = 'DS residuals',
+     xlab = '',
+     ylab = '',
      pch = 16,
      col = 'white',
      cex = 1,
      ylim = range(series_residuals, na.rm = T))
+
 draws <- sample(1:dim(preds)[1],
-                min(300, dim(preds)[1]),
+                min(200, dim(preds)[1]),
                 replace = FALSE)
 for(i in draws){
   points(x = preds[i,],
          y = series_residuals[i,],
          pch = 16,
-         cex = 0.8,
-         col = sample(c("#B97C7C60",
-                        "#A2505060",
-                        "#8F272760",
-                        "#7C000060"),
-                      1))
+         cex = 0.7,
+         col = '#80808020')
 }
 title('Resids vs Fitted', line = 0)
-abline(h = 0, col = '#FFFFFF60', lwd = 2.85)
-abline(h = 0, col = 'black', lwd = 2.5, lty = 'dashed')
+title(ylab = "DS residuals", line = 1.5)
+title(xlab = "Fitted values", line = 1.5)
+
+# Plot quantile regression lines
+y <- apply(series_residuals, 2, function(x) quantile(x, 0.5, na.rm = TRUE))
+x <- apply(preds, 2, function(x) quantile(x, 0.5, na.rm = TRUE))
+predvals <- seq(min(preds),
+                max(preds),
+                length.out = 200)
+medmod <- gam(y ~ s(x))
+medpreds <- predict(medmod, newdata = data.frame(x = predvals),
+                      type = 'response', se.fit = TRUE)
+
+polygon(c(predvals, rev(predvals)), c(medpreds$fit + 2*medpreds$se.fit,
+                                        rev(medpreds$fit - 2*medpreds$se.fit)),
+        col = "#7C000040",
+        border = NA)
+lines(x = predvals,
+      y = medpreds$fit,
+      col = "#7C000060",
+      lwd = 3)
 
 # Q-Q plot
 coords <- qqnorm(series_residuals[1,], plot.it = F)
@@ -375,14 +279,16 @@ pred_vals <- pred_vals[complete.cases(cred[1,])]
 plot(x = pred_vals,
      y = cred[5,][complete.cases(cred[1,])],
      bty = 'L',
-     xlab = 'Theoretical Quantiles',
-     ylab = 'Sample Quantiles',
+     xlab = '',
+     ylab = '',
      pch = 16,
      col = 'white',
      cex = 1,
      ylim = range(cred, na.rm = T),
      tck = -0.04)
 title('Normal Q-Q Plot', line = 0)
+title(ylab = "Sample Quantiles", line = 1.5)
+title(xlab = "Theoretical Quantiles", line = 1.5)
 polygon(c(pred_vals, rev(pred_vals)), c(cred[1,][complete.cases(cred[1,])],
                                         rev(cred[9,][complete.cases(cred[1,])])),
         col = c_light, border = NA)
@@ -424,8 +330,8 @@ cred <- sapply(1:NCOL(resid_acf),
 cred <- cred[, -1]
 clim <- qnorm((1 + .95)/2)/sqrt(acf1$n.used)
 plot(1, type = "n", bty = 'L',
-     xlab = 'Lag',
-     ylab = 'Autocorrelation',
+     xlab = '',
+     ylab = '',
      xlim = c(1, N-1),
      xaxt = 'n',
      ylim = range(c(cred,
@@ -433,6 +339,8 @@ plot(1, type = "n", bty = 'L',
                     clim + 0.05)))
 axis(1, at = seq(1, NCOL(cred), by = 2))
 title('ACF', line = 0)
+title(ylab = "Autocorrelation", line = 1.5)
+title(xlab = "Lag", line = 1.5)
 
 N <- N - 1
 rect(xleft = x[seq(1, N*2, by = 2)],
@@ -495,8 +403,8 @@ cred <- sapply(1:NCOL(resid_pacf),
 
 clim <- qnorm((1 + .95)/2)/sqrt(pacf1$n.used)
 plot(1, type = "n", bty = 'L',
-     xlab = 'Lag',
-     ylab = 'Autocorrelation',
+     xlab = '',
+     ylab = '',
      xlim = c(1, length(sorted_x)),
      xaxt = 'n',
      ylim = range(c(cred,
@@ -504,6 +412,8 @@ plot(1, type = "n", bty = 'L',
                     clim + 0.05)))
 axis(1, at = seq(1, NCOL(cred), by = 2))
 title('pACF', line = 0)
+title(ylab = "Autocorrelation", line = 1.5)
+title(xlab = "Lag", line = 1.5)
 
 rect(xleft = x[seq(1, N*2, by = 2)],
      xright = x[seq(2, N*2, by = 2)],
@@ -539,6 +449,9 @@ abline(h = clim, col = '#FFFFFF60', lwd = 2.85)
 abline(h = clim, col = 'black', lwd = 2.5, lty = 'dashed')
 abline(h = -clim, col = '#FFFFFF60', lwd = 2.85)
 abline(h = -clim, col = 'black', lwd = 2.5, lty = 'dashed')
+
+invisible()
+par(.pardefault)
 layout(1)
 
 }

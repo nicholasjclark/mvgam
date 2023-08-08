@@ -160,8 +160,6 @@ plot.mvgam = function(x, type = 'residuals',
     n_plots <- n_smooths
     if (n_plots==0) stop("No suitable terms to plot - plot.mvgam() only handles smooths of 2 or fewer dimensions.")
     pages <- 1
-    .pardefault <- par(no.readonly=T)
-    par(.pardefault)
 
     if (n_plots > 4) pages <- 2
     if (n_plots > 8) pages <- 3
@@ -179,7 +177,13 @@ plot.mvgam = function(x, type = 'residuals',
     if (c<1) r <- c <- 1
     if (c*r < ppp) c <- c + 1
     if (c*r < ppp) r <- r + 1
-    oldpar<-par(mfrow=c(r,c))
+
+    .pardefault <- par(no.readonly=T)
+    par(.pardefault)
+    oldpar<-par(mfrow=c(r,c),
+                mar=c(2.5, 2.3, 2, 2),
+                oma = c(1, 1, 0, 0),
+                mgp = c(1.5, 0.5, 0))
 
     } else { ppp<-1;oldpar<-par()}
 
