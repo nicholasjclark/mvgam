@@ -27,7 +27,6 @@ Imports:
     posterior (>= 1.0.0),
     loo (>= 2.3.1),
     parallel,
-    collapse,
     pbapply,
     tweedie,
     MASS,
@@ -47,6 +46,7 @@ RoxygenNote: 7.2.3
 Suggests: 
     cmdstanr (>= 0.4.0),
     knitr, 
+    collapse,
     rmarkdown, 
     rjags,
     coda,

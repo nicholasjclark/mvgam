@@ -32,6 +32,7 @@ jobs:
           dependencies: NA
           extra-packages: |
               knitr
+              collapse
               rmarkdown
               rjags
               coda
