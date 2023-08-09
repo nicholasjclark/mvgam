@@ -19,9 +19,11 @@ or the character string \code{'all'}, specifying that all series should be forec
 if the fitted model contained multivariate trends (either as a dynamic factor or \code{VAR} process),
 as it saves recomputing the full set of trends for each series individually}
 
-\item{type}{When this has the value \code{link}, the linear predictor is calculated on the log link scale.
-When \code{response} is used, the predictions take uncertainty in the observation process into account to return
-predictions on the outcome (discrete) scale (default). When \code{trend} is used, only the hindcast distribution for the
+\item{type}{When this has the value \code{link} (default) the linear predictor is calculated on the link scale.
+If \code{expected} is used, predictions reflect the expectation of the response (the mean)
+but ignore uncertainty in the observation process. When \code{response} is used,
+the predictions take uncertainty in the observation process into account to return
+predictions on the outcome scale. When \code{trend} is used, only the hindcast distribution for the
 latent trend is returned}
 }
 \value{

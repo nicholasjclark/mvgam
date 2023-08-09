@@ -72,9 +72,11 @@ as it saves recomputing the full set of trends for each series individually</p><
 
 
 <dt>type</dt>
-<dd><p>When this has the value <code>link</code>, the linear predictor is calculated on the log link scale.
-When <code>response</code> is used, the predictions take uncertainty in the observation process into account to return
-predictions on the outcome (discrete) scale (default). When <code>trend</code> is used, only the hindcast distribution for the
+<dd><p>When this has the value <code>link</code> (default) the linear predictor is calculated on the link scale.
+If <code>expected</code> is used, predictions reflect the expectation of the response (the mean)
+but ignore uncertainty in the observation process. When <code>response</code> is used,
+the predictions take uncertainty in the observation process into account to return
+predictions on the outcome scale. When <code>trend</code> is used, only the hindcast distribution for the
 latent trend is returned</p></dd>
 
 </dl></div>
