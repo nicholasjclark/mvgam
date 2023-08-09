@@ -210,11 +210,12 @@ oldpar <- par(mar=c(2.5, 2.3, 2, 2),
 
 # Extract expectation (fitted) values
 preds <- hindcast(object, type = 'expected')$hindcasts[[series]]
+series_residuals <- object$resids[[series]]
+limits <- quantile(preds, probs = c(0.025, 0.975))
 
 # Plot resids vs fitted
 plot(1,
-     xlim = c(min(apply(preds, 2, function(x) quantile(x, 0.05, na.rm = TRUE))),
-              max(apply(preds, 2, function(x) quantile(x, 0.95, na.rm = TRUE)))),
+     xlim = limits,
      bty = 'L',
      xlab = '',
      ylab = '',
@@ -226,29 +227,32 @@ plot(1,
 draws <- sample(1:dim(preds)[1],
                 min(200, dim(preds)[1]),
                 replace = FALSE)
+moddata <- vector(mode = 'list')
 for(i in draws){
   points(x = preds[i,],
          y = series_residuals[i,],
          pch = 16,
          cex = 0.7,
          col = '#80808020')
+  moddata[[which(draws == i)]] <- data.frame(y = series_residuals[i,],
+                             x = preds[i,])
 }
 title('Resids vs Fitted', line = 0)
 title(ylab = "DS residuals", line = 1.5)
 title(xlab = "Fitted values", line = 1.5)
 
-# Plot quantile regression lines
-y <- apply(series_residuals, 2, function(x) quantile(x, 0.5, na.rm = TRUE))
-x <- apply(preds, 2, function(x) quantile(x, 0.5, na.rm = TRUE))
-predvals <- seq(min(preds),
-                max(preds),
+# Plot a fitted line
+moddata <- do.call(rbind, moddata)
+
+predvals <- seq(min(preds[draws, ], na.rm = TRUE),
+                max(preds[draws, ], na.rm = TRUE),
                 length.out = 200)
-medmod <- gam(y ~ s(x))
+medmod <- bam(y ~ s(x), data = moddata)
 medpreds <- predict(medmod, newdata = data.frame(x = predvals),
                       type = 'response', se.fit = TRUE)
 
-polygon(c(predvals, rev(predvals)), c(medpreds$fit + 2*medpreds$se.fit,
-                                        rev(medpreds$fit - 2*medpreds$se.fit)),
+polygon(c(predvals, rev(predvals)), c(medpreds$fit + 3*medpreds$se.fit,
+                                        rev(medpreds$fit - 3*medpreds$se.fit)),
         col = "#7C000040",
         border = NA)
 lines(x = predvals,
