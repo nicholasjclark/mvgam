@@ -158,6 +158,12 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
     offset_line <- NULL
   }
 
+  if(any(grepl('eta <- X * b + offset', jags_file, fixed = TRUE))){
+    offset_line <- paste0('vector[total_obs] offset; // offset vector\n')
+  } else {
+    offset_line <- NULL
+  }
+
   # Search for any non-contiguous indices that sometimes are used by mgcv
   if(any(grep('in c\\(', jags_file))){
     add_idxs <- TRUE

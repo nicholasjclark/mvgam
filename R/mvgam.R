@@ -830,6 +830,8 @@ mvgam = function(formula,
   if(offset){
     model_file[grep('eta <- X %*% b', model_file, fixed = TRUE)] <-
       "eta <- X %*% b + offset"
+    model_file[grep('eta <- X * b', model_file, fixed = TRUE)] <-
+      "eta <- X * b + offset"
     if(!missing(data_test) & !prior_simulation){
 
       get_offset <- function(model) {
@@ -980,7 +982,12 @@ mvgam = function(formula,
   ss_jagam$jags.data$X <- as.matrix(X %>%
                                      dplyr::select(-time, -series, -outcome))
   if(NCOL(ss_jagam$jags.data$X) == 1){
-    model_file[grep('eta <-', model_file, fixed = TRUE)] <- 'eta <- X * b'
+    if(offset){
+      model_file[grep('eta <-', model_file, fixed = TRUE)] <- 'eta <- X * b + offset'
+    } else{
+      model_file[grep('eta <-', model_file, fixed = TRUE)] <- 'eta <- X * b'
+    }
+
   }
 
   if(!missing(upper_bounds)){
@@ -1305,6 +1312,7 @@ mvgam = function(formula,
 
   } else {
     # Set up data and model file for JAGS
+    trend_sp_names <- NA
     if(!smooths_included){
       inits <- NULL
     } else {
