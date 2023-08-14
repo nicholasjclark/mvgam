@@ -16,6 +16,7 @@
   n_lv,
   family,
   priors,
+  lfo = FALSE,
   ...
 )
 }
@@ -76,6 +77,11 @@ families are: \code{nb()}, \code{poisson()}, \code{tweedie()}, \code{gaussian()}
 \item{priors}{An optional \code{data.frame} with prior
 definitions. See \code{\link{get_mvgam_priors}} and
 \link{mvgam} for more information on changing default prior distributions}
+
+\item{lfo}{Logical indicating whether this is part of a call to \link{lfo_cv.mvgam}. Returns a
+lighter version of the model with no residuals and fewer monitored parameters to speed up
+post-processing. But other downstream functions will not work properly, so users should always
+leave this set as \code{FALSE}}
 
 \item{...}{Other arguments to be passed to \code{\link{mvgam}}}
 }

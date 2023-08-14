@@ -31,6 +31,7 @@ mvgam(
   priors,
   upper_bounds,
   refit = FALSE,
+  lfo = FALSE,
   use_stan = TRUE,
   max_treedepth,
   adapt_delta,
@@ -163,6 +164,11 @@ in \code{Stan}}
 
 \item{refit}{Logical indicating whether this is a refit, called using \link{update.mvgam}. Users should leave
 as \code{FALSE}}
+
+\item{lfo}{Logical indicating whether this is part of a call to \link{lfo_cv.mvgam}. Returns a
+lighter version of the model with no residuals and fewer monitored parameters to speed up
+post-processing. But other downstream functions will not work properly, so users should always
+leave this set as \code{FALSE}}
 
 \item{use_stan}{Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
 the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if \code{cmdstanr} is not available,

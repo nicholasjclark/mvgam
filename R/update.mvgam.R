@@ -50,6 +50,10 @@
 #'@param priors An optional \code{data.frame} with prior
 #'definitions. See \code{\link{get_mvgam_priors}} and
 #'[mvgam] for more information on changing default prior distributions
+#'@param lfo Logical indicating whether this is part of a call to [lfo_cv.mvgam]. Returns a
+#'lighter version of the model with no residuals and fewer monitored parameters to speed up
+#'post-processing. But other downstream functions will not work properly, so users should always
+#'leave this set as `FALSE`
 #'@param ... Other arguments to be passed to \code{\link{mvgam}}
 #'@export
 update.mvgam = function(object, formula,
@@ -59,6 +63,7 @@ update.mvgam = function(object, formula,
                         trend_map,
                         use_lv, n_lv,
                         family, priors,
+                        lfo = FALSE,
                         ...){
 
   if(missing(formula)){
@@ -156,6 +161,7 @@ update.mvgam = function(object, formula,
                          n_lv = n_lv,
                          family = family,
                          refit = TRUE,
+                         lfo = lfo,
                          use_stan = ifelse(object$fit_engine == 'stan', TRUE,
                                            FALSE),
                          ...)
@@ -169,6 +175,7 @@ update.mvgam = function(object, formula,
                          n_lv = n_lv,
                          family = family,
                          refit = TRUE,
+                         lfo = lfo,
                          use_stan = ifelse(object$fit_engine == 'stan', TRUE,
                                            FALSE),
                          ...)

@@ -88,7 +88,8 @@ lfo_cv.mvgam = function(object,
   # Fit model to training and forecast all remaining testing observations
   fit_past <- update(object,
                     data = data_splits$data_train,
-                    newdata = data_splits$data_test)
+                    newdata = data_splits$data_test,
+                    lfo = TRUE)
 
   # Calculate log likelihoods of forecast observations for the next
   # fc_horizon ahead observations
@@ -138,7 +139,8 @@ lfo_cv.mvgam = function(object,
       # Re-fit the model
       fit_past <- update(fit_past,
                          data = data_splits$data_train,
-                         newdata = data_splits$data_test)
+                         newdata = data_splits$data_test,
+                         lfo = TRUE)
 
       # Calculate ELPD as before
       fc_indices <- which(c(data_splits$data_train$time,
@@ -184,8 +186,16 @@ plot.mvgam_lfo = function(x, ...){
 
   # Graphical parameters
   layout(matrix(1:2, nrow = 2))
+  .pardefault <- par(no.readonly=T)
+  par(.pardefault)
+  par(mfrow = c(2, 1),
+      mar=c(2.5, 2.3, 2, 2),
+      oma = c(1, 1, 0, 0),
+      mgp = c(1.5, 0.5, 0))
 
   # Plot Pareto-k values over time
+  object$pareto_ks[which(is.infinite(object$pareto_ks))] <-
+    max(object$pareto_ks[which(!is.infinite(object$pareto_ks))])
   plot(1, type = "n", bty = 'L',
        xlab = '',
        ylab = 'Pareto k',
@@ -246,6 +256,8 @@ plot.mvgam_lfo = function(x, ...){
 
   box(bty = 'l', lwd = 2)
 
+  invisible()
+  par(.pardefault)
   layout(1)
 }
 

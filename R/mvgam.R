@@ -103,6 +103,10 @@
 #''Details' for more information on changing default prior distributions
 #'@param refit Logical indicating whether this is a refit, called using [update.mvgam]. Users should leave
 #'as `FALSE`
+#'@param lfo Logical indicating whether this is part of a call to [lfo_cv.mvgam]. Returns a
+#'lighter version of the model with no residuals and fewer monitored parameters to speed up
+#'post-processing. But other downstream functions will not work properly, so users should always
+#'leave this set as `FALSE`
 #'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
 #'this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
@@ -431,6 +435,7 @@ mvgam = function(formula,
                  priors,
                  upper_bounds,
                  refit = FALSE,
+                 lfo = FALSE,
                  use_stan = TRUE,
                  max_treedepth,
                  adapt_delta,
@@ -457,6 +462,11 @@ mvgam = function(formula,
   data_train <- validate_series_time(data_train, name = 'data')
   if(!missing(data_test)){
     data_test <- validate_series_time(data_test, name = 'newdata')
+  }
+
+  # Lighten the final object if this is an lfo run
+  if(lfo){
+    return_model_data <- FALSE
   }
 
   # Validate observation formula
@@ -1405,6 +1415,16 @@ mvgam = function(formula,
 
   #### Else if running the model, complete the setup for fitting ####
   } else {
+
+    # If this is a lfo_cv run, trim down parameters to monitor so post-processing
+    # is faster
+    if(lfo){
+      to_remove <- c('trend', 'b_trend', 'b', 'b_raw', 'rho', 'sigma',
+                     'alpha_gp', 'rho_gp', 'ar1', 'ar2', 'ar3',
+                     'LV', 'lv_coefs', 'penalty', 'Sigma')
+      param <- param[!param %in% to_remove]
+    }
+
     if(use_stan){
       # Remove data likelihood if this is a prior sampling run
       if(prior_simulation){
@@ -1606,8 +1626,9 @@ mvgam = function(formula,
   unlink('base_gam.txt')
   unlink(fil)
 
-  # Get Dunn-Smyth Residual distributions for each series
-  if(prior_simulation){
+  # Get Dunn-Smyth Residual distributions for each series if this
+  # is not a prior simulation or an lfo fit
+  if(prior_simulation || lfo){
     series_resids <- NULL
   } else {
     object = list(
@@ -1633,7 +1654,7 @@ mvgam = function(formula,
   # smooths that aren't yet supported by mvgam plotting functions
   # Extract median beta params for smooths and their covariances
   # so that uncertainty from mgcv plots is reasonably accurate
-  if(run_model){
+  if(run_model & !lfo){
     # Use the empirical covariance matrix from the fitted coefficients
     V <- cov(mcmc_chains(out_gam_mod, 'b'))
     ss_gam$Ve <- ss_gam$Vp <- ss_gam$Vc <- V
@@ -1651,6 +1672,10 @@ mvgam = function(formula,
       names(p) <- names(trend_mgcv_model$coefficients)
       trend_mgcv_model$coefficients <- p
     }
+  }
+
+  if(lfo){
+    ss_gam <- NULL
   }
 
   #### Return the output as class mvgam ####

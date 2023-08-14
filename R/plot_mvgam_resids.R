@@ -211,7 +211,7 @@ oldpar <- par(mar=c(2.5, 2.3, 2, 2),
 # Extract expectation (fitted) values
 preds <- hindcast(object, type = 'expected')$hindcasts[[series]]
 series_residuals <- object$resids[[series]]
-limits <- quantile(preds, probs = c(0.025, 0.975))
+limits <- quantile(preds, probs = c(0.025, 0.975), na.rm = TRUE)
 
 # Plot resids vs fitted
 plot(1,
