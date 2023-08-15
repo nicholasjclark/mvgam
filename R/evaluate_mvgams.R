@@ -597,7 +597,8 @@ drps_score <- function(truth, fc, interval_width = 0.9,
     fc <- log(fc + 0.001)
   }
 
-  nsum <- 1000
+  #nsum <- 1000
+  nsum <- max(c(truth, fc)) + 1000
   Fy = ecdf(fc)
   ysum <- 0:nsum
   indicator <- ifelse(ysum - truth >= 0, 1, 0)
@@ -698,7 +699,8 @@ crps_mcmc_object <- function(truth, fc, interval_width = 0.9,
     scores <- matrix(NA, nrow = length(truth), ncol = 2)
     for(i in indices_keep){
       scores[i,] <- crps_score(truth = as.vector(truth)[i],
-                               fc = fc[,i], interval_width,
+                               fc = fc[,i],
+                               interval_width = interval_width,
                                log = log)
     }
   }
