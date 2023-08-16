@@ -451,12 +451,18 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
   series_fcs <- structure(list(call = object$call,
                                trend_call = object$trend_call,
                                family = object$family,
+                               family_pars = if(type == 'link'){
+                                 extract_family_pars(object = object)
+                               } else {
+                                 NULL
+                               },
                                trend_model = object$trend_model,
                                drift = object$drift,
                                use_lv = object$use_lv,
                                fit_engine = object$fit_engine,
                                type = type,
-                               series_names = levels(data_train$series),
+                               series_names = factor(unique(data_train$series),
+                                                     levels = levels(data_train$series)),
                                train_observations = series_obs,
                                test_observations = series_test,
                                hindcasts = series_hcs,

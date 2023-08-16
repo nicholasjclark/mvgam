@@ -4,10 +4,20 @@
 \alias{logLik.mvgam}
 \title{Compute pointwise Log-Likelihoods from fitted \code{mvgam} objects}
 \usage{
-\method{logLik}{mvgam}(object, n_cores = 1, ...)
+\method{logLik}{mvgam}(object, linpreds, newdata, family_pars, n_cores = 1, ...)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
+
+\item{linpreds}{Optional \code{matrix} of linear predictor draws to use for calculating
+poitwise log-likelihoods}
+
+\item{newdata}{Optional \code{data.frame} of \code{list} object specifying which series each column
+in \code{linpreds} belongs to. If \code{linpreds} is supplied, then \code{newdata} must also be supplied}
+
+\item{family_pars}{Optional \code{list} containing posterior draws of
+family-specific parameters (i.e. shape, scale or overdispersion parameters). Required if
+\code{linpreds} and \code{newdata} are supplied}
 
 \item{n_cores}{\code{integer} specifying number of cores for calculating likelihoods in parallel}
 
@@ -15,7 +25,9 @@
 }
 \value{
 A \code{matrix} of dimension \verb{n_samples x n_observations} containing the pointwise
-log-likelihood draws for all observations (training observations and, if supplied to the
+log-likelihood draws for all observations in \code{newdata}. If no \code{newdata} is supplied,
+log-likelihood draws are returned for all observations that were originally fed to
+the model (training observations and, if supplied to the
 original model via the \code{newdata} argument in \code{\link{mvgam}},
 testing observations)
 }

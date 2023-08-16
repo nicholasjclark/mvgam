@@ -4,8 +4,12 @@
 #'supplied to \code{forecast.mvgam} contained out of sample test observations, the calibration
 #'of probabilistic forecasts can be scored using proper scoring rules
 #'@param ... Ignored
-#'@param score \code{character} specifying the type of ranked probability score to use for evaluation. Options are:
-#'`variogram`, `drps` or `crps`
+#'@param score \code{character} specifying the type of proper scoring rule to use for evaluation. Options are:
+#'`variogram`, `elpd` (i.e. the Expected log pointwise Predictive Density),
+#'`drps` (i.e. the Discrete Rank Probability Score) or `crps` (the Continuous Rank Probability Score).
+#'Note that when choosing `elpd`, the supplied object must have forecasts on the `link` scale so that
+#'expectations can be calculated prior to scoring. For all other scores, forecasts should be supplied
+#'on the `response` scale (i.e. posterior predictions)
 #'@param log \code{logical}. Should the forecasts and truths be logged prior to scoring?
 #'This is often appropriate for comparing
 #'performance of models when series vary in their observation ranges
@@ -15,9 +19,10 @@
 #'are of less interest when forecasting. Ignored if \code{score != 'variogram'}
 #'@param interval_width proportional value on `[0.05,0.95]` defining the forecast interval
 #'for calculating coverage
+#'@param n_cores \code{integer} specifying number of cores for calculating scores in parallel
 #'@param ... Ignored
-#'@return a \code{list} containing scores and 90% interval coverages per forecast horizon.
-#'If \code{score %in% c('drps', 'crps')},
+#'@return a \code{list} containing scores and interval coverages per forecast horizon.
+#'If \code{score %in% c('drps', 'crps', 'elpd')},
 #'the list will also contain return the sum of all series-level scores per horizon. If
 #'\code{score == 'variogram'}, no series-level scores are computed and the only score returned
 #'will be for all series. For all scores, the `in_interval` column in each series-level
@@ -44,10 +49,22 @@
 score.mvgam_forecast = function(object, score = 'crps',
                                 log = FALSE, weights,
                                 interval_width = 0.9,
+                                n_cores = 1,
                                 ...){
+
+  score <- match.arg(arg = score,
+                           choices = c('crps',
+                                       'drps',
+                                       'elpd',
+                                       'variogram'))
 
   if(object$type == 'trend'){
     stop('cannot evaluate accuracy of latent trend forecasts. Use "type == response" when forecasting instead',
+         call. = FALSE)
+  }
+
+  if(object$type != 'link' & score == 'elpd'){
+    stop('cannot evaluate elpd scores unless . Use "type == response" when forecasting instead',
          call. = FALSE)
   }
 
@@ -60,6 +77,47 @@ score.mvgam_forecast = function(object, score = 'crps',
   truths <- do.call(rbind, lapply(seq_len(n_series), function(series){
     object$test_observations[[series]]
   }))
+
+  if(score == 'elpd'){
+    # Get linear predictor forecasts into the correct format
+    linpreds <- do.call(cbind, object$forecasts)
+
+    # Build a dataframe for indexing which series each observation belongs to
+    newdata <- data.frame(series = factor(sort(rep(object$series_names,
+                                                   NCOL(object$forecasts[[1]]))),
+                                          levels = levels(object$series_names)),
+                          y = unname(unlist(object$test_observations)))
+
+    class(object) <- c('mvgam', class(object))
+
+    # Calculate log-likelihoods
+    elpd_score <- logLik(object = object,
+                         linpreds = linpreds,
+                         newdata = newdata,
+                         family_pars = object$family_pars,
+                         n_cores = n_cores)
+    elpd_score <- apply(elpd_score, 2, log_mean_exp)
+
+    # Calculate coverage using one of the univariate scores
+    series_score <- lapply(seq_len(n_series), function(series){
+      DRPS <- data.frame(drps_mcmc_object(truths[series,],
+                                          object$forecasts[[series]],
+                                          log = log,
+                                          interval_width = interval_width))
+      colnames(DRPS) <- c('score','in_interval')
+      DRPS$score <- elpd_score[which(newdata$series ==
+                                       levels(object$series_names)[series])]
+      DRPS$interval_width <- interval_width
+      DRPS$eval_horizon <- seq(1, NCOL(object$forecasts[[1]]))
+      DRPS$score_type <- 'elpd'
+      DRPS
+    })
+    names(series_score) <- object$series_names
+    all_scores <- data.frame(score = rowSums(do.call(cbind, lapply(seq_len(n_series), function(series){
+      series_score[[series]]$score
+    }))), eval_horizon = seq(1, NCOL(object$forecasts[[1]])), score_type = 'sum_elpd')
+    series_score$all_series <- all_scores
+  }
 
   if(score == 'variogram'){
 

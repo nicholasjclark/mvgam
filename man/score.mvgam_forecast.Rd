@@ -5,15 +5,27 @@
 \alias{score}
 \title{Compute probabilistic forecast scores for mvgam objects}
 \usage{
-\method{score}{mvgam_forecast}(object, score = "crps", log = FALSE, weights, interval_width = 0.9, ...)
+\method{score}{mvgam_forecast}(
+  object,
+  score = "crps",
+  log = FALSE,
+  weights,
+  interval_width = 0.9,
+  n_cores = 1,
+  ...
+)
 
 score(object, ...)
 }
 \arguments{
 \item{object}{\code{mvgam_forecast} object. See \code{\link[=forecast.mvgam]{forecast.mvgam()}}.}
 
-\item{score}{\code{character} specifying the type of ranked probability score to use for evaluation. Options are:
-\code{variogram}, \code{drps} or \code{crps}}
+\item{score}{\code{character} specifying the type of proper scoring rule to use for evaluation. Options are:
+\code{variogram}, \code{elpd} (i.e. the Expected log pointwise Predictive Density),
+\code{drps} (i.e. the Discrete Rank Probability Score) or \code{crps} (the Continuous Rank Probability Score).
+Note that when choosing \code{elpd}, the supplied object must have forecasts on the \code{link} scale so that
+expectations can be calculated prior to scoring. For all other scores, forecasts should be supplied
+on the \code{response} scale (i.e. posterior predictions)}
 
 \item{log}{\code{logical}. Should the forecasts and truths be logged prior to scoring?
 This is often appropriate for comparing
@@ -27,11 +39,13 @@ are of less interest when forecasting. Ignored if \code{score != 'variogram'}}
 \item{interval_width}{proportional value on \verb{[0.05,0.95]} defining the forecast interval
 for calculating coverage}
 
+\item{n_cores}{\code{integer} specifying number of cores for calculating scores in parallel}
+
 \item{...}{Ignored}
 }
 \value{
 a \code{list} containing scores and 90\% interval coverages per forecast horizon.
-If \code{score \%in\% c('drps', 'crps')},
+If \code{score \%in\% c('drps', 'crps', 'elpd')},
 the list will also contain return the sum of all series-level scores per horizon. If
 \code{score == 'variogram'}, no series-level scores are computed and the only score returned
 will be for all series. For all scores, the \code{in_interval} column in each series-level

@@ -14,6 +14,8 @@ A \code{mvgam_forecast} object contains the following elements:
 \item \code{trend_call} If a \verb{trend_formula was supplied}, the original trend model formula is
 returned. Otherwise \code{NULL}
 \item \code{family} \code{character} description of the observation distribution
+\item \code{family_pars} \code{list} containing draws of family-specific parameters (i.e.
+shape, scale or overdispersion parameters). Only returned if \code{type = link}. Otherwise \code{NULL}
 \item \code{trend_model} \code{character} description of the latent trend model
 \item \code{drift} Logical specifying whether a drift term was used in the trend model
 \item \code{use_lv} Logical flag indicating whether latent dynamic factors were used in the model

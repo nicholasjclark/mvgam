@@ -8,6 +8,8 @@
 #'   \item `trend_call` If a `trend_formula was supplied`, the original trend model formula is
 #'   returned. Otherwise `NULL`
 #'   \item `family` \code{character} description of the observation distribution
+#'   \item `family_pars` \code{list} containing draws of family-specific parameters (i.e.
+#'   shape, scale or overdispersion parameters). Only returned if `type = link`. Otherwise `NULL`
 #'   \item `trend_model` \code{character} description of the latent trend model
 #'   \item `drift` Logical specifying whether a drift term was used in the trend model
 #'   \item `use_lv` Logical flag indicating whether latent dynamic factors were used in the model
