@@ -266,7 +266,7 @@ trend_par_names = function(trend_model,
 
     if(trend_model == 'GP'){
       param <- c('trend', 'alpha_gp', 'rho_gp',
-                 'LV', 'lv_coefs')
+                 'LV', 'lv_coefs', 'b_gp')
     }
 
     if(trend_model == 'VAR1'){
@@ -294,7 +294,7 @@ trend_par_names = function(trend_model,
     }
 
     if(trend_model == 'GP'){
-      param <- c('trend', 'alpha_gp', 'rho_gp')
+      param <- c('trend', 'alpha_gp', 'rho_gp', 'b_gp')
     }
 
     if(trend_model == 'VAR1'){

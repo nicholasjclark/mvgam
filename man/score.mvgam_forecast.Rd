@@ -44,13 +44,14 @@ for calculating coverage}
 \item{...}{Ignored}
 }
 \value{
-a \code{list} containing scores and 90\% interval coverages per forecast horizon.
+a \code{list} containing scores and interval coverages per forecast horizon.
 If \code{score \%in\% c('drps', 'crps', 'elpd')},
 the list will also contain return the sum of all series-level scores per horizon. If
 \code{score == 'variogram'}, no series-level scores are computed and the only score returned
-will be for all series. For all scores, the \code{in_interval} column in each series-level
+will be for all series. For all scores apart from \code{elpd}, the \code{in_interval} column in each series-level
 slot is a binary indicator of whether or not the true value was within the forecast's corresponding
-posterior empirical quantiles
+posterior empirical quantiles. Intervals are not calculated when using \code{elpd} because forecasts
+will only contain the linear predictors
 }
 \description{
 Compute probabilistic forecast scores for mvgam objects

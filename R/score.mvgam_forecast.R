@@ -25,9 +25,10 @@
 #'If \code{score %in% c('drps', 'crps', 'elpd')},
 #'the list will also contain return the sum of all series-level scores per horizon. If
 #'\code{score == 'variogram'}, no series-level scores are computed and the only score returned
-#'will be for all series. For all scores, the `in_interval` column in each series-level
+#'will be for all series. For all scores apart from `elpd`, the `in_interval` column in each series-level
 #'slot is a binary indicator of whether or not the true value was within the forecast's corresponding
-#'posterior empirical quantiles
+#'posterior empirical quantiles. Intervals are not calculated when using `elpd` because forecasts
+#'will only contain the linear predictors
 #'@examples
 #'\dontrun{
 #'#Simulate observations for three count-valued time series
@@ -64,7 +65,7 @@ score.mvgam_forecast = function(object, score = 'crps',
   }
 
   if(object$type != 'link' & score == 'elpd'){
-    stop('cannot evaluate elpd scores unless . Use "type == response" when forecasting instead',
+    stop('cannot evaluate elpd scores unless linear predictors are supplied. Use "type == link" when forecasting instead',
          call. = FALSE)
   }
 
@@ -98,19 +99,16 @@ score.mvgam_forecast = function(object, score = 'crps',
                          n_cores = n_cores)
     elpd_score <- apply(elpd_score, 2, log_mean_exp)
 
-    # Calculate coverage using one of the univariate scores
+    # Construct series-level score dataframes
     series_score <- lapply(seq_len(n_series), function(series){
       DRPS <- data.frame(drps_mcmc_object(truths[series,],
                                           object$forecasts[[series]],
                                           log = log,
                                           interval_width = interval_width))
-      colnames(DRPS) <- c('score','in_interval')
-      DRPS$score <- elpd_score[which(newdata$series ==
-                                       levels(object$series_names)[series])]
-      DRPS$interval_width <- interval_width
-      DRPS$eval_horizon <- seq(1, NCOL(object$forecasts[[1]]))
-      DRPS$score_type <- 'elpd'
-      DRPS
+      data.frame(score = elpd_score[which(newdata$series ==
+                                            levels(object$series_names)[series])],
+                 eval_horizon = seq(1, NCOL(object$forecasts[[1]])),
+                 score_type = 'elpd')
     })
     names(series_score) <- object$series_names
     all_scores <- data.frame(score = rowSums(do.call(cbind, lapply(seq_len(n_series), function(series){
