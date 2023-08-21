@@ -370,8 +370,8 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(min(partial_resids, min(cred) - 0.9 * sd(preds), na.rm = T)),
-                    max(max(partial_resids, max(cred) + 0.9 * sd(preds), na.rm = T))))
+           ylim = c(min(min(partial_resids, min(cred) - 0.4 * sd(preds), na.rm = T)),
+                    max(max(partial_resids, max(cred) + 0.4 * sd(preds), na.rm = T))))
 
       if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
         if(trend_effects){
@@ -602,8 +602,8 @@ plot_mvgam_smooth = function(object,
            xlab = smooth,
            ylab = 'Partial effect',
            xlim = c(min(pred_vals), max(pred_vals)),
-           ylim = c(min(min(partial_resids, min(cred) - 0.9 * sd(preds), na.rm = T)),
-                    max(max(partial_resids, max(cred) + 0.9 * sd(preds), na.rm = T))))
+           ylim = c(min(min(partial_resids, min(cred) - 0.4 * sd(preds), na.rm = T)),
+                    max(max(partial_resids, max(cred) + 0.4 * sd(preds), na.rm = T))))
       if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
         if(trend_effects){
           title(sub('series', 'trend',
@@ -642,9 +642,8 @@ plot_mvgam_smooth = function(object,
                    na.rm = TRUE)
         }))
         resid_probs <- rbind(quantile(as.vector(partial_resids[,which(obs_x == sorted_x[1])]),
-                                                probs = probs),
-                             resid_probs,
-                             na.rm = TRUE)
+                                                probs = probs, na.rm = TRUE),
+                             resid_probs)
 
       } else {
         resid_probs <- do.call(rbind, lapply(sorted_x, function(i){

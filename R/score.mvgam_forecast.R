@@ -5,7 +5,8 @@
 #'of probabilistic forecasts can be scored using proper scoring rules
 #'@param ... Ignored
 #'@param score \code{character} specifying the type of proper scoring rule to use for evaluation. Options are:
-#'`variogram`, `elpd` (i.e. the Expected log pointwise Predictive Density),
+#'`sis` (i.e. the Scaled Interval Score), `variogram`, `elpd`
+#'(i.e. the Expected log pointwise Predictive Density),
 #'`drps` (i.e. the Discrete Rank Probability Score) or `crps` (the Continuous Rank Probability Score).
 #'Note that when choosing `elpd`, the supplied object must have forecasts on the `link` scale so that
 #'expectations can be calculated prior to scoring. For all other scores, forecasts should be supplied
@@ -18,7 +19,7 @@
 #'forecasts. Useful for down-weighting series that have larger magnitude observations or that
 #'are of less interest when forecasting. Ignored if \code{score != 'variogram'}
 #'@param interval_width proportional value on `[0.05,0.95]` defining the forecast interval
-#'for calculating coverage
+#'for calculating coverage and, if `score = 'sis'`, for calculating the interval score
 #'@param n_cores \code{integer} specifying number of cores for calculating scores in parallel
 #'@param ... Ignored
 #'@return a \code{list} containing scores and interval coverages per forecast horizon.
@@ -57,6 +58,7 @@ score.mvgam_forecast = function(object, score = 'crps',
                            choices = c('crps',
                                        'drps',
                                        'elpd',
+                                       'sis',
                                        'variogram'))
 
   if(object$type == 'trend'){
@@ -143,6 +145,25 @@ score.mvgam_forecast = function(object, score = 'crps',
     series_score$all_series <- data.frame(score = var_score,
                                       eval_horizon = 1:NCOL(object$forecasts[[1]]),
                                       score_type = 'variogram')
+  }
+
+  if(score == 'sis'){
+    series_score <- lapply(seq_len(n_series), function(series){
+      SIS <- data.frame(sis_mcmc_object(truths[series,],
+                                          object$forecasts[[series]],
+                                          log = log,
+                                          interval_width = interval_width))
+      colnames(SIS) <- c('score','in_interval')
+      SIS$interval_width <- interval_width
+      SIS$eval_horizon <- seq(1, NCOL(object$forecasts[[1]]))
+      SIS$score_type <- 'sis'
+      SIS
+    })
+    names(series_score) <- object$series_names
+    all_scores <- data.frame(score = rowSums(do.call(cbind, lapply(seq_len(n_series), function(series){
+      series_score[[series]]$score
+    }))), eval_horizon = seq(1, NCOL(object$forecasts[[1]])), score_type = 'sum_sis')
+    series_score$all_series <- all_scores
   }
 
   if(score == 'drps'){

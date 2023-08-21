@@ -247,7 +247,7 @@ moddata <- do.call(rbind, moddata)
 predvals <- seq(min(preds[draws, ], na.rm = TRUE),
                 max(preds[draws, ], na.rm = TRUE),
                 length.out = 200)
-medmod <- bam(y ~ s(x), data = moddata)
+medmod <- bam(y ~ s(x), data = moddata, discrete = TRUE)
 medpreds <- predict(medmod, newdata = data.frame(x = predvals),
                       type = 'response', se.fit = TRUE)
 
@@ -340,7 +340,7 @@ plot(1, type = "n", bty = 'L',
      xaxt = 'n',
      ylim = range(c(cred,
                     -clim - 0.05,
-                    clim + 0.05)))
+                    clim + 0.05), na.rm = TRUE))
 axis(1, at = seq(1, NCOL(cred), by = 2))
 title('ACF', line = 0)
 title(ylab = "Autocorrelation", line = 1.5)
@@ -413,7 +413,7 @@ plot(1, type = "n", bty = 'L',
      xaxt = 'n',
      ylim = range(c(cred,
                     -clim - 0.05,
-                    clim + 0.05)))
+                    clim + 0.05), na.rm = TRUE))
 axis(1, at = seq(1, NCOL(cred), by = 2))
 title('pACF', line = 0)
 title(ylab = "Autocorrelation", line = 1.5)

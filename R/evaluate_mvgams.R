@@ -612,6 +612,36 @@ drps_score <- function(truth, fc, interval_width = 0.9,
   return(c(score, in_interval))
 }
 
+# Calculate out of sample scaled interval score
+#' @noRd
+sis_score <- function(truth, fc, interval_width = 0.9,
+                       log = FALSE){
+  if(log){
+    truth <- log(truth + 0.001)
+    fc <- log(fc + 0.001)
+  }
+
+  lower_prob <- (1 - interval_width) / 2
+  upper_prob <- 1 - lower_prob
+  creds <- quantile(fc, probs = c(lower_prob, upper_prob), na.rm = TRUE)
+  cred_lower <- creds[1]; cred_upper <- creds[2]; alpha <- 2 / (2 * lower_prob)
+  cred_interval <- (cred_upper - cred_lower) / 2
+  err_up <- truth - cred_upper
+  err_low <- cred_lower - truth
+
+  # SIS
+  score <- 2 * cred_interval + alpha * err_up * (err_up > 0) +
+    alpha * err_low * (err_low > 0)
+
+  # Is value within empirical interval?
+  interval <- quantile(fc, probs = c((1-interval_width)/2,
+                                     (interval_width + (1-interval_width)/2)),
+                       na.rm = TRUE)
+  in_interval <- ifelse(truth <= interval[2] & truth >= interval[1], 1, 0)
+  return(c(score, in_interval))
+}
+
+
 #' Compute the variogram score, using the median pairwise difference
 #' from the forecast distribution (scoringRules::vs_sample uses the
 #' mean, which is not appropriate for skewed distributions)
@@ -669,7 +699,7 @@ variogram_mcmc_object <- function(truths, fcs, log = FALSE,
   }))
 }
 
-# Wrapper to calculate scores on all observations in fc_horizon
+# Wrapper to calculate DRPS scores on all observations in fc_horizon
 #' @noRd
 drps_mcmc_object <- function(truth, fc, interval_width = 0.9,
                              log = FALSE){
@@ -688,6 +718,26 @@ drps_mcmc_object <- function(truth, fc, interval_width = 0.9,
   scores
 }
 
+# Wrapper to calculate <SIS scores on all observations in fc_horizon
+#' @noRd
+sis_mcmc_object <- function(truth, fc, interval_width = 0.9,
+                             log = FALSE){
+  indices_keep <- which(!is.na(truth))
+  if(length(indices_keep) == 0){
+    scores = data.frame('sis' = rep(NA, length(truth)),
+                        'interval' = rep(NA, length(truth)))
+  } else {
+    scores <- matrix(NA, nrow = length(truth), ncol = 2)
+    for(i in indices_keep){
+      scores[i,] <- sis_score(truth = as.vector(truth)[i],
+                               fc = fc[,i], interval_width,
+                               log = log)
+    }
+  }
+  scores
+}
+
+# Wrapper to calculate CRPS scores on all observations in fc_horizon
 #' @noRd
 crps_mcmc_object <- function(truth, fc, interval_width = 0.9,
                              log = FALSE){

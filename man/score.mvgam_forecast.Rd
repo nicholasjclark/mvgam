@@ -21,7 +21,8 @@ score(object, ...)
 \item{object}{\code{mvgam_forecast} object. See \code{\link[=forecast.mvgam]{forecast.mvgam()}}.}
 
 \item{score}{\code{character} specifying the type of proper scoring rule to use for evaluation. Options are:
-\code{variogram}, \code{elpd} (i.e. the Expected log pointwise Predictive Density),
+\code{sis} (i.e. the Scaled Interval Score), \code{variogram}, \code{elpd}
+(i.e. the Expected log pointwise Predictive Density),
 \code{drps} (i.e. the Discrete Rank Probability Score) or \code{crps} (the Continuous Rank Probability Score).
 Note that when choosing \code{elpd}, the supplied object must have forecasts on the \code{link} scale so that
 expectations can be calculated prior to scoring. For all other scores, forecasts should be supplied
@@ -37,7 +38,7 @@ forecasts. Useful for down-weighting series that have larger magnitude observati
 are of less interest when forecasting. Ignored if \code{score != 'variogram'}}
 
 \item{interval_width}{proportional value on \verb{[0.05,0.95]} defining the forecast interval
-for calculating coverage}
+for calculating coverage and, if \code{score = 'sis'}, for calculating the interval score}
 
 \item{n_cores}{\code{integer} specifying number of cores for calculating scores in parallel}
 
