@@ -5,7 +5,7 @@
 #'of probabilistic forecasts can be scored using proper scoring rules
 #'@param ... Ignored
 #'@param score \code{character} specifying the type of proper scoring rule to use for evaluation. Options are:
-#'`sis` (i.e. the Scaled Interval Score), `variogram`, `elpd`
+#'`sis` (i.e. the Scaled Interval Score), `energy`, `variogram`, `elpd`
 #'(i.e. the Expected log pointwise Predictive Density),
 #'`drps` (i.e. the Discrete Rank Probability Score) or `crps` (the Continuous Rank Probability Score).
 #'Note that when choosing `elpd`, the supplied object must have forecasts on the `link` scale so that
@@ -25,7 +25,7 @@
 #'@return a \code{list} containing scores and interval coverages per forecast horizon.
 #'If \code{score %in% c('drps', 'crps', 'elpd')},
 #'the list will also contain return the sum of all series-level scores per horizon. If
-#'\code{score == 'variogram'}, no series-level scores are computed and the only score returned
+#'\code{score %in% c('energy','variogram')}, no series-level scores are computed and the only score returned
 #'will be for all series. For all scores apart from `elpd`, the `in_interval` column in each series-level
 #'slot is a binary indicator of whether or not the true value was within the forecast's corresponding
 #'posterior empirical quantiles. Intervals are not calculated when using `elpd` because forecasts
@@ -59,6 +59,7 @@ score.mvgam_forecast = function(object, score = 'crps',
                                        'drps',
                                        'elpd',
                                        'sis',
+                                       'energy',
                                        'variogram'))
 
   if(object$type == 'trend'){
@@ -119,7 +120,7 @@ score.mvgam_forecast = function(object, score = 'crps',
     series_score$all_series <- all_scores
   }
 
-  if(score == 'variogram'){
+  if(score %in% c('energy', 'variogram')){
 
     if(missing(weights)){
       weights <- rep(1, length(object$series_names))
@@ -138,13 +139,24 @@ score.mvgam_forecast = function(object, score = 'crps',
     })
     names(series_score) <- object$series_names
 
-    var_score <- variogram_mcmc_object(truths = truths,
-                                                  fcs = object$forecasts,
-                                                  log = log,
-                                                  weights = weights)
-    series_score$all_series <- data.frame(score = var_score,
-                                      eval_horizon = 1:NCOL(object$forecasts[[1]]),
-                                      score_type = 'variogram')
+    if(score == 'variogram'){
+      var_score <- variogram_mcmc_object(truths = truths,
+                                         fcs = object$forecasts,
+                                         log = log,
+                                         weights = weights)
+      series_score$all_series <- data.frame(score = var_score,
+                                            eval_horizon = 1:NCOL(object$forecasts[[1]]),
+                                            score_type = 'variogram')
+    }
+
+    if(score == 'energy'){
+      en_score <- energy_mcmc_object(truths = truths,
+                                     fcs = object$forecasts,
+                                     log = log)
+      series_score$all_series <- data.frame(score = en_score,
+                                            eval_horizon = 1:NCOL(object$forecasts[[1]]),
+                                            score_type = 'energy')
+    }
   }
 
   if(score == 'sis'){

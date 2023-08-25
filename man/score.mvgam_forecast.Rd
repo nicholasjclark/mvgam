@@ -21,7 +21,7 @@ score(object, ...)
 \item{object}{\code{mvgam_forecast} object. See \code{\link[=forecast.mvgam]{forecast.mvgam()}}.}
 
 \item{score}{\code{character} specifying the type of proper scoring rule to use for evaluation. Options are:
-\code{sis} (i.e. the Scaled Interval Score), \code{variogram}, \code{elpd}
+\code{sis} (i.e. the Scaled Interval Score), \code{energy}, \code{variogram}, \code{elpd}
 (i.e. the Expected log pointwise Predictive Density),
 \code{drps} (i.e. the Discrete Rank Probability Score) or \code{crps} (the Continuous Rank Probability Score).
 Note that when choosing \code{elpd}, the supplied object must have forecasts on the \code{link} scale so that
@@ -48,7 +48,7 @@ for calculating coverage and, if \code{score = 'sis'}, for calculating the inter
 a \code{list} containing scores and interval coverages per forecast horizon.
 If \code{score \%in\% c('drps', 'crps', 'elpd')},
 the list will also contain return the sum of all series-level scores per horizon. If
-\code{score == 'variogram'}, no series-level scores are computed and the only score returned
+\code{score \%in\% c('energy','variogram')}, no series-level scores are computed and the only score returned
 will be for all series. For all scores apart from \code{elpd}, the \code{in_interval} column in each series-level
 slot is a binary indicator of whether or not the true value was within the forecast's corresponding
 posterior empirical quantiles. Intervals are not calculated when using \code{elpd} because forecasts

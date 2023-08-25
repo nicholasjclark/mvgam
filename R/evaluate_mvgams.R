@@ -641,6 +641,35 @@ sis_score <- function(truth, fc, interval_width = 0.9,
   return(c(score, in_interval))
 }
 
+#' Compute the multivariate energy score
+#' @importFrom scoringRules es_sample
+#' @noRd
+energy_score <- function(truth, fc, log = FALSE) {
+  if(log){
+    truth <- log(truth + 0.001)
+    fc <- log(fc + 0.001)
+  }
+  es <- es_sample(y = truth, dat = fc)
+  return(es)
+}
+
+#' Wrapper to calculate energy score on all observations in fc_horizon
+#' @noRd
+energy_mcmc_object <- function(truths, fcs, log = FALSE,
+                                  weights){
+  fc_horizon <- length(fcs[[1]][1,])
+  fcs_per_horizon <- lapply(seq_len(fc_horizon), function(horizon){
+    do.call(rbind, lapply(seq_along(fcs), function(fc){
+      fcs[[fc]][,horizon]
+    }))
+  })
+
+  unlist(lapply(seq_len(fc_horizon), function(horizon){
+    energy_score(truth = truths[,horizon],
+                 fc = fcs_per_horizon[[horizon]],
+                 log = log)
+  }))
+}
 
 #' Compute the variogram score, using the median pairwise difference
 #' from the forecast distribution (scoringRules::vs_sample uses the
