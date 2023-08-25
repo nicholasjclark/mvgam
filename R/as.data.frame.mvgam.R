@@ -112,6 +112,11 @@ as.data.frame.mvgam = function(x,
                                                    'AR2', 'AR3')){
       to_extract <- c(to_extract, 'sigma')
     }
+
+    if(!is.null(x$trend_call) & x$trend_model %in% c('VAR1', 'VAR1cor')){
+      to_extract <- c(to_extract, 'Sigma')
+    }
+
     post <- mcmc_chains(x$model_output, params = to_extract)
     varnames <- dimnames(post)[[2]]
     post <- as.data.frame(post)

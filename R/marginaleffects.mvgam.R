@@ -138,6 +138,11 @@ get_data.mvgam = function (x, source = "environment", verbose = TRUE, ...) {
       mf_data$trend_series <- trend_level_data$trend_series[idx]
       mf_data$time <- trend_level_data$time[idx]
 
+      if('series' %in% names(mf_data)){
+        mf_data %>%
+          dplyr::select(-series) -> mf_data
+      }
+
       # Now join with the original data so the original observations can
       # be included
       trend_level_data %>%

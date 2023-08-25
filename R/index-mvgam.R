@@ -136,13 +136,15 @@ variables.mvgam = function(x, ...){
   if(any(grepl(paste(c('sigma', 'alpha_gp',
                        'rho_gp',
                        'ar1', 'ar2',
-                       'ar3', '//bA//b'), collapse = '|'),
+                       'ar3', '//bA//b',
+                       'Sigma'), collapse = '|'),
                parnames) &
          !grepl('sigma_obs', parnames, fixed = TRUE))){
     trend_pars <- grepl(paste(c('sigma', 'alpha_gp',
                                 'rho_gp',
                                 'ar1', 'ar2',
-                                'ar3', '//bA//b'), collapse = '|'),
+                                'ar3', '//bA//b',
+                                'Sigma'), collapse = '|'),
                         parnames) &
       !grepl('sigma_obs', parnames, fixed = TRUE)
     trend_pars <- data.frame(orig_name = parnames[trend_pars],
