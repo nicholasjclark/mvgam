@@ -608,9 +608,6 @@ ds_resids_nb = function(truth, fitted, draw, size){
   u_obs <- runif(n = length(draw[!na_obs]), min = a_obs, max = b_obs)
 
   if(any(is.na(truth))){
-    u_na <- runif(n = length(draw[na_obs]),
-                  min = 0, max = 1)
-    u <- vector(length = length(truth))
     u[na_obs] <- NaN
     u[!na_obs] <- u_obs
   } else {
@@ -637,9 +634,6 @@ ds_resids_beta = function(truth, fitted, draw, precision){
                  max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
-    u_na <- runif(n = length(draw[na_obs]),
-                  min = 0, max = 1)
-    u <- vector(length = length(truth))
     u[na_obs] <- NaN
     u[!na_obs] <- u_obs
   } else {
@@ -662,9 +656,6 @@ ds_resids_pois = function(truth, fitted, draw){
                  max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
-    u_na <- runif(n = length(draw[na_obs]),
-                  min = 0, max = 1)
-    u <- vector(length = length(truth))
     u[na_obs] <- NaN
     u[!na_obs] <- u_obs
   } else {
@@ -686,9 +677,6 @@ ds_resids_tw = function(truth, fitted, draw){
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
-    u_na <- runif(n = length(draw[na_obs]),
-                  min = 0, max = 1)
-    u <- vector(length = length(truth))
     u[na_obs] <- NaN
     u[!na_obs] <- u_obs
   } else {
@@ -712,9 +700,6 @@ ds_resids_gaus = function(truth, fitted, sigma, draw){
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
-    u_na <- runif(n = length(draw[na_obs]),
-                  min = 0, max = 1)
-    u <- vector(length = length(truth))
     u[na_obs] <- NaN
     u[!na_obs] <- u_obs
   } else {
@@ -738,9 +723,6 @@ ds_resids_lnorm = function(truth, fitted, sigma, draw){
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
-    u_na <- runif(n = length(draw[na_obs]),
-                  min = 0, max = 1)
-    u <- vector(length = length(truth))
     u[na_obs] <- NaN
     u[!na_obs] <- u_obs
   } else {
@@ -764,9 +746,6 @@ ds_resids_gamma = function(truth, fitted, shape, draw){
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
-    u_na <- runif(n = length(draw[na_obs]),
-                  min = 0, max = 1)
-    u <- vector(length = length(truth))
     u[na_obs] <- NaN
     u[!na_obs] <- u_obs
   } else {
@@ -792,9 +771,6 @@ ds_resids_student = function(truth, fitted, sigma, nu, draw){
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
-    u_na <- runif(n = length(draw[na_obs]),
-                  min = 0, max = 1)
-    u <- vector(length = length(truth))
     u[na_obs] <- NaN
     u[!na_obs] <- u_obs
   } else {

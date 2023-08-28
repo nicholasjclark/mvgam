@@ -13,7 +13,6 @@
 #'@param fc_horizon Integer specifying the number of time steps ahead for evaluating forecasts
 #'@param pareto_k_threshold Proportion specifying the threshold over which the Pareto shape parameter
 #'is considered unstable, triggering a model refit. Default is `0.7`
-#'@param n_cores \code{integer} specifying number of cores for calculating likelihoods in parallel
 #'@param ... Ignored
 #'@details Approximate leave-future-out cross-validation uses an expanding training window scheme
 #' to evaluate a model on its forecasting ability. The steps used in this function mirror those laid out
@@ -52,12 +51,10 @@ lfo_cv.mvgam = function(object,
                         min_t,
                         fc_horizon = 1,
                         pareto_k_threshold = 0.7,
-                        n_cores = 1,
                         ...){
 
   validate_proportional(pareto_k_threshold)
   validate_pos_integer(fc_horizon)
-  validate_pos_integer(n_cores)
 
   if(missing(data)){
     all_data <- object$obs_data
@@ -96,7 +93,7 @@ lfo_cv.mvgam = function(object,
   fc_indices <- which(c(data_splits$data_train$time,
                         data_splits$data_test$time) %in%
                         (min_t + 1):(min_t + fc_horizon))
-  loglik_past <- logLik(fit_past, n_cores = n_cores)
+  loglik_past <- logLik(fit_past)
 
   # Store the EPLD estimate
   approx_elpds[min_t + 1] <- log_mean_exp(sum_rows(loglik_past[,fc_indices]))
@@ -146,7 +143,7 @@ lfo_cv.mvgam = function(object,
       fc_indices <- which(c(data_splits$data_train$time,
                             data_splits$data_test$time) %in%
                             (i + 1):(i + fc_horizon))
-      loglik_past <- logLik(fit_past, n_cores = n_cores)
+      loglik_past <- logLik(fit_past)
       approx_elpds[i + 1] <- log_mean_exp(sum_rows(loglik_past[,fc_indices]))
     } else {
       # If k below threshold, calculate log likelihoods for the

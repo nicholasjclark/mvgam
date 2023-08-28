@@ -9,7 +9,6 @@
 #'@param family_pars Optional `list` containing posterior draws of
 #'family-specific parameters (i.e. shape, scale or overdispersion parameters). Required if
 #'`linpreds` and `newdata` are supplied
-#'@param n_cores \code{integer} specifying number of cores for calculating likelihoods in parallel
 #'@param ... Ignored
 #'@return A `matrix` of dimension `n_samples x n_observations` containing the pointwise
 #'log-likelihood draws for all observations in `newdata`. If no `newdata` is supplied,
@@ -19,9 +18,7 @@
 #'testing observations)
 #'@export
 logLik.mvgam = function(object, linpreds, newdata,
-                        family_pars, n_cores = 1, ...){
-
-  validate_pos_integer(n_cores)
+                        family_pars, ...){
 
   if(!missing(linpreds) & missing(newdata)){
     stop('argument "newdata" must be supplied when "linpreds" is supplied')
@@ -81,54 +78,33 @@ logLik.mvgam = function(object, linpreds, newdata,
     n_series <- length(object$series_names)
   }
 
-  # Calculate log-likelihoods
-  cl <- parallel::makePSOCKcluster(n_cores)
-  setDefaultCluster(cl)
-  clusterExport(NULL, c('n_series',
-                        'series_obs',
-                        'obs',
-                        'family_pars',
-                        'mus'),
-                envir = environment())
+  # Family parameters spread into a vector
+  family_extracts <- lapply(seq_along(family_pars), function(j){
+    if(is.matrix(family_pars[[j]])){
+      as.vector(family_pars[[j]][, series_obs])
+    } else {
+      family_pars[[j]][]
+    }
+  })
+  names(family_extracts) <- names(family_pars)
 
-  clusterExport(cl = cl,
-                unclass(lsf.str(envir = asNamespace("mvgam"),
-                                all = T)),
-                envir = as.environment(asNamespace("mvgam"))
-  )
+  # Create a truth matrix that can also be spread to a vector
+  truth_mat <- matrix(rep(obs, NROW(mus)),
+                      nrow = NROW(mus),
+                      byrow = TRUE)
 
-  pbapply::pboptions(type = "none")
-  log_lik_mat <- do.call(rbind, pbapply::pblapply(seq_len(dim(mus)[1]),
-                                                  function(samp_index){
+  # Log-likelihood as a vector
+  Xp <- as.matrix(as.vector(mus))
+  attr(Xp, 'model.offset') <- 0
+  log_lik_vec <- mvgam_predict(family = family,
+                               family_pars = family_extracts,
+                               truth = as.vector(truth_mat),
+                               type = 'link',
+                               Xp = Xp,
+                               betas = 1,
+                               density = TRUE)
 
-    # Loop across each observation in obs and calculate the log-likelihood
-    liks <- unlist(lapply(seq_along(obs), function(x){
-
-      # Family-specific parameters
-      family_extracts <- lapply(seq_along(family_pars), function(j){
-        if(is.matrix(family_pars[[j]])){
-          family_pars[[j]][samp_index, series_obs[x]]
-        } else {
-          family_pars[[j]][samp_index]
-        }
-      })
-      names(family_extracts) <- names(family_pars)
-
-      # Log-likelihood
-      Xp <- t(as.matrix(mus[samp_index, x]))
-      attr(Xp, 'model.offset') <- 0
-      mvgam_predict(family = family,
-                    family_pars = family_extracts,
-                    truth = obs[x],
-                    type = 'link',
-                    Xp = Xp,
-                    betas = 1,
-                    density = TRUE)
-
-    }))
-
-  }, cl = cl))
-  stopCluster(cl)
-
+  # Convert back to matrix and return
+  log_lik_mat <- matrix(log_lik_vec, nrow = NROW(mus))
   return(log_lik_mat)
 }

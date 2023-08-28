@@ -7,15 +7,7 @@
 \usage{
 lfo_cv(object, ...)
 
-\method{lfo_cv}{mvgam}(
-  object,
-  data,
-  min_t,
-  fc_horizon = 1,
-  pareto_k_threshold = 0.7,
-  n_cores = 1,
-  ...
-)
+\method{lfo_cv}{mvgam}(object, data, min_t, fc_horizon = 1, pareto_k_threshold = 0.7, ...)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
@@ -36,8 +28,6 @@ from the data. Default is either \code{30}, or whatever training time allows for
 
 \item{pareto_k_threshold}{Proportion specifying the threshold over which the Pareto shape parameter
 is considered unstable, triggering a model refit. Default is \code{0.7}}
-
-\item{n_cores}{\code{integer} specifying number of cores for calculating likelihoods in parallel}
 }
 \value{
 A \code{list} of class \code{mvgam_lfo} containing the approximate ELPD scores,

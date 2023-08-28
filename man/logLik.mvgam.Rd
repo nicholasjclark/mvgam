@@ -4,7 +4,7 @@
 \alias{logLik.mvgam}
 \title{Compute pointwise Log-Likelihoods from fitted \code{mvgam} objects}
 \usage{
-\method{logLik}{mvgam}(object, linpreds, newdata, family_pars, n_cores = 1, ...)
+\method{logLik}{mvgam}(object, linpreds, newdata, family_pars, ...)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
@@ -18,8 +18,6 @@ in \code{linpreds} belongs to. If \code{linpreds} is supplied, then \code{newdat
 \item{family_pars}{Optional \code{list} containing posterior draws of
 family-specific parameters (i.e. shape, scale or overdispersion parameters). Required if
 \code{linpreds} and \code{newdata} are supplied}
-
-\item{n_cores}{\code{integer} specifying number of cores for calculating likelihoods in parallel}
 
 \item{...}{Ignored}
 }

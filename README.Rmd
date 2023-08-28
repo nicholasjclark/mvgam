@@ -347,7 +347,7 @@ Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-fut
 For this example, we simulate a single count-valued time series of length `T = 60`, using a latent `AR1` trend and a cyclic seasonal pattern. Two models are fit as before, the first is a complex but more correct model, while the second is simpler and mis-specified. We then run approximate leave-future-out cross-validation, setting `min_t = 36` so that the first refit uses all observations from `t = 1` to `t = 36`. This is done for both models so that we can compare approximate ELPD values when forecasting two time steps ahead (`fc_horizon = 2`)
 ```{r, eval=FALSE}
 set.seed(12345)
-simdat <- sim_mvgam(T = 60, train_prop = 1, n_series = 1,
+simdat <- sim_mvgam(T = 60, prop_train = 1, n_series = 1,
                     mu = 2,
                     trend_model = 'AR1', trend_rel = 0.35)
 good <- mvgam(y ~ s(season, bs = 'cc', k = 8),
@@ -357,11 +357,9 @@ good <- mvgam(y ~ s(season, bs = 'cc', k = 8),
 poor <- update(good, formula = y ~ 1,
                trend_model = 'RW')
 lfo_good <- lfo_cv(good, min_t = 36,
-                   fc_horizon = 2,
-                   n_cores = 3)
+                   fc_horizon = 2)
 lfo_poor <- lfo_cv(poor, min_t = 36,
-                   fc_horizon = 2,
-                   n_cores = 3)
+                   fc_horizon = 2)
 ```
 
 ```{r, include=FALSE}
@@ -376,11 +374,9 @@ good <- mvgam(y ~ s(season, bs = 'cc', k = 8),
 poor <- update(good, formula = y ~ 1,
                trend_model = 'RW')
 lfo_good <- lfo_cv(good, min_t = 36,
-                   fc_horizon = 2,
-                   n_cores = 3)
+                   fc_horizon = 2)
 lfo_poor <- lfo_cv(poor, min_t = 36,
-                   fc_horizon = 2,
-                   n_cores = 3)
+                   fc_horizon = 2)
 ```
 
 The `S3` plotting function for these `lfo_cv` objects will show the Pareto-k values and ELPD values over the evaluation time points. For the Pareto-k plot, a dashed red line indicates the specified threshold chosen for triggering model refits. For the ELPD plot, a dashed red line indicates the bottom 10% quantile of ELPD values. Points below this threshold may represent outliers that were more difficult to forecast

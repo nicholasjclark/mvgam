@@ -18,12 +18,12 @@ License: MIT + file LICENSE
 Depends: 
     R (>= 3.6.0),
     mgcv (>= 1.8-13),
+    brms (>= 2.17),
     marginaleffects,
     insight (>= 0.19.1),
     methods
 Imports: 
     rstan (>= 2.19.2),
-    brms (>= 2.17),
     posterior (>= 1.0.0),
     loo (>= 2.3.1),
     parallel,
