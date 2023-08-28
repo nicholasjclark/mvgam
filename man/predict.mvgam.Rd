@@ -4,15 +4,7 @@
 \alias{predict.mvgam}
 \title{Predict from the GAM component of an mvgam model}
 \usage{
-\method{predict}{mvgam}(
-  object,
-  newdata,
-  data_test,
-  type = "link",
-  process_error = TRUE,
-  n_cores = 1,
-  ...
-)
+\method{predict}{mvgam}(object, newdata, data_test, type = "link", process_error = TRUE, ...)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
@@ -34,8 +26,6 @@ predictions on the outcome scale}
 expected uncertainty in the process model is accounted for by using draws
 from the latent trend SD parameters. If \code{FALSE}, uncertainty in the latent trend
 component is ignored when calculating predictions}
-
-\item{n_cores}{\code{integer} specifying number of cores for generating predictions in parallel}
 
 \item{...}{Ignored}
 }

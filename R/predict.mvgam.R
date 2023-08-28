@@ -1,6 +1,4 @@
 #'Predict from the GAM component of an mvgam model
-#'@importFrom parallel clusterExport stopCluster setDefaultCluster
-#'@importFrom utils lsf.str
 #'@importFrom stats predict
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing the
@@ -8,7 +6,6 @@
 #'predictions are generated for the original observations used for the model fit.
 #'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
 #'\code{newdata} instead for more seamless integration into `R` workflows
-#'@param n_cores \code{integer} specifying number of cores for generating predictions in parallel
 #'@param type When this has the value \code{link} (default) the linear predictor is calculated on the link scale.
 #'If \code{expected} is used, predictions reflect the expectation of the response (the mean)
 #'but ignore uncertainty in the observation process. When \code{response} is used,
@@ -37,8 +34,7 @@
 predict.mvgam = function(object, newdata,
                          data_test,
                          type = 'link',
-                         process_error = TRUE,
-                         n_cores = 1, ...){
+                         process_error = TRUE, ...){
 
   # Argument checks
   if(!missing("data_test")){
@@ -56,7 +52,6 @@ predict.mvgam = function(object, newdata,
                              levels = levels(object$obs_data$series))
   }
 
-  validate_pos_integer(n_cores)
   type <- match.arg(arg = type, choices = c("link",
                                             "expected",
                                             "response"))
@@ -81,10 +76,9 @@ predict.mvgam = function(object, newdata,
     if(object$trend_model %in% c('VAR1')){
       family_pars <- list(sigma_obs =
                             mcmc_chains(object$model_output, 'Sigma')[ ,
-                               seq(1, NCOL(object$ytimes)^2,
-                                   by = NCOL(object$ytimes)+1)])
+                                                                       seq(1, NCOL(object$ytimes)^2,
+                                                                           by = NCOL(object$ytimes)+1)])
     }
-
 
     # Indicators of which trend to use for each observation
     if(inherits(newdata, 'list')){
@@ -99,47 +93,33 @@ predict.mvgam = function(object, newdata,
         dplyr::left_join(object$trend_map,
                          by = 'series') -> newdata_trend
     }
-
     trend_ind <- as.numeric(newdata_trend$trend)
 
     # Beta coefficients for GAM process model component
     betas <- mcmc_chains(object$model_output, 'b_trend')
 
-    # Loop across all posterior samples and calculate
-    # trend predictions
-    cl <- parallel::makePSOCKcluster(n_cores)
-    setDefaultCluster(cl)
-    clusterExport(NULL, c('betas',
-                          'family_pars',
-                          'Xp',
-                          'trend_ind'),
-                  envir = environment())
-    parallel::clusterExport(cl = cl,
-                            unclass(lsf.str(envir = asNamespace("mvgam"),
-                                            all = T)),
-                            envir = as.environment(asNamespace("mvgam"))
-    )
+    # Family parameters spread into a vector
+    family_extracts <- lapply(seq_along(family_pars), function(j){
+      if(is.matrix(family_pars[[j]])){
+        as.vector(family_pars[[j]][, trend_ind])
+      } else {
+        family_pars[[j]]
+      }
+    })
+    names(family_extracts) <- names(family_pars)
 
-    pbapply::pboptions(type = "none")
-    trend_predictions <- do.call(rbind, pbapply::pblapply(seq_len(dim(betas)[1]),
-                                                          function(x){
+    # Pre-multiply the linear predictors
+    all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
+                                                function(row) Xp %*% row +
+                                                  attr(Xp, 'model.offset')))))
+    attr(all_linpreds, 'model.offset') <- 0
 
-                                                            # Trend-specific SD parameters
-                                                            par_extracts <- lapply(seq_along(family_pars), function(j){
-                                                              if(is.matrix(family_pars[[j]])){
-                                                                family_pars[[j]][x, trend_ind]
-                                                              } else {
-                                                                family_pars[[j]][x]
-                                                              }
-                                                            })
-                                                            names(par_extracts) <- names(family_pars)
-                                                            mvgam_predict(family = 'gaussian',
-                                                                          Xp = Xp,
-                                                                          type = 'response',
-                                                                          betas = betas[x,],
-                                                                          family_pars = par_extracts)
-                                                          }, cl = cl))
-    stopCluster(cl)
+    # Trend stationary predictions
+    trend_predictions <- mvgam_predict(family = 'gaussian',
+                                       Xp = all_linpreds,
+                                       type = 'response',
+                                       betas = 1,
+                                       family_pars = family_extracts)
 
   } else if(object$trend_model != 'None' & process_error){
     # If no linear predictor for the trends but a dynamic trend model was used,
@@ -204,47 +184,34 @@ predict.mvgam = function(object, newdata,
       Xp <- matrix(1, ncol = 1, nrow = NROW(newdata))
       attr(Xp, 'model.offset') <- 0
 
-      # Loop across all posterior samples and calculate
-      # trend predictions
-      cl <- parallel::makePSOCKcluster(n_cores)
-      setDefaultCluster(cl)
-      clusterExport(NULL, c('betas',
-                            'family_pars',
-                            'Xp',
-                            'trend_ind'),
-                    envir = environment())
-      parallel::clusterExport(cl = cl,
-                              unclass(lsf.str(envir = asNamespace("mvgam"),
-                                              all = T)),
-                              envir = as.environment(asNamespace("mvgam"))
-      )
+      # Family parameters spread into a vector
+      family_extracts <- lapply(seq_along(family_pars), function(j){
+        if(is.matrix(family_pars[[j]])){
+          as.vector(family_pars[[j]][, trend_ind])
+        } else {
+          family_pars[[j]]
+        }
+      })
+      names(family_extracts) <- names(family_pars)
 
-      pbapply::pboptions(type = "none")
-      trend_predictions <- do.call(rbind,
-                                   pbapply::pblapply(seq_len(dim(betas)[1]),
-                                                     function(x){
+      # Pre-multiply the linear predictors
+      all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
+                                                  function(row) Xp %*% row +
+                                                    attr(Xp, 'model.offset')))))
+      attr(all_linpreds, 'model.offset') <- 0
 
-                                                       # Trend-specific SD parameters
-                                                       par_extracts <- lapply(seq_along(family_pars), function(j){
-                                                         if(is.matrix(family_pars[[j]])){
-                                                           family_pars[[j]][x, trend_ind]
-                                                         } else {
-                                                           family_pars[[j]][x]
-                                                         }
-                                                       })
-                                                       names(par_extracts) <- names(family_pars)
-                                                       mvgam_predict(family = 'gaussian',
-                                                                     Xp = Xp,
-                                                                     type = 'response',
-                                                                     betas = betas[x,],
-                                                                     family_pars = par_extracts)
-                                                     }, cl = cl))
-      stopCluster(cl)
+      # Trend stationary predictions
+      trend_predictions <- mvgam_predict(family = 'gaussian',
+                                         Xp = all_linpreds,
+                                         type = 'response',
+                                         betas = 1,
+                                         family_pars = family_extracts)
+
     }
   } else {
     # If no trend_model was used, or if process_error == FALSE,
     # ignore uncertainty in any latent trend component
-    trend_predictions <- NULL
+    trend_predictions <- 0
   }
 
   #### Once trend predictions are made, calculate observation predictions ####
@@ -264,61 +231,33 @@ predict.mvgam = function(object, newdata,
   # Determine which series each observation belongs to
   series_ind <- as.numeric(newdata$series)
 
-  # Loop across all posterior samples and calculate observation model
-  # predictions
-  cl <- parallel::makePSOCKcluster(n_cores)
-  setDefaultCluster(cl)
-
-  trend_model <- object$trend_model
-
-  clusterExport(NULL, c('betas',
-                        'family_pars',
-                        'trend_model',
-                        'family',
-                        'trend_predictions',
-                        'type',
-                        'Xp',
-                        'series_ind'),
-                envir = environment())
-  parallel::clusterExport(cl = cl,
-                          unclass(lsf.str(envir = asNamespace("mvgam"),
-                                          all = T)),
-                          envir = as.environment(asNamespace("mvgam"))
-  )
-  pbapply::pboptions(type = "none")
-  predictions <- do.call(rbind, pbapply::pblapply(seq_len(dim(betas)[1]), function(x){
-
-    # Family-specific parameters
-    par_extracts <- lapply(seq_along(family_pars), function(j){
-      if(is.matrix(family_pars[[j]])){
-        family_pars[[j]][x, series_ind]
-      } else {
-        family_pars[[j]][x]
-      }
-    })
-    names(par_extracts) <- names(family_pars)
-
-    # Set up Xp matrix to include the latent process predictions
-    # if necessary
-    if(trend_model != 'None' & !is.null(trend_predictions[x,])){
-      Xpmat <- cbind(as.matrix(Xp),
-                     trend_predictions[x,])
-      attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
-      betas_pred <- c(betas[x,], 1)
+  # Family parameters spread into a vector
+  family_extracts <- lapply(seq_along(family_pars), function(j){
+    if(is.matrix(family_pars[[j]])){
+      as.vector(family_pars[[j]][, series_ind])
     } else {
-      Xpmat <- Xp
-      betas_pred <- betas[x, ]
+      family_pars[[j]]
     }
+  })
+  names(family_extracts) <- names(family_pars)
 
-    # Calculate predictions
-    as.vector(mvgam_predict(family = family,
-                  Xp = Xpmat,
-                  type = type,
-                  betas = betas_pred,
-                  family_pars = par_extracts))
-  }, cl = cl))
-  stopCluster(cl)
+  # Pre-multiply the linear predictors, including any offset and trend
+  # predictions if applicable
+  all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
+                                              function(row) Xp %*% row +
+                                                attr(Xp, 'model.offset')))) +
+                              trend_predictions)
+  attr(all_linpreds, 'model.offset') <- 0
 
+  # Calculate vectorized predictions
+  predictions_vec <- mvgam_predict(family = family,
+                                   Xp = all_linpreds,
+                                   type = type,
+                                   betas = 1,
+                                   family_pars = family_extracts)
+
+  # Convert back to matrix
+  predictions <- matrix(predictions_vec, nrow = NROW(betas))
   return(predictions)
 }
 

@@ -16,14 +16,7 @@
 
 \method{get_vcov}{mvgam}(model, vcov = NULL, ...)
 
-\method{get_predict}{mvgam}(
-  model,
-  newdata,
-  type = "response",
-  process_error = FALSE,
-  n_cores = 1,
-  ...
-)
+\method{get_predict}{mvgam}(model, newdata, type = "response", process_error = FALSE, ...)
 
 \method{get_data}{mvgam}(x, source = "environment", verbose = TRUE, ...)
 
@@ -99,9 +92,6 @@ the \code{marginaleffects:::type_dictionary} dataframe.}
 
 \item{process_error}{\code{logical}. If \code{TRUE}, uncertainty in the latent
 process (or trend) model is incorporated in predictions}
-
-\item{n_cores}{\code{Integer} specifying number of cores to use for
-generating predictions}
 
 \item{x}{A fitted model.}
 

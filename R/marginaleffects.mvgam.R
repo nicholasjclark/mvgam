@@ -13,8 +13,6 @@
 #' (only applicable if a `trend_formula` was specified in the model)
 #' @param process_error `logical`. If `TRUE`, uncertainty in the latent
 #' process (or trend) model is incorporated in predictions
-#' @param n_cores `Integer` specifying number of cores to use for
-#' generating predictions
 #' @name mvgam_marginaleffects
 #' @author Nicholas J Clark
 NULL
@@ -77,13 +75,11 @@ get_vcov.mvgam <- function(model,
 get_predict.mvgam <- function(model, newdata,
                               type = 'response',
                               process_error = FALSE,
-                              n_cores = 1,
                               ...) {
   preds <- predict(object = model,
                    newdata = newdata,
                    type = type,
                    process_error = process_error,
-                   n_cores = n_cores,
                    ...)
   out <- data.frame(
     rowid = seq_len(NCOL(preds)),
