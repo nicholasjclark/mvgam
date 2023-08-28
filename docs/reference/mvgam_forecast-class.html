@@ -56,6 +56,8 @@ Run <code>methods(class = "mvgam_forecast")</code> to see an overview of availab
 <li><p><code>trend_call</code> If a <code>trend_formula was supplied</code>, the original trend model formula is
 returned. Otherwise <code>NULL</code></p></li>
 <li><p><code>family</code> <code>character</code> description of the observation distribution</p></li>
+<li><p><code>family_pars</code> <code>list</code> containing draws of family-specific parameters (i.e.
+shape, scale or overdispersion parameters). Only returned if <code>type = link</code>. Otherwise <code>NULL</code></p></li>
 <li><p><code>trend_model</code> <code>character</code> description of the latent trend model</p></li>
 <li><p><code>drift</code> Logical specifying whether a drift term was used in the trend model</p></li>
 <li><p><code>use_lv</code> Logical flag indicating whether latent dynamic factors were used in the model</p></li>

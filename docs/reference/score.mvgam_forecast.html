@@ -49,7 +49,15 @@
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for mvgam_forecast</span></span>
-<span><span class="fu">score</span><span class="op">(</span><span class="va">object</span>, score <span class="op">=</span> <span class="st">"crps"</span>, log <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">weights</span>, interval_width <span class="op">=</span> <span class="fl">0.9</span>, <span class="va">...</span><span class="op">)</span></span>
+<span><span class="fu">score</span><span class="op">(</span></span>
+<span>  <span class="va">object</span>,</span>
+<span>  score <span class="op">=</span> <span class="st">"crps"</span>,</span>
+<span>  log <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  <span class="va">weights</span>,</span>
+<span>  interval_width <span class="op">=</span> <span class="fl">0.9</span>,</span>
+<span>  n_cores <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">score</span><span class="op">(</span><span class="va">object</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -61,8 +69,13 @@
 
 
 <dt>score</dt>
-<dd><p><code>character</code> specifying the type of ranked probability score to use for evaluation. Options are:
-<code>variogram</code>, <code>drps</code> or <code>crps</code></p></dd>
+<dd><p><code>character</code> specifying the type of proper scoring rule to use for evaluation. Options are:
+<code>sis</code> (i.e. the Scaled Interval Score), <code>energy</code>, <code>variogram</code>, <code>elpd</code>
+(i.e. the Expected log pointwise Predictive Density),
+<code>drps</code> (i.e. the Discrete Rank Probability Score) or <code>crps</code> (the Continuous Rank Probability Score).
+Note that when choosing <code>elpd</code>, the supplied object must have forecasts on the <code>link</code> scale so that
+expectations can be calculated prior to scoring. For all other scores, forecasts should be supplied
+on the <code>response</code> scale (i.e. posterior predictions)</p></dd>
 
 
 <dt>log</dt>
@@ -80,7 +93,11 @@ are of less interest when forecasting. Ignored if <code>score != 'variogram'</co
 
 <dt>interval_width</dt>
 <dd><p>proportional value on <code>[0.05,0.95]</code> defining the forecast interval
-for calculating coverage</p></dd>
+for calculating coverage and, if <code>score = 'sis'</code>, for calculating the interval score</p></dd>
+
+
+<dt>n_cores</dt>
+<dd><p><code>integer</code> specifying number of cores for calculating scores in parallel</p></dd>
 
 
 <dt>...</dt>
@@ -91,13 +108,14 @@ for calculating coverage</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>a <code>list</code> containing scores and 90% interval coverages per forecast horizon.
-If <code>score %in% c('drps', 'crps')</code>,
+<p>a <code>list</code> containing scores and interval coverages per forecast horizon.
+If <code>score %in% c('drps', 'crps', 'elpd')</code>,
 the list will also contain return the sum of all series-level scores per horizon. If
-<code>score == 'variogram'</code>, no series-level scores are computed and the only score returned
-will be for all series. For all scores, the <code>in_interval</code> column in each series-level
+<code>score %in% c('energy','variogram')</code>, no series-level scores are computed and the only score returned
+will be for all series. For all scores apart from <code>elpd</code>, the <code>in_interval</code> column in each series-level
 slot is a binary indicator of whether or not the true value was within the forecast's corresponding
-posterior empirical quantiles</p>
+posterior empirical quantiles. Intervals are not calculated when using <code>elpd</code> because forecasts
+will only contain the linear predictors</p>
     </div>
 
     <div class="section level2">

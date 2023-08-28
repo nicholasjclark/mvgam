@@ -51,15 +51,7 @@
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">lfo_cv</span><span class="op">(</span><span class="va">object</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu">lfo_cv</span><span class="op">(</span></span>
-<span>  <span class="va">object</span>,</span>
-<span>  <span class="va">data</span>,</span>
-<span>  <span class="va">min_t</span>,</span>
-<span>  fc_horizon <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>  pareto_k_threshold <span class="op">=</span> <span class="fl">0.7</span>,</span>
-<span>  n_cores <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>  <span class="va">...</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">lfo_cv</span><span class="op">(</span><span class="va">object</span>, <span class="va">data</span>, <span class="va">min_t</span>, fc_horizon <span class="op">=</span> <span class="fl">1</span>, pareto_k_threshold <span class="op">=</span> <span class="fl">0.7</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -93,10 +85,6 @@ from the data. Default is either <code>30</code>, or whatever training time allo
 <dt>pareto_k_threshold</dt>
 <dd><p>Proportion specifying the threshold over which the Pareto shape parameter
 is considered unstable, triggering a model refit. Default is <code>0.7</code></p></dd>
-
-
-<dt>n_cores</dt>
-<dd><p><code>integer</code> specifying number of cores for calculating likelihoods in parallel</p></dd>
 
 </dl></div>
     <div class="section level2">

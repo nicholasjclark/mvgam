@@ -84,6 +84,7 @@ dynamic factors to capture trend dependencies among series in a reduced dimensio
 <span>  <span class="va">priors</span>,</span>
 <span>  <span class="va">upper_bounds</span>,</span>
 <span>  refit <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  lfo <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  use_stan <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  <span class="va">max_treedepth</span>,</span>
 <span>  <span class="va">adapt_delta</span>,</span>
@@ -266,6 +267,13 @@ in <code>Stan</code></p></dd>
 <dt>refit</dt>
 <dd><p>Logical indicating whether this is a refit, called using <a href="update.mvgam.html">update.mvgam</a>. Users should leave
 as <code>FALSE</code></p></dd>
+
+
+<dt>lfo</dt>
+<dd><p>Logical indicating whether this is part of a call to <a href="lfo_cv.mvgam.html">lfo_cv.mvgam</a>. Returns a
+lighter version of the model with no residuals and fewer monitored parameters to speed up
+post-processing. But other downstream functions will not work properly, so users should always
+leave this set as <code>FALSE</code></p></dd>
 
 
 <dt>use_stan</dt>

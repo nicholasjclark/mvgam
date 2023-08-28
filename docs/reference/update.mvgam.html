@@ -61,6 +61,7 @@
 <span>  <span class="va">n_lv</span>,</span>
 <span>  <span class="va">family</span>,</span>
 <span>  <span class="va">priors</span>,</span>
+<span>  lfo <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -143,6 +144,13 @@ families are: <code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="ex
 <dd><p>An optional <code>data.frame</code> with prior
 definitions. See <code><a href="get_mvgam_priors.html">get_mvgam_priors</a></code> and
 <a href="mvgam.html">mvgam</a> for more information on changing default prior distributions</p></dd>
+
+
+<dt>lfo</dt>
+<dd><p>Logical indicating whether this is part of a call to <a href="lfo_cv.mvgam.html">lfo_cv.mvgam</a>. Returns a
+lighter version of the model with no residuals and fewer monitored parameters to speed up
+post-processing. But other downstream functions will not work properly, so users should always
+leave this set as <code>FALSE</code></p></dd>
 
 
 <dt>...</dt>
