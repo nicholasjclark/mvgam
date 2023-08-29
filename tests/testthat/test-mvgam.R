@@ -71,8 +71,8 @@ test_that("all series must have observations for all unique timepoints", {
 })
 
 test_that("median coefs should be stored in the mgcv object", {
-  identical(unname(coef(gaus_ar1$mgcv_model)),
-            coef(gaus_ar1)[,2])
+  expect_true(identical(unname(coef(gaus_ar1$mgcv_model)),
+            coef(gaus_ar1)[,2]))
 })
 
 test_that("missing values not allowed in predictors", {
@@ -89,7 +89,6 @@ test_that("missing values not allowed in predictors", {
   simdat <- sim_mvgam()
   simdat$data_test$season[4] <- NA
   expect_error(mvgam(y ~ s(season),
-                     trend_model = 'GP',
                      data = simdat$data_train,
                      newdata = simdat$data_test,
                      run_model = FALSE))

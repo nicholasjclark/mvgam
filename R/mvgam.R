@@ -629,7 +629,7 @@ mvgam = function(formula,
   }
 
   # Check the test data for NAs as well using predict.gam
-  testdat_pred <- try(predict(test,
+  testdat_pred <- try(predict(ss_gam,
                               newdata = data_test,
                               na.action = na.fail),
                       silent = TRUE)

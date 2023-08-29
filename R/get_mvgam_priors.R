@@ -340,7 +340,6 @@ get_mvgam_priors = function(formula,
     # Use a small fit from mgcv to extract relevant information on smooths included
     # in the model
     ss_gam <- try(mvgam_setup(formula = formula,
-                              knots = knots,
                               family = family_to_mgcvfam(family),
                               data = data_train,
                               drop.unused.levels = FALSE,
