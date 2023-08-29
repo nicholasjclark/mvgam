@@ -45,20 +45,31 @@ test_that("coef has resonable outputs", {
 })
 
 test_that("logLik has reasonable ouputs", {
-  expect_equal(dim(logLik(gaus_ar1, n_cores = 1)),
+  liks <- logLik(gaus_ar1)
+  expect_equal(dim(liks),
                c(1200, NROW(gaus_ar1$obs_data)))
+  # NAs in observations should propagate for likelihood calculations
+  expect_true(all(is.na(liks[,which(is.na(gaus_ar1$obs_data$y))])))
 })
 
 test_that("predict has reasonable outputs", {
-  gaus_preds <- predict(gaus_ar1, n_cores = 1, type = 'link')
+  gaus_preds <- predict(gaus_ar1, type = 'link')
   expect_equal(dim(gaus_preds),
                c(1200, NROW(gaus_data$data_train)))
 
-  beta_preds <- predict(beta_gp, n_cores = 1, type = 'response')
+  beta_preds <- predict(beta_gp, type = 'response')
   expect_equal(dim(beta_preds),
                c(1200, NROW(beta_data$data_train)))
   expect_lt(max(beta_preds), 1.00000001)
   expect_gt(max(beta_preds), -0.0000001)
+})
+
+test_that("get_predict has reasonable outputs", {
+gaus_preds <- predict(gaus_ar1, type = 'link', process_error = FALSE)
+meffects_preds <- get_predict(gaus_ar1, type = 'link')
+expect_true(NROW(meffects_preds) == NCOL(gaus_preds))
+expect_true(identical(meffects_preds$estimate,
+                      apply(gaus_preds, 2, median)))
 })
 
 test_that("forecast and friends have reasonable outputs", {

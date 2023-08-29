@@ -12,7 +12,8 @@ sim_mvgam(
   n_lv = 1,
   trend_model = "RW",
   drift = FALSE,
-  trend_rel = 0.2,
+  prop_trend = 0.2,
+  trend_rel,
   freq = 12,
   family = poisson(),
   phi,
@@ -51,7 +52,9 @@ and the observation process is the only source of error; similarly to what is es
 
 \item{drift}{\code{logical}, simulate a drift term for each trend}
 
-\item{trend_rel}{\code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}}
+\item{prop_trend}{\code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}}
+
+\item{trend_rel}{Depracated. Use \code{prop_trend} instead}
 
 \item{freq}{\code{integer}. The seasonal frequency of the series}
 
@@ -94,10 +97,10 @@ correlations in their long-term trends, are included in the form of correlated l
 }
 \examples{
 #Simulate series with observations bounded at 0 and 1 (Beta responses)
-sim_data <- sim_mvgam(family = betar(), trend_model = 'GP', trend_rel = 0.6)
+sim_data <- sim_mvgam(family = betar(), trend_model = 'GP', prop_trend = 0.6)
 plot_mvgam_series(data = sim_data$data_train, series = 'all')
 
 #Now simulate series with overdispersed discrete observations
-sim_data <- sim_mvgam(family = nb(), trend_model = 'GP', trend_rel = 0.6, phi = 10)
+sim_data <- sim_mvgam(family = nb(), trend_model = 'GP', prop_trend = 0.6, phi = 10)
 plot_mvgam_series(data = sim_data$data_train, series = 'all')
 }

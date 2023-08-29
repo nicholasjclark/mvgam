@@ -2,9 +2,12 @@
 % Please edit documentation in R/model.frame.mvgam.R
 \name{model.frame.mvgam}
 \alias{model.frame.mvgam}
+\alias{model.frame.mvgam_prefit}
 \title{Extract model.frame from a fitted mvgam object}
 \usage{
 \method{model.frame}{mvgam}(formula, trend_effects = FALSE, ...)
+
+\method{model.frame}{mvgam_prefit}(formula, trend_effects = FALSE, ...)
 }
 \arguments{
 \item{formula}{a model \code{\link[stats]{formula}} or \code{\link[stats]{terms}}

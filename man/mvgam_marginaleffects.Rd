@@ -7,7 +7,9 @@
 \alias{get_vcov.mvgam}
 \alias{get_predict.mvgam}
 \alias{get_data.mvgam}
+\alias{get_data.mvgam_prefit}
 \alias{find_predictors.mvgam}
+\alias{find_predictors.mvgam_prefit}
 \title{Helper functions for mvgam marginaleffects calculations}
 \usage{
 \method{get_coef}{mvgam}(model, trend_effects = FALSE, ...)
@@ -20,7 +22,19 @@
 
 \method{get_data}{mvgam}(x, source = "environment", verbose = TRUE, ...)
 
+\method{get_data}{mvgam_prefit}(x, source = "environment", verbose = TRUE, ...)
+
 \method{find_predictors}{mvgam}(
+  x,
+  effects = c("fixed", "random", "all"),
+  component = c("all", "conditional", "zi", "zero_inflated", "dispersion", "instruments",
+    "correlation", "smooth_terms"),
+  flatten = FALSE,
+  verbose = TRUE,
+  ...
+)
+
+\method{find_predictors}{mvgam_prefit}(
   x,
   effects = c("fixed", "random", "all"),
   component = c("all", "conditional", "zi", "zero_inflated", "dispersion", "instruments",

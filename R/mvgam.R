@@ -14,8 +14,11 @@
 #'@param trend_formula An optional \code{character} string specifying the GAM process model formula. If
 #'supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
 #'separately from the observation model. Should not have a response variable specified on the left-hand side
-#'of the formula (i.e. a valid option would be `~ season + s(year)`). This feature is experimental, and is only
-#'currently available for Random Walk trend models.
+#'of the formula (i.e. a valid option would be `~ season + s(year)`). Also note that you should not use
+#'the identifier `series` in this formula to specify effects that vary across time series. Instead you should use
+#'`trend`. This will ensure that models in which a `trend_map` is supplied will still work consistently
+#'(i.e. by allowing effects to vary across process models, even when some time series share the same underlying
+#'process model). This feature is experimental, and is only currently available for Random Walk and AR trend models.
 #'@param knots An optional \code{list} containing user specified knot values to be used for basis construction.
 #'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
 #'(note that the number of knots is not always just `k`). Different terms can use different numbers of knots,
@@ -201,7 +204,7 @@
 #'# Simulate a collection of three time series that have shared seasonal dynamics
 # # and independent random walk trends, with a Poisson observation process
 #'dat <- sim_mvgam(T = 80, n_series = 3, prop_missing = 0.1,
-#'                 trend_rel = 0.6)
+#'                 prop_trend = 0.6)
 #'
 #'# Plot key summary statistics for a single series
 #'plot_mvgam_series(data = dat$data_train, series = 1)
@@ -350,7 +353,7 @@
 #' # Example showing how to incorporate an offset; simulate some count data
 #' # with different means per series
 #' set.seed(100)
-#' dat <- sim_mvgam(trend_rel = 0, mu = c(0, 2, 2), seasonality = 'hierarchical')
+#' dat <- sim_mvgam(prop_trend = 0, mu = c(0, 2, 2), seasonality = 'hierarchical')
 #'
 #' # Add offset terms to the training and testing data
 #' dat$data_train$offset <- 0.5 * as.numeric(dat$data_train$series)
@@ -446,6 +449,7 @@ mvgam = function(formula,
     stop('Argument "data" is missing with no default')
   }
   validate_pos_integer(chains)
+  validate_pos_integer(threads)
   validate_pos_integer(burnin)
   validate_pos_integer(samples)
   validate_pos_integer(thin)
@@ -525,6 +529,9 @@ mvgam = function(formula,
 
   # Check trend formula
   if(!missing(trend_formula)){
+
+    validate_trend_formula(trend_formula)
+
     if(missing(trend_map)){
       trend_map <- data.frame(series = unique(data_train$series),
                               trend = 1:length(unique(data_train$series)))
@@ -606,12 +613,33 @@ mvgam = function(formula,
 
   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the Bayesian model later on;
-  ss_gam <- mvgam_setup(formula = formula,
+  ss_gam <- try(mvgam_setup(formula = formula,
                         knots = knots,
                         family = family_to_mgcvfam(family),
                         data = data_train,
                         drop.unused.levels = FALSE,
-                        maxit = 30)
+                        maxit = 30),
+                silent = TRUE)
+  if(inherits(ss_gam, 'try-error')){
+    if(grepl('missing values', ss_gam[1])){
+      stop(paste('Missing values found in data predictors:\n',
+                 attr(ss_gam, 'condition')),
+           call. = FALSE)
+    }
+  }
+
+  # Check the test data for NAs as well using predict.gam
+  testdat_pred <- try(predict(test,
+                              newdata = data_test,
+                              na.action = na.fail),
+                      silent = TRUE)
+  if(inherits(testdat_pred, 'try-error')){
+    if(grepl('missing values', testdat_pred[1])){
+      stop(paste('Missing values found in newdata predictors:\n',
+                 attr(testdat_pred, 'condition')),
+           call. = FALSE)
+    }
+  }
 
   # Make JAGS file and appropriate data structures
   if(length(ss_gam$smooth) == 0){

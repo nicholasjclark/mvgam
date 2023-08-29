@@ -79,9 +79,16 @@ print.mvgam_prefit = function(x, ...){
 
   object <- x
 
-  cat("GAM formula:\n")
-  print(object$call)
+  if(!is.null(object$trend_call)){
+    cat("GAM observation formula:\n")
+    print(object$call)
 
+    cat("\nGAM process formula:\n")
+    print(object$trend_call)
+  } else {
+    cat("GAM formula:\n")
+    print(object$call)
+  }
 
   cat("Family:\n")
   cat(paste0(object$family, '\n'))

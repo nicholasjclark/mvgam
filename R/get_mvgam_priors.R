@@ -212,6 +212,7 @@ get_mvgam_priors = function(formula,
   # If trend_formula supplied, first run get_mvgam_priors for the observation model
   # and then modify the resulting output
   if(!missing(trend_formula)){
+    validate_trend_formula(trend_formula)
     prior_df <- get_mvgam_priors(formula = formula,
                                  data = data,
                                  data_train = data_train,
@@ -338,11 +339,20 @@ get_mvgam_priors = function(formula,
 
     # Use a small fit from mgcv to extract relevant information on smooths included
     # in the model
-    ss_gam <- mvgam_setup(formula = formula,
-                          family = family_to_mgcvfam(family),
-                          data = data_train,
-                          drop.unused.levels = FALSE,
-                          maxit = 30)
+    ss_gam <- try(mvgam_setup(formula = formula,
+                              knots = knots,
+                              family = family_to_mgcvfam(family),
+                              data = data_train,
+                              drop.unused.levels = FALSE,
+                              maxit = 30),
+                  silent = TRUE)
+    if(inherits(ss_gam, 'try-error')){
+      if(grepl('missing values', ss_gam[1])){
+        stop(paste('Missing values found in data predictors:\n',
+                   attr(ss_gam, 'condition')),
+             call. = FALSE)
+      }
+    }
 
     # Check if smooth terms are included in the formula
     if(length(ss_gam$smooth) == 0){

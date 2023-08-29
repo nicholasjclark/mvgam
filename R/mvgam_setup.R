@@ -18,7 +18,8 @@ mvgam_setup <- function(formula,
                                method = "REML",
                                family = family,
                                control = list(maxit = maxit),
-                               drop.unused.levels = FALSE))
+                               drop.unused.levels = FALSE,
+                               na.action = na.fail))
   } else {
     # Initialise the GAM for a few iterations to get all necessary structures for
     # generating predictions; also provides information to regularize parametric
@@ -29,7 +30,8 @@ mvgam_setup <- function(formula,
                                family = family,
                                knots = knots,
                                control = list(maxit = maxit),
-                               drop.unused.levels = FALSE))
+                               drop.unused.levels = FALSE,
+                               na.action = na.fail))
   }
 
 }

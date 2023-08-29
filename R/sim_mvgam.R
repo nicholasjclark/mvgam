@@ -25,7 +25,8 @@
 #'   \item `VAR1cor` (contemporaneously correlated VAR1)
 #'   \item `GP` (Gaussian Process with squared exponential kernel)} See [mvgam_trends] for more details
 #'@param drift \code{logical}, simulate a drift term for each trend
-#'@param trend_rel \code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}
+#'@param prop_trend \code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}
+#'@param trend_rel Depracated. Use `prop_trend` instead
 #'@param freq \code{integer}. The seasonal frequency of the series
 #'@param family \code{family} specifying the exponential observation family for the series. Currently supported
 #'families are: `nb()`, `poisson()`, `tweedie()`, `gaussian()`, `betar()`, `lognormal()`, `student_t()` and `Gamma()`
@@ -51,11 +52,11 @@
 #'as well as some additional information about the simulated seasonality and trend dependencies
 #'@examples
 #'#Simulate series with observations bounded at 0 and 1 (Beta responses)
-#'sim_data <- sim_mvgam(family = betar(), trend_model = 'GP', trend_rel = 0.6)
+#'sim_data <- sim_mvgam(family = betar(), trend_model = 'GP', prop_trend = 0.6)
 #'plot_mvgam_series(data = sim_data$data_train, series = 'all')
 #'
 #'#Now simulate series with overdispersed discrete observations
-#'sim_data <- sim_mvgam(family = nb(), trend_model = 'GP', trend_rel = 0.6, phi = 10)
+#'sim_data <- sim_mvgam(family = nb(), trend_model = 'GP', prop_trend = 0.6, phi = 10)
 #'plot_mvgam_series(data = sim_data$data_train, series = 'all')
 #'@export
 
@@ -66,7 +67,8 @@ sim_mvgam = function(T = 100,
                      n_lv = 1,
                      trend_model = 'RW',
                      drift = FALSE,
-                     trend_rel = 0.2,
+                     prop_trend = 0.2,
+                     trend_rel,
                      freq = 12,
                      family = poisson(),
                      phi,
@@ -96,7 +98,7 @@ sim_mvgam = function(T = 100,
   }
 
   if(missing(trend_rel)){
-    trend_rel <- 0.2
+    trend_rel <- prop_trend
   }
   validate_proportional(trend_rel)
 

@@ -119,6 +119,20 @@ validate_obs_formula = function(formula, data, refit = FALSE){
 }
 
 #'@noRd
+validate_trend_formula = function(formula){
+
+  if(!is.null(rlang::f_lhs(formula))){
+    stop('Argument "trend_formula" should not have a left-hand side',
+         call. = FALSE)
+  }
+
+  if(any(grepl('series', as.character(formula)))){
+    stop('Argument "trend_formula" should not have the identifier "series" in it.\nUse "trend" instead for varying effects',
+         call. = FALSE)
+  }
+}
+
+#'@noRd
 validate_proportional = function(x){
   s <- substitute(x)
   x <- base::suppressWarnings(as.numeric(x))

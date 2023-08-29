@@ -226,7 +226,7 @@ plot(1,
      ylim = range(series_residuals, na.rm = T))
 
 draws <- sample(1:dim(preds)[1],
-                min(200, dim(preds)[1]),
+                min(150, dim(preds)[1]),
                 replace = FALSE)
 moddata <- vector(mode = 'list')
 for(i in draws){
