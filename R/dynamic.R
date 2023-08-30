@@ -27,6 +27,61 @@
 #' set automatically to ensure enough basis functions are used to approximate the expected
 #' wiggliness of the underlying dynamic function (\code{k} will increase as \code{rho} decreases)
 #' @rdname dynamic
+#'@examples
+#'\dontrun{
+#'# Simulate a time-varying coefficient \
+#'#(as a Gaussian Process with length scale = 10)
+#'set.seed(1111)
+#'N <- 200
+#'beta <- mvgam:::sim_gp(rnorm(1),
+#'                       alpha_gp = 0.75,
+#'                       rho_gp = 10,
+#'                       h = N) + 0.5
+#'plot(beta, type = 'l', lwd = 3,
+#'     bty = 'l', xlab = 'Time',
+#'     ylab = 'Coefficient',
+#'     col = 'darkred')
+#'
+#'# Simulate the predictor as a standard normal
+#'predictor <- rnorm(N, sd = 1)
+#'
+#'# Simulate a Gaussian outcome variable
+#'out <- rnorm(N, mean = 4 + beta * predictor,
+#'             sd = 0.25)
+#'time <- seq_along(predictor)
+#'plot(out,  type = 'l', lwd = 3,
+#'     bty = 'l', xlab = 'Time', ylab = 'Outcome',
+#'     col = 'darkred')
+#'
+#'# Gather into a data.frame and fit a dynamic coefficient mmodel
+#'data <- data.frame(out, predictor, time)
+#'
+#'# Split into training and testing
+#'data_train <- data[1:190,]
+#'data_test <- data[191:200,]
+#'
+#'# Fit a model using the dynamic function
+#'mod <- mvgam(out ~
+#'             # mis-specify the length scale slightly as this
+#'             # won't be known in practice
+#'             dynamic(predictor, rho = 8, stationary = TRUE),
+#'            family = gaussian(),
+#'            data = data_train)
+#'
+#'# Inspect the summary
+#'summary(mod)
+#'
+#'# Plot the time-varying coefficient estimates
+#'plot(mod, type = 'smooths')
+#'
+#'# Extrapolate the coefficient forward in time
+#'plot_mvgam_smooth(mod, smooth = 1, newdata = data)
+#'abline(v = 190, lty = 'dashed', lwd = 2)
+#'
+#'# Overlay the true simulated time-varying coefficient
+#'lines(beta, lwd = 2.5, col = 'white')
+#'lines(beta, lwd = 2)
+#'}
 #' @author Nicholas J Clark
 #' @export
 dynamic = function(variable, rho = 5, stationary = TRUE){

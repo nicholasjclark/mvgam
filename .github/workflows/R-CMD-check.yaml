@@ -52,6 +52,7 @@ jobs:
               knitr
               collapse
               rmarkdown
+              ggplot2
               rjags
               coda
               runjags

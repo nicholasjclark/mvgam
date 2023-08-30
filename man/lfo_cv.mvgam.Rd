@@ -57,6 +57,68 @@ crossing a certain threshold \code{pareto_k_threshold}. Only then do we refit th
 all of the observations up to the time of the failure. We then restart the process and iterate forward
 until the next refit is triggered (Bürkner et al. 2020).
 }
+\examples{
+\dontrun{
+# Simulate from a Poisson-AR2 model with a seasonal smooth
+set.seed(100)
+dat <- sim_mvgam(T = 75,
+                n_series = 1,
+                prop_trend = 0.75,
+                 trend_model = 'AR2',
+                 family = poisson())
+
+# Plot the time series
+plot_mvgam_series(data = dat$data_train,
+                 newdata = dat$data_test,
+                 series = 1)
+
+# Fit an appropriate model
+mod_ar2 <- mvgam(y ~ s(season, bs = 'cc'),
+               trend_model = 'AR2',
+               family = poisson(),
+               data = dat$data_train,
+               newdata = dat$data_test)
+
+# Fit a less appropriate model
+mod_rw <- mvgam(y ~ s(season, bs = 'cc'),
+              trend_model = 'RW',
+              family = poisson(),
+              data = dat$data_train,
+              newdata = dat$data_test)
+
+# Compare Discrete Ranked Probability Scores for the testing period
+fc_ar2 <- forecast(mod_ar2)
+fc_rw <- forecast(mod_rw)
+score_ar2 <- score(fc_ar2, score = 'drps')
+score_rw <- score(fc_rw, score = 'drps')
+sum(score_ar2$series_1$score)
+sum(score_rw$series_1$score)
+
+# Now use approximate leave-future-out CV to compare
+# rolling forecasts; start at time point 40 to reduce
+# computational time and to ensure enough data is available
+# for estimating model parameters
+lfo_ar2 <- lfo_cv(mod_ar2,
+                 min_t = 40,
+                 fc_horizon = 3)
+lfo_rw <- lfo_cv(mod_rw,
+                min_t = 40,
+                fc_horizon = 3)
+
+# Plot Pareto-K values and ELPD estimates
+plot(lfo_ar2)
+plot(lfo_rw)
+
+# Proportion of timepoints in which AR2 model gives
+# better forecasts
+length(which((lfo_ar2$elpds - lfo_rw$elpds) > 0)) /
+      length(lfo_ar2$elpds)
+
+# A higher total ELPD is preferred
+lfo_ar2$sum_ELPD
+lfo_rw$sum_ELPD
+}
+}
 \references{
 Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-future-out cross-validation for Bayesian time series models
 Journal of Statistical Computation and Simulation. 90:14, 2499-2523.

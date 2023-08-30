@@ -144,7 +144,8 @@ We are now ready for our first `mvgam` model. The syntax will be familiar to use
 ```{r model1, include=FALSE, results='hide'}
 model1 <- mvgam(count ~ s(year_fac, bs = 're') - 1,
                 family = poisson(),
-                data = model_data)
+                data = model_data,
+                parallel = FALSE)
 ```
 
 ```{r eval=FALSE}
@@ -224,7 +225,8 @@ model_data %>%
 model1b <- mvgam(count ~ s(year_fac, bs = 're') - 1,
                 family = poisson(),
                 data = data_train,
-                newdata = data_test)
+                newdata = data_test,
+                parallel = FALSE)
 ```
 
 ```{r eval=FALSE}
@@ -262,7 +264,8 @@ model2 <- mvgam(count ~ s(year_fac, bs = 're') +
                   ndvi - 1,
                 family = poisson(),
                 data = data_train,
-                newdata = data_test)
+                newdata = data_test,
+                parallel = FALSE)
 ```
 
 ```{r eval=FALSE}
@@ -342,7 +345,8 @@ model3 <- mvgam(count ~ s(time, bs = 'bs', k = 15) +
                   ndvi,
                 family = poisson(),
                 data = data_train,
-                newdata = data_test)
+                newdata = data_test,
+                parallel = FALSE)
 ```
 
 ```{r eval=FALSE}
@@ -425,7 +429,8 @@ model4 <- mvgam(count ~ s(ndvi, k = 6),
                 family = poisson(),
                 data = data_train,
                 newdata = data_test,
-                trend_model = 'AR1')
+                trend_model = 'AR1',
+                parallel = FALSE)
 ```
 
 ```{r eval=FALSE}

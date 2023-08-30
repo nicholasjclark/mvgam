@@ -1510,29 +1510,56 @@ mvgam = function(formula,
 
         # Condition the model using Cmdstan
         if(prior_simulation){
-          fit1 <- cmd_mod$sample(data = model_data,
-                                 chains = chains,
-                                 parallel_chains = min(c(chains, parallel::detectCores() - 1)),
-                                 threads_per_chain = if(threads > 1){ threads } else { NULL },
-                                 refresh = 100,
-                                 init = inits,
-                                 max_treedepth = 12,
-                                 adapt_delta = 0.8,
-                                 iter_sampling = samples,
-                                 iter_warmup = 200,
-                                 show_messages = FALSE,
-                                 diagnostics = NULL)
+          if(parallel){
+            fit1 <- cmd_mod$sample(data = model_data,
+                                   chains = chains,
+                                   parallel_chains = min(c(chains, parallel::detectCores() - 1)),
+                                   threads_per_chain = if(threads > 1){ threads } else { NULL },
+                                   refresh = 100,
+                                   init = inits,
+                                   max_treedepth = 12,
+                                   adapt_delta = 0.8,
+                                   iter_sampling = samples,
+                                   iter_warmup = 200,
+                                   show_messages = FALSE,
+                                   diagnostics = NULL)
+          } else {
+            fit1 <- cmd_mod$sample(data = model_data,
+                                   chains = chains,
+                                   threads_per_chain = if(threads > 1){ threads } else { NULL },
+                                   refresh = 100,
+                                   init = inits,
+                                   max_treedepth = 12,
+                                   adapt_delta = 0.8,
+                                   iter_sampling = samples,
+                                   iter_warmup = 200,
+                                   show_messages = FALSE,
+                                   diagnostics = NULL)
+          }
+
         } else {
-          fit1 <- cmd_mod$sample(data = model_data,
-                                 chains = chains,
-                                 parallel_chains = min(c(chains, parallel::detectCores() - 1)),
-                                 threads_per_chain = if(threads > 1){ threads } else { NULL },
-                                 refresh = 100,
-                                 init = inits,
-                                 max_treedepth = max_treedepth,
-                                 adapt_delta = adapt_delta,
-                                 iter_sampling = samples,
-                                 iter_warmup = burnin)
+          if(parallel){
+            fit1 <- cmd_mod$sample(data = model_data,
+                                   chains = chains,
+                                   parallel_chains = min(c(chains, parallel::detectCores() - 1)),
+                                   threads_per_chain = if(threads > 1){ threads } else { NULL },
+                                   refresh = 100,
+                                   init = inits,
+                                   max_treedepth = max_treedepth,
+                                   adapt_delta = adapt_delta,
+                                   iter_sampling = samples,
+                                   iter_warmup = burnin)
+          } else {
+            fit1 <- cmd_mod$sample(data = model_data,
+                                   chains = chains,
+                                   threads_per_chain = if(threads > 1){ threads } else { NULL },
+                                   refresh = 100,
+                                   init = inits,
+                                   max_treedepth = max_treedepth,
+                                   adapt_delta = adapt_delta,
+                                   iter_sampling = samples,
+                                   iter_warmup = burnin)
+          }
         }
 
         # Convert model files to stan_fit class for consistency
@@ -1570,18 +1597,33 @@ mvgam = function(formula,
 
         stan_control <- list(max_treedepth = max_treedepth,
                              adapt_delta = adapt_delta)
-        fit1 <- rstan::stan(model_code = vectorised$model_file,
-                            iter = samples,
-                            warmup = burnin,
-                            chains = chains,
-                            data = model_data,
-                            cores = min(c(chains, parallel::detectCores() - 1)),
-                            init = inits,
-                            verbose = FALSE,
-                            thin = thin,
-                            control = stan_control,
-                            pars = param,
-                            refresh = 100)
+        if(parallel){
+          fit1 <- rstan::stan(model_code = vectorised$model_file,
+                              iter = samples,
+                              warmup = burnin,
+                              chains = chains,
+                              data = model_data,
+                              cores = 1,
+                              init = inits,
+                              verbose = FALSE,
+                              thin = thin,
+                              control = stan_control,
+                              pars = param,
+                              refresh = 100)
+        } else {
+          fit1 <- rstan::stan(model_code = vectorised$model_file,
+                              iter = samples,
+                              warmup = burnin,
+                              chains = chains,
+                              data = model_data,
+                              cores = min(c(chains, parallel::detectCores() - 1)),
+                              init = inits,
+                              verbose = FALSE,
+                              thin = thin,
+                              control = stan_control,
+                              pars = param,
+                              refresh = 100)
+        }
 
         out_gam_mod <- fit1
       }

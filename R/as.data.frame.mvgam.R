@@ -38,9 +38,12 @@
 #'head(beta_draws_df)
 #'str(beta_draws_df)
 #'
-#'beta_draws_mat <- as.data.frame(mod1, variable = 'betas')
+#'beta_draws_mat <- as.matrix(mod1, variable = 'betas')
 #'head(beta_draws_mat)
-#'str(beta_draws_mat)}
+#'str(beta_draws_mat)
+#'
+#'shape_pars <- as.matrix(mod1, variable = 'shape', regex = TRUE)
+#'head(shape_pars)}
 NULL
 
 #'@rdname mvgam_draws
@@ -228,7 +231,6 @@ as.data.frame.mvgam = function(x,
   }
 
   return(post)
-
 }
 
 #'@rdname mvgam_draws
@@ -244,6 +246,5 @@ as.matrix.mvgam = function(x,
   colnames(post) <- varnames
 
   return(post)
-
 }
 

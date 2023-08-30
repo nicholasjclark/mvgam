@@ -1,4 +1,5 @@
 #' Generic GAM setup function
+#' @importFrom stats na.fail
 #' @noRd
 #'
 mvgam_setup <- function(formula,

@@ -5,7 +5,7 @@
 #'
 #'@param x \code{list} object returned from \code{mvgam}. See [mvgam()]
 #'@param type \code{character} specifying which type of plot to return. Options are:
-#''series,
+#'series,
 #'residuals,
 #'smooths,
 #'re (random effect smooths),

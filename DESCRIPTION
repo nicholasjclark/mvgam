@@ -46,6 +46,7 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
 Suggests: 
     cmdstanr (>= 0.4.0),
+    ggplot2 (>= 2.0.0),
     knitr, 
     collapse,
     rmarkdown, 
