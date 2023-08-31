@@ -369,7 +369,7 @@ validate_variables = function(x, variable, regex = FALSE){
            call. = FALSE)
     }
     to_extract <- 'rho'
-    newnames <- x$sp_names
+    newnames <- paste0(x$sp_names, '_rho')
   }
 
   if(variable[1] == 'linpreds'){
@@ -412,7 +412,7 @@ validate_variables = function(x, variable, regex = FALSE){
 
     to_extract <- 'rho_trend'
     newnames <- paste0(unlist(purrr::map(x$trend_mgcv_model$smooth,
-                                         'label')), '_trend')
+                                         'label')), '_rho_trend')
   }
 
   if(variable[1] == 'trend_linpreds'){
@@ -453,8 +453,8 @@ validate_variables = function(x, variable, regex = FALSE){
             vars_to_extract[[i]] <- unname(unlist(purrr::map(all_vars, 'orig_name'))[
               grepl(variable[i], unlist(purrr::map(all_vars, 'orig_name')))])
 
-            names_to_use[[i]] <- unname(unlist(purrr::map(all_vars, 'orig_name'))[
-              grepl(variable[i], unlist(purrr::map(all_vars, 'alias')))])
+            names_to_use[[i]] <- unname(unlist(purrr::map(all_vars, 'alias'))[
+              grepl(variable[i], unlist(purrr::map(all_vars, 'orig_name')))])
           }
         }
       }
