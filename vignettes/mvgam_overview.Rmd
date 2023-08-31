@@ -165,7 +165,7 @@ Where the $\beta_{year}$ effects are drawn from a *population* distribution that
 summary(model1)
 ```
 
-The diagnostic messages at the bottom of the summary show that the HMC sampler did not encounter any problems or difficult posterior spaces. This is a good sign. Posterior distributions for the coefficients related to the GAM linear predictor (i.e. the $\beta$'s) can be extracted as a `data.frame` or `matrix` as follows:
+The diagnostic messages at the bottom of the summary show that the HMC sampler did not encounter any problems or difficult posterior spaces. This is a good sign. Posterior distributions for model parameters can be extracted in any way that an object of class `brmsfit` can (see `?mvgam::mvgam_draws` for details). For example, we can extract the coefficients related to the GAM linear predictor (i.e. the $\beta$'s) into a `data.frame` using:
 ```{r Extract coefficient posteriors}
 beta_post <- as.data.frame(model1, variable = 'betas')
 dplyr::glimpse(beta_post)
@@ -183,7 +183,14 @@ Now for interrogating the model. We can get some sense of the variation in yearl
 plot(model1, type = 're')
 ```
 
-How do these yearly intercepts translate into time-varying predictions? To understand this, we can plot posterior hindcasts from this model for the training period using `plot.mvgam` with `type = 'forecast'`
+We can also capitalize on most of the useful MCMC plotting functions from the `bayesplot` package to visualize posterior distributions and diagnostics (see `?mvgam::mcmc_plot.mvgam` for details):
+```{r}
+mcmc_plot(object = model1,
+          variable = 'betas',
+          type = 'areas')
+```
+
+There is clearly some variation in these yearly intercept estimates. But how do these translate into time-varying predictions? To understand this, we can plot posterior hindcasts from this model for the training period using `plot.mvgam` with `type = 'forecast'`
 ```{r Plot posterior hindcasts}
 plot(model1, type = 'forecast')
 ```

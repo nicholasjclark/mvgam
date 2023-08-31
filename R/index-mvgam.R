@@ -107,7 +107,7 @@ variables.mvgam = function(x, ...){
     observation_smoothpars <- data.frame(orig_name = parnames[grepl('rho[',
                                                            parnames,
                                                            fixed = TRUE)],
-                                alias = x$sp_names)
+                                alias = paste0(x$sp_names, '_rho'))
   } else {
     observation_smoothpars <- NULL
   }
@@ -116,7 +116,7 @@ variables.mvgam = function(x, ...){
     trend_smoothpars <- data.frame(orig_name = parnames[grepl('rho_trend[',
                                                                     parnames,
                                                                     fixed = TRUE)],
-                                         alias = paste0(x$trend_sp_names, '_trend'))
+                                         alias = paste0(x$trend_sp_names, '_rho_trend'))
   } else {
     trend_smoothpars <- NULL
   }

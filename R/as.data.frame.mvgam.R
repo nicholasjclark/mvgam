@@ -23,6 +23,10 @@
 #'should `variable` be treated as a (vector of)
 #'regular expressions? Any variable in x matching at least one of the regular expressions
 #'will be selected. Defaults to `FALSE`.
+#'@param use_alias Logical. If more informative names for parameters are available
+#'(i.e. for beta coefficients `b` or for smoothing parameters `rho`), replace the uninformative
+#'names with the more informative alias. Defaults to `TRUE`
+#'@param inc_warmup Should warmup draws be included? Defaults to \code{FALSE}.
 #'@param row.names Ignored
 #'@param optional Ignored
 #'@param ... Ignored
@@ -52,8 +56,282 @@ as.data.frame.mvgam = function(x,
                                row.names = NULL,
                                optional = TRUE,
                                variable = 'betas',
+                               use_alias = TRUE,
                                regex = FALSE,
                                ...){
+
+  # Check variable and get more informative names if applicable
+  extract_pars <- validate_variables(x,
+                                     variable = variable,
+                                     regex = regex)
+
+  # Create a slim brmsfit object and use brms machinery to do extraction
+  dummy <- structure(list(fit = x$model_output),
+                     class = 'brmsfit')
+  post <- as.data.frame(dummy, variable = extract_pars$to_extract)
+
+  # Rename if needed
+  if(use_alias){
+    if(!is.null(extract_pars$newnames)){
+      colnames(post) <- extract_pars$newnames
+    }
+  }
+
+  return(post)
+}
+
+#'@rdname mvgam_draws
+#'@export
+as.matrix.mvgam = function(x,
+                           variable = 'betas',
+                           regex = FALSE,
+                           use_alias = TRUE,
+                           ...){
+
+  # Check variable and get more informative names if applicable
+  extract_pars <- validate_variables(x,
+                                     variable = variable,
+                                     regex = regex)
+
+  # Create a slim brmsfit object and use brms machinery to do extraction
+  dummy <- structure(list(fit = x$model_output),
+                     class = 'brmsfit')
+  post <- as.matrix(dummy, variable = extract_pars$to_extract)
+
+  # Rename if needed
+  if(use_alias){
+    if(!is.null(extract_pars$newnames)){
+      colnames(post) <- extract_pars$newnames
+    }
+  }
+
+  return(post)
+}
+
+#'@rdname mvgam_draws
+#'@export
+as.array.mvgam = function(x,
+                          variable = 'betas',
+                          regex = FALSE,
+                          use_alias = TRUE,
+                          ...){
+
+  # Check variable and get more informative names if applicable
+  extract_pars <- validate_variables(x,
+                                     variable = variable,
+                                     regex = regex)
+
+  # Create a slim brmsfit object and use brms machinery to do extraction
+  dummy <- structure(list(fit = x$model_output),
+                     class = 'brmsfit')
+  post <- as.array(dummy, variable = extract_pars$to_extract)
+
+  # Rename if needed
+  if(use_alias){
+    if(!is.null(extract_pars$newnames)){
+      dimnames(post)$variable <- extract_pars$newnames
+    }
+  }
+
+  return(post)
+}
+
+#' @rdname mvgam_draws
+#' @importFrom posterior as_draws
+#' @method as_draws mvgam
+#' @export
+as_draws.mvgam <- function(x, variable = NULL, regex = FALSE,
+                           inc_warmup = FALSE, use_alias = TRUE,
+                           ...){
+
+  # Check variable and get more informative names if applicable
+  extract_pars <- validate_variables(x,
+                                     variable = variable,
+                                     regex = regex)
+
+  # Create a slim brmsfit object and use brms machinery to do extraction
+  dummy <- structure(list(fit = x$model_output),
+                     class = 'brmsfit')
+  # Extract
+  post <- as_draws_list(dummy,
+                        variable = extract_pars$to_extract,
+                        regex = FALSE,
+                        inc_warmup = inc_warmup,
+                        ...)
+
+  # Rename if needed
+  if(use_alias){
+    if(!is.null(extract_pars$newnames)){
+      for(chain in seq_along(post)){
+        names(post[[chain]]) <- extract_pars$newnames
+      }
+    }
+  }
+  return(post)
+}
+
+#' @rdname mvgam_draws
+#' @importFrom posterior as_draws_matrix
+#' @method as_draws_matrix mvgam
+#' @export
+as_draws_matrix.mvgam <- function(x, variable = NULL, regex = FALSE,
+                                  inc_warmup = FALSE, use_alias = TRUE,
+                                  ...){
+
+  # Check variable and get more informative names if applicable
+  extract_pars <- validate_variables(x,
+                                     variable = variable,
+                                     regex = regex)
+
+  # Create a slim brmsfit object and use brms machinery to do extraction
+  dummy <- structure(list(fit = x$model_output),
+                     class = 'brmsfit')
+  # Extract
+  post <- as_draws_matrix(dummy,
+                        variable = extract_pars$to_extract,
+                        regex = FALSE,
+                        inc_warmup = inc_warmup,
+                        ...)
+
+  # Rename if needed
+  if(use_alias){
+    if(!is.null(extract_pars$newnames)){
+      colnames(post) <- extract_pars$newnames
+    }
+  }
+
+  return(post)
+}
+
+#' @rdname mvgam_draws
+#' @importFrom posterior as_draws_df
+#' @method as_draws_df mvgam
+#' @export
+as_draws_df.mvgam <- function(x, variable = NULL, regex = FALSE,
+                                  inc_warmup = FALSE, use_alias = TRUE,
+                                  ...){
+
+  # Check variable and get more informative names if applicable
+  extract_pars <- validate_variables(x,
+                                     variable = variable,
+                                     regex = regex)
+
+  # Create a slim brmsfit object and use brms machinery to do extraction
+  dummy <- structure(list(fit = x$model_output),
+                     class = 'brmsfit')
+  # Extract
+  post <- as_draws_df(dummy,
+                      variable = extract_pars$to_extract,
+                      regex = FALSE,
+                      inc_warmup = inc_warmup,
+                      ...)
+
+  # Rename if needed
+  if(use_alias){
+    if(!is.null(extract_pars$newnames)){
+      colnames(post)[1:length(extract_pars$newnames)] <- extract_pars$newnames
+    }
+  }
+
+  return(post)
+}
+
+#' @rdname mvgam_draws
+#' @importFrom posterior as_draws_array
+#' @method as_draws_array mvgam
+#' @export
+as_draws_array.mvgam <- function(x, variable = NULL, regex = FALSE,
+                                  inc_warmup = FALSE, use_alias = TRUE,
+                                  ...){
+
+  # Check variable and get more informative names if applicable
+  extract_pars <- validate_variables(x,
+                                     variable = variable,
+                                     regex = regex)
+
+  # Create a slim brmsfit object and use brms machinery to do extraction
+  dummy <- structure(list(fit = x$model_output),
+                     class = 'brmsfit')
+  # Extract
+  post <- as_draws_array(dummy,
+                          variable = extract_pars$to_extract,
+                          regex = FALSE,
+                          inc_warmup = inc_warmup,
+                          ...)
+
+  # Rename if needed
+  if(use_alias){
+    if(!is.null(extract_pars$newnames)){
+      dimnames(post)$variable <- extract_pars$newnames
+    }
+  }
+
+  return(post)
+}
+
+#' @rdname mvgam_draws
+#' @importFrom posterior as_draws_list
+#' @method as_draws_list mvgam
+#' @export
+as_draws_list.mvgam <- function(x, variable = NULL, regex = FALSE,
+                                 inc_warmup = FALSE, use_alias = TRUE,
+                                 ...){
+
+  # Check variable and get more informative names if applicable
+  extract_pars <- validate_variables(x,
+                                     variable = variable,
+                                     regex = regex)
+
+  # Create a slim brmsfit object and use brms machinery to do extraction
+  dummy <- structure(list(fit = x$model_output),
+                     class = 'brmsfit')
+  # Extract
+  post <- as_draws_list(dummy,
+                         variable = extract_pars$to_extract,
+                         regex = FALSE,
+                         inc_warmup = inc_warmup,
+                         ...)
+
+  # Rename if needed
+  if(use_alias){
+    if(!is.null(extract_pars$newnames)){
+      for(chain in seq_along(post)){
+        names(post[[chain]]) <- extract_pars$newnames
+      }
+    }
+  }
+
+  return(post)
+}
+
+#' @rdname mvgam_draws
+#' @importFrom posterior as_draws_rvars
+#' @method as_draws_rvars mvgam
+#' @export
+as_draws_rvars.mvgam <- function(x, variable = NULL, regex = FALSE,
+                                inc_warmup = FALSE,
+                                ...){
+
+  # Check variable and get more informative names if applicable
+  extract_pars <- validate_variables(x,
+                                     variable = variable,
+                                     regex = regex)
+
+  # Create a slim brmsfit object and use brms machinery to do extraction
+  dummy <- structure(list(fit = x$model_output),
+                     class = 'brmsfit')
+
+  # Extract (can't rename rvars due to the way it is structured)
+  post <- as_draws_rvars(dummy,
+                        variable = extract_pars$to_extract,
+                        regex = FALSE,
+                        inc_warmup = inc_warmup,
+                        ...)
+  return(post)
+}
+
+#'@noRd
+validate_variables = function(x, variable, regex = FALSE){
 
   # Get a string of all possible variables to extract
   all_vars <- variables(x)
@@ -77,16 +355,12 @@ as.data.frame.mvgam = function(x,
 
   if(variable[1] == 'obs_params'){
     to_extract <- family_par_names(x$family)
-    post <- data.frame(mcmc_chains(x$model_output,
-                                   params = to_extract))
-    newnames <- gsub("\\.(?=[^.]*\\.)", "[", colnames(post), perl = TRUE)
-    newnames <- gsub("\\.", "]", newnames, perl = TRUE)
-    colnames(post) <- newnames
+    newnames <- NULL
   }
 
   if(variable[1] == 'betas'){
-    post <- data.frame(mcmc_chains(x$model_output, params = 'b'))
-    colnames(post) <- names(coef(x$mgcv_model))
+    to_extract <- 'b'
+    newnames <- names(coef(x$mgcv_model))
   }
 
   if(variable[1] == 'smooth_params'){
@@ -94,25 +368,23 @@ as.data.frame.mvgam = function(x,
       stop('No observation-level smooth parameters in model; no smooth_params to extract',
            call. = FALSE)
     }
-    post <- data.frame(mcmc_chains(x$model_output, params = 'rho'))
-    colnames(post) <- x$sp_names
+    to_extract <- 'rho'
+    newnames <- x$sp_names
   }
 
   if(variable[1] == 'linpreds'){
-    post <- mcmc_chains(x$model_output, params = 'mus')
-    varnames <- dimnames(post)[[2]]
-    post <- as.data.frame(post)
-    colnames(post) <- varnames
+    to_extract <- 'mus'
+    newnames <- NULL
   }
 
   if(variable[1] == 'trend_params'){
     to_extract <- trend_par_names(x$trend_model,
-                                          x$use_lv,
-                                          x$drift)
+                                  x$use_lv,
+                                  x$drift)
     to_extract <- to_extract[!to_extract %in% c('tau','trend',
                                                 'LV', 'penalty', 'lv_coefs')]
     if(!is.null(x$trend_call) & x$trend_model %in% c('RW', 'AR1',
-                                                   'AR2', 'AR3')){
+                                                     'AR2', 'AR3')){
       to_extract <- c(to_extract, 'sigma')
     }
 
@@ -120,10 +392,7 @@ as.data.frame.mvgam = function(x,
       to_extract <- c(to_extract, 'Sigma')
     }
 
-    post <- mcmc_chains(x$model_output, params = to_extract)
-    varnames <- dimnames(post)[[2]]
-    post <- as.data.frame(post)
-    colnames(post) <- varnames
+    newnames <- NULL
   }
 
   if(variable[1] == 'trend_betas'){
@@ -131,8 +400,8 @@ as.data.frame.mvgam = function(x,
       stop('No trend_formula supplied to model; no trend_betas to extract',
            call. = FALSE)
     }
-    post <- data.frame(mcmc_chains(x$model_output, params = 'b_trend'))
-    colnames(post) <- paste0(names(coef(x$trend_mgcv_model)), '_trend')
+    to_extract <- 'b_trend'
+    newnames <- paste0(names(coef(x$trend_mgcv_model)), '_trend')
   }
 
   if(variable[1] == "trend_smooth_params"){
@@ -141,9 +410,9 @@ as.data.frame.mvgam = function(x,
            call. = FALSE)
     }
 
-    post <- data.frame(mcmc_chains(x$model_output, params = 'rho_trend'))
-    colnames(post) <- paste0(unlist(purrr::map(x$trend_mgcv_model$smooth,
-                                               'label')), '_trend')
+    to_extract <- 'rho_trend'
+    newnames <- paste0(unlist(purrr::map(x$trend_mgcv_model$smooth,
+                                         'label')), '_trend')
   }
 
   if(variable[1] == 'trend_linpreds'){
@@ -151,21 +420,19 @@ as.data.frame.mvgam = function(x,
       stop('No trend_formula supplied to model; no trend_linpreds to extract',
            call. = FALSE)
     }
-    post <- mcmc_chains(x$model_output, params = 'trend_mus')
-    varnames <- dimnames(post)[[2]]
-    post <- as.data.frame(post)
-    colnames(post) <- varnames
+    to_extract <- 'trend_mus'
+    newnames <- NULL
   }
 
-  # If not one of the standard subsets, extract the chosen variable(s)
+  # If not one of the standard subsets, get aliases for the chosen variable(s)
   if(!variable[1] %in% c("obs_params",
-                     "betas",
-                     "smooth_params",
-                     "linpreds",
-                     "trend_params",
-                     "trend_betas",
-                     "trend_smooth_params",
-                     "trend_linpreds")){
+                         "betas",
+                         "smooth_params",
+                         "linpreds",
+                         "trend_params",
+                         "trend_betas",
+                         "trend_smooth_params",
+                         "trend_linpreds")){
 
     if(regex){
       vars_to_extract <- vector(mode = 'list')
@@ -187,7 +454,7 @@ as.data.frame.mvgam = function(x,
               grepl(variable[i], unlist(purrr::map(all_vars, 'orig_name')))])
 
             names_to_use[[i]] <- unname(unlist(purrr::map(all_vars, 'orig_name'))[
-              grepl(variable[i], unlist(purrr::map(all_vars, 'orig_name')))])
+              grepl(variable[i], unlist(purrr::map(all_vars, 'alias')))])
           }
         }
       }
@@ -207,7 +474,8 @@ as.data.frame.mvgam = function(x,
           } else {
             vars_to_extract[[i]] <- unname(unlist(purrr::map(all_vars, 'orig_name'))[
               which(all_orig_vars == variable[i])])
-            names_to_use[[i]] <- variable[i]
+            names_to_use[[i]] <- unname(unlist(purrr::map(all_vars, 'alias'))[
+              which(all_orig_vars == variable[i])])
           }
         }
       }
@@ -215,36 +483,19 @@ as.data.frame.mvgam = function(x,
 
     vars_to_extract <- unlist(vars_to_extract)
     names_to_use <- unlist(names_to_use)
+    names_to_use[is.na(names_to_use)] <- vars_to_extract[is.na(names_to_use)]
 
     if(all(is.na(vars_to_extract))){
       stop('could not find any variables matching the supplied patterns',
            call. = FALSE)
     }
 
-    vars_to_extract <- vars_to_extract[!is.na(vars_to_extract)]
-    names_to_use <- names_to_use[!is.na(names_to_use)]
-
-    dummy <- structure(list(fit = x$model_output),
-                       class = 'brmsfit')
-    post <- as.data.frame(dummy, variable = vars_to_extract)
-    colnames(post) <- names_to_use
+    to_extract <- vars_to_extract[!is.na(vars_to_extract)]
+    newnames <- names_to_use[!is.na(names_to_use)]
   }
 
-  return(post)
+  return(list(to_extract = to_extract,
+              newnames = newnames))
 }
 
-#'@rdname mvgam_draws
-#'@export
-as.matrix.mvgam = function(x,
-                           variable = 'betas',
-                           regex = FALSE,
-                           ...){
-
-  post_df <- as.data.frame(x, variable = variable, regex = regex)
-  varnames <- colnames(post_df)
-  post <- as.matrix(post_df)
-  colnames(post) <- varnames
-
-  return(post)
-}
 

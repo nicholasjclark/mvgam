@@ -618,8 +618,7 @@ mvgam = function(formula,
                         family = family_to_mgcvfam(family),
                         data = data_train,
                         drop.unused.levels = FALSE,
-                        maxit = 30),
-                silent = TRUE)
+                        maxit = 30))
   if(inherits(ss_gam, 'try-error')){
     if(grepl('missing values', ss_gam[1])){
       stop(paste('Missing values found in data predictors:\n',

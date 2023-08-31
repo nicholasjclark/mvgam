@@ -4,6 +4,13 @@
 \alias{mvgam_draws}
 \alias{as.data.frame.mvgam}
 \alias{as.matrix.mvgam}
+\alias{as.array.mvgam}
+\alias{as_draws.mvgam}
+\alias{as_draws_matrix.mvgam}
+\alias{as_draws_df.mvgam}
+\alias{as_draws_array.mvgam}
+\alias{as_draws_list.mvgam}
+\alias{as_draws_rvars.mvgam}
 \title{Extract posterior draws from fitted \code{mvgam} objects}
 \usage{
 \method{as.data.frame}{mvgam}(
@@ -11,11 +18,61 @@
   row.names = NULL,
   optional = TRUE,
   variable = "betas",
+  use_alias = TRUE,
   regex = FALSE,
   ...
 )
 
-\method{as.matrix}{mvgam}(x, variable = "betas", regex = FALSE, ...)
+\method{as.matrix}{mvgam}(x, variable = "betas", regex = FALSE, use_alias = TRUE, ...)
+
+\method{as.array}{mvgam}(x, variable = "betas", regex = FALSE, use_alias = TRUE, ...)
+
+\method{as_draws}{mvgam}(
+  x,
+  variable = NULL,
+  regex = FALSE,
+  inc_warmup = FALSE,
+  use_alias = TRUE,
+  ...
+)
+
+\method{as_draws_matrix}{mvgam}(
+  x,
+  variable = NULL,
+  regex = FALSE,
+  inc_warmup = FALSE,
+  use_alias = TRUE,
+  ...
+)
+
+\method{as_draws_df}{mvgam}(
+  x,
+  variable = NULL,
+  regex = FALSE,
+  inc_warmup = FALSE,
+  use_alias = TRUE,
+  ...
+)
+
+\method{as_draws_array}{mvgam}(
+  x,
+  variable = NULL,
+  regex = FALSE,
+  inc_warmup = FALSE,
+  use_alias = TRUE,
+  ...
+)
+
+\method{as_draws_list}{mvgam}(
+  x,
+  variable = NULL,
+  regex = FALSE,
+  inc_warmup = FALSE,
+  use_alias = TRUE,
+  ...
+)
+
+\method{as_draws_rvars}{mvgam}(x, variable = NULL, regex = FALSE, inc_warmup = FALSE, ...)
 }
 \arguments{
 \item{x}{\code{list} object of class \code{mvgam}}
@@ -42,12 +99,18 @@ only available if a \code{trend_formula} was supplied in the original model)
 only available if a \code{trend_formula} was supplied in the original model)} OR can be a character vector
 providing the variables to extract}
 
+\item{use_alias}{Logical. If more informative names for parameters are available
+(i.e. for beta coefficients \code{b} or for smoothing parameters \code{rho}), replace the uninformative
+names with the more informative alias. Defaults to \code{TRUE}}
+
 \item{regex}{Logical. If not using one of the prespecified options for extractions,
 should \code{variable} be treated as a (vector of)
 regular expressions? Any variable in x matching at least one of the regular expressions
 will be selected. Defaults to \code{FALSE}.}
 
 \item{...}{Ignored}
+
+\item{inc_warmup}{Should warmup draws be included? Defaults to \code{FALSE}.}
 }
 \value{
 A \code{data.frame}, \code{matrix}, or \code{array} containing the posterior draws.

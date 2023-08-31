@@ -172,7 +172,7 @@ if(any(!is.na(object$sp_names)) & !all(smooth_labs$class == 'random.effect')){
     cat("\nGAM observation smoothing parameter (rho) estimates:\n")
   }
   rho_coefs <- mcmc_summary(object$model_output, 'rho')[,c(3:7)]
-  rownames(rho_coefs) <- object$sp_names
+  rownames(rho_coefs) <- paste0(object$sp_names, '_rho')
 
   # Don't print random effect lambdas as they follow the prior distribution
   if(any(smooth_labs$class == 'random.effect')){
@@ -433,7 +433,7 @@ if(!is.null(object$trend_call)){
       } else {
         cat("\nGAM process smoothing parameter (rho) estimates:\n")
         rho_coefs <- mcmc_summary(object$model_output, 'rho_trend')[,c(3:7)]
-        rownames(rho_coefs) <- paste0(object$trend_sp_names, '_trend')
+        rownames(rho_coefs) <- paste0(object$trend_sp_names, '_rho_trend')
         print(rho_coefs[to_print,])
 
       }

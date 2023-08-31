@@ -366,18 +366,38 @@ example)</p>
 <span class="r-in"><span>                              family <span class="op">=</span> <span class="st">'nb'</span>,</span></span>
 <span class="r-in"><span>                              data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>                              trend_model <span class="op">=</span> <span class="st">'AR2'</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in ss_gam$smooth:</span> $ operator is invalid for atomic vectors</span>
 <span class="r-in"><span><span class="va">test_priors</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in eval(expr, envir, enclos):</span> object 'test_priors' not found</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                    param_name param_length</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1               vector&lt;lower=0&gt;[n_sp] lambda;            2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2                           vector[1] mu_raw;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3               vector&lt;lower=0&gt;[1] sigma_raw;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 vector&lt;lower=-1.5,upper=1.5&gt;[n_series] ar1;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 vector&lt;lower=-1.5,upper=1.5&gt;[n_series] ar2;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6            vector&lt;lower=0&gt;[n_series] sigma;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7          vector&lt;lower=0&gt;[n_series] phi_inv;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                    param_info                           prior</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 s(season) smooth parameters        lambda ~ normal(10, 25);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2          s(series) pop mean          mu_raw ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3            s(series) pop sd   sigma_raw ~ exponential(0.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4       trend AR1 coefficient             ar1 ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5       trend AR2 coefficient             ar2 ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd         sigma ~ exponential(2);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion phi_inv ~ student_t(3, 0, 0.1);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.88);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(-0.38, 0.23);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.55);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.14, 0.33);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5       ar2 ~ normal(0.2, 0.83);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6      sigma ~ exponential(0.2);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7   phi_inv ~ normal(0.1, 0.58);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>
 <span class="r-in"><span><span class="va">test_priors</span><span class="op">$</span><span class="va">prior</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">'mu_raw ~ normal(0.2, 0.5);'</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in test_priors$prior[2] &lt;- "mu_raw ~ normal(0.2, 0.5);":</span> object 'test_priors' not found</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now use stronger regularisation for the series-level AR2 coefficients</span></span></span>
 <span class="r-in"><span><span class="va">test_priors</span><span class="op">$</span><span class="va">prior</span><span class="op">[</span><span class="fl">5</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">'ar2 ~ normal(0, 0.25);'</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in test_priors$prior[5] &lt;- "ar2 ~ normal(0, 0.25);":</span> object 'test_priors' not found</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Check that the changes are made to the model file without any warnings by</span></span></span>
 <span class="r-in"><span><span class="co"># setting 'run_model = FALSE'</span></span></span>
@@ -388,16 +408,127 @@ example)</p>
 <span class="r-in"><span>            trend_model <span class="op">=</span> <span class="st">'AR2'</span>,</span></span>
 <span class="r-in"><span>            priors <span class="op">=</span> <span class="va">test_priors</span>,</span></span>
 <span class="r-in"><span>            run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in update_priors(vectorised$model_file, priors, use_stan = TRUE):</span> object 'test_priors' not found</span>
 <span class="r-in"><span>            <span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in class(object) %in% c("mvgam", "mvgam_prefit"):</span> object 'mod' not found</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> // Stan model code generated by package mvgam</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> functions {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector rep_each(vector x, int K) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int N = rows(x);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[N * K] y;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int pos = 1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for (n in 1:N) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for (k in 1:K) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   y[pos] = x[n];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   pos += 1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   return y;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> data {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; total_obs; // total number of observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n; // number of timepoints per series</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_sp; // number of smoothing parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_series; // number of series</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; num_basis; // total number of basis coefficients</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] zero; // prior locations for basis coefficients</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[total_obs, num_basis] X; // mgcv GAM design matrix</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[8,8] S1; // mgcv smooth penalty matrix S1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; flat_ys[n_nonmissing]; // flattened nonmissing observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n_nonmissing, num_basis] flat_xs; // X values for nonmissing observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; obs_ind[n_nonmissing]; // indices of nonmissing observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> parameters {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // raw basis coefficients</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] b_raw;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // random effect variances</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[1] sigma_raw;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // random effect means</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[1] mu_raw;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // negative binomial overdispersion</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] phi_inv;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR1 terms</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5,upper=1.5&gt;[n_series] ar1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR2 terms</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5,upper=1.5&gt;[n_series] ar2;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend variance parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] sigma;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trends</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n, n_series] trend;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // smoothing parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_sp] lambda;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> transformed parameters {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // basis coefficients</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] b;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b[1:8] = b_raw[1:8];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b[9:11] = mu_raw[1] + b_raw[9:11] * sigma_raw[1];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population variances</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ exponential(0.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population means</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   mu_raw ~ normal(0.2, 0.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(season)...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[1:8] ~ multi_normal_prec(zero[1:8],S1[1:8,1:8] * lambda[1]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior (non-centred) for s(series)...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[9:11] ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for AR parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ar1 ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ar2 ~ normal(0, 0.25);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for smoothing parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(10, 25);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for overdispersion parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   phi_inv ~ student_t(3, 0, 0.1);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for latent trend variance parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ exponential(2);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // trend estimates</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1:n_series] ~ normal(0, sigma);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   trend[2, 1:n_series] ~ normal(trend[1, 1:n_series] * ar1, sigma);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for(s in 1:n_series){</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   trend[3:n, s] ~ normal(ar1[s] * trend[2:(n - 1), s] + ar2[s] * trend[1:(n - 2), s], sigma[s]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // likelihood functions</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_nonmissing] flat_trends;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   real flat_phis[n_nonmissing];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   flat_trends = (to_vector(trend))[obs_ind];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   flat_phis = to_array_1d(rep_each(phi_inv, n)[obs_ind]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   flat_ys ~ neg_binomial_2(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)),</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   inv(flat_phis));</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> generated quantities {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[total_obs] eta;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n, n_series] mus;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_sp] rho;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_series] tau;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   array[n, n_series] int ypred;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n, n_series] phi_vec;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_series] phi;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   phi = inv(phi_inv);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for (s in 1:n_series) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   phi_vec[1:n,s] = rep_vector(phi[s], n);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   rho = log(lambda);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for (s in 1:n_series) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   tau[s] = pow(sigma[s], -2.0);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // posterior predictions</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   eta = X * b;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for(s in 1:n_series){ </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ypred[1:n, s] = neg_binomial_2_rng(exp(mus[1:n, s]), phi_vec[1:n, s]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># No warnings, the model is ready for fitting now in the usual way with the addition</span></span></span>
 <span class="r-in"><span><span class="co"># of the 'priors' argument</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Look at what is returned when an incorrect spelling is used</span></span></span>
 <span class="r-in"><span><span class="va">test_priors</span><span class="op">$</span><span class="va">prior</span><span class="op">[</span><span class="fl">5</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">'ar2_bananas ~ normal(0, 0.25);'</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in test_priors$prior[5] &lt;- "ar2_bananas ~ normal(0, 0.25);":</span> object 'test_priors' not found</span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>            <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
 <span class="r-in"><span>            family <span class="op">=</span> <span class="st">'nb'</span>,</span></span>
@@ -405,9 +536,122 @@ example)</p>
 <span class="r-in"><span>            trend_model <span class="op">=</span> <span class="st">'AR2'</span>,</span></span>
 <span class="r-in"><span>            priors <span class="op">=</span> <span class="va">test_priors</span>,</span></span>
 <span class="r-in"><span>            run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in update_priors(vectorised$model_file, priors, use_stan = TRUE):</span> object 'test_priors' not found</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>no match found in model_file for parameter: ar2_bananas</span>
 <span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in class(object) %in% c("mvgam", "mvgam_prefit"):</span> object 'mod' not found</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> // Stan model code generated by package mvgam</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> functions {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector rep_each(vector x, int K) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int N = rows(x);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[N * K] y;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int pos = 1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for (n in 1:N) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for (k in 1:K) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   y[pos] = x[n];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   pos += 1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   return y;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> data {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; total_obs; // total number of observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n; // number of timepoints per series</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_sp; // number of smoothing parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_series; // number of series</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; num_basis; // total number of basis coefficients</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] zero; // prior locations for basis coefficients</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[total_obs, num_basis] X; // mgcv GAM design matrix</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[8,8] S1; // mgcv smooth penalty matrix S1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; flat_ys[n_nonmissing]; // flattened nonmissing observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n_nonmissing, num_basis] flat_xs; // X values for nonmissing observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; obs_ind[n_nonmissing]; // indices of nonmissing observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> parameters {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // raw basis coefficients</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] b_raw;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // random effect variances</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[1] sigma_raw;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // random effect means</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[1] mu_raw;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // negative binomial overdispersion</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] phi_inv;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR1 terms</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5,upper=1.5&gt;[n_series] ar1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR2 terms</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5,upper=1.5&gt;[n_series] ar2;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend variance parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] sigma;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trends</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n, n_series] trend;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // smoothing parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_sp] lambda;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> transformed parameters {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // basis coefficients</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] b;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b[1:8] = b_raw[1:8];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b[9:11] = mu_raw[1] + b_raw[9:11] * sigma_raw[1];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population variances</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_raw ~ exponential(0.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for random effect population means</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   mu_raw ~ normal(0.2, 0.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(season)...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[1:8] ~ multi_normal_prec(zero[1:8],S1[1:8,1:8] * lambda[1]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior (non-centred) for s(series)...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[9:11] ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for AR parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ar1 ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ar2 ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for smoothing parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(10, 25);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for overdispersion parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   phi_inv ~ student_t(3, 0, 0.1);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for latent trend variance parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ exponential(2);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // trend estimates</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1:n_series] ~ normal(0, sigma);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   trend[2, 1:n_series] ~ normal(trend[1, 1:n_series] * ar1, sigma);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for(s in 1:n_series){</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   trend[3:n, s] ~ normal(ar1[s] * trend[2:(n - 1), s] + ar2[s] * trend[1:(n - 2), s], sigma[s]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // likelihood functions</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_nonmissing] flat_trends;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   real flat_phis[n_nonmissing];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   flat_trends = (to_vector(trend))[obs_ind];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   flat_phis = to_array_1d(rep_each(phi_inv, n)[obs_ind]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   flat_ys ~ neg_binomial_2(</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)),</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   inv(flat_phis));</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> generated quantities {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[total_obs] eta;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n, n_series] mus;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_sp] rho;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_series] tau;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   array[n, n_series] int ypred;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n, n_series] phi_vec;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_series] phi;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   phi = inv(phi_inv);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for (s in 1:n_series) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   phi_vec[1:n,s] = rep_vector(phi[s], n);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   rho = log(lambda);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for (s in 1:n_series) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   tau[s] = pow(sigma[s], -2.0);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // posterior predictions</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   eta = X * b;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for(s in 1:n_series){ </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ypred[1:n, s] = neg_binomial_2_rng(exp(mus[1:n, s]), phi_vec[1:n, s]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

@@ -19,7 +19,7 @@
 \item{x}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{type}{\code{character} specifying which type of plot to return. Options are:
-'series,
+series,
 residuals,
 smooths,
 re (random effect smooths),
