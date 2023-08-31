@@ -36,3 +36,12 @@ mvgam_setup <- function(formula,
   }
 
 }
+
+#' @noRd
+trim_mgcv <- function(mgcv_model){
+
+  mgcv_model$fitted.values <- mgcv_model$residuals <- mgcv_model$linear.predictors <-
+    mgcv_model$working.weights <- mgcv_model$z <- NULL
+
+  mgcv_model
+}

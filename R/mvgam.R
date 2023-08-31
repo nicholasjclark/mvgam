@@ -1378,6 +1378,12 @@ mvgam = function(formula,
 
   }
 
+  # Lighten up the mgcv model(s) to reduce size of the returned object
+  ss_gam <- trim_mgcv(ss_gam)
+  if(!missing(trend_formula)){
+    trend_mgcv_model <- trim(trend_mgcv_model)
+  }
+
   #### Return only the model file and all data / inits needed to run the model
   # outside of mvgam ####
   if(!run_model){

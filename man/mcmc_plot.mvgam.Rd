@@ -22,8 +22,7 @@ Supported types are (as names) \code{hist}, \code{dens},
 \code{violin}, \code{intervals}, \code{areas}, \code{acf},
 \code{acf_bar},\code{trace}, \code{trace_highlight}, \code{scatter},
 \code{rhat}, \code{rhat_hist}, \code{neff}, \code{neff_hist}
-\code{nuts_acceptance}, \code{nuts_divergence},
-\code{nuts_stepsize}, \code{nuts_treedepth}, and \code{nuts_energy}.
+and \code{nuts_energy}.
 For an overview on the various plot types see
 \code{\link[bayesplot:MCMC-overview]{MCMC-overview}}.}
 

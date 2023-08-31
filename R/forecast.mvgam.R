@@ -539,6 +539,22 @@ forecast_draws = function(object,
     Xp_trend <- NULL
   }
 
+  # No need to compute in parallel if there was no trend model
+  if(object$trend_model == 'None'){
+    if(series != 'all'){
+      fc_preds <- predict(object, type = type, newdata = series_test)
+    } else {
+      all_preds <- predict(object, type = type, newdata = data_test)
+      fc_preds <- lapply(seq_len(NROW(all_preds)), function(draw){
+        lapply(seq_len(n_series), function(series){
+          all_preds[draw, which(data_test$series == levels(data_test$series)[series])]
+        })
+      })
+    }
+
+  } else {
+  # Else compute forecasts including dynamic trend components
+
   # Set forecast horizon
   if(series != 'all'){
     fc_horizon <- NROW(series_test)
@@ -751,7 +767,8 @@ forecast_draws = function(object,
 
     out
   }, cl = cl)
-  stopCluster(cl)
+   stopCluster(cl)
+ }
 
   return(fc_preds)
 }
