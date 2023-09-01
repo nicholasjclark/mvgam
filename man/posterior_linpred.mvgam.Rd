@@ -6,15 +6,20 @@
 \usage{
 \method{posterior_linpred}{mvgam}(
   object,
+  transform = FALSE,
   newdata,
   data_test,
   process_error = TRUE,
-  transform = FALSE,
   ...
 )
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
+
+\item{transform}{Logical; if \code{FALSE}
+(the default), draws of the linear predictor are returned.
+If \code{TRUE}, draws of the transformed linear predictor,
+i.e. the conditional expectation, are returned.}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the
 variables included in the linear predictor of \code{formula}. If not supplied,
@@ -29,11 +34,6 @@ from any latent trend SD parameters. If \code{FALSE}, uncertainty in the latent
 trend component is ignored when calculating predictions. If no \code{newdata} is
 supplied, draws from the fitted model's posterior predictive distribution will be used
 (which will always include uncertainty in any latent trend components)}
-
-\item{transform}{Logical; if \code{FALSE}
-(the default), draws of the linear predictor are returned.
-If \code{TRUE}, draws of the transformed linear predictor,
-i.e. the conditional expectation, are returned.}
 
 \item{...}{Ignored}
 }

@@ -10,6 +10,7 @@
 #' incorporated in the draws computed by \code{posterior_epred} while the
 #' residual error is ignored there. However, the estimated means of both methods
 #' averaged across draws should be very similar.
+#' @importFrom rstantools posterior_epred
 #' @inheritParams predict.mvgam
 #' @param process_error Logical. If \code{TRUE} and \code{newdata} is supplied,
 #' expected uncertainty in the process model is accounted for by using draws
@@ -34,12 +35,11 @@
 #' where \code{n_samples} is the number of posterior samples from the fitted object
 #' and \code{n_obs} is the number of observations in \code{newdata}
 #' @seealso \code{\link{hindcast.mvgam}} \code{\link{posterior_linpred.mvgam}} \code{\link{posterior_predict.mvgam}}
+#' @aliases posterior_epred
 #' @export
 posterior_epred.mvgam = function(object, newdata,
                                  data_test,
                                  process_error = TRUE, ...){
-
-  process_error <- brms:::as_one_logical(process_error)
 
   if(missing(newdata) & missing(data_test)){
     .mvgam_fitted(object, type = 'expected')
@@ -57,7 +57,7 @@ posterior_epred.mvgam = function(object, newdata,
 #' Compute posterior draws of the linear predictor, that is draws before
 #' applying any link functions or other transformations. Can be performed for
 #' the data used to fit the model (posterior predictive checks) or for new data.
-#'
+#' @importFrom rstantools posterior_linpred
 #' @inheritParams posterior_epred.mvgam
 #' @param transform Logical; if \code{FALSE}
 #'  (the default), draws of the linear predictor are returned.
@@ -83,14 +83,12 @@ posterior_epred.mvgam = function(object, newdata,
 #' and \code{n_obs} is the number of observations in \code{newdata}
 #' @seealso \code{\link{hindcast.mvgam}} \code{\link{posterior_epred.mvgam}} \code{\link{posterior_predict.mvgam}}
 #' @export
-posterior_linpred.mvgam = function(object, newdata,
+posterior_linpred.mvgam = function(object,
+                                   transform = FALSE,
+                                   newdata,
                                    data_test,
                                    process_error = TRUE,
-                                   transform = FALSE,
                                    ...){
-
-  transform <- brms:::as_one_logical(transform)
-  process_error <- brms:::as_one_logical(process_error)
 
   if(transform){
     type <- 'expected'
@@ -114,6 +112,7 @@ posterior_linpred.mvgam = function(object, newdata,
 #' \code{\link{posterior_epred.mvgam}}. This is because the residual error
 #' is incorporated in \code{posterior_predict}. However, the estimated means of
 #' both methods averaged across draws should be very similar.
+#' @importFrom rstantools posterior_predict
 #' @inheritParams predict.mvgam
 #' @param process_error Logical. If \code{TRUE} and \code{newdata} is supplied,
 #' expected uncertainty in the process model is accounted for by using draws
@@ -143,7 +142,6 @@ posterior_predict.mvgam = function(object, newdata,
                                    data_test,
                                    process_error = TRUE, ...){
 
-  process_error <- brms:::as_one_logical(process_error)
   predict(object,
           newdata = newdata,
           data_test = data_test,
@@ -185,9 +183,7 @@ fitted.mvgam <- function(object, process_error = TRUE,
                         summary = TRUE, robust = FALSE,
                         probs = c(0.025, 0.975), ...) {
 
-  process_error <- brms:::as_one_logical(process_error)
   scale <- match.arg(scale)
-  summary <- brms:::as_one_logical(summary)
   type <- switch(scale, "response" = "expected",
                   "linear" = "link")
   preds <- .mvgam_fitted(object = object, type = type)

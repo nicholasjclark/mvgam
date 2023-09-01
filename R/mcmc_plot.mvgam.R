@@ -2,6 +2,8 @@
 #'
 #' Convenient way to call MCMC plotting functions
 #' implemented in the \pkg{bayesplot} package
+#' @importFrom brms mcmc_plot
+#' @importFrom bayesplot color_scheme_set color_scheme_get
 #' @inheritParams brms::mcmc_plot
 #' @inheritParams as.data.frame.mvgam
 #' @param type The type of the plot.
@@ -24,17 +26,17 @@ mcmc_plot.mvgam = function(object,
                            ...){
 
   # Set red colour scheme
-  col_scheme <- attr(bayesplot::color_scheme_get(),
+  col_scheme <- attr(color_scheme_get(),
                      'scheme_name')
-  bayesplot::color_scheme_set('red')
+  color_scheme_set('red')
 
   # Check type validity
-  type <- brms:::as_one_character(type)
   valid_types <- as.character(bayesplot::available_mcmc(""))
   valid_types <- sub("^mcmc_", "", valid_types)
-  if (!type %in% valid_types) {
-    brms:::stop2("Invalid plot type. Valid plot types are: \n",
-                 brms:::collapse_comma(valid_types))
+  if(!type %in% valid_types) {
+    stop("Invalid plot type. Valid plot types are: \n",
+                 paste0("'", valid_types, "'", collapse = ", "),
+         call. = FALSE)
   }
 
   # Set default params to plot
@@ -65,9 +67,10 @@ mcmc_plot.mvgam = function(object,
                       use_alias = use_alias)
     sel_variables <- dimnames(draws)[[2]]
     if(type %in% c("scatter", "hex") && length(sel_variables) != 2L){
-      brms:::stop2("Exactly 2 parameters must be selected for this type.",
+      stop("Exactly 2 parameters must be selected for this type.",
                    "\nParameters selected: ",
-                   brms:::collapse_comma(sel_variables))
+                   paste0("'", sel_variables, "'", collapse = ", "),
+           call. = FALSE)
     }
     mcmc_args$x <- draws
     }
@@ -87,9 +90,8 @@ mcmc_plot.mvgam = function(object,
 
   # Generate plot and reset colour scheme
   out_plot <- do.call(mcmc_fun, args = mcmc_args)
-  bayesplot::color_scheme_set(col_scheme)
+  color_scheme_set(col_scheme)
 
   # Return the plot
   return(out_plot)
 }
-

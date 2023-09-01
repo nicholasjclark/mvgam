@@ -102,7 +102,7 @@
 #'               run_model = FALSE)
 #'
 #'# Inspect the model file with default mvgam priors
-#'code(model_file)
+#'code(mod_default)
 #'
 #'# Look at which priors can be updated in mvgam
 #'test_priors <- get_mvgam_priors(y ~ s(series, bs = 're') +
