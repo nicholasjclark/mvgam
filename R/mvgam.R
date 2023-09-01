@@ -102,7 +102,8 @@
 #'\code{Stan}'s `reduce_sum` function and have a slow running model that cannot be sped
 #'up by any other means. Only available when using \code{Cmdstan} as the backend
 #'@param priors An optional \code{data.frame} with prior
-#'definitions (in JAGS or Stan syntax). See [get_mvgam_priors] and
+#'definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
+#'class `brmsprior` (see. \code{\link[brms]{prior}} for details). See [get_mvgam_priors] and
 #''Details' for more information on changing default prior distributions
 #'@param refit Logical indicating whether this is a refit, called using [update.mvgam]. Users should leave
 #'as `FALSE`
@@ -454,12 +455,27 @@ mvgam = function(formula,
   validate_pos_integer(samples)
   validate_pos_integer(thin)
 
-  # Check data and ensure terms are found in data
+  # Check for brmspriors
   if(!missing("data")){
     data_train <- data
   }
   if(!missing("newdata")){
     data_test <- newdata
+  }
+
+  if(!missing(priors)){
+    if(inherits(priors, 'brmsprior')){
+      priors <- adapt_brms_priors(priors = priors,
+                                  formula = formula,
+                                  trend_formula = trend_formula,
+                                  data = data_train,
+                                  family = family,
+                                  use_lv = use_lv,
+                                  n_lv = n_lv,
+                                  trend_model = trend_model,
+                                  trend_map = trend_map,
+                                  drift = drift)
+    }
   }
 
   # Ensure series and time variables are present
@@ -1381,7 +1397,7 @@ mvgam = function(formula,
   # Lighten up the mgcv model(s) to reduce size of the returned object
   ss_gam <- trim_mgcv(ss_gam)
   if(!missing(trend_formula)){
-    trend_mgcv_model <- trim(trend_mgcv_model)
+    trend_mgcv_model <- trim_mgcv(trend_mgcv_model)
   }
 
   #### Return only the model file and all data / inits needed to run the model

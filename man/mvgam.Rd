@@ -156,7 +156,8 @@ parallelisation in \code{Stan}. We recommend its use only if you are experienced
 up by any other means. Only available when using \code{Cmdstan} as the backend}
 
 \item{priors}{An optional \code{data.frame} with prior
-definitions (in JAGS or Stan syntax). See \link{get_mvgam_priors} and
+definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
+class \code{brmsprior} (see. \code{\link[brms]{prior}} for details). See \link{get_mvgam_priors} and
 'Details' for more information on changing default prior distributions}
 
 \item{upper_bounds}{Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,

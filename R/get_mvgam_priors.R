@@ -73,7 +73,9 @@
 #'users can also modify the parameter bounds by modifying the `new_lowerbound` and/or `new_upperbound` columns.
 #'This will be necessary if using restrictive distributions on some parameters, such as a Beta distribution
 #'for the trend sd parameters for example (Beta only has support on  \code{(0,1)}), so the upperbound cannot
-#'be above `1`
+#'be above `1`. Another option is to make use of the prior modification functions in `brms`
+#'(i.e. \code{\link[brms]{prior}}) to change prior distributions and bounds (just use the name of the parameter that
+#'you'd like to change as the `class` argument; see examples below)
 #' @note Only the `prior`, `new_lowerbound` and/or `new_upperbound` columns of the output
 #' should be altered when defining the user-defined priors for the `mvgam` model. Use only if you are
 #' familiar with the underlying probabilistic programming language. There are no sanity checks done to
@@ -100,7 +102,7 @@
 #'               run_model = FALSE)
 #'
 #'# Inspect the model file with default mvgam priors
-#'mod_default$model_file
+#'code(model_file)
 #'
 #'# Look at which priors can be updated in mvgam
 #'test_priors <- get_mvgam_priors(y ~ s(series, bs = 're') +
@@ -130,6 +132,22 @@
 #'
 #'# No warnings, the model is ready for fitting now in the usual way with the addition
 #'# of the 'priors' argument
+#'
+#'# The same can be done using brms functions; here we will also change the ar1 prior
+#'# and put some bounds on the ar coefficients to enforce stationarity
+#'brmsprior <- c(prior(normal(0.2, 0.5), class = mu_raw),
+#'               prior(normal(0, 0.25), class = ar1, lb = -1, ub = 1),
+#'               prior(normal(0, 0.25), class = ar2, lb = -1, ub = 1))
+#'               brmsprior
+#'
+#'mod <- mvgam(y ~ s(series, bs = 're') +
+#'             s(season, bs = 'cc') - 1,
+#'           family = 'nb',
+#'           data = dat$data_train,
+#'           trend_model = 'AR2',
+#'           priors = brmsprior,
+#'           run_model = FALSE)
+#'code(mod)
 #'
 #'# Look at what is returned when an incorrect spelling is used
 #'test_priors$prior[5] <- 'ar2_bananas ~ normal(0, 0.25);'
@@ -336,6 +354,30 @@ get_mvgam_priors = function(formula,
       use_lv <- FALSE
       warning('No point in latent variables if trend model is None; changing use_lv to FALSE')
     }
+
+    # Fill in missing observations in data_train so the size of the dataset is correct when
+    # building the initial JAGS model.
+    replace_nas = function(var){
+      if(all(is.na(var))){
+        # Sampling from uniform[0.1,0.99] will allow all the gam models
+        # to work, even though the Poisson / Negative Binomial will issue
+        # warnings. This is ok as we just need to produce the linear predictor matrix
+        # and store the coefficient names
+        var <- runif(length(var), 0.1, 0.99)
+      } else {
+        # If there are some non-missing observations,
+        # sample from the observed values to ensure
+        # distributional assumptions are met without warnings
+        var[which(is.na(var))] <-
+          sample(var[which(!is.na(var))],
+                 length(which(is.na(var))),
+                 replace = TRUE)
+      }
+      var
+    }
+
+    data_train[[terms(formula(formula))[[2]]]] <-
+      replace_nas(data_train[[terms(formula(formula))[[2]]]])
 
     # Use a small fit from mgcv to extract relevant information on smooths included
     # in the model

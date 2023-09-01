@@ -109,7 +109,9 @@ altered. To make alterations, change the contents of the \code{prior} column and
 users can also modify the parameter bounds by modifying the \code{new_lowerbound} and/or \code{new_upperbound} columns.
 This will be necessary if using restrictive distributions on some parameters, such as a Beta distribution
 for the trend sd parameters for example (Beta only has support on  \code{(0,1)}), so the upperbound cannot
-be above \code{1}
+be above \code{1}. Another option is to make use of the prior modification functions in \code{brms}
+(i.e. \code{\link[brms]{prior}}) to change prior distributions and bounds (just use the name of the parameter that
+you'd like to change as the \code{class} argument; see examples below)
 }
 \note{
 Only the \code{prior}, \code{new_lowerbound} and/or \code{new_upperbound} columns of the output
@@ -133,7 +135,7 @@ mod_default <- mvgam(y ~ s(series, bs = 're') +
               run_model = FALSE)
 
 # Inspect the model file with default mvgam priors
-mod_default$model_file
+code(model_file)
 
 # Look at which priors can be updated in mvgam
 test_priors <- get_mvgam_priors(y ~ s(series, bs = 're') +
@@ -163,6 +165,22 @@ mod <- mvgam(y ~ s(series, bs = 're') +
 
 # No warnings, the model is ready for fitting now in the usual way with the addition
 # of the 'priors' argument
+
+# The same can be done using brms functions; here we will also change the ar1 prior
+# and put some bounds on the ar coefficients to enforce stationarity
+brmsprior <- c(prior(normal(0.2, 0.5), class = mu_raw),
+              prior(normal(0, 0.25), class = ar1, lb = -1, ub = 1),
+              prior(normal(0, 0.25), class = ar2, lb = -1, ub = 1))
+              brmsprior
+
+mod <- mvgam(y ~ s(series, bs = 're') +
+            s(season, bs = 'cc') - 1,
+          family = 'nb',
+          data = dat$data_train,
+          trend_model = 'AR2',
+          priors = brmsprior,
+          run_model = FALSE)
+code(mod)
 
 # Look at what is returned when an incorrect spelling is used
 test_priors$prior[5] <- 'ar2_bananas ~ normal(0, 0.25);'

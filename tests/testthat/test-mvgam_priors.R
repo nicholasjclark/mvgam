@@ -30,4 +30,17 @@ test_that("specified priors appear in the Stan code", {
                     run_model = FALSE)$model_file
   expect_true(expect_match2(stancode,
                             'alpha_gp ~ normal(-1, 0.75);'))
+
+  # Now the same using brms functionality; this time use a bound as well
+  priors <- prior(normal(-1, 0.75), class = alpha_gp, ub = 1)
+  stancode <- mvgam(y ~ s(season, bs = 'cc'),
+                    trend_model = 'GP',
+                    data = beta_data$data_train,
+                    family = betar(),
+                    priors = priors,
+                    run_model = FALSE)$model_file
+  expect_true(expect_match2(stancode,
+                            'alpha_gp ~ normal(-1, 0.75);'))
+  expect_true(expect_match2(stancode,
+                            'vector<lower=0,upper=1>[n_series] alpha_gp;'))
 })

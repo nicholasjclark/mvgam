@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   style="overflow:hidden"
+   id="svg81"
+   version="1.1"
+   overflow="hidden"
+   height="324.50705"
+   width="945.35211">
+  <metadata
+     id="metadata85">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs5">
+    <clipPath
+       id="clip0">
+      <rect
+         id="rect2"
+         height="720"
+         width="1280"
+         y="0"
+         x="0" />
+    </clipPath>
+  </defs>
+  <path
+     d="m 318.01408,121.495 0.175,53.401 -3,0.01 -0.175,-53.401 z m 3.17,51.891 -4.47,9.015 -4.529,-8.986 z"
+     id="path9" />
+  <path
+     d="m 606.01408,121.495 0.175,53.401 -3,0.01 -0.175,-53.401 z m 3.17,51.891 -4.47,9.015 -4.529,-8.986 z"
+     id="path11" />
+  <path
+     d="m 850.01408,120.495 0.175,53.401 -3,0.01 -0.175,-53.401 z m 3.17,51.891 -4.47,9.015 -4.529,-8.986 z"
+     id="path13" />
+  <path
+     d="m 801.11408,71 -34.1,9e-5 v 3 l 34.1,-9e-5 z m -32.6,-2.99992 -9,4.500025 9,4.499975 z"
+     id="path15" />
+  <path
+     d="m 367.51408,71 h 26.9 v 3 h -26.9 z m 25.4,-3 9,4.5 -9,4.5 z"
+     id="path17" />
+  <path
+     d="m 511.51408,71 h 26.9 v 3 h -26.9 z m 25.4,-3 9,4.5 -9,4.5 z"
+     id="path19" />
+  <path
+     d="m 652.51408,72 h 26.9 v 3 h -26.9 z m 25.4,-3 9,4.5 -9,4.5 z"
+     id="path21" />
+  <path
+     d="m 722.01408,122.495 0.039,12 -3,0.01 -0.039,-12 z m 0.069,21 0.039,12 -3,0.01 -0.039,-12 z m 0.069,21 0.037,11.401 -3,0.01 -0.037,-11.401 z m 3.032,9.891 -4.47,9.015 -4.529,-8.986 z"
+     id="path23" />
+  <path
+     d="m 265.01408,71 c 0,-28.167 22.833,-51 51,-51 28.167,0 51,22.833 51,51 0,28.167 -22.833,51 -51,51 -28.167,0 -51,-22.833 -51,-51 z"
+     id="path25"
+     style="fill:#e7e6e6;fill-rule:evenodd" />
+  <text
+     y="83"
+     x="302.21408"
+     font-weight="400"
+     font-size="35"
+     id="text27"
+     style="font-weight:400;font-size:35px;font-family:Constantia, Constantia_MSFontService, sans-serif">X</text>
+  <text
+     y="91"
+     x="325.04709"
+     font-weight="400"
+     font-size="23"
+     id="text29"
+     style="font-weight:400;font-size:23px;font-family:Constantia, Constantia_MSFontService, sans-serif">1</text>
+  <path
+     d="m 409.01408,71 c 0,-28.167 22.833,-51 51,-51 28.167,0 51,22.833 51,51 0,28.167 -22.833,51 -51,51 -28.167,0 -51,-22.833 -51,-51 z"
+     id="path31"
+     style="fill:#e7e6e6;fill-rule:evenodd" />
+  <text
+     y="83"
+     x="445.81409"
+     font-weight="400"
+     font-size="35"
+     id="text33"
+     style="font-weight:400;font-size:35px;font-family:Constantia, Constantia_MSFontService, sans-serif">X</text>
+  <text
+     y="91"
+     x="468.64709"
+     font-weight="400"
+     font-size="23"
+     id="text35"
+     style="font-weight:400;font-size:23px;font-family:Constantia, Constantia_MSFontService, sans-serif">2</text>
+  <path
+     d="m 797.01408,71 c 0,-28.167 22.833,-51 51,-51 28.167,0 51,22.833 51,51 0,28.167 -22.833,51 -51,51 -28.167,0 -51,-22.833 -51,-51 z"
+     id="path37"
+     style="fill:#e7e6e6;fill-rule:evenodd" />
+  <text
+     y="83"
+     x="834.61407"
+     font-weight="400"
+     font-size="35"
+     id="text39"
+     style="font-weight:400;font-size:35px;font-family:Constantia, Constantia_MSFontService, sans-serif">X</text>
+  <text
+     y="91"
+     x="857.44708"
+     font-weight="400"
+     font-size="23"
+     id="text41"
+     style="font-weight:400;font-size:23px;font-family:Constantia, Constantia_MSFontService, sans-serif">T</text>
+  <text
+     y="74"
+     x="708.31409"
+     font-weight="400"
+     font-size="35"
+     id="text43"
+     style="font-weight:400;font-size:35px;font-family:Constantia, Constantia_MSFontService, sans-serif">…</text>
+  <path
+     d="m 553.01408,72 c 0,-28.167 22.833,-51 51,-51 28.167,0 51,22.833 51,51 0,28.167 -22.833,51 -51,51 -28.167,0 -51,-22.833 -51,-51 z"
+     id="path45"
+     style="fill:#e7e6e6;fill-rule:evenodd" />
+  <text
+     y="85"
+     x="590.11407"
+     font-weight="400"
+     font-size="35"
+     id="text47"
+     style="font-weight:400;font-size:35px;font-family:Constantia, Constantia_MSFontService, sans-serif">X</text>
+  <text
+     y="93"
+     x="612.94708"
+     font-weight="400"
+     font-size="23"
+     id="text49"
+     style="font-weight:400;font-size:23px;font-family:Constantia, Constantia_MSFontService, sans-serif">3</text>
+  <path
+     d="m 265.01408,241 c 0,-28.167 22.833,-51 51,-51 28.167,0 51,22.833 51,51 0,28.167 -22.833,51 -51,51 -28.167,0 -51,-22.833 -51,-51 z"
+     id="path51"
+     style="fill:#c00000;fill-rule:evenodd" />
+  <text
+     y="254"
+     x="302.21408"
+     font-weight="400"
+     font-size="35"
+     id="text53"
+     style="font-weight:400;font-size:35px;font-family:Constantia, Constantia_MSFontService, sans-serif;fill:#ffffff">Y</text>
+  <text
+     y="262"
+     x="322.71408"
+     font-weight="400"
+     font-size="23"
+     id="text55"
+     style="font-weight:400;font-size:23px;font-family:Constantia, Constantia_MSFontService, sans-serif;fill:#ffffff">1</text>
+  <path
+     d="m 553.01408,241 c 0,-28.167 22.833,-51 51,-51 28.167,0 51,22.833 51,51 0,28.167 -22.833,51 -51,51 -28.167,0 -51,-22.833 -51,-51 z"
+     id="path57"
+     style="fill:#c00000;fill-rule:evenodd" />
+  <rect
+     x="580.0141"
+     y="217"
+     width="58"
+     height="51"
+     id="rect59"
+     style="fill:#c00000" />
+  <text
+     y="254"
+     x="590.11407"
+     font-weight="400"
+     font-size="35"
+     id="text61"
+     style="font-weight:400;font-size:35px;font-family:Constantia, Constantia_MSFontService, sans-serif;fill:#ffffff">Y</text>
+  <text
+     y="262"
+     x="610.61407"
+     font-weight="400"
+     font-size="23"
+     id="text63"
+     style="font-weight:400;font-size:23px;font-family:Constantia, Constantia_MSFontService, sans-serif;fill:#ffffff">3</text>
+  <path
+     d="m 797.01408,241 c 0,-28.167 22.833,-51 51,-51 28.167,0 51,22.833 51,51 0,28.167 -22.833,51 -51,51 -28.167,0 -51,-22.833 -51,-51 z"
+     id="path65"
+     style="fill:#c00000;fill-rule:evenodd" />
+  <rect
+     x="825.0141"
+     y="217"
+     width="58"
+     height="51"
+     id="rect67"
+     style="fill:#c00000" />
+  <text
+     y="254"
+     x="834.61407"
+     font-weight="400"
+     font-size="35"
+     id="text69"
+     style="font-weight:400;font-size:35px;font-family:Constantia, Constantia_MSFontService, sans-serif;fill:#ffffff">Y</text>
+  <text
+     y="262"
+     x="855.96106"
+     font-weight="400"
+     font-size="23"
+     id="text71"
+     style="font-weight:400;font-size:23px;font-family:Constantia, Constantia_MSFontService, sans-serif;fill:#ffffff">T</text>
+  <text
+     y="250"
+     x="708.31409"
+     font-weight="400"
+     font-size="35"
+     id="text73"
+     style="font-weight:400;font-size:35px;font-family:Constantia, Constantia_MSFontService, sans-serif">…</text>
+  <text
+     y="77"
+     x="93.414085"
+     font-weight="400"
+     font-size="24"
+     id="text75"
+     style="font-weight:400;font-size:24px;font-family:Constantia, Constantia_MSFontService, sans-serif">Process model</text>
+  <text
+     y="250"
+     x="46.614082"
+     font-weight="400"
+     font-size="24"
+     id="text77"
+     style="font-weight:400;font-size:24px;font-family:Constantia, Constantia_MSFontService, sans-serif">Observation model</text>
+</svg>

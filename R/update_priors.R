@@ -42,7 +42,8 @@ update_priors = function(model_file,
           priors$prior[i]
       } else {
         warning('no match found in model_file for parameter: ',
-                trimws(strsplit(priors$prior[i], "[~]")[[1]][1]))
+                trimws(strsplit(priors$prior[i], "[~]")[[1]][1]),
+                call. = FALSE)
       }
 
     } else {
@@ -150,4 +151,59 @@ update_priors = function(model_file,
   }
 
   return(model_file)
+}
+
+#' Allow brmsprior objects to be supplied instead
+#' @noRd
+adapt_brms_priors = function(priors,
+                             formula,
+                             trend_formula,
+                             data,
+                             family = 'poisson',
+                             use_lv = FALSE,
+                             n_lv,
+                             trend_model = 'None',
+                             trend_map,
+                             drift = FALSE){
+
+  # Get priors that are able to be updated
+  priors_df <- get_mvgam_priors(formula = formula,
+                                trend_formula = trend_formula,
+                                data = data,
+                                family = family,
+                                use_lv = use_lv,
+                                n_lv = n_lv,
+                                use_stan = TRUE,
+                                trend_model = trend_model,
+                                trend_map = trend_map,
+                                drift = drift)
+
+  # Update using priors from the brmsprior object
+  for(i in 1:NROW(priors)){
+
+    if(any(grepl(paste0(priors$class[i], ' ~ '),
+                 priors_df$prior, fixed = TRUE))){
+
+      # Update the prior distribution
+      priors_df$prior[grepl(paste0(priors$class[i], ' ~ '),
+                            priors_df$prior, fixed = TRUE)] <-
+        paste0(priors$class[i], ' ~ ', priors$prior[i], ';')
+
+      # Now update bounds
+      priors_df$new_lowerbound[grepl(paste0(priors$class[i], ' ~ '),
+                                     priors_df$prior, fixed = TRUE)] <-
+        priors$lb[i]
+
+      priors_df$new_upperbound[grepl(paste0(priors$class[i], ' ~ '),
+                                     priors_df$prior, fixed = TRUE)] <-
+        priors$ub[i]
+
+    } else {
+      warning('no match found in model_file for parameter: ',
+              priors$class[i],
+              call. = FALSE)
+    }
+  }
+
+  return(priors_df)
 }
