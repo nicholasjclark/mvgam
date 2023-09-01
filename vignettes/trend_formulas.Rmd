@@ -474,7 +474,18 @@ mcmc_plot(varcor_mod,
           type = 'hist')
 ```
 
-This symmetric matrix tells us there is support for correlated process errors. For example, series 1 and 3 (Bluegreens and Greens) show negatively correlated process errors, while series 1 and 4 (Bluegreens and Other.algae) show positively correlated errors. 
+This symmetric matrix tells us there is support for correlated process errors. For example, series 1 and 3 (Bluegreens and Greens) show negatively correlated process errors, while series 1 and 4 (Bluegreens and Other.algae) show positively correlated errors. But it is easier to interpret these estimates if we convert the covariance matrix to a correlation matrix. Here we compute the posterior median process error correlations:
+```{r}
+Sigma_post <- as.matrix(varcor_mod, variable = 'Sigma', regex = TRUE)
+median_correlations <- cov2cor(matrix(apply(Sigma_post, 2, median),
+                                      nrow = 5, ncol = 5))
+rownames(median_correlations) <- 
+  colnames(median_correlations) <- 
+  levels(plankton_train$series)
+
+round(median_correlations, 2)
+```
+
 Because this model is able to capture correlated errors, the VAR matrix has changed slightly:
 ```{r warning=FALSE, message=FALSE}
 A_pars <- matrix(NA, nrow = 5, ncol = 5)
@@ -488,7 +499,7 @@ mcmc_plot(varcor_mod,
           type = 'hist')
 ```
 
-We still have some evidence of lagged cross-dependence, but some of these interactions have now been pulled more toward zero. But which model is better? Forecasts don't appear to differ very much, at least qualitatively (here are forecasts for two of the series, for each model):
+We still have some evidence of lagged cross-dependence, but some of these interactions have now been pulled more toward zero. But which model is better? Forecasts don't appear to differ very much, at least qualitatively (here are forecasts for three of the series, for each model):
 ```{r}
 plot(var_mod, type = 'forecast', series = 1, newdata = plankton_test)
 ```
@@ -503,6 +514,14 @@ plot(var_mod, type = 'forecast', series = 2, newdata = plankton_test)
 
 ```{r}
 plot(varcor_mod, type = 'forecast', series = 2, newdata = plankton_test)
+```
+
+```{r}
+plot(var_mod, type = 'forecast', series = 3, newdata = plankton_test)
+```
+
+```{r}
+plot(varcor_mod, type = 'forecast', series = 3, newdata = plankton_test)
 ```
 
 We can compute the variogram score for out of sample forecasts to get a sense of which model does a better job of capturing the dependence structure in the true evaluation set:
@@ -523,4 +542,18 @@ plot(diff_scores, pch = 16, cex = 1.25, col = 'darkred',
 abline(h = 0, lty = 'dashed')
 ```
 
-The VAR1cor model seems to do a better job overall, but there are some horizons where the uncorrelated error model gives slightly better forecasts. This is often the case when comparing models: some models give better forecasts *some of the time*, while other models do better in other contexts. But overall, I'd choose the second model here as it converged better and tends to give better community-level forecasts
+And we can also compute the energy score for out of sample forecasts to get a sense of which model provides forecasts that are better calibrated:
+```{r}
+# plot the difference in energy scores; a negative value means the VAR1cor model is better, while a positive value means the VAR1 model is better
+diff_scores <- score(fcvarcor, score = 'energy')$all_series$score -
+  score(fcvar, score = 'energy')$all_series$score
+plot(diff_scores, pch = 16, cex = 1.25, col = 'darkred', 
+     ylim = c(-1*max(abs(diff_scores), na.rm = TRUE),
+              max(abs(diff_scores), na.rm = TRUE)),
+     bty = 'l',
+     xlab = 'Forecast horizon',
+     ylab = expression(energy[VAR1cor]~-~energy[VAR1]))
+abline(h = 0, lty = 'dashed')
+```
+
+The models tend to provide similar forecasts, so we would probably need to use a more extensive rolling forecast evaluation exercise if we felt like we needed to only choose one for production. `mvgam` offers some utilities for doing this (i.e. see `?lfo_cv` for guidance).
