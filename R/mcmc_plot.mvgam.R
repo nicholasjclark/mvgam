@@ -17,6 +17,16 @@
 #'   \code{\link[bayesplot:MCMC-overview]{MCMC-overview}}.
 #' @return A \code{\link[ggplot2:ggplot]{ggplot}} object
 #' that can be further customized using the \pkg{ggplot2} package.
+#'
+#' @examples
+#' \dontrun{
+#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' mod <- mvgam(y ~ s(season, bs = 'cc'),
+#'             trend_model = 'AR1',
+#'             data = simdat$data_train)
+#' mcmc_plot(mod)
+#' mcmc_plot(mod, type = 'neff_hist')
+#' }
 #' @export
 mcmc_plot.mvgam = function(object,
                            type = 'intervals',
@@ -81,11 +91,10 @@ mcmc_plot.mvgam = function(object,
   }
   interval_type <- type %in% c("intervals", "areas")
   if("rhat" %in% mcmc_arg_names && !interval_type){
-    mcmc_args$rhat <- mcmc_summary(object$model_output)$Rhat
+    mcmc_args$rhat <- rhat(object)
   }
   if("ratio" %in% mcmc_arg_names){
-    mcmc_args$ratio <- mcmc_summary(object$model_output)$n.eff /
-      dim(mcmc_chains(object$model_output, 'b'))[1]
+    mcmc_args$ratio <- neff_ratio(object)
   }
 
   # Generate plot and reset colour scheme

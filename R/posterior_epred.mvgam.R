@@ -158,6 +158,7 @@ posterior_predict.mvgam = function(object, newdata,
 #'
 #' @inheritParams brms::fitted.brmsfit
 #' @inheritParams predict.mvgam
+#' @param object An object of class `mvgam`
 #' @details This method gives the actual fitted values from the model (i.e. what you
 #' will see if you generate hindcasts from the fitted model using \code{\link{hindcast.mvgam}}). These
 #' predictions can be overly precise if a flexible dynamic trend component was included

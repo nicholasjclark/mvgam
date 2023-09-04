@@ -603,6 +603,9 @@ mvgam = function(formula,
   # these in so that initial values to maintain the true size of the training dataset
   orig_y <- data_train$y
 
+  # Some general family-level restrictions can now be checked
+  validate_family_resrictions(response = orig_y, family = family)
+
   # Fill in missing observations in data_train so the size of the dataset is correct when
   # building the initial JAGS model.
   replace_nas = function(var){

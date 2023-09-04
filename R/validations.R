@@ -77,6 +77,39 @@ validate_family = function(family){
 }
 
 #'@noRd
+validate_family_resrictions = function(response, family){
+
+  # 0s and 1s not allowed for Beta
+  if(family$family == 'beta'){
+    if(any(response <= 0)){
+      stop('Values <= 0 not allowed for beta responses',
+           call. = FALSE)
+    }
+    if(any(response >= 1)){
+      stop('Values >= 1 not allowed for beta responses',
+           call. = FALSE)
+    }
+  }
+
+  # negatives not allowed for several families
+  if(family$family %in%  c('poisson', 'negative binomial',
+                           'tweedie')){
+    if(any(response < 0)){
+      stop(paste0('Values < 0 not allowed for ', family$family, ' responses'),
+           call. = FALSE)
+    }
+  }
+
+  # negatives and zeros not allowed for several families
+  if(family$family %in%  c('lognormal', 'Gamma')){
+    if(any(response<= 0)){
+      stop(paste0('Values <= 0 not allowed for ', family$family, ' responses'),
+           call. = FALSE)
+    }
+  }
+}
+
+#'@noRd
 validate_trend_model = function(trend_model, drift = FALSE){
   trend_model <- match.arg(arg = trend_model,
                            choices = trend_model_choices())

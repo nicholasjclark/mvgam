@@ -14,7 +14,7 @@
 )
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}}
+\item{object}{Object of class \code{mvgam}}
 
 \item{transform}{Logical; if \code{FALSE}
 (the default), draws of the linear predictor are returned.

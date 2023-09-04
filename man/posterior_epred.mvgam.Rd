@@ -8,7 +8,7 @@
 \method{posterior_epred}{mvgam}(object, newdata, data_test, process_error = TRUE, ...)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}}
+\item{object}{Object of class \code{mvgam}}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the
 variables included in the linear predictor of \code{formula}. If not supplied,

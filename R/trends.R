@@ -87,14 +87,11 @@ sim_ar3 = function(drift = 0,
                    betas_trend = NULL,
                    last_trends = rnorm(3),
                    h = 50){
-  states <- rep(NA, length = h + 3)
-  last_trends <- tail(last_trends, 3)
-  states[1] <- last_trends[1]
-  states[2] <- last_trends[2]
-  states[3] <- last_trends[3]
 
+  # Draw errors
   errors <- rnorm(h + 3, sd = sqrt(1 / tau))
 
+  # Prepare linear predictors (if necessary)
   if(!is.null(Xp_trend)){
     linpreds <- c(rep(0, 3), as.vector(((matrix(Xp_trend, ncol = NCOL(Xp_trend)) %*%
                     betas_trend)) +
@@ -103,15 +100,15 @@ sim_ar3 = function(drift = 0,
     linpreds <- rep(0, h + 3)
   }
 
-  for (t in 4:(h + 3)) {
-    states[t] <- drift +
-      ar1 * (states[t - 1] - linpreds[t - 1]) +
-      ar2 * (states[t - 2] - linpreds[t - 2]) +
-      ar3 * (states[t - 3] - linpreds[t - 3]) +
-      linpreds[t]  +
-      errors[t]
-  }
-  states[-c(1:3)]
+  # Propagate the process
+  ar3_recursC(drift = drift,
+              ar1 = ar1,
+              ar2 = ar2,
+              ar3 = ar3,
+              linpreds = linpreds,
+              h = h,
+              errors = errors,
+              last_trends = tail(last_trends, 3))
 }
 
 #' VAR1 simulation function

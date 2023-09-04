@@ -196,7 +196,17 @@ test_priors
 ```
 
 Any of the above priors can be changed by modifying the `prior` column and supplying the resulting `data.frame` to the `priors` argument in `mvgam()`. But for now, we will proceed with the defaults by conditioning the model on observed data in `Stan` using MCMC sampling with the `Cmdstan` interface (installation links for `rstan` and `cmdstanr` are found [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"} and [here](https://mc-stan.org/cmdstanr/articles/cmdstanr.html){target="_blank"}).
-```{r, message=FALSE, warning=FALSE}
+```{r, include=FALSE}
+lynx_mvgam <- mvgam(data = lynx_train,
+               newdata = lynx_test,
+               formula = population ~ s(season, bs = 'cc', k = 12),
+               knots = list(season = c(0.5, 19.5)),
+               family = 'poisson',
+               trend_model = 'AR3',
+               use_stan = TRUE)
+```
+
+```{r, eval=FALSE}
 lynx_mvgam <- mvgam(data = lynx_train,
                newdata = lynx_test,
                formula = population ~ s(season, bs = 'cc', k = 12),
@@ -214,11 +224,6 @@ code(lynx_mvgam)
 Perform a series of posterior retrodictive checks to see if the model is able to simulate data for the training period that looks realistic and unbiased. First, examine histograms for posterior retrodictions (`yhat`) and compare to the histogram of the observations (`y`)
 ```{r}
 ppc(lynx_mvgam, series = 1, type = 'hist')
-```
-
-Now plot the distribution of predicted means compared to the observed mean
-```{r}
-ppc(lynx_mvgam, series = 1, type = 'mean')
 ```
 
 Next examine simulated empirical Cumulative Distribution Functions (CDF) for posterior retrodictions (`yhat`) and compare to the CDF of the observations (`y`)
@@ -241,15 +246,14 @@ All of these plots indicate the model is well calibrated against the training da
 summary(lynx_mvgam)
 ```
 
-As with any `MCMC` based software, we can inspect traceplots. Here for the `GAM` component smoothing parameters.
-There is no requirement for `rstan` to be installed as a dependency, but we can still use it if available to examine traceplots
+As with any `MCMC` based software, we can inspect traceplots. Here for the `GAM` component smoothing parameters, using `mvgam`'s reliance on the excellent `bayesplot` library:
 ```{r}
-rstan::stan_trace(lynx_mvgam$model_output, 'rho')
+mcmc_plot(lynx_mvgam, variable = 'rho', regex = TRUE, type = 'trace')
 ```
 
 and for the latent trend component parameters
 ```{r}
-rstan::stan_trace(lynx_mvgam$model_output, c('ar1', 'ar2', 'ar3', 'sigma'))
+mcmc_plot(lynx_mvgam, variable = 'trend_params', regex = TRUE, type = 'trace')
 ```
 
 Inspect the model's estimated smooth for the 19-year cyclic pattern, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior quantiles of partial residuals (shown as ribbon rectangles in red), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. Note that these are on a different scale to those from `mgcv::plot.gam` as these are randomised quantile residuals that are essentially standard normal in distribution. But either way, a strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model
@@ -296,10 +300,6 @@ ppc(lynx_mvgam, series = 1, type = 'rootogram', newdata = lynx_test)
 ```
 
 ```{r}
-ppc(lynx_mvgam, series = 1, type = 'mean', newdata = lynx_test)
-```
-
-```{r}
 ppc(lynx_mvgam, series = 1, type = 'cdf', newdata = lynx_test)
 ```
 
@@ -323,7 +323,17 @@ plot(lynx_mvgam, type = 'residuals')
 
 ## Comparing models based on forecasts
 Another useful utility of `mvgam` is the ability to use approximate rolling window forecasts to evaluate competing models that may represent different hypotheses about the series dynamics. Here we will fit a poorly specified model to showcase how these evaluations works. In this model, we ignore the cyclic pattern of seasonality. We also use a random walk process for the trend
-```{r, message=FALSE, warning=FALSE}
+```{r, include=FALSE}
+lynx_mvgam_poor <- mvgam(data = lynx_train,
+               newdata = lynx_test,
+               formula = population ~ 1,
+               family = 'poisson',
+               trend_model = 'RW',
+               use_stan = TRUE,
+               chains = 4)
+```
+
+```{r, eval=FALSE}
 lynx_mvgam_poor <- mvgam(data = lynx_train,
                newdata = lynx_test,
                formula = population ~ 1,
@@ -427,7 +437,7 @@ data <- sim_mvgam(family = betar(),
 plot_mvgam_series(data = data$data_train, series = 'all')
 ```
 
-```{r, message=FALSE, warning=FALSE}
+```{r, include=FALSE}
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
                s(season, by = series, m = 1, k = 5),
              trend_model = 'GP',
@@ -436,9 +446,18 @@ mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
              family = betar())
 ```
 
-Inspect the summary to see that the posterior now also contains estimates for the `Beta` precision parameters $\phi$
+```{r, eval=FALSE}
+mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
+               s(season, by = series, m = 1, k = 5),
+             trend_model = 'GP',
+             data = data$data_train,
+             newdata = data$data_test,
+             family = betar())
+```
+
+Inspect the summary to see that the posterior now also contains estimates for the `Beta` precision parameters $\phi$. Note that we can also suppress a summary of the $\beta$ coefficients as an option, which is useful when there are many spline coefficients to report:
 ```{r}
-summary(mod)
+summary(mod, include_betas = FALSE)
 ```
 
 Plot the hindcast and forecast distributions for one series
@@ -476,7 +495,16 @@ box(bty = 'l', lwd = 2)
 ```
 
 Gather the data into a `data.frame` and fit a model using the `dynamic()` formula wrapper to specify a low-rank Gaussian Process smooth function to estimate the time-varying coefficient of $temperature$. We will mis-specify the $\rho$ parameter here as, in practice, it is never known 
-```{r, message=FALSE, warning=FALSE}
+```{r, include=FALSE}
+data = data.frame(out, temp, time)
+data_train <- data[1:190,]
+data_test <- data[191:200,]
+mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
+             family = gaussian(),
+             data = data_train)
+```
+
+```{r, eval=FALSE}
 data = data.frame(out, temp, time)
 data_train <- data[1:190,]
 data_test <- data[191:200,]
@@ -487,7 +515,7 @@ mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
 
 Inspect the model summary, which now contains estimates for the observation errors
 ```{r}
-summary(mod)
+summary(mod, include_betas = FALSE)
 ```
 
 Plot the estimated time-varying coefficient for the in-sample training period

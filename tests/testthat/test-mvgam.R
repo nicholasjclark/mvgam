@@ -18,6 +18,22 @@ expect_error(mod <- mvgam( ~ s(season),
              'response variable is missing from formula')
 })
 
+test_that("response variable must follow family-specific restrictions", {
+  expect_error(mod <- mvgam(y ~ s(season),
+                             trend_model = 'AR1',
+                             data = gaus_data$data_train,
+                             family = lognormal(),
+                             run_model = FALSE),
+               'Values <= 0 not allowed for lognormal responses')
+
+  expect_error(mod <- mvgam(y ~ s(season),
+                            trend_model = 'AR1',
+                            data = gaus_data$data_train,
+                            family = poisson(),
+                            run_model = FALSE),
+               'Values < 0 not allowed for poisson responses')
+})
+
 test_that("trend_model must be correctly specified", {
   expect_error(mod <- mvgam(y ~ s(season),
                             trend_model = 'AR11',

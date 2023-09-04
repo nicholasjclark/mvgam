@@ -15,7 +15,7 @@
 )
 }
 \arguments{
-\item{object}{An object of class \code{brmsfit}.}
+\item{object}{An object of class \code{mvgam}}
 
 \item{process_error}{Logical. If \code{TRUE} and a dynamic trend model was fit,
 expected uncertainty in the process model is accounted for by using draws

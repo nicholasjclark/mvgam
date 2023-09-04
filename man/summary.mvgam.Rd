@@ -6,7 +6,7 @@
 \alias{coef.mvgam}
 \title{Summary for a fitted mvgam object}
 \usage{
-\method{summary}{mvgam}(object, ...)
+\method{summary}{mvgam}(object, include_betas = TRUE, digits = 2, ...)
 
 \method{summary}{mvgam_prefit}(object, ...)
 
@@ -14,6 +14,13 @@
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
+
+\item{include_betas}{Logical. Print a summary of linear predictor beta coefficients?
+Defaults to \code{TRUE}, but if your model contains many spline coefficients then it may be
+worth setting this to \code{FALSE} for a more concise summary}
+
+\item{digits}{The number of significant digits for printing out the summary;
+defaults to \code{2}.}
 
 \item{...}{Ignored}
 

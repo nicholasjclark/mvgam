@@ -1,6 +1,6 @@
 #'Predict from the GAM component of an mvgam model
 #'@importFrom stats predict
-#'@param object \code{list} object returned from \code{mvgam}
+#'@param object Object of class `mvgam`
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing the
 #'variables included in the linear predictor of \code{formula}. If not supplied,
 #'predictions are generated for the original observations used for the model fit.

@@ -18,6 +18,7 @@ License: MIT + file LICENSE
 Depends: 
     R (>= 3.6.0),
     mgcv (>= 1.8-13),
+    Rcpp (>= 0.12.0),
     brms (>= 2.17),
     marginaleffects,
     insight (>= 0.19.1),
@@ -56,4 +57,5 @@ Suggests:
     coda,
     runjags,
     testthat
+LinkingTo: Rcpp, RcppArmadillo
 VignetteBuilder: knitr

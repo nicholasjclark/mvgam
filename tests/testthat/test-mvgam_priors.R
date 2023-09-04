@@ -15,6 +15,20 @@ test_that("trend_model must be correctly specified", {
                                 family = betar()))
 })
 
+test_that("response variable must follow family-specific restrictions", {
+  expect_error(get_mvgam_priors(y ~ s(season),
+                            trend_model = 'AR1',
+                            data = gaus_data$data_train,
+                            family = lognormal()),
+               'Values <= 0 not allowed for lognormal responses')
+
+  expect_error(get_mvgam_priors(y ~ s(season),
+                                trend_model = 'AR1',
+                                data = gaus_data$data_train,
+                                family = poisson()),
+               'Values < 0 not allowed for poisson responses')
+})
+
 test_that("specified priors appear in the Stan code", {
 
   priors <- get_mvgam_priors(formula = y ~ s(season, bs = 'cc'),

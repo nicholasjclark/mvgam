@@ -49,3 +49,13 @@ that can be further customized using the \pkg{ggplot2} package.
 Convenient way to call MCMC plotting functions
 implemented in the \pkg{bayesplot} package
 }
+\examples{
+\dontrun{
+simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+mod <- mvgam(y ~ s(season, bs = 'cc'),
+            trend_model = 'AR1',
+            data = simdat$data_train)
+mcmc_plot(mod)
+mcmc_plot(mod, type = 'neff_hist')
+}
+}
