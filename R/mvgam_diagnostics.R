@@ -53,7 +53,7 @@ rhat.mvgam <- function(x, pars = NULL, ...) {
     draws <- as_draws_array(x,
                             variable = unlist(purrr::map(vars_extract, 'orig_name')))
   } else {
-    draws <- as_draws_array(mod,
+    draws <- as_draws_array(x,
                             variable = pars)
   }
 
@@ -97,12 +97,12 @@ neff_ratio.mvgam <- function(object, pars = NULL, ...) {
   # bayesplot uses outdated ess code from rstan
   # bayesplot::neff_ratio(object$fit, pars = pars, ...)
   if(is.null(pars)){
-    vars_extract <- unlist(purrr::map(variables(x), 'orig_name'))
+    vars_extract <- unlist(purrr::map(variables(object), 'orig_name'))
     vars_extract <- vars_extract[-grep('ypred', vars_extract)]
-    draws <- as_draws_array(mod,
+    draws <- as_draws_array(object,
                             variable = vars_extract)
   } else {
-    draws <- as_draws_array(mod,
+    draws <- as_draws_array(object,
                             variable = pars)
   }
   tmp <- posterior::summarise_draws(

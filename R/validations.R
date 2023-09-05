@@ -1,4 +1,5 @@
 #'Argument validation functions
+#'@param data Data to be validated (list or dataframe)
 #'@noRd
 validate_series_time = function(data, name = 'data'){
 

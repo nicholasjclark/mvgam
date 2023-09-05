@@ -1,4 +1,3 @@
-#' @useDynLib mvgam
+#' @useDynLib mvgam, .registration = TRUE
 #' @importFrom Rcpp evalCpp
-#' @exportPattern "^[[:alpha:]]+"
 NULL

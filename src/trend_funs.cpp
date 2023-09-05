@@ -6,6 +6,7 @@
 using namespace Rcpp;
 
 // function for recursively extending an AR3 process
+//' @noRd
 // [[Rcpp::export]]
 Rcpp::NumericVector ar3_recursC(double drift, double ar1,
                          double ar2, double ar3,
@@ -31,6 +32,7 @@ Rcpp::NumericVector ar3_recursC(double drift, double ar1,
 }
 
 // function for recursively extending an VAR1 process
+//' @noRd
 // [[Rcpp::export]]
 arma::mat var1_recursC(arma::mat A,
                        arma::mat linpreds,
