@@ -50,7 +50,7 @@ rhat.mvgam <- function(x, pars = NULL, ...) {
   # bayesplot::rhat(object$fit, pars = pars, ...)
   if(is.null(pars)){
     vars_extract <- variables(x)
-    draws <- as_draws_array(mod,
+    draws <- as_draws_array(x,
                             variable = unlist(purrr::map(vars_extract, 'orig_name')))
   } else {
     draws <- as_draws_array(mod,
@@ -65,18 +65,19 @@ rhat.mvgam <- function(x, pars = NULL, ...) {
 
 #' @rdname mvgam_diagnostics
 #' @importFrom bayesplot neff_ratio
+#' @importFrom brms ndraws
 #' @export neff_ratio
 #' @export
 neff_ratio.mvgam <- function(object, pars = NULL, ...) {
   # bayesplot uses outdated ess code from rstan
   # bayesplot::neff_ratio(object$fit, pars = pars, ...)
   if(is.null(pars)){
-    vars_extract <- unlist(purrr::map(variables(x), 'orig_name'))
+    vars_extract <- unlist(purrr::map(variables(object), 'orig_name'))
     vars_extract <- vars_extract[-grep('ypred', vars_extract)]
-    draws <- as_draws_array(mod,
+    draws <- as_draws_array(object,
                             variable = vars_extract)
   } else {
-    draws <- as_draws_array(mod,
+    draws <- as_draws_array(object,
                             variable = pars)
   }
   tmp <- posterior::summarise_draws(
@@ -85,7 +86,7 @@ neff_ratio.mvgam <- function(object, pars = NULL, ...) {
   # min of ess_bulk and ess_tail mimics definition of posterior::rhat.default
   ess <- matrixStats::rowMins(cbind(tmp$ess_bulk, tmp$ess_tail))
   names(ess) <- tmp$variable
-  ess / ndraws(draws)
+  ess / brms::ndraws(draws)
 }
 
 #' @rdname mvgam_diagnostics
