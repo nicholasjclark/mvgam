@@ -79,6 +79,8 @@ validate_family = function(family){
 #'@noRd
 validate_family_resrictions = function(response, family){
 
+  response <- response[!is.na(response)]
+
   # 0s and 1s not allowed for Beta
   if(family$family == 'beta'){
     if(any(response <= 0)){
