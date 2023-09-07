@@ -51,21 +51,85 @@ trend_model_choices = function(){
 #' @noRd
 sim_gp = function(last_trends, h, rho_gp, alpha_gp){
 
-  t <- 1:length(last_trends)
-  t_new <- 1:(length(last_trends) + h)
-  Sigma_new <- alpha_gp^2 * exp(-0.5 * ((outer(t, t_new, "-") / rho_gp) ^ 2))
-  Sigma_star <- alpha_gp^2 * exp(-0.5 * ((outer(t_new, t_new, "-") / rho_gp) ^ 2)) +
+  t <- as.numeric(1:length(last_trends))
+  t_new <- as.numeric(1:(length(last_trends) + h))
+  Sigma_new <- alpha_gp^2 *
+    exp(-0.5 * ((outer(t, t_new, "-") / rho_gp) ^ 2))
+  Sigma_star <- alpha_gp^2 *
+    exp(-0.5 * ((outer(t_new, t_new, "-") / rho_gp) ^ 2)) +
     diag(1e-4, length(t_new))
-  Sigma <- alpha_gp^2 * exp(-0.5 * ((outer(t, t, "-") / rho_gp) ^ 2)) +
+  Sigma <- alpha_gp^2 *
+    exp(-0.5 * ((outer(t, t, "-") / rho_gp) ^ 2)) +
     diag(1e-4, length(t))
 
   as.vector(tail(t(Sigma_new) %*% solve(Sigma, last_trends),
                  h) +
-              tail(MASS::mvrnorm(1,
+              tail(mvnfast::rmvn(1,
                                  mu = rep(0, length(t_new)),
-                                 Sigma = Sigma_star - t(Sigma_new) %*% solve(Sigma, Sigma_new)),
+                                 sigma = Sigma_star - t(Sigma_new) %*%
+                                   solve(Sigma, Sigma_new))[1,],
                    h))
 }
+
+#' Propagate a Hilbert basis GP
+#' Evaluate Laplacian eigenfunction for a given GP basis function
+#' @noRd
+phi = function(boundary, m, centred_covariate) {
+  1 / sqrt(boundary) * sin((m * pi)/(2 * boundary) *
+                             (centred_covariate + boundary))
+}
+
+#' Evaluate eigenvalues for a given GP basis function
+#' @noRd
+lambda = function(boundary, m) {
+  ((m * pi)/(2 * boundary))^2
+}
+
+#' Spectral density squared exponential Gaussian Process kernel
+#' @noRd
+spd = function(alpha_gp, rho_gp, eigenvalues) {
+  (alpha_gp^2) * sqrt(2 * pi) * rho_gp *
+    exp(-0.5 * (rho_gp^2) * (eigenvalues^2))
+}
+
+#' @noRd
+sim_hilbert_gp = function(alpha_gp,
+                          rho_gp,
+                          b_gp,
+                          last_trends,
+                          fc_times,
+                          train_times,
+                          mean_train_times){
+
+  num_gp_basis <- length(b_gp)
+
+  # Get vector of eigenvalues of covariance matrix
+  eigenvalues <- vector()
+  for(m in 1:num_gp_basis){
+    eigenvalues[m] <- lambda(boundary = (5.0/4) *
+                               (max(train_times) - min(train_times)),
+                             m = m)
+  }
+
+  # Get vector of eigenfunctions
+  eigenfunctions <- matrix(NA, nrow = length(fc_times),
+                           ncol = num_gp_basis)
+  for(m in 1:num_gp_basis){
+    eigenfunctions[, m] <- phi(boundary = (5.0/4) *
+                                 (max(train_times) - min(train_times)),
+                               m = m,
+                               centred_covariate = fc_times - mean_train_times)
+  }
+
+  # Compute diagonal of covariance matrix
+  diag_SPD <- sqrt(spd(alpha_gp = alpha_gp,
+                       rho_gp = rho_gp,
+                       sqrt(eigenvalues)))
+
+  # Compute GP trend forecast
+  as.vector((diag_SPD * b_gp) %*% t(eigenfunctions))
+}
+
 
 #' AR3  simulation function
 #' @param last_trends Vector of trend estimates leading up to the current timepoint
@@ -152,22 +216,17 @@ sim_var1 = function(drift, A, Sigma,
     linpreds <- matrix(0, nrow = h + 1, ncol = NROW(A))
   }
 
-  # Last estimate in time is where the series will start
-  states <- matrix(NA, nrow = h + 1, ncol = NCOL(A))
-  states[1, ] <- last_trends
-  errors <- MASS::mvrnorm(h + 1, mu = rep(0, NROW(A)),
-                          Sigma = Sigma)
+  # Draw errors
+  errors <- Rfast::rmvnorm(h + 1, mu = rep(0, NROW(A)),
+                          sigma = Sigma)
 
   # Stochastic realisations
-  for (t in 2:(h + 1)) {
-    states[t, ] <- A %*% (states[t - 1,] - linpreds[t - 1, ]) +
-      drift +
-      linpreds[t, ] +
-      errors[t, ]
-  }
-
-  # Return state estimates
-  states[-1, ]
+  var1_recursC(A = A,
+               drift = drift,
+               linpreds = linpreds,
+               errors = errors,
+               last_trends = last_trends,
+               h = h)
 }
 
 #' Simulate stationary VAR(p) phi matrices using the algorithm proposed by
@@ -505,6 +564,42 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
     }
   }
 
+  # Extract centred training times and number of GP basis functions
+  # if this is a GP model
+  if(object$trend_model == 'GP'){
+    num_basis_line <- object$model_file[grep('num_gp_basis = ',
+                                             object$model_file)]
+    out$num_gp_basis <- as.numeric(unlist(regmatches(num_basis_line,
+                                                 gregexpr("[[:digit:]]+",
+                                                          num_basis_line))))
+    out$mean_time <- mean(unique(object$obs_data$time))
+    out$time_cent <- unique(object$obs_data$time) - mean(unique(object$obs_data$time))
+
+    # Get the basis coefficients in the correct format
+    n_series <- NCOL(object$ytimes)
+
+    if(object$use_lv){
+      n_lv <- object$n_lv
+      all_bgps <- out$b_gp
+      out$b_gp <- lapply(seq_len(n_lv), function(lv){
+        all_bgps[,seq(lv,
+                      NCOL(all_bgps),
+                      by = NCOL(out$alpha_gp))]
+
+      })
+
+    } else {
+      all_bgps <- out$b_gp
+      out$b_gp <- lapply(seq_len(n_series), function(series){
+        all_bgps[,seq(series,
+                      NCOL(all_bgps),
+                      by = NCOL(out$alpha_gp))]
+
+      })
+    }
+
+  }
+
   # Return list of extracted posterior parameter samples
   out
 }
@@ -516,9 +611,10 @@ extract_general_trend_pars = function(samp_index, trend_pars){
   general_trend_pars <- lapply(seq_along(trend_pars), function(x){
 
     if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
-                                   'A', 'Sigma')){
+                                   'A', 'Sigma', 'b_gp')){
 
-      if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends')){
+      if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
+                                     'b_gp')){
         out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
       }
 
@@ -526,6 +622,8 @@ extract_general_trend_pars = function(samp_index, trend_pars){
         out <- unname(trend_pars[[x]][samp_index, ])
       }
 
+    } else if(names(trend_pars)[x] %in% c('time_cent', 'mean_time')){
+      out <- trend_pars[[x]]
     } else {
       if(is.matrix(trend_pars[[x]])){
         out <- unname(trend_pars[[x]][samp_index, ])
@@ -548,7 +646,16 @@ extract_series_trend_pars = function(series, samp_index, trend_pars,
   trend_extracts <- lapply(seq_along(trend_pars), function(x){
 
     if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
-                                   'A', 'Sigma')){
+                                   'A', 'Sigma', 'b_gp')){
+
+      if(!use_lv & names(trend_pars)[x] == 'b_gp'){
+        out <- trend_pars[[x]][[series]][samp_index, ]
+      }
+
+      if(use_lv & names(trend_pars)[x] == 'b_gp'){
+        out <- lapply(trend_pars[[x]], `[`, samp_index, )
+      }
+
       if(names(trend_pars)[x] %in% c('last_trends', 'lv_coefs')){
         out <- trend_pars[[x]][[series]][samp_index, ]
       }
@@ -561,6 +668,8 @@ extract_series_trend_pars = function(series, samp_index, trend_pars,
         out <- trend_pars[[x]][samp_index, ]
       }
 
+    } else if(names(trend_pars)[x] %in% c('time_cent', 'mean_time')){
+      out <- trend_pars[[x]]
     } else {
       if(is.matrix(trend_pars[[x]])){
         if(use_lv){
@@ -584,7 +693,7 @@ extract_series_trend_pars = function(series, samp_index, trend_pars,
 #' @noRd
 forecast_trend = function(trend_model, use_lv, trend_pars,
                           Xp_trend = NULL, betas_trend = NULL,
-                          h = 1){
+                          h = 1, time = NULL){
 
   # Propagate dynamic factors forward
   if(use_lv){
@@ -631,6 +740,15 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                        rho_gp = trend_pars$rho_gp[lv],
                        last_trends = trend_pars$last_lvs[[lv]],
                        h = h)
+        # Before usig the Hilbert version, we need to sign flip
+        # the b_gp coefficients in the actual model
+        # sim_hilbert_gp(alpha_gp = trend_pars$alpha_gp[lv],
+        #                rho_gp = trend_pars$rho_gp[lv],
+        #                b_gp = trend_pars$b_gp[[lv]],
+        #                last_trends = trend_pars$last_lvs[[lv]],
+        #                fc_times = time,
+        #                train_times = trend_pars$time_cent,
+        #                mean_train_times = trend_pars$mean_time)
       }))
     }
 
@@ -643,7 +761,8 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
 
       # Reconstruct the last trend vector
       last_trendvec <- unlist(lapply(trend_pars$last_lvs,
-                                     function(x) tail(x, 1)))
+                                     function(x) tail(x, 1)),
+                              use.names = FALSE)
 
       next_lvs <- sim_var1(A = Amat,
                            Sigma = Sigmamat,
@@ -686,10 +805,18 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
     }
 
     if(trend_model == 'GP'){
-      trend_fc <- sim_gp(alpha_gp = trend_pars$alpha_gp,
+      # trend_fc <- sim_gp(alpha_gp = trend_pars$alpha_gp,
+      #                            rho_gp = trend_pars$rho_gp,
+      #                            last_trends = trend_pars$last_trends,
+      #                            h = h)
+      #
+      trend_fc <- sim_hilbert_gp(alpha_gp = trend_pars$alpha_gp,
                                  rho_gp = trend_pars$rho_gp,
+                                 b_gp = trend_pars$b_gp,
                                  last_trends = trend_pars$last_trends,
-                                 h = h)
+                                 fc_times = time,
+                                 train_times = trend_pars$time_cent,
+                                 mean_train_times = trend_pars$mean_time)
     }
 
     if(trend_model == 'VAR1'){
@@ -701,7 +828,8 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
 
       # Reconstruct the last trend vector
       last_trendvec <- unlist(lapply(trend_pars$last_lvs,
-                                     function(x) tail(x, 1)))
+                                     function(x) tail(x, 1)),
+                              use.names = FALSE)
 
       trend_fc <- sim_var1(A = Amat,
                            Sigma = Sigmamat,

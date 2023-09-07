@@ -293,9 +293,9 @@ sim_mvgam = function(T = 100,
       trends <- sim_var1(drift = trend_alphas,
                          A = A,
                          Sigma = Sigma,
-                         last_trends = MASS::mvrnorm(n = 1,
+                         last_trends = mvnfast::rmvn(n = 1,
                                                      mu = rep(0, n_lv),
-                                                     Sigma = Sigma),
+                                                     sigma = Sigma),
                          h = T)
     }
 
@@ -313,9 +313,9 @@ sim_mvgam = function(T = 100,
       Sigma <- trend_alphas[lv]^2 *
         exp(-0.5 * ((outer(1:T, 1:T, "-") / trend_rhos[lv]) ^ 2)) +
         diag(1e-9, T)
-      MASS::mvrnorm(1,
+      mvnfast::rmvn(1,
                     mu = rep(0, T),
-                    Sigma = Sigma)
+                    sigma = Sigma)[1,]
     }))
 
   }
@@ -333,8 +333,8 @@ sim_mvgam = function(T = 100,
     diag(corMat) <- 1
     stddev <- rep(1, n_series)
     Sigma <- stddev %*% t(stddev) * corMat
-    loadings <- matrix(MASS::mvrnorm(n = n_lv, mu = rep(0, n_series),
-                                     Sigma = as.matrix(Matrix::nearPD(Sigma)$mat)),
+    loadings <- matrix(mvnfast::rmvn(n = n_lv, mu = rep(0, n_series),
+                                     sigma = as.matrix(Matrix::nearPD(Sigma)$mat)),
                        ncol = n_series)
 
   } else {

@@ -423,7 +423,11 @@ family_inits = function(family, trend_model,
   # with the inits. Just let Stan choose reasonable and diffuse inits,
   # this is better anyway for sampling
     inits <- function() {
-      list(b_raw = runif(model_data$num_basis, -2, 2))
+      if(model_data$num_basis == 1){
+        list(b_raw = array(runif(model_data$num_basis, -2, 2)))
+      } else {
+        list(b_raw = runif(model_data$num_basis, -2, 2))
+      }
     }
   return(inits)
 }

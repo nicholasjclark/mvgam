@@ -461,7 +461,7 @@ pfilter_mvgam_smooth = function(particles,
                         'norm_weights'),
                 envir = environment())
 
-  clusterEvalQ(cl, library(MASS))
+  clusterEvalQ(cl, library(mvnfast))
   pbapply::pboptions(type = "none")
 
   # Perform kernel smoothing and mutation of particles. Argument next_update_seq is determined by whether

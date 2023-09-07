@@ -116,11 +116,16 @@
 #'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 #'truncation entirely (i.e. there is no upper bound for each series). Currently not implemented
 #'in `Stan`
-#'@param use_stan Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
-#'the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if `cmdstanr` is not available,
+#'@param use_stan Logical. If \code{TRUE}, the model will be compiled and sampled using
+#'the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or
 #'a call to \code{\link[rstan]{stan}}. Note that
 #'there are many more options when using `Stan` vs `JAGS` (the only "advantage" of `JAGS` is the ability
 #'to use a Tweedie family).
+#'@param backend Character string naming the package to use as the backend for fitting
+#'the Stan model (if `use_stan = TRUE`). Options are "cmdstanr" (the default) or "rstan". Can be set globally
+#'for the current R session via the \code{"brms.backend"} option (see \code{\link{options}}). Details on
+#'the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
+#'https://mc-stan.org/cmdstanr/, respectively.
 #'@param max_treedepth positive integer placing a cap on the number of simulation steps evaluated during each iteration when
 #'`use_stan == TRUE`. Default is `12`. Increasing this value can sometimes help with exploration of complex
 #'posterior geometries, but it is rarely fruitful to go above a `max_treedepth` of `14`
@@ -441,6 +446,7 @@ mvgam = function(formula,
                  refit = FALSE,
                  lfo = FALSE,
                  use_stan = TRUE,
+                 backend = getOption("brms.backend", "cmdstanr"),
                  max_treedepth,
                  adapt_delta,
                  jags_path){
@@ -1222,7 +1228,7 @@ mvgam = function(formula,
   #### Set up model file and modelling data ####
   if(use_stan){
     fit_engine <- 'stan'
-    use_cmdstan <- FALSE
+    use_cmdstan <- ifelse(backend == 'cmdstanr', TRUE, FALSE)
 
     # Import the base Stan model file
     modification <- add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
@@ -1491,18 +1497,31 @@ mvgam = function(formula,
       model_data <- vectorised$model_data
 
       # Check if cmdstan is accessible; if not, use rstan
-      if(!requireNamespace('cmdstanr', quietly = TRUE)){
-        use_cmdstan <- FALSE
-      } else {
-        use_cmdstan <- TRUE
-        if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE))){
+
+      if(backend == 'cmdstanr'){
+        if(!requireNamespace('cmdstanr', quietly = TRUE)){
+          warning('cmdstanr library not found. Defaulting to rstan')
           use_cmdstan <- FALSE
+        } else {
+          use_cmdstan <- TRUE
+          if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE))){
+            warning('cmdstanr library found but Cmdstan not found. Defaulting to rstan')
+            use_cmdstan <- FALSE
+          }
         }
       }
 
       if(use_cmdstan){
         message('Using cmdstanr as the backend')
         message()
+
+        # Replace new syntax if this is an older version of Stan
+        if(cmdstanr::cmdstan_version() < "2.26"){
+          vectorised$model_file <-
+            gsub('array[n, n_series] int ypred;',
+                 'int ypred[n, n_series];',
+                 vectorised$model_file, fixed = TRUE)
+        }
 
         if(cmdstanr::cmdstan_version() >= "2.29.0"){
           if(threads > 1){
@@ -1604,6 +1623,26 @@ mvgam = function(formula,
 
         if(missing(adapt_delta)){
           adapt_delta <- 0.85
+        }
+
+        if(threads > 1){
+          if(utils::packageVersion("rstan") >= "2.26") {
+            threads_per_chain_def <- rstan::rstan_options("threads_per_chain")
+            on.exit(rstan::rstan_options(threads_per_chain = threads_per_chain_def))
+            rstan::rstan_options(threads_per_chain = threads)
+          } else {
+            stop("Threading is not supported by backend 'rstan' version ",
+                  utils::packageVersion("rstan"), ".",
+                 call. = FALSE)
+          }
+        }
+
+        # Replace new syntax if this is an older version of Stan
+        if(rstan::stan_version() < "2.26"){
+          vectorised$model_file <-
+            gsub('array[n, n_series] int ypred;',
+                 'int ypred[n, n_series];',
+                 vectorised$model_file, fixed = TRUE)
         }
 
         message("Compiling the Stan program...")

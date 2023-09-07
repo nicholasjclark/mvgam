@@ -4,7 +4,7 @@ test_that("offset incorporated into link-level linpred for beta", {
   beta_data$data_train$pop <- as.numeric(beta_data$data_train$series) + 0.5
   beta_data$data_test$pop <- as.numeric(beta_data$data_test$series) + 0.5
   testmod <- mvgam(y ~ s(season, bs = 'cc') +
-                     offset(pop),
+                     offset(pop) + s(series, bs = 're'),
                    trend_model = 'GP',
                    data = beta_data$data_train,
                    family = betar(),
@@ -16,20 +16,20 @@ test_that("offset incorporated into link-level linpred for beta", {
 
   # Offset should be in the linpred calculation
   expect_true(expect_match2(stancode,
-                            'eta = X * b + offset;'))
+                            'eta = X * b + off_set;'))
 
   # Offset should be inv_logit in the model declaration
   expect_true(expect_match2(stancode,
-                            'inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0) + offset[obs_ind])'))
+                            'inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0) + off_set[obs_ind])'))
 
 
   # Offset should be provided in 'data'
   expect_true(expect_match2(stancode,
-                            'int<lower=0> obs_ind[n_nonmissing];'))
+                            'vector[total_obs] off_set;'))
 
   # Data for the offset vector should also be incorporated
   # in model_data
-  expect_true(!is.null(testmod$model_data$offset))
+  expect_true(!is.null(testmod$model_data$off_set))
 })
 
 test_that("offset incorporated into link-level linpred for NB", {
@@ -49,18 +49,18 @@ test_that("offset incorporated into link-level linpred for NB", {
 
   # Offset should be in the linpred calculation
   expect_true(expect_match2(stancode,
-                            'eta = X * b + offset;'))
+                            'eta = X * b + off_set;'))
 
   # Offset should be exponentiated in the model declaration
   expect_true(expect_match2(stancode,
-                            'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0) + offset[obs_ind])'))
+                            'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0) + off_set[obs_ind])'))
 
   # Offset should be provided in 'data'
   expect_true(expect_match2(stancode,
-                            'int<lower=0> obs_ind[n_nonmissing];'))
+                            'vector[total_obs] off_set;'))
 
   # Data for the offset vector should also be incorporated
   # in model_data
-  expect_true(!is.null(testmod$model_data$offset))
+  expect_true(!is.null(testmod$model_data$off_set))
 })
 

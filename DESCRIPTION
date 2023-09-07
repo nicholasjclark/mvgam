@@ -33,7 +33,7 @@ Imports:
     parallel,
     pbapply,
     tweedie,
-    MASS,
+    mvnfast,
     purrr,
     zoo,
     xts,

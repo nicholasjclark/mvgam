@@ -37,6 +37,7 @@ Rcpp::NumericVector ar3_recursC(double drift, double ar1,
 arma::mat var1_recursC(arma::mat A,
                        arma::mat linpreds,
                        arma::mat errors,
+                       arma::rowvec drift,
                        arma::rowvec last_trends,
                        int h) {
 
@@ -45,7 +46,8 @@ arma::mat var1_recursC(arma::mat A,
   arma::mat states(T, n_series);
   states.row(0) = last_trends;
   for (int t = 1; t < T; t++) {
-    states.row(t) = (states.row(t-1) - linpreds.row(t-1)) * trans(A) + errors.row(t);
+    states.row(t) = (states.row(t-1) - linpreds.row(t-1)) * trans(A) +
+                     linpreds.row(t) + drift + errors.row(t);
   }
-  return states;
+  return states.rows(1, h);
 }

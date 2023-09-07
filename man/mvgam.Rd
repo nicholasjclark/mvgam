@@ -33,6 +33,7 @@ mvgam(
   refit = FALSE,
   lfo = FALSE,
   use_stan = TRUE,
+  backend = getOption("brms.backend", "cmdstanr"),
   max_treedepth,
   adapt_delta,
   jags_path
@@ -174,11 +175,17 @@ lighter version of the model with no residuals and fewer monitored parameters to
 post-processing. But other downstream functions will not work properly, so users should always
 leave this set as \code{FALSE}}
 
-\item{use_stan}{Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
-the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if \code{cmdstanr} is not available,
+\item{use_stan}{Logical. If \code{TRUE}, the model will be compiled and sampled using
+the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or
 a call to \code{\link[rstan]{stan}}. Note that
 there are many more options when using \code{Stan} vs \code{JAGS} (the only "advantage" of \code{JAGS} is the ability
 to use a Tweedie family).}
+
+\item{backend}{Character string naming the package to use as the backend for fitting
+the Stan model (if \code{use_stan = TRUE}). Options are "cmdstanr" (the default) or "rstan. Can be set globally
+for the current R session via the \code{"brms.backend"} option (see \code{\link{options}}). Details on
+the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
+https://mc-stan.org/cmdstanr/, respectively.}
 
 \item{max_treedepth}{positive integer placing a cap on the number of simulation steps evaluated during each iteration when
 \code{use_stan == TRUE}. Default is \code{12}. Increasing this value can sometimes help with exploration of complex

@@ -7,7 +7,7 @@ ar3_recursC <- function(drift, ar1, ar2, ar3, linpreds, errors, last_trends, h) 
 }
 
 #' @noRd
-var1_recursC <- function(A, linpreds, errors, last_trends, h) {
-    .Call(`_mvgam_var1_recursC`, A, linpreds, errors, last_trends, h)
+var1_recursC <- function(A, linpreds, errors, drift, last_trends, h) {
+    .Call(`_mvgam_var1_recursC`, A, linpreds, errors, drift, last_trends, h)
 }
 

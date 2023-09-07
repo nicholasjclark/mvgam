@@ -541,6 +541,11 @@ forecast_draws = function(object,
 
   # No need to compute in parallel if there was no trend model
   if(object$trend_model == 'None'){
+    if(type == 'trend'){
+      stop('No trend_model was used in this model',
+           call. = FALSE)
+    }
+
     if(series != 'all'){
       fc_preds <- predict(object, type = type, newdata = series_test)
     } else {
@@ -604,6 +609,9 @@ forecast_draws = function(object,
                                      ending_time = ending_time)
   }
 
+  # Add pre-computed eigenvalues and eigenfunctions for GPs
+  # if applicable
+
   # Set up parallel environment for looping across posterior draws
   # to compute h-step ahead forecasts
   cl <- parallel::makePSOCKcluster(n_cores)
@@ -656,7 +664,8 @@ forecast_draws = function(object,
                                  trend_pars = general_trend_pars,
                                  h = fc_horizon,
                                  betas_trend = betas_trend,
-                                 Xp_trend = Xp_trend)
+                                 Xp_trend = Xp_trend,
+                                 time = sort(unique(data_test$time)))
       }
 
       # Loop across series and produce the next trend estimate
@@ -683,7 +692,8 @@ forecast_draws = function(object,
                                 trend_pars = trend_extracts,
                                 h = fc_horizon,
                                 betas_trend = betas_trend,
-                                Xp_trend = Xp_trend)
+                                Xp_trend = Xp_trend,
+                                time = sort(unique(data_test$time)))
         }
         out
       })
@@ -696,7 +706,10 @@ forecast_draws = function(object,
 
           Xpmat <- cbind(Xp[which(as.numeric(data_test$series) == series),],
                          trend_states[, series])
-          attr(Xpmat, 'model.offset') <- attr(Xp, 'model.offset')
+          if(!is.null(attr(Xp, 'model.offset'))){
+            attr(Xpmat, 'model.offset') <-
+              attr(Xp, 'model.offset')[which(as.numeric(data_test$series) == series)]
+          }
 
           # Family-specific parameters
           family_extracts <- lapply(seq_along(family_pars), function(x){
@@ -730,7 +743,8 @@ forecast_draws = function(object,
                                trend_pars = trend_extracts,
                                h = fc_horizon,
                                betas_trend = betas_trend,
-                               Xp_trend = Xp_trend)
+                               Xp_trend = Xp_trend,
+                               time = sort(unique(series_test$time)))
 
       if(use_lv){
         # Multiply lv states with loadings to generate the series' forecast trend state
@@ -738,7 +752,6 @@ forecast_draws = function(object,
       } else if(trend_model == 'VAR1'){
         trends <- trends[, series]
       }
-
 
       if(type == 'trend'){
         out <- trends
