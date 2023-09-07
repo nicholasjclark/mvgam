@@ -51,7 +51,8 @@ rhat.mvgam <- function(x, pars = NULL, ...) {
   if(is.null(pars)){
     vars_extract <- variables(x)
     draws <- as_draws_array(x,
-                            variable = unlist(purrr::map(vars_extract, 'orig_name')))
+                            variable = unlist(purrr::map(vars_extract, 'orig_name')),
+                            use_alias = FALSE)
   } else {
     draws <- as_draws_array(x,
                             variable = pars)
@@ -75,7 +76,8 @@ neff_ratio.mvgam <- function(object, pars = NULL, ...) {
     vars_extract <- unlist(purrr::map(variables(object), 'orig_name'))
     vars_extract <- vars_extract[-grep('ypred', vars_extract)]
     draws <- as_draws_array(object,
-                            variable = vars_extract)
+                            variable = vars_extract,
+                            use_alias = FALSE)
   } else {
     draws <- as_draws_array(object,
                             variable = pars)
@@ -100,7 +102,8 @@ neff_ratio.mvgam <- function(object, pars = NULL, ...) {
     vars_extract <- unlist(purrr::map(variables(object), 'orig_name'))
     vars_extract <- vars_extract[-grep('ypred', vars_extract)]
     draws <- as_draws_array(object,
-                            variable = vars_extract)
+                            variable = vars_extract,
+                            use_alias = FALSE)
   } else {
     draws <- as_draws_array(object,
                             variable = pars)

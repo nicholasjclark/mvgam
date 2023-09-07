@@ -34,6 +34,7 @@ mvgam(
   lfo = FALSE,
   use_stan = TRUE,
   backend = getOption("brms.backend", "cmdstanr"),
+  autoformat = TRUE,
   max_treedepth,
   adapt_delta,
   jags_path
@@ -182,10 +183,13 @@ there are many more options when using \code{Stan} vs \code{JAGS} (the only "adv
 to use a Tweedie family).}
 
 \item{backend}{Character string naming the package to use as the backend for fitting
-the Stan model (if \code{use_stan = TRUE}). Options are "cmdstanr" (the default) or "rstan. Can be set globally
+the Stan model (if \code{use_stan = TRUE}). Options are "cmdstanr" (the default) or "rstan". Can be set globally
 for the current R session via the \code{"brms.backend"} option (see \code{\link{options}}). Details on
 the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
 https://mc-stan.org/cmdstanr/, respectively.}
+
+\item{autoformat}{\code{Logical}. Use the \code{stanc} parser to automatically format the
+\code{Stan} code and check for deprecations. Defaults to \code{TRUE}}
 
 \item{max_treedepth}{positive integer placing a cap on the number of simulation steps evaluated during each iteration when
 \code{use_stan == TRUE}. Default is \code{12}. Increasing this value can sometimes help with exploration of complex

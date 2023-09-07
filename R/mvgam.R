@@ -126,6 +126,8 @@
 #'for the current R session via the \code{"brms.backend"} option (see \code{\link{options}}). Details on
 #'the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
 #'https://mc-stan.org/cmdstanr/, respectively.
+#'@param autoformat \code{Logical}. Use the `stanc` parser to automatically format the
+#'`Stan` code and check for deprecations. Defaults to `TRUE`
 #'@param max_treedepth positive integer placing a cap on the number of simulation steps evaluated during each iteration when
 #'`use_stan == TRUE`. Default is `12`. Increasing this value can sometimes help with exploration of complex
 #'posterior geometries, but it is rarely fruitful to go above a `max_treedepth` of `14`
@@ -447,6 +449,7 @@ mvgam = function(formula,
                  lfo = FALSE,
                  use_stan = TRUE,
                  backend = getOption("brms.backend", "cmdstanr"),
+                 autoformat = TRUE,
                  max_treedepth,
                  adapt_delta,
                  jags_path){
@@ -1364,6 +1367,7 @@ mvgam = function(formula,
       priors <- NULL
     }
 
+    # Tidy the representation
     clean_up <- vector()
     for(x in 1:length(vectorised$model_file)){
       clean_up[x] <- vectorised$model_file[x-1] == "" &
@@ -1371,6 +1375,36 @@ mvgam = function(formula,
     }
     clean_up[is.na(clean_up)] <- FALSE
     vectorised$model_file <- vectorised$model_file[!clean_up]
+
+    if(requireNamespace('cmdstanr', quietly = TRUE)){
+      # Replace new syntax if this is an older version of Stan
+      if(cmdstanr::cmdstan_version() < "2.26"){
+        vectorised$model_file <-
+          gsub('array[n, n_series] int ypred;',
+               'int ypred[n, n_series];',
+               vectorised$model_file, fixed = TRUE)
+      }
+
+      # Auto-format the model file
+      if(autoformat){
+        if(cmdstanr::cmdstan_version() >= "2.29.0") {
+          tmp_file <- cmdstanr::write_stan_file(vectorised$model_file)
+          vectorised$model_file <- .autoformat(tmp_file,
+                                               overwrite_file = FALSE)
+        }
+        vectorised$model_file <- readLines(textConnection(vectorised$model_file), n = -1)
+      }
+
+      } else {
+
+      # Replace new syntax if this is an older version of Stan
+      if(rstan::stan_version() < "2.26"){
+        vectorised$model_file <-
+          gsub('array[n, n_series] int ypred;',
+               'int ypred[n, n_series];',
+               vectorised$model_file, fixed = TRUE)
+      }
+    }
 
   } else {
     # Set up data and model file for JAGS
@@ -1497,7 +1531,6 @@ mvgam = function(formula,
       model_data <- vectorised$model_data
 
       # Check if cmdstan is accessible; if not, use rstan
-
       if(backend == 'cmdstanr'){
         if(!requireNamespace('cmdstanr', quietly = TRUE)){
           warning('cmdstanr library not found. Defaulting to rstan')
@@ -1514,25 +1547,19 @@ mvgam = function(formula,
       if(use_cmdstan){
         message('Using cmdstanr as the backend')
         message()
-
-        # Replace new syntax if this is an older version of Stan
-        if(cmdstanr::cmdstan_version() < "2.26"){
-          vectorised$model_file <-
-            gsub('array[n, n_series] int ypred;',
-                 'int ypred[n, n_series];',
-                 vectorised$model_file, fixed = TRUE)
+        if(cmdstanr::cmdstan_version() < "2.24.0"){
+          warning('Your version of Cmdstan is < 2.24.0; some mvgam models may not work properly!')
         }
 
+        # Prepare threading
         if(cmdstanr::cmdstan_version() >= "2.29.0"){
           if(threads > 1){
             cmd_mod <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(vectorised$model_file),
-                                               stanc_options = list('O1',
-                                                                    'canonicalize=deprecations,braces,parentheses'),
+                                               stanc_options = list('O1'),
                                                cpp_options = list(stan_threads = TRUE))
           } else {
             cmd_mod <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(vectorised$model_file),
-                                               stanc_options = list('O1',
-                                                                    'canonicalize=deprecations,braces,parentheses'))
+                                               stanc_options = list('O1'))
           }
 
         } else {
@@ -1614,6 +1641,12 @@ mvgam = function(formula,
         requireNamespace('rstan', quietly = TRUE)
         message('Using rstan as the backend')
         message()
+
+        if(rstan::stan_version() < "2.24.0"){
+          warning('Your version of Stan is < 2.24.0; some mvgam models may not work properly!')
+        }
+
+
         options(mc.cores = parallel::detectCores())
 
         # Fit the model in rstan using custom control parameters
@@ -1635,14 +1668,6 @@ mvgam = function(formula,
                   utils::packageVersion("rstan"), ".",
                  call. = FALSE)
           }
-        }
-
-        # Replace new syntax if this is an older version of Stan
-        if(rstan::stan_version() < "2.26"){
-          vectorised$model_file <-
-            gsub('array[n, n_series] int ypred;',
-                 'int ypred[n, n_series];',
-                 vectorised$model_file, fixed = TRUE)
         }
 
         message("Compiling the Stan program...")

@@ -217,7 +217,7 @@ sim_var1 = function(drift, A, Sigma,
   }
 
   # Draw errors
-  errors <- Rfast::rmvnorm(h + 1, mu = rep(0, NROW(A)),
+  errors <- mvnfast::rmvn(h + 1, mu = rep(0, NROW(A)),
                           sigma = Sigma)
 
   # Stochastic realisations
