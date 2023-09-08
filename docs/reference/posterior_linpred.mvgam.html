@@ -29,6 +29,7 @@ the data used to fit the model (posterior predictive checks) or for new data."><
   <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
     <a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a>
+    <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in the mvgam package</a>
   </div>
 </li>
       </ul><form class="form-inline my-2 my-lg-0" role="search">
@@ -63,10 +64,10 @@ the data used to fit the model (posterior predictive checks) or for new data.</p
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for mvgam</span></span>
 <span><span class="fu">posterior_linpred</span><span class="op">(</span></span>
 <span>  <span class="va">object</span>,</span>
+<span>  transform <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">newdata</span>,</span>
 <span>  <span class="va">data_test</span>,</span>
 <span>  process_error <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  transform <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -74,7 +75,14 @@ the data used to fit the model (posterior predictive checks) or for new data.</p
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>object</dt>
-<dd><p><code>list</code> object returned from <code>mvgam</code></p></dd>
+<dd><p>Object of class <code>mvgam</code></p></dd>
+
+
+<dt>transform</dt>
+<dd><p>Logical; if <code>FALSE</code>
+(the default), draws of the linear predictor are returned.
+If <code>TRUE</code>, draws of the transformed linear predictor,
+i.e. the conditional expectation, are returned.</p></dd>
 
 
 <dt>newdata</dt>
@@ -95,13 +103,6 @@ from any latent trend SD parameters. If <code>FALSE</code>, uncertainty in the l
 trend component is ignored when calculating predictions. If no <code>newdata</code> is
 supplied, draws from the fitted model's posterior predictive distribution will be used
 (which will always include uncertainty in any latent trend components)</p></dd>
-
-
-<dt>transform</dt>
-<dd><p>Logical; if <code>FALSE</code>
-(the default), draws of the linear predictor are returned.
-If <code>TRUE</code>, draws of the transformed linear predictor,
-i.e. the conditional expectation, are returned.</p></dd>
 
 
 <dt>...</dt>

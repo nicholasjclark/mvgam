@@ -31,6 +31,7 @@ dynamic factors to capture trend dependencies among series in a reduced dimensio
   <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
     <a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a>
+    <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in the mvgam package</a>
   </div>
 </li>
       </ul><form class="form-inline my-2 my-lg-0" role="search">
@@ -92,6 +93,8 @@ dynamic factors to capture trend dependencies among series in a reduced dimensio
 <span>  refit <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  lfo <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  use_stan <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  backend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">"brms.backend"</span>, <span class="st">"cmdstanr"</span><span class="op">)</span>,</span>
+<span>  autoformat <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  <span class="va">max_treedepth</span>,</span>
 <span>  <span class="va">adapt_delta</span>,</span>
 <span>  <span class="va">jags_path</span></span>
@@ -174,12 +177,12 @@ the size of the returned object, unless <code>run_model == FALSE</code></p></dd>
 
 <dt>family</dt>
 <dd><p><code>family</code> specifying the exponential observation family for the series. Currently supported
-families are:</p><ul><li><p><code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code> for count data</p></li>
+families are:</p><ul><li><p><code>nb()</code> for count data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</p></li>
 <li><p><code><a href="mvgam_families.html">tweedie()</a></code> for count data (power parameter <code>p</code> fixed at <code>1.5</code>)</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> for real-valued data</p></li>
-<li><p><code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar()</a></code> for proportional data on <code>(0,1)</code></p></li>
-<li><p><code><a href="https://rdrr.io/pkg/brms/man/brmsfamily.html" class="external-link">lognormal()</a></code> for non-negative real-valued data</p></li>
+<li><p><code>betar()</code> for proportional data on <code>(0,1)</code></p></li>
+<li><p><code>lognormal()</code> for non-negative real-valued data</p></li>
 <li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
 </ul><p>See <a href="mvgam_families.html">mvgam_families</a> for more details</p></dd>
@@ -261,7 +264,8 @@ up by any other means. Only available when using <code>Cmdstan</code> as the bac
 
 <dt>priors</dt>
 <dd><p>An optional <code>data.frame</code> with prior
-definitions (in JAGS or Stan syntax). See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and
+definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
+class <code>brmsprior</code> (see. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code> for details). See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and
 'Details' for more information on changing default prior distributions</p></dd>
 
 
@@ -286,11 +290,24 @@ leave this set as <code>FALSE</code></p></dd>
 
 
 <dt>use_stan</dt>
-<dd><p>Logical. If <code>TRUE</code> and if <code>rstan</code> is installed, the model will be compiled and sampled using
-the Hamiltonian Monte Carlo with a call to <code><a href="https://mc-stan.org/cmdstanr/reference/cmdstan_model.html" class="external-link">cmdstan_model</a></code> or, if <code>cmdstanr</code> is not available,
+<dd><p>Logical. If <code>TRUE</code>, the model will be compiled and sampled using
+the Hamiltonian Monte Carlo with a call to <code><a href="https://mc-stan.org/cmdstanr/reference/cmdstan_model.html" class="external-link">cmdstan_model</a></code> or
 a call to <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code>. Note that
 there are many more options when using <code>Stan</code> vs <code>JAGS</code> (the only "advantage" of <code>JAGS</code> is the ability
 to use a Tweedie family).</p></dd>
+
+
+<dt>backend</dt>
+<dd><p>Character string naming the package to use as the backend for fitting
+the Stan model (if <code>use_stan = TRUE</code>). Options are "cmdstanr" (the default) or "rstan". Can be set globally
+for the current R session via the <code>"brms.backend"</code> option (see <code><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></code>). Details on
+the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
+https://mc-stan.org/cmdstanr/, respectively.</p></dd>
+
+
+<dt>autoformat</dt>
+<dd><p><code>Logical</code>. Use the <code>stanc</code> parser to automatically format the
+<code>Stan</code> code and check for deprecations. Defaults to <code>TRUE</code></p></dd>
 
 
 <dt>max_treedepth</dt>
@@ -348,7 +365,7 @@ principled workflow. Also note that models are parameterised using <code>drop.un
 to ensure predictions can be made for all levels of the supplied factor variable
 <br><br><em>Overdispersion parameters</em>: When more than one series is included in <code>data_train</code> and an overdispersed
 exponential family is used, additional observation family parameters
-(i.e. <code>phi</code> for <code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code> or <code>sigma</code> for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>) are
+(i.e. <code>phi</code> for <code>nb()</code> or <code>sigma</code> for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>) are
 estimated independently for each series.
 <br><br><em>Factor regularisation</em>: When using a dynamic factor model for the trends with <code>JAGS</code> factor precisions are given
 regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
@@ -402,7 +419,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="co"># Formulate a model using Stan where series share a cyclic smooth for</span></span></span>
 <span class="r-in"><span><span class="co"># seasonality and each series has an independent random walk temporal process;</span></span></span>
 <span class="r-in"><span><span class="co"># Set run_model = FALSE to inspect the returned objects</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>             trend_model <span class="op">=</span> <span class="st">'RW'</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="st">'poisson'</span>,</span></span>
@@ -439,7 +456,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span>                     init <span class="op">=</span> <span class="va">mod1</span><span class="op">$</span><span class="va">inits</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now fit the model using mvgam with the Stan backend</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              trend_model <span class="op">=</span> <span class="st">'RW'</span>,</span></span>
 <span class="r-in"><span>              family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
@@ -486,7 +503,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span>                       trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>,<span class="fl">1</span>,<span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit the model using AR1 trends</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span></span>
 <span class="r-in"><span>              trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span></span>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">mod_data</span>,</span></span>
@@ -549,9 +566,9 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="co"># Fit a model that includes the offset in the linear predictor as well as</span></span></span>
 <span class="r-in"><span><span class="co"># hierarchical seasonal smooths</span></span></span>
 <span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset</a></span><span class="op">(</span><span class="va">offset</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>         <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>         <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>         <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, m <span class="op">=</span> <span class="fl">1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>         <span class="fu">s</span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>         <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>         <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, m <span class="op">=</span> <span class="fl">1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>         data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>         trend_model <span class="op">=</span> <span class="st">'None'</span>,</span></span>
 <span class="r-in"><span>         use_stan <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>

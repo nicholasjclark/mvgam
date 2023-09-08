@@ -128,6 +128,9 @@
 #'https://mc-stan.org/cmdstanr/, respectively.
 #'@param autoformat \code{Logical}. Use the `stanc` parser to automatically format the
 #'`Stan` code and check for deprecations. Defaults to `TRUE`
+#' @param save_all_pars A \code{Logical} flag to indicate if draws from all
+#'   variables defined in Stan's \code{parameters} block should be saved
+#'   (default is \code{FALSE}).
 #'@param max_treedepth positive integer placing a cap on the number of simulation steps evaluated during each iteration when
 #'`use_stan == TRUE`. Default is `12`. Increasing this value can sometimes help with exploration of complex
 #'posterior geometries, but it is rarely fruitful to go above a `max_treedepth` of `14`
@@ -450,6 +453,7 @@ mvgam = function(formula,
                  use_stan = TRUE,
                  backend = getOption("brms.backend", "cmdstanr"),
                  autoformat = TRUE,
+                 save_all_pars = FALSE,
                  max_treedepth,
                  adapt_delta,
                  jags_path){
@@ -1383,6 +1387,10 @@ mvgam = function(formula,
           gsub('array[n, n_series] int ypred;',
                'int ypred[n, n_series];',
                vectorised$model_file, fixed = TRUE)
+        vectorised$model_file <-
+          gsub('array[n, n_series] real ypred;',
+               'real ypred[n, n_series];',
+               vectorised$model_file, fixed = TRUE)
       }
 
       # Auto-format the model file
@@ -1520,12 +1528,7 @@ mvgam = function(formula,
     if(use_stan){
       # Remove data likelihood if this is a prior sampling run
       if(prior_simulation){
-        vectorised$model_file <- vectorised$model_file[-c((grep('// likelihood functions',
-                                                                 vectorised$model_file,
-                                                                 fixed = TRUE) - 1):
-                                                              (grep('generated quantities {',
-                                                                    vectorised$model_file,
-                                                                    fixed = TRUE) - 3))]
+        vectorised$model_file <- remove_likelihood(vectorised$model_file)
       }
 
       model_data <- vectorised$model_data
@@ -1633,8 +1636,13 @@ mvgam = function(formula,
         }
 
         # Convert model files to stan_fit class for consistency
-        out_gam_mod <- read_csv_as_stanfit(fit1$output_files(),
-                                   variables = param)
+        if(save_all_pars){
+          out_gam_mod <- read_csv_as_stanfit(fit1$output_files())
+        } else {
+          out_gam_mod <- read_csv_as_stanfit(fit1$output_files(),
+                                             variables = param)
+        }
+
         out_gam_mod <- repair_stanfit(out_gam_mod)
 
       } else {
@@ -1685,6 +1693,12 @@ mvgam = function(formula,
 
         stan_control <- list(max_treedepth = max_treedepth,
                              adapt_delta = adapt_delta)
+        if(save_all_pars){
+          pars <- NA
+        } else {
+          pars <- param
+        }
+
         if(parallel){
           fit1 <- rstan::stan(model_code = vectorised$model_file,
                               iter = samples,
@@ -1696,7 +1710,7 @@ mvgam = function(formula,
                               verbose = FALSE,
                               thin = thin,
                               control = stan_control,
-                              pars = param,
+                              pars = pars,
                               refresh = 100)
         } else {
           fit1 <- rstan::stan(model_code = vectorised$model_file,
@@ -1709,7 +1723,7 @@ mvgam = function(formula,
                               verbose = FALSE,
                               thin = thin,
                               control = stan_control,
-                              pars = param,
+                              pars = pars,
                               refresh = 100)
         }
 

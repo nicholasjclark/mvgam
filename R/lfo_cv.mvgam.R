@@ -44,8 +44,8 @@
 #'dat <- sim_mvgam(T = 75,
 #'                 n_series = 1,
 #'                 prop_trend = 0.75,
-#'                  trend_model = 'AR2',
-#'                  family = poisson())
+#'                 trend_model = 'AR2',
+#'                 family = poisson())
 #'
 #'# Plot the time series
 #'plot_mvgam_series(data = dat$data_train,
@@ -134,6 +134,10 @@ lfo_cv.mvgam = function(object,
     min_t <- 1
   }
   validate_pos_integer(min_t)
+  if(min_t >= N){
+    stop('Argument "min_t" is >= the maximum training time',
+         call. = FALSE)
+  }
 
   # Store the Expected Log Predictive Density (EPLD) at each time point
   approx_elpds <- rep(NA, N)

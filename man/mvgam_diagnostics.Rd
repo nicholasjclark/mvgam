@@ -6,11 +6,14 @@
 \alias{rhat}
 \alias{neff_ratio}
 \alias{nuts_params.mvgam}
+\alias{log_posterior.mvgam}
 \alias{rhat.mvgam}
 \alias{neff_ratio.mvgam}
 \title{Extract diagnostic quantities of \pkg{mvgam} models}
 \usage{
 \method{nuts_params}{mvgam}(object, pars = NULL, ...)
+
+\method{log_posterior}{mvgam}(object, ...)
 
 \method{rhat}{mvgam}(x, pars = NULL, ...)
 

@@ -325,3 +325,91 @@ varcor_mod <- mvgam(y ~ 1,
 #    # include the updated priors
 #    priors = priors)
 
+## ----warning=FALSE, message=FALSE---------------------------------------------
+mcmc_plot(varcor_mod, type = 'rhat') +
+  labs(title = 'VAR1cor')
+mcmc_plot(var_mod, type = 'rhat') +
+  labs(title = 'VAR1')
+
+## -----------------------------------------------------------------------------
+mvgam:::check_rhat(varcor_mod$model_output)
+mvgam:::check_rhat(var_mod$model_output)
+
+## ----warning=FALSE, message=FALSE---------------------------------------------
+Sigma_pars <- matrix(NA, nrow = 5, ncol = 5)
+for(i in 1:5){
+  for(j in 1:5){
+    Sigma_pars[i, j] <- paste0('Sigma[', i, ',', j, ']')
+  }
+}
+mcmc_plot(varcor_mod, 
+          variable = as.vector(t(Sigma_pars)), 
+          type = 'hist')
+
+## -----------------------------------------------------------------------------
+Sigma_post <- as.matrix(varcor_mod, variable = 'Sigma', regex = TRUE)
+median_correlations <- cov2cor(matrix(apply(Sigma_post, 2, median),
+                                      nrow = 5, ncol = 5))
+rownames(median_correlations) <- 
+  colnames(median_correlations) <- 
+  levels(plankton_train$series)
+
+round(median_correlations, 2)
+
+## ----warning=FALSE, message=FALSE---------------------------------------------
+A_pars <- matrix(NA, nrow = 5, ncol = 5)
+for(i in 1:5){
+  for(j in 1:5){
+    A_pars[i, j] <- paste0('A[', i, ',', j, ']')
+  }
+}
+mcmc_plot(varcor_mod, 
+          variable = as.vector(t(A_pars)), 
+          type = 'hist')
+
+## -----------------------------------------------------------------------------
+plot(var_mod, type = 'forecast', series = 1, newdata = plankton_test)
+
+## -----------------------------------------------------------------------------
+plot(varcor_mod, type = 'forecast', series = 1, newdata = plankton_test)
+
+## -----------------------------------------------------------------------------
+plot(var_mod, type = 'forecast', series = 2, newdata = plankton_test)
+
+## -----------------------------------------------------------------------------
+plot(varcor_mod, type = 'forecast', series = 2, newdata = plankton_test)
+
+## -----------------------------------------------------------------------------
+plot(var_mod, type = 'forecast', series = 3, newdata = plankton_test)
+
+## -----------------------------------------------------------------------------
+plot(varcor_mod, type = 'forecast', series = 3, newdata = plankton_test)
+
+## -----------------------------------------------------------------------------
+# create forecast objects for each model
+fcvar <- forecast(var_mod)
+fcvarcor <- forecast(varcor_mod)
+
+# plot the difference in variogram scores; a negative value means the VAR1cor model is better, while a positive value means the VAR1 model is better
+diff_scores <- score(fcvarcor, score = 'variogram')$all_series$score -
+  score(fcvar, score = 'variogram')$all_series$score
+plot(diff_scores, pch = 16, cex = 1.25, col = 'darkred', 
+     ylim = c(-1*max(abs(diff_scores), na.rm = TRUE),
+              max(abs(diff_scores), na.rm = TRUE)),
+     bty = 'l',
+     xlab = 'Forecast horizon',
+     ylab = expression(variogram[VAR1cor]~-~variogram[VAR1]))
+abline(h = 0, lty = 'dashed')
+
+## -----------------------------------------------------------------------------
+# plot the difference in energy scores; a negative value means the VAR1cor model is better, while a positive value means the VAR1 model is better
+diff_scores <- score(fcvarcor, score = 'energy')$all_series$score -
+  score(fcvar, score = 'energy')$all_series$score
+plot(diff_scores, pch = 16, cex = 1.25, col = 'darkred', 
+     ylim = c(-1*max(abs(diff_scores), na.rm = TRUE),
+              max(abs(diff_scores), na.rm = TRUE)),
+     bty = 'l',
+     xlab = 'Forecast horizon',
+     ylab = expression(energy[VAR1cor]~-~energy[VAR1]))
+abline(h = 0, lty = 'dashed')
+

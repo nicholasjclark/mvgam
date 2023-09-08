@@ -8,10 +8,10 @@
 A dataframe containing the following fields:
 \describe{
 \item{moon}{time of sampling in lunar cycles}
-\item{DM}{Total captures of species DM}
-\item{DO}{Total captures of species DO}
-\item{DM}{Total captures of species PP}
-\item{DM}{Total captures of species OT}
+\item{DM}{Total captures of species Dipodomys merriami}
+\item{DO}{Total captures of species Dipodomys ordii}
+\item{PP}{Total captures of species Chaetodipus penicillatus}
+\item{OT}{Total captures of species Onychomys torridus}
 \item{year}{Sampling year}
 \item{month}{Sampling month}
 \item{mintemp}{Monthly mean minimum temperature}
@@ -20,12 +20,12 @@ A dataframe containing the following fields:
 }
 }
 \source{
-\url{https://www.weecology.org/data-projects/portal/}
+\url{https://github.com/weecology/PortalData/blob/main/SiteandMethods/Methods.md}
 }
 \usage{
 portal_data
 }
 \description{
-A dataset containing timeseries of select rodent species captures in control plots from the Portal Project
+A dataset containing timeseries of total captures (across all control plots) for select rodent species from the Portal Project
 }
 \keyword{datasets}

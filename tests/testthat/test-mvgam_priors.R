@@ -56,5 +56,5 @@ test_that("specified priors appear in the Stan code", {
   expect_true(expect_match2(stancode,
                             'alpha_gp ~ normal(-1, 0.75);'))
   expect_true(expect_match2(stancode,
-                            'vector<lower=0,upper=1>[n_series] alpha_gp;'))
+                            'vector<lower=0, upper=1>[n_series] alpha_gp;'))
 })

@@ -42,6 +42,14 @@ nuts_params.mvgam <- function(object, pars = NULL, ...) {
 }
 
 #' @rdname mvgam_diagnostics
+#' @importFrom bayesplot log_posterior
+#' @export log_posterior
+#' @export
+log_posterior.mvgam <- function(object, ...) {
+  bayesplot::log_posterior(object$model_output, ...)
+}
+
+#' @rdname mvgam_diagnostics
 #' @importFrom posterior rhat
 #' @export rhat
 #' @export

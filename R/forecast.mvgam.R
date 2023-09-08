@@ -709,6 +709,8 @@ forecast_draws = function(object,
           if(!is.null(attr(Xp, 'model.offset'))){
             attr(Xpmat, 'model.offset') <-
               attr(Xp, 'model.offset')[which(as.numeric(data_test$series) == series)]
+
+            attr(Xpmat, 'model.offset')[is.na(attr(Xpmat, 'model.offset'))] <- 0
           }
 
           # Family-specific parameters

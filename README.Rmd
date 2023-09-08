@@ -277,6 +277,7 @@ plot_mvgam_smooth(lynx_mvgam, series = 1,
                   smooth = 'season', 
                   derivatives = TRUE)
 ```
+
 As for many types of regression models, it is often more useful and intuitive to plot model effects on the scale of the outcome. `mvgam` has support for the wonderful `marginaleffects` package, allowing a wide variety of posterior contrasts, averages, conditional and marginal predictions to be seamlessly calculated and plotted. Below is the conditional effect of season plotted on the outcome scale, for example:
 ```{r}
 require(ggplot2)

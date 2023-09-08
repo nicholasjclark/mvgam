@@ -711,7 +711,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
         if(!is.null(Xp_trend)){
           inds_keep <- seq(lv, NROW(Xp_trend), by = n_lv)
           Xp_trend_sub = Xp_trend[inds_keep, ]
-          attr(Xp_trend_sub, 'model.offset') <- attr(Xp_trend, 'model.offset')
+          attr(Xp_trend_sub, 'model.offset') <- attr(Xp_trend, 'model.offset')[inds_keep]
         } else {
           Xp_trend_sub <- NULL
         }
@@ -740,7 +740,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                        rho_gp = trend_pars$rho_gp[lv],
                        last_trends = trend_pars$last_lvs[[lv]],
                        h = h)
-        # Before usig the Hilbert version, we need to sign flip
+        # Before using the Hilbert version, we need to sign flip
         # the b_gp coefficients in the actual model
         # sim_hilbert_gp(alpha_gp = trend_pars$alpha_gp[lv],
         #                rho_gp = trend_pars$rho_gp[lv],

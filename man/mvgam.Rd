@@ -35,6 +35,7 @@ mvgam(
   use_stan = TRUE,
   backend = getOption("brms.backend", "cmdstanr"),
   autoformat = TRUE,
+  save_all_pars = FALSE,
   max_treedepth,
   adapt_delta,
   jags_path
@@ -190,6 +191,10 @@ https://mc-stan.org/cmdstanr/, respectively.}
 
 \item{autoformat}{\code{Logical}. Use the \code{stanc} parser to automatically format the
 \code{Stan} code and check for deprecations. Defaults to \code{TRUE}}
+
+\item{save_all_pars}{A \code{Logical} flag to indicate if draws from all
+variables defined in Stan's \code{parameters} block should be saved
+(default is \code{FALSE}).}
 
 \item{max_treedepth}{positive integer placing a cap on the number of simulation steps evaluated during each iteration when
 \code{use_stan == TRUE}. Default is \code{12}. Increasing this value can sometimes help with exploration of complex

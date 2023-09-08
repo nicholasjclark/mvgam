@@ -64,8 +64,8 @@ set.seed(100)
 dat <- sim_mvgam(T = 75,
                 n_series = 1,
                 prop_trend = 0.75,
-                 trend_model = 'AR2',
-                 family = poisson())
+                trend_model = 'AR2',
+                family = poisson())
 
 # Plot the time series
 plot_mvgam_series(data = dat$data_train,
