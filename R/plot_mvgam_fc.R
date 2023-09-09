@@ -90,6 +90,13 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
     return_forecasts <- TRUE
   }
 
+  if(missing(data_test) & missing("newdata")){
+    # Check if newdata already included in the model
+    if(!is.null(object$test_data)){
+      data_test <- object$test_data
+    }
+  }
+
   if(!missing("newdata")){
     data_test <- newdata
 
@@ -269,8 +276,27 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
     plot(1, type = "n", bty = 'L',
          xlab = xlab,
          ylab = ylab,
+         xaxt = 'n',
          xlim = c(0, length(preds_last)),
          ylim = ylim, ...)
+
+    if(!missing(data_test)){
+      axis(side = 1,
+           at = floor(seq(0, max(data_test$time) -
+                            (min(object$obs_data$time)-1),
+                          length.out = 6)),
+           labels = floor(seq(min(object$obs_data$time),
+                              max(data_test$time),
+                              length.out = 6)))
+    } else {
+      axis(side = 1,
+           at = floor(seq(0, max(object$obs_data$time) -
+                            (min(object$obs_data$time)-1),
+                          length.out = 6)),
+           labels = floor(seq(min(object$obs_data$time),
+                              max(object$obs_data$time),
+                              length.out = 6)))
+    }
   }
 
   if(realisations){
@@ -532,9 +558,28 @@ plot.mvgam_forecast = function(x, series = 1,
   } else {
     plot(1, type = "n", bty = 'L',
          xlab = xlab,
+         xaxt = 'n',
          ylab = ylab,
          xlim = c(0, length(preds_last)),
          ylim = ylim, ...)
+    if(is.null(object$test_times)){
+      axis(side = 1,
+           at = floor(seq(0, max(object$train_times) -
+                            (min(object$train_times)-1),
+                          length.out = 6)),
+           labels = floor(seq(min(object$train_times),
+                              max(object$train_times),
+                              length.out = 6)))
+    } else {
+      axis(side = 1,
+           at = floor(seq(0, max(object$test_times) -
+                            (min(object$train_times)-1),
+                          length.out = 6)),
+           labels = floor(seq(min(object$train_times),
+                              max(object$test_times),
+                              length.out = 6)))
+    }
+
   }
 
   if(realisations){

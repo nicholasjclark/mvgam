@@ -65,7 +65,8 @@ hindcast.mvgam = function(object, series = 'all',
   }
   n_series <- NCOL(object$ytimes)
 
-last_train <- max(object$obs_data$time)
+last_train <- max(object$obs_data$time) -
+  (min(object$obs_data$time) - 1)
 
 if(series == 'all'){
   data_train <- object$obs_data
@@ -188,7 +189,9 @@ series_fcs <- structure(list(call = object$call,
                              type = type,
                              series_names = levels(data_train$series),
                              train_observations = series_obs,
+                             train_times = unique(data_train$time),
                              test_observations = NULL,
+                             test_times = NULL,
                              hindcasts = series_hcs,
                              forecasts = NULL),
                         class = 'mvgam_forecast')

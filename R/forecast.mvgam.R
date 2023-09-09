@@ -258,7 +258,8 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
 
   } else {
     # If forecasts already exist, simply extract them
-    last_train <- max(object$obs_data$time)
+    last_train <- max(object$obs_data$time) -
+      (min(object$obs_data$time) - 1)
 
     if(series == 'all'){
       data_train <- object$obs_data
@@ -464,7 +465,9 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
                                series_names = factor(unique(data_train$series),
                                                      levels = levels(data_train$series)),
                                train_observations = series_obs,
+                               train_times = unique(data_train$time),
                                test_observations = series_test,
+                               test_times = unique(object$test_data$time),
                                hindcasts = series_hcs,
                                forecasts = series_fcs),
                           class = 'mvgam_forecast')

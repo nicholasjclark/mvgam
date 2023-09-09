@@ -25,6 +25,16 @@ validate_series_time = function(data, name = 'data'){
     }
   }
 
+  # Series factor must have all unique levels present
+  if(!all(levels(data$series) %in% unique(data$series))){
+    stop(paste0('Mismatch between factor levels of "series" and unique values of "series"',
+                '\n',
+                'Use\n  `setdiff(levels(data$series), unique(data$series))` \nand',
+                '\n',
+                '  `intersect(levels(data$series), unique(data$series))`\nfor guidance'),
+         call. = FALSE)
+  }
+
   # Ensure each series has an observation, even if NA, for each
   # unique timepoint
   all_times_avail = function(time, min_time, max_time){

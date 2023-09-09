@@ -27,7 +27,8 @@
 #'functions within the `trend_formula`
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
-#'`series` (character or factor index of the series IDs)
+#'`series` (character or factor index of the series IDs; if a factor, the number of levels should be identical
+#'to the number of unique series labels)
 #'`time` (numeric index of the time point for each observation).
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
 #'@param data_train Deprecated. Still works in place of \code{data} but users are recommended to use

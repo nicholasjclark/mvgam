@@ -221,8 +221,16 @@ plot_mvgam_series = function(object,
       plot(1, type = "n", bty = 'L',
            xlab = 'Time',
            ylab = ylab,
+           xaxt = 'n',
            ylim = range(unlist(all_ys), na.rm = TRUE),
            xlim = c(0, length(c(truth))))
+      axis(side = 1,
+           at = floor(seq(0, max(data_train$time) -
+                            (min(data_train$time)-1),
+                          length.out = 6)),
+           labels = floor(seq(min(data_train$time),
+                              max(data_train$time),
+                              length.out = 6)))
       title(s_name, line = 0)
 
       if(n_plots > 1){
@@ -289,8 +297,17 @@ plot_mvgam_series = function(object,
       plot(1, type = "n", bty = 'L',
            xlab = '',
            ylab = '',
+           xaxt = 'n',
            ylim = range(c(truth, test), na.rm = TRUE),
            xlim = c(0, length(c(truth, test))))
+        axis(side = 1,
+             at = floor(seq(0, max(data_test$time) -
+                              (min(data_train$time)-1),
+                            length.out = 6)),
+             labels = floor(seq(min(data_train$time),
+                                max(data_test$time),
+                                length.out = 6)))
+
       title('Time series', line = 0)
       title(ylab = ylab, line = 1.5)
       title(xlab = "Time", line = 1.5)
@@ -370,8 +387,16 @@ plot_mvgam_series = function(object,
       plot(1, type = "n", bty = 'L',
            xlab = '',
            ylab = '',
+           xaxt = 'n',
            ylim = range(c(truth), na.rm = TRUE),
            xlim = c(0, length(c(truth))))
+      axis(side = 1,
+           at = floor(seq(0, max(data_train$time) -
+                            (min(data_train$time)-1),
+                          length.out = 6)),
+           labels = floor(seq(min(data_train$time),
+                              max(data_train$time),
+                              length.out = 6)))
       title('Time series', line = 0)
       title(ylab = ylab, line = 1.5)
       title(xlab = "Time", line = 1.5)
