@@ -20,7 +20,7 @@ test_that("offset incorporated into link-level linpred for beta", {
 
   # Offset should be inv_logit in the model declaration
   expect_true(expect_match2(stancode,
-                            'inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0) + off_set[obs_ind])'))
+                            '* append_row(b, 1.0) + off_set[obs_ind])'))
 
 
   # Offset should be provided in 'data'
@@ -53,7 +53,7 @@ test_that("offset incorporated into link-level linpred for NB", {
 
   # Offset should be exponentiated in the model declaration
   expect_true(expect_match2(stancode,
-                            'exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0) + off_set[obs_ind])'))
+                            '* append_row(b, 1.0) + off_set[obs_ind])'))
 
   # Offset should be provided in 'data'
   expect_true(expect_match2(stancode,

@@ -220,9 +220,12 @@ for other functions in the package. See \code{\link{mvgam-class}} for details.
 }
 \description{
 This function estimates the posterior distribution for Generalised Additive Models (GAMs) that can include
-smooth spline functions, specified in the GAM formula, as well as latent temporal processes, specified by trend_model.
-There are currently two options for specifying the structures of the trends (either as latent
-dynamic factors to capture trend dependencies among series in a reduced dimension format, or as independent trends)
+smooth spline functions, specified in the GAM formula, as well as latent temporal processes,
+specified by trend_model. Further modelling options include State-Space representations to allow covariates
+and dynamic processes to occur on the latent 'State' level while also capturing observation-level effects.
+Prior specifications are flexible and explicitly encourage users to apply
+prior distributions that actually reflect their beliefs. In addition, model fits can easily be assessed and
+compared with posterior predictive checks, forecast comparisons and leave-one-out / leave-future-out cross-validation.
 }
 \details{
 Dynamic GAMs are useful when we wish to predict future values from time series that show temporal dependence
@@ -233,15 +236,34 @@ must model time series that show complex distributional features and missing dat
 in a Bayesian framework using Markov Chain Monte Carlo.
 \cr
 \cr
-\emph{Priors}: A \code{\link[mgcv]{jagam}} model file is generated from \code{formula} and modified to include any latent
-temporal processes. Prior distributions for most important model parameters can be altered by the user to inspect model
-sensitivities to given priors (see \code{\link{get_mvgam_priors}} for details). Note that latent trends are estimated on the log scale so choose tau, AR and phi priors
+\emph{Formula syntax}: Details of the formula syntax used by \pkg{mvgam} can be found in
+\code{\link[mgcv]{formula.gam}}.
+\cr
+\cr
+\emph{Families and link functions}: Details of families supported by \pkg{mvgam} can be found in
+\code{\link{mvgam_families}}.
+\cr
+\cr
+\emph{Trend models}: Details of latent trend models supported by \pkg{mvgam} can be found in
+\code{\link{mvgam_trends}}.
+\cr
+\cr
+\emph{Priors}: A \code{\link[mgcv]{jagam}} model file is generated from \code{formula} and
+modified to include any latent
+temporal processes. Prior distributions for most important model parameters can be
+altered by the user to inspect model
+sensitivities to given priors (see \code{\link{get_mvgam_priors}} for details).
+Note that latent trends are estimated on the link scale so choose priors
 accordingly. However more control over the model specification can be accomplished by first using \code{mvgam} as a
 baseline, then editing the returned model accordingly. The model file can be edited and run outside
-of \code{mvgam} by setting \code{run_model = FALSE} and this is encouraged for complex modelling tasks. Note, no priors are
-formally checked to ensure they are in the right syntax for the respective probabilistic modelling framework, so it is
-up to the user to ensure these are correct (i.e. use \code{dnorm} for normal densities in \code{JAGS}, with the mean and precision
-parameterisation; but use \code{normal} for normal densities in \code{Stan}, with the mean and standard deviation parameterisation)
+of \code{mvgam} by setting \code{run_model = FALSE} and this is encouraged for complex
+modelling tasks. Note, no priors are
+formally checked to ensure they are in the right syntax for the respective
+probabilistic modelling framework, so it is
+up to the user to ensure these are correct (i.e. use \code{dnorm} for normal
+densities in \code{JAGS}, with the mean and precision
+parameterisation; but use \code{normal} for normal densities in \code{Stan}, with the mean
+and standard deviation parameterisation)
 \cr
 \cr
 \emph{Random effects}: For any smooth terms using the random effect basis (\code{\link[mgcv]{smooth.construct.re.smooth.spec}}),
@@ -252,8 +274,8 @@ principled workflow. Also note that models are parameterised using \code{drop.un
 to ensure predictions can be made for all levels of the supplied factor variable
 \cr
 \cr
-\emph{Overdispersion parameters}: When more than one series is included in \code{data_train} and an overdispersed
-exponential family is used, additional observation family parameters
+\emph{Observation level parameters}: When more than one series is included in \code{data} and an
+observation family that contains more than one parameter is used, additional observation family parameters
 (i.e. \code{phi} for \code{nb()} or \code{sigma} for \code{gaussian()}) are
 estimated independently for each series.
 \cr
@@ -309,7 +331,6 @@ mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
 # View the model code in Stan language
 code(mod1)
 
-
 # Inspect the data objects needed to condition the model
 str(mod1$model_data)
 
@@ -364,13 +385,21 @@ plot(mod1, type = 'smooths', derivatives = TRUE)
 # Plot partial residuals of the smooth
 plot(mod1, type = 'smooths', residuals = TRUE)
 
+
 # Plot posterior realisations for the smooth
 plot(mod1, type = 'smooths', realisations = TRUE)
+
+# Plot conditional response predictions using marginaleffects
+plot_predictions(mod1, condition = 'season', points = 0.5)
 
 # Extract observation model beta coefficient draws as a data.frame
 beta_draws_df <- as.data.frame(mod1, variable = 'betas')
 head(beta_draws_df)
 str(beta_draws_df)
+
+# Investigate model fit
+loo(mod1)
+
 
 # Example of supplying a trend_map so that some series can share
 # latent trend processes
@@ -434,6 +463,7 @@ plot(mod, type = 'forecast', newdata = data_test)
 plot_mvgam_smooth(mod, smooth = 1, newdata = data)
 abline(v = 180, lty = 'dashed', lwd = 2)
 
+
 # Example showing how to incorporate an offset; simulate some count data
 # with different means per series
 set.seed(100)
@@ -493,6 +523,107 @@ for(i in 2:50){
  lines(preds_rr[i, series2_inds], col = 'darkred')
  }
 layout(1)
+
+# Example of a State Space model
+# Simulate a true signal we are trying to track, which depends
+# nonlinearly on some covariate 'productivity' as well as showing
+# some temporal autocorrelation
+set.seed(1111)
+signal_dat <- gamSim(n = 100, eg = 1, scale = 0.1)
+productivity <- signal_dat$x1
+true_signal <- as.vector(scale(signal_dat$y) +
+                         arima.sim(100, model = list(ar = 0.9, sd = 0.1)))
+plot(true_signal, type = 'l')
+
+# Simulate three sensors, all with different observation
+# errors that depend nonlinearly on an external covariate 'temperature'
+sim_series = function(n_series = 3, true_signal){
+ temp_effects <- gamSim(n = 100, eg = 7, scale = 0.1)
+ temperature <- temp_effects$y
+ alphas <- rnorm(n_series, sd = 2)
+
+ do.call(rbind, lapply(seq_len(n_series), function(series){
+   data.frame(observed = rnorm(length(true_signal),
+                               mean = alphas[series] +
+                                      as.vector(scale(temp_effects[, series + 1])) +
+                                      true_signal,
+                               sd = runif(1, 0.5, 1.5)),
+              series = paste0('sensor_', series),
+              time = 1:length(true_signal),
+              temperature = temperature,
+              productivity = productivity,
+              true_signal = true_signal)
+  }))
+ }
+model_dat <- sim_series(true_signal = true_signal) \%>\%
+ dplyr::mutate(series = factor(series))
+
+# Plot the sensor observations
+plot_mvgam_series(data = model_dat, y = 'observed',
+                 series = 'all')
+# Plot relationships between sensors and temperature
+plot(observed ~ temperature, data = model_dat \%>\%
+  dplyr::filter(series == 'sensor_1'))
+plot(observed ~ temperature, data = model_dat \%>\%
+  dplyr::filter(series == 'sensor_2'))
+plot(observed ~ temperature, data = model_dat \%>\%
+  dplyr::filter(series == 'sensor_3'))
+
+# Plot the true signal against productivity
+plot(true_signal ~ productivity, data = model_dat)
+
+# Formulate and fit a model that allows each sensor's observation error
+# to depend nonlinearly on temperature while allowing the true signal
+# to depend nonlinearly on productivity. By fixing all trend values in
+# the trend_map to 1, we are assuming that all observation sensors are
+# tracking the same latent signal
+mod <- mvgam(formula =
+             # formula for observations, allowing for different
+             # intercepts and smooth effects of temperature
+             observed ~ series + s(temperature, by = series, k = 8),
+
+            trend_formula =
+            # formula for the latent signal, which can depend
+            # nonlinearly on productivity
+            ~ s(productivity, k = 8),
+
+           trend_model =
+           # in addition to productivity effects, the signal is
+           # assumed to exhibit temporal autocorrelation
+           'AR1',
+
+           trend_map =
+           # trend_map forces all sensors to track the same
+           # latent signal
+           data.frame(series = unique(model_dat$series),
+                      trend = c(1, 1, 1)),
+
+          # informative priors on process error
+          # and observation error will help with convergence
+          priors = c(prior(normal(2, 2), class = sigma),
+                     prior(normal(0.5, 0.5), class = sigma_obs)),
+
+          # Gaussian observations
+          family = gaussian(),
+          data = model_dat)
+
+# View a reduced version of the model summary because there will be
+# many spline coefficients in this model
+summary(mod, include_betas = FALSE)
+
+# Plot the estimated latent signal
+plot(mod, type = 'trend')
+
+# Overlay the true simulated signal
+lines(true_signal, lwd = 3)
+
+# Plot response of the signal to productivity
+plot(mod, type = 'smooths', trend_effects = TRUE)
+
+# Plot the responses of observation sensors to
+# temperature
+
+plot(mod, type = 'smooths')
 }
 }
 \references{

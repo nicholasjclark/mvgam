@@ -23,12 +23,25 @@ update_priors = function(model_file,
     stop('priors must be a data.frame with at least the colnames: param_name, prior')
   }
 
+  # Replace any call to 'Intercept' with '(Intercept)' to match mgcv style
+  priors[] <- lapply(priors, function(x)
+    gsub("Intercept(?!.*[^()]*\\))", "(Intercept)", x,
+         perl = TRUE))
+
   # Modify the file to update the prior definitions
   for(i in 1:NROW(priors)){
     if(!any(grepl(paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][1]), '~'),
          model_file, fixed = TRUE))){
 
-      if(grepl('num_gp_basis', priors$prior[i])){
+      # Updating parametric effects
+      if(any(grepl(paste0(priors$param_name[i], '...'), model_file, fixed = TRUE))){
+        header_line <- grep(paste0(priors$param_name[i], '...'), model_file, fixed = TRUE)
+        newprior <- paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][2]))
+        model_file[header_line + 1] <-
+          paste(trimws(strsplit(model_file[header_line + 1], "[~]")[[1]][1]), '~',
+                newprior)
+
+      } else if(grepl('num_gp_basis', priors$prior[i])){
         model_file[grep('num_gp_basis = min(20, n);', model_file, fixed = TRUE)] <-
           priors$prior[i]
 
@@ -59,91 +72,102 @@ update_priors = function(model_file,
     if(any(!is.na(c(priors$new_lowerbound, priors$new_upperbound)))){
       for(i in 1:NROW(priors)){
 
-        # Create boundary text strings
-        if(!is.na(priors$new_lowerbound[i])){
-          change_lower <- TRUE
-          lower_text <- paste0('lower=',
-                               priors$new_lowerbound[i])
+        # Not currently possible to include new bounds on parametric effect
+        # priors
+        if(grepl('fixed effect', priors$param_info[i])){
+          if(!is.na(priors$new_lowerbound)[i]|!is.na(priors$new_upperbound)[i]){
+            warning('not currently possible to place bounds on fixed effect priors: ',
+                    trimws(strsplit(priors$prior[i], "[~]")[[1]][1]),
+                    call. = FALSE)
+          }
         } else {
-          if(grepl('lower=', priors$param_name[i])){
+          # Create boundary text strings
+          if(!is.na(priors$new_lowerbound[i])){
             change_lower <- TRUE
-            lower_text <-
-              paste0('lower=',
-                     regmatches(priors$param_name[i],
-                                regexpr("lower=.*?\\K-?\\d+",
-                                        priors$param_name[i], perl=TRUE)))
+            lower_text <- paste0('lower=',
+                                 priors$new_lowerbound[i])
           } else {
-            change_lower <- FALSE
+            if(grepl('lower=', priors$param_name[i])){
+              change_lower <- TRUE
+              lower_text <-
+                paste0('lower=',
+                       regmatches(priors$param_name[i],
+                                  regexpr("lower=.*?\\K-?\\d+",
+                                          priors$param_name[i], perl=TRUE)))
+            } else {
+              change_lower <- FALSE
+            }
           }
-        }
 
-        if(!is.na(priors$new_upperbound[i])){
-          change_upper <- TRUE
-          upper_text <- paste0('upper=',
-                               priors$new_upperbound[i])
-        } else {
-          if(grepl('upper=', priors$param_name[i])){
+          if(!is.na(priors$new_upperbound[i])){
             change_upper <- TRUE
-            upper_text <-
-              paste0('upper=',
-                     regmatches(priors$param_name[i],
-                                regexpr("upper=.*?\\K-?\\d+",
-                                        priors$param_name[i], perl=TRUE)))
+            upper_text <- paste0('upper=',
+                                 priors$new_upperbound[i])
           } else {
-            change_upper <- FALSE
+            if(grepl('upper=', priors$param_name[i])){
+              change_upper <- TRUE
+              upper_text <-
+                paste0('upper=',
+                       regmatches(priors$param_name[i],
+                                  regexpr("upper=.*?\\K-?\\d+",
+                                          priors$param_name[i], perl=TRUE)))
+            } else {
+              change_upper <- FALSE
+            }
+          }
+
+          # Insert changes
+          if(change_lower & change_upper){
+            model_file[grep(trimws(priors$param_name[i]),
+                            model_file, fixed = TRUE)] <-
+              ifelse(!grepl('<', priors$param_name[i]),
+                     sub('\\[', paste0('<',
+                                       lower_text,
+                                       ',',
+                                       upper_text,
+                                       '>\\['),
+                         priors$param_name[i]),
+                     sub("<[^\\)]+>",
+                         paste0('<',
+                                lower_text,
+                                ',',
+                                upper_text,
+                                '>'),
+                         priors$param_name[i]))
+          }
+
+          if(change_lower & !change_upper){
+            model_file[grep(trimws(priors$param_name[i]),
+                            model_file, fixed = TRUE)] <-
+
+              ifelse(!grepl('<', priors$param_name[i]),
+                     sub('\\[', paste0('<',
+                                       lower_text,
+                                       '>\\['),
+                         priors$param_name[i]),
+                     sub("<[^\\)]+>",
+                         paste0('<',
+                                lower_text,
+                                '>'),
+                         priors$param_name[i]))
+          }
+
+          if(change_upper & !change_lower){
+            model_file[grep(trimws(priors$param_name[i]),
+                            model_file, fixed = TRUE)] <-
+              ifelse(!grepl('<', priors$param_name[i]),
+                     sub('\\[', paste0('<',
+                                       upper_text,
+                                       '>\\['),
+                         priors$param_name[i]),
+                     sub("<[^\\)]+>",
+                         paste0('<',
+                                upper_text,
+                                '>'),
+                         priors$param_name[i]))
           }
         }
 
-        # Insert changes
-        if(change_lower & change_upper){
-          model_file[grep(trimws(priors$param_name[i]),
-                          model_file, fixed = TRUE)] <-
-            ifelse(!grepl('<', priors$param_name[i]),
-                   sub('\\[', paste0('<',
-                                     lower_text,
-                                     ',',
-                                     upper_text,
-                                     '>\\['),
-                       priors$param_name[i]),
-                   sub("<[^\\)]+>",
-                       paste0('<',
-                              lower_text,
-                              ',',
-                              upper_text,
-                              '>'),
-                       priors$param_name[i]))
-        }
-
-        if(change_lower & !change_upper){
-          model_file[grep(trimws(priors$param_name[i]),
-                          model_file, fixed = TRUE)] <-
-
-            ifelse(!grepl('<', priors$param_name[i]),
-                   sub('\\[', paste0('<',
-                                     lower_text,
-                                     '>\\['),
-                       priors$param_name[i]),
-                   sub("<[^\\)]+>",
-                       paste0('<',
-                              lower_text,
-                              '>'),
-                       priors$param_name[i]))
-        }
-
-        if(change_upper & !change_lower){
-          model_file[grep(trimws(priors$param_name[i]),
-                          model_file, fixed = TRUE)] <-
-            ifelse(!grepl('<', priors$param_name[i]),
-                   sub('\\[', paste0('<',
-                                     upper_text,
-                                     '>\\['),
-                       priors$param_name[i]),
-                   sub("<[^\\)]+>",
-                       paste0('<',
-                              upper_text,
-                              '>'),
-                       priors$param_name[i]))
-        }
         change_lower <- FALSE
         change_upper <- FALSE
       }
@@ -165,6 +189,11 @@ adapt_brms_priors = function(priors,
                              trend_model = 'None',
                              trend_map,
                              drift = FALSE){
+
+  # Replace any call to 'Intercept' with '(Intercept)' to match mgcv style
+  priors[] <- lapply(priors, function(x)
+    gsub("Intercept(?!.*[^()]*\\))", "(Intercept)", x,
+         perl = TRUE))
 
   # Get priors that are able to be updated
   priors_df <- get_mvgam_priors(formula = formula,
@@ -198,9 +227,26 @@ adapt_brms_priors = function(priors,
                                      priors_df$prior, fixed = TRUE)] <-
         priors$ub[i]
 
+    } else if(any(grepl(paste0(priors$coef[i], ' ~ '),
+                        priors_df$prior, fixed = TRUE))){
+
+      # Update the prior distribution
+      priors_df$prior[grepl(paste0(priors$class[i], ' ~ '),
+                            priors_df$prior, fixed = TRUE)] <-
+        paste0(priors$coef[i], ' ~ ', priors$prior[i], ';')
+
+      # Now update bounds
+      priors_df$new_lowerbound[grepl(paste0(priors$coef[i], ' ~ '),
+                                     priors_df$prior, fixed = TRUE)] <-
+        priors$lb[i]
+
+      priors_df$new_upperbound[grepl(paste0(priors$coef[i], ' ~ '),
+                                     priors_df$prior, fixed = TRUE)] <-
+        priors$ub[i]
+
     } else {
-      warning('no match found in model_file for parameter: ',
-              priors$class[i],
+      warning(paste0('no match found in model_file for parameter: ',
+              paste0(priors$class[i], ', ', priors$coef[i])),
               call. = FALSE)
     }
   }

@@ -4,6 +4,7 @@
 #' @noRd
 #' @param jags_file Prepared JAGS mvgam model file
 #' @param stan_file Incomplete Stan model file to be edited
+#' @param ss_gam The GAM setup object
 #' @param use_lv logical
 #' @param n_lv \code{integer} number of latent dynamic factors (if \code{use_lv = TRUE})
 #' @param jags_data Prepared mvgam data for JAGS modelling
@@ -13,7 +14,9 @@
 #' is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
 #' truncation entirely (i.e. there is no upper bound for each series)
 #' @return A `list` containing the updated Stan model and model data
-add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
+add_stan_data = function(jags_file, stan_file,
+                         ss_gam,
+                         use_lv = FALSE,
                          n_lv,
                          jags_data, family = 'poisson',
                          upper_bounds){
@@ -210,7 +213,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                                                lambda_links,
                                                'int<lower=0> n_series; // number of series\n',
                                                'int<lower=0> num_basis; // total number of basis coefficients\n',
-                                               p_terms,
+                                               #p_terms,
                                                zero_data,
                                                offset_line,
                                                'matrix[num_basis, total_obs] X; // transposed mgcv GAM design matrix\n',
@@ -235,7 +238,7 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
                                                'int<lower=0> num_basis; // total number of basis coefficients\n',
                                                zero_data,
                                                offset_line,
-                                               p_terms,
+                                               #p_terms,
                                                'matrix[num_basis, total_obs] X; // transposed mgcv GAM design matrix\n',
                                                'int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)\n',
                                                paste0(smooth_penalty_data, collapse = '\n'), '\n',
@@ -407,16 +410,36 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
 
     # Update parametric effect priors
     if(any(grep('// parametric effect', stan_file))){
-      stan_file[grep('// parametric effect', stan_file) + 1] <-
-        paste0('for (i in ',
 
-               as.numeric(sub('.*(?=.$)', '',
-                              sub("\\:.*", "",
-                                  stan_file[grep('// parametric effect', stan_file) + 1]), perl=T)),
-               ':', as.numeric(substr(sub(".*\\:", "",
-                                          stan_file[grep('// parametric effect', stan_file) + 1]),
-                                      1, 1)),
-               ') {\nb_raw[i] ~ normal(p_coefs[i], sqrt(1 / p_taus[i]));\n}')
+      # Get indices of parametric effects
+      min_paras <- as.numeric(sub('.*(?=.$)', '',
+                                  sub("\\:.*", "",
+                                      stan_file[grep('// parametric effect', stan_file) + 1]),
+                                  perl=T))
+      max_paras <- as.numeric(substr(sub(".*\\:", "",
+                                         stan_file[grep('// parametric effect', stan_file) + 1]),
+                                     1, 1))
+      para_indices <- seq(min_paras, max_paras)
+
+      # Get names of parametric terms
+      int_included <- attr(ss_gam$pterms, 'intercept') == 1L
+      other_pterms <- attr(ss_gam$pterms, 'term.labels')
+      all_paras <- other_pterms
+      if(int_included){
+        all_paras <- c('(Intercept)', all_paras)
+      }
+
+      # Create prior lines for parametric terms
+      para_lines <- vector()
+      for(i in seq_along(all_paras)){
+        para_lines[i] <- paste0('// prior for ', all_paras[i],
+                                '...\n',
+                                'b_raw[', para_indices[i], '] ~ student_t(3, 0, 2);\n')
+      }
+
+      stan_file <- stan_file[-(grep('// parametric effect', stan_file) + 1)]
+      stan_file[grep('// parametric effect', stan_file)] <-
+        paste0(paste(para_lines, collapse = '\n'))
       stan_file <- readLines(textConnection(stan_file), n = -1)
     }
 
@@ -459,22 +482,41 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
       paste0('\nfor (i in ','1:num_basis) {\nb[i] = b_raw[i];\n}\n')
 
     if(any(grep('## parametric effect priors', jags_file))){
-      stan_file[grep('##insert smooths', stan_file)] <-
-        paste0('for (i in ',
 
-               as.numeric(sub('.*(?=.$)', '',
-                              sub("\\:.*", "",
-                                  jags_file[grep('## parametric effect', jags_file) + 1]), perl=T)),
-               ':', as.numeric(substr(sub(".*\\:", "",
-                                          jags_file[grep('## parametric effect', jags_file) + 1]),
-                                      1, 1)),
-               ') {\nb_raw[i] ~ normal(p_coefs[i], sqrt(1 / p_taus[i]));\n}\n')
+      # Get indices of parametric effects
+      min_paras <- as.numeric(sub('.*(?=.$)', '',
+                                  sub("\\:.*", "",
+                                      jags_file[grep('## parametric effect', jags_file) + 1]), perl=T))
+      max_paras <- as.numeric(substr(sub(".*\\:", "",
+                                         jags_file[grep('## parametric effect', jags_file) + 1]),
+                                     1, 1))
+      para_indices <- seq(min_paras, max_paras)
+
+      # Get names of parametric terms
+      int_included <- attr(ss_gam$pterms, 'intercept') == 1L
+      other_pterms <- attr(ss_gam$pterms, 'term.labels')
+      all_paras <- other_pterms
+      if(int_included){
+        all_paras <- c('(Intercept)', all_paras)
+      }
+
+      # Create prior lines for parametric terms
+      para_lines <- vector()
+      for(i in seq_along(all_paras)){
+        para_lines[i] <- paste0('// prior for ', all_paras[i],
+                                '...\n',
+                                'b_raw[', para_indices[i], '] ~ student_t(3, 0, 2);\n')
+      }
+
+      stan_file[grep('##insert smooths', stan_file)] <-
+        paste0(paste(para_lines, collapse = '\n'))
       stan_file <- readLines(textConnection(stan_file), n = -1)
     }
 
   }
 
   #### Minor text changes to improve efficiency of Stan code ####
+  #stan_file <- gsub('...', '', stan_file)
   clean_up <- vector()
   for(x in 1:length(stan_file)){
     clean_up[x] <- stan_file[x-1] == "" & stan_file[x] == ""
@@ -628,10 +670,10 @@ add_stan_data = function(jags_file, stan_file, use_lv = FALSE,
   }
 
   # Add parametric prior means and precisions if required
-  if('p_taus' %in% names(jags_data)){
-    stan_data$p_coefs <- array(jags_data$p_coefs, dim = length(jags_data$p_taus))
-    stan_data$p_taus <- array(jags_data$p_taus, dim = length(jags_data$p_taus))
-  }
+  # if('p_taus' %in% names(jags_data)){
+  #   stan_data$p_coefs <- array(jags_data$p_coefs, dim = length(jags_data$p_taus))
+  #   stan_data$p_taus <- array(jags_data$p_taus, dim = length(jags_data$p_taus))
+  # }
 
   # Add bounds if required
   if(!is.null(upper_bounds)){

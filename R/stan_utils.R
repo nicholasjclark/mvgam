@@ -40,7 +40,7 @@ remove_likelihood = function(model_file){
   cmdstan_mod <- cmdstanr::cmdstan_model(stan_file, compile = FALSE)
   out <- utils::capture.output(
     cmdstan_mod$format(
-      max_line_length = 120,
+      max_line_length = 80,
       canonicalize = list("deprecations", "parentheses"),
       overwrite_file = overwrite_file, backup = FALSE))
   paste0(out, collapse = "\n")
@@ -2567,23 +2567,6 @@ add_trend_predictors = function(trend_formula,
 
   model_file <- readLines(textConnection(model_file), n = -1)
 
-  # Add any parametric effect beta lines
-  if(any(grepl('// parametric effect', trend_model_file))){
-    trend_parametrics <- TRUE
-    pstart <- as.numeric(sub('.*(?=.$)', '',
-                             sub("\\:.*", "",
-                                 trend_model_file[grep('// parametric effect',
-                                                       trend_model_file) + 1]), perl = T))
-    pend <- as.numeric(substr(sub(".*\\:", "",
-                                  trend_model_file[grep('// parametric effect',
-                                                        trend_model_file) + 1]),
-                              1, 1))
-    model_file[grep("// dynamic factor estimates", model_file, fixed = TRUE)] <-
-      paste0('// dynamic process models\n',
-             paste0('b_raw_trend[', pstart, ':', pend, '] ~ std_normal();'))
-    model_file <- readLines(textConnection(model_file), n = -1)
-  }
-
   trend_smooths_included <- FALSE
 
   # Add any multinormal smooth lines
@@ -2604,12 +2587,22 @@ add_trend_predictors = function(trend_formula,
     }
     model_data$n_sp_trend <- trend_mvgam$model_data$n_sp
 
+    spline_coef_headers <- trend_model_file[grep('multi_normal_prec',
+                                                trend_model_file) - 1]
+    spline_coef_headers <- gsub('...', '_trend...', spline_coef_headers,
+                                fixed = TRUE)
     spline_coef_lines <- trend_model_file[grepl('multi_normal_prec',
                                                 trend_model_file)]
     spline_coef_lines <- gsub('_raw', '_raw_trend', spline_coef_lines)
     spline_coef_lines <- gsub('lambda', 'lambda_trend', spline_coef_lines)
     spline_coef_lines <- gsub('zero', 'zero_trend', spline_coef_lines)
     spline_coef_lines <- gsub('S', 'S_trend', spline_coef_lines, fixed = TRUE)
+
+    for(i in seq_along(spline_coef_lines)){
+      spline_coef_lines[i] <- paste0(spline_coef_headers[i],
+                                     '\n',
+                                     spline_coef_lines[i])
+    }
 
     lambda_prior_line <- sub('lambda', 'lambda_trend',
                              trend_model_file[grep('lambda ~', trend_model_file, fixed = TRUE)])
@@ -2711,9 +2704,34 @@ add_trend_predictors = function(trend_formula,
 
   }
 
-  trend_random_included <- FALSE
+  # Add any parametric effect beta lines
+  if(length(attr(trend_mvgam$mgcv_model$pterms, 'term.labels')) != 0L){
+    trend_parametrics <- TRUE
+    pnames <- attr(trend_mvgam$mgcv_model$pterms, 'term.labels')
+    pindices <- colnames(attr(trend_mvgam$mgcv_model$terms, 'factors'))
+    plines <- vector()
+    for(i in seq_along(pnames)){
+      plines[i] <- paste0('// prior for ', pnames[i], '_trend...',
+                          '\n',
+                          'b_raw_trend[', which(pindices == pnames[i]),
+                          '] ~ student_t(3, 0, 2);\n')
+    }
+
+    if(any(grepl('// dynamic process models', model_file, fixed = TRUE))){
+      model_file[grep("// dynamic process models", model_file, fixed = TRUE)] <-
+        paste0('// dynamic process models\n',
+               paste0(paste(plines, collapse = '\n')))
+    } else {
+      model_file[grep("// dynamic factor estimates", model_file, fixed = TRUE)] <-
+        paste0('// dynamic process models\n',
+               paste0(paste(plines, collapse = '\n')))
+    }
+
+  }
+  model_file <- readLines(textConnection(model_file), n = -1)
 
   # Add any random effect beta lines
+  trend_random_included <- FALSE
   if(any(grepl('mu_raw[', trend_model_file, fixed = TRUE))){
     trend_random_included <- TRUE
     smooth_labs <- do.call(rbind,

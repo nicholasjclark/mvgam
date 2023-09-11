@@ -167,11 +167,12 @@ mod <- mvgam(y ~ s(series, bs = 're') +
 # of the 'priors' argument
 
 # The same can be done using brms functions; here we will also change the ar1 prior
-# and put some bounds on the ar coefficients to enforce stationarity
+# and put some bounds on the ar coefficients to enforce stationarity; we set the
+# prior using the 'class' argument in all brms prior functions
 brmsprior <- c(prior(normal(0.2, 0.5), class = mu_raw),
               prior(normal(0, 0.25), class = ar1, lb = -1, ub = 1),
               prior(normal(0, 0.25), class = ar2, lb = -1, ub = 1))
-              brmsprior
+brmsprior
 
 mod <- mvgam(y ~ s(series, bs = 're') +
             s(season, bs = 'cc') - 1,
@@ -192,6 +193,43 @@ mod <- mvgam(y ~ s(series, bs = 're') +
             priors = test_priors,
             run_model = FALSE)
 code(mod)
+
+# Example of changing parametric (fixed effect) priors
+simdat <- sim_mvgam()
+
+# Add a fake covariate
+simdat$data_train$cov <- rnorm(NROW(simdat$data_train))
+
+priors <- get_mvgam_priors(y ~ cov + s(season),
+                          data = simdat$data_train,
+                          family = poisson(),
+                          trend_model = 'AR1')
+
+# Change priors for the intercept and fake covariate effects
+priors$prior[1] <- '(Intercept) ~ normal(0, 1);'
+priors$prior[2] <- 'cov ~ normal(0, 0.1);'
+
+mod2 <- mvgam(y ~ cov + s(season),
+             data = data_train,
+             trend_model = 'AR1',
+             family = poisson(),
+             priors = priors,
+             run_model = FALSE)
+code(mod2)
+
+# Likewise using brms utilities (note that you can use Intercept rather than `(Intercept)`)
+# to change priors on the intercept term
+brmsprior <- c(prior(normal(0.2, 0.5), class = cov),
+              prior(normal(0, 0.25), class = Intercept))
+brmsprior
+
+mod2 <- mvgam(y ~ cov + s(season),
+             data = data_train,
+             trend_model = 'AR1',
+             family = poisson(),
+             priors = brmsprior,
+             run_model = FALSE)
+code(mod2)
 
 }
 \seealso{

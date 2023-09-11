@@ -134,11 +134,12 @@
 #'# of the 'priors' argument
 #'
 #'# The same can be done using brms functions; here we will also change the ar1 prior
-#'# and put some bounds on the ar coefficients to enforce stationarity
+#'# and put some bounds on the ar coefficients to enforce stationarity; we set the
+#'# prior using the 'class' argument in all brms prior functions
 #'brmsprior <- c(prior(normal(0.2, 0.5), class = mu_raw),
 #'               prior(normal(0, 0.25), class = ar1, lb = -1, ub = 1),
 #'               prior(normal(0, 0.25), class = ar2, lb = -1, ub = 1))
-#'               brmsprior
+#'brmsprior
 #'
 #'mod <- mvgam(y ~ s(series, bs = 're') +
 #'             s(season, bs = 'cc') - 1,
@@ -159,6 +160,43 @@
 #'             priors = test_priors,
 #'             run_model = FALSE)
 #'code(mod)
+#'
+#'# Example of changing parametric (fixed effect) priors
+#'simdat <- sim_mvgam()
+#'
+#'# Add a fake covariate
+#'simdat$data_train$cov <- rnorm(NROW(simdat$data_train))
+#'
+#'priors <- get_mvgam_priors(y ~ cov + s(season),
+#'                           data = simdat$data_train,
+#'                           family = poisson(),
+#'                           trend_model = 'AR1')
+#'
+#'# Change priors for the intercept and fake covariate effects
+#'priors$prior[1] <- '(Intercept) ~ normal(0, 1);'
+#'priors$prior[2] <- 'cov ~ normal(0, 0.1);'
+#'
+#'mod2 <- mvgam(y ~ cov + s(season),
+#'              data = data_train,
+#'              trend_model = 'AR1',
+#'              family = poisson(),
+#'              priors = priors,
+#'              run_model = FALSE)
+#'code(mod2)
+#'
+#'# Likewise using brms utilities (note that you can use Intercept rather than `(Intercept)`)
+#'# to change priors on the intercept term
+#'brmsprior <- c(prior(normal(0.2, 0.5), class = cov),
+#'               prior(normal(0, 0.25), class = Intercept))
+#'brmsprior
+#'
+#'mod2 <- mvgam(y ~ cov + s(season),
+#'              data = data_train,
+#'              trend_model = 'AR1',
+#'              family = poisson(),
+#'              priors = brmsprior,
+#'              run_model = FALSE)
+#'code(mod2)
 #'
 #'@export
 get_mvgam_priors = function(formula,
@@ -296,6 +334,18 @@ get_mvgam_priors = function(formula,
                                        trend_model = 'None')
 
     # Modify some of the term names and return
+    if(any(grepl('fixed effect', trend_prior_df$param_info))){
+      para_lines <- grep('fixed effect', trend_prior_df$param_info)
+      for(i in seq_along(para_lines)){
+        trend_prior_df$param_name[i] <- paste0(trend_prior_df$param_name[i], '_trend')
+        trend_prior_df$prior[i] <- paste0(trimws(strsplit(trend_prior_df$prior[i],
+                                                         "[~]")[[1]][1]),
+                                          '_trend ~ student_t(3, 0, 2);')
+        trend_prior_df$example_change[i] <- paste0(trimws(strsplit(trend_prior_df$example_change[i],
+                                                          "[~]")[[1]][1]),
+                                          '_trend ~ normal(0, 1);')
+      }
+    }
     trend_prior_df[] <- lapply(trend_prior_df, function(x)
       gsub("lambda", "lambda_trend", x))
     trend_prior_df[] <- lapply(trend_prior_df, function(x)
@@ -397,6 +447,36 @@ get_mvgam_priors = function(formula,
                    attr(ss_gam, 'condition')),
              call. = FALSE)
       }
+    }
+
+    # Parametric effect priors
+    if(use_stan){
+      int_included <- attr(ss_gam$pterms, 'intercept') == 1L
+      other_pterms <- attr(ss_gam$pterms, 'term.labels')
+      all_paras <- other_pterms
+      if(int_included){
+        all_paras <- c('(Intercept)', all_paras)
+      }
+
+      if(length(all_paras) == 0){
+        para_df <- NULL
+      } else {
+        para_df <- data.frame(param_name = all_paras,
+                              param_length = 1,
+                              param_info = c(paste(all_paras,
+                                                   'fixed effect')),
+                              prior = c(paste(all_paras,
+                                              '~ student_t(3, 0, 2);')),
+                              # Add an example for changing the prior; note that it is difficult to
+                              # understand how to change individual smoothing parameter priors because each
+                              # one acts on a different subset of the smooth function parameter space
+                              example_change = c(
+                                paste0(all_paras, ' ~ normal(0, 1);'
+                                )))
+      }
+
+    } else {
+      para_df <- NULL
     }
 
     # Check if smooth terms are included in the formula
@@ -1029,7 +1109,8 @@ get_mvgam_priors = function(formula,
                                    data = data_train)
 
     # Return the dataframe of prior information
-    prior_df <- rbind(sp_df,
+    prior_df <- rbind(para_df,
+                      sp_df,
                       re_df,
                       trend_df,
                       drift_df,
@@ -1038,8 +1119,69 @@ get_mvgam_priors = function(formula,
     prior_df$new_lowerbound <- NA
     prior_df$new_upperbound <- NA
 
+    # Final update to use more brms-like default priors on
+    # scale parameters
+    def_scale_prior <- update_default_scales(response = replace_nas(data_train[[terms(formula(formula))[[2]]]]),
+                                             family = family)
+
+    # Update in priors df
+    if(any(grepl('sigma|sigma_raw|sigma_obs', prior_df$prior))){
+      lines_with_scales <- grep('sigma|sigma_raw|sigma_obs', prior_df$prior)
+      for(i in lines_with_scales){
+        prior_df$prior[i] <- paste0(trimws(strsplit(prior_df$prior[i], "[~]")[[1]][1]), ' ~ ',
+                                  def_scale_prior)
+      }
+    }
     out <- prior_df
   }
 
   return(out)
+}
+
+#' Use informative scale priors following brms example
+#' @noRd
+make_default_scales = function(response, family){
+  def_scale_prior <- update_default_scales(response, family)
+  c(prior_string(def_scale_prior, class = 'sigma'),
+    prior_string(def_scale_prior, class = 'sigma_raw'),
+    prior_string(def_scale_prior, class = 'sigma_obs'))
+}
+
+update_default_scales = function(response,
+                                 family,
+                                 df = 3,
+                                 center = TRUE,
+                                 location = 0,
+                                 scale = 2.5){
+
+  linkfun = function (x, link) {
+    switch(link, identity = x, log = log(x), logm1 = logm1(x),
+           log1p = log1p(x), inverse = 1/x, sqrt = sqrt(x), `1/mu^2` = 1/x^2,
+           tan_half = tan(x/2), logit = plogis(x), probit = qnorm(x),
+           cauchit = qcauchy(x), cloglog = cloglog(x), probit_approx = qnorm(x),
+           softplus = log_expm1(x), squareplus = (x^2 - 1)/x, softit = softit(x),
+           stop2("Link '", link, "' is not supported."))
+  }
+
+  y <- response
+  link <- family$link
+  if(link %in% c("log", "inverse", "1/mu^2")) {
+    # avoid Inf in link(y)
+    y <- ifelse(y == 0, y + 0.1, y)
+  }
+
+  y_link <- suppressWarnings(linkfun(y, link = link))
+  scale_y <- round(mad(y_link), 1)
+  if(is.finite(scale_y)) {
+    scale <- max(scale, scale_y)
+  }
+  if(!center){
+    location_y <- round(median(y_link), 1)
+    if (is.finite(location_y)) {
+      location <- location_y
+    }
+  }
+  paste0("student_t(",
+         paste0(as.character(c(df, location, scale)),
+                collapse = ", "), ");")
 }
