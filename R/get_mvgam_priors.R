@@ -177,21 +177,21 @@
 #'priors$prior[2] <- 'cov ~ normal(0, 0.1);'
 #'
 #'mod2 <- mvgam(y ~ cov + s(season),
-#'              data = data_train,
+#'              data = simdat$data_train,
 #'              trend_model = 'AR1',
 #'              family = poisson(),
 #'              priors = priors,
 #'              run_model = FALSE)
 #'code(mod2)
 #'
-#'# Likewise using brms utilities (note that you can use Intercept rather than `(Intercept)`)
-#'# to change priors on the intercept term
+#'# Likewise using brms utilities (note that you can use
+#'# Intercept rather than `(Intercept)`) to change priors on the intercept
 #'brmsprior <- c(prior(normal(0.2, 0.5), class = cov),
 #'               prior(normal(0, 0.25), class = Intercept))
 #'brmsprior
 #'
 #'mod2 <- mvgam(y ~ cov + s(season),
-#'              data = data_train,
+#'              data = simdat$data_train,
 #'              trend_model = 'AR1',
 #'              family = poisson(),
 #'              priors = brmsprior,
@@ -454,8 +454,24 @@ get_mvgam_priors = function(formula,
       int_included <- attr(ss_gam$pterms, 'intercept') == 1L
       other_pterms <- attr(ss_gam$pterms, 'term.labels')
       all_paras <- other_pterms
+
+      para_priors <- c()
+      para_info <- c()
+
+      if(length(other_pterms) > 0){
+        para_priors <- c(para_priors, paste(other_pterms,
+                             '~ student_t(3, 0, 2);'))
+        para_info <- c(para_info, paste(other_pterms, 'fixed effect'))
+      }
+
       if(int_included){
         all_paras <- c('(Intercept)', all_paras)
+        # Compute default intercept prior using brms
+        def_int <- make_default_int(response = data_train[[terms(formula(formula))[[2]]]],
+                                    family = family)
+        para_priors <- c(paste0(def_int$class, ' ~ ', def_int$prior, ';'),
+                         para_priors)
+        para_info <- c('(Intercept)', para_info)
       }
 
       if(length(all_paras) == 0){
@@ -463,13 +479,8 @@ get_mvgam_priors = function(formula,
       } else {
         para_df <- data.frame(param_name = all_paras,
                               param_length = 1,
-                              param_info = c(paste(all_paras,
-                                                   'fixed effect')),
-                              prior = c(paste(all_paras,
-                                              '~ student_t(3, 0, 2);')),
-                              # Add an example for changing the prior; note that it is difficult to
-                              # understand how to change individual smoothing parameter priors because each
-                              # one acts on a different subset of the smooth function parameter space
+                              param_info = para_info,
+                              prior = para_priors,
                               example_change = c(
                                 paste0(all_paras, ' ~ normal(0, 1);'
                                 )))
@@ -1129,7 +1140,7 @@ get_mvgam_priors = function(formula,
       lines_with_scales <- grep('sigma|sigma_raw|sigma_obs', prior_df$prior)
       for(i in lines_with_scales){
         prior_df$prior[i] <- paste0(trimws(strsplit(prior_df$prior[i], "[~]")[[1]][1]), ' ~ ',
-                                  def_scale_prior)
+                                  def_scale_prior, ';')
       }
     }
     out <- prior_df
@@ -1138,7 +1149,9 @@ get_mvgam_priors = function(formula,
   return(out)
 }
 
-#' Use informative scale priors following brms example
+#' Use informative scale and intercept priors following brms example
+#' @importFrom stats mad qcauchy setNames
+#' @importFrom brms logm1 prior_string get_prior
 #' @noRd
 make_default_scales = function(response, family){
   def_scale_prior <- update_default_scales(response, family)
@@ -1147,6 +1160,17 @@ make_default_scales = function(response, family){
     prior_string(def_scale_prior, class = 'sigma_obs'))
 }
 
+#' @noRd
+make_default_int = function(response, family){
+  int_prior <- get_prior(y ~ 1,
+                         data = data.frame(y = response),
+                         family = family_to_brmsfam(family))
+  int_prior$prior[which(int_prior$class == 'Intercept')]
+  prior_string(int_prior$prior[which(int_prior$class == 'Intercept')],
+               class = '(Intercept)')
+}
+
+#' @noRd
 update_default_scales = function(response,
                                  family,
                                  df = 3,
@@ -1158,9 +1182,10 @@ update_default_scales = function(response,
     switch(link, identity = x, log = log(x), logm1 = logm1(x),
            log1p = log1p(x), inverse = 1/x, sqrt = sqrt(x), `1/mu^2` = 1/x^2,
            tan_half = tan(x/2), logit = plogis(x), probit = qnorm(x),
-           cauchit = qcauchy(x), cloglog = cloglog(x), probit_approx = qnorm(x),
-           softplus = log_expm1(x), squareplus = (x^2 - 1)/x, softit = softit(x),
-           stop2("Link '", link, "' is not supported."))
+           cauchit = qcauchy(x), probit_approx = qnorm(x),
+           squareplus = (x^2 - 1)/x,
+           stop("Link '", link, "' is not supported.",
+                call. = FALSE))
   }
 
   y <- response
@@ -1183,5 +1208,5 @@ update_default_scales = function(response,
   }
   paste0("student_t(",
          paste0(as.character(c(df, location, scale)),
-                collapse = ", "), ");")
+                collapse = ", "), ")")
 }

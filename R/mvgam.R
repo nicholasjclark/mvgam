@@ -639,6 +639,7 @@ mvgam = function(formula,
   orig_formula <- formula
   formula <- interpret_mvgam(formula, N = max(data_train$time))
   data_train <- validate_obs_formula(formula, data = data_train, refit = refit)
+
   if(!missing(data_test)){
     data_test <- validate_obs_formula(formula, data = data_test, refit = refit)
   }
@@ -777,17 +778,19 @@ mvgam = function(formula,
     replace_nas(data_train[[terms(formula(formula))[[2]]]])
 
   # Compute default priors
-  def_scale_df <- adapt_brms_priors(make_default_scales(data_train[[terms(formula(formula))[[2]]]],
+  def_priors <- adapt_brms_priors(c(make_default_scales(data_train[[terms(formula(formula))[[2]]]],
                                                         family),
-                                    formula = orig_formula,
-                                    trend_formula = trend_formula,
-                                    data = orig_data,
-                                    family = family,
-                                    use_lv = use_lv,
-                                    n_lv = n_lv,
-                                    trend_model = trend_model,
-                                    trend_map = trend_map,
-                                    drift = drift)
+                                    make_default_int(data_train[[terms(formula(formula))[[2]]]],
+                                                     family)),
+                                  formula = orig_formula,
+                                  trend_formula = trend_formula,
+                                  data = orig_data,
+                                  family = family,
+                                  use_lv = use_lv,
+                                  n_lv = n_lv,
+                                  trend_model = trend_model,
+                                  trend_map = trend_map,
+                                  drift = drift)
 
   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the Bayesian model later on;
@@ -1512,7 +1515,7 @@ mvgam = function(formula,
 
     # Update priors
     vectorised$model_file <- suppressWarnings(update_priors(vectorised$model_file,
-                                                            def_scale_df,
+                                                            def_priors,
                                                             use_stan = TRUE))
     if(!missing(priors)){
       vectorised$model_file <- update_priors(vectorised$model_file, priors,

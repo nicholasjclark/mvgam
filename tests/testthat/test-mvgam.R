@@ -110,6 +110,17 @@ test_that("missing values not allowed in predictors", {
                      run_model = FALSE))
 })
 
+test_that("series levels must match unique entries in series", {
+  # Include missing vals in training data
+  simdat <- sim_mvgam()
+  levels(simdat$data_train$series) <- paste0('series_', 1:6)
+  expect_error(mvgam(y ~ s(season),
+                     trend_model = 'GP',
+                     data = simdat$data_train,
+                     newdata = simdat$data_test,
+                     run_model = FALSE))
+})
+
 test_that("trend_map is behaving propoerly", {
   sim <- sim_mvgam(n_series = 3)
   mod_data <- sim$data_train

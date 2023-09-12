@@ -9,6 +9,9 @@
 #'@param family_pars Optional `list` containing posterior draws of
 #'family-specific parameters (i.e. shape, scale or overdispersion parameters). Required if
 #'`linpreds` and `newdata` are supplied
+#'@param inclue_forecast Logical. If `newdata` were fed to the model to compute
+#'forecasts, should the log-likelihood draws for these observations also be returned.
+#'Defaults to `TRUE`
 #'@param ... Ignored
 #'@return A `matrix` of dimension `n_samples x n_observations` containing the pointwise
 #'log-likelihood draws for all observations in `newdata`. If no `newdata` is supplied,
@@ -17,8 +20,12 @@
 #'original model via the `newdata` argument in \code{\link{mvgam}},
 #'testing observations)
 #'@export
-logLik.mvgam = function(object, linpreds, newdata,
-                        family_pars, ...){
+logLik.mvgam = function(object,
+                        linpreds,
+                        newdata,
+                        family_pars,
+                        include_forecast = TRUE,
+                        ...){
 
   if(!missing(linpreds) & missing(newdata)){
     stop('argument "newdata" must be supplied when "linpreds" is supplied')
@@ -67,6 +74,13 @@ logLik.mvgam = function(object, linpreds, newdata,
 
   obs <- all_dat$y
   series_obs <- as.numeric(all_dat$series)
+
+  # Supply forecast NAs if include_forecast is FALSE
+  if(!is.null(object$test_data) & !include_forecast){
+    n_fc_obs <- length(object$test_data$y)
+    n_obs <- length(obs)
+    obs[((n_obs - n_fc_obs) + 1):n_obs] <- NA
+  }
 
   # Family-specific parameters
   family <- object$family

@@ -147,15 +147,9 @@ validate_obs_formula = function(formula, data, refit = FALSE){
          call. = FALSE)
   }
 
-  if(terms(formula(formula))[[2]] != 'y'){
-
-    # Check if 'y' is in names, but only if this is not a refit
-    if(!refit){
-      if('y' %in% names(data)){
-        stop('variable "y" found in data but not used as outcome. mvgam uses the name "y" when modeling so this variable should be re-named',
-             call. = FALSE)
-      }
-    }
+  if(any(attr(terms(formula), 'term.labels') %in% 'y')){
+    stop('due to internal data processing, "y" should not be used as the name of a predictor in mvgam',
+         call. = FALSE)
   }
 
   # Add a y outcome for sending to the modelling backend

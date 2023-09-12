@@ -40,10 +40,9 @@
 #'# Compare models using LOO
 #'loo_compare(mod1, mod2, mod3)
 #'}
-#' @export loo
 #' @export
 loo.mvgam <- function(x, ...) {
-  logliks <- logLik(x)
+  logliks <- logLik(x, include_forecast = FALSE)
   logliks <- logliks[,!apply(logliks, 2, function(x) all(is.na(x)))]
 
   releffs <- loo::relative_eff(exp(logliks),
@@ -56,8 +55,9 @@ loo.mvgam <- function(x, ...) {
 #' @importFrom loo loo_compare
 #' @param x Object of class `mvgam`
 #' @param ... More \code{mvgam} objects.
+#' @param model_names If `NULL` (the default) will use model names derived
+#' from deparsing the call. Otherwise will use the passed values as model names.
 #' @rdname loo.mvgam
-#' @export loo_compare
 #' @export
 loo_compare.mvgam <- function(x, ...,
                               model_names = NULL) {

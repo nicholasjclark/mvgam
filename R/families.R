@@ -328,6 +328,23 @@ mvgam_predict = function(Xp, family, betas,
   return(out)
 }
 
+#' Set which family to use when calculating default intercept priors
+#' in brms
+#' @noRd
+family_to_brmsfam = function(family){
+  if(family$family == 'beta'){
+    brms::Beta()
+  } else if(family$family == 'Beta regression'){
+    brms::Beta()
+  } else if(family$family == 'student'){
+    brms::student()
+  } else if(family$family == 'negative binomial'){
+    brms::negbinomial()
+  }else {
+    family
+  }
+}
+
 #' Set which family to use when setting up the gam object
 #' @noRd
 family_to_mgcvfam = function(family){

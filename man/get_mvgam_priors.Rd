@@ -210,21 +210,21 @@ priors$prior[1] <- '(Intercept) ~ normal(0, 1);'
 priors$prior[2] <- 'cov ~ normal(0, 0.1);'
 
 mod2 <- mvgam(y ~ cov + s(season),
-             data = data_train,
+             data = simdat$data_train,
              trend_model = 'AR1',
              family = poisson(),
              priors = priors,
              run_model = FALSE)
 code(mod2)
 
-# Likewise using brms utilities (note that you can use Intercept rather than `(Intercept)`)
-# to change priors on the intercept term
+# Likewise using brms utilities (note that you can use
+# Intercept rather than `(Intercept)`) to change priors on the intercept
 brmsprior <- c(prior(normal(0.2, 0.5), class = cov),
               prior(normal(0, 0.25), class = Intercept))
 brmsprior
 
 mod2 <- mvgam(y ~ cov + s(season),
-             data = data_train,
+             data = simdat$data_train,
              trend_model = 'AR1',
              family = poisson(),
              priors = brmsprior,

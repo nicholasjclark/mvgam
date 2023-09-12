@@ -140,7 +140,7 @@ dplyr::glimpse(model_data)
 levels(model_data$year_fac)
 ```
 
-We are now ready for our first `mvgam` model. The syntax will be familiar to users who have previously built models with `mgcv`. But for a refresher, see `?formula.gam` and the examples in `?gam`. Random effects can be specified using the `s` wrapper with the `re` basis. Note that we can also suppress the primary intercept using the usual `R` formula syntax `- 1`. `mvgam` has a number of possible observation families that can be used, see `?mvgam_families` for more information. We will use `Stan` as the fitting engine, which deploys Hamiltonian Monte Carlo (HMC) for full Bayesian inference. By default, 4 HMC chains will be run using a warmup of 500 iterations and collecting 500 posterior samples from each chain. The package will also aim to use the `Cmdstan` backend when possible, so it is recommended that users have an up-to-date installation of `Cmdstan` and the associated `cmdstanr` interface on their machines. Interested users should consult the [`Stan` user's guide](https://mc-stan.org/docs/stan-users-guide/index.html){target="_blank"} for more information about the software and the enormous variety of models that can be tackled with HMC.
+We are now ready for our first `mvgam` model. The syntax will be familiar to users who have previously built models with `mgcv`. But for a refresher, see `?formula.gam` and the examples in `?gam`. Random effects can be specified using the `s` wrapper with the `re` basis. Note that we can also suppress the primary intercept using the usual `R` formula syntax `- 1`. `mvgam` has a number of possible observation families that can be used, see `?mvgam_families` for more information. We will use `Stan` as the fitting engine, which deploys Hamiltonian Monte Carlo (HMC) for full Bayesian inference. By default, 4 HMC chains will be run using a warmup of 500 iterations and collecting 500 posterior samples from each chain. The package will also aim to use the `Cmdstan` backend when possible, so it is recommended that users have an up-to-date installation of `Cmdstan` and the associated `cmdstanr` interface on their machines (note that you can set the backend yourself using the `backend` argument: see `?mvgam` for details). Interested users should consult the [`Stan` user's guide](https://mc-stan.org/docs/stan-users-guide/index.html){target="_blank"} for more information about the software and the enormous variety of models that can be tackled with HMC.
 ```{r model1, include=FALSE, results='hide'}
 model1 <- mvgam(count ~ s(year_fac, bs = 're') - 1,
                 family = poisson(),
@@ -157,10 +157,18 @@ model1 <- mvgam(count ~ s(year_fac, bs = 're') - 1,
 The model can be described mathematically for each timepoint $t$ as follows:
 \begin{align*}
 \boldsymbol{count}_t & \sim \text{Poisson}(\lambda_t) \\
-log(\lambda_t) & = \beta_{year[year_t]} * \boldsymbol{year}_{t} \\
+log(\lambda_t) & = \beta_{year[year_t]} \\
 \beta_{year} & \sim \text{Normal}(\mu_{year}, \sigma_{year}) \end{align*}
 
-Where the $\beta_{year}$ effects are drawn from a *population* distribution that is parameterized by a common mean $(\mu_{year})$ and variance $(\sigma_{year})$. Once the model has finished, the first step is to inspect the `summary` to ensure no major diagnostic warnings have been produced and to quickly summarise posterior distributions for key parameters
+Where the $\beta_{year}$ effects are drawn from a *population* distribution that is parameterized by a common mean $(\mu_{year})$ and variance $(\sigma_{year})$. Priors on most of the model parameters can be interrogated and changed using similar functionality to the options available in `brms`. For example, the default priors on $(\mu_{year})$ and $(\sigma_{year})$ can be viewed using the following code:
+```{r}
+get_mvgam_priors(count ~ s(year_fac, bs = 're') - 1,
+                 family = poisson(),
+                 data = model_data)
+```
+
+See examples in `?get_mvgam_priors` to find out different ways that priors can be altered.
+Once the model has finished, the first step is to inspect the `summary` to ensure no major diagnostic warnings have been produced and to quickly summarise posterior distributions for key parameters
 ```{r}
 summary(model1)
 ```
@@ -183,6 +191,7 @@ Now for interrogating the model. We can get some sense of the variation in yearl
 plot(model1, type = 're')
 ```
 
+### `bayesplot` support
 We can also capitalize on most of the useful MCMC plotting functions from the `bayesplot` package to visualize posterior distributions and diagnostics (see `?mvgam::mcmc_plot.mvgam` for details):
 ```{r}
 mcmc_plot(object = model1,
@@ -286,7 +295,7 @@ model2 <- mvgam(count ~ s(year_fac, bs = 're') +
 The model can be described mathematically as follows:
 \begin{align*}
 \boldsymbol{count}_t & \sim \text{Poisson}(\lambda_t) \\
-log(\lambda_t) & = \beta_{year[year_t]} * \boldsymbol{year}_{t} + \beta_{ndvi} * \boldsymbol{ndvi}_t \\
+log(\lambda_t) & = \beta_{year[year_t]} + \beta_{ndvi} * \boldsymbol{ndvi}_t \\
 \beta_{year} & \sim \text{Normal}(\mu_{year}, \sigma_{year}) \\
 \beta_{ndvi} & \sim \text{Normal}(0, 1) \end{align*}
 
@@ -327,6 +336,7 @@ hist(beta_post$ndvi,
 abline(v = 0, lwd = 2.5)
 ```
 
+### `marginaleffects` support
 Given our model used a nonlinear link function (log link in this example), it can still be difficult to fully understand what relationship our model is estimating between a predictor and the response. Fortunately, the `marginaleffects` package makes this relatively straightforward. Objects of class `mvgam` can be used with `marginaleffects` to inspect contrasts, scenario-based predictions, conditional and marginal effects, all on the outcome scale. Here we will use the `plot_predictions` function from `marginaleffects` to inspect the conditional effect of `ndvi` (use `?plot_predictions` for guidance on how to modify these plots):
 ```{r warning=FALSE}
 plot_predictions(model2, 
@@ -344,7 +354,7 @@ plot_predictions(model2,
                  type = 'link')
 ```
 
-### Smooths in `mvgam`
+## Adding predictors as smooths
 
 Smooth functions, using penalized splines, are a major feature of `mvgam`. Nonlinear splines are commonly viewed as variations of random effects in which the coefficients that control the shape of the spline are drawn from a joint, penalized distribution. This strategy is very often used in ecological time series analysis to capture smooth temporal variation in the processes we seek to study. When we construct smoothing splines, the workhorse package `mgcv` will calculate a set of basis functions that will collectively control the shape and complexity of the resulting spline. It is often helpful to visualize these basis functions to get a better sense of how splines work. We'll create a set of 6 basis functions to represent possible variation in the effect of `time` on our outcome.In addition to constructing the basis functions, `mgcv` also creates a penalty matrix $S$, which contains **known** coefficients that work to constrain the wiggliness of the resulting smooth function. When fitting a GAM to data, we must estimate the smoothing parameters ($\lambda$) that will penalize these matrices, resulting in constrained basis coefficients and smoother functions that are less likely to overfit the data. This is the key to fitting GAMs in a Bayesian framework, as we can jointly estimate the $\lambda$'s using informative priors to prevent overfitting and expand the complexity of models we can tackle. To see this in practice, we can now fit a model that replaces the yearly random effects with a smooth function of `time`. We will need a reasonably complex function (large `k`) to try and accommodate the temporal variation in our observations. Following some [useful advice by Gavin Simpson](https://fromthebottomoftheheap.net/2020/06/03/extrapolating-with-gams/){target="_blank"}, we will use a b-spline basis for the temporal smooth. Because we no longer have intercepts for each year, we also retain the primary intercept term in this model (there is no `-1` in the formula now):
 ```{r model3, include=FALSE, message=FALSE, warning=FALSE}
@@ -480,7 +490,14 @@ The trend is evolving as an AR1 process, which we can also view:
 plot(model4, type = 'trend', newdata = data_test)
 ```
 
-Though it should be obvious that this model provides better forecasts, we can quantify forecast performance for models 3 and 4 using the `forecast` and `score` functions:
+In-sample model performance can be interrogated using leave-one-out cross-validation utilities from the `loo` package (a higher value is preferred for this metric):
+```{r}
+loo_compare(model3, model4)
+```
+
+The higher estimated log predictive density (ELPD) value for the dynamic model suggests it provides a better fit to the in-sample data. 
+
+Though it should be obvious that this model provides better forecasts, we can quantify forecast performance for models 3 and 4 using the `forecast` and `score` functions. Here we will compare models based on their Discrete Ranked Probability Scores (a lower value is preferred for this metric)
 ```{r}
 fc_mod3 <- forecast(model3)
 fc_mod4 <- forecast(model4)

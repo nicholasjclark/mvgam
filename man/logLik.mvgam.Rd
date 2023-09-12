@@ -4,7 +4,7 @@
 \alias{logLik.mvgam}
 \title{Compute pointwise Log-Likelihoods from fitted \code{mvgam} objects}
 \usage{
-\method{logLik}{mvgam}(object, linpreds, newdata, family_pars, ...)
+\method{logLik}{mvgam}(object, linpreds, newdata, family_pars, include_forecast = TRUE, ...)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
@@ -20,6 +20,10 @@ family-specific parameters (i.e. shape, scale or overdispersion parameters). Req
 \code{linpreds} and \code{newdata} are supplied}
 
 \item{...}{Ignored}
+
+\item{inclue_forecast}{Logical. If \code{newdata} were fed to the model to compute
+forecasts, should the log-likelihood draws for these observations also be returned.
+Defaults to \code{TRUE}}
 }
 \value{
 A \code{matrix} of dimension \verb{n_samples x n_observations} containing the pointwise

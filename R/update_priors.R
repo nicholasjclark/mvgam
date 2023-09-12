@@ -74,7 +74,7 @@ update_priors = function(model_file,
 
         # Not currently possible to include new bounds on parametric effect
         # priors
-        if(grepl('fixed effect', priors$param_info[i])){
+        if(grepl('fixed effect|Intercept', priors$param_info[i])){
           if(!is.na(priors$new_lowerbound)[i]|!is.na(priors$new_upperbound)[i]){
             warning('not currently possible to place bounds on fixed effect priors: ',
                     trimws(strsplit(priors$prior[i], "[~]")[[1]][1]),

@@ -13,6 +13,9 @@
 \item{x}{Object of class \code{mvgam}}
 
 \item{...}{More \code{mvgam} objects.}
+
+\item{model_names}{If \code{NULL} (the default) will use model names derived
+from deparsing the call. Otherwise will use the passed values as model names.}
 }
 \description{
 Extract the LOOIC (leave-one-out information criterion) using

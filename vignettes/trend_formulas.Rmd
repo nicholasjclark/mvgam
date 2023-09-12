@@ -183,7 +183,7 @@ The "global" tensor product smooth function can be quickly visualized:
 plot_mvgam_smooth(notrend_mod, smooth = 1)
 ```
 
-We can then plot the deviation smooths for each algal group to see how they vary from the "global" pattern:
+On this plot, red indicates below-average linear predictors and white indicates above-average. We can then plot the deviation smooths for each algal group to see how they vary from the "global" pattern:
 ```{r}
 plot_mvgam_smooth(notrend_mod, smooth = 2)
 ```
@@ -278,16 +278,20 @@ priors <- get_mvgam_priors(
   trend_model = 'VAR1',
   family = gaussian(),
   data = plankton_train)
-
-# update the sigma_obs prior so that it avoids very small
-# and very large values that are nonsensical
-priors$prior[10] <- "sigma_obs ~ uniform(0.1, 1);"
-priors$new_lowerbound[10] <- 0.1
-priors$new_upperbound[10] <- 1
 ```
 
-Note that if you already know the names of parameters for which you'd like to modify the priors, you can more quickly make edits using `brms` functionality:
-```{r eval=FALSE}
+Get names of all parameters whose priors can be modified:
+```{r}
+priors[, 3]
+```
+
+And their default prior distributions:
+```{r}
+priors[, 4]
+```
+
+Setting priors is easy in `mvgam` as you can use `brms` routines:
+```{r}
 priors <- prior(uniform(0.1, 1), class = sigma_obs, lb = 0.1, ub = 1)
 ```
 
@@ -306,7 +310,7 @@ var_mod <- mvgam(y ~ 1,
                  newdata = plankton_test,
                  trend_model = 'VAR1',
                  priors = priors, 
-                 burnin = 800)
+                 burnin = 1000)
 ```
 
 ```{r eval=FALSE}
@@ -329,9 +333,9 @@ var_mod <- mvgam(
 ```
 
 ### Inspecting SS models
-This model's summary is a bit different to other `mvgam` summaries. It separates parameters based on whether they belong to the observation model or to the latent process model. This is because we may often have covariates that impact the observations but not the latent process, so we can have fairly complex models for each component. You will notice that some parameters have not fully converged, particularly for the VAR coefficients (called `A` in the output) and for the process errors (`Sigma`)
+This model's summary is a bit different to other `mvgam` summaries. It separates parameters based on whether they belong to the observation model or to the latent process model. This is because we may often have covariates that impact the observations but not the latent process, so we can have fairly complex models for each component. You will notice that some parameters have not fully converged, particularly for the VAR coefficients (called `A` in the output) and for the process errors (`Sigma`). Note that we set `include_betas = FALSE` to stop the summary from printing output for all of the spline coefficients, which can be dense and hard to interpret:
 ```{r}
-summary(var_mod)
+summary(var_mod, include_betas = FALSE)
 ```
 
 The convergence of this model isn't fabulous (more on this in a moment). But we can again plot the smooth functions, which this time operate on the process model. We can see the same plot using `trend_effects = TRUE` in the plotting functions:
@@ -390,27 +394,10 @@ These are still a bit hard to identify overall.
 
 Let's see if the estimates improve when we allow the process errors to be correlated. Once again, we need to first update the priors for the observation errors:
 ```{r}
-priors <- get_mvgam_priors(
-  # observation formula, which just uses an intercept
-  y ~ 1,
-  
-  # process model formula, which includes the smooth functions
-  trend_formula = ~ te(temp, month, k = c(4, 4)) +
-    te(temp, month, k = c(4, 4), by = trend),
-  
-  # VAR1 model with correlated process errors
-  trend_model = 'VAR1cor',
-  family = gaussian(),
-  data = plankton_train)
-
-# update the sigma_obs prior so that it avoids very small
-# and very large values that are nonsensical
-priors$prior[11] <- "sigma_obs ~ uniform(0.1, 1);"
-priors$new_lowerbound[11] <- 0.1
-priors$new_upperbound[11] <- 1
+priors <- prior(uniform(0.1, 1), class = sigma_obs, lb = 0.1, ub = 1)
 ```
 
-And now we can fit the correlated process error model.
+And now we can fit the correlated process error model
 ```{r varcor_mod, include = FALSE, results='hide'}
 varcor_mod <- mvgam(y ~ 1,
                  trend_formula = ~
@@ -424,7 +411,7 @@ varcor_mod <- mvgam(y ~ 1,
                  data = plankton_train,
                  newdata = plankton_test,
                  trend_model = 'VAR1cor',
-                 burnin = 800,
+                 burnin = 1000,
                  priors = priors)
 ```
 

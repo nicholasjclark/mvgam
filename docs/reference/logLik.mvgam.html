@@ -25,6 +25,7 @@
   <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
     <a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a>
+    <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in the mvgam package</a>
   </div>
 </li>
       </ul><form class="form-inline my-2 my-lg-0" role="search">
@@ -55,7 +56,7 @@
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/stats/logLik.html" class="external-link">logLik</a></span><span class="op">(</span><span class="va">object</span>, <span class="va">linpreds</span>, <span class="va">newdata</span>, <span class="va">family_pars</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/logLik.html" class="external-link">logLik</a></span><span class="op">(</span><span class="va">object</span>, <span class="va">linpreds</span>, <span class="va">newdata</span>, <span class="va">family_pars</span>, include_forecast <span class="op">=</span> <span class="cn">TRUE</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -82,6 +83,12 @@ family-specific parameters (i.e. shape, scale or overdispersion parameters). Req
 
 <dt>...</dt>
 <dd><p>Ignored</p></dd>
+
+
+<dt>inclue_forecast</dt>
+<dd><p>Logical. If <code>newdata</code> were fed to the model to compute
+forecasts, should the log-likelihood draws for these observations also be returned.
+Defaults to <code>TRUE</code></p></dd>
 
 </dl></div>
     <div class="section level2">
