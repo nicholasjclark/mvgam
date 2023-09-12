@@ -9,7 +9,7 @@
 #'@param family_pars Optional `list` containing posterior draws of
 #'family-specific parameters (i.e. shape, scale or overdispersion parameters). Required if
 #'`linpreds` and `newdata` are supplied
-#'@param inclue_forecast Logical. If `newdata` were fed to the model to compute
+#'@param include_forecast Logical. If `newdata` were fed to the model to compute
 #'forecasts, should the log-likelihood draws for these observations also be returned.
 #'Defaults to `TRUE`
 #'@param ... Ignored

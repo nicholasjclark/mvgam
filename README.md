@@ -143,10 +143,10 @@ library(mvgam)
 #> Warning: package 'mgcv' was built under R version 4.2.2
 #> Loading required package: nlme
 #> This is mgcv 1.8-41. For overview type 'help("mgcv-package")'.
-#> Loading required package: brms
-#> Warning: package 'brms' was built under R version 4.2.3
 #> Loading required package: Rcpp
 #> Warning: package 'Rcpp' was built under R version 4.2.3
+#> Loading required package: brms
+#> Warning: package 'brms' was built under R version 4.2.3
 #> Loading 'brms' package (version 2.19.0). Useful instructions
 #> can be found by typing help('brms'). A more detailed introduction
 #> to the package is available through vignette('brms_overview').
@@ -332,23 +332,26 @@ test_priors <- get_mvgam_priors(population ~ s(season, bs = 'cc', k = 12),
                                 use_stan = TRUE)
 test_priors
 #>                                    param_name param_length
-#> 1               vector<lower=0>[n_sp] lambda;            1
-#> 2 vector<lower=-1.5,upper=1.5>[n_series] ar1;            1
-#> 3 vector<lower=-1.5,upper=1.5>[n_series] ar2;            1
-#> 4 vector<lower=-1.5,upper=1.5>[n_series] ar3;            1
-#> 5            vector<lower=0>[n_series] sigma;            1
-#>                    param_info                    prior
-#> 1 s(season) smooth parameters lambda ~ normal(10, 25);
-#> 2       trend AR1 coefficient      ar1 ~ std_normal();
-#> 3       trend AR2 coefficient      ar2 ~ std_normal();
-#> 4       trend AR3 coefficient      ar3 ~ std_normal();
-#> 5                    trend sd  sigma ~ exponential(2);
+#> 1                                 (Intercept)            1
+#> 2               vector<lower=0>[n_sp] lambda;            1
+#> 3 vector<lower=-1.5,upper=1.5>[n_series] ar1;            1
+#> 4 vector<lower=-1.5,upper=1.5>[n_series] ar2;            1
+#> 5 vector<lower=-1.5,upper=1.5>[n_series] ar3;            1
+#> 6            vector<lower=0>[n_series] sigma;            1
+#>                    param_info                                 prior
+#> 1                 (Intercept) (Intercept) ~ student_t(3, 6.5, 2.5);
+#> 2 s(season) smooth parameters              lambda ~ normal(10, 25);
+#> 3       trend AR1 coefficient                   ar1 ~ std_normal();
+#> 4       trend AR2 coefficient                   ar2 ~ std_normal();
+#> 5       trend AR3 coefficient                   ar3 ~ std_normal();
+#> 6                    trend sd         sigma ~ student_t(3, 0, 2.5);
 #>                example_change new_lowerbound new_upperbound
-#> 1 lambda ~ exponential(0.08);             NA             NA
-#> 2  ar1 ~ normal(-0.36, 0.14);             NA             NA
-#> 3    ar2 ~ normal(0.57, 0.3);             NA             NA
-#> 4   ar3 ~ normal(0.79, 0.89);             NA             NA
-#> 5  sigma ~ exponential(0.11);             NA             NA
+#> 1 (Intercept) ~ normal(0, 1);             NA             NA
+#> 2 lambda ~ exponential(0.45);             NA             NA
+#> 3   ar1 ~ normal(0.16, 0.42);             NA             NA
+#> 4  ar2 ~ normal(-0.15, 0.55);             NA             NA
+#> 5  ar3 ~ normal(-0.36, 0.34);             NA             NA
+#> 6  sigma ~ exponential(0.35);             NA             NA
 ```
 
 Any of the above priors can be changed by modifying the `prior` column
@@ -385,25 +388,23 @@ code(lynx_mvgam)
 #>   int<lower=0> n_series; // number of series
 #>   int<lower=0> num_basis; // total number of basis coefficients
 #>   vector[num_basis] zero; // prior locations for basis coefficients
-#>   real p_taus[1]; // prior precisions for parametric coefficients
-#>   real p_coefs[1]; // prior locations for parametric coefficients
 #>   matrix[total_obs, num_basis] X; // mgcv GAM design matrix
-#>   int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)
-#>   matrix[10,10] S1; // mgcv smooth penalty matrix S1
+#>   array[n, n_series] int<lower=0> ytimes; // time-ordered matrix (which col in X belongs to each [time, series] observation?)
+#>   matrix[10, 10] S1; // mgcv smooth penalty matrix S1
 #>   int<lower=0> n_nonmissing; // number of nonmissing observations
-#>   int<lower=0> flat_ys[n_nonmissing]; // flattened nonmissing observations
+#>   array[n_nonmissing] int<lower=0> flat_ys; // flattened nonmissing observations
 #>   matrix[n_nonmissing, num_basis] flat_xs; // X values for nonmissing observations
-#>   int<lower=0> obs_ind[n_nonmissing]; // indices of nonmissing observations
+#>   array[n_nonmissing] int<lower=0> obs_ind; // indices of nonmissing observations
 #> }
 #> parameters {
 #>   // raw basis coefficients
 #>   vector[num_basis] b_raw;
 #>   // latent trend AR1 terms
-#>   vector<lower=-1.5,upper=1.5>[n_series] ar1;
+#>   vector<lower=-1.5, upper=1.5>[n_series] ar1;
 #>   // latent trend AR2 terms
-#>   vector<lower=-1.5,upper=1.5>[n_series] ar2;
+#>   vector<lower=-1.5, upper=1.5>[n_series] ar2;
 #>   // latent trend AR3 terms
-#>   vector<lower=-1.5,upper=1.5>[n_series] ar3;
+#>   vector<lower=-1.5, upper=1.5>[n_series] ar3;
 #>   // latent trend variance parameters
 #>   vector<lower=0>[n_series] sigma;
 #>   // latent trends
@@ -414,15 +415,14 @@ code(lynx_mvgam)
 #> transformed parameters {
 #>   // basis coefficients
 #>   vector[num_basis] b;
-#>   b[1:num_basis] = b_raw[1:num_basis];
+#>   b[1 : num_basis] = b_raw[1 : num_basis];
 #> }
 #> model {
-#>   // parametric effect priors (regularised for identifiability)
-#>   for (i in 1:1) {
-#>   b_raw[i] ~ normal(p_coefs[i], sqrt(1 / p_taus[i]));
-#>   }
+#>   // prior for (Intercept)...
+#>   b_raw[1] ~ student_t(3, 6.5, 2.5);
 #>   // prior for s(season)...
-#>   b_raw[2:11] ~ multi_normal_prec(zero[2:11],S1[1:10,1:10] * lambda[1]);
+#>   b_raw[2 : 11] ~ multi_normal_prec(zero[2 : 11],
+#>                                     S1[1 : 10, 1 : 10] * lambda[1]);
 #>   // priors for AR parameters
 #>   ar1 ~ std_normal();
 #>   ar2 ~ std_normal();
@@ -430,20 +430,23 @@ code(lynx_mvgam)
 #>   // priors for smoothing parameters
 #>   lambda ~ normal(10, 25);
 #>   // priors for latent trend variance parameters
-#>   sigma ~ exponential(2);
+#>   sigma ~ student_t(3, 0, 2.5);
 #>   // trend estimates
-#>   trend[1, 1:n_series] ~ normal(0, sigma);
-#>   trend[2, 1:n_series] ~ normal(trend[1, 1:n_series] * ar1, sigma);
-#>   trend[3, 1:n_series] ~ normal(trend[2, 1:n_series] * ar1 + trend[1, 1:n_series] * ar2, sigma);
-#>   for(s in 1:n_series){
-#>   trend[4:n, s] ~ normal(ar1[s] * trend[3:(n - 1), s] + ar2[s] * trend[2:(n - 2), s] + ar3[s] * trend[1:(n - 3), s], sigma[s]);
+#>   trend[1, 1 : n_series] ~ normal(0, sigma);
+#>   trend[2, 1 : n_series] ~ normal(trend[1, 1 : n_series] * ar1, sigma);
+#>   trend[3, 1 : n_series] ~ normal(trend[2, 1 : n_series] * ar1
+#>                                   + trend[1, 1 : n_series] * ar2, sigma);
+#>   for (s in 1 : n_series) {
+#>     trend[4 : n, s] ~ normal(ar1[s] * trend[3 : (n - 1), s]
+#>                              + ar2[s] * trend[2 : (n - 2), s]
+#>                              + ar3[s] * trend[1 : (n - 3), s], sigma[s]);
 #>   }
 #>   {
-#>   // likelihood functions
-#>   vector[n_nonmissing] flat_trends;
-#>   flat_trends = (to_vector(trend))[obs_ind];
-#>   flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends),
-#>   0.0,append_row(b, 1.0));
+#>     // likelihood functions
+#>     vector[n_nonmissing] flat_trends;
+#>     flat_trends = to_vector(trend)[obs_ind];
+#>     flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends), 0.0,
+#>                               append_row(b, 1.0));
 #>   }
 #> }
 #> generated quantities {
@@ -453,14 +456,14 @@ code(lynx_mvgam)
 #>   vector[n_series] tau;
 #>   array[n, n_series] int ypred;
 #>   rho = log(lambda);
-#>   for (s in 1:n_series) {
-#>   tau[s] = pow(sigma[s], -2.0);
+#>   for (s in 1 : n_series) {
+#>     tau[s] = pow(sigma[s], -2.0);
 #>   }
 #>   // posterior predictions
 #>   eta = X * b;
-#>   for(s in 1:n_series){ 
-#>   mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];
-#>   ypred[1:n, s] = poisson_log_rng(mus[1:n, s]);
+#>   for (s in 1 : n_series) {
+#>     mus[1 : n, s] = eta[ytimes[1 : n, s]] + trend[1 : n, s];
+#>     ypred[1 : n, s] = poisson_log_rng(mus[1 : n, s]);
 #>   }
 #> }
 ```
@@ -549,29 +552,29 @@ summary(lynx_mvgam)
 #> Fitted using Stan 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                2.5%    50%  97.5% Rhat n.eff
-#> (Intercept)   6.800  6.800  6.800 1.00  3175
-#> s(season).1  -0.560  0.059  0.780 1.00   764
-#> s(season).2  -0.240  0.800  1.900 1.00   351
-#> s(season).3  -0.037  1.200  2.500 1.01   357
-#> s(season).4  -0.540  0.440  1.300 1.00   813
-#> s(season).5  -1.100 -0.120  0.940 1.00   368
-#> s(season).6  -0.960  0.030  1.100 1.01   378
-#> s(season).7  -0.720  0.350  1.400 1.01   629
-#> s(season).8  -1.100  0.210  1.700 1.01   361
-#> s(season).9  -1.200 -0.370  0.570 1.00   460
-#> s(season).10 -1.400 -0.710 -0.028 1.00   580
+#>                2.5%     50% 97.5% Rhat n.eff
+#> (Intercept)   6.000  6.6000 7.000    1   445
+#> s(season).1  -0.650  0.0160 0.690    1   936
+#> s(season).2  -0.250  0.8400 1.800    1   551
+#> s(season).3  -0.022  1.3000 2.500    1   474
+#> s(season).4  -0.470  0.4300 1.300    1   899
+#> s(season).5  -1.100 -0.1500 0.890    1   629
+#> s(season).6  -1.100 -0.0011 1.100    1   671
+#> s(season).7  -0.690  0.4100 1.500    1   848
+#> s(season).8  -0.940  0.3300 1.800    1   490
+#> s(season).9  -1.100 -0.2400 0.760    1   570
+#> s(season).10 -1.400 -0.7000 0.021    1   774
 #> 
 #> GAM observation smoothing parameter (rho) estimates:
 #>               2.5% 50% 97.5% Rhat n.eff
-#> s(season)_rho  2.1 3.4   4.3    1   531
+#> s(season)_rho  2.1 3.4   4.3    1   595
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n.eff
-#> ar1[1]    0.70  1.10 1.400 1.00   607
-#> ar2[1]   -0.83 -0.41 0.049 1.00  1297
-#> ar3[1]   -0.45 -0.14 0.270 1.01   452
-#> sigma[1]  0.40  0.49 0.620 1.00  1436
+#> ar1[1]    0.72  1.10 1.400    1   915
+#> ar2[1]   -0.83 -0.40 0.045    1  1726
+#> ar3[1]   -0.47 -0.12 0.320    1   574
+#> sigma[1]  0.40  0.50 0.630    1  1189
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -654,6 +657,7 @@ plot_mvgam_smooth(lynx_mvgam, series = 1,
 ```
 
 <img src="man/figures/README-unnamed-chunk-29-1.png" width="60%" style="display: block; margin: auto;" />
+
 As for many types of regression models, it is often more useful and
 intuitive to plot model effects on the scale of the outcome. `mvgam` has
 support for the wonderful `marginaleffects` package, allowing a wide
@@ -680,7 +684,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-31-1.png" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample DRPS:
-    #> [1] 3148.147
+    #> [1] 2832.311
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -781,11 +785,11 @@ each competing model at the same set of timepoints.
 compare_mvgams(lynx_mvgam, lynx_mvgam_poor, fc_horizon = 10)
 #> RPS summaries per model (lower is better)
 #>             Min.   1st Qu.    Median      Mean   3rd Qu.      Max.
-#> Model 1 3484.029  4387.575  5230.923  5350.424  6140.907  7346.334
-#> Model 2 5798.542 11725.989 17921.953 15874.719 19879.518 22535.450
+#> Model 1 3640.368  4110.281  4751.571  5112.227  5842.017  7574.854
+#> Model 2 5599.492 11762.542 17755.341 15798.951 20044.077 22136.354
 #> 
 #> 90% interval coverages per model (closer to 0.9 is better)
-#> Model 1 0.95 
+#> Model 1 0.96 
 #> Model 2 0.89
 ```
 
@@ -889,16 +893,16 @@ than the poor model
 ``` r
 length(which((lfo_good$elpds - lfo_poor$elpds) > 0)) /
   length(lfo_good$elpds)
-#> [1] 0.8181818
+#> [1] 0.8636364
 ```
 
 Total ELPDs per model are also a useful overall indicator of performance
 
 ``` r
 lfo_good$sum_ELPD
-#> [1] -131.9259
+#> [1] -136.7877
 lfo_poor$sum_ELPD
-#> [1] -148.8736
+#> [1] -159.196
 ```
 
 As before, these metrics all favour the more complex model over the
@@ -987,45 +991,52 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Observation precision parameter estimates:
 #>        2.5% 50% 97.5% Rhat n.eff
-#> phi[1]  3.8 5.8   8.4    1  1313
-#> phi[2]  4.4 6.5   9.4    1  1693
-#> phi[3]  5.9 8.8  12.0    1  3078
+#> phi[1]  5.5 8.3    12    1  1206
+#> phi[2]  5.8 8.7    13    1  1072
+#> phi[3]  5.7 8.5    12    1  1603
 #> 
 #> GAM observation smoothing parameter (rho) estimates:
 #>                              2.5% 50% 97.5% Rhat n.eff
-#> s(season)_rho                1.40 3.1   4.1 1.00  1489
-#> s(season):seriesseries_1_rho 0.92 3.1   4.2 1.01   457
-#> s(season):seriesseries_2_rho 1.30 3.1   4.2 1.00  1086
-#> s(season):seriesseries_3_rho 1.60 3.3   4.2 1.00  1091
+#> s(season)_rho                 1.3 3.0   4.1    1  1226
+#> s(season):seriesseries_1_rho  1.5 3.3   4.2    1  1041
+#> s(season):seriesseries_2_rho  1.4 3.2   4.2    1  1096
+#> s(season):seriesseries_3_rho  1.2 3.0   4.1    1   992
 #> 
 #> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
-#>               2.5%   50% 97.5% Rhat n.eff
-#> alpha_gp[1] 0.2700  0.63  1.20    1   829
-#> alpha_gp[2] 0.3800  0.72  1.20    1  1145
-#> alpha_gp[3] 0.0097  0.20  0.67    1   862
-#> rho_gp[1]   1.8000  9.50 44.00    1   499
-#> rho_gp[2]   3.2000 12.00 56.00    1   489
-#> rho_gp[3]   1.1000  4.30 41.00    1   789
+#>              2.5%  50% 97.5% Rhat n.eff
+#> alpha_gp[1] 0.067 0.42  0.94 1.00   635
+#> alpha_gp[2] 0.380 0.71  1.30 1.00   967
+#> alpha_gp[3] 0.140 0.46  0.98 1.00   815
+#> rho_gp[1]   1.200 3.90 16.00 1.01   197
+#> rho_gp[2]   1.700 7.10 35.00 1.01   358
+#> rho_gp[3]   1.400 4.90 21.00 1.00   658
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
-#> 74 of 2000 iterations ended with a divergence (3.7%)
+#> 8 of 2000 iterations ended with a divergence (0.4%)
 #> *Try running with larger adapt_delta to remove the divergences
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 ```
 
-Plot the hindcast and forecast distributions for one series
+Plot the hindcast and forecast distributions for each series
 
-``` r
-plot(mod, type = 'forecast', newdata = data$data_test, series = 2)
-```
+    #> Out of sample CRPS:
+    #> [1] 2.109595
+    #> Out of sample CRPS:
+    #> [1] 1.844845
+    #> Out of sample CRPS:
+    #> [1] 1.780909
 
 <img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />
 
-    #> Out of sample CRPS:
-    #> [1] 2.335517
+``` r
+layout(matrix(1:4, nrow = 2, byrow = TRUE))
+for(i in 1:3){
+  plot(mod, type = 'forecast', series = i)
+}
+```
 
 ## Dynamic coefficient models
 
@@ -1052,7 +1063,7 @@ plot(beta_temp, type = 'l', lwd = 3,
 box(bty = 'l', lwd = 2)
 ```
 
-<img src="man/figures/README-unnamed-chunk-50-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-51-1.png" width="60%" style="display: block; margin: auto;" />
 
 Now simulate the outcome, which is a Gaussian observation process (with
 observation error) over the time-varying effect of $temperature$
@@ -1068,7 +1079,7 @@ plot(out,  type = 'l', lwd = 3,
 box(bty = 'l', lwd = 2)
 ```
 
-<img src="man/figures/README-unnamed-chunk-51-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-52-1.png" width="60%" style="display: block; margin: auto;" />
 
 Gather the data into a `data.frame` and fit a model using the
 `dynamic()` formula wrapper to specify a low-rank Gaussian Process
@@ -1113,18 +1124,17 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Observation error parameter estimates:
 #>              2.5%  50% 97.5% Rhat n.eff
-#> sigma_obs[1] 0.22 0.24  0.27    1  2096
+#> sigma_obs[1] 0.23 0.25  0.28    1  2428
 #> 
 #> GAM observation smoothing parameter (rho) estimates:
-#>                   2.5%   50% 97.5% Rhat n.eff
-#> s(time):temp_rho  -1.7 -1.40  -1.0    1  2091
-#> s(time):temp2_rho -3.0  0.96   3.7    1  1438
+#>                   2.5%  50% 97.5% Rhat n.eff
+#> s(time):temp_rho  -1.8 -1.5  -1.2    1  1635
+#> s(time):temp2_rho -1.4  1.5   3.8    1  1517
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
-#> 2 of 2000 iterations ended with a divergence (0.1%)
-#> *Try running with larger adapt_delta to remove the divergences
+#> 0 of 2000 iterations ended with a divergence (0%)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 ```
@@ -1136,7 +1146,7 @@ period
 plot(mod, type = 'smooths')
 ```
 
-<img src="man/figures/README-unnamed-chunk-55-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-56-1.png" width="60%" style="display: block; margin: auto;" />
 
 Plot the estimates for the in-sample and out-of-sample periods to see
 how the Gaussian Process function produces sensible smooth forecasts.
@@ -1150,7 +1160,7 @@ lines(beta_temp, lwd = 2.5, col = 'white')
 lines(beta_temp, lwd = 2)
 ```
 
-<img src="man/figures/README-unnamed-chunk-56-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-57-1.png" width="60%" style="display: block; margin: auto;" />
 
 This results in sensible forecasts of the observations as well
 
@@ -1158,10 +1168,10 @@ This results in sensible forecasts of the observations as well
 plot(mod, type = 'forecast', newdata = data_test)
 ```
 
-<img src="man/figures/README-unnamed-chunk-57-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-58-1.png" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample CRPS:
-    #> [1] 1.748159
+    #> [1] 1.269367
 
 There are many more extended uses for `mvgam` models, including the
 ability to fit dynamic factor processes for analysing and forecasting

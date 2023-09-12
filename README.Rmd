@@ -461,9 +461,22 @@ Inspect the summary to see that the posterior now also contains estimates for th
 summary(mod, include_betas = FALSE)
 ```
 
-Plot the hindcast and forecast distributions for one series
-```{r beta_fc}
-plot(mod, type = 'forecast', newdata = data$data_test, series = 2)
+Plot the hindcast and forecast distributions for each series
+```{r beta_fc, echo=FALSE}
+layout(matrix(1:4, nrow = 2, byrow = TRUE))
+par(mar=c(3, 3, 2, 2),
+    oma = c(2, 2, 0, 0),
+    mgp = c(2, 0.5, 0))
+for(i in 1:3){
+  plot(mod, type = 'forecast', series = i)
+}
+```
+
+```{r eval=FALSE}
+layout(matrix(1:4, nrow = 2, byrow = TRUE))
+for(i in 1:3){
+  plot(mod, type = 'forecast', series = i)
+}
 ```
 
 ## Dynamic coefficient models

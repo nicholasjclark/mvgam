@@ -19,11 +19,11 @@ in \code{linpreds} belongs to. If \code{linpreds} is supplied, then \code{newdat
 family-specific parameters (i.e. shape, scale or overdispersion parameters). Required if
 \code{linpreds} and \code{newdata} are supplied}
 
-\item{...}{Ignored}
-
-\item{inclue_forecast}{Logical. If \code{newdata} were fed to the model to compute
+\item{include_forecast}{Logical. If \code{newdata} were fed to the model to compute
 forecasts, should the log-likelihood draws for these observations also be returned.
 Defaults to \code{TRUE}}
+
+\item{...}{Ignored}
 }
 \value{
 A \code{matrix} of dimension \verb{n_samples x n_observations} containing the pointwise

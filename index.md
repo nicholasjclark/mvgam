@@ -76,11 +76,12 @@ Plot the series to see how they evolve over time
 plot_mvgam_series(data = data$data_train, series = 'all')
 ```
 
-![](man/figures/README-beta_sim-1.png) Fit a DGAM to these series that
-uses a hierarchical cyclic seasonal smooth term to capture variation in
-seasonality among series. The model also includes series-specific latent
-Gaussian Processes with squared exponential covariance functions to
-capture temporal dynamics
+![](man/figures/README-beta_sim-1.png)
+
+Fit a DGAM to these series that uses a hierarchical cyclic seasonal
+smooth term to capture variation in seasonality among series. The model
+also includes series-specific latent Gaussian Processes with squared
+exponential covariance functions to capture temporal dynamics
 
 ``` r
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
@@ -91,8 +92,8 @@ mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
              family = betar())
 ```
 
-Plot the estimated posterior hindcast and forecast distributions for one
-of the series
+Plot the estimated posterior hindcast and forecast distributions for
+each series
 
 ``` r
 plot(mod, type = 'forecast', newdata = data$data_test, series = 2)
@@ -104,6 +105,14 @@ Various `S3` functions can be used to inspect parameter estimates, plot
 smooth functions and residuals, and evaluate models through posterior
 predictive checks or forecast comparisons. Please see the package
 documentation for more detailed examples.
+
+## Vignettes
+
+You can set `build_vignettes = TRUE` when installing with either
+`devtools::install_github` or `remotes::install_github`, but be aware
+this will slow down the installation drastically. Instead, you can
+always access the vignette htmls online at
+<https://nicholasjclark.github.io/mvgam/articles/>
 
 ## Other resources
 
