@@ -347,11 +347,11 @@ test_priors
 #> 6                    trend sd         sigma ~ student_t(3, 0, 2.5);
 #>                example_change new_lowerbound new_upperbound
 #> 1 (Intercept) ~ normal(0, 1);             NA             NA
-#> 2 lambda ~ exponential(0.45);             NA             NA
-#> 3   ar1 ~ normal(0.16, 0.42);             NA             NA
-#> 4  ar2 ~ normal(-0.15, 0.55);             NA             NA
-#> 5  ar3 ~ normal(-0.36, 0.34);             NA             NA
-#> 6  sigma ~ exponential(0.35);             NA             NA
+#> 2 lambda ~ exponential(0.98);             NA             NA
+#> 3   ar1 ~ normal(-0.2, 0.25);             NA             NA
+#> 4  ar2 ~ normal(-0.13, 0.86);             NA             NA
+#> 5   ar3 ~ normal(0.32, 0.58);             NA             NA
+#> 6  sigma ~ exponential(0.38);             NA             NA
 ```
 
 Any of the above priors can be changed by modifying the `prior` column
@@ -552,29 +552,29 @@ summary(lynx_mvgam)
 #> Fitted using Stan 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                2.5%     50% 97.5% Rhat n.eff
-#> (Intercept)   6.000  6.6000 7.000    1   445
-#> s(season).1  -0.650  0.0160 0.690    1   936
-#> s(season).2  -0.250  0.8400 1.800    1   551
-#> s(season).3  -0.022  1.3000 2.500    1   474
-#> s(season).4  -0.470  0.4300 1.300    1   899
-#> s(season).5  -1.100 -0.1500 0.890    1   629
-#> s(season).6  -1.100 -0.0011 1.100    1   671
-#> s(season).7  -0.690  0.4100 1.500    1   848
-#> s(season).8  -0.940  0.3300 1.800    1   490
-#> s(season).9  -1.100 -0.2400 0.760    1   570
-#> s(season).10 -1.400 -0.7000 0.021    1   774
+#>               2.5%    50%  97.5% Rhat n.eff
+#> (Intercept)   6.10  6.600  7.000 1.00   786
+#> s(season).1  -0.62  0.038  0.710 1.00  1028
+#> s(season).2  -0.21  0.860  1.800 1.01   462
+#> s(season).3  -0.08  1.300  2.500 1.01   350
+#> s(season).4  -0.48  0.430  1.400 1.00  1012
+#> s(season).5  -1.20 -0.180  0.900 1.01   555
+#> s(season).6  -1.10 -0.042  1.100 1.01   613
+#> s(season).7  -0.74  0.400  1.400 1.00  1049
+#> s(season).8  -0.99  0.330  1.900 1.01   438
+#> s(season).9  -1.10 -0.250  0.710 1.01   505
+#> s(season).10 -1.40 -0.700 -0.036 1.00   847
 #> 
 #> GAM observation smoothing parameter (rho) estimates:
 #>               2.5% 50% 97.5% Rhat n.eff
-#> s(season)_rho  2.1 3.4   4.3    1   595
+#> s(season)_rho    2 3.4   4.3 1.01   558
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n.eff
-#> ar1[1]    0.72  1.10 1.400    1   915
-#> ar2[1]   -0.83 -0.40 0.045    1  1726
-#> ar3[1]   -0.47 -0.12 0.320    1   574
-#> sigma[1]  0.40  0.50 0.630    1  1189
+#> ar1[1]    0.72  1.10 1.400 1.01   480
+#> ar2[1]   -0.84 -0.39 0.048 1.00  1555
+#> ar3[1]   -0.48 -0.11 0.320 1.01   530
+#> sigma[1]  0.40  0.50 0.640 1.00   986
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -684,7 +684,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-31-1.png" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample DRPS:
-    #> [1] 2832.311
+    #> [1] 2798.769
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -785,8 +785,8 @@ each competing model at the same set of timepoints.
 compare_mvgams(lynx_mvgam, lynx_mvgam_poor, fc_horizon = 10)
 #> RPS summaries per model (lower is better)
 #>             Min.   1st Qu.    Median      Mean   3rd Qu.      Max.
-#> Model 1 3640.368  4110.281  4751.571  5112.227  5842.017  7574.854
-#> Model 2 5599.492 11762.542 17755.341 15798.951 20044.077 22136.354
+#> Model 1 3734.548  4142.569  4635.096  5077.008  5848.748  7521.549
+#> Model 2 5670.916 11696.896 17805.183 15720.637 19693.500 22188.503
 #> 
 #> 90% interval coverages per model (closer to 0.9 is better)
 #> Model 1 0.96 
@@ -991,30 +991,30 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Observation precision parameter estimates:
 #>        2.5% 50% 97.5% Rhat n.eff
-#> phi[1]  5.5 8.3    12    1  1206
-#> phi[2]  5.8 8.7    13    1  1072
-#> phi[3]  5.7 8.5    12    1  1603
+#> phi[1]  5.5 8.3    12    1  1047
+#> phi[2]  5.8 8.7    13    1  1336
+#> phi[3]  5.7 8.5    12    1  1582
 #> 
 #> GAM observation smoothing parameter (rho) estimates:
 #>                              2.5% 50% 97.5% Rhat n.eff
-#> s(season)_rho                 1.3 3.0   4.1    1  1226
-#> s(season):seriesseries_1_rho  1.5 3.3   4.2    1  1041
-#> s(season):seriesseries_2_rho  1.4 3.2   4.2    1  1096
-#> s(season):seriesseries_3_rho  1.2 3.0   4.1    1   992
+#> s(season)_rho                 1.4 3.0   4.1    1  1395
+#> s(season):seriesseries_1_rho  1.5 3.3   4.2    1  1005
+#> s(season):seriesseries_2_rho  1.4 3.2   4.2    1   908
+#> s(season):seriesseries_3_rho  1.2 3.0   4.1    1   894
 #> 
 #> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
 #>              2.5%  50% 97.5% Rhat n.eff
-#> alpha_gp[1] 0.067 0.42  0.94 1.00   635
-#> alpha_gp[2] 0.380 0.71  1.30 1.00   967
-#> alpha_gp[3] 0.140 0.46  0.98 1.00   815
-#> rho_gp[1]   1.200 3.90 16.00 1.01   197
-#> rho_gp[2]   1.700 7.10 35.00 1.01   358
-#> rho_gp[3]   1.400 4.90 21.00 1.00   658
+#> alpha_gp[1] 0.068 0.42  0.94 1.00   514
+#> alpha_gp[2] 0.380 0.72  1.30 1.00   838
+#> alpha_gp[3] 0.150 0.47  0.98 1.00   866
+#> rho_gp[1]   1.200 3.90 18.00 1.00   238
+#> rho_gp[2]   1.800 7.00 33.00 1.01   424
+#> rho_gp[3]   1.300 4.90 22.00 1.00   651
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
-#> 8 of 2000 iterations ended with a divergence (0.4%)
+#> 11 of 2000 iterations ended with a divergence (0.55%)
 #> *Try running with larger adapt_delta to remove the divergences
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
@@ -1022,21 +1022,21 @@ summary(mod, include_betas = FALSE)
 
 Plot the hindcast and forecast distributions for each series
 
-    #> Out of sample CRPS:
-    #> [1] 2.109595
-    #> Out of sample CRPS:
-    #> [1] 1.844845
-    #> Out of sample CRPS:
-    #> [1] 1.780909
-
-<img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />
-
 ``` r
 layout(matrix(1:4, nrow = 2, byrow = TRUE))
 for(i in 1:3){
   plot(mod, type = 'forecast', series = i)
 }
 ```
+
+    #> Out of sample CRPS:
+    #> [1] 2.098879
+    #> Out of sample CRPS:
+    #> [1] 1.83356
+    #> Out of sample CRPS:
+    #> [1] 1.792292
+
+<img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />
 
 ## Dynamic coefficient models
 

@@ -96,7 +96,10 @@ Plot the estimated posterior hindcast and forecast distributions for
 each series
 
 ``` r
-plot(mod, type = 'forecast', newdata = data$data_test, series = 2)
+layout(matrix(1:4, nrow = 2, byrow = TRUE))
+for(i in 1:3){
+  plot(mod, type = 'forecast', series = i)
+}
 ```
 
 ![](man/figures/README-beta_fc-1.png)
