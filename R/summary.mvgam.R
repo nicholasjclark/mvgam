@@ -1,22 +1,28 @@
 #'Summary for a fitted mvgam object
 #'
 #'These functions take a fitted \code{mvgam} object and return various useful summaries
+#'@importFrom stats printCoefmat
 #'@param object \code{list} object of class `mvgam`
-#'@param include_betas Logical. Print a summary of linear predictor beta coefficients?
-#'Defaults to \code{TRUE}, but if your model contains many spline coefficients then it may be
-#'worth setting this to \code{FALSE} for a more concise summary
+#'@param include_betas Logical. Print a summary that includes posterior summaries
+#'of all linear predictor beta coefficients (including spline coefficients)?
+#'Defaults to \code{FALSE} for a more concise summary
 #'@param digits The number of significant digits for printing out the summary;
 #'  defaults to \code{2}.
 #'@param ... Ignored
 #'@author Nicholas J Clark
-#'@details `summary.mvgam` and `summary.mvgam_prefit` return brief summaries of the model's call is printed, along with posterior intervals for
+#'@details `summary.mvgam` and `summary.mvgam_prefit` return brief summaries of the model's call, along with posterior intervals for
 #'some of the key parameters in the model. Note that some smooths have extra penalties on the null space,
 #'so summaries for the \code{rho} parameters may include more penalty terms than the number of smooths in
-#'the original model formula.
+#'the original model formula. Approximate p-values for smooth terms are also returned, with methods used for their
+#'calculation following those used for `mgcv` equivalents (see \code{\link[mgcv]{summary.gam}} for details).
+#'The Estimated Degrees of Freedom (edf) for smooth terms is computed using
+#'`edf.type = 1` as described in the documentation for \code{\link[mgcv]{jagam}}. Experiments suggest
+#'these p-values tend to be more conservative than those that might be returned from an equivalent
+#'model fit with \code{\link[mgcv]{summary.gam}} using `method = 'REML'`
 #'
 #'`coef.mvgam` returns either summaries or full posterior estimates for `GAM` component
 #'coefficients
-#'@return For `summary.mvgam` and `summary.mvgam_prefit`, Aa\code{list} is printed
+#'@return For `summary.mvgam` and `summary.mvgam_prefit`, a \code{list} is printed
 #'on-screen showing the summaries for the model
 #'
 #'For `coef.mvgam`, either a \code{matrix} of posterior coefficient distributions
@@ -115,63 +121,52 @@ if(object$family == 'Gamma'){
   print(mcmc_summary(object$model_output, 'shape', digits = digits)[,c(3:7)])
 }
 
-if(include_betas){
   if(!is.null(object$trend_call)){
-    cat("\nGAM observation model coefficient (beta) estimates:\n")
-    coef_names <- names(object$mgcv_model$coefficients)
-    mvgam_coefs <- mcmc_summary(object$model_output, 'b', digits = digits)[,c(3:7)]
-    rownames(mvgam_coefs) <- coef_names
-    print(mvgam_coefs)
+    if(include_betas){
+      cat("\nGAM observation model coefficient (beta) estimates:\n")
+      coef_names <- names(object$mgcv_model$coefficients)
+      mvgam_coefs <- mcmc_summary(object$model_output, 'b', digits = digits)[,c(3:7)]
+      rownames(mvgam_coefs) <- coef_names
+      print(mvgam_coefs)
+
+    } else {
+      if(length(object$mgcv_model$nsdf) > 0){
+        coefs_keep <- 1:object$mgcv_model$nsdf
+
+        cat("\nGAM observation model coefficient (beta) estimates:\n")
+        coef_names <- names(object$mgcv_model$coefficients)[coefs_keep]
+        mvgam_coefs <- mcmc_summary(object$model_output, 'b',
+                                    digits = digits)[coefs_keep,c(3:7)]
+        rownames(mvgam_coefs) <- coef_names
+        print(mvgam_coefs)
+      }
+    }
 
   } else {
-    cat("\nGAM coefficient (beta) estimates:\n")
-    coef_names <- names(object$mgcv_model$coefficients)
-    mvgam_coefs <- mcmc_summary(object$model_output, 'b', digits = digits)[,c(3:7)]
-    rownames(mvgam_coefs) <- coef_names
-    print(mvgam_coefs)
+    if(include_betas){
+      cat("\nGAM coefficient (beta) estimates:\n")
+      coef_names <- names(object$mgcv_model$coefficients)
+      mvgam_coefs <- mcmc_summary(object$model_output, 'b', digits = digits)[,c(3:7)]
+      rownames(mvgam_coefs) <- coef_names
+      print(mvgam_coefs)
+    } else {
+      if(length(object$mgcv_model$nsdf) > 0){
+        cat("\nGAM coefficient (beta) estimates:\n")
+        coefs_keep <- 1:object$mgcv_model$nsdf
+        coef_names <- names(object$mgcv_model$coefficients)[coefs_keep]
+        mvgam_coefs <- mcmc_summary(object$model_output, 'b',
+                                    digits = digits)[coefs_keep,c(3:7)]
+        rownames(mvgam_coefs) <- coef_names
+        print(mvgam_coefs)
+      }
+    }
   }
-}
 
 smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
   data.frame(label = object$mgcv_model$smooth[[x]]$label,
              term = paste(object$mgcv_model$smooth[[x]]$term, collapse = ','),
              class = class(object$mgcv_model$smooth[[x]])[1])
 }))
-
-if(any(smooth_labs$class == 'random.effect')){
-  re_smooths <- smooth_labs %>%
-    dplyr::filter(class == 'random.effect') %>%
-    dplyr::pull(term)
-
-  if(object$fit_engine == 'jags'){
-    re_sds <- mcmc_summary(object$model_output,
-                                   paste0('sigma_raw',
-                                          seq_along(re_smooths)),
-                           digits = digits)[,c(3:7)]
-
-    re_mus <- mcmc_summary(object$model_output,
-                                   paste0('mu_raw',
-                                          seq_along(re_smooths)),
-                           digits = digits)[,c(3:7)]
-  } else {
-    re_sds <- mcmc_summary(object$model_output, 'sigma_raw',
-                                   ISB = TRUE, digits = digits)[,c(3:7)]
-
-    re_mus <- mcmc_summary(object$model_output, 'mu_raw',
-                                   ISB = TRUE, digits = digits)[,c(3:7)]
-  }
-
-  rownames(re_sds) <- paste0('sd(',re_smooths,')')
-  rownames(re_mus) <- paste0('mean(',re_smooths,')')
-
-  if(!is.null(object$trend_call)){
-    cat("\nGAM observation model group-level estimates:\n")
-    print(rbind(re_mus, re_sds))
-  } else {
-    cat("\nGAM group-level estimates:\n")
-    print(rbind(re_mus, re_sds))
-  }
-}
 
 if(any(!is.na(object$sp_names)) & !all(smooth_labs$class == 'random.effect')){
   if(!is.null(object$trend_call)){
@@ -192,6 +187,50 @@ if(any(!is.na(object$sp_names)) & !all(smooth_labs$class == 'random.effect')){
 
   } else {
     print(rho_coefs)
+  }
+}
+
+if(any(!is.na(object$sp_names))){
+  cat("\nApproximate significance of GAM observation smooths:\n")
+  printCoefmat(summary(object$mgcv_model)$s.table,
+               digits = min(3, digits + 1),
+               signif.stars = getOption("show.signif.stars"),
+               has.Pvalue = TRUE, na.print = "NA",
+               cs.ind = 1)
+}
+
+if(any(smooth_labs$class == 'random.effect')){
+  re_smooths <- smooth_labs %>%
+    dplyr::filter(class == 'random.effect') %>%
+    dplyr::pull(term)
+
+  if(object$fit_engine == 'jags'){
+    re_sds <- mcmc_summary(object$model_output,
+                           paste0('sigma_raw',
+                                  seq_along(re_smooths)),
+                           digits = digits)[,c(3:7)]
+
+    re_mus <- mcmc_summary(object$model_output,
+                           paste0('mu_raw',
+                                  seq_along(re_smooths)),
+                           digits = digits)[,c(3:7)]
+  } else {
+    re_sds <- mcmc_summary(object$model_output, 'sigma_raw',
+                           ISB = TRUE, digits = digits)[,c(3:7)]
+
+    re_mus <- mcmc_summary(object$model_output, 'mu_raw',
+                           ISB = TRUE, digits = digits)[,c(3:7)]
+  }
+
+  rownames(re_sds) <- paste0('sd(',re_smooths,')')
+  rownames(re_mus) <- paste0('mean(',re_smooths,')')
+
+  if(!is.null(object$trend_call)){
+    cat("\nGAM observation model group-level estimates:\n")
+    print(rbind(re_mus, re_sds))
+  } else {
+    cat("\nGAM group-level estimates:\n")
+    print(rbind(re_mus, re_sds))
   }
 }
 
@@ -460,6 +499,15 @@ if(!is.null(object$trend_call)){
     rownames(mvgam_coefs) <- gsub('series', 'trend',
                                   coef_names, fixed = TRUE)
     print(mvgam_coefs)
+  } else {
+    coefs_include <- 1:object$trend_mgcv_model$nsdf
+    cat("\nGAM process model coefficient (beta) estimates:\n")
+    coef_names <- paste0(names(object$trend_mgcv_model$coefficients), '_trend')[coefs_include]
+    mvgam_coefs <- mcmc_summary(object$model_output, 'b_trend',
+                                digits = digits)[coefs_include,c(3:7)]
+    rownames(mvgam_coefs) <- gsub('series', 'trend',
+                                  coef_names, fixed = TRUE)
+    print(mvgam_coefs)
   }
 
   if(all(is.na(object$trend_sp_names))){
@@ -482,6 +530,13 @@ if(!is.null(object$trend_call)){
                                   digits = digits)[,c(3:7)]
         rownames(rho_coefs) <- paste0(object$trend_sp_names, '_rho_trend')
         print(rho_coefs[to_print,])
+
+        cat("\nApproximate significance of GAM process smooths:\n")
+        printCoefmat(summary(object$trend_mgcv_model)$s.table,
+                     digits = min(3, digits + 1),
+                     signif.stars = getOption("show.signif.stars"),
+                     has.Pvalue = TRUE, na.print = "NA",
+                     cs.ind = 1)
 
       }
 

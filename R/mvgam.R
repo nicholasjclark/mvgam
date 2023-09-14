@@ -1365,6 +1365,8 @@ mvgam = function(formula,
 
   # Get names of smoothing parameters
   if(smooths_included){
+    ss_gam$off <- ss_jagam$pregam$off
+    ss_gam$S <- ss_jagam$pregam$S
     name_starts <- unlist(purrr::map(ss_jagam$pregam$smooth, 'first.sp'))
     name_ends <- unlist(purrr::map(ss_jagam$pregam$smooth, 'last.sp'))
 
@@ -1989,6 +1991,20 @@ mvgam = function(formula,
     names(p) <- names(ss_gam$coefficients)
     ss_gam$coefficients <- p
 
+    # Compute estimated degrees of freedom for smooths
+    object = list(
+      model_output = out_gam_mod,
+      fit_engine = fit_engine,
+      family = family_char,
+      obs_data = data_train,
+      test_data = data_test,
+      trend_model = trend_model,
+      mgcv_model = ss_gam,
+      ytimes = ytimes)
+    class(object) <- 'mvgam'
+    ss_gam <- compute_edf(ss_gam, object, 'rho', 'sigma_raw')
+
+    # Repeat for any trend-specific mgcv model
     if(!missing(trend_formula)){
       V <- cov(mcmc_chains(out_gam_mod, 'b_trend'))
       trend_mgcv_model$Ve <- trend_mgcv_model$Vp <- trend_mgcv_model$Vc <- V
@@ -1996,6 +2012,10 @@ mvgam = function(formula,
       p <- mcmc_summary(out_gam_mod, 'b_trend')[,c(4)]
       names(p) <- names(trend_mgcv_model$coefficients)
       trend_mgcv_model$coefficients <- p
+
+      object$trend_mgcv_model <- trend_mgcv_model
+      trend_mgcv_model <- compute_edf(trend_mgcv_model,
+                                      object, 'rho_trend', 'sigma_raw_trend')
     }
   }
 

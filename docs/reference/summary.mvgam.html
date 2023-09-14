@@ -6,7 +6,7 @@
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
     
 
-    <nav class="navbar fixed-top navbar-light navbar-expand-lg bg-light"><div class="container">
+    <nav class="navbar fixed-top navbar-dark navbar-expand-lg bg-primary"><div class="container">
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
@@ -72,9 +72,9 @@
 
 
 <dt>include_betas</dt>
-<dd><p>Logical. Print a summary of linear predictor beta coefficients?
-Defaults to <code>TRUE</code>, but if your model contains many spline coefficients then it may be
-worth setting this to <code>FALSE</code> for a more concise summary</p></dd>
+<dd><p>Logical. Print a summary that includes posterior summaries
+of all linear predictor beta coefficients (including spline coefficients)?
+Defaults to <code>FALSE</code> for a more concise summary</p></dd>
 
 
 <dt>digits</dt>
@@ -95,7 +95,7 @@ if <code>TRUE</code>. Otherwise the full posterior distribution will be returned
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>For <code>summary.mvgam</code> and <code>summary.mvgam_prefit</code>, Aa<code>list</code> is printed
+<p>For <code>summary.mvgam</code> and <code>summary.mvgam_prefit</code>, a <code>list</code> is printed
 on-screen showing the summaries for the model</p>
 
 
@@ -104,10 +104,15 @@ on-screen showing the summaries for the model</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p><code>summary.mvgam</code> and <code>summary.mvgam_prefit</code> return brief summaries of the model's call is printed, along with posterior intervals for
+    <p><code>summary.mvgam</code> and <code>summary.mvgam_prefit</code> return brief summaries of the model's call, along with posterior intervals for
 some of the key parameters in the model. Note that some smooths have extra penalties on the null space,
 so summaries for the <code>rho</code> parameters may include more penalty terms than the number of smooths in
-the original model formula.</p>
+the original model formula. Approximate p-values for smooth terms are also returned, with methods used for their
+calculation following those used for <code>mgcv</code> equivalents (see <code><a href="https://rdrr.io/pkg/mgcv/man/summary.gam.html" class="external-link">summary.gam</a></code> for details).
+The Estimated Degrees of Freedom (edf) for smooth terms is computed using
+<code>edf.type = 1</code> as described in the documentation for <code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>. Experiments suggest
+these p-values tend to be more conservative than those that might be returned from an equivalent
+model fit with <code><a href="https://rdrr.io/pkg/mgcv/man/summary.gam.html" class="external-link">summary.gam</a></code> using <code>method = 'REML'</code></p>
 <p><code>coef.mvgam</code> returns either summaries or full posterior estimates for <code>GAM</code> component
 coefficients</p>
     </div>
@@ -121,7 +126,7 @@ coefficients</p>
 
 
     <footer><div class="pkgdown-footer-left">
-  <p></p><p>Developed by Nicholas J Clark.</p>
+  <p></p><p>Developed by <a href="https://researchers.uq.edu.au/researcher/15140" class="external-link">Nicholas J Clark</a>.</p>
 </div>
 
 <div class="pkgdown-footer-right">

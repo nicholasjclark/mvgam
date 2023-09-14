@@ -252,20 +252,14 @@ fitted.mvgam <- function(object, process_error = TRUE,
     })
     names(family_extracts) <- names(family_pars)
 
-    # Create a truth matrix that can also be spread to a vector
-    truth_mat <- matrix(rep(obs, NROW(mus)),
-                        nrow = NROW(mus),
-                        byrow = TRUE)
-
     # Expectations as a vector
     Xp <- as.matrix(as.vector(mus))
     attr(Xp, 'model.offset') <- 0
     pred_vec <- mvgam_predict(family = family,
-                                 family_pars = family_extracts,
-                                 truth = as.vector(truth_mat),
-                                 type = type,
-                                 Xp = Xp,
-                                 betas = 1)
+                              family_pars = family_extracts,
+                              type = type,
+                              Xp = Xp,
+                              betas = 1)
 
     # Convert back to matrix and return
     pred_mat <- matrix(pred_vec, nrow = NROW(mus))

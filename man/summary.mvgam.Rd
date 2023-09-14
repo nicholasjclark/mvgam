@@ -15,9 +15,9 @@
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}}
 
-\item{include_betas}{Logical. Print a summary of linear predictor beta coefficients?
-Defaults to \code{TRUE}, but if your model contains many spline coefficients then it may be
-worth setting this to \code{FALSE} for a more concise summary}
+\item{include_betas}{Logical. Print a summary that includes posterior summaries
+of all linear predictor beta coefficients (including spline coefficients)?
+Defaults to \code{FALSE} for a more concise summary}
 
 \item{digits}{The number of significant digits for printing out the summary;
 defaults to \code{2}.}
@@ -28,7 +28,7 @@ defaults to \code{2}.}
 if \code{TRUE}. Otherwise the full posterior distribution will be returned}
 }
 \value{
-For \code{summary.mvgam} and \code{summary.mvgam_prefit}, Aa\code{list} is printed
+For \code{summary.mvgam} and \code{summary.mvgam_prefit}, a \code{list} is printed
 on-screen showing the summaries for the model
 
 For \code{coef.mvgam}, either a \code{matrix} of posterior coefficient distributions
@@ -38,10 +38,15 @@ For \code{coef.mvgam}, either a \code{matrix} of posterior coefficient distribut
 These functions take a fitted \code{mvgam} object and return various useful summaries
 }
 \details{
-\code{summary.mvgam} and \code{summary.mvgam_prefit} return brief summaries of the model's call is printed, along with posterior intervals for
+\code{summary.mvgam} and \code{summary.mvgam_prefit} return brief summaries of the model's call, along with posterior intervals for
 some of the key parameters in the model. Note that some smooths have extra penalties on the null space,
 so summaries for the \code{rho} parameters may include more penalty terms than the number of smooths in
-the original model formula.
+the original model formula. Approximate p-values for smooth terms are also returned, with methods used for their
+calculation following those used for \code{mgcv} equivalents (see \code{\link[mgcv]{summary.gam}} for details).
+The Estimated Degrees of Freedom (edf) for smooth terms is computed using
+\code{edf.type = 1} as described in the documentation for \code{\link[mgcv]{jagam}}. Experiments suggest
+these p-values tend to be more conservative than those that might be returned from an equivalent
+model fit with \code{\link[mgcv]{summary.gam}} using \code{method = 'REML'}
 
 \code{coef.mvgam} returns either summaries or full posterior estimates for \code{GAM} component
 coefficients

@@ -10,6 +10,9 @@
     <loc>https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html</loc>
   </url>
   <url>
+    <loc>https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html</loc>
+  </url>
+  <url>
     <loc>https://nicholasjclark.github.io/mvgam/authors.html</loc>
   </url>
   <url>
@@ -35,6 +38,9 @@
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/evaluate_mvgams.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/fitted.mvgam.html</loc>
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/forecast.mvgam.html</loc>
@@ -64,6 +70,9 @@
     <loc>https://nicholasjclark.github.io/mvgam/reference/logLik.mvgam.html</loc>
   </url>
   <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/loo.mvgam.html</loc>
+  </url>
+  <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/lv_correlations.html</loc>
   </url>
   <url>
@@ -79,6 +88,9 @@
     <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam.html</loc>
   </url>
   <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_diagnostics.html</loc>
+  </url>
+  <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_draws.html</loc>
   </url>
   <url>
@@ -92,6 +104,9 @@
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_trends.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/pairs.mvgam.html</loc>
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/pfilter_mvgam_fc.html</loc>
@@ -145,6 +160,15 @@
     <loc>https://nicholasjclark.github.io/mvgam/reference/portal_data.html</loc>
   </url>
   <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/posterior_epred.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/posterior_linpred.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/posterior_predict.mvgam.html</loc>
+  </url>
+  <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/ppc.mvgam.html</loc>
   </url>
   <url>
@@ -152,6 +176,9 @@
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/print.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/residuals.mvgam.html</loc>
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/score.mvgam_forecast.html</loc>
