@@ -73,11 +73,16 @@ compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names){
 
     # Because some mvgam families do not (yet) have simple functions to compute
     # prediction variance, we will resort to brute force sampling
-    preds <- do.call(rbind, lapply(1:100, function(x){
+    preds <- do.call(rbind, lapply(1:75, function(x){
       # luckily the predict function is vectorized!!
       predict(object, process_error = FALSE, type = 'response')[best_draw,]
     }))
     pred_variance <- apply(preds, 2, var)
+    if(any(pred_variance == 0)){
+      pred_variance[which(pred_variance == 0)] <-
+        mu[which(pred_variance == 0)]
+    }
+
     w <- as.numeric(mgcv_model$family$mu.eta(eta) / pred_variance)
     XWX <- t(X) %*% (w * X)
     rho <- mgcv_model$sp
