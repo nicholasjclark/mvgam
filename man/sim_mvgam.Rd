@@ -59,7 +59,7 @@ and the observation process is the only source of error; similarly to what is es
 \item{freq}{\code{integer}. The seasonal frequency of the series}
 
 \item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
-families are: \code{nb()}, \code{poisson()}, \code{tweedie()}, \code{gaussian()}, \code{betar()}, \code{lognormal()}, \code{student_t()} and \code{Gamma()}}
+families are: \code{nb()}, \code{poisson()}, \code{tweedie()}, \code{gaussian()}, \code{betar()}, \code{lognormal()}, \code{student()} and \code{Gamma()}}
 
 \item{phi}{\code{vector} of dispersion parameters for the series (i.e. \code{size} for Negative Binomial or
 \code{phi} for Tweedie or Beta). If \code{length(phi) < n_series}, the first element of \code{phi} will

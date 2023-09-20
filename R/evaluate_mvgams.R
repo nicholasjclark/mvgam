@@ -667,7 +667,7 @@ drps_score <- function(truth, fc, interval_width = 0.9,
   }
 
   #nsum <- 1000
-  nsum <- max(c(truth, fc)) + 1000
+  nsum <- max(c(truth, fc), na.rm = TRUE) + 1000
   Fy = ecdf(fc)
   ysum <- 0:nsum
   indicator <- ifelse(ysum - truth >= 0, 1, 0)
@@ -714,6 +714,9 @@ sis_score <- function(truth, fc, interval_width = 0.9,
 #' @importFrom scoringRules es_sample
 #' @noRd
 energy_score <- function(truth, fc, log = FALSE) {
+  # es_sample can't handle any NAs
+  has_nas <- apply(fc, 2, function(x) any(is.na(x)))
+  fc <- fc[,!has_nas]
   if(log){
     truth <- log(truth + 0.001)
     fc <- log(fc + 0.001)

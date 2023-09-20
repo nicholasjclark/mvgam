@@ -71,19 +71,16 @@ compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names){
       mu <- fitted(object, summary = FALSE)[best_draw, 1:length(eta)]
     }
 
-    # Because some mvgam families do not (yet) have simple functions to compute
-    # prediction variance, we will resort to brute force sampling
-    preds <- do.call(rbind, lapply(1:75, function(x){
-      # luckily the predict function is vectorized!!
-      predict(object, process_error = FALSE, type = 'response')[best_draw,]
-    }))
-    pred_variance <- apply(preds, 2, var)
-    if(any(pred_variance == 0)){
-      pred_variance[which(pred_variance == 0)] <-
-        mu[which(pred_variance == 0)]
+    # Calculate variance using family's mean-variance relationship
+    mu_variance <- predict(object,
+                           process_error = FALSE,
+                           type = 'variance')[best_draw, 1:length(eta)]
+    if(any(mu_variance == 0)){
+      mu_variance[which(mu_variance == 0)] <-
+        mu[which(mu_variance == 0)]
     }
 
-    w <- as.numeric(mgcv_model$family$mu.eta(eta) / pred_variance)
+    w <- as.numeric(mgcv_model$family$mu.eta(eta) / mu_variance)
     XWX <- t(X) %*% (w * X)
     rho <- mgcv_model$sp
     lambda <- exp(rho)

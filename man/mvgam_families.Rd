@@ -35,11 +35,14 @@ Finally, \code{mvgam} supports the three extended families described here:
 \itemize{
 \item \code{\link[brms]{lognormal}} for non-negative real-valued data
 \item \code{tweedie} for count data (power parameter \code{p} fixed at \code{1.5})
-\item \code{student-t} for real-valued data
+\item \code{student_t()} (or \code{\link[brms]{student}}) for real-valued data
 }
 Note that only \code{poisson()}, \code{nb()}, and \code{tweedie()} are available if
 using \code{JAGS}. All families, apart from \code{tweedie()}, are supported if
 using \code{Stan}.
+
+Note that currently it is not possible to change the default link
+functions in \code{mvgam}, so any call to change these will be silently ignored
 }
 \author{
 Nicholas J Clark

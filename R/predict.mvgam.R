@@ -10,7 +10,8 @@
 #'If \code{expected} is used, predictions reflect the expectation of the response (the mean)
 #'but ignore uncertainty in the observation process. When \code{response} is used,
 #'the predictions take uncertainty in the observation process into account to return
-#'predictions on the outcome scale
+#'predictions on the outcome scale. When \code{variance} is used, the variance of the response
+#'with respect to the mean (mean-variance relationship) is returned
 #'@param process_error Logical. If \code{TRUE} and a dynamic trend model was fit,
 #'expected uncertainty in the process model is accounted for by using draws
 #'from the latent trend SD parameters. If \code{FALSE}, uncertainty in the latent trend
@@ -54,7 +55,8 @@ predict.mvgam = function(object, newdata,
 
   type <- match.arg(arg = type, choices = c("link",
                                             "expected",
-                                            "response"))
+                                            "response",
+                                            "variance"))
 
   # If a linear predictor was supplied for the latent process models, calculate
   # predictions by assuming the trend is stationary (this is basically what brms)

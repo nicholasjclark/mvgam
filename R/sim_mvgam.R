@@ -29,7 +29,7 @@
 #'@param trend_rel Depracated. Use `prop_trend` instead
 #'@param freq \code{integer}. The seasonal frequency of the series
 #'@param family \code{family} specifying the exponential observation family for the series. Currently supported
-#'families are: `nb()`, `poisson()`, `tweedie()`, `gaussian()`, `betar()`, `lognormal()`, `student_t()` and `Gamma()`
+#'families are: `nb()`, `poisson()`, `tweedie()`, `gaussian()`, `betar()`, `lognormal()`, `student()` and `Gamma()`
 #'@param phi \code{vector} of dispersion parameters for the series (i.e. `size` for Negative Binomial or
 #'`phi` for Tweedie or Beta). If \code{length(phi) < n_series}, the first element of `phi` will
 #'be replicated `n_series` times. Defaults to \code{5} for Negative Binomial and Tweedie; \code{10} for

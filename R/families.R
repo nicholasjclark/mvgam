@@ -1,6 +1,6 @@
 #' Supported mvgam families
 #' @importFrom stats make.link dgamma pgamma rgamma qnorm plnorm runif pbeta dlnorm dpois pnorm ppois plogis gaussian poisson Gamma dnbinom rnbinom dnorm dbeta
-#' @importFrom brms lognormal
+#' @importFrom brms lognormal student rstudent_t qstudent_t dstudent_t pstudent_t
 #' @param link a specification for the family link function. At present these cannot
 #' be changed
 #' @details \code{mvgam} currently supports the following standard observation families:
@@ -20,12 +20,14 @@
 #'\itemize{
 #'   \item \code{\link[brms]{lognormal}} for non-negative real-valued data
 #'   \item \code{tweedie} for count data (power parameter `p` fixed at `1.5`)
-#'   \item \code{student-t} for real-valued data
+#'   \item `student_t()` (or \code{\link[brms]{student}}) for real-valued data
 #'   }
 #'Note that only `poisson()`, `nb()`, and `tweedie()` are available if
 #'using `JAGS`. All families, apart from `tweedie()`, are supported if
 #'using `Stan`.
 #' @name mvgam_families
+#' @details Note that currently it is not possible to change the default link
+#' functions in `mvgam`, so any call to change these will be silently ignored
 #' @author Nicholas J Clark
 NULL
 
@@ -36,7 +38,7 @@ tweedie = function(link = 'log'){
   structure(list(family = "tweedie", link = 'log', linkfun = linktemp$linkfun,
                  linkinv = linktemp$linkinv, mu.eta = linktemp$mu.eta,
                  valideta = linktemp$valideta),
-            class = c("extended.family","family"))
+            class = c("extended.family", "family"))
 }
 
 #' @rdname mvgam_families
@@ -46,7 +48,7 @@ student_t = function(link = 'identity'){
   structure(list(family = "student", link = 'identity', linkfun = linktemp$linkfun,
                  linkinv = linktemp$linkinv, mu.eta = linktemp$mu.eta,
                  valideta = linktemp$valideta),
-            class = c("extended.family","family"))
+            class = c("extended.family", "family"))
 }
 
 #### Non-exported functions for performing family-specific tasks ####
@@ -71,57 +73,20 @@ beta_shapes = function(mu, phi) {
               shape2 = (1 - mu) * phi))
 }
 
-# Scaled Student's t distribution
-# Original author: mjskay (https://github.com/mjskay/ggdist/blob/master/R/student_t.R)
-#'
-#' Density, distribution function, quantile function and random generation for the
-#' scaled Student's t distribution, parameterized by degrees of freedom (`df`),
-#' location (`mu`), and scale (`sigma`).
-#'
-#' @inheritParams stats::dt
-#' @param mu Location parameter (median)
-#' @param sigma Scale parameter
-#'
-#' @name student_t
-#' @importFrom stats dt pt qt rt
-#' @noRd
-dstudent_t = function(x, df, mu = 0, sigma = 1, log = FALSE) {
-  if (log) {
-    dt((x - mu)/sigma, df = df, log = TRUE) - log(sigma)
-  }
-  else {
-    dt((x - mu)/sigma, df = df) / sigma
-  }
-}
-
-#' @noRd
-pstudent_t = function(q, df, mu = 0, sigma = 1, lower.tail = TRUE, log.p = FALSE) {
-  pt((q - mu)/sigma, df = df, lower.tail = lower.tail, log.p = log.p)
-}
-
-#' @noRd
-qstudent_t = function(p, df, mu = 0, sigma = 1, lower.tail = TRUE, log.p = FALSE) {
-  qt(p, df = df, lower.tail = lower.tail, log.p = log.p)*sigma + mu
-}
-
-#' @noRd
-rstudent_t = function(n, df, mu = 0, sigma = 1) {
-  as.vector(rt(n, df = df)*sigma + mu)
-}
-
 #' Generic prediction function
 #' @importFrom stats predict
 #' @param Xp A `mgcv` linear predictor matrix
 #' @param family \code{character}. The `family` slot of the model's family argument
 #' @param betas Vector of regression coefficients of length `NCOL(Xp)`
-#' @param type Either `link`, `expected` or `response`
+#' @param type Either `link`, `expected`, `response` or `variance`
 #' @param family_pars Additional arguments for each specific observation process (i.e.
 #' overdispersion parameter if `family == "nb"`)
 #' @param density logical. Rather than calculating a prediction, evaluate the log-likelihood.
 #' Use this option when particle filtering
 #' @param truth Observation to use for evaluating the likelihood (if `density == TRUE`)
 #' @details A generic prediction function that will make it easier to add new
-#' response distributions in future
+#' response distributions in future. Use `type = variance` for computing family-level
+#' variance as a function of the mean
 #' @noRd
 mvgam_predict = function(Xp, family, betas,
                          type = 'link',
@@ -140,6 +105,8 @@ mvgam_predict = function(Xp, family, betas,
                      log = TRUE)
       }
 
+    } else if(type == 'variance') {
+      out <- rep.int(1, NROW(Xp))
     } else {
       out <- rnorm(n = NROW(Xp),
                    mean = ((matrix(Xp, ncol = NCOL(Xp)) %*%
@@ -166,6 +133,12 @@ mvgam_predict = function(Xp, family, betas,
                                       betas)) +
                                     attr(Xp, 'model.offset'),
                     sdlog = as.vector(family_pars$sigma_obs))
+    } else if(type == 'variance'){
+      mu <- ((matrix(Xp, ncol = NCOL(Xp)) %*%
+                betas)) + attr(Xp, 'model.offset')
+      sd <- as.vector(family_pars$sigma_obs)
+      out <- (exp((sd) ^ 2) - 1) * exp((2 * mu + sd ^ 2))
+
     } else {
       mu <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                               betas) + attr(Xp, 'model.offset'))
@@ -180,11 +153,15 @@ mvgam_predict = function(Xp, family, betas,
                           betas) + attr(Xp, 'model.offset'))
       if(density){
         out <- dstudent_t(truth,
-                          df = family_pars$nu,
+                          df = as.vector(family_pars$nu),
                           mu = out,
                           sigma = as.vector(family_pars$sigma_obs),
                           log = TRUE)
       }
+
+    } else if(type == 'variance') {
+      out <- as.vector(family_pars$nu) /
+        (pmax(2.01, as.vector(family_pars$nu)) - 2)
 
     } else {
       out <- rstudent_t(n = NROW(Xp),
@@ -211,7 +188,10 @@ mvgam_predict = function(Xp, family, betas,
                    lambda = exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                                     betas)) +
                                   attr(Xp, 'model.offset')))
-    } else {
+    } else if(type == 'variance'){
+      out <- exp(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                          betas) + attr(Xp, 'model.offset')))
+      } else {
       out <- exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                      betas)) +
                    attr(Xp, 'model.offset'))
@@ -236,6 +216,10 @@ mvgam_predict = function(Xp, family, betas,
                                   betas)) +
                                 attr(Xp, 'model.offset')),
                      size = as.vector(family_pars$phi))
+    } else if(type == 'variance'){
+      mu <- exp(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                             betas) + attr(Xp, 'model.offset')))
+      out <- mu + mu^2 / as.vector(family_pars$phi)
     } else {
       out <- exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                      betas)) +
@@ -263,7 +247,11 @@ mvgam_predict = function(Xp, family, betas,
       out <- rbeta(n = NROW(Xp),
                    shape1 = shape_pars$shape1,
                    shape2 = shape_pars$shape2)
-    } else {
+    } else if(type == 'variance'){
+      mu <- plogis(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                               betas) + attr(Xp, 'model.offset')))
+      out <- mu * (1 - mu) / (1 + exp(as.vector(family_pars$phi)))
+      } else {
      out <- plogis(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                           betas) + attr(Xp, 'model.offset')))
     }
@@ -288,7 +276,10 @@ mvgam_predict = function(Xp, family, betas,
                       exp(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                                        betas) + attr(Xp, 'model.offset'))),
                     shape = as.vector(family_pars$shape))
-    } else {
+    } else if(type == 'variance'){
+      out <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                          betas) + attr(Xp, 'model.offset')) ^ 2
+      } else {
       out <- as.vector(family_pars$shape) /
         (as.vector(family_pars$shape) / exp(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                                               betas) + attr(Xp, 'model.offset'))))
@@ -319,7 +310,12 @@ mvgam_predict = function(Xp, family, betas,
                      # Power parameter is fixed
                      p = 1.5,
                      phi = as.vector(family_pars$phi)))
-    } else {
+    } else if(type == 'variance'){
+      out <- (exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
+                     betas)) +
+                   attr(Xp, 'model.offset')) ^ 1.5) *
+        as.vector(family_pars$phi)
+      } else {
       out <- exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                      betas)) +
                    attr(Xp, 'model.offset'))
@@ -353,9 +349,9 @@ family_to_mgcvfam = function(family){
   } else if(family$family == 'student'){
     gaussian()
   } else if(family$family == 'lognormal'){
-    mgcv::tw()
+    mgcv::Tweedie(p = 1.5, link = 'identity')
   } else if(family$family == 'tweedie'){
-    mgcv::Tweedie(p=1.5)
+    mgcv::Tweedie(p = 1.5, link = 'log')
   } else {
     family
   }

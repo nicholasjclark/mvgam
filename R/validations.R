@@ -113,7 +113,7 @@ validate_family_resrictions = function(response, family){
     }
   }
 
-  # negatives and zeros not allowed for several families
+  # negatives and/or zeros not allowed for several families
   if(family$family %in%  c('lognormal', 'Gamma')){
     if(any(response<= 0)){
       stop(paste0('Values <= 0 not allowed for ', family$family, ' responses'),

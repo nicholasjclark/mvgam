@@ -152,7 +152,7 @@ Now time to fit some models. This requires a bit of thinking about how we can be
 
 ### Capturing seasonality
 
-First we will fit a model that does not include a dynamic component, just to see if it can reproduce the seasonal variation in the observations. This model builds from our hierarchical GAMs above by introducing hierarchical multidimensional smooths. It includes a "global" tensor product of the `month` and `temp` variables, capturing our expectation that algal seasonality responds to temperature variation. But this response should depend on when in the year these temperatures are recorded (i.e. a response to warm temperatures in Spring should be different to a response to warm temperatures in Autumn). The model also fits series-specific deviation smooths (i.e. one tensor product per series) to capture how each algal group's seasonality differs from the overall "global" seasonality. Note that we do not include series-specific intercepts in this model because each series was z-scored to have a mean of 0.
+First we will fit a model that does not include a dynamic component, just to see if it can reproduce the seasonal variation in the observations. This model introduces hierarchical multidimensional smooths, where all time series share a "global" tensor product of the `month` and `temp` variables, capturing our expectation that algal seasonality responds to temperature variation. But this response should depend on when in the year these temperatures are recorded (i.e. a response to warm temperatures in Spring should be different to a response to warm temperatures in Autumn). The model also fits series-specific deviation smooths (i.e. one tensor product per series) to capture how each algal group's seasonality differs from the overall "global" seasonality. Note that we do not include series-specific intercepts in this model because each series was z-scored to have a mean of 0.
 ```{r notrend_mod, include = FALSE, results='hide'}
 notrend_mod <- mvgam(y ~ 
                        te(temp, month, k = c(4, 4)) +
@@ -247,7 +247,7 @@ plot(notrend_mod, type = 'residuals', series = 4)
 plot(notrend_mod, type = 'residuals', series = 5)
 ```
 
-Now it is time to get into multivariate State-Space models. We will fit two models that can both incorporate lagged cross-dependencies in the latent process models. The first model assumes that the process errors operate independnetly from one another, while the second assumes that there may be contemporaneous correlations in the process errors. Both models include a Vector Autoregressive component for the process means, and so both can model complex community dynamics. The models can be described mathematically as follows:
+Now it is time to get into multivariate State-Space models. We will fit two models that can both incorporate lagged cross-dependencies in the latent process models. The first model assumes that the process errors operate independently from one another, while the second assumes that there may be contemporaneous correlations in the process errors. Both models include a Vector Autoregressive component for the process means, and so both can model complex community dynamics. The models can be described mathematically as follows:
 
 \begin{align*}
 \boldsymbol{count}_t & \sim \text{Normal}(\mu_{obs[t]}, \sigma_{obs}) \\
@@ -293,6 +293,12 @@ priors[, 4]
 Setting priors is easy in `mvgam` as you can use `brms` routines:
 ```{r}
 priors <- prior(uniform(0.1, 1), class = sigma_obs, lb = 0.1, ub = 1)
+```
+
+There is one more small catch with this model: the shared intercept parameter can sometimes be unidentifiable with respect to the latent VAR process. We will often get better convergence in these State-Space models if we regularize this parameter toward zero. A tight Normal prior will do this for us:
+```{r}
+priors <- c(priors,
+            prior(normal(0, 0.001), class = Intercept))
 ```
 
 Now we can fit the first model, which assumes that process errors are contemporaneously uncorrelated
@@ -392,9 +398,10 @@ These are still a bit hard to identify overall.
 
 ### Correlated process errors
 
-Let's see if the estimates improve when we allow the process errors to be correlated. Once again, we need to first update the priors for the observation errors:
+Let's see if the estimates improve when we allow the process errors to be correlated. Once again, we need to first update the priors for the shared intercept and observation errors:
 ```{r}
-priors <- prior(uniform(0.1, 1), class = sigma_obs, lb = 0.1, ub = 1)
+priors <- c(prior(uniform(0.1, 1), class = sigma_obs, lb = 0.1, ub = 1),
+            prior(normal(0, 0.001), class = Intercept))
 ```
 
 And now we can fit the correlated process error model
@@ -466,9 +473,7 @@ This symmetric matrix tells us there is support for correlated process errors. F
 Sigma_post <- as.matrix(varcor_mod, variable = 'Sigma', regex = TRUE)
 median_correlations <- cov2cor(matrix(apply(Sigma_post, 2, median),
                                       nrow = 5, ncol = 5))
-rownames(median_correlations) <- 
-  colnames(median_correlations) <- 
-  levels(plankton_train$series)
+rownames(median_correlations) <- colnames(median_correlations) <- levels(plankton_train$series)
 
 round(median_correlations, 2)
 ```

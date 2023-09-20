@@ -66,6 +66,52 @@ update.mvgam = function(object, formula,
                         lfo = FALSE,
                         ...){
 
+  dots <- list(...)
+
+  # Extract sampling parameters
+  if("backend" %in% names(dots)){
+    backend <- dots$backend
+  } else {
+    backend <- getOption("brms.backend", "cmdstanr")
+  }
+
+  total_iter <- object$model_output@sim$iter
+  burnin <- object$model_output@sim$warmup
+  samples <- total_iter - burnin
+  max_treedepth <- object$max_treedepth
+  adapt_delta <- object$adapt_delta
+  chains <- object$model_output@sim$chains
+
+  if("chains" %in% names(dots)){
+    chains <- dots$chains
+  } else {
+    chains <- object$model_output@sim$chains
+  }
+
+  if("burnin" %in% names(dots)){
+    burnin <- dots$burnin
+  } else {
+    burnin <- burnin
+  }
+
+  if("samples" %in% names(dots)){
+    samples <- dots$samples
+  } else {
+    samples <- samples
+  }
+
+  if("max_treedepth" %in% names(dots)){
+    max_treedepth <- dots$max_treedepth
+  } else {
+    max_treedepth <- max_treedepth
+  }
+
+  if("adapt_delta" %in% names(dots)){
+    adapt_delta <- dots$adapt_delta
+  } else {
+    adapt_delta <- adapt_delta
+  }
+
   if(missing(formula)){
     formula <- object$call
   }
@@ -164,6 +210,12 @@ update.mvgam = function(object, formula,
                          lfo = lfo,
                          use_stan = ifelse(object$fit_engine == 'stan', TRUE,
                                            FALSE),
+                         backend = backend,
+                         chains = chains,
+                         burnin = burnin,
+                         samples = samples,
+                         adapt_delta = adapt_delta,
+                         max_treedepth = max_treedepth,
                          ...)
   } else {
     updated_mod <- mvgam(formula = formula,
@@ -178,6 +230,12 @@ update.mvgam = function(object, formula,
                          lfo = lfo,
                          use_stan = ifelse(object$fit_engine == 'stan', TRUE,
                                            FALSE),
+                         backend = backend,
+                         chains = chains,
+                         burnin = burnin,
+                         samples = samples,
+                         adapt_delta = adapt_delta,
+                         max_treedepth = max_treedepth,
                          ...)
   }
 
