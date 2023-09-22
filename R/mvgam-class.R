@@ -50,6 +50,9 @@
 #'   \item `test_data` If test data were supplied (as argument `newdata` in the original model), it
 #'   will be returned. Othwerise `NULL`
 #'   \item `fit_engine` `Character` describing the fit engine, either as `stan` or `jags`
+#'   \item `backend` `Character` describing the backend used for modelling, either as `rstan`, `cmdstanr` or `rjags`
+#'   \item `algorithm` `Character` describing the algorithm used for finding the posterior,
+#'   either as `sampling`, `meanfield` or `fullrank`
 #'   \item `max_treedepth` If the model was fitted using `Stan`, the value supplied for the maximum
 #'   treedepth tuning parameter is returned (see \code{\link[rstan]{stan}} for details).
 #'   Otherwise `NULL`

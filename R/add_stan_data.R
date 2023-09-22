@@ -137,6 +137,12 @@ add_stan_data = function(jags_file, stan_file,
     n_sp_data <- NULL
   }
 
+  # Occasionally there are smooths with no zero vector
+  # (i.e. for bs = 'fs', they are often just normal(0, lambda))
+  if(is.null(jags_data$zero)){
+    zero_data <- NULL
+  }
+
   # latent variable lines
   if(use_lv){
     lv_data <- paste0('int<lower=0> n_lv; // number of dynamic factors\n')
@@ -256,7 +262,18 @@ add_stan_data = function(jags_file, stan_file,
     jags_smooth_text <- gsub('##', '//', jags_smooth_text)
     jags_smooth_text <- gsub('dexp', 'exponential', jags_smooth_text)
 
-    any_ks <- any(grep('K.* <- ', jags_smooth_text))
+    smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
+      data.frame(label = ss_gam$smooth[[x]]$label,
+                 term = paste(ss_gam$smooth[[x]]$term, collapse = ','),
+                 class = class(ss_gam$smooth[[x]])[1])
+    }))
+
+    if(length(ss_gam$sp) > 0 & !all(smooth_labs$class == 'random.effect')){
+      any_ks <- TRUE
+    } else {
+      any_ks <- FALSE
+    }
+    # any_ks <- any(grep('K.* <- ', jags_smooth_text))
     any_timevarying <- any(grep('// prior for s(time):', jags_smooth_text, fixed = TRUE))
     if(any_ks ||
        any_timevarying){
@@ -290,8 +307,8 @@ add_stan_data = function(jags_file, stan_file,
                                    fixed = TRUE)]
       stan_file <- stan_file[-grep('[n_sp] lambda', stan_file,
                                    fixed = TRUE)]
-      stan_file <- stan_file[-grep('vector[num_basis] zero; //', stan_file,
-                                   fixed = TRUE)]
+      # stan_file <- stan_file[-grep('vector[num_basis] zero; //', stan_file,
+      #                              fixed = TRUE)]
       stan_file <- stan_file[-grep('int<lower=0> n_sp; //', stan_file,
                                    fixed = TRUE)]
     }
@@ -412,22 +429,31 @@ add_stan_data = function(jags_file, stan_file,
     if(any(grep('// parametric effect', stan_file))){
 
       # Get indices of parametric effects
-      min_paras <- as.numeric(sub('.*(?=.$)', '',
-                                  sub("\\:.*", "",
-                                      stan_file[grep('// parametric effect', stan_file) + 1]),
-                                  perl=T))
-      max_paras <- as.numeric(substr(sub(".*\\:", "",
-                                         stan_file[grep('// parametric effect', stan_file) + 1]),
-                                     1, 1))
-      para_indices <- seq(min_paras, max_paras)
+      smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
+        data.frame(label = ss_gam$smooth[[x]]$label,
+                   term = paste(ss_gam$smooth[[x]]$term, collapse = ','),
+                   class = class(ss_gam$smooth[[x]])[1])
+      }))
+      lpmat <- predict(ss_gam, type = 'lpmatrix', exclude = smooth_labs$label)
+      para_indices <- which(apply(lpmat, 2, function(x) !all(x == 0)) == TRUE)
+
+      # min_paras <- as.numeric(sub('.*(?=.$)', '',
+      #                             sub("\\:.*", "",
+      #                                 stan_file[grep('// parametric effect', stan_file) + 1]),
+      #                             perl=T))
+      # max_paras <- as.numeric(substr(sub(".*\\:", "",
+      #                                    stan_file[grep('// parametric effect', stan_file) + 1]),
+      #                                1, 1))
+      # para_indices <- seq(min_paras, max_paras)
 
       # Get names of parametric terms
-      int_included <- attr(ss_gam$pterms, 'intercept') == 1L
-      other_pterms <- attr(ss_gam$pterms, 'term.labels')
-      all_paras <- other_pterms
-      if(int_included){
-        all_paras <- c('(Intercept)', all_paras)
-      }
+      # int_included <- attr(ss_gam$pterms, 'intercept') == 1L
+      # other_pterms <- attr(ss_gam$pterms, 'term.labels')
+      # all_paras <- other_pterms
+      # if(int_included){
+      #   all_paras <- c('(Intercept)', all_paras)
+      # }
+      all_paras <- names(para_indices)
 
       # Create prior lines for parametric terms
       para_lines <- vector()

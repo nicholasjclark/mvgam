@@ -56,6 +56,9 @@ fitting.
 \item \code{test_data} If test data were supplied (as argument \code{newdata} in the original model), it
 will be returned. Othwerise \code{NULL}
 \item \code{fit_engine} \code{Character} describing the fit engine, either as \code{stan} or \code{jags}
+\item \code{backend} \code{Character} describing the backend used for modelling, either as \code{rstan}, \code{cmdstanr} or \code{rjags}
+\item \code{algorithm} \code{Character} describing the algorithm used for finding the posterior,
+either as \code{sampling}, \code{meanfield} or \code{fullrank}
 \item \code{max_treedepth} If the model was fitted using \code{Stan}, the value supplied for the maximum
 treedepth tuning parameter is returned (see \code{\link[rstan]{stan}} for details).
 Otherwise \code{NULL}

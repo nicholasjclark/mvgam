@@ -12,7 +12,7 @@
 formula.mvgam = function(x, trend_effects = FALSE, ...){
   # Check trend_effects
   if(trend_effects){
-    if(is.null(formula$trend_call)){
+    if(is.null(x$trend_call)){
       stop('no trend_formula exists so there is no trend-level model.frame')
     }
   }

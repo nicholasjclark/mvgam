@@ -17,7 +17,7 @@ get_monitor_pars = function(family, smooths_included = TRUE,
                                                 "student", "Gamma"))
 
   if(smooths_included){
-    param <- c('rho', 'b', 'ypred', 'mus', 'lp__')
+    param <- c('rho', 'b', 'ypred', 'mus', 'lp__', 'lambda')
   } else {
     param <- c('b', 'ypred', 'mus', 'lp__')
   }

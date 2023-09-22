@@ -451,8 +451,21 @@ get_mvgam_priors = function(formula,
 
     # Parametric effect priors
     if(use_stan){
+      smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
+        data.frame(label = ss_gam$smooth[[x]]$label,
+                   term = paste(ss_gam$smooth[[x]]$term, collapse = ','),
+                   class = class(ss_gam$smooth[[x]])[1])
+      }))
+      lpmat <- suppressWarnings(predict(ss_gam, type = 'lpmatrix',
+                                        exclude = smooth_labs$label))
+      para_indices <- which(apply(lpmat, 2, function(x) !all(x == 0)) == TRUE)
+
       int_included <- attr(ss_gam$pterms, 'intercept') == 1L
-      other_pterms <- attr(ss_gam$pterms, 'term.labels')
+      if(int_included){
+        other_pterms <- names(para_indices)[-1]
+      } else {
+        other_pterms <- names(para_indices)
+      }
       all_paras <- other_pterms
 
       para_priors <- c()

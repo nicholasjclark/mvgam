@@ -323,6 +323,110 @@ plot.mvgam_lfo = function(x, ...){
   layout(1)
 }
 
+#' Function to generate informative priors based on the posterior
+#' of a previously fitted model (EXPERIMENTAL!!)
+#' @noRd
+summarize_posterior = function(object){
+
+  # Extract the trend model
+  trend_model <- object$trend_model
+  if(trend_model == 'VAR1'){
+    trend_model <- 'VAR1cor'
+  }
+
+  # Get params that can be modified for this model
+  if(is.null(object$trend_call)){
+    update_priors <- get_mvgam_priors(formula = formula(object),
+                                      family = object$family,
+                                      data = object$obs_data,
+                                      trend_model = trend_model)
+  } else {
+    update_priors <- get_mvgam_priors(formula = formula(object),
+                                      family = object$family,
+                                      trend_formula = as.formula(object$trend_call),
+                                      data = object$obs_data,
+                                      trend_model = trend_model)
+  }
+
+  pars_keep <- c('smooth parameter|process error|fixed effect|Intercept|pop mean|pop sd|AR1|AR2|AR3|amplitude|length scale')
+  update_priors <- update_priors[grepl(pars_keep, update_priors$param_info), ]
+
+  # Get all possible parameters to summarize
+  pars_to_prior <- vector()
+  for(i in 1:NROW(update_priors)){
+    pars_to_prior[i] <- trimws(strsplit(update_priors$prior[i], "[~]")[[1]][1])
+  }
+
+  # Summarize parameter posteriors as Normal distributions
+  pars_posterior <- list()
+  for(i in seq_along(pars_to_prior)){
+    if(pars_to_prior[i] == '(Intercept)'){
+      post_samps <- mcmc_chains(object$model_output, 'b[1]',
+                                ISB = FALSE)
+    } else {
+
+      suppressWarnings(post_samps <- try(mcmc_chains(object$model_output,
+                                                     pars_to_prior[i]),
+                                         silent = TRUE))
+
+      if(inherits(post_samps, 'try-error')){
+        suppressWarnings(post_samps <- try(as.matrix(mod,
+                                                     variable = pars_to_prior[i],
+                                                     regex = TRUE),
+                                           silent = TRUE))
+      }
+
+      if(inherits(post_samps, 'try-error')) next
+    }
+
+    new_lowers <- round(apply(post_samps, 2, min), 3)
+    new_uppers <- round(apply(post_samps, 2, max), 3)
+    means <- round(apply(post_samps, 2, mean), 3)
+    sds <- round(apply(post_samps, 2, sd), 3)
+    priors <- paste0('normal(', means, ', ', sds, ')')
+    parametric <- grepl('Intercept|fixed effect',
+                        update_priors$param_info[i])
+    parnames <- dimnames(post_samps)[[2]]
+
+    priorstring <- list()
+    for(j in 1:NCOL(post_samps)){
+      priorstring[[j]] <- prior_string(priors[j],
+                                       class = parnames[j],
+                                       resp = parametric,
+                                       ub = new_uppers[j],
+                                       lb = new_lowers[j],
+                                       group = pars_to_prior[i])
+    }
+
+    pars_posterior[[i]] <- do.call(rbind, priorstring)
+  }
+  pars_posterior <- do.call(rbind, pars_posterior)
+  pars_posterior <- pars_posterior[(pars_posterior$ub == 0 &
+                                      pars_posterior$lb == 0)
+                                   == FALSE, ]
+  pars_posterior <- pars_posterior[(pars_posterior$ub == 1 &
+                                      pars_posterior$lb == 1)
+                                   == FALSE, ]
+  pars_posterior$param_name <- NA
+  pars_posterior$parametric <- pars_posterior$resp
+  pars_posterior$resp <- NULL
+  attr(pars_posterior, 'posterior_to_prior') <- TRUE
+
+  return(pars_posterior)
+}
+
+#' Function for a leave-future-out update that uses informative priors
+#' @noRd
+lfo_update = function(object, ...){
+  # Get informative priors
+  priors <- summarize_posterior(object)
+
+  # Run the update using the informative priors
+  update.mvgam(object,
+               priors = priors,
+               ...)
+}
+
 #' Function to generate training and testing splits
 #' @noRd
 cv_split = function(data, last_train, fc_horizon = 1){

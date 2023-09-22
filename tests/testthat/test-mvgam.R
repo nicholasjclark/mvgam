@@ -147,6 +147,24 @@ test_that("trend_map is behaving propoerly", {
                fixed = TRUE)
 })
 
+test_that("models with only random effects should work without error", {
+  sim <- sim_mvgam(n_series = 3)
+  mod_data <- sim$data_train
+  mod_map <- mvgam(y ~ s(series, bs = 're'),
+                   data = mod_data,
+                   run_model = FALSE)
+  expect_true(inherits(mod_map, 'mvgam_prefit'))
+})
+
+test_that("models with only fs smooths should work without error", {
+  sim <- sim_mvgam(n_series = 3)
+  mod_data <- sim$data_train
+  mod_map <- mvgam(y ~ s(season, series, bs = 'fs'),
+                   data = mod_data,
+                   run_model = FALSE)
+  expect_true(inherits(mod_map, 'mvgam_prefit'))
+})
+
 test_that("trend_formula setup is working properly", {
   sim <- sim_mvgam(n_series = 3)
   mod_data <- sim$data_train

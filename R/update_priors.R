@@ -28,154 +28,221 @@ update_priors = function(model_file,
     gsub("Intercept(?!.*[^()]*\\))", "(Intercept)", x,
          perl = TRUE))
 
-  # Modify the file to update the prior definitions
-  for(i in 1:NROW(priors)){
-    if(!any(grepl(paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][1]), '~'),
-         model_file, fixed = TRUE))){
+  if(!is.null(attr(priors, 'posterior_to_prior'))){
 
-      # Updating parametric effects
-      if(any(grepl(paste0(priors$param_name[i], '...'), model_file, fixed = TRUE))){
-        header_line <- grep(paste0(priors$param_name[i], '...'), model_file, fixed = TRUE)
-        newprior <- paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][2]))
-        model_file[header_line + 1] <-
-          paste(trimws(strsplit(model_file[header_line + 1], "[~]")[[1]][1]), '~',
-                newprior)
+    model_file <- posterior_to_prior(model_file, priors)
 
-      } else if(grepl('num_gp_basis', priors$prior[i])){
-        model_file[grep('num_gp_basis = min(20, n);', model_file, fixed = TRUE)] <-
-          priors$prior[i]
+  } else {
+    # Modify the file to update the prior definitions
+    for(i in 1:NROW(priors)){
+      if(!any(grepl(paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][1]), '~'),
+                    model_file, fixed = TRUE))){
 
-      } else if(grepl('=', priors$prior[i])){
-        tomatch <- trimws(strsplit(paste0('\\b',
-                                          gsub(']', '\\]',
-                                               gsub('[', '\\[',
-                                                    priors$prior[i], fixed = TRUE),
-                                               fixed = TRUE)), "[=]")[[1]][1])
-        model_file[grep(tomatch, model_file, fixed = TRUE)] <-
-          priors$prior[i]
-      } else {
-        warning('no match found in model_file for parameter: ',
-                trimws(strsplit(priors$prior[i], "[~]")[[1]][1]),
-                call. = FALSE)
-      }
+        # Updating parametric effects
+        if(any(grepl(paste0(priors$param_name[i], '...'), model_file, fixed = TRUE))){
+          header_line <- grep(paste0(priors$param_name[i], '...'), model_file, fixed = TRUE)
+          newprior <- paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][2]))
+          model_file[header_line + 1] <-
+            paste(trimws(strsplit(model_file[header_line + 1], "[~]")[[1]][1]), '~',
+                  newprior)
 
-    } else {
-      model_file[grep(paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][1]), '~'),
-                      model_file, fixed = TRUE)] <-
-        priors$prior[i]
-    }
-  }
+        } else if(grepl('num_gp_basis', priors$prior[i])){
+          model_file[grep('num_gp_basis = min(20, n);', model_file, fixed = TRUE)] <-
+            priors$prior[i]
 
-
-  # Modify the file to update any bounds on parameters
-  if(use_stan){
-    if(any(!is.na(c(priors$new_lowerbound, priors$new_upperbound)))){
-      for(i in 1:NROW(priors)){
-
-        # Not currently possible to include new bounds on parametric effect
-        # priors
-        if(grepl('fixed effect|Intercept', priors$param_info[i])){
-          if(!is.na(priors$new_lowerbound)[i]|!is.na(priors$new_upperbound)[i]){
-            warning('not currently possible to place bounds on fixed effect priors: ',
-                    trimws(strsplit(priors$prior[i], "[~]")[[1]][1]),
-                    call. = FALSE)
-          }
+        } else if(grepl('=', priors$prior[i])){
+          tomatch <- trimws(strsplit(paste0('\\b',
+                                            gsub(']', '\\]',
+                                                 gsub('[', '\\[',
+                                                      priors$prior[i], fixed = TRUE),
+                                                 fixed = TRUE)), "[=]")[[1]][1])
+          model_file[grep(tomatch, model_file, fixed = TRUE)] <-
+            priors$prior[i]
         } else {
-          # Create boundary text strings
-          if(!is.na(priors$new_lowerbound[i])){
-            change_lower <- TRUE
-            lower_text <- paste0('lower=',
-                                 priors$new_lowerbound[i])
-          } else {
-            if(grepl('lower=', priors$param_name[i])){
-              change_lower <- TRUE
-              lower_text <-
-                paste0('lower=',
-                       regmatches(priors$param_name[i],
-                                  regexpr("lower=.*?\\K-?\\d+",
-                                          priors$param_name[i], perl=TRUE)))
-            } else {
-              change_lower <- FALSE
-            }
-          }
-
-          if(!is.na(priors$new_upperbound[i])){
-            change_upper <- TRUE
-            upper_text <- paste0('upper=',
-                                 priors$new_upperbound[i])
-          } else {
-            if(grepl('upper=', priors$param_name[i])){
-              change_upper <- TRUE
-              upper_text <-
-                paste0('upper=',
-                       regmatches(priors$param_name[i],
-                                  regexpr("upper=.*?\\K-?\\d+",
-                                          priors$param_name[i], perl=TRUE)))
-            } else {
-              change_upper <- FALSE
-            }
-          }
-
-          # Insert changes
-          if(change_lower & change_upper){
-            model_file[grep(trimws(priors$param_name[i]),
-                            model_file, fixed = TRUE)] <-
-              ifelse(!grepl('<', priors$param_name[i]),
-                     sub('\\[', paste0('<',
-                                       lower_text,
-                                       ',',
-                                       upper_text,
-                                       '>\\['),
-                         priors$param_name[i]),
-                     sub("<[^\\)]+>",
-                         paste0('<',
-                                lower_text,
-                                ',',
-                                upper_text,
-                                '>'),
-                         priors$param_name[i]))
-          }
-
-          if(change_lower & !change_upper){
-            model_file[grep(trimws(priors$param_name[i]),
-                            model_file, fixed = TRUE)] <-
-
-              ifelse(!grepl('<', priors$param_name[i]),
-                     sub('\\[', paste0('<',
-                                       lower_text,
-                                       '>\\['),
-                         priors$param_name[i]),
-                     sub("<[^\\)]+>",
-                         paste0('<',
-                                lower_text,
-                                '>'),
-                         priors$param_name[i]))
-          }
-
-          if(change_upper & !change_lower){
-            model_file[grep(trimws(priors$param_name[i]),
-                            model_file, fixed = TRUE)] <-
-              ifelse(!grepl('<', priors$param_name[i]),
-                     sub('\\[', paste0('<',
-                                       upper_text,
-                                       '>\\['),
-                         priors$param_name[i]),
-                     sub("<[^\\)]+>",
-                         paste0('<',
-                                upper_text,
-                                '>'),
-                         priors$param_name[i]))
-          }
+          warning('no match found in model_file for parameter: ',
+                  trimws(strsplit(priors$prior[i], "[~]")[[1]][1]),
+                  call. = FALSE)
         }
 
-        change_lower <- FALSE
-        change_upper <- FALSE
+      } else {
+        model_file[grep(paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][1]), '~'),
+                        model_file, fixed = TRUE)] <-
+          priors$prior[i]
+      }
+    }
+
+
+    # Modify the file to update any bounds on parameters
+    if(use_stan){
+      if(any(!is.na(c(priors$new_lowerbound, priors$new_upperbound)))){
+        for(i in 1:NROW(priors)){
+
+          # Not currently possible to include new bounds on parametric effect
+          # priors
+          if(grepl('fixed effect|Intercept', priors$param_info[i])){
+            if(!is.na(priors$new_lowerbound)[i]|!is.na(priors$new_upperbound)[i]){
+              warning('not currently possible to place bounds on fixed effect priors: ',
+                      trimws(strsplit(priors$prior[i], "[~]")[[1]][1]),
+                      call. = FALSE)
+            }
+          } else {
+            # Create boundary text strings
+            if(!is.na(priors$new_lowerbound[i])){
+              change_lower <- TRUE
+              lower_text <- paste0('lower=',
+                                   priors$new_lowerbound[i])
+            } else {
+              if(grepl('lower=', priors$param_name[i])){
+                change_lower <- TRUE
+                lower_text <-
+                  paste0('lower=',
+                         regmatches(priors$param_name[i],
+                                    regexpr("lower=.*?\\K-?\\d+",
+                                            priors$param_name[i], perl=TRUE)))
+              } else {
+                change_lower <- FALSE
+              }
+            }
+
+            if(!is.na(priors$new_upperbound[i])){
+              change_upper <- TRUE
+              upper_text <- paste0('upper=',
+                                   priors$new_upperbound[i])
+            } else {
+              if(grepl('upper=', priors$param_name[i])){
+                change_upper <- TRUE
+                upper_text <-
+                  paste0('upper=',
+                         regmatches(priors$param_name[i],
+                                    regexpr("upper=.*?\\K-?\\d+",
+                                            priors$param_name[i], perl=TRUE)))
+              } else {
+                change_upper <- FALSE
+              }
+            }
+
+            # Insert changes
+            if(change_lower & change_upper){
+              model_file[grep(trimws(priors$param_name[i]),
+                              model_file, fixed = TRUE)] <-
+                ifelse(!grepl('<', priors$param_name[i]),
+                       sub('\\[', paste0('<',
+                                         lower_text,
+                                         ',',
+                                         upper_text,
+                                         '>\\['),
+                           priors$param_name[i]),
+                       sub("<[^\\)]+>",
+                           paste0('<',
+                                  lower_text,
+                                  ',',
+                                  upper_text,
+                                  '>'),
+                           priors$param_name[i]))
+            }
+
+            if(change_lower & !change_upper){
+              model_file[grep(trimws(priors$param_name[i]),
+                              model_file, fixed = TRUE)] <-
+
+                ifelse(!grepl('<', priors$param_name[i]),
+                       sub('\\[', paste0('<',
+                                         lower_text,
+                                         '>\\['),
+                           priors$param_name[i]),
+                       sub("<[^\\)]+>",
+                           paste0('<',
+                                  lower_text,
+                                  '>'),
+                           priors$param_name[i]))
+            }
+
+            if(change_upper & !change_lower){
+              model_file[grep(trimws(priors$param_name[i]),
+                              model_file, fixed = TRUE)] <-
+                ifelse(!grepl('<', priors$param_name[i]),
+                       sub('\\[', paste0('<',
+                                         upper_text,
+                                         '>\\['),
+                           priors$param_name[i]),
+                       sub("<[^\\)]+>",
+                           paste0('<',
+                                  upper_text,
+                                  '>'),
+                           priors$param_name[i]))
+            }
+          }
+
+          change_lower <- FALSE
+          change_upper <- FALSE
+        }
       }
     }
   }
 
   return(model_file)
 }
+
+#' Make detailed changes to allow a prior model to as closely match a posterior
+#' from a previous model as possible
+#' @noRd
+posterior_to_prior = function(model_file, priors){
+
+  # parametric terms
+  para_terms <- priors$group[which(priors$parametric == TRUE)]
+  para_priors <- priors$prior[which(priors$parametric == TRUE)]
+  para_lowers <- priors$lb[which(priors$parametric == TRUE)]
+  para_uppers <- priors$ub[which(priors$parametric == TRUE)]
+  if(length(para_terms) > 0){
+    for(i in 1:length(para_terms)){
+      header_line <- grep(paste0(para_terms[i], '...'), model_file, fixed = TRUE)
+      model_file[header_line + 1] <-
+        paste0(trimws(strsplit(model_file[header_line + 1], "[~]")[[1]][1]), ' ~ ',
+               para_priors[i], ';')
+    }
+  }
+
+  # Other lines to modify
+  mainlines_to_modify <- unique(priors$group[which(priors$parametric == FALSE)])
+  for(i in 1:length(mainlines_to_modify)){
+    priors %>%
+      dplyr::filter(group == mainlines_to_modify[i]) -> group_priors
+    replace_line <- c()
+    for(j in 1:NROW(group_priors)){
+      replace_line <- c(replace_line,
+                        paste0(group_priors$class[j], ' ~ ', group_priors$prior[j]))
+    }
+    replace_line <- paste0(paste(replace_line, collapse = ';\n'), ';\n')
+
+    orig_line <- grep(paste(trimws(strsplit(mainlines_to_modify[i], "[~]")[[1]][1]), '~'),
+                      model_file, fixed = TRUE)
+    model_file[orig_line] <- replace_line
+  }
+  model_file <- readLines(textConnection(model_file), n = -1)
+
+  if('P_real' %in% mainlines_to_modify){
+    priors %>%
+      dplyr::filter(group == 'P_real') -> group_priors
+    replace_line <- c()
+    for(j in 1:NROW(group_priors)){
+      replace_line <- c(replace_line,
+                        paste0(group_priors$class[j], ' ~ ', group_priors$prior[j]))
+    }
+    replace_line <- paste0(paste(replace_line, collapse = ';\n'), ';\n')
+
+    remove_start <- grep('// partial autocorrelation hyperpriors', model_file, fixed = TRUE) + 1
+    remove_end <- grep('P_real[i, j] ~ normal(Pmu[2], 1 / sqrt(Pomega[2]));',
+                       model_file, fixed = TRUE) + 2
+    model_file <- model_file[-c(remove_start:remove_end)]
+    model_file[grep('// partial autocorrelation hyperpriors', model_file, fixed = TRUE)] <-
+      paste0('  // partial autocorrelation hyperpriors\n',
+             replace_line)
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
+
+  return(model_file)
+}
+
 
 #' Allow brmsprior objects to be supplied instead
 #' @noRd

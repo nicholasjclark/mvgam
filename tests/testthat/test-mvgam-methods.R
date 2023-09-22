@@ -59,7 +59,7 @@ test_that("predict has reasonable outputs", {
 
   beta_preds <- predict(beta_gp, type = 'response')
   expect_equal(dim(beta_preds),
-               c(1200, NROW(beta_data$data_train)))
+               c(300, NROW(beta_data$data_train)))
   expect_lt(max(beta_preds), 1.00000001)
   expect_gt(max(beta_preds), -0.0000001)
 })
@@ -79,7 +79,7 @@ test_that("forecast and friends have reasonable outputs", {
   expect_s3_class(hc, 'mvgam_forecast')
   expect_true(is.null(hc$forecasts))
   expect_equal(dim(hc$hindcasts[[1]]),
-               c(1200, NROW(beta_data$data_train) /
+               c(300, NROW(beta_data$data_train) /
                    length(unique(beta_data$data_train$series))))
   expect_equal(hc$train_observations[[1]],
                beta_data$data_train$y[which(beta_data$data_train$series == 'series_1')])

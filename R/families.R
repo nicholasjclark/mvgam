@@ -930,30 +930,8 @@ get_mvgam_resids = function(object, n_cores = 1){
   # Family-specific parameters
   family_pars <- extract_family_pars(object = object)
 
-  # Calculate DS residual distributions in parallel
-  cl <- parallel::makePSOCKcluster(n_cores)
-  setDefaultCluster(cl)
-  clusterExport(NULL, c('sample_seq',
-                        'draw_seq',
-                        'n_series',
-                        'obs_series',
-                        'series_levels',
-                        'family',
-                        'family_pars',
-                        'preds',
-                        'obs_series',
-                        'obs_data',
-                        'fit_engine'),
-                envir = environment())
-  clusterEvalQ(cl, library(dplyr))
-  clusterExport(cl = cl,
-                          unclass(lsf.str(envir = asNamespace("mvgam"),
-                                          all = T)),
-                          envir = as.environment(asNamespace("mvgam"))
-  )
-
-  pbapply::pboptions(type = "none")
-  series_resids <- pbapply::pblapply(seq_len(n_series), function(series){
+  # Calculate DS residual distributions in sequence (parallel is no faster)
+  series_resids <- lapply(seq_len(n_series), function(series){
     if(class(obs_data)[1] == 'list'){
       n_obs <- data.frame(series = obs_series) %>%
         dplyr::filter(series == !!(series_levels[series])) %>%
@@ -1076,8 +1054,7 @@ get_mvgam_resids = function(object, n_cores = 1){
 
     resids
 
-  }, cl = cl)
-  stopCluster(cl)
+  })
   names(series_resids) <- series_levels
   return(series_resids)
 }

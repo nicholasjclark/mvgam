@@ -63,7 +63,12 @@ mcmc_summary = function(object,
             Rhat = TRUE,
             n.eff = TRUE,
             func = NULL,
-            func_name = NULL){
+            func_name = NULL,
+            variational = FALSE){
+  if(variational){
+    Rhat <- FALSE
+    n.eff <- FALSE
+  }
   # SORTING BLOCK
 
   if (methods::is(object, 'matrix'))
@@ -701,6 +706,11 @@ mcmc_summary = function(object,
 
     mcmc_summary <- do.call("cbind", x)
     row.names(mcmc_summary) <- all_params[f_ind]
+
+    if(variational){
+      mcmc_summary$Rhat <- NaN
+      mcmc_summary$n.eff <- NaN
+    }
   }
   return(mcmc_summary)
 }
@@ -713,7 +723,7 @@ mcmc_chains = function(object,
                        exact = TRUE,
                        mcmc.list = FALSE,
                        chain_num = NULL){
-  #for rstanarm/brms obejcts - set to NULL by default
+  #for rstanarm/brms objects - set to NULL by default
   sp_names <- NULL
 
   #if from R2jags::jags.parallel
@@ -2707,13 +2717,25 @@ add_trend_predictors = function(trend_formula,
   # Add any parametric effect beta lines
   if(length(attr(trend_mvgam$mgcv_model$pterms, 'term.labels')) != 0L){
     trend_parametrics <- TRUE
-    pnames <- attr(trend_mvgam$mgcv_model$pterms, 'term.labels')
-    pindices <- colnames(attr(trend_mvgam$mgcv_model$terms, 'factors'))
+
+    smooth_labs <- do.call(rbind, lapply(seq_along(trend_mvgam$mgcv_model$smooth), function(x){
+      data.frame(label = trend_mvgam$mgcv_model$smooth[[x]]$label,
+                 term = paste(trend_mvgam$mgcv_model$smooth[[x]]$term, collapse = ','),
+                 class = class(trend_mvgam$mgcv_model$smooth[[x]])[1])
+    }))
+    lpmat <- predict(trend_mvgam$mgcv_model, type = 'lpmatrix',
+                     exclude = smooth_labs$label)
+    pindices <- which(apply(lpmat, 2, function(x) !all(x == 0)) == TRUE)
+    pnames <- names(pindices)
+    pnames <- gsub('series', 'trend', pnames)
+
+    # pnames <- attr(trend_mvgam$mgcv_model$pterms, 'term.labels')
+    # pindices <- colnames(attr(trend_mvgam$mgcv_model$terms, 'factors'))
     plines <- vector()
     for(i in seq_along(pnames)){
       plines[i] <- paste0('// prior for ', pnames[i], '_trend...',
                           '\n',
-                          'b_raw_trend[', which(pindices == pnames[i]),
+                          'b_raw_trend[', pindices[i],
                           '] ~ student_t(3, 0, 2);\n')
     }
 

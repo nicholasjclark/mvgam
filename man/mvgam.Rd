@@ -34,11 +34,13 @@ mvgam(
   lfo = FALSE,
   use_stan = TRUE,
   backend = getOption("brms.backend", "cmdstanr"),
+  algorithm = getOption("brms.algorithm", "sampling"),
   autoformat = TRUE,
   save_all_pars = FALSE,
   max_treedepth,
   adapt_delta,
-  jags_path
+  jags_path,
+  ...
 )
 }
 \arguments{
@@ -140,15 +142,18 @@ the drift parameter can become unidentifiable, especially if an intercept term i
 predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift parameters will also likely
 be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}}
 
-\item{chains}{\code{integer} specifying the number of parallel chains for the model}
+\item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
+if using Variational Inference with \code{algorithm = 'meanfield'} or \code{algorithm = 'fullrank'}}
 
 \item{burnin}{\code{integer} specifying the number of warmup iterations of the Markov chain to run
-to tune sampling algorithms}
+to tune sampling algorithms. Ignored
+if using Variational Inference with \code{algorithm = 'meanfield'} or \code{algorithm = 'fullrank'}}
 
 \item{samples}{\code{integer} specifying the number of post-warmup iterations of the Markov chain to run for
 sampling the posterior distribution}
 
-\item{thin}{Thinning interval for monitors}
+\item{thin}{Thinning interval for monitors.  Ignored
+if using Variational Inference with \code{algorithm = 'meanfield'} or \code{algorithm = 'fullrank'}}
 
 \item{parallel}{\code{logical} specifying whether multiple cores should be used for
 generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to use will be
@@ -190,6 +195,13 @@ for the current R session via the \code{"brms.backend"} option (see \code{\link{
 the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
 https://mc-stan.org/cmdstanr/, respectively.}
 
+\item{algorithm}{Character string naming the estimation approach to use.
+Options are \code{"sampling"} for MCMC (the default), \code{"meanfield"} for
+variational inference with independent normal distributions or
+\code{"fullrank"} for variational inference with a multivariate normal
+distribution. Can be set globally for the current \R session via the
+\code{"brms.algorithm"} option (see \code{\link{options}}).}
+
 \item{autoformat}{\code{Logical}. Use the \code{stanc} parser to automatically format the
 \code{Stan} code and check for deprecations. Defaults to \code{TRUE}}
 
@@ -211,6 +223,12 @@ typically result in a slower sampler, but it will always lead to a more robust s
 
 \item{jags_path}{Optional character vector specifying the path to the location of the \code{JAGS} executable (.exe) to use
 for modelling if \code{use_stan == FALSE}. If missing, the path will be recovered from a call to \code{\link[runjags]{findjags}}}
+
+\item{...}{Further arguments passed to Stan.
+For \code{backend = "rstan"} the arguments are passed to
+\code{\link[rstan]{sampling}} or \code{\link[rstan]{vb}}.
+For \code{backend = "cmdstanr"} the arguments are passed to the
+\code{cmdstanr::sample} or \code{cmdstanr::variational} method.}
 }
 \value{
 A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,

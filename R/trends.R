@@ -327,7 +327,7 @@ trend_par_names = function(trend_model,
 
     if(trend_model == 'VAR1'){
       param <- c('trend', 'A', 'Sigma',
-                 'lv_coefs', 'LV')
+                 'lv_coefs', 'LV', 'P_real', 'sigma')
     }
 
   }
@@ -354,7 +354,7 @@ trend_par_names = function(trend_model,
     }
 
     if(trend_model == 'VAR1'){
-      param <- c('trend', 'A', 'Sigma')
+      param <- c('trend', 'A', 'Sigma', 'P_real', 'sigma')
     }
 
   }
