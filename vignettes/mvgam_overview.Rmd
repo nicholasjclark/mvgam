@@ -27,7 +27,7 @@ theme_set(theme_bw(base_size = 12, base_family = 'serif'))
 The purpose of this vignette is to give a general overview of the `mvgam` package and its primary functions.
 
 ## Dynamic GAMs
-Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Assuming $\boldsymbol{y}$ is drawn from an exponential distribution (such as Poisson or Negative Binomial) with an invertible link function, the linear predictor for a Dynamic GAM is written as:
+Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Assuming $\boldsymbol{y}$ is drawn from an exponential distribution with an invertible link function, the linear predictor for a Dynamic GAM is written as:
 
 $$g(\tilde{\boldsymbol{y}}_{t})=\alpha+\sum\limits_{i=1}^I\boldsymbol{s}_{i,t}\boldsymbol{x}_{i,t}+\boldsymbol{z}_{t}\,,$$
 
@@ -65,7 +65,7 @@ data <- sim_mvgam(n_series = 4, T = 24)
 head(data$data_train, 12)
 ```
 
-Notice how we have four different time series in these simulated data, but we do not spread these out into different columns. Rather, there is only a single column for the outcome variable, labelled `y` in these simulated data. We also must supply a variable labelled `time` to ensure the modelling software knows how to arrange the time series when building models. This setup still allows us to formulate multivariate time series models, as you can see in the [State-Space vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html). Below are the steps needed to shape our `portal_data` object into the correct form. First, we create a `time` variable, select the column representing counts of our target species (`PP`), and select appropriate variables that we can use as predictors
+Notice how we have four different time series in these simulated data, but we do not spread the outcome values into different columns. Rather, there is only a single column for the outcome variable, labelled `y` in these simulated data. We also must supply a variable labelled `time` to ensure the modelling software knows how to arrange the time series when building models. This setup still allows us to formulate multivariate time series models, as you can see in the [State-Space vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html). Below are the steps needed to shape our `portal_data` object into the correct form. First, we create a `time` variable, select the column representing counts of our target species (`PP`), and select appropriate variables that we can use as predictors
 ```{r Wrangle data for modelling}
 portal_data %>%
   

@@ -93,7 +93,11 @@ update.mvgam = function(object, formula,
   }
 
   if(missing(priors)){
-    priors <- object$priors
+    if(!is.null(object$priors)){
+      priors <- object$priors
+    } else {
+      priors <- rlang::missing_arg()
+    }
   }
 
   if(!missing(newdata)){

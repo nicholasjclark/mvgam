@@ -347,11 +347,11 @@ test_priors
 #> 6                    trend sd         sigma ~ student_t(3, 0, 2.5);
 #>                example_change new_lowerbound new_upperbound
 #> 1 (Intercept) ~ normal(0, 1);             NA             NA
-#> 2 lambda ~ exponential(0.82);             NA             NA
-#> 3  ar1 ~ normal(-0.99, 0.33);             NA             NA
-#> 4   ar2 ~ normal(0.18, 0.76);             NA             NA
-#> 5   ar3 ~ normal(0.48, 0.15);             NA             NA
-#> 6  sigma ~ exponential(0.52);             NA             NA
+#> 2 lambda ~ exponential(0.08);             NA             NA
+#> 3    ar1 ~ normal(0.71, 0.3);             NA             NA
+#> 4   ar2 ~ normal(0.18, 0.25);             NA             NA
+#> 5   ar3 ~ normal(0.75, 0.68);             NA             NA
+#> 6  sigma ~ exponential(0.51);             NA             NA
 ```
 
 Any of the above priors can be changed by modifying the `prior` column
@@ -552,33 +552,33 @@ summary(lynx_mvgam)
 #> Fitted using Stan 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                2.5%    50%  97.5% Rhat n.eff
-#> (Intercept)   5.900  6.600  7.000 1.00   323
-#> s(season).1  -0.630  0.030  0.740 1.00  1080
-#> s(season).2  -0.240  0.820  1.800 1.00   467
-#> s(season).3  -0.055  1.200  2.500 1.00   355
-#> s(season).4  -0.590  0.430  1.400 1.00  1074
-#> s(season).5  -1.200 -0.160  0.910 1.00   506
-#> s(season).6  -1.100 -0.031  1.000 1.00   523
-#> s(season).7  -0.690  0.360  1.400 1.00   769
-#> s(season).8  -0.990  0.290  1.800 1.00   340
-#> s(season).9  -1.100 -0.240  0.720 1.01   392
-#> s(season).10 -1.300 -0.660 -0.025 1.00   764
+#>                2.5%    50%   97.5% Rhat n.eff
+#> (Intercept)   6.000  6.600 7.00000 1.01   408
+#> s(season).1  -0.630  0.033 0.76000 1.01   823
+#> s(season).2  -0.230  0.850 1.90000 1.01   382
+#> s(season).3  -0.065  1.200 2.50000 1.01   358
+#> s(season).4  -0.530  0.430 1.40000 1.01   856
+#> s(season).5  -1.200 -0.160 0.91000 1.00   551
+#> s(season).6  -1.100 -0.012 1.00000 1.00   625
+#> s(season).7  -0.770  0.360 1.40000 1.00   614
+#> s(season).8  -1.100  0.270 1.80000 1.00   374
+#> s(season).9  -1.100 -0.310 0.68000 1.00   410
+#> s(season).10 -1.400 -0.700 0.00064 1.01   574
 #> 
 #> GAM observation smoothing parameter (rho) estimates:
 #>               2.5% 50% 97.5% Rhat n.eff
-#> s(season)_rho  2.1 3.4   4.3    1   415
+#> s(season)_rho  2.1 3.4   4.2    1   520
 #> 
 #> Approximate significance of GAM observation smooths:
-#>            edf Ref.df Chi.sq p-value
-#> s(season) 6.56     10  19358    0.24
+#>            edf Chi.sq p-value
+#> s(season) 4.04  20290    0.22
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n.eff
-#> ar1[1]    0.74  1.10 1.400    1   614
-#> ar2[1]   -0.82 -0.39 0.065    1  1524
-#> ar3[1]   -0.46 -0.12 0.320    1   432
-#> sigma[1]  0.40  0.50 0.650    1  1216
+#> ar1[1]    0.76  1.10 1.400 1.00   747
+#> ar2[1]   -0.85 -0.40 0.062 1.00  1608
+#> ar3[1]   -0.50 -0.12 0.330 1.01   470
+#> sigma[1]  0.40  0.50 0.640 1.00  1031
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -688,7 +688,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-31-1.png" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample DRPS:
-    #> [1] 2806.193
+    #> [1] 2896.107
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -788,9 +788,9 @@ each competing model at the same set of timepoints.
 ``` r
 compare_mvgams(lynx_mvgam, lynx_mvgam_poor, fc_horizon = 10)
 #> RPS summaries per model (lower is better)
-#>             Min.  1st Qu.    Median     Mean   3rd Qu.      Max.
-#> Model 1 3741.261  4251.22  4740.237  5170.38  5900.935  7639.796
-#> Model 2 5625.613 11398.04 16985.819 15268.62 19268.205 21496.856
+#>             Min.   1st Qu.    Median      Mean   3rd Qu.      Max.
+#> Model 1 3726.048  4241.425  4879.843  5248.287  5995.075  7779.446
+#> Model 2 5644.477 11567.963 17900.513 15766.338 19783.975 22561.216
 #> 
 #> 90% interval coverages per model (closer to 0.9 is better)
 #> Model 1 0.98 
@@ -904,9 +904,9 @@ Total ELPDs per model are also a useful overall indicator of performance
 
 ``` r
 lfo_good$sum_ELPD
-#> [1] -134.3953
+#> [1] -141.4854
 lfo_poor$sum_ELPD
-#> [1] -156.5703
+#> [1] -166.5148
 ```
 
 As before, these metrics all favour the more complex model over the
@@ -1011,11 +1011,11 @@ summary(mod, include_betas = FALSE)
 #> s(season):seriesseries_3_rho  1.2 3.0   4.1    1   992
 #> 
 #> Approximate significance of GAM observation smooths:
-#>                           edf Ref.df Chi.sq p-value    
-#> s(season)                4.66      5  15.46 1.9e-05 ***
-#> s(season):seriesseries_1 1.41      4   0.12    0.98    
-#> s(season):seriesseries_2 1.78      4   0.10    0.98    
-#> s(season):seriesseries_3 3.31      4   0.82    0.46    
+#>                           edf Chi.sq p-value    
+#> s(season)                5.00  15.46 1.9e-05 ***
+#> s(season):seriesseries_1 3.74   0.12    0.98    
+#> s(season):seriesseries_2 3.83   0.10    0.98    
+#> s(season):seriesseries_3 3.97   0.82    0.46    
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
@@ -1153,8 +1153,8 @@ summary(mod, include_betas = FALSE)
 #> s(time):temp2_rho -1.4  1.5   3.8    1  1517
 #> 
 #> Approximate significance of GAM observation smooths:
-#>               edf Ref.df    F p-value    
-#> s(time):temp 24.4   25.9 86.3  <2e-16 ***
+#>               edf    F p-value    
+#> s(time):temp 14.9 80.2  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
@@ -1198,7 +1198,7 @@ plot(mod, type = 'forecast', newdata = data_test)
 <img src="man/figures/README-unnamed-chunk-58-1.png" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample CRPS:
-    #> [1] 1.295975
+    #> [1] 1.281124
 
 There are many more extended uses for `mvgam` models, including the
 ability to fit dynamic factor processes for analysing and forecasting

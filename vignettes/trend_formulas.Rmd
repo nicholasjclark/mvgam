@@ -88,7 +88,7 @@ Note that we have z-scored the counts in this example as that will make it easie
 plot_mvgam_series(data = plankton_data, series = 'all')
 ```
 
-As usual, check the data for `NA`s:
+It is always helpful to check the data for `NA`s before attempting any models:
 ```{r}
 image(is.na(t(plankton_data)), axes = F,
       col = c('grey80', 'darkred'))
@@ -96,7 +96,7 @@ axis(3, at = seq(0,1, len = NCOL(plankton_data)),
      labels = colnames(plankton_data))
 ```
 
-We have some missing observations, but of course this isn't an issue for modelling in `mvgam`. A useful property to understand about these counts is that they tend to be highly seasonal. Below are some plots of z-scored counts against the z-scored temperature measurements in the lake for each month:
+We have some missing observations, but this isn't an issue for modelling in `mvgam`. A useful property to understand about these counts is that they tend to be highly seasonal. Below are some plots of z-scored counts against the z-scored temperature measurements in the lake for each month:
 ```{r}
 plankton_data %>%
   dplyr::filter(series == 'Other.algae') %>%
