@@ -755,9 +755,11 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
     if(trend_model == 'VAR1'){
       # Reconstruct the A and Sigma matrices
       Amat <- matrix(trend_pars$A, nrow = length(trend_pars$last_lvs),
-                     ncol = length(trend_pars$last_lvs))
+                     ncol = length(trend_pars$last_lvs),
+                     byrow = TRUE)
       Sigmamat <- matrix(trend_pars$Sigma, nrow = length(trend_pars$last_lvs),
-                         ncol = length(trend_pars$last_lvs))
+                         ncol = length(trend_pars$last_lvs),
+                         byrow = TRUE)
 
       # Reconstruct the last trend vector
       last_trendvec <- unlist(lapply(trend_pars$last_lvs,
@@ -822,9 +824,11 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
     if(trend_model == 'VAR1'){
       # Reconstruct the A and Sigma matrices
       Amat <- matrix(trend_pars$A, nrow = length(trend_pars$last_lvs),
-                     ncol = length(trend_pars$last_lvs))
+                     ncol = length(trend_pars$last_lvs),
+                     byrow = TRUE)
       Sigmamat <- matrix(trend_pars$Sigma, nrow = length(trend_pars$last_lvs),
-                         ncol = length(trend_pars$last_lvs))
+                         ncol = length(trend_pars$last_lvs),
+                         byrow = TRUE)
 
       # Reconstruct the last trend vector
       last_trendvec <- unlist(lapply(trend_pars$last_lvs,
