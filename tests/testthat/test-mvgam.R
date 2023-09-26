@@ -91,6 +91,30 @@ test_that("median coefs should be stored in the mgcv object", {
             coef(gaus_ar1)[,2]))
 })
 
+test_that("empty obs formula should error if no trend_formula", {
+  expect_error(mvgam(y ~ -1,
+                     trend_model = 'AR1',
+                     data = gaus_data$data_train,
+                     family = gaussian(),
+                     run_model = FALSE),
+               'argument "formula" contains no terms')
+})
+
+test_that("empty obs formula allowed if trend_formula supplied", {
+  mod <- mvgam(y ~ -1,
+               trend_formula = ~ s(season),
+               trend_model = 'AR1',
+               data = gaus_data$data_train,
+               family = gaussian(),
+               run_model = FALSE)
+
+  # Check that the intercept coefficient is correctly fixed at zero
+  expect_true(any(grepl('// (Intercept) fixed at zero', mod$model_file,
+                        fixed = TRUE)))
+  expect_true(any(grepl('b[1] = 0;', mod$model_file,
+                        fixed = TRUE)))
+})
+
 test_that("missing values not allowed in predictors", {
   # Include missing vals in training data
   simdat <- sim_mvgam()

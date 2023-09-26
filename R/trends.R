@@ -712,6 +712,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
           inds_keep <- seq(lv, NROW(Xp_trend), by = n_lv)
           Xp_trend_sub = Xp_trend[inds_keep, ]
           attr(Xp_trend_sub, 'model.offset') <- attr(Xp_trend, 'model.offset')[inds_keep]
+          attr(Xp_trend_sub, 'model.offset')[is.na(attr(Xp_trend_sub, 'model.offset'))] <- 0
         } else {
           Xp_trend_sub <- NULL
         }

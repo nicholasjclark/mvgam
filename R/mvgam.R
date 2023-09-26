@@ -616,6 +616,25 @@ mvgam = function(formula,
   validate_pos_integer(samples)
   validate_pos_integer(thin)
 
+  # Check for missing rhs in formula
+  drop_obs_intercept <- FALSE
+  if(length(attr(terms(formula), 'term.labels')) == 0 &
+     !attr(terms(formula), 'intercept') == 1){
+    if(!missing(trend_formula)){
+      # If there are no terms in the observation formula (i.e. y ~ -1),
+      # but a trend_formula is supplied, we will use an intercept-only
+      # observation formula and fix the intercept coefficient at zero
+      formula_envir <- attr(formula, '.Environment')
+      formula <- formula(paste(rlang::f_lhs(formula), '~ 1'))
+      attr(formula, '.Environment') <- formula_envir
+      drop_obs_intercept <- TRUE
+    } else {
+      stop('argument "formula" contains no terms',
+           call. = FALSE)
+    }
+  }
+  orig_formula <- formula
+
   # Check for brmspriors
   if(!missing("data")){
     data_train <- data
@@ -652,7 +671,6 @@ mvgam = function(formula,
   }
 
   # Validate observation formula
-  orig_formula <- formula
   formula <- interpret_mvgam(formula, N = max(data_train$time))
   data_train <- validate_obs_formula(formula, data = data_train, refit = refit)
 
@@ -794,7 +812,7 @@ mvgam = function(formula,
     replace_nas(data_train[[terms(formula(formula))[[2]]]])
 
   # Compute default priors
-  def_priors <- mvgam:::adapt_brms_priors(c(make_default_scales(data_train[[terms(formula(formula))[[2]]]],
+  def_priors <- adapt_brms_priors(c(make_default_scales(data_train[[terms(formula(formula))[[2]]]],
                                                         family),
                                     make_default_int(data_train[[terms(formula(formula))[[2]]]],
                                                      family)),
@@ -1537,15 +1555,29 @@ mvgam = function(formula,
       }
     }
 
-    # Update priors
+    # Update default priors
     vectorised$model_file <- suppressWarnings(update_priors(vectorised$model_file,
                                                             def_priors,
                                                             use_stan = TRUE))
+
+    # Add in any user-specified priors
     if(!missing(priors)){
       vectorised$model_file <- update_priors(vectorised$model_file, priors,
                                              use_stan = TRUE)
     } else {
       priors <- NULL
+    }
+
+    # Drop observation intercept if specified
+    if(drop_obs_intercept){
+      vectorised$model_file[grep('// observation model basis coefficients',
+                                 vectorised$model_file,
+                      fixed = TRUE) + 1] <-
+        paste0(vectorised$model_file[grep('// observation model basis coefficients',
+                                          vectorised$model_file,
+                               fixed = TRUE) + 1],
+               '\n', '// (Intercept) fixed at zero\n', "b[1] = 0;")
+      vectorised$model_file <- readLines(textConnection(vectorised$model_file), n = -1)
     }
 
     # Tidy the representation
