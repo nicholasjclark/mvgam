@@ -223,8 +223,26 @@ get_mvgam_priors = function(formula,
   # Ensure series and time variables are present
   data_train <- validate_series_time(data_train, name = 'data')
 
-  # Validate observation formula
+  # Check for missing rhs in formula
+  drop_obs_intercept <- FALSE
+  if(length(attr(terms(formula), 'term.labels')) == 0 &
+     !attr(terms(formula), 'intercept') == 1){
+    if(!missing(trend_formula)){
+      # If there are no terms in the observation formula (i.e. y ~ -1),
+      # but a trend_formula is supplied, we will use an intercept-only
+      # observation formula and fix the intercept coefficient at zero
+      formula_envir <- attr(formula, '.Environment')
+      formula <- formula(paste(rlang::f_lhs(formula), '~ 1'))
+      attr(formula, '.Environment') <- formula_envir
+      drop_obs_intercept <- TRUE
+    } else {
+      stop('argument "formula" contains no terms',
+           call. = FALSE)
+    }
+  }
   orig_formula <- formula
+
+  # Validate observation formula
   formula <- interpret_mvgam(formula, N = max(data_train$time))
   data_train <- validate_obs_formula(formula, data = data_train, refit = FALSE)
 
@@ -374,6 +392,14 @@ get_mvgam_priors = function(formula,
     out[] <- lapply(out, function(x)
       gsub("vector<lower=0>[n_series] sigma;", "vector<lower=0>[n_lv] sigma;", x,
            fixed = TRUE))
+
+    # Remove intercept prior if an intercept was suppressed from the
+    # observation model
+    if(drop_obs_intercept){
+      if(any(grepl('Intercept', out$param_name))){
+        out <- out[-grep('Intercept', out$param_name),]
+      }
+    }
 
   } else {
 

@@ -34,7 +34,7 @@ pairs.mvgam <- function(x, variable = NULL, regex = FALSE,
   # By default, don't plot the Betas as there can be hundreds
   # of them in spline models
   if(is.null(variable)) {
-    all_pars <- variables(object)
+    all_pars <- variables(x)
     variable <- c(all_pars$observation_pars[,1],
                   all_pars$observation_smoothpars[,1],
                   all_pars$observation_re_params[,1],

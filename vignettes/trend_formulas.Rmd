@@ -225,8 +225,7 @@ plot(notrend_mod, type = 'forecast', series = 4)
 plot(notrend_mod, type = 'forecast', series = 5)
 ```
 
-### Multiseries dynamics
-The basic model gives us confidence that we can capture the seasonal variation in the observations. But the model has not captured the remaining temporal dynamics, which is obvious when we inspect Dunn-Smyth residuals for each series:
+This basic model gives us confidence that we can capture the seasonal variation in the observations. But the model has not captured the remaining temporal dynamics, which is obvious when we inspect Dunn-Smyth residuals for each series:
 ```{r}
 plot(notrend_mod, type = 'residuals', series = 1)
 ```
@@ -247,28 +246,25 @@ plot(notrend_mod, type = 'residuals', series = 4)
 plot(notrend_mod, type = 'residuals', series = 5)
 ```
 
+### Multiseries dynamics
 Now it is time to get into multivariate State-Space models. We will fit two models that can both incorporate lagged cross-dependencies in the latent process models. The first model assumes that the process errors operate independently from one another, while the second assumes that there may be contemporaneous correlations in the process errors. Both models include a Vector Autoregressive component for the process means, and so both can model complex community dynamics. The models can be described mathematically as follows:
 
 \begin{align*}
 \boldsymbol{count}_t & \sim \text{Normal}(\mu_{obs[t]}, \sigma_{obs}) \\
 \mu_{obs[t]} & = \alpha + process_t \\
-\sigma_{obs} & \sim \text{Uniform}(0.1, 1) \\
 process_t & \sim \text{MVNormal}(\mu_{process[t]}, \Sigma_{process}) \\
 \mu_{process[t]} & = VAR * process_{t-1} + f_{global}(\boldsymbol{month},\boldsymbol{temp})_t + f_{series}(\boldsymbol{month},\boldsymbol{temp})_t \\
 f_{global}(\boldsymbol{month},\boldsymbol{temp}) & = \sum_{k=1}^{K}b_{global} * \beta_{global} \\
-f_{series}(\boldsymbol{month},\boldsymbol{temp}) & = \sum_{k=1}^{K}b_{series} * \beta_{series} \\
-VAR & \sim \text{Normal}(0, 1) \\
-\Sigma_{process} & = \text{diag}(\sigma_{process}) * \text{R} * \text{diag}(\sigma_{process}) \\
-\text{R} & \sim \text{LKJcorr}(2) \end{align*}
+f_{series}(\boldsymbol{month},\boldsymbol{temp}) & = \sum_{k=1}^{K}b_{series} * \beta_{series} \end{align*}
 
 Here you can see that we assume independent observation processes (there is no covariance structure in the observation errors $\sigma_{obs}$) but there is a lot going on in the underlying process model. This component has a Vector Autoregressive part (where the process mean at time $t$ $(\mu_{process[t]})$) is a vector that evolves as a function of where the vector-valued process model was at time $t-1$. The $VAR$ matrix captures these dynamics with self-dependencies on the diagonal and possibly assymetric cross-dependencies on the off-diagonals. The contemporaneous process errors are captured by $\Sigma_{process}$, which can be constrained so that process errors are independent (i.e. setting the off-diagonals to 0) or can be fully parameterized using a Cholesky decomposition (using `Stan`'s $LKJcorr$ distribution to place a prior on the strength of inter-species correlations). 
 
 <br>
-Ok that was a lot to take in. Let's fit some models to try and inspect what is going on and what they assume. But first, we need to update `mvgam`'s default priors for the observation errors. By default, `mvgam` uses a fairly wide Student-T prior on this parameter because the package doesn't know what range the observations will be on. But our observations are z-scored and so we do not expect very large observation errors. However, we also do not expect very small observation errors. So let's update the prior for this parameter. In doing so, you will get to see how the formula for the latent process (i.e. trend) model is used in `mvgam`:
+Ok that was a lot to take in. Let's fit some models to try and inspect what is going on and what they assume. But first, we need to update `mvgam`'s default priors for the observation and process errors. By default, `mvgam` uses a fairly wide Student-T prior on these parameters to avoid being overly informative. But our observations are z-scored and so we do not expect very large process or observation errors. However, we also do not expect very small observation errors either as we know these measurements are not perfect. So let's update the priors for these parameters. In doing so, you will get to see how the formula for the latent process (i.e. trend) model is used in `mvgam`:
 ```{r}
 priors <- get_mvgam_priors(
-  # observation formula, which just uses an intercept
-  y ~ 1,
+  # observation formula, which has no terms in it
+  y ~ -1,
   
   # process model formula, which includes the smooth functions
   trend_formula = ~ te(temp, month, k = c(4, 4)) +
@@ -290,20 +286,15 @@ And their default prior distributions:
 priors[, 4]
 ```
 
-Setting priors is easy in `mvgam` as you can use `brms` routines:
+Setting priors is easy in `mvgam` as you can use `brms` routines. Here we use more informative Normal priors for both error components, but we impose a lower bound of 0.2 for the observation errors:
 ```{r}
-priors <- prior(uniform(0.1, 1), class = sigma_obs, lb = 0.1, ub = 1)
+priors <- c(prior(normal(0.5, 0.1), class = sigma_obs, lb = 0.2),
+            prior(normal(0.5, 0.25), class = sigma))
 ```
 
-There is one more small catch with this model: the shared intercept parameter can sometimes be unidentifiable with respect to the latent VAR process. We will often get better convergence in these State-Space models if we regularize this parameter toward zero. A tight Normal prior will do this for us:
-```{r}
-priors <- c(priors,
-            prior(normal(0, 0.001), class = Intercept))
-```
-
-Now we can fit the first model, which assumes that process errors are contemporaneously uncorrelated
+You may have noticed something else unique about this model: there is no intercept term in the observation formula. This is because a shared intercept parameter can sometimes be unidentifiable with respect to the latent VAR process, particularly if our series have similar long-run averages (which they do in this case because they were Z-scored). We will often get better convergence in these State-Space models if we drop this parameter. `mvgam` accomplishes this by fixing the coefficient for the intercept to zero. Now we can fit the first model, which assumes that process errors are contemporaneously uncorrelated
 ```{r var_mod, include = FALSE, results='hide'}
-var_mod <- mvgam(y ~ 1,
+var_mod <- mvgam(y ~ -1,
                  trend_formula = ~
                    # tensor of temp and month should capture
                    # seasonality
@@ -321,8 +312,8 @@ var_mod <- mvgam(y ~ 1,
 
 ```{r eval=FALSE}
 var_mod <- mvgam(  
-  # observation formula, which just uses an intercept
-  y ~ 1,
+  # observation formula, which is empty
+  y ~ -1,
   
   # process model formula, which includes the smooth functions
   trend_formula = ~ te(temp, month, k = c(4, 4)) +
@@ -394,19 +385,19 @@ The observation error estimates $(\sigma_{obs})$ represent how much the model th
 mcmc_plot(var_mod, variable = 'sigma_obs', regex = TRUE, type = 'hist')
 ```
 
-These are still a bit hard to identify overall. 
+These are still a bit hard to identify overall, especially when trying to estimate both process and observation error. Often we need to make some strong assumptions about which of these is more important for determining unexplained variation in our observations. 
 
 ### Correlated process errors
 
-Let's see if the estimates improve when we allow the process errors to be correlated. Once again, we need to first update the priors for the shared intercept and observation errors:
+Let's see if these estimates improve when we allow the process errors to be correlated. Once again, we need to first update the priors for the observation errors:
 ```{r}
-priors <- c(prior(uniform(0.1, 1), class = sigma_obs, lb = 0.1, ub = 1),
-            prior(normal(0, 0.001), class = Intercept))
+priors <- c(prior(normal(0.5, 0.1), class = sigma_obs, lb = 0.2),
+            prior(normal(0.5, 0.25), class = sigma))
 ```
 
 And now we can fit the correlated process error model
 ```{r varcor_mod, include = FALSE, results='hide'}
-varcor_mod <- mvgam(y ~ 1,
+varcor_mod <- mvgam(y ~ -1,
                  trend_formula = ~
                    # tensor of temp and month should capture
                    # seasonality
@@ -424,8 +415,8 @@ varcor_mod <- mvgam(y ~ 1,
 
 ```{r eval=FALSE}
 varcor_mod <- mvgam(  
-  # observation formula, which just uses an intercept
-  y ~ 1,
+  # observation formula, which remains empty
+  y ~ -1,
   
   # process model formula, which includes the smooth functions
   trend_formula = ~ te(temp, month, k = c(4, 4)) +
@@ -441,7 +432,7 @@ varcor_mod <- mvgam(
   priors = priors)
 ```
 
-Plot convergence diagnostics for the two models, which shows that the more complex model with correlated errors has better convergence:
+Plot convergence diagnostics for the two models, which shows that both models display similar levels of convergence:
 ```{r warning=FALSE, message=FALSE}
 mcmc_plot(varcor_mod, type = 'rhat') +
   labs(title = 'VAR1cor')
@@ -449,13 +440,7 @@ mcmc_plot(var_mod, type = 'rhat') +
   labs(title = 'VAR1')
 ```
 
-We can also check convergence using one of the package's inbuilt utility functions:
-```{r}
-mvgam:::check_rhat(varcor_mod$model_output)
-mvgam:::check_rhat(var_mod$model_output)
-```
-
-This model has converged better than the first model (that assumed process errors were independent), possibly telling us that this is a more appropriate model. The $(\Sigma)$ matrix now captures any evidence of contemporaneously correlated process error:
+The $(\Sigma)$ matrix now captures any evidence of contemporaneously correlated process error:
 ```{r warning=FALSE, message=FALSE}
 Sigma_pars <- matrix(NA, nrow = 5, ncol = 5)
 for(i in 1:5){
@@ -548,4 +533,4 @@ plot(diff_scores, pch = 16, cex = 1.25, col = 'darkred',
 abline(h = 0, lty = 'dashed')
 ```
 
-The models tend to provide similar forecasts, so we would probably need to use a more extensive rolling forecast evaluation exercise if we felt like we needed to only choose one for production. `mvgam` offers some utilities for doing this (i.e. see `?lfo_cv` for guidance).
+The models tend to provide similar forecasts, though the correlated error model does slightly better overall. We would probably need to use a more extensive rolling forecast evaluation exercise if we felt like we needed to only choose one for production. `mvgam` offers some utilities for doing this (i.e. see `?lfo_cv` for guidance).
