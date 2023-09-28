@@ -74,7 +74,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2023-09-27</h4>
+            <h4 data-toc-skip class="date">2023-09-28</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/trend_formulas.Rmd" class="external-link"><code>vignettes/trend_formulas.Rmd</code></a></small>
       <div class="d-none name"><code>trend_formulas.Rmd</code></div>
@@ -252,7 +252,7 @@ capture the seasonal variation, our multivariate dynamic model will be
 forced to try and capture it, which could lead to poor convergence and
 unstable results (we could feasibly capture cyclic dynamics with a more
 complex multi-species Lotka-Volterra model, but ordinary differential
-equation approaches are beyond the scope of this workshop).</p>
+equation approaches are beyond the scope of <code>mvgam</code>).</p>
 </div>
 <div class="section level3">
 <h3 id="capturing-seasonality">Capturing seasonality<a class="anchor" aria-label="anchor" href="#capturing-seasonality"></a>
@@ -312,27 +312,27 @@ seasonal variation in our observations:</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">notrend_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
 <p><img src="trend_formulas_files/figure-html/unnamed-chunk-19-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 6.763645</span></span></code></pre>
+<span><span class="co">## [1] 6.754852</span></span></code></pre>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">notrend_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
 <p><img src="trend_formulas_files/figure-html/unnamed-chunk-20-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 6.789209</span></span></code></pre>
+<span><span class="co">## [1] 6.802001</span></span></code></pre>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">notrend_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
 <p><img src="trend_formulas_files/figure-html/unnamed-chunk-21-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 4.11424</span></span></code></pre>
+<span><span class="co">## [1] 4.093416</span></span></code></pre>
 <div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">notrend_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></code></pre></div>
 <p><img src="trend_formulas_files/figure-html/unnamed-chunk-22-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 3.54709</span></span></code></pre>
+<span><span class="co">## [1] 3.588627</span></span></code></pre>
 <div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">notrend_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">5</span><span class="op">)</span></span></code></pre></div>
 <p><img src="trend_formulas_files/figure-html/unnamed-chunk-23-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 2.907445</span></span></code></pre>
+<span><span class="co">## [1] 2.79454</span></span></code></pre>
 <p>This basic model gives us confidence that we can capture the seasonal
 variation in the observations. But the model has not captured the
 remaining temporal dynamics, which is obvious when we inspect Dunn-Smyth
@@ -367,7 +367,7 @@ be described mathematically as follows:</p>
 <p><span class="math display">\[\begin{align*}
 \boldsymbol{count}_t &amp; \sim \text{Normal}(\mu_{obs[t]},
 \sigma_{obs}) \\
-\mu_{obs[t]} &amp; = \alpha + process_t \\
+\mu_{obs[t]} &amp; = process_t \\
 process_t &amp; \sim \text{MVNormal}(\mu_{process[t]}, \Sigma_{process})
 \\
 \mu_{process[t]} &amp; = VAR * process_{t-1} +
@@ -377,19 +377,33 @@ f_{global}(\boldsymbol{month},\boldsymbol{temp}) &amp; =
 \sum_{k=1}^{K}b_{global} * \beta_{global} \\
 f_{series}(\boldsymbol{month},\boldsymbol{temp}) &amp; =
 \sum_{k=1}^{K}b_{series} * \beta_{series} \end{align*}\]</span></p>
-<p>Here you can see that we assume independent observation processes
-(there is no covariance structure in the observation errors <span class="math inline">\(\sigma_{obs}\)</span>) but there is a lot going on
-in the underlying process model. This component has a Vector
-Autoregressive part (where the process mean at time <span class="math inline">\(t\)</span> <span class="math inline">\((\mu_{process[t]})\)</span>) is a vector that
+<p>Here you can see that there are no terms in the observation model
+apart from the underlying process model. But we could easily add
+covariates into the observation model if we felt that they could explain
+some of the systematic observation errors. We also assume independent
+observation processes (there is no covariance structure in the
+observation errors <span class="math inline">\(\sigma_{obs}\)</span>).
+At present, <code>mvgam</code> does not support multivariate observation
+models. But this feature will be added in future versions. However the
+underlying process model is multivariate, and there is a lot going on
+here. This component has a Vector Autoregressive part, where the process
+mean at time <span class="math inline">\(t\)</span> <span class="math inline">\((\mu_{process[t]})\)</span> is a vector that
 evolves as a function of where the vector-valued process model was at
 time <span class="math inline">\(t-1\)</span>. The <span class="math inline">\(VAR\)</span> matrix captures these dynamics with
-self-dependencies on the diagonal and possibly assymetric
-cross-dependencies on the off-diagonals. The contemporaneous process
-errors are captured by <span class="math inline">\(\Sigma_{process}\)</span>, which can be
+self-dependencies on the diagonal and possibly asymmetric
+cross-dependencies on the off-diagonals, while also incorporating the
+nonlinear smooth functions that capture seasonality for each series. The
+contemporaneous process errors are modeled by <span class="math inline">\(\Sigma_{process}\)</span>, which can be
 constrained so that process errors are independent (i.e. setting the
 off-diagonals to 0) or can be fully parameterized using a Cholesky
 decomposition (using <code>Stan</code>’s <span class="math inline">\(LKJcorr\)</span> distribution to place a prior on
-the strength of inter-species correlations).</p>
+the strength of inter-species correlations). For those that are
+interested in the inner-workings, <code>mvgam</code> makes use of a
+recent breakthrough by <a href="https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648" class="external-link">Sarah
+Heaps to enforce stationarity of Bayesian VAR processes</a>. This is
+advantageous as we often don’t expect forecast variance to increase
+without bound forever into the future, but many estimated VARs tend to
+behave this way.</p>
 <p><br> Ok that was a lot to take in. Let’s fit some models to try and
 inspect what is going on and what they assume. But first, we need to
 update <code>mvgam</code>’s default priors for the observation and
@@ -448,7 +462,7 @@ observation errors:</p>
 no intercept term in the observation formula. This is because a shared
 intercept parameter can sometimes be unidentifiable with respect to the
 latent VAR process, particularly if our series have similar long-run
-averages (which they do in this case because they were Z-scored). We
+averages (which they do in this case because they were z-scored). We
 will often get better convergence in these State-Space models if we drop
 this parameter. <code>mvgam</code> accomplishes this by fixing the
 coefficient for the intercept to zero. Now we can fit the first model,
@@ -517,11 +531,11 @@ to interpret:</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## Observation error parameter estimates:</span></span>
 <span><span class="co">##              2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## sigma_obs[1] 0.21 0.26  0.34 1.01   314</span></span>
-<span><span class="co">## sigma_obs[2] 0.27 0.40  0.53 1.03   193</span></span>
-<span><span class="co">## sigma_obs[3] 0.43 0.65  0.82 1.10    33</span></span>
-<span><span class="co">## sigma_obs[4] 0.25 0.37  0.49 1.02   215</span></span>
-<span><span class="co">## sigma_obs[5] 0.30 0.44  0.54 1.03   169</span></span>
+<span><span class="co">## sigma_obs[1] 0.20 0.25  0.34 1.01   420</span></span>
+<span><span class="co">## sigma_obs[2] 0.25 0.40  0.54 1.01   152</span></span>
+<span><span class="co">## sigma_obs[3] 0.42 0.63  0.80 1.02   143</span></span>
+<span><span class="co">## sigma_obs[4] 0.24 0.37  0.49 1.01   264</span></span>
+<span><span class="co">## sigma_obs[5] 0.30 0.43  0.55 1.00   247</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">##             2.5% 50% 97.5% Rhat n.eff</span></span>
@@ -529,104 +543,103 @@ to interpret:</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## Process model VAR parameter estimates:</span></span>
 <span><span class="co">##          2.5%    50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## A[1,1]  0.100  0.440 0.740 1.01   132</span></span>
-<span><span class="co">## A[1,2] -0.270  0.025 1.100 1.14    24</span></span>
-<span><span class="co">## A[1,3] -0.490 -0.200 0.027 1.01   204</span></span>
-<span><span class="co">## A[1,4] -0.140  0.120 0.370 1.02    84</span></span>
-<span><span class="co">## A[1,5] -0.038  0.230 0.640 1.02   189</span></span>
-<span><span class="co">## A[2,1] -0.490 -0.024 0.370 1.01   373</span></span>
-<span><span class="co">## A[2,2] -0.037  0.530 0.890 1.07    45</span></span>
-<span><span class="co">## A[2,3] -0.330 -0.028 0.190 1.01   255</span></span>
-<span><span class="co">## A[2,4] -0.097  0.120 0.550 1.05    89</span></span>
-<span><span class="co">## A[2,5] -0.290  0.029 0.400 1.01   637</span></span>
-<span><span class="co">## A[3,1] -0.400 -0.130 0.053 1.01   241</span></span>
-<span><span class="co">## A[3,2] -0.160  0.014 0.270 1.02   499</span></span>
-<span><span class="co">## A[3,3]  0.610  0.790 0.910 1.01   261</span></span>
-<span><span class="co">## A[3,4] -0.055  0.058 0.200 1.01   501</span></span>
-<span><span class="co">## A[3,5] -0.030  0.120 0.360 1.02   237</span></span>
-<span><span class="co">## A[4,1] -0.610 -0.170 0.140 1.01   153</span></span>
-<span><span class="co">## A[4,2] -0.180  0.073 2.000 1.17    21</span></span>
-<span><span class="co">## A[4,3] -0.420 -0.110 0.076 1.01   168</span></span>
-<span><span class="co">## A[4,4]  0.460  0.730 0.940 1.02    89</span></span>
-<span><span class="co">## A[4,5] -0.052  0.200 0.610 1.02   172</span></span>
-<span><span class="co">## A[5,1] -0.450 -0.110 0.120 1.03   176</span></span>
-<span><span class="co">## A[5,2] -0.130  0.052 1.100 1.14    28</span></span>
-<span><span class="co">## A[5,3] -0.099  0.051 0.260 1.02   372</span></span>
-<span><span class="co">## A[5,4] -0.220 -0.035 0.120 1.01   168</span></span>
-<span><span class="co">## A[5,5]  0.500  0.750 0.940 1.02   291</span></span>
+<span><span class="co">## A[1,1]  0.016  0.420 0.700 1.00   286</span></span>
+<span><span class="co">## A[1,2] -0.280  0.013 0.320 1.01   201</span></span>
+<span><span class="co">## A[1,3] -0.520 -0.200 0.020 1.01   201</span></span>
+<span><span class="co">## A[1,4] -0.047  0.130 0.390 1.00   329</span></span>
+<span><span class="co">## A[1,5] -0.014  0.230 0.640 1.01   212</span></span>
+<span><span class="co">## A[2,1] -0.450 -0.032 0.380 1.00   313</span></span>
+<span><span class="co">## A[2,2] -0.021  0.460 0.830 1.02   141</span></span>
+<span><span class="co">## A[2,3] -0.340 -0.029 0.220 1.00   443</span></span>
+<span><span class="co">## A[2,4] -0.092  0.150 0.540 1.01   214</span></span>
+<span><span class="co">## A[2,5] -0.300  0.029 0.410 1.00   552</span></span>
+<span><span class="co">## A[3,1] -0.420 -0.130 0.042 1.00   363</span></span>
+<span><span class="co">## A[3,2] -0.150  0.014 0.170 1.00   562</span></span>
+<span><span class="co">## A[3,3]  0.620  0.780 0.910 1.01   416</span></span>
+<span><span class="co">## A[3,4] -0.057  0.062 0.210 1.00   635</span></span>
+<span><span class="co">## A[3,5] -0.034  0.120 0.340 1.00   384</span></span>
+<span><span class="co">## A[4,1] -0.660 -0.190 0.120 1.01   192</span></span>
+<span><span class="co">## A[4,2] -0.220  0.068 0.370 1.02   223</span></span>
+<span><span class="co">## A[4,3] -0.430 -0.130 0.077 1.01   233</span></span>
+<span><span class="co">## A[4,4]  0.530  0.740 0.950 1.00   366</span></span>
+<span><span class="co">## A[4,5] -0.042  0.200 0.610 1.01   230</span></span>
+<span><span class="co">## A[5,1] -0.450 -0.120 0.120 1.00   266</span></span>
+<span><span class="co">## A[5,2] -0.150  0.050 0.280 1.01   446</span></span>
+<span><span class="co">## A[5,3] -0.098  0.059 0.240 1.00   446</span></span>
+<span><span class="co">## A[5,4] -0.180 -0.031 0.120 1.00   632</span></span>
+<span><span class="co">## A[5,5]  0.480  0.740 0.940 1.00   352</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Process error parameter estimates:</span></span>
 <span><span class="co">##             2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## Sigma[1,1] 0.054 0.15  0.29 1.04   151</span></span>
+<span><span class="co">## Sigma[1,1] 0.059 0.16  0.30 1.01   143</span></span>
 <span><span class="co">## Sigma[1,2] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[1,3] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[1,4] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[1,5] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[2,1] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">## Sigma[2,2] 0.012 0.27  0.65 1.12    26</span></span>
+<span><span class="co">## Sigma[2,2] 0.066 0.30  0.65 1.03    96</span></span>
 <span><span class="co">## Sigma[2,3] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[2,4] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[2,5] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[3,1] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[3,2] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">## Sigma[3,3] 0.066 0.11  0.18 1.03   217</span></span>
+<span><span class="co">## Sigma[3,3] 0.068 0.12  0.18 1.02   353</span></span>
 <span><span class="co">## Sigma[3,4] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[3,5] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[4,1] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[4,2] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[4,3] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">## Sigma[4,4] 0.100 0.21  0.34 1.02   230</span></span>
+<span><span class="co">## Sigma[4,4] 0.110 0.21  0.36 1.00   284</span></span>
 <span><span class="co">## Sigma[4,5] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[5,1] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[5,2] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[5,3] 0.000 0.00  0.00  NaN   NaN</span></span>
 <span><span class="co">## Sigma[5,4] 0.000 0.00  0.00  NaN   NaN</span></span>
-<span><span class="co">## Sigma[5,5] 0.049 0.13  0.27 1.04   108</span></span>
+<span><span class="co">## Sigma[5,5] 0.057 0.13  0.27 1.01   197</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM process model coefficient (beta) estimates:</span></span>
-<span><span class="co">##                        2.5%   50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## te(temp,month).1_trend -0.7 -0.22  0.32 1.01   276</span></span>
+<span><span class="co">##                         2.5%  50% 97.5% Rhat n.eff</span></span>
+<span><span class="co">## te(temp,month).1_trend -0.73 -0.2  0.33 1.01   338</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM process smoothing parameter (rho) estimates:</span></span>
-<span><span class="co">##                                         2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## te(temp,month)_rho_trend                1.80  3.3   4.2 1.00   908</span></span>
-<span><span class="co">## te(temp,month)2_rho_trend              -0.41  2.3   3.9 1.03   109</span></span>
-<span><span class="co">## te(temp,month)3_rho_trend              -0.60  2.1   4.0 1.02   181</span></span>
-<span><span class="co">## te(temp,month):seriestrend1_rho_trend   0.63  2.7   4.0 1.02   425</span></span>
-<span><span class="co">## te(temp,month):seriestrend12_rho_trend -2.30 -0.5   1.9 1.01   320</span></span>
-<span><span class="co">## te(temp,month):seriestrend13_rho_trend -1.40  2.7   4.1 1.04   168</span></span>
-<span><span class="co">## te(temp,month):seriestrend2_rho_trend   0.88  3.1   4.2 1.00   454</span></span>
-<span><span class="co">## te(temp,month):seriestrend22_rho_trend  0.91  3.2   4.2 1.01   332</span></span>
-<span><span class="co">## te(temp,month):seriestrend23_rho_trend  1.00  3.1   4.2 1.00   615</span></span>
-<span><span class="co">## te(temp,month):seriestrend3_rho_trend   1.60  3.3   4.2 1.01   723</span></span>
-<span><span class="co">## te(temp,month):seriestrend32_rho_trend  0.45  2.8   4.0 1.01   204</span></span>
-<span><span class="co">## te(temp,month):seriestrend33_rho_trend  0.68  3.1   4.2 1.01   327</span></span>
-<span><span class="co">## te(temp,month):seriestrend4_rho_trend   1.00  3.2   4.2 1.00   356</span></span>
-<span><span class="co">## te(temp,month):seriestrend42_rho_trend  0.51  2.9   4.1 1.00   500</span></span>
-<span><span class="co">## te(temp,month):seriestrend43_rho_trend -0.13  3.0   4.2 1.01   309</span></span>
-<span><span class="co">## te(temp,month):seriestrend5_rho_trend   1.10  3.2   4.2 1.01   423</span></span>
-<span><span class="co">## te(temp,month):seriestrend52_rho_trend -0.22  2.1   4.0 1.00   159</span></span>
-<span><span class="co">## te(temp,month):seriestrend53_rho_trend  0.37  3.1   4.1 1.01   610</span></span>
+<span><span class="co">##                                         2.5%   50% 97.5% Rhat n.eff</span></span>
+<span><span class="co">## te(temp,month)_rho_trend                1.70  3.30   4.2 1.00   851</span></span>
+<span><span class="co">## te(temp,month)2_rho_trend              -0.18  2.20   4.0 1.05   155</span></span>
+<span><span class="co">## te(temp,month)3_rho_trend              -0.68  2.30   4.0 1.02   262</span></span>
+<span><span class="co">## te(temp,month):seriestrend1_rho_trend   0.62  2.80   4.0 1.00   549</span></span>
+<span><span class="co">## te(temp,month):seriestrend12_rho_trend -2.30 -0.61   1.7 1.00   472</span></span>
+<span><span class="co">## te(temp,month):seriestrend13_rho_trend -1.00  2.70   4.1 1.01   341</span></span>
+<span><span class="co">## te(temp,month):seriestrend2_rho_trend   1.00  3.10   4.1 1.00   576</span></span>
+<span><span class="co">## te(temp,month):seriestrend22_rho_trend  1.10  3.20   4.2 1.01   365</span></span>
+<span><span class="co">## te(temp,month):seriestrend23_rho_trend  0.84  3.10   4.2 1.00   620</span></span>
+<span><span class="co">## te(temp,month):seriestrend3_rho_trend   1.20  3.20   4.2 1.01   465</span></span>
+<span><span class="co">## te(temp,month):seriestrend32_rho_trend  0.23  2.70   4.1 1.05   127</span></span>
+<span><span class="co">## te(temp,month):seriestrend33_rho_trend  0.31  3.10   4.2 1.02   239</span></span>
+<span><span class="co">## te(temp,month):seriestrend4_rho_trend   1.20  3.20   4.2 1.00   734</span></span>
+<span><span class="co">## te(temp,month):seriestrend42_rho_trend  0.54  2.90   4.1 1.00   473</span></span>
+<span><span class="co">## te(temp,month):seriestrend43_rho_trend  0.43  3.10   4.1 1.01   511</span></span>
+<span><span class="co">## te(temp,month):seriestrend5_rho_trend   1.10  3.20   4.2 1.00   628</span></span>
+<span><span class="co">## te(temp,month):seriestrend52_rho_trend -0.23  2.00   3.9 1.02   241</span></span>
+<span><span class="co">## te(temp,month):seriestrend53_rho_trend  0.41  3.00   4.1 1.00   512</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##                              edf    F p-value   </span></span>
-<span><span class="co">## te(temp,month)              5.41 0.61  0.1812   </span></span>
-<span><span class="co">## te(temp,month):seriestrend1 3.80 1.68  0.0078 **</span></span>
-<span><span class="co">## te(temp,month):seriestrend2 1.24 0.02  1.0000   </span></span>
-<span><span class="co">## te(temp,month):seriestrend3 1.89 0.08  0.9769   </span></span>
-<span><span class="co">## te(temp,month):seriestrend4 1.95 0.07  0.9968   </span></span>
-<span><span class="co">## te(temp,month):seriestrend5 3.50 0.17  0.7573   </span></span>
+<span><span class="co">##                              edf    F p-value    </span></span>
+<span><span class="co">## te(temp,month)              4.58 0.67 0.09398 .  </span></span>
+<span><span class="co">## te(temp,month):seriestrend1 3.12 1.85 0.00044 ***</span></span>
+<span><span class="co">## te(temp,month):seriestrend2 1.15 0.02 0.99999    </span></span>
+<span><span class="co">## te(temp,month):seriestrend3 1.43 0.12 0.97574    </span></span>
+<span><span class="co">## te(temp,month):seriestrend4 1.40 0.09 0.99365    </span></span>
+<span><span class="co">## te(temp,month):seriestrend5 1.30 0.28 0.79248    </span></span>
 <span><span class="co">## ---</span></span>
 <span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">## Rhats above 1.05 found for 31 parameters</span></span>
+<span><span class="co">## Rhats above 1.05 found for 1 parameters</span></span>
 <span><span class="co">## *Diagnose further to investigate why the chains have not mixed</span></span>
 <span><span class="co">## 0 of 2000 iterations ended with a divergence (0%)</span></span>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
-<span><span class="co">## Chain 3: E-FMI = 0.1048</span></span>
-<span><span class="co">## *E-FMI below 0.2 indicates you may need to reparameterize your model</span></span></code></pre>
+<span><span class="co">## E-FMI indicated no pathological behavior</span></span></code></pre>
 <p>The convergence of this model isn’t fabulous (more on this in a
 moment). But we can again plot the smooth functions, which this time
 operate on the process model. We can see the same plot using
@@ -656,7 +669,7 @@ order:</p>
 <p><img src="trend_formulas_files/figure-html/unnamed-chunk-37-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>There is a lot happening in this matrix. Each cell captures the
 lagged effect of the process in the column on the process in the row in
-the next timestep. So for example, the effect in cell [3,1], which is
+the next timestep. So for example, the effect in cell [1,3], which is
 quite strongly negative, means that an <em>increase</em> in the process
 for series 3 (Greens) at time <span class="math inline">\(t\)</span> is
 expected to lead to a subsequent <em>decrease</em> in the process for
@@ -761,11 +774,11 @@ correlations:</p>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">median_correlations</span>, <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">##             Bluegreens Diatoms Greens Other.algae Unicells</span></span>
-<span><span class="co">## Bluegreens        1.00    0.17  -0.23        0.47     0.19</span></span>
-<span><span class="co">## Diatoms           0.17    1.00  -0.05        0.30    -0.06</span></span>
-<span><span class="co">## Greens           -0.23   -0.05   1.00        0.17     0.50</span></span>
-<span><span class="co">## Other.algae       0.47    0.30   0.17        1.00     0.27</span></span>
-<span><span class="co">## Unicells          0.19   -0.06   0.50        0.27     1.00</span></span></code></pre>
+<span><span class="co">## Bluegreens        1.00    0.15  -0.21        0.47     0.19</span></span>
+<span><span class="co">## Diatoms           0.15    1.00  -0.05        0.30    -0.05</span></span>
+<span><span class="co">## Greens           -0.21   -0.05   1.00        0.17     0.49</span></span>
+<span><span class="co">## Other.algae       0.47    0.30   0.17        1.00     0.28</span></span>
+<span><span class="co">## Unicells          0.19   -0.05   0.49        0.28     1.00</span></span></code></pre>
 <p>Because this model is able to capture correlated errors, the VAR
 matrix has changed slightly:</p>
 <div class="sourceCode" id="cb59"><pre class="downlit sourceCode r">
@@ -788,32 +801,32 @@ model):</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">var_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">1</span>, newdata <span class="op">=</span> <span class="va">plankton_test</span><span class="op">)</span></span></code></pre></div>
 <p><img src="trend_formulas_files/figure-html/unnamed-chunk-48-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 3.043714</span></span></code></pre>
+<span><span class="co">## [1] 3.171557</span></span></code></pre>
 <div class="sourceCode" id="cb62"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">varcor_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">1</span>, newdata <span class="op">=</span> <span class="va">plankton_test</span><span class="op">)</span></span></code></pre></div>
 <p><img src="trend_formulas_files/figure-html/unnamed-chunk-49-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 2.985842</span></span></code></pre>
+<span><span class="co">## [1] 2.974592</span></span></code></pre>
 <div class="sourceCode" id="cb64"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">var_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">2</span>, newdata <span class="op">=</span> <span class="va">plankton_test</span><span class="op">)</span></span></code></pre></div>
 <p><img src="trend_formulas_files/figure-html/unnamed-chunk-50-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 5.561298</span></span></code></pre>
+<span><span class="co">## [1] 6.008988</span></span></code></pre>
 <div class="sourceCode" id="cb66"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">varcor_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">2</span>, newdata <span class="op">=</span> <span class="va">plankton_test</span><span class="op">)</span></span></code></pre></div>
 <p><img src="trend_formulas_files/figure-html/unnamed-chunk-51-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 5.624434</span></span></code></pre>
+<span><span class="co">## [1] 5.619509</span></span></code></pre>
 <div class="sourceCode" id="cb68"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">var_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">3</span>, newdata <span class="op">=</span> <span class="va">plankton_test</span><span class="op">)</span></span></code></pre></div>
 <p><img src="trend_formulas_files/figure-html/unnamed-chunk-52-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 4.081156</span></span></code></pre>
+<span><span class="co">## [1] 4.101476</span></span></code></pre>
 <div class="sourceCode" id="cb70"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">varcor_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">3</span>, newdata <span class="op">=</span> <span class="va">plankton_test</span><span class="op">)</span></span></code></pre></div>
 <p><img src="trend_formulas_files/figure-html/unnamed-chunk-53-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 3.972818</span></span></code></pre>
+<span><span class="co">## [1] 4.076647</span></span></code></pre>
 <p>We can compute the variogram score for out of sample forecasts to get
 a sense of which model does a better job of capturing the dependence
 structure in the true evaluation set:</p>
@@ -854,6 +867,32 @@ a more extensive rolling forecast evaluation exercise if we felt like we
 needed to only choose one for production. <code>mvgam</code> offers some
 utilities for doing this (i.e. see <code><a href="../reference/lfo_cv.mvgam.html">?lfo_cv</a></code> for
 guidance).</p>
+</div>
+<div class="section level3">
+<h3 id="further-reading">Further reading<a class="anchor" aria-label="anchor" href="#further-reading"></a>
+</h3>
+<p>The following papers and resources offer a lot of useful material
+about multivariate State-Space models and how they can be applied in
+practice:</p>
+<p>Heaps, Sarah E. “<a href="https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648" class="external-link">Enforcing
+stationarity through the prior in vector autoregressions.</a>”
+<em>Journal of Computational and Graphical Statistics</em> 32.1 (2023):
+74-83.</p>
+<p>Hannaford, Naomi E., et al. “<a href="https://www.sciencedirect.com/science/article/pii/S0167947322002390" class="external-link">A
+sparse Bayesian hierarchical vector autoregressive model for microbial
+dynamics in a wastewater treatment plant.</a>” <em>Computational
+Statistics &amp; Data Analysis</em> 179 (2023): 107659.</p>
+<p>Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. “<a href="https://d1wqtxts1xzle7.cloudfront.net/30588864/rjournal_2012-1_holmes_et_al-libre.pdf?1391843792=&amp;response-content-disposition=inline%3B+filename%3DMARSS_Multivariate_Autoregressive_State.pdf&amp;Expires=1695861526&amp;Signature=TCRXULs0mUKRM4m1pmvZxwE10bUqS6vzLcuKeUBCj57YIjx23iTxS1fEgBpV0fs2wb5XAw7ZkG84XyMaoS~vjiqZ-DpheQDHwAHpIWG-TcckHQjEjPWTNajFvAemToUdCiHnDa~yrhW9HRgXjgncdalkjzjvjT3HLSW8mcjBDhQN-WJ3MKQFSXtxoBpWfcuPYbf-HC1E1oSl7957y~w0I1gcIVdu6LHjP~CEKXa0BQzS4xuarL2nz~tHD2MverbNJYMrDGrAxIi-MX6i~lfHWuwV6UKRdoOZ0pXIcMYWBTv9V5xYey76aMKTICiJ~0NqXLZdXO5qlS4~~2nFEO7b7w__&amp;Key-Pair-Id=APKAJLOHF5GGSLRBV4ZA" class="external-link">MARSS:
+multivariate autoregressive state-space models for analyzing time-series
+data.</a>” <em>R Journal</em>. 4.1 (2012): 11.</p>
+<p>Ward, Eric J., et al. “<a href="https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.1365-2664.2009.01745.x" class="external-link">Inferring
+spatial structure from time‐series data: using multivariate state‐space
+models to detect metapopulation structure of California sea lions in the
+Gulf of California, Mexico.</a>” <em>Journal of Applied Ecology</em>
+47.1 (2010): 47-56.</p>
+<p>Auger‐Méthé, Marie, et al. <a href="https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/ecm.1470" class="external-link">“A
+guide to state–space modeling of ecological time series.</a>”
+<em>Ecological Monographs</em> 91.4 (2021): e01470.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

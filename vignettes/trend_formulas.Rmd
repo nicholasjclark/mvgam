@@ -148,7 +148,7 @@ plankton_test <- plankton_data %>%
   dplyr::filter(time > 112)
 ```
 
-Now time to fit some models. This requires a bit of thinking about how we can best tackle the seasonal variation and the likely dependence structure in the data. These algae are interacting as part of a complex system within the same lake, so we certainly expect there to be some lagged cross-dependencies underling their dynamics. But if we do not capture the seasonal variation, our multivariate dynamic model will be forced to try and capture it, which could lead to poor convergence and unstable results (we could feasibly capture cyclic dynamics with a more complex multi-species Lotka-Volterra model, but ordinary differential equation approaches are beyond the scope of this workshop). 
+Now time to fit some models. This requires a bit of thinking about how we can best tackle the seasonal variation and the likely dependence structure in the data. These algae are interacting as part of a complex system within the same lake, so we certainly expect there to be some lagged cross-dependencies underling their dynamics. But if we do not capture the seasonal variation, our multivariate dynamic model will be forced to try and capture it, which could lead to poor convergence and unstable results (we could feasibly capture cyclic dynamics with a more complex multi-species Lotka-Volterra model, but ordinary differential equation approaches are beyond the scope of `mvgam`). 
 
 ### Capturing seasonality
 
@@ -251,13 +251,13 @@ Now it is time to get into multivariate State-Space models. We will fit two mode
 
 \begin{align*}
 \boldsymbol{count}_t & \sim \text{Normal}(\mu_{obs[t]}, \sigma_{obs}) \\
-\mu_{obs[t]} & = \alpha + process_t \\
+\mu_{obs[t]} & = process_t \\
 process_t & \sim \text{MVNormal}(\mu_{process[t]}, \Sigma_{process}) \\
 \mu_{process[t]} & = VAR * process_{t-1} + f_{global}(\boldsymbol{month},\boldsymbol{temp})_t + f_{series}(\boldsymbol{month},\boldsymbol{temp})_t \\
 f_{global}(\boldsymbol{month},\boldsymbol{temp}) & = \sum_{k=1}^{K}b_{global} * \beta_{global} \\
 f_{series}(\boldsymbol{month},\boldsymbol{temp}) & = \sum_{k=1}^{K}b_{series} * \beta_{series} \end{align*}
 
-Here you can see that we assume independent observation processes (there is no covariance structure in the observation errors $\sigma_{obs}$) but there is a lot going on in the underlying process model. This component has a Vector Autoregressive part (where the process mean at time $t$ $(\mu_{process[t]})$) is a vector that evolves as a function of where the vector-valued process model was at time $t-1$. The $VAR$ matrix captures these dynamics with self-dependencies on the diagonal and possibly assymetric cross-dependencies on the off-diagonals. The contemporaneous process errors are captured by $\Sigma_{process}$, which can be constrained so that process errors are independent (i.e. setting the off-diagonals to 0) or can be fully parameterized using a Cholesky decomposition (using `Stan`'s $LKJcorr$ distribution to place a prior on the strength of inter-species correlations). 
+Here you can see that there are no terms in the observation model apart from the underlying process model. But we could easily add covariates into the observation model if we felt that they could explain some of the systematic observation errors. We also assume independent observation processes (there is no covariance structure in the observation errors $\sigma_{obs}$).  At present, `mvgam` does not support multivariate observation models. But this feature will be added in future versions. However the underlying process model is multivariate, and there is a lot going on here. This component has a Vector Autoregressive part, where the process mean at time $t$ $(\mu_{process[t]})$ is a vector that evolves as a function of where the vector-valued process model was at time $t-1$. The $VAR$ matrix captures these dynamics with self-dependencies on the diagonal and possibly asymmetric cross-dependencies on the off-diagonals, while also incorporating the nonlinear smooth functions that capture seasonality for each series. The contemporaneous process errors are modeled by $\Sigma_{process}$, which can be constrained so that process errors are independent (i.e. setting the off-diagonals to 0) or can be fully parameterized using a Cholesky decomposition (using `Stan`'s $LKJcorr$ distribution to place a prior on the strength of inter-species correlations). For those that are interested in the inner-workings, `mvgam` makes use of a recent breakthrough by [Sarah Heaps to enforce stationarity of Bayesian VAR processes](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648). This is advantageous as we often don't expect forecast variance to increase without bound forever into the future, but many estimated VARs tend to behave this way. 
 
 <br>
 Ok that was a lot to take in. Let's fit some models to try and inspect what is going on and what they assume. But first, we need to update `mvgam`'s default priors for the observation and process errors. By default, `mvgam` uses a fairly wide Student-T prior on these parameters to avoid being overly informative. But our observations are z-scored and so we do not expect very large process or observation errors. However, we also do not expect very small observation errors either as we know these measurements are not perfect. So let's update the priors for these parameters. In doing so, you will get to see how the formula for the latent process (i.e. trend) model is used in `mvgam`:
@@ -292,7 +292,7 @@ priors <- c(prior(normal(0.5, 0.1), class = sigma_obs, lb = 0.2),
             prior(normal(0.5, 0.25), class = sigma))
 ```
 
-You may have noticed something else unique about this model: there is no intercept term in the observation formula. This is because a shared intercept parameter can sometimes be unidentifiable with respect to the latent VAR process, particularly if our series have similar long-run averages (which they do in this case because they were Z-scored). We will often get better convergence in these State-Space models if we drop this parameter. `mvgam` accomplishes this by fixing the coefficient for the intercept to zero. Now we can fit the first model, which assumes that process errors are contemporaneously uncorrelated
+You may have noticed something else unique about this model: there is no intercept term in the observation formula. This is because a shared intercept parameter can sometimes be unidentifiable with respect to the latent VAR process, particularly if our series have similar long-run averages (which they do in this case because they were z-scored). We will often get better convergence in these State-Space models if we drop this parameter. `mvgam` accomplishes this by fixing the coefficient for the intercept to zero. Now we can fit the first model, which assumes that process errors are contemporaneously uncorrelated
 ```{r var_mod, include = FALSE, results='hide'}
 var_mod <- mvgam(y ~ -1,
                  trend_formula = ~
@@ -358,7 +358,7 @@ mcmc_plot(var_mod,
           type = 'hist')
 ```
 
-There is a lot happening in this matrix. Each cell captures the lagged effect of the process in the column on the process in the row in the next timestep. So for example, the effect in cell [3,1], which is quite strongly negative, means that an *increase* in the process for series 3 (Greens) at time $t$ is expected to lead to a subsequent *decrease* in the process for series 1 (Bluegreens) at time $t+1$. The latent process model is now capturing these effects and the smooth seasonal effects, so the trend plot shows our best estimate of what the *true* count should have been at each time point:
+There is a lot happening in this matrix. Each cell captures the lagged effect of the process in the column on the process in the row in the next timestep. So for example, the effect in cell [1,3], which is quite strongly negative, means that an *increase* in the process for series 3 (Greens) at time $t$ is expected to lead to a subsequent *decrease* in the process for series 1 (Bluegreens) at time $t+1$. The latent process model is now capturing these effects and the smooth seasonal effects, so the trend plot shows our best estimate of what the *true* count should have been at each time point:
 ```{r}
 plot(var_mod, type = 'trend', series = 1)
 ```
@@ -534,3 +534,16 @@ abline(h = 0, lty = 'dashed')
 ```
 
 The models tend to provide similar forecasts, though the correlated error model does slightly better overall. We would probably need to use a more extensive rolling forecast evaluation exercise if we felt like we needed to only choose one for production. `mvgam` offers some utilities for doing this (i.e. see `?lfo_cv` for guidance).
+
+### Further reading
+The following papers and resources offer a lot of useful material about multivariate State-Space models and how they can be applied in practice:
+  
+Heaps, Sarah E. "[Enforcing stationarity through the prior in vector autoregressions.](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648)" *Journal of Computational and Graphical Statistics* 32.1 (2023): 74-83.
+  
+Hannaford, Naomi E., et al. "[A sparse Bayesian hierarchical vector autoregressive model for microbial dynamics in a wastewater treatment plant.](https://www.sciencedirect.com/science/article/pii/S0167947322002390)" *Computational Statistics & Data Analysis* 179 (2023): 107659.
+  
+Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. "[MARSS: multivariate autoregressive state-space models for analyzing time-series data.](https://d1wqtxts1xzle7.cloudfront.net/30588864/rjournal_2012-1_holmes_et_al-libre.pdf?1391843792=&response-content-disposition=inline%3B+filename%3DMARSS_Multivariate_Autoregressive_State.pdf&Expires=1695861526&Signature=TCRXULs0mUKRM4m1pmvZxwE10bUqS6vzLcuKeUBCj57YIjx23iTxS1fEgBpV0fs2wb5XAw7ZkG84XyMaoS~vjiqZ-DpheQDHwAHpIWG-TcckHQjEjPWTNajFvAemToUdCiHnDa~yrhW9HRgXjgncdalkjzjvjT3HLSW8mcjBDhQN-WJ3MKQFSXtxoBpWfcuPYbf-HC1E1oSl7957y~w0I1gcIVdu6LHjP~CEKXa0BQzS4xuarL2nz~tHD2MverbNJYMrDGrAxIi-MX6i~lfHWuwV6UKRdoOZ0pXIcMYWBTv9V5xYey76aMKTICiJ~0NqXLZdXO5qlS4~~2nFEO7b7w__&Key-Pair-Id=APKAJLOHF5GGSLRBV4ZA)" *R Journal*. 4.1 (2012): 11.
+  
+Ward, Eric J., et al. "[Inferring spatial structure from time‐series data: using multivariate state‐space models to detect metapopulation structure of California sea lions in the Gulf of California, Mexico.](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.1365-2664.2009.01745.x)" *Journal of Applied Ecology* 47.1 (2010): 47-56.
+  
+Auger‐Méthé, Marie, et al. ["A guide to state–space modeling of ecological time series.](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/ecm.1470)" *Ecological Monographs* 91.4 (2021): e01470.
