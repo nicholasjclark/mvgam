@@ -26,7 +26,9 @@ Run methods(class = "mvgam") to see an overview of available methods.'><!-- math
 <li class="nav-item dropdown">
   <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
+    <a class="dropdown-item" href="../articles/data_in_mvgam.html">Formatting data for use in mvgam</a>
     <a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a>
+    <a class="dropdown-item" href="../articles/shared_states.html">Shared latent states in mvgam</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in the mvgam package</a>
   </div>
 </li>
@@ -105,6 +107,9 @@ fitting.</p></li>
 <li><p><code>test_data</code> If test data were supplied (as argument <code>newdata</code> in the original model), it
 will be returned. Othwerise <code>NULL</code></p></li>
 <li><p><code>fit_engine</code> <code>Character</code> describing the fit engine, either as <code>stan</code> or <code>jags</code></p></li>
+<li><p><code>backend</code> <code>Character</code> describing the backend used for modelling, either as <code>rstan</code>, <code>cmdstanr</code> or <code>rjags</code></p></li>
+<li><p><code>algorithm</code> <code>Character</code> describing the algorithm used for finding the posterior,
+either as <code>sampling</code>, <code>meanfield</code> or <code>fullrank</code></p></li>
 <li><p><code>max_treedepth</code> If the model was fitted using <code>Stan</code>, the value supplied for the maximum
 treedepth tuning parameter is returned (see <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code> for details).
 Otherwise <code>NULL</code></p></li>

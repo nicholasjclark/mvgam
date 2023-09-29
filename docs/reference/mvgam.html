@@ -36,7 +36,9 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
 <li class="nav-item dropdown">
   <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
+    <a class="dropdown-item" href="../articles/data_in_mvgam.html">Formatting data for use in mvgam</a>
     <a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a>
+    <a class="dropdown-item" href="../articles/shared_states.html">Shared latent states in mvgam</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in the mvgam package</a>
   </div>
 </li>
@@ -103,11 +105,13 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
 <span>  lfo <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  use_stan <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  backend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">"brms.backend"</span>, <span class="st">"cmdstanr"</span><span class="op">)</span>,</span>
+<span>  algorithm <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">"brms.algorithm"</span>, <span class="st">"sampling"</span><span class="op">)</span>,</span>
 <span>  autoformat <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  save_all_pars <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">max_treedepth</span>,</span>
 <span>  <span class="va">adapt_delta</span>,</span>
-<span>  <span class="va">jags_path</span></span>
+<span>  <span class="va">jags_path</span>,</span>
+<span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -243,12 +247,14 @@ be unidentifiable if using dynamic factor models. Therefore this defaults to <co
 
 
 <dt>chains</dt>
-<dd><p><code>integer</code> specifying the number of parallel chains for the model</p></dd>
+<dd><p><code>integer</code> specifying the number of parallel chains for the model. Ignored
+if using Variational Inference with <code>algorithm = 'meanfield'</code> or <code>algorithm = 'fullrank'</code></p></dd>
 
 
 <dt>burnin</dt>
 <dd><p><code>integer</code> specifying the number of warmup iterations of the Markov chain to run
-to tune sampling algorithms</p></dd>
+to tune sampling algorithms. Ignored
+if using Variational Inference with <code>algorithm = 'meanfield'</code> or <code>algorithm = 'fullrank'</code></p></dd>
 
 
 <dt>samples</dt>
@@ -257,7 +263,8 @@ sampling the posterior distribution</p></dd>
 
 
 <dt>thin</dt>
-<dd><p>Thinning interval for monitors</p></dd>
+<dd><p>Thinning interval for monitors.  Ignored
+if using Variational Inference with <code>algorithm = 'meanfield'</code> or <code>algorithm = 'fullrank'</code></p></dd>
 
 
 <dt>parallel</dt>
@@ -316,6 +323,15 @@ the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
 https://mc-stan.org/cmdstanr/, respectively.</p></dd>
 
 
+<dt>algorithm</dt>
+<dd><p>Character string naming the estimation approach to use.
+Options are <code>"sampling"</code> for MCMC (the default), <code>"meanfield"</code> for
+variational inference with independent normal distributions or
+<code>"fullrank"</code> for variational inference with a multivariate normal
+distribution. Can be set globally for the current <span style="R">R</span> session via the
+<code>"brms.algorithm"</code> option (see <code><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></code>).</p></dd>
+
+
 <dt>autoformat</dt>
 <dd><p><code>Logical</code>. Use the <code>stanc</code> parser to automatically format the
 <code>Stan</code> code and check for deprecations. Defaults to <code>TRUE</code></p></dd>
@@ -346,6 +362,14 @@ typically result in a slower sampler, but it will always lead to a more robust s
 <dt>jags_path</dt>
 <dd><p>Optional character vector specifying the path to the location of the <code>JAGS</code> executable (.exe) to use
 for modelling if <code>use_stan == FALSE</code>. If missing, the path will be recovered from a call to <code><a href="https://rdrr.io/pkg/runjags/man/findjags.html" class="external-link">findjags</a></code></p></dd>
+
+
+<dt>...</dt>
+<dd><p>Further arguments passed to Stan.
+For <code>backend = "rstan"</code> the arguments are passed to
+<code><a href="https://mc-stan.org/rstan/reference/stanmodel-method-sampling.html" class="external-link">sampling</a></code> or <code><a href="https://mc-stan.org/rstan/reference/stanmodel-method-vb.html" class="external-link">vb</a></code>.
+For <code>backend = "cmdstanr"</code> the arguments are passed to the
+<code><a href="https://mc-stan.org/cmdstanr/reference/model-method-sample.html" class="external-link">cmdstanr::sample</a></code> or <code><a href="https://mc-stan.org/cmdstanr/reference/model-method-variational.html" class="external-link">cmdstanr::variational</a></code> method.</p></dd>
 
 </dl></div>
     <div class="section level2">

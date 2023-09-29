@@ -24,7 +24,9 @@
 <li class="nav-item dropdown">
   <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
+    <a class="dropdown-item" href="../articles/data_in_mvgam.html">Formatting data for use in mvgam</a>
     <a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a>
+    <a class="dropdown-item" href="../articles/shared_states.html">Shared latent states in mvgam</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in the mvgam package</a>
   </div>
 </li>
@@ -76,10 +78,12 @@ be changed</p></dd>
 <li><p><code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb</a></code> for count data</p></li>
 </ul><p>Finally, <code>mvgam</code> supports the three extended families described here:</p><ul><li><p><code><a href="https://rdrr.io/pkg/brms/man/brmsfamily.html" class="external-link">lognormal</a></code> for non-negative real-valued data</p></li>
 <li><p><code>tweedie</code> for count data (power parameter <code>p</code> fixed at <code>1.5</code>)</p></li>
-<li><p><code>student-t</code> for real-valued data</p></li>
+<li><p><code>student_t()</code> (or <code><a href="https://rdrr.io/pkg/brms/man/brmsfamily.html" class="external-link">student</a></code>) for real-valued data</p></li>
 </ul><p>Note that only <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code>, and <code>tweedie()</code> are available if
 using <code>JAGS</code>. All families, apart from <code>tweedie()</code>, are supported if
 using <code>Stan</code>.</p>
+<p>Note that currently it is not possible to change the default link
+functions in <code>mvgam</code>, so any call to change these will be silently ignored</p>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>

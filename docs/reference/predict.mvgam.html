@@ -24,7 +24,9 @@
 <li class="nav-item dropdown">
   <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
+    <a class="dropdown-item" href="../articles/data_in_mvgam.html">Formatting data for use in mvgam</a>
     <a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a>
+    <a class="dropdown-item" href="../articles/shared_states.html">Shared latent states in mvgam</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in the mvgam package</a>
   </div>
 </li>
@@ -81,7 +83,8 @@ predictions are generated for the original observations used for the model fit.<
 If <code>expected</code> is used, predictions reflect the expectation of the response (the mean)
 but ignore uncertainty in the observation process. When <code>response</code> is used,
 the predictions take uncertainty in the observation process into account to return
-predictions on the outcome scale</p></dd>
+predictions on the outcome scale. When <code>variance</code> is used, the variance of the response
+with respect to the mean (mean-variance relationship) is returned</p></dd>
 
 
 <dt>process_error</dt>

@@ -26,7 +26,9 @@ changed for a given mvgam model, as well listing their default distributions"><!
 <li class="nav-item dropdown">
   <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
+    <a class="dropdown-item" href="../articles/data_in_mvgam.html">Formatting data for use in mvgam</a>
     <a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a>
+    <a class="dropdown-item" href="../articles/shared_states.html">Shared latent states in mvgam</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in the mvgam package</a>
   </div>
 </li>
@@ -362,13 +364,13 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.66);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2    mu_raw ~ normal(0.03, 0.3);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.33);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.38, 0.38);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5     ar2 ~ normal(-0.83, 0.26);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.67);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7   phi_inv ~ normal(0.2, 0.38);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.46);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    mu_raw ~ normal(0.77, 0.9);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.09);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.85, 0.19);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     ar2 ~ normal(-0.66, 0.42);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.76);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.01, 0.98);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>
