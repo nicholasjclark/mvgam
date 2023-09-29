@@ -2588,8 +2588,25 @@ add_trend_predictors = function(trend_formula,
   trend_smooths_included <- FALSE
 
   # Add any multinormal smooth lines
-  if(any(grepl('multi_normal_prec', trend_model_file))){
+  if(any(grepl('multi_normal_prec', trend_model_file)) |
+     any(grepl('// priors for smoothing parameters', trend_model_file))){
     trend_smooths_included <- TRUE
+
+    # Replace any noncontiguous indices from trend model so names aren't
+    # conflicting with any possible indices in the observation model
+    if(any(grepl('idx', trend_model_file))){
+      trend_model_file <- gsub('idx', 'trend_idx', trend_model_file)
+      idx_data <- trend_mvgam$model_data[grep('idx', names(trend_mvgam$model_data))]
+      names(idx_data) <- gsub('idx', 'trend_idx', names(idx_data))
+      model_data <- append(model_data, idx_data)
+
+      idx_lines <- grep('int trend_idx', trend_model_file)
+      model_file[min(grep('data {', model_file, fixed = TRUE))] <-
+        paste0('data {\n',
+               paste(trend_model_file[idx_lines],
+                     collapse = '\n'))
+      model_file <- readLines(textConnection(model_file), n = -1)
+    }
 
     if(any(grepl("int<lower=0> n_sp; // number of smoothing parameters",
                  model_file, fixed = TRUE))){
@@ -2607,10 +2624,28 @@ add_trend_predictors = function(trend_formula,
 
     spline_coef_headers <- trend_model_file[grep('multi_normal_prec',
                                                 trend_model_file) - 1]
+    if(any(grepl('normal(0, lambda',
+                trend_model_file, fixed = TRUE))){
+      spline_coef_headers <- c(spline_coef_headers,
+                               trend_model_file[grep('normal(0, lambda',
+                                                     trend_model_file, fixed = TRUE)-1])
+    }
     spline_coef_headers <- gsub('...', '_trend...', spline_coef_headers,
                                 fixed = TRUE)
+
     spline_coef_lines <- trend_model_file[grepl('multi_normal_prec',
                                                 trend_model_file)]
+    if(any(grepl('normal(0, lambda',
+                 trend_model_file, fixed = TRUE))){
+      lambda_normals <- (grep('normal(0, lambda',
+                                 trend_model_file, fixed = TRUE))
+      for(i in 1:length(lambda_normals)){
+        spline_coef_lines <- c(spline_coef_lines,
+                               paste(trend_model_file[lambda_normals[i]],
+                                     collapse = '\n'))
+      }
+    }
+
     spline_coef_lines <- gsub('_raw', '_raw_trend', spline_coef_lines)
     spline_coef_lines <- gsub('lambda', 'lambda_trend', spline_coef_lines)
     spline_coef_lines <- gsub('zero', 'zero_trend', spline_coef_lines)
@@ -2681,23 +2716,28 @@ add_trend_predictors = function(trend_formula,
 
     }
 
-    S_lines <- trend_model_file[grep('mgcv smooth penalty matrix',
-                                     trend_model_file, fixed = TRUE)]
-    S_lines <- gsub('S', 'S_trend', S_lines, fixed = TRUE)
-    model_file[grep("int<lower=0> n_nonmissing; // number of nonmissing observations",
-                    model_file, fixed = TRUE)] <-
-      paste0("int<lower=0> n_nonmissing; // number of nonmissing observations\n",
-             paste(S_lines, collapse = '\n'))
+    if(any(grepl('mgcv smooth penalty matrix',
+                 trend_model_file, fixed = TRUE))){
+      S_lines <- trend_model_file[grep('mgcv smooth penalty matrix',
+                                       trend_model_file, fixed = TRUE)]
+      S_lines <- gsub('S', 'S_trend', S_lines, fixed = TRUE)
+      model_file[grep("int<lower=0> n_nonmissing; // number of nonmissing observations",
+                      model_file, fixed = TRUE)] <-
+        paste0("int<lower=0> n_nonmissing; // number of nonmissing observations\n",
+               paste(S_lines, collapse = '\n'))
 
-    S_mats <- trend_mvgam$model_data[paste0('S', 1:length(S_lines))]
-    names(S_mats) <- gsub('S', 'S_trend', names(S_mats))
-    model_data <- append(model_data, S_mats)
+      S_mats <- trend_mvgam$model_data[paste0('S', 1:length(S_lines))]
+      names(S_mats) <- gsub('S', 'S_trend', names(S_mats))
+      model_data <- append(model_data, S_mats)
+    }
 
-    model_file[grep("int<lower=0> num_basis_trend; // number of trend basis coefficients",
-                    model_file, fixed = TRUE)] <-
-      paste0("int<lower=0> num_basis_trend; // number of trend basis coefficients\n",
-             "vector[num_basis_trend] zero_trend; // prior locations for trend basis coefficients")
-    model_data$zero_trend <- trend_mvgam$model_data$zero
+    if(!is.null(trend_mvgam$model_data$zero)){
+      model_file[grep("int<lower=0> num_basis_trend; // number of trend basis coefficients",
+                      model_file, fixed = TRUE)] <-
+        paste0("int<lower=0> num_basis_trend; // number of trend basis coefficients\n",
+               "vector[num_basis_trend] zero_trend; // prior locations for trend basis coefficients")
+      model_data$zero_trend <- trend_mvgam$model_data$zero
+    }
 
     if(any(grepl("vector[n_sp] rho;", model_file, fixed = TRUE))){
       model_file[grep("vector[n_sp] rho;", model_file, fixed = TRUE)] <-

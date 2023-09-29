@@ -48,3 +48,18 @@ test_that("rho argument cannot be larger than N - 1", {
                'Argument "rho" in dynamic() cannot be larger than (max(time) - 1)',
                fixed = TRUE)
 })
+
+test_that("dynamic works for trend_formulas", {
+  mod <- mvgam(y ~ dynamic(time, rho = 5),
+               trend_formula = ~ dynamic(time, rho = 15),
+               trend_model = 'RW',
+               data = beta_data$data_train,
+               family = betar(),
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+
+  # trend_idx should be in the model file and in the model data
+  expect_true(any(grepl('trend_idx', mod$model_file)))
+  expect_true(!is.null(mod$model_data$trend_idx1))
+})
+
