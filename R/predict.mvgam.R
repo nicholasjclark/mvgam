@@ -76,10 +76,17 @@ predict.mvgam = function(object, newdata,
     }
 
     if(object$trend_model %in% c('VAR1')){
-      family_pars <- list(sigma_obs =
-                            mcmc_chains(object$model_output, 'Sigma')[ ,
-                                                                       seq(1, NCOL(object$ytimes)^2,
-                                                                           by = NCOL(object$ytimes)+1)])
+      if(object$use_lv){
+        family_pars <- list(sigma_obs =
+                              mcmc_chains(object$model_output, 'Sigma')[ ,
+                                                                         seq(1, object$n_lv^2,
+                                                                             by = object$n_lv+1)])
+      } else {
+        family_pars <- list(sigma_obs =
+                              mcmc_chains(object$model_output, 'Sigma')[ ,
+                                                                         seq(1, NCOL(object$ytimes)^2,
+                                                                             by = NCOL(object$ytimes)+1)])
+      }
     }
 
     # Indicators of which trend to use for each observation

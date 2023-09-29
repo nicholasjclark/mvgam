@@ -2320,6 +2320,14 @@ if(trend_model != 'VAR1'){
                     model_file, fixed = TRUE)] <-
       "matrix[n_lv, n_lv] A;"
 
+    model_file[grep("vector[n_series] mu[n - 1];",
+                    model_file, fixed = TRUE)] <-
+      "vector[n_lv] mu[n];"
+
+    model_file[grep("array[n] vector[n_series] mu;",
+                    model_file, fixed = TRUE)] <-
+      "array[n] vector[n_lv] mu;"
+
     model_file[grep("matrix[n_series, n_series] Sigma;",
                     model_file, fixed = TRUE)] <-
       "matrix[n_lv, n_lv] Sigma;"

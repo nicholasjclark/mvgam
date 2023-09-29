@@ -712,6 +712,11 @@ mvgam = function(formula,
     drift <- FALSE
   }
 
+  if(use_lv & trend_model == 'VAR1' & missing(trend_map)){
+    stop('Cannot identify dynamic factor models that evolve as VAR processes',
+         call. = FALSE)
+  }
+
   # JAGS cannot support latent GP or VAR trends
   if(!use_stan & trend_model %in% c('GP', 'VAR1')){
     stop('gaussian process and VAR trends not supported for JAGS',
