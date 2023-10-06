@@ -71,66 +71,6 @@ sim_gp = function(last_trends, h, rho_gp, alpha_gp){
                    h))
 }
 
-#' Propagate a Hilbert basis GP
-#' Evaluate Laplacian eigenfunction for a given GP basis function
-#' @noRd
-phi = function(boundary, m, centred_covariate) {
-  1 / sqrt(boundary) * sin((m * pi)/(2 * boundary) *
-                             (centred_covariate + boundary))
-}
-
-#' Evaluate eigenvalues for a given GP basis function
-#' @noRd
-lambda = function(boundary, m) {
-  ((m * pi)/(2 * boundary))^2
-}
-
-#' Spectral density squared exponential Gaussian Process kernel
-#' @noRd
-spd = function(alpha_gp, rho_gp, eigenvalues) {
-  (alpha_gp^2) * sqrt(2 * pi) * rho_gp *
-    exp(-0.5 * (rho_gp^2) * (eigenvalues^2))
-}
-
-#' @noRd
-sim_hilbert_gp = function(alpha_gp,
-                          rho_gp,
-                          b_gp,
-                          last_trends,
-                          fc_times,
-                          train_times,
-                          mean_train_times){
-
-  num_gp_basis <- length(b_gp)
-
-  # Get vector of eigenvalues of covariance matrix
-  eigenvalues <- vector()
-  for(m in 1:num_gp_basis){
-    eigenvalues[m] <- lambda(boundary = (5.0/4) *
-                               (max(train_times) - min(train_times)),
-                             m = m)
-  }
-
-  # Get vector of eigenfunctions
-  eigenfunctions <- matrix(NA, nrow = length(fc_times),
-                           ncol = num_gp_basis)
-  for(m in 1:num_gp_basis){
-    eigenfunctions[, m] <- phi(boundary = (5.0/4) *
-                                 (max(train_times) - min(train_times)),
-                               m = m,
-                               centred_covariate = fc_times - mean_train_times)
-  }
-
-  # Compute diagonal of covariance matrix
-  diag_SPD <- sqrt(spd(alpha_gp = alpha_gp,
-                       rho_gp = rho_gp,
-                       sqrt(eigenvalues)))
-
-  # Compute GP trend forecast
-  as.vector((diag_SPD * b_gp) %*% t(eigenfunctions))
-}
-
-
 #' AR3  simulation function
 #' @param last_trends Vector of trend estimates leading up to the current timepoint
 #' @param h \code{integer} specifying the forecast horizon

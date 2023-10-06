@@ -39,8 +39,8 @@ update_priors = function(model_file,
                     model_file, fixed = TRUE))){
 
         # Updating parametric effects
-        if(any(grepl(paste0(priors$param_name[i], '...'), model_file, fixed = TRUE))){
-          header_line <- grep(paste0(priors$param_name[i], '...'), model_file, fixed = TRUE)
+        if(any(grepl(paste0('// prior for ', priors$param_name[i], '...'), model_file, fixed = TRUE))){
+          header_line <- grep(paste0('// prior for ', priors$param_name[i], '...'), model_file, fixed = TRUE)
           newprior <- paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][2]))
           model_file[header_line + 1] <-
             paste(trimws(strsplit(model_file[header_line + 1], "[~]")[[1]][1]), '~',

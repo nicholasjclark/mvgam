@@ -223,6 +223,31 @@ get_mvgam_priors = function(formula,
   # Ensure series and time variables are present
   data_train <- validate_series_time(data_train, name = 'data')
 
+  # Check for gp and mo terms in the formula
+  orig_formula <- gp_terms <- mo_terms <- NULL
+  if(any(grepl('gp(', attr(terms(formula), 'term.labels'), fixed = TRUE))){
+
+    # Check that there are no multidimensional gp terms
+    formula <- interpret_mvgam(formula, N = max(data_train$time))
+    orig_formula <- formula
+
+    # Keep intercept?
+    keep_intercept <- attr(terms(formula), 'intercept') == 1
+
+    # Indices of gp() terms in formula
+    gp_terms <- which_are_gp(formula)
+
+    # Extract GP attributes
+    gp_details <- get_gp_attributes(formula)
+
+    # Replace with s() terms so the correct terms are included
+    # in the model.frame
+    formula <- gp_to_s(formula)
+    if(!keep_intercept){
+      formula <- update(formula, trend_y  ~ . -1)
+    }
+  }
+
   # Check for missing rhs in formula
   drop_obs_intercept <- FALSE
   if(length(attr(terms(formula), 'term.labels')) == 0 &
@@ -240,7 +265,9 @@ get_mvgam_priors = function(formula,
            call. = FALSE)
     }
   }
-  orig_formula <- formula
+  if(is.null(orig_formula)){
+    orig_formula <- formula
+  }
 
   # Validate observation formula
   formula <- interpret_mvgam(formula, N = max(data_train$time))

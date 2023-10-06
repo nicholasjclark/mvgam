@@ -17,6 +17,66 @@
 #' @author Nicholas J Clark
 NULL
 
+#' Effect plot as implemented in \pkg{marginaleffects}
+#'
+#' Convenient way to call marginal or conditional effect plotting functions
+#' implemented in the \pkg{marginaleffects} package
+#' @importFrom marginaleffects plot_predictions
+#' @importFrom bayesplot color_scheme_set color_scheme_get
+#' @inheritParams marginaleffects::plot_predictions
+#' @return A \code{\link[ggplot2:ggplot]{ggplot}} object
+#' that can be further customized using the \pkg{ggplot2} package,
+#' or a `data.frame` (if `draw=FALSE`)
+#'
+#' @export
+plot_predictions.mvgam = function(model,
+                                  condition = NULL,
+                                  by = NULL,
+                                  newdata = NULL,
+                                  type = NULL,
+                                  vcov = NULL,
+                                  conf_level = 0.95,
+                                  wts = NULL,
+                                  transform = NULL,
+                                  points = 0,
+                                  rug = FALSE,
+                                  gray = FALSE,
+                                  draw = TRUE,
+                                  ...){
+  # Set red colour scheme
+  orig_col <- .Options$ggplot2.discrete.colour
+  orig_fill <- .Options$ggplot2.discrete.fill
+  options(ggplot2.discrete.colour = c("#B97C7C",
+                                      "#A25050",
+                                      "#8F2727",
+                                      "darkred",
+                                      "#630000",
+                                      "#300000",
+                                      "#170000"),
+          ggplot2.discrete.fill = c("#B97C7C",
+                                    "#A25050",
+                                    "#8F2727",
+                                    "darkred",
+                                    "#630000",
+                                    "#300000",
+                                    "#170000"))
+  plot_predictions(model = model,
+                   condition = condition,
+                   by = by,
+                   newdata = newdata,
+                   type = type,
+                   vcov = vcov,
+                   conf_level = conf_level,
+                   wts = wts,
+                   transform = transform,
+                   points = points,
+                   rug = rug,
+                   gray = gray,
+                   draw = draw,
+                   ...)
+
+}
+
 #' Functions needed for working with marginaleffects
 #' @rdname mvgam_marginaleffects
 #' @export

@@ -180,84 +180,82 @@ if(object$family == 'Gamma'){
     }
   }
 
-smooth_labs <- do.call(rbind, lapply(seq_along(object$mgcv_model$smooth), function(x){
-  data.frame(label = object$mgcv_model$smooth[[x]]$label,
-             term = paste(object$mgcv_model$smooth[[x]]$term, collapse = ','),
-             class = class(object$mgcv_model$smooth[[x]])[1])
-}))
+if(all(is.na(object$sp_names))){
 
-if(any(!is.na(object$sp_names)) & !all(smooth_labs$class == 'random.effect')){
-  if(!is.null(object$trend_call)){
-    cat("\nGAM smoothing parameter (rho) estimates:\n")
-  } else {
-    cat("\nGAM observation smoothing parameter (rho) estimates:\n")
-  }
-  rho_coefs <- mcmc_summary(object$model_output, 'rho',
-                            digits = digits,
-                            variational = object$algorithm %in% c('fullrank',
-                                                                  'meanfield'))[,c(3:7)]
-  rownames(rho_coefs) <- paste0(object$sp_names, '_rho')
-
-  # Don't print random effect lambdas as they follow the prior distribution
-  if(any(smooth_labs$class == 'random.effect')){
-    re_smooths <- smooth_labs %>%
-      dplyr::filter(class == 'random.effect') %>%
-      dplyr::pull(label)
-
-  print(rho_coefs[!rownames(rho_coefs) %in% re_smooths,])
-
-  } else {
-    print(rho_coefs)
-  }
-}
-
-if(any(!is.na(object$sp_names))){
-  cat("\nApproximate significance of GAM observation smooths:\n")
-  suppressWarnings(printCoefmat(summary(object$mgcv_model)$s.table[, c(1,3,4), drop = FALSE],
-                                digits = min(3, digits + 1),
-                                signif.stars = getOption("show.signif.stars"),
-                                has.Pvalue = TRUE, na.print = "NA",
-                                cs.ind = 1))
-}
-
-if(any(smooth_labs$class == 'random.effect')){
-  re_smooths <- smooth_labs %>%
-    dplyr::filter(class == 'random.effect') %>%
-    dplyr::pull(term)
-
-  if(object$fit_engine == 'jags'){
-    re_sds <- mcmc_summary(object$model_output,
-                           paste0('sigma_raw',
-                                  seq_along(re_smooths)),
-                           digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
-
-    re_mus <- mcmc_summary(object$model_output,
-                           paste0('mu_raw',
-                                  seq_along(re_smooths)),
-                           digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
-  } else {
+} else {
+  if(any(unlist(purrr::map(object$mgcv_model$smooth, inherits, 'random.effect')))){
+    re_labs <- unlist(lapply(purrr::map(object$mgcv_model$smooth, 'term'),
+                             paste, collapse = ','))[
+                               unlist(purrr::map(object$mgcv_model$smooth, inherits, 'random.effect'))]
+    re_labs <- gsub('series', 'trend', re_labs)
     re_sds <- mcmc_summary(object$model_output, 'sigma_raw',
-                           ISB = TRUE,
-                           digits = digits,
+                           ISB = TRUE, digits = digits,
                            variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
 
     re_mus <- mcmc_summary(object$model_output, 'mu_raw',
-                           ISB = TRUE,
-                           digits = digits,
+                           ISB = TRUE, digits = digits,
                            variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
-  }
 
-  rownames(re_sds) <- paste0('sd(',re_smooths,')')
-  rownames(re_mus) <- paste0('mean(',re_smooths,')')
+    rownames(re_sds) <- paste0('sd(',re_labs,')')
+    rownames(re_mus) <- paste0('mean(',re_labs,')')
+
+    if(!is.null(object$trend_call)){
+      cat("\nGAM observation model group-level estimates:\n")
+    } else {
+      cat("\nGAM group-level estimates:\n")
+    }
+    print(rbind(re_mus, re_sds))
+  }
+}
+
+if(!is.null(attr(object$mgcv_model, 'gp_att_table'))){
+  gp_names <- unlist(purrr::map(attr(object$mgcv_model, 'gp_att_table'), 'name'))
+  alpha_params <- gsub(':', 'by', gsub(')', '_',
+                       gsub('(', '_', paste0('alpha_', gp_names),
+                            fixed = TRUE), fixed = TRUE))
+  alpha_summary <- mcmc_summary(object$model_output, alpha_params,
+                         ISB = TRUE, digits = digits,
+                         variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
+
+  rownames(alpha_summary) <- paste0('alpha_', gp_names)
+
+  rho_params <- gsub(':', 'by', gsub(')', '_',
+                                       gsub('(', '_', paste0('rho_', gp_names),
+                                            fixed = TRUE), fixed = TRUE))
+  rho_summary <- mcmc_summary(object$model_output, rho_params,
+                                ISB = TRUE, digits = digits,
+                                variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
+  rownames(rho_summary) <- paste0('rho_', gp_names)
 
   if(!is.null(object$trend_call)){
-    cat("\nGAM observation model group-level estimates:\n")
-    print(rbind(re_mus, re_sds))
+    cat("\nGAM observation model gp term marginal deviation (alpha) and length scale (rho) estimates:\n")
   } else {
-    cat("\nGAM group-level estimates:\n")
-    print(rbind(re_mus, re_sds))
+    cat("\nGAM gp term marginal deviation (alpha) and length scale (rho) estimates:\n")
+  }
+  print(rbind(alpha_summary, rho_summary))
+}
+
+if(any(!is.na(object$sp_names))){
+  gam_sig_table <- summary(object$mgcv_model)$s.table[, c(1,3,4), drop = FALSE]
+  if(!is.null(attr(object$mgcv_model, 'gp_att_table'))){
+    gp_names <- unlist(purrr::map(attr(object$mgcv_model, 'gp_att_table'), 'name'))
+    if(all(rownames(gam_sig_table) %in% gsub('gp(', 's(', gp_names, fixed = TRUE))){
+
+    } else {
+      gam_sig_table <- gam_sig_table[!rownames(gam_sig_table) %in%
+                                       gsub('gp(', 's(', gp_names, fixed = TRUE),,drop = FALSE]
+
+      if(!is.null(object$trend_call)){
+        cat("\nApproximate significance of GAM observation smooths:\n")
+      } else {
+        cat("\nApproximate significance of GAM observation smooths:\n")
+      }
+      suppressWarnings(printCoefmat(gam_sig_table,
+                                    digits = min(3, digits + 1),
+                                    signif.stars = getOption("show.signif.stars"),
+                                    has.Pvalue = TRUE, na.print = "NA",
+                                    cs.ind = 1))
+      }
   }
 }
 
@@ -576,54 +574,68 @@ if(!is.null(object$trend_call)){
   if(all(is.na(object$trend_sp_names))){
 
   } else {
-      to_print <- vector(length = length(object$trend_mgcv_model$smooth))
-      for(i in 1:length(object$trend_mgcv_model$smooth)){
-        if(inherits(object$trend_mgcv_model$smooth[[i]], 'random.effect')){
-          to_print[i] <- FALSE
-        } else {
-          to_print[i] <- TRUE
-        }
-      }
+    if(any(unlist(purrr::map(object$trend_mgcv_model$smooth, inherits, 'random.effect')))){
+      re_labs <- unlist(lapply(purrr::map(object$trend_mgcv_model$smooth, 'term'),
+                               paste, collapse = ','))[
+                                 unlist(purrr::map(object$trend_mgcv_model$smooth, inherits, 'random.effect'))]
+      re_labs <- gsub('series', 'trend', re_labs)
+      re_sds <- mcmc_summary(object$model_output, 'sigma_raw_trend',
+                             ISB = TRUE, digits = digits,
+                             variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
 
-      if(all(to_print == FALSE)){
+      re_mus <- mcmc_summary(object$model_output, 'mu_raw_trend',
+                             ISB = TRUE, digits = digits,
+                             variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
+
+      rownames(re_sds) <- paste0('sd(',re_labs,')_trend')
+      rownames(re_mus) <- paste0('mean(',re_labs,')_trend')
+
+      cat("\nGAM process model group-level estimates:\n")
+      print(rbind(re_mus, re_sds))
+    }
+  }
+
+  if(!is.null(attr(object$trend_mgcv_model, 'gp_att_table'))){
+    gp_names <- unlist(purrr::map(attr(object$trend_mgcv_model, 'gp_att_table'), 'name'))
+    alpha_params <- gsub(':', 'by', gsub(')', '_',
+                                         gsub('(', '_', paste0('alpha_', gp_names),
+                                              fixed = TRUE), fixed = TRUE))
+    alpha_summary <- mcmc_summary(object$model_output, alpha_params,
+                                  ISB = TRUE, digits = digits,
+                                  variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
+
+    rownames(alpha_summary) <- gsub('series', 'trend', paste0('alpha_', gp_names))
+
+    rho_params <- gsub(':', 'by', gsub(')', '_',
+                                       gsub('(', '_', paste0('rho_', gp_names),
+                                            fixed = TRUE), fixed = TRUE))
+    rho_summary <- mcmc_summary(object$model_output, rho_params,
+                                ISB = TRUE, digits = digits,
+                                variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
+    rownames(rho_summary) <- gsub('series', 'trend', paste0('rho_', gp_names))
+
+    cat("\nGAM process model gp term marginal deviation (alpha) and length scale (rho) estimates:\n")
+    print(rbind(alpha_summary, rho_summary))
+  }
+
+  if(any(!is.na(object$trend_sp_names))){
+    gam_sig_table <- summary(object$trend_mgcv_model)$s.table[, c(1,3,4), drop = FALSE]
+    if(!is.null(attr(object$trend_mgcv_model, 'gp_att_table'))){
+      gp_names <- unlist(purrr::map(attr(object$trend_mgcv_model, 'gp_att_table'), 'name'))
+      if(all(rownames(gam_sig_table) %in% gsub('gp(', 's(', gp_names, fixed = TRUE))){
 
       } else {
-        cat("\nGAM process smoothing parameter (rho) estimates:\n")
-        rho_coefs <- mcmc_summary(object$model_output, 'rho_trend',
-                                  digits = digits,
-                                  variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
-        rownames(rho_coefs) <- paste0(object$trend_sp_names, '_rho_trend')
-        print(rho_coefs[to_print,])
+        gam_sig_table <- gam_sig_table[!rownames(gam_sig_table) %in%
+                                         gsub('gp(', 's(', gp_names, fixed = TRUE),,drop = FALSE]
 
         cat("\nApproximate significance of GAM process smooths:\n")
-        suppressWarnings(printCoefmat(summary(object$trend_mgcv_model)$s.table[,c(1,3,4), drop = FALSE],
+        suppressWarnings(printCoefmat(gam_sig_table,
                                       digits = min(3, digits + 1),
                                       signif.stars = getOption("show.signif.stars"),
                                       has.Pvalue = TRUE, na.print = "NA",
                                       cs.ind = 1))
-
       }
-
-      if(any(to_print == FALSE)){
-        re_labs <- unlist(lapply(purrr::map(object$trend_mgcv_model$smooth, 'term'),
-                                 paste, collapse = ','))[
-          unlist(purrr::map(object$trend_mgcv_model$smooth, inherits, 'random.effect'))]
-        re_labs <- gsub('series', 'trend', re_labs)
-        re_sds <- mcmc_summary(object$model_output, 'sigma_raw_trend',
-                               ISB = TRUE, digits = digits,
-                               variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
-
-        re_mus <- mcmc_summary(object$model_output, 'mu_raw_trend',
-                               ISB = TRUE, digits = digits,
-                               variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
-
-        rownames(re_sds) <- paste0('sd(',re_labs,')_trend')
-        rownames(re_mus) <- paste0('mean(',re_labs,')_trend')
-
-        cat("\nGAM process model group-level estimates:\n")
-        print(rbind(re_mus, re_sds))
-
-      }
+    }
   }
 }
 
@@ -649,8 +661,6 @@ if(object$fit_engine == 'jags'){
   } else {
     cat('\nRhat looks reasonable for all parameters\n')
   }
-
-
 }
 
 }

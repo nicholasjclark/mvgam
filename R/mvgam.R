@@ -616,6 +616,31 @@ mvgam = function(formula,
   validate_pos_integer(samples)
   validate_pos_integer(thin)
 
+  # Check for gp and mo terms in the formula
+  orig_formula <- gp_terms <- mo_terms <- NULL
+  if(any(grepl('gp(', attr(terms(formula), 'term.labels'), fixed = TRUE))){
+
+    # Check that there are no multidimensional gp terms
+    formula <- interpret_mvgam(formula, N = max(data_train$time))
+    orig_formula <- formula
+
+    # Keep intercept?
+    keep_intercept <- attr(terms(formula), 'intercept') == 1
+
+    # Indices of gp() terms in formula
+    gp_terms <- which_are_gp(formula)
+
+    # Extract GP attributes
+    gp_details <- get_gp_attributes(formula)
+
+    # Replace with s() terms so the correct terms are included
+    # in the model.frame
+    formula <- gp_to_s(formula)
+    if(!keep_intercept){
+      formula <- update(formula, trend_y  ~ . -1)
+    }
+  }
+
   # Check for missing rhs in formula
   drop_obs_intercept <- FALSE
   if(length(attr(terms(formula), 'term.labels')) == 0 &
@@ -633,7 +658,9 @@ mvgam = function(formula,
            call. = FALSE)
     }
   }
-  orig_formula <- formula
+  if(is.null(orig_formula)){
+    orig_formula <- formula
+  }
 
   # Check for brmspriors
   if(!missing("data")){
@@ -1475,6 +1502,27 @@ mvgam = function(formula,
     inits <- family_inits(family = family_char, trend_model,
                           smooths_included, model_data)
 
+    # Include any GP term updates
+    if(!is.null(gp_terms)){
+      gp_additions <- make_gp_additions(gp_details = gp_details,
+                                        data = data_train,
+                                        newdata = data_test,
+                                        model_data = stan_objects$model_data,
+                                        mgcv_model = ss_gam,
+                                        gp_terms = gp_terms)
+      stan_objects$model_data <- gp_additions$model_data
+      ss_gam <- gp_additions$mgcv_model
+
+      gp_names <- unlist(purrr::map(gp_additions$gp_att_table, 'name'))
+      gp_names <- gsub('gp(', 's(', gp_names, fixed = TRUE)
+      rhos_change <- list()
+      for(i in seq_along(gp_names)){
+        rhos_change[[i]] <- grep(gp_names[i], rho_names, fixed = TRUE)
+      }
+      rho_names[c(unique(unlist(rhos_change)))] <- gsub('s(', 'gp(',
+                                                      rho_names[c(unique(unlist(rhos_change)))],
+                                                      fixed = TRUE)
+    }
 
     # Vectorise likelihoods
     vectorised <- vectorise_stan_lik(model_file = stan_objects$stan_file,
@@ -1585,6 +1633,33 @@ mvgam = function(formula,
       vectorised$model_file <- readLines(textConnection(vectorised$model_file), n = -1)
     }
 
+    # Remaining model file updates for any GP terms
+    if(!is.null(gp_terms)){
+     final_gp_updates <- add_gp_model_file(model_file = vectorised$model_file,
+                                           model_data = vectorised$model_data,
+                                           mgcv_model = ss_gam,
+                                           gp_additions = gp_additions)
+     vectorised$model_file <- final_gp_updates$model_file
+     vectorised$model_data <- final_gp_updates$model_data
+    }
+
+    # Update monitor pars for any GP terms
+    if(any(grepl('real<lower=0> alpha_gp',
+                vectorised$model_file, fixed = TRUE)) &
+       !lfo){
+      alpha_params <- trimws(gsub(';', '', gsub('real<lower=0> ',
+                                                '',
+                                                grep('real<lower=0> alpha_gp',
+                                                     vectorised$model_file, fixed = TRUE,
+                                                     value = TRUE), fixed = TRUE)))
+      rho_params <- trimws(gsub(';', '', gsub('real<lower=0> ',
+                                              '',
+                                              grep('real<lower=0> rho_gp',
+                                                   vectorised$model_file, fixed = TRUE,
+                                                   value = TRUE), fixed = TRUE)))
+      param <- c(param, alpha_params, rho_params)
+    }
+
     # Tidy the representation
     clean_up <- vector()
     for(x in 1:length(vectorised$model_file)){
@@ -1674,7 +1749,7 @@ mvgam = function(formula,
   # outside of mvgam ####
   if(!run_model){
     unlink('base_gam.txt')
-      output <- structure(list(call = formula,
+      output <- structure(list(call = orig_formula,
                                trend_call = if(!missing(trend_formula)){
                                  trend_formula
                                } else {
@@ -2133,7 +2208,7 @@ mvgam = function(formula,
   }
 
   #### Return the output as class mvgam ####
-  output <- structure(list(call = formula,
+  output <- structure(list(call = orig_formula,
                            trend_call = if(!missing(trend_formula)){
                              trend_formula
                            } else {

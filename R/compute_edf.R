@@ -1,4 +1,5 @@
 #' Compute approximate EDFs of smooths
+#' @importFrom stats fitted
 #'@noRd
 compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names){
 
@@ -91,7 +92,11 @@ compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names){
         (mgcv_model$off[i] + ncol(mgcv_model$S[[i]]) - 1)
       XWXS[ind, ind] <- XWXS[ind, ind] + mgcv_model$S[[i]] * lambda[i]
     }
-    edf <- diag(solve(XWXS, XWX))
+    suppressWarnings(edf <- try(diag(solve(XWXS, XWX)), silent = TRUE))
+    if(inherits(edf, 'try-error')){
+      edf <- rep(1, length(coef(mgcv_model)))
+      names(edf) <- names(coef(mgcv_model))
+    }
     mgcv_model$edf <- edf
   }
 

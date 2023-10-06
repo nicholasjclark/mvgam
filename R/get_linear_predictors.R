@@ -26,6 +26,47 @@ obs_Xp_matrix = function(newdata, mgcv_model){
                                     type = 'lpmatrix'))
   }
 
+  # Check for any gp() terms and update the design matrix
+  # accordingly
+  if(!is.null(attr(mgcv_model, 'gp_att_table'))){
+    # Compute the eigenfunctions from the supplied attribute table,
+    # and add them to the Xp matrix
+
+    # Extract GP attributes
+    gp_att_table <- attr(mgcv_model, 'gp_att_table')
+    gp_covariates <- unlist(purrr::map(gp_att_table, 'covariate'))
+    by <- unlist(purrr::map(gp_att_table, 'by'))
+    level <- unlist(purrr::map(gp_att_table, 'level'))
+    k <- unlist(purrr::map(gp_att_table, 'k'))
+    scale <- unlist(purrr::map(gp_att_table, 'scale'))
+    mean <- unlist(purrr::map(gp_att_table, 'mean'))
+    max_dist <- unlist(purrr::map(gp_att_table, 'max_dist'))
+    boundary <- unlist(purrr::map(gp_att_table, 'boundary'))
+    L <- unlist(purrr::map(gp_att_table, 'L'))
+
+    # Compute eigenfunctions
+    test_eigenfunctions <- lapply(seq_along(gp_covariates), function(x){
+      prep_eigenfunctions(data = newdata,
+                          covariate = gp_covariates[x],
+                          by = by[x],
+                          level = level[x],
+                          k = k[x],
+                          boundary = boundary[x],
+                          L = L[x],
+                          mean = mean[x],
+                          scale = scale[x],
+                          max_dist = max_dist[x])
+    })
+
+    # Find indices to replace in the design matrix and replace with
+    # the computed eigenfunctions
+    starts <- purrr::map(gp_att_table, 'first_coef')
+    ends <- purrr::map(gp_att_table, 'last_coef')
+    for(i in seq_along(starts)){
+      Xp[,c(starts[[i]]:ends[[i]])] <- test_eigenfunctions[[i]]
+    }
+  }
+
   return(Xp)
 }
 
@@ -45,31 +86,6 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
   trend_indicators <- as.factor(paste0('trend', trend_indicators))
   trend_test$series <- trend_indicators
   trend_test$y <- NULL
-
-  # Because these are set up inherently as dynamic factor models,
-  # we ALWAYS need to forecast the full set of trends, regardless of
-  # which series (or set of series) is being forecast
-  # data.frame(series = trend_test$series,
-  #            time = trend_test$time,
-  #            row_num = 1:length(trend_test$time)) %>%
-  #   dplyr::group_by(series, time) %>%
-  #   dplyr::slice_head(n = 1) %>%
-  #   dplyr::ungroup() %>%
-  #   dplyr::arrange(time, series) %>%
-  #   dplyr::pull(row_num) -> inds_keep
-  #
-  # if(inherits(newdata, 'list')){
-  #   trend_test <- lapply(trend_test, function(x){
-  #     if(is.matrix(x)){
-  #       matrix(x[inds_keep,], ncol = NCOL(x))
-  #     } else {
-  #       x[inds_keep]
-  #     }
-  #
-  #   })
-  # } else {
-  #   trend_test <- trend_test[inds_keep, ]
-  # }
 
   suppressWarnings(Xp_trend  <- try(predict(mgcv_model,
                                             newdata = trend_test,
@@ -95,6 +111,48 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
                                           newdata = testdat,
                                           type = 'lpmatrix'))
   }
+
+  # Check for any gp() terms and update the design matrix
+  # accordingly
+  if(!is.null(attr(mgcv_model, 'gp_att_table'))){
+    # Compute the eigenfunctions from the supplied attribute table,
+    # and add them to the Xp matrix
+
+    # Extract GP attributes
+    gp_att_table <- attr(mgcv_model, 'gp_att_table')
+    gp_covariates <- unlist(purrr::map(gp_att_table, 'covariate'))
+    by <- unlist(purrr::map(gp_att_table, 'by'))
+    level <- unlist(purrr::map(gp_att_table, 'level'))
+    k <- unlist(purrr::map(gp_att_table, 'k'))
+    scale <- unlist(purrr::map(gp_att_table, 'scale'))
+    mean <- unlist(purrr::map(gp_att_table, 'mean'))
+    max_dist <- unlist(purrr::map(gp_att_table, 'max_dist'))
+    boundary <- unlist(purrr::map(gp_att_table, 'boundary'))
+    L <- unlist(purrr::map(gp_att_table, 'L'))
+
+    # Compute eigenfunctions
+    test_eigenfunctions <- lapply(seq_along(gp_covariates), function(x){
+      prep_eigenfunctions(data = newdata,
+                          covariate = gp_covariates[x],
+                          by = by[x],
+                          level = level[x],
+                          k = k[x],
+                          boundary = boundary[x],
+                          L = L[x],
+                          mean = mean[x],
+                          scale = scale[x],
+                          max_dist = max_dist[x])
+    })
+
+    # Find indices to replace in the design matrix and replace with
+    # the computed eigenfunctions
+    starts <- purrr::map(gp_att_table, 'first_coef')
+    ends <- purrr::map(gp_att_table, 'last_coef')
+    for(i in seq_along(starts)){
+      Xp_trend[,c(starts[[i]]:ends[[i]])] <- test_eigenfunctions[[i]]
+    }
+  }
+
   return(Xp_trend)
 }
 

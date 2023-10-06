@@ -145,6 +145,24 @@ interpret_mvgam = function(formula, N){
 
   attr(newformula, '.Environment') <- attr(formula, '.Environment')
 
+  # Check if any terms use the gp wrapper, as mvgam cannot handle
+  # multivariate GPs yet
+  response <- terms.formula(newformula)[[2]]
+  tf <- terms.formula(newformula, specials = c("gp"))
+  which_gp <- attr(tf,"specials")$gp
+  if(length(which_gp) != 0L){
+    gp_details <- vector(length = length(which_gp),
+                          mode = 'list')
+      for(i in seq_along(which_gp)){
+        gp_details[[i]] <- eval(parse(text = rownames(attr(tf,
+                                                            "factors"))[which_gp[i]]))
+      }
+    if(any(unlist(lapply(purrr::map(gp_details, 'term'), length)) > 1)){
+      stop('mvgam cannot yet handle multidimensional gps',
+           call. = FALSE)
+    }
+  }
+
   # Check if any terms use the dynamic wrapper
   response <- terms.formula(newformula)[[2]]
   tf <- terms.formula(newformula, specials = c("dynamic"))
