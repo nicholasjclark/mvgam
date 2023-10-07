@@ -22,7 +22,7 @@ NULL
 #' Convenient way to call marginal or conditional effect plotting functions
 #' implemented in the \pkg{marginaleffects} package
 #' @importFrom marginaleffects plot_predictions
-#' @importFrom bayesplot color_scheme_set color_scheme_get
+#' @importFrom ggplot2 theme_get theme_set theme_classic
 #' @inheritParams marginaleffects::plot_predictions
 #' @return A \code{\link[ggplot2:ggplot]{ggplot}} object
 #' that can be further customized using the \pkg{ggplot2} package,
@@ -44,9 +44,19 @@ plot_predictions.mvgam = function(model,
                                   draw = TRUE,
                                   ...){
   # Set red colour scheme
+  def_theme <- theme_get()
+  theme_set(theme_classic(base_size = 12, base_family = 'serif'))
   orig_col <- .Options$ggplot2.discrete.colour
   orig_fill <- .Options$ggplot2.discrete.fill
+  orig_cont <- .Options$ggplot2.continuous.colour
   options(ggplot2.discrete.colour = c("#B97C7C",
+                                      "#A25050",
+                                      "#8F2727",
+                                      "darkred",
+                                      "#630000",
+                                      "#300000",
+                                      "#170000"),
+          ggplot2.continuous.colour = c("#B97C7C",
                                       "#A25050",
                                       "#8F2727",
                                       "darkred",
@@ -74,7 +84,10 @@ plot_predictions.mvgam = function(model,
                    gray = gray,
                    draw = draw,
                    ...)
-
+  theme_set(def_theme)
+  orig_col -> .Options$ggplot2.discrete.colour
+  orig_fill -> .Options$ggplot2.discrete.fill
+  orig_cont -> .Options$ggplot2.continuous.colour
 }
 
 #' Functions needed for working with marginaleffects

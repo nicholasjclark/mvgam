@@ -59,6 +59,7 @@ make_gp_additions = function(gp_details, data,
                                smooth_terms == gp_covariates[x]))]]$df
 
     prep_gp_covariate(data = data,
+                      response = rlang::f_lhs(formula(mgcv_model)),
                       covariate = gp_covariates[x],
                       by = by[x],
                       level = level[x],
@@ -182,6 +183,8 @@ gp_to_s <- function(formula){
   # Extract details of gp() terms
   gp_details <- get_gp_attributes(formula)
 
+  termlabs <- attr(terms(formula), 'term.labels')
+
   # Drop these terms from the formula
   which_gp <- which_are_gp(formula)
   response <- rlang::f_lhs(formula)
@@ -213,18 +216,22 @@ gp_to_s <- function(formula){
                            ', k = ',
                            gp_details$k[i] + 1, ')')
     }
+
+    termlabs[which_gp[i]] <- s_terms[i]
   }
 
-  if(length(attr(terms(newformula), 'term.labels')) == 0){
-    rhs <- '1'
-  } else {
-    rhs <- attr(terms(newformula), 'term.labels')
-  }
+  newformula <- reformulate(termlabs, rlang::f_lhs(formula))
 
-  newformula <- as.formula(paste(response, '~',
-                                 paste(paste(rhs,
-                                             collapse = '+'), '+',
-                                       paste(s_terms, collapse = '+'))))
+  # if(length(attr(terms(newformula), 'term.labels')) == 0){
+  #   rhs <- '1'
+  # } else {
+  #   rhs <- attr(terms(newformula), 'term.labels')
+  # }
+  #
+  # newformula <- as.formula(paste(response, '~',
+  #                                paste(paste(rhs,
+  #                                            collapse = '+'), '+',
+  #                                      paste(s_terms, collapse = '+'))))
   attr(newformula, '.Environment') <- attr(formula, '.Environment')
   return(newformula)
 }
@@ -393,12 +400,6 @@ prep_eigenfunctions = function(data,
   }
 
   for(m in 1:k){
-    # eigenfunctions[, m] <- phi(boundary = boundary *
-    #                                      (max(covariate_cent) -
-    #                                         min(covariate_cent)),
-    #                                    m = m,
-    #                                    centred_covariate = covariate_cent)
-
     eigenfunctions[, m] <- brms:::eigen_fun_cov_exp_quad(x = matrix(covariate_cent),
                                                          m = m,
                                                          L = L)
@@ -425,6 +426,7 @@ prep_eigenfunctions = function(data,
 #' Prep Hilbert Basis GP covariates
 #' @noRd
 prep_gp_covariate = function(data,
+                             response,
                              covariate,
                              by = NA,
                              level = NA,
@@ -432,6 +434,26 @@ prep_gp_covariate = function(data,
                              boundary = 5.0/4,
                              k = 20){
 
+  # Get default gp param priors from a call to brms::get_prior()
+  def_gp_prior <- brms::get_prior(formula(paste0(response, ' ~ gp(', covariate,
+                                                 ifelse(is.na(by), ', ',
+                                                        paste0(', by = ', by, ', ')),
+                                                 'k = ', k,
+                                                 ', scale = ',
+                                                 scale,
+                                                 ', c = ',
+                                                 boundary,
+                                                 ')')), data)
+  def_gp_prior <- def_gp_prior[def_gp_prior$prior != '',]
+  def_rho <- def_gp_prior$prior[min(which(def_gp_prior$class == 'lscale'))]
+  if(def_rho == ''){
+    def_rho <- 'inv_gamma(1.5, 5);'
+  }
+  def_alpha <- def_gp_prior$prior[min(which(def_gp_prior$class == 'sdgp'))]
+  if(def_alpha == ''){
+    def_alpha<- 'student_t(3, 0, 2.5);'
+  }
+  # Prepare the covariate
   covariate_cent <- scale_cov(data = data,
                               covariate = covariate,
                               scale = scale,
@@ -455,12 +477,6 @@ prep_gp_covariate = function(data,
                                  min(Xgp,
                                      na.rm = TRUE)),
                                1)
-  # Check k
-  if(k > length(unique(covariate_cent))){
-    warning('argument "k" > number of unique covariate values;\ndropping to the maximum allowed "k"',
-            call. = FALSE)
-    k <- length(unique(covariate_cent))
-  }
 
   # Construct vector of eigenvalues for GP covariance matrix; the
   # same eigenvalues are always used in prediction, so we only need to
@@ -501,6 +517,8 @@ prep_gp_covariate = function(data,
                     boundary = boundary,
                     L = L,
                     scale = scale,
+                    def_rho = def_rho,
+                    def_alpha = def_alpha,
                     mean = covariate_mean,
                     max_dist = covariate_max_dist,
                     eigenvalues = eigenvalues)
@@ -532,6 +550,9 @@ prep_gp_covariate = function(data,
 }
 
 add_gp_model_file = function(model_file, model_data, mgcv_model, gp_additions){
+
+  rho_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_rho'))
+  alpha_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_alpha'))
 
   # Add data lines
   model_file[grep('int<lower=0> ytimes[n, n_series];',
@@ -569,10 +590,14 @@ add_gp_model_file = function(model_file, model_data, mgcv_model, gp_additions){
              ' ~ std_normal();\n',
              'alpha_',
              gp_names_clean[i],
-             ' ~ normal(0, 0.5);\n',
+             ' ~ ',
+             alpha_priors[i],
+             ';\n',
              'rho_',
              gp_names_clean[i],
-             ' ~ inv_gamma(1.65, 5.97);\n',
+             ' ~ ',
+             rho_priors[i],
+             ';\n',
              'b_raw[b_idx_',
              gp_names_clean[i],
              '] ~ std_normal();\n')
