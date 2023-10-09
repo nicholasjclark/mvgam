@@ -133,9 +133,17 @@ plot.mvgam = function(x, type = 'residuals',
                  class = class(object2$mgcv_model$smooth[[x]])[1],
                  mgcv_plottable = object2$mgcv_model$smooth[[x]]$plot.me)
     }))
+
+    # Filter out any GP terms
+    if(!is.null(attr(object2$mgcv_model, 'gp_att_table'))){
+      gp_names <- unlist(purrr::map(attr(object2$mgcv_model, 'gp_att_table'), 'name'))
+      smooth_labs %>%
+        dplyr::filter(!label %in% gsub('gp(', 's(', gp_names, fixed = TRUE)) -> smooth_labs
+    }
     n_smooths <- NROW(smooth_labs)
+    if(n_smooths == 0) stop("No smooth terms to plot. Use plot_effects() to visualise other effects",
+                            call. = FALSE)
     smooth_labs$smooth_index <- 1:NROW(smooth_labs)
-    if(n_smooths == 0) stop("No terms to plot - nothing for plot.mvgam() to do.")
 
     # Leave out random effects and MRF smooths, and any others that are not
     # considered plottable by mgcv

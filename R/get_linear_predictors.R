@@ -79,7 +79,7 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
 
   trend_test <- newdata
   trend_indicators <- vector(length = length(trend_test$time))
-  for(i in 1:length(trend_test$time)){
+  for(i in 1:length(trend_test[[1]])){
     trend_indicators[i] <- trend_map$trend[which(trend_map$series ==
                                                    trend_test$series[i])]
   }
@@ -132,7 +132,7 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
 
     # Compute eigenfunctions
     test_eigenfunctions <- lapply(seq_along(gp_covariates), function(x){
-      prep_eigenfunctions(data = newdata,
+      prep_eigenfunctions(data = trend_test,
                           covariate = gp_covariates[x],
                           by = by[x],
                           level = level[x],

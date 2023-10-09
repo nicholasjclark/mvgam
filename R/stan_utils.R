@@ -9,7 +9,7 @@ code = function(object){
     stop('argument "object" must be of class "mvgam" or "mvgam_prefit"')
   }
 
-  cat(object$model_file[!grepl('^\\s*$', object$model_file)], sep = '\n')
+  cat(object$model_file, sep = '\n')
 }
 
 #' @noRd
@@ -2571,8 +2571,8 @@ add_trend_predictors = function(trend_formula,
   b_trend_lines <- gsub('raw', 'raw_trend', b_trend_lines)
   b_trend_lines <- gsub('num_basis', 'num_basis_trend', b_trend_lines)
   b_trend_lines <- gsub('idx', 'trend_idx', b_trend_lines)
-  b_trend_lines <- gsub('l_gp', 'trend_l_gp', b_trend_lines)
-  b_trend_lines <- gsub('k_gp', 'trend_k_gp', b_trend_lines)
+  b_trend_lines <- gsub('l_gp', 'l_gp_trend', b_trend_lines)
+  b_trend_lines <- gsub('k_gp', 'k_gp_trend', b_trend_lines)
   model_file[grep("// derived latent states", model_file, fixed = TRUE)] <-
     paste0('// process model basis coefficients\n',
            paste(b_trend_lines, collapse = '\n'),
@@ -2614,7 +2614,9 @@ add_trend_predictors = function(trend_formula,
     }
 
     # Check for gp() terms
-    if(any(grepl('l_gp', trend_model_file))){
+    if(any(grepl('l_gp', trend_model_file)) &
+       any(grepl('k_gp', trend_model_file)) &
+       any(grepl('z_gp', trend_model_file))){
 
       # Add spd_cov_exp_quad function from brms code
       if(any(grepl('functions {', model_file, fixed = TRUE))){
@@ -2665,10 +2667,10 @@ add_trend_predictors = function(trend_formula,
       }
       model_file <- readLines(textConnection(model_file), n = -1)
 
-      trend_model_file <- gsub('l_gp', 'trend_l_gp', trend_model_file)
-      trend_model_file <- gsub('k_gp', 'trend_k_gp', trend_model_file)
+      trend_model_file <- gsub('l_gp', 'l_gp_trend', trend_model_file)
+      trend_model_file <- gsub('k_gp', 'k_gp_trend', trend_model_file)
       idx_data <- trend_mvgam$model_data[grep('l_gp', names(trend_mvgam$model_data))]
-      names(idx_data) <- gsub('l_gp', 'trend_l_gp', names(idx_data))
+      names(idx_data) <- gsub('l_gp', 'l_gp_trend', names(idx_data))
       model_data <- append(model_data, idx_data)
 
       l_lines <- grep('// approximate gp eigenvalues', trend_model_file, fixed = TRUE)
@@ -2681,7 +2683,7 @@ add_trend_predictors = function(trend_formula,
 
     if(any(grepl('k_gp', trend_model_file))){
       idx_data <- trend_mvgam$model_data[grep('k_gp', names(trend_mvgam$model_data))]
-      names(idx_data) <- gsub('k_gp', 'trend_k_gp', names(idx_data))
+      names(idx_data) <- gsub('k_gp', 'k_gp_trend', names(idx_data))
       model_data <- append(model_data, idx_data)
 
       k_lines <- grep('// basis functions for approximate gp', trend_model_file, fixed = TRUE)
@@ -2698,7 +2700,7 @@ add_trend_predictors = function(trend_formula,
                   fixed = TRUE) + 1
       last <- end
       for(i in end:(end+50)){
-        if(grepl('vector[trend_k_gp', trend_model_file[i],
+        if(grepl('vector[k_gp_trend', trend_model_file[i],
                  fixed = TRUE)){
           last <- i
         } else {
@@ -2732,9 +2734,10 @@ add_trend_predictors = function(trend_formula,
                                                 trend_model_file) - 1]
     if(any(grepl('normal(0, lambda',
                 trend_model_file, fixed = TRUE))){
+      idx_headers <- trend_model_file[grep('normal(0, lambda',
+                            trend_model_file, fixed = TRUE)-1]
       spline_coef_headers <- c(spline_coef_headers,
-                               trend_model_file[grep('normal(0, lambda',
-                                                     trend_model_file, fixed = TRUE)-1])
+                               grep('//', idx_headers, value = TRUE))
     }
 
     if(any(grepl('// prior for gp', trend_model_file))){
@@ -2880,7 +2883,6 @@ add_trend_predictors = function(trend_formula,
     }
 
     model_file <- readLines(textConnection(model_file), n = -1)
-
   }
 
   # Add any parametric effect beta lines
@@ -3140,6 +3142,18 @@ add_trend_predictors = function(trend_formula,
 
   model_file <- gsub('latent trend', 'latent state',
                      model_file)
+
+  # Any final tidying for trend_level terms
+  model_file <- gsub('byseriestrend', 'bytrendtrend', model_file)
+  model_file <- gsub(':seriestrend', ':trendtrend', model_file)
+
+  names(model_data) <- gsub('byseriestrend', 'bytrendtrend', names(model_data))
+  names(model_data) <- gsub(':seriestrend', ':trendtrend', names(model_data))
+
+  names(trend_mvgam$mgcv_model$coefficients) <-
+    gsub('byseriestrend', 'bytrendtrend', names(trend_mvgam$mgcv_model$coefficients))
+  names(trend_mvgam$mgcv_model$coefficients) <-
+    gsub(':seriestrend', ':trendtrend', names(trend_mvgam$mgcv_model$coefficients))
 
   return(list(model_file = model_file,
               model_data = model_data,

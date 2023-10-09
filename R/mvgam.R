@@ -1247,7 +1247,8 @@ mvgam = function(formula,
     dplyr::arrange(time, series) -> X
 
   # Matrix of indices in X that correspond to timepoints for each series
-  ytimes <- matrix(NA, nrow = length(unique(X$time)), ncol = length(unique(X$series)))
+  ytimes <- matrix(NA, nrow = length(unique(X$time)),
+                   ncol = length(unique(X$series)))
   for(i in 1:length(unique(X$series))){
     ytimes[,i] <- which(X$series == i)
   }
@@ -1661,13 +1662,7 @@ mvgam = function(formula,
     }
 
     # Tidy the representation
-    clean_up <- vector()
-    for(x in 1:length(vectorised$model_file)){
-      clean_up[x] <- vectorised$model_file[x-1] == "" &
-        vectorised$model_file[x] == ""
-    }
-    clean_up[is.na(clean_up)] <- FALSE
-    vectorised$model_file <- vectorised$model_file[!clean_up]
+    vectorised$model_file <- sanitise_modelfile(vectorised$model_file)
 
     if(requireNamespace('cmdstanr', quietly = TRUE)){
       # Replace new syntax if this is an older version of Stan

@@ -119,7 +119,8 @@ make_gp_additions = function(gp_details, data,
                           L = L[x],
                           mean = mean[x],
                           scale = scale[x],
-                          max_dist = max_dist[x])
+                          max_dist = max_dist[x],
+                          initial_setup = TRUE)
     })
 
     eigenfuncs <- rbind(eigenfuncs,
@@ -167,40 +168,22 @@ make_gp_additions = function(gp_details, data,
 #' Which terms are gp() terms?
 #' @noRd
 which_are_gp = function(formula){
-  tf <- terms.formula(formula, specials = c("gp"))
-  if(is.null(rlang::f_lhs(formula))){
-    out <- attr(tf,"specials")$gp
-  } else {
-    out <- attr(tf,"specials")$gp - 1
-  }
-  return(out)
+  termlabs <- attr(terms(formula, keep.order = TRUE), 'term.labels')
+  return(grep('gp(', termlabs, fixed = TRUE))
 }
 
 #' Convert gp() terms to s() terms for initial model construction#'
 #' @importFrom stats drop.terms
 #' @noRd
 gp_to_s <- function(formula){
+
   # Extract details of gp() terms
   gp_details <- get_gp_attributes(formula)
+  termlabs <- attr(terms(formula, keep.order = TRUE), 'term.labels')
 
-  termlabs <- attr(terms(formula), 'term.labels')
-
-  # Drop these terms from the formula
+  # Replace the gp() terms with s() for constructing the initial model
   which_gp <- which_are_gp(formula)
   response <- rlang::f_lhs(formula)
-
-  suppressWarnings(tt <- try(drop.terms(terms(formula),
-                                        which_gp,
-                                        keep.response = TRUE),
-                             silent = TRUE))
-  if(inherits(tt, 'try-error')){
-    newformula <- as.formula(paste(response, '~ 1'))
-  } else {
-    tt <- drop.terms(terms(formula), which_gp, keep.response = TRUE)
-    newformula <- reformulate(attr(tt, "term.labels"), rlang::f_lhs(formula))
-  }
-
-  # Now replace the gp() terms with s() for constructing the initial model
   s_terms <- vector()
   for(i in 1:NROW(gp_details)){
     if(!is.na(gp_details$by[i])){
@@ -221,17 +204,6 @@ gp_to_s <- function(formula){
   }
 
   newformula <- reformulate(termlabs, rlang::f_lhs(formula))
-
-  # if(length(attr(terms(newformula), 'term.labels')) == 0){
-  #   rhs <- '1'
-  # } else {
-  #   rhs <- attr(terms(newformula), 'term.labels')
-  # }
-  #
-  # newformula <- as.formula(paste(response, '~',
-  #                                paste(paste(rhs,
-  #                                            collapse = '+'), '+',
-  #                                      paste(s_terms, collapse = '+'))))
   attr(newformula, '.Environment') <- attr(formula, '.Environment')
   return(newformula)
 }
@@ -379,7 +351,8 @@ prep_eigenfunctions = function(data,
                                mean = NA,
                                max_dist = NA,
                                scale = TRUE,
-                               L){
+                               L,
+                               initial_setup = FALSE){
 
   # Extract and scale covariate (scale set to FALSE if this is a prediction
   # step so that we can scale by the original training covariate values supplied
@@ -410,11 +383,23 @@ prep_eigenfunctions = function(data,
     if(!is.na(level)){
       # no multiplying needed as this is a factor by variable,
       # but we need to pad the eigenfunctions with zeros
-      # for the observations where the by is a different level
+      # for the observations where the by is a different level;
+      # the design matrix is always sorted by time and then by series
+      # in mvgam
+      if(initial_setup){
+        sorted_by <- data.frame(time = data$time,
+                                series = data$series,
+                                byvar = data[[by]]) %>%
+          dplyr::arrange(time, series) %>%
+          dplyr::pull(byvar)
+      } else {
+        sorted_by <- data[[by]]
+      }
+
       full_eigens <- matrix(0, nrow = length(data[[by]]),
                             ncol = NCOL(eigenfunctions))
       full_eigens[(1:length(data[[by]]))[
-        data[[by]] == level],] <- eigenfunctions
+        sorted_by == level],] <- eigenfunctions
       eigenfunctions <- full_eigens
     } else {
       eigenfunctions <- eigenfunctions * data[[by]]
@@ -435,7 +420,7 @@ prep_gp_covariate = function(data,
                              k = 20){
 
   # Get default gp param priors from a call to brms::get_prior()
-  def_gp_prior <- brms::get_prior(formula(paste0(response, ' ~ gp(', covariate,
+  def_gp_prior <- suppressWarnings(brms::get_prior(formula(paste0(response, ' ~ gp(', covariate,
                                                  ifelse(is.na(by), ', ',
                                                         paste0(', by = ', by, ', ')),
                                                  'k = ', k,
@@ -443,7 +428,7 @@ prep_gp_covariate = function(data,
                                                  scale,
                                                  ', c = ',
                                                  boundary,
-                                                 ')')), data)
+                                                 ')')), data))
   def_gp_prior <- def_gp_prior[def_gp_prior$prior != '',]
   def_rho <- def_gp_prior$prior[min(which(def_gp_prior$class == 'lscale'))]
   if(def_rho == ''){
@@ -500,7 +485,8 @@ prep_gp_covariate = function(data,
                                         boundary = boundary,
                                         mean = NA,
                                         max_dist = covariate_max_dist,
-                                        scale = scale)
+                                        scale = scale,
+                                        initial_setup = TRUE)
 
   # Make attributes table
   byname <- ifelse(is.na(by), '', paste0(':', by))

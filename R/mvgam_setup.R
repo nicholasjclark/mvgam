@@ -8,7 +8,7 @@ mvgam_setup <- function(formula,
                         data = list(),
                         na.action,
                         drop.unused.levels = FALSE,
-                        maxit = 40) {
+                        maxit = 5) {
 
   if(missing(knots)){
     # Initialise the GAM for a few iterations to get all necessary structures for

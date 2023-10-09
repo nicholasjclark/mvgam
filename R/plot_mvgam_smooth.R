@@ -115,6 +115,17 @@ plot_mvgam_smooth = function(object,
     smooth_int <- smooth
   }
 
+  # Check whether this is actually a gp() term
+  if(!is.null(attr(object2$mgcv_model, 'gp_att_table'))){
+    gp_names <- unlist(purrr::map(attr(object2$mgcv_model, 'gp_att_table'), 'name'))
+    if(any(grepl(object2$mgcv_model$smooth[[smooth_int]]$label,
+          gsub('gp(', 's(', gp_names, fixed = TRUE),
+          fixed = TRUE))){
+      stop(smooth, ' is a gp() term. Use plot_effects() instead to visualise',
+           call. = FALSE)
+    }
+  }
+
   # Check whether this type of smooth is even plottable
   if(!object2$mgcv_model$smooth[[smooth_int]]$plot.me){
     stop(paste0('unable to plot ', object2$mgcv_model$smooth[[smooth_int]]$label,
@@ -251,8 +262,14 @@ plot_mvgam_smooth = function(object,
     }
 
     # Generate linear predictor matrix from fitted mgcv model
-    Xp <- obs_Xp_matrix(newdata = pred_dat,
-                        mgcv_model = object2$mgcv_model)
+    if(trend_effects){
+      Xp <- trend_Xp_matrix(newdata = pred_dat,
+                            trend_map = object2$trend_map,
+                          mgcv_model = object2$trend_mgcv_model)
+    } else {
+      Xp <- obs_Xp_matrix(newdata = pred_dat,
+                          mgcv_model = object2$mgcv_model)
+    }
 
     # Zero out all other columns in Xp
     keeps <- object2$mgcv_model$smooth[[smooth_int]]$first.para:
@@ -299,8 +316,14 @@ plot_mvgam_smooth = function(object,
   if(residuals){
     # Need to predict from a reduced set that zeroes out all terms apart from the
     # smooth of interest
-    Xp2 <- obs_Xp_matrix(newdata = object2$obs_data,
-                        mgcv_model = object2$mgcv_model)
+    if(trend_effects){
+      Xp2 <- trend_Xp_matrix(newdata = object2$obs_data,
+                           trend_map = object2$trend_map,
+                          mgcv_model = object2$trend_mgcv_model)
+    } else {
+      Xp2 <- obs_Xp_matrix(newdata = object2$obs_data,
+                           mgcv_model = object2$mgcv_model)
+    }
 
     if(!missing(newdata)){
       stop('Partial residual plots not available when using newdata')
