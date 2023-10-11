@@ -35,6 +35,20 @@ update_priors = function(model_file,
   } else {
     # Modify the file to update the prior definitions
     for(i in 1:NROW(priors)){
+
+      # gp() terms can be supplied using more mgcv-like syntax; replace
+      # with the uglier syntax that is used in the Stan code so the prior
+      # can be correctly updated
+      if(grepl('gp(', priors$prior[i], fixed = TRUE) |
+         grepl('gp_trend', priors$prior[i], fixed = TRUE)){
+        lhs <- trimws(strsplit(priors$prior[i], "[~]")[[1]][1])
+        rhs <- trimws(strsplit(priors$prior[i], "[~]")[[1]][2])
+        lhs <- gsub('(', '_', lhs, fixed = TRUE)
+        lhs <- gsub(')', '_', lhs, fixed = TRUE)
+        lhs <- gsub(':', 'by', lhs, fixed = TRUE)
+        priors$prior[i] <- paste(lhs, '~', rhs)
+      }
+
       if(!any(grepl(paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][1]), '~'),
                     model_file, fixed = TRUE))){
 
@@ -86,6 +100,16 @@ update_priors = function(model_file,
                       call. = FALSE)
             }
           } else {
+            # gp() terms can be supplied using more mgcv-like syntax; replace
+            # with the uglier syntax that is used in the Stan code so the prior
+            # can be correctly updated
+            if(grepl('gp(', priors$param_name[i], fixed = TRUE)|
+               grepl('gp_trend', priors$param_name[i], fixed = TRUE)){
+              priors$param_name[i] <- gsub('(', '_', priors$param_name[i], fixed = TRUE)
+              priors$param_name[i] <- gsub(')', '_', priors$param_name[i], fixed = TRUE)
+              priors$param_name[i] <- gsub(':', 'by', priors$param_name[i], fixed = TRUE)
+            }
+
             # Create boundary text strings
             if(!is.na(priors$new_lowerbound[i])){
               change_lower <- TRUE

@@ -314,7 +314,7 @@ get_mvgam_priors = function(formula,
   # and then modify the resulting output
   if(!missing(trend_formula)){
     validate_trend_formula(trend_formula)
-    prior_df <- get_mvgam_priors(formula = formula,
+    prior_df <- get_mvgam_priors(formula = orig_formula,
                                  data = data,
                                  data_train = data_train,
                                  family = family,
@@ -403,6 +403,10 @@ get_mvgam_priors = function(formula,
       gsub("n_series", "n_lv", x))
     trend_prior_df[] <- lapply(trend_prior_df, function(x)
       gsub("series", "trend", x))
+    trend_prior_df[] <- lapply(trend_prior_df, function(x)
+      gsub("alpha_gp", "alpha_gp_trend", x))
+    trend_prior_df[] <- lapply(trend_prior_df, function(x)
+      gsub("rho_gp", "rho_gp_trend", x))
     trend_prior_df <- trend_prior_df[!trend_prior_df$param_info ==
                                        'observation error sd',]
     out <- rbind(prior_df, trend_prior_df)
@@ -492,7 +496,7 @@ get_mvgam_priors = function(formula,
                               family = family_to_mgcvfam(family),
                               data = data_train,
                               drop.unused.levels = FALSE,
-                              maxit = 30),
+                              maxit = 5),
                   silent = TRUE)
     if(inherits(ss_gam, 'try-error')){
       if(grepl('missing values', ss_gam[1])){
@@ -556,13 +560,6 @@ get_mvgam_priors = function(formula,
       para_df <- NULL
     }
 
-    # Check if smooth terms are included in the formula
-    if(length(ss_gam$smooth) == 0){
-      smooths_included <- FALSE
-    } else {
-      smooths_included <- TRUE
-    }
-
     # Extract information on the number of smoothing parameters and
     # random effects
     smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
@@ -572,7 +569,49 @@ get_mvgam_priors = function(formula,
                    ss_gam$smooth[[x]]$first.sp + 1)
     }))
 
-    # Smoothing parameter priors for non random effect smooths
+    # Check for gp() terms
+    if(!is.null(gp_terms)){
+      gp_additions <- make_gp_additions(gp_details = gp_details,
+                                        data = data_train,
+                                        newdata = NULL,
+                                        model_data = list(X = t(predict(ss_gam, type = 'lpmatrix'))),
+                                        mgcv_model = ss_gam,
+                                        gp_terms = gp_terms)
+      gp_names <- unlist(purrr::map(gp_additions$gp_att_table, 'name'))
+      alpha_priors <- unlist(purrr::map(gp_additions$gp_att_table,
+                                        'def_alpha'))
+      rho_priors <- unlist(purrr::map(gp_additions$gp_att_table,
+                                        'def_rho'))
+      smooth_labs <- smooth_labs %>%
+        dplyr::filter(!label %in%
+                        gsub('gp(', 's(', gp_names, fixed = TRUE))
+
+      alpha_df <- data.frame(param_name = paste0('real<lower=0> alpha_',
+                                              gp_names, ';'),
+                          param_length = 1,
+                          param_info = paste(gp_names,
+                                               'marginal deviation'),
+                          prior = paste0('alpha_', gp_names, ' ~ ', alpha_priors, ';'),
+                          example_change = paste0('alpha_', gp_names, ' ~ ',
+                                                  'normal(0, ',
+                                                  round(runif(length(gp_names), 0.5, 1), 2),
+                                                  ');'))
+      rho_df <- data.frame(param_name = paste0('real<lower=0> rho_',
+                                                 gp_names, ';'),
+                             param_length = 1,
+                             param_info = paste(gp_names,
+                                                'length scale'),
+                             prior = paste0('rho_', gp_names, ' ~ ', rho_priors, ';'),
+                             example_change = paste0('rho_', gp_names, ' ~ ',
+                                                     'normal(0, ',
+                                                     round(runif(length(gp_names), 1, 10), 2),
+                                                     ');'))
+      gp_df <- rbind(alpha_df, rho_df)
+    } else {
+      gp_df <- NULL
+    }
+
+    # Smoothing parameter priors for non-random effect smooths
     if(any(smooth_labs$class != 'random.effect')){
       n_smooth_params <- smooth_labs %>%
         dplyr::filter(class != 'random.effect') %>%
@@ -1187,6 +1226,7 @@ get_mvgam_priors = function(formula,
 
     # Return the dataframe of prior information
     prior_df <- rbind(para_df,
+                      gp_df,
                       sp_df,
                       re_df,
                       trend_df,

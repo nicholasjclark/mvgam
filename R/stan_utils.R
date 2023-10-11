@@ -2573,6 +2573,9 @@ add_trend_predictors = function(trend_formula,
   b_trend_lines <- gsub('idx', 'trend_idx', b_trend_lines)
   b_trend_lines <- gsub('l_gp', 'l_gp_trend', b_trend_lines)
   b_trend_lines <- gsub('k_gp', 'k_gp_trend', b_trend_lines)
+  b_trend_lines <- gsub('alpha_gp', 'alpha_gp_trend', b_trend_lines)
+  b_trend_lines <- gsub('rho_gp', 'rho_gp_trend', b_trend_lines)
+  b_trend_lines <- gsub('z_gp', 'z_gp_trend', b_trend_lines)
   model_file[grep("// derived latent states", model_file, fixed = TRUE)] <-
     paste0('// process model basis coefficients\n',
            paste(b_trend_lines, collapse = '\n'),
@@ -2669,6 +2672,9 @@ add_trend_predictors = function(trend_formula,
 
       trend_model_file <- gsub('l_gp', 'l_gp_trend', trend_model_file)
       trend_model_file <- gsub('k_gp', 'k_gp_trend', trend_model_file)
+      trend_model_file <- gsub('alpha_gp', 'alpha_gp_trend', trend_model_file)
+      trend_model_file <- gsub('rho_gp', 'rho_gp_trend', trend_model_file)
+      trend_model_file <- gsub('z_gp', 'z_gp_trend', trend_model_file)
       idx_data <- trend_mvgam$model_data[grep('l_gp', names(trend_mvgam$model_data))]
       names(idx_data) <- gsub('l_gp', 'l_gp_trend', names(idx_data))
       model_data <- append(model_data, idx_data)

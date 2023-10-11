@@ -597,22 +597,24 @@ if(!is.null(object$trend_call)){
 
   if(!is.null(attr(object$trend_mgcv_model, 'gp_att_table'))){
     gp_names <- unlist(purrr::map(attr(object$trend_mgcv_model, 'gp_att_table'), 'name'))
-    alpha_params <- gsub(':', 'by', gsub(')', '_',
+    alpha_params <- gsub('gp_', 'gp_trend_', gsub(':', 'by', gsub(')', '_',
                                          gsub('(', '_', paste0('alpha_', gp_names),
-                                              fixed = TRUE), fixed = TRUE))
+                                              fixed = TRUE), fixed = TRUE)))
     alpha_summary <- mcmc_summary(object$model_output, alpha_params,
                                   ISB = TRUE, digits = digits,
                                   variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
 
-    rownames(alpha_summary) <- gsub('series', 'trend', paste0('alpha_', gp_names))
+    rownames(alpha_summary) <- paste0(gsub('series', 'trend', paste0('alpha_', gp_names)),
+                                      '_trend')
 
-    rho_params <- gsub(':', 'by', gsub(')', '_',
+    rho_params <- gsub('gp_', 'gp_trend_', gsub(':', 'by', gsub(')', '_',
                                        gsub('(', '_', paste0('rho_', gp_names),
-                                            fixed = TRUE), fixed = TRUE))
+                                            fixed = TRUE), fixed = TRUE)))
     rho_summary <- mcmc_summary(object$model_output, rho_params,
                                 ISB = TRUE, digits = digits,
                                 variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
-    rownames(rho_summary) <- gsub('series', 'trend', paste0('rho_', gp_names))
+    rownames(rho_summary) <- paste0(gsub('series', 'trend', paste0('rho_', gp_names)),
+                                    '_trend')
 
     cat("\nGAM process model gp term marginal deviation (alpha) and length scale (rho) estimates:\n")
     print(rbind(alpha_summary, rho_summary))
