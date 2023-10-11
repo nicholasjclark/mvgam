@@ -187,3 +187,34 @@ test_that("priors on parametric effects behave correctly", {
                        priors = priors,
                        run_model = FALSE))
 })
+
+
+test_that("priors on gp() effects work properly", {
+  dat <- sim_mvgam()
+
+  priors <- c(prior(normal(0, 0.5),
+                  class = `alpha_gp(time):seriesseries_1`,
+                  ub = 1),
+              prior(normal(5, 1.3),
+                    class = `rho_gp_trend(season)`,
+                    ub = 50))
+
+  mod <- mvgam(formula = y ~ gp(time, by = series, scale = FALSE),
+               trend_formula = ~ gp(season, scale = FALSE),
+               trend_model = 'AR1',
+               data = dat$data_train,
+               run_model = FALSE,
+               priors = priors)
+
+  # Observation model priors working
+  expect_true(any(grepl('alpha_gp_time_byseriesseries_1 ~ normal(0, 0.5);',
+            mod$model_file, fixed = TRUE)))
+  expect_true(any(grepl('real<lower=0, upper=1> alpha_gp_time_byseriesseries_1;',
+            mod$model_file, fixed = TRUE)))
+
+  # Process model priors working
+  expect_true(any(grepl('rho_gp_trend_season_ ~ normal(5, 1.3);',
+                        mod$model_file, fixed = TRUE)))
+  expect_true(any(grepl('real<lower=0, upper=50> rho_gp_trend_season_;',
+            mod$model_file, fixed = TRUE)))
+})

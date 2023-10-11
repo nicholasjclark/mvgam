@@ -674,7 +674,7 @@ mvgam = function(formula,
   if(!missing(priors)){
     if(inherits(priors, 'brmsprior') & !lfo){
       priors <- adapt_brms_priors(priors = priors,
-                                  formula = formula,
+                                  formula = orig_formula,
                                   trend_formula = trend_formula,
                                   data = data_train,
                                   family = family,
@@ -865,7 +865,7 @@ mvgam = function(formula,
                         family = family_to_mgcvfam(family),
                         data = data_train,
                         drop.unused.levels = FALSE,
-                        maxit = 30))
+                        maxit = 5))
   if(inherits(ss_gam, 'try-error')){
     if(grepl('missing values', ss_gam[1])){
       stop(paste('Missing values found in data predictors:\n',
@@ -1614,14 +1614,6 @@ mvgam = function(formula,
                                                             def_priors,
                                                             use_stan = TRUE))
 
-    # Add in any user-specified priors
-    if(!missing(priors)){
-      vectorised$model_file <- update_priors(vectorised$model_file, priors,
-                                             use_stan = TRUE)
-    } else {
-      priors <- NULL
-    }
-
     # Drop observation intercept if specified
     if(drop_obs_intercept){
       vectorised$model_file[grep('// observation model basis coefficients',
@@ -1659,6 +1651,14 @@ mvgam = function(formula,
                                                    vectorised$model_file, fixed = TRUE,
                                                    value = TRUE), fixed = TRUE)))
       param <- c(param, alpha_params, rho_params)
+    }
+
+    # Add in any user-specified priors
+    if(!missing(priors)){
+      vectorised$model_file <- update_priors(vectorised$model_file, priors,
+                                             use_stan = TRUE)
+    } else {
+      priors <- NULL
     }
 
     # Tidy the representation
