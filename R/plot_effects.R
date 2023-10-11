@@ -15,7 +15,7 @@ plot_effects <- function(object, ...){
 #' @name plot_effects.mvgam
 #' @method plot_effects mvgam
 #' @export
-plot_effects.mvgam = function(model,
+plot_effects.mvgam = function(object,
                               condition = NULL,
                               by = NULL,
                               newdata = NULL,
@@ -32,7 +32,7 @@ plot_effects.mvgam = function(model,
   bayesplot::color_scheme_set('viridis')
 
   # Generate plot and reset colour scheme
-  out_plot <- plot_predictions(model = model,
+  out_plot <- plot_predictions(model = object,
                                condition = condition,
                                by = by,
                                newdata = newdata,

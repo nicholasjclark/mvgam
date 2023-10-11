@@ -9,4 +9,4 @@ utils::globalVariables(c("y", "year", "smooth_vals", "smooth_num",
                          "param_name", "outcome", "mgcv_plottable",
                          "term", "data_test", "object", "row_num", "trends_test",
                          "trend", "trend_series", "trend_y", ".", "gam",
-                         "group", "mod", "row_id"))
+                         "group", "mod", "row_id", "byvar"))
