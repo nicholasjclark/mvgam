@@ -309,13 +309,11 @@ sim_hilbert_gp = function(alpha_gp,
 #' @noRd
 scale_cov <- function(data, covariate, by, level, scale = TRUE,
                       mean, max_dist){
-  if(!is.na(by)){
-    if(!is.na(level)){
+  Xgp <- data[[covariate]]
+  if(!is.na(by) &
+     !is.na(level)){
       Xgp <- data[[covariate]][data[[by]] == level]
-    }
-  } else {
-    Xgp <- data[[covariate]]
-  }
+   }
 
   if(is.na(mean)){
     Xgp_mean <- mean(Xgp, na.rm = TRUE)
@@ -447,12 +445,10 @@ prep_gp_covariate = function(data,
                               max_dist = NA,
                               level = level)
 
-  if(!is.na(by)){
-    if(!is.na(level)){
-      Xgp <- data[[covariate]][data[[by]] == level]
-    }
-  } else {
-    Xgp <- data[[covariate]]
+  Xgp <- data[[covariate]]
+  if(!is.na(by) &
+     !is.na(level)){
+    Xgp <- data[[covariate]][data[[by]] == level]
   }
 
   covariate_mean <- mean(Xgp, na.rm = TRUE)

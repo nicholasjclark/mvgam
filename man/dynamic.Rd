@@ -4,20 +4,32 @@
 \alias{dynamic}
 \title{Defining dynamic coefficients in mvgam formulae}
 \usage{
-dynamic(variable, rho = 5, stationary = TRUE)
+dynamic(variable, k, rho = 5, stationary = TRUE, scale = TRUE)
 }
 \arguments{
 \item{variable}{The variable that the dynamic smooth will be a function of}
 
-\item{rho}{Positive numeric stating the length scale to be used for approximating the
-squared exponential Gaussian Process smooth. See \code{\link[mgcv]{gp.smooth}} for details}
+\item{k}{Optional number of basis functions for computing approximate GPs. If missing,
+\code{k} will be set as large as possible to accurately estimate the nonlinear function}
 
-\item{stationary}{logical. If \code{TRUE} (the default), the latent Gaussian Process
-smooth will not have a linear trend component. If \code{FALSE},
+\item{rho}{Either a positive numeric stating the length scale to be used for approximating the
+squared exponential Gaussian Process smooth (see \code{\link[mgcv]{gp.smooth}} for details)
+or missing, in which case the length scale will be estimated by setting up a Hilbert space approximate
+GP}
+
+\item{stationary}{Logical. If \code{TRUE} (the default) and \code{rho} is supplied,
+the latent Gaussian Process smooth will not have a linear trend component. If \code{FALSE},
 a linear trend in the covariate is added to the Gaussian Process smooth. Leave at \code{TRUE}
 if you do not believe the coefficient is evolving with much trend, as the linear component of the
 basis functions can be hard to penalize to zero. This sometimes causes divergence issues in \code{Stan}.
-See \code{\link[mgcv]{gp.smooth}} for details}
+See \code{\link[mgcv]{gp.smooth}} for details. Ignored if \code{rho} is missing (in which case a
+Hilbert space approximate GP is used)}
+
+\item{scale}{Logical; If \code{TRUE} (the default) and \code{rho} is missing, predictors
+are scaled so that the maximum Euclidean distance between two points is \code{1}. This
+often improves sampling speed and convergence. Scaling also affects the estimated
+length-scale parameters in that they resemble those of scaled predictors
+(not of the original predictors) if scale is \code{TRUE}.}
 }
 \description{
 Set up time-varying (dynamic) coefficients for use in mvgam models. Currently, only

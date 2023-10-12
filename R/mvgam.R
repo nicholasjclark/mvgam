@@ -610,13 +610,28 @@ mvgam = function(formula,
   if(missing("data") & missing("data_train")){
     stop('Argument "data" is missing with no default')
   }
+  if(!missing("data")){
+    data_train <- data
+  }
+  if(!missing("newdata")){
+    data_test <- newdata
+  }
+  orig_data <- data_train
+
+  # Ensure series and time variables are present
+  data_train <- validate_series_time(data_train, name = 'data')
+
+  # Validate the formula to convert any dynamic() terms
+  formula <- interpret_mvgam(formula, N = max(data_train$time))
+
+  # Check sampler arguments
   validate_pos_integer(chains)
   validate_pos_integer(threads)
   validate_pos_integer(burnin)
   validate_pos_integer(samples)
   validate_pos_integer(thin)
 
-  # Check for gp and mo terms in the formula
+  # Check for gp and mo terms in the validated formula
   orig_formula <- gp_terms <- mo_terms <- NULL
   if(any(grepl('gp(', attr(terms(formula), 'term.labels'), fixed = TRUE))){
 
@@ -663,14 +678,6 @@ mvgam = function(formula,
   }
 
   # Check for brmspriors
-  if(!missing("data")){
-    data_train <- data
-  }
-  if(!missing("newdata")){
-    data_test <- newdata
-  }
-  orig_data <- data_train
-
   if(!missing(priors)){
     if(inherits(priors, 'brmsprior') & !lfo){
       priors <- adapt_brms_priors(priors = priors,

@@ -215,15 +215,18 @@ get_mvgam_priors = function(formula,
   if(missing("data") & missing("data_train")){
     stop('Argument "data" is missing with no default')
   }
-
   if(!missing("data")){
     data_train <- data
   }
+  orig_data <- data_train
 
   # Ensure series and time variables are present
   data_train <- validate_series_time(data_train, name = 'data')
 
-  # Check for gp and mo terms in the formula
+  # Validate the formula to convert any dynamic() terms
+  formula <- interpret_mvgam(formula, N = max(data_train$time))
+
+  # Check for gp and mo terms in the validated formula
   orig_formula <- gp_terms <- mo_terms <- NULL
   if(any(grepl('gp(', attr(terms(formula), 'term.labels'), fixed = TRUE))){
 

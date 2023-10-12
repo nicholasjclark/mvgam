@@ -8,7 +8,7 @@
 plot_effects(object, ...)
 
 \method{plot_effects}{mvgam}(
-  model,
+  object,
   condition = NULL,
   by = NULL,
   newdata = NULL,
@@ -18,7 +18,6 @@ plot_effects(object, ...)
   transform = NULL,
   points = 0,
   rug = FALSE,
-  gray = FALSE,
   ...
 )
 }
@@ -31,8 +30,6 @@ model, depending on the range of supported arguments by each modeling
 package. See the "Model-Specific Arguments" section of the
 \code{?marginaleffects} documentation for a non-exhaustive list of available
 arguments.}
-
-\item{model}{Model object}
 
 \item{condition}{Conditional predictions
 \itemize{
@@ -76,13 +73,10 @@ the \code{marginaleffects:::type_dictionary} dataframe.}
 \item{points}{Number between 0 and 1 which controls the transparency of raw data points. 0 (default) does not display any points.}
 
 \item{rug}{TRUE displays tick marks on the axes to mark the distribution of raw data.}
-
-\item{gray}{FALSE grayscale or color plot}
 }
 \value{
 A \code{\link[ggplot2:ggplot]{ggplot}} object
-that can be further customized using the \pkg{ggplot2} package,
-or a \code{data.frame} (if \code{draw=FALSE})
+that can be further customized using the \pkg{ggplot2} package
 }
 \description{
 Convenient way to call marginal or conditional effect plotting functions
