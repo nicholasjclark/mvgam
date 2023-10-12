@@ -14,7 +14,7 @@ time-varying coefficient."><!-- mathjax --><script src="https://cdnjs.cloudflare
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.6</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,7 +63,7 @@ time-varying coefficient.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">dynamic</span><span class="op">(</span><span class="va">variable</span>, rho <span class="op">=</span> <span class="fl">5</span>, stationary <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">dynamic</span><span class="op">(</span><span class="va">variable</span>, <span class="va">k</span>, rho <span class="op">=</span> <span class="fl">5</span>, stationary <span class="op">=</span> <span class="cn">TRUE</span>, scale <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -72,18 +72,34 @@ time-varying coefficient.</p>
 <dd><p>The variable that the dynamic smooth will be a function of</p></dd>
 
 
+<dt>k</dt>
+<dd><p>Optional number of basis functions for computing approximate GPs. If missing,
+<code>k</code> will be set as large as possible to accurately estimate the nonlinear function</p></dd>
+
+
 <dt>rho</dt>
-<dd><p>Positive numeric stating the length scale to be used for approximating the
-squared exponential Gaussian Process smooth. See <code><a href="https://rdrr.io/pkg/mgcv/man/smooth.construct.gp.smooth.spec.html" class="external-link">gp.smooth</a></code> for details</p></dd>
+<dd><p>Either a positive numeric stating the length scale to be used for approximating the
+squared exponential Gaussian Process smooth (see <code><a href="https://rdrr.io/pkg/mgcv/man/smooth.construct.gp.smooth.spec.html" class="external-link">gp.smooth</a></code> for details)
+or missing, in which case the length scale will be estimated by setting up a Hilbert space approximate
+GP</p></dd>
 
 
 <dt>stationary</dt>
-<dd><p>logical. If <code>TRUE</code> (the default), the latent Gaussian Process
-smooth will not have a linear trend component. If <code>FALSE</code>,
+<dd><p>Logical. If <code>TRUE</code> (the default) and <code>rho</code> is supplied,
+the latent Gaussian Process smooth will not have a linear trend component. If <code>FALSE</code>,
 a linear trend in the covariate is added to the Gaussian Process smooth. Leave at <code>TRUE</code>
 if you do not believe the coefficient is evolving with much trend, as the linear component of the
 basis functions can be hard to penalize to zero. This sometimes causes divergence issues in <code>Stan</code>.
-See <code><a href="https://rdrr.io/pkg/mgcv/man/smooth.construct.gp.smooth.spec.html" class="external-link">gp.smooth</a></code> for details</p></dd>
+See <code><a href="https://rdrr.io/pkg/mgcv/man/smooth.construct.gp.smooth.spec.html" class="external-link">gp.smooth</a></code> for details. Ignored if <code>rho</code> is missing (in which case a
+Hilbert space approximate GP is used)</p></dd>
+
+
+<dt>scale</dt>
+<dd><p>Logical; If <code>TRUE</code> (the default) and <code>rho</code> is missing, predictors
+are scaled so that the maximum Euclidean distance between two points is <code>1</code>. This
+often improves sampling speed and convergence. Scaling also affects the estimated
+length-scale parameters in that they resemble those of scaled predictors
+(not of the original predictors) if scale is <code>TRUE</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">

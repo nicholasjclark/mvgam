@@ -480,12 +480,12 @@ for(i in 1:3){
 ```
 
 ## Dynamic coefficient models
-Dynamic fixed-effect coefficients (often referred to as dynamic linear models) can also be readily incorporated into GAMs / DGAMs. In `mvgam`, the `dynamic()` formula wrapper is used to set these up. The plan is to incorporate a range of dynamic options (such as random walk, AR1 etc...) but for the moment only low-rank Gaussian Process smooths are allowed (making use of the `gp` basis in `mgcv`). An example below illustrates:
+Dynamic fixed-effect coefficients (often referred to as dynamic linear models) can also be readily incorporated into GAMs / DGAMs. In `mvgam`, the `dynamic()` formula wrapper is used to set these up. The plan is to incorporate a range of dynamic options (such as random walk, AR1 etc...) but for the moment only low-rank Gaussian Process smooths are allowed (making use either of the `gp` basis in `mgcv` of of Hilbert space approximate GPs). An example below illustrates:
   
 Simulate a time-varying coefficient using a squared exponential Gaussian Process function with length scale $\rho$=10
 ```{r}
 set.seed(1111)
-N = 200
+N <- 200
 beta_temp <- mvgam:::sim_gp(rnorm(1),
                             alpha_gp = 0.75,
                             rho_gp = 10,
@@ -508,9 +508,9 @@ plot(out,  type = 'l', lwd = 3,
 box(bty = 'l', lwd = 2)
 ```
 
-Gather the data into a `data.frame` and fit a model using the `dynamic()` formula wrapper to specify a low-rank Gaussian Process smooth function to estimate the time-varying coefficient of $temperature$. We will mis-specify the $\rho$ parameter here as, in practice, it is never known 
+Gather the data into a `data.frame` and fit a model using the `dynamic()` formula wrapper to specify a low-rank Gaussian Process smooth function to estimate the time-varying coefficient of $temperature$. The `dynamic()` function will automatically use a spline with the `gp` basis in `mgcv` if you supply a value for `rho`. If you do not supply a value for this argument, it will be estimated using a Hilbert space approximate GP following the documentation outlined in the `gp()` function in `brms`. We will mis-specify the $\rho$ parameter here as, in practice, it is never known 
 ```{r, include=FALSE}
-data = data.frame(out, temp, time)
+data <- data.frame(out, temp, time)
 data_train <- data[1:190,]
 data_test <- data[191:200,]
 mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
@@ -519,7 +519,7 @@ mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
 ```
 
 ```{r, eval=FALSE}
-data = data.frame(out, temp, time)
+data <- data.frame(out, temp, time)
 data_train <- data[1:190,]
 data_test <- data[191:200,]
 mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
@@ -527,12 +527,12 @@ mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
              data = data_train)
 ```
 
-Inspect the model summary, which now contains estimates for the observation errors
+Inspect the model summary, which shows how the `dynamic` wrapper was used to construct a low-rank Gaussian Process smooth function:
 ```{r}
 summary(mod, include_betas = FALSE)
 ```
 
-Plot the estimated time-varying coefficient for the in-sample training period
+Because this model used a spline with a `gp` basis, it's smooths can be visualised just like any other `gam`. Plot the estimated time-varying coefficient for the in-sample training period
 ```{r}
 plot(mod, type = 'smooths')
 ```
@@ -546,6 +546,32 @@ lines(beta_temp, lwd = 2)
 ```
 
 This results in sensible forecasts of the observations as well
+```{r}
+plot(mod, type = 'forecast', newdata = data_test)
+```
+
+The syntax is very similar if we wish to estimate the parameters of the underlying Gaussian Process, this time using a Hilbert space approximation. We simply omit the `rho` argument in `dynamic`:
+```{r}
+mod <- mvgam(out ~ dynamic(temp, scale = FALSE),
+             family = gaussian(),
+             data = data_train)
+```
+
+This model summary now contains estimates for the marginal deviation and length scale parameters of the underlying Gaussian Process function:
+```{r}
+summary(mod, include_betas = FALSE)
+```
+
+We can use `plot_predictions` from the `marginaleffects` package to visualise the time-varying coefficient for the effect of `temp`, which is similar to what we estimated above:
+```{r}
+plot_predictions(mod, 
+                 newdata = datagrid(time = unique,
+                                    temp = 1),
+                 by = 'time',
+                 type = 'link')
+```
+
+Forecasts are also similar:
 ```{r}
 plot(mod, type = 'forecast', newdata = data_test)
 ```

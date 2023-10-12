@@ -347,11 +347,11 @@ test_priors
 #> 6                    trend sd         sigma ~ student_t(3, 0, 2.5);
 #>                example_change new_lowerbound new_upperbound
 #> 1 (Intercept) ~ normal(0, 1);             NA             NA
-#> 2 lambda ~ exponential(0.08);             NA             NA
-#> 3    ar1 ~ normal(0.71, 0.3);             NA             NA
-#> 4   ar2 ~ normal(0.18, 0.25);             NA             NA
-#> 5   ar3 ~ normal(0.75, 0.68);             NA             NA
-#> 6  sigma ~ exponential(0.51);             NA             NA
+#> 2 lambda ~ exponential(0.95);             NA             NA
+#> 3  ar1 ~ normal(-0.69, 0.65);             NA             NA
+#> 4   ar2 ~ normal(0.19, 0.53);             NA             NA
+#> 5  ar3 ~ normal(-0.42, 0.61);             NA             NA
+#> 6  sigma ~ exponential(0.78);             NA             NA
 ```
 
 Any of the above priors can be changed by modifying the `prior` column
@@ -399,16 +399,22 @@ code(lynx_mvgam)
 #> parameters {
 #>   // raw basis coefficients
 #>   vector[num_basis] b_raw;
+#>   
 #>   // latent trend AR1 terms
 #>   vector<lower=-1.5, upper=1.5>[n_series] ar1;
+#>   
 #>   // latent trend AR2 terms
 #>   vector<lower=-1.5, upper=1.5>[n_series] ar2;
+#>   
 #>   // latent trend AR3 terms
 #>   vector<lower=-1.5, upper=1.5>[n_series] ar3;
+#>   
 #>   // latent trend variance parameters
 #>   vector<lower=0>[n_series] sigma;
+#>   
 #>   // latent trends
 #>   matrix[n, n_series] trend;
+#>   
 #>   // smoothing parameters
 #>   vector<lower=0>[n_sp] lambda;
 #> }
@@ -420,17 +426,22 @@ code(lynx_mvgam)
 #> model {
 #>   // prior for (Intercept)...
 #>   b_raw[1] ~ student_t(3, 6.5, 2.5);
+#>   
 #>   // prior for s(season)...
 #>   b_raw[2 : 11] ~ multi_normal_prec(zero[2 : 11],
 #>                                     S1[1 : 10, 1 : 10] * lambda[1]);
+#>   
 #>   // priors for AR parameters
 #>   ar1 ~ std_normal();
 #>   ar2 ~ std_normal();
 #>   ar3 ~ std_normal();
+#>   
 #>   // priors for smoothing parameters
 #>   lambda ~ normal(10, 25);
+#>   
 #>   // priors for latent trend variance parameters
 #>   sigma ~ student_t(3, 0, 2.5);
+#>   
 #>   // trend estimates
 #>   trend[1, 1 : n_series] ~ normal(0, sigma);
 #>   trend[2, 1 : n_series] ~ normal(trend[1, 1 : n_series] * ar1, sigma);
@@ -459,6 +470,7 @@ code(lynx_mvgam)
 #>   for (s in 1 : n_series) {
 #>     tau[s] = pow(sigma[s], -2.0);
 #>   }
+#>   
 #>   // posterior predictions
 #>   eta = X * b;
 #>   for (s in 1 : n_series) {
@@ -552,33 +564,25 @@ summary(lynx_mvgam)
 #> Fitted using Stan 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                2.5%    50%   97.5% Rhat n.eff
-#> (Intercept)   6.000  6.600 7.00000 1.01   408
-#> s(season).1  -0.630  0.033 0.76000 1.01   823
-#> s(season).2  -0.230  0.850 1.90000 1.01   382
-#> s(season).3  -0.065  1.200 2.50000 1.01   358
-#> s(season).4  -0.530  0.430 1.40000 1.01   856
-#> s(season).5  -1.200 -0.160 0.91000 1.00   551
-#> s(season).6  -1.100 -0.012 1.00000 1.00   625
-#> s(season).7  -0.770  0.360 1.40000 1.00   614
-#> s(season).8  -1.100  0.270 1.80000 1.00   374
-#> s(season).9  -1.100 -0.310 0.68000 1.00   410
-#> s(season).10 -1.400 -0.700 0.00064 1.01   574
-#> 
-#> GAM observation smoothing parameter (rho) estimates:
-#>               2.5% 50% 97.5% Rhat n.eff
-#> s(season)_rho  2.1 3.4   4.2    1   520
-#> 
-#> Approximate significance of GAM observation smooths:
-#>            edf Chi.sq p-value
-#> s(season) 4.04  20290    0.22
+#>                2.5%    50%  97.5% Rhat n.eff
+#> (Intercept)   5.900  6.600  7.000 1.01   411
+#> s(season).1  -0.610  0.056  0.730 1.00   883
+#> s(season).2  -0.210  0.860  1.900 1.01   391
+#> s(season).3  -0.029  1.300  2.400 1.01   357
+#> s(season).4  -0.460  0.440  1.300 1.01   816
+#> s(season).5  -1.300 -0.180  0.830 1.00   518
+#> s(season).6  -1.200 -0.025  1.000 1.01   553
+#> s(season).7  -0.720  0.390  1.500 1.00   832
+#> s(season).8  -0.960  0.280  1.800 1.01   376
+#> s(season).9  -1.200 -0.270  0.740 1.01   510
+#> s(season).10 -1.400 -0.710 -0.038 1.01   568
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n.eff
-#> ar1[1]    0.76  1.10 1.400 1.00   747
-#> ar2[1]   -0.85 -0.40 0.062 1.00  1608
-#> ar3[1]   -0.50 -0.12 0.330 1.01   470
-#> sigma[1]  0.40  0.50 0.640 1.00  1031
+#> ar1[1]    0.75  1.10 1.400 1.00   890
+#> ar2[1]   -0.83 -0.40 0.041 1.00  1391
+#> ar3[1]   -0.47 -0.11 0.320 1.02   415
+#> sigma[1]  0.40  0.50 0.630 1.00  1113
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -688,7 +692,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-31-1.png" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample DRPS:
-    #> [1] 2896.107
+    #> [1] 2820.858
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -789,8 +793,8 @@ each competing model at the same set of timepoints.
 compare_mvgams(lynx_mvgam, lynx_mvgam_poor, fc_horizon = 10)
 #> RPS summaries per model (lower is better)
 #>             Min.   1st Qu.    Median      Mean   3rd Qu.      Max.
-#> Model 1 3726.048  4241.425  4879.843  5248.287  5995.075  7779.446
-#> Model 2 5644.477 11567.963 17900.513 15766.338 19783.975 22561.216
+#> Model 1 3836.557  4246.513  4825.217  5228.524  6013.686  7722.069
+#> Model 2 5753.894 11795.078 17950.797 15884.080 20015.136 22239.033
 #> 
 #> 90% interval coverages per model (closer to 0.9 is better)
 #> Model 1 0.98 
@@ -995,43 +999,27 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Observation precision parameter estimates:
 #>        2.5% 50% 97.5% Rhat n.eff
-#> phi[1]  5.5 8.3    12    1  1206
-#> phi[2]  5.8 8.7    13    1  1072
-#> phi[3]  5.7 8.5    12    1  1603
+#> phi[1]  5.4 8.3    12    1  1046
+#> phi[2]  5.7 8.6    12    1  1610
+#> phi[3]  5.7 8.4    12    1  1721
 #> 
 #> GAM coefficient (beta) estimates:
 #>              2.5%  50% 97.5% Rhat n.eff
-#> (Intercept) -0.23 0.18  0.45    1   602
-#> 
-#> GAM observation smoothing parameter (rho) estimates:
-#>                              2.5% 50% 97.5% Rhat n.eff
-#> s(season)_rho                 1.3 3.0   4.1    1  1226
-#> s(season):seriesseries_1_rho  1.5 3.3   4.2    1  1041
-#> s(season):seriesseries_2_rho  1.4 3.2   4.2    1  1096
-#> s(season):seriesseries_3_rho  1.2 3.0   4.1    1   992
-#> 
-#> Approximate significance of GAM observation smooths:
-#>                           edf Chi.sq p-value    
-#> s(season)                5.00  15.46 1.9e-05 ***
-#> s(season):seriesseries_1 3.74   0.12    0.98    
-#> s(season):seriesseries_2 3.83   0.10    0.98    
-#> s(season):seriesseries_3 3.97   0.82    0.46    
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+#> (Intercept) -0.21 0.18  0.42    1   592
 #> 
 #> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
 #>              2.5%  50% 97.5% Rhat n.eff
-#> alpha_gp[1] 0.067 0.42  0.94 1.00   635
-#> alpha_gp[2] 0.380 0.71  1.30 1.00   967
-#> alpha_gp[3] 0.140 0.46  0.98 1.00   815
-#> rho_gp[1]   1.200 3.90 16.00 1.01   197
-#> rho_gp[2]   1.700 7.10 35.00 1.01   358
-#> rho_gp[3]   1.400 4.90 21.00 1.00   658
+#> alpha_gp[1] 0.078 0.42  0.93 1.00   581
+#> alpha_gp[2] 0.380 0.70  1.30 1.00  1258
+#> alpha_gp[3] 0.150 0.46  0.95 1.01   725
+#> rho_gp[1]   1.200 3.90 18.00 1.01   249
+#> rho_gp[2]   1.800 7.60 36.00 1.00   326
+#> rho_gp[3]   1.300 5.00 20.00 1.00   756
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
-#> 8 of 2000 iterations ended with a divergence (0.4%)
+#> 9 of 2000 iterations ended with a divergence (0.45%)
 #> *Try running with larger adapt_delta to remove the divergences
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
@@ -1047,11 +1035,11 @@ for(i in 1:3){
 ```
 
     #> Out of sample CRPS:
-    #> [1] 2.109595
+    #> [1] 2.113229
     #> Out of sample CRPS:
-    #> [1] 1.844845
+    #> [1] 1.850393
     #> Out of sample CRPS:
-    #> [1] 1.780909
+    #> [1] 1.778506
 
 <img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />
 
@@ -1062,14 +1050,15 @@ models) can also be readily incorporated into GAMs / DGAMs. In `mvgam`,
 the `dynamic()` formula wrapper is used to set these up. The plan is to
 incorporate a range of dynamic options (such as random walk, AR1 etc…)
 but for the moment only low-rank Gaussian Process smooths are allowed
-(making use of the `gp` basis in `mgcv`). An example below illustrates:
+(making use either of the `gp` basis in `mgcv` of of Hilbert space
+approximate GPs). An example below illustrates:
 
 Simulate a time-varying coefficient using a squared exponential Gaussian
 Process function with length scale $\rho$=10
 
 ``` r
 set.seed(1111)
-N = 200
+N <- 200
 beta_temp <- mvgam:::sim_gp(rnorm(1),
                             alpha_gp = 0.75,
                             rho_gp = 10,
@@ -1101,11 +1090,15 @@ box(bty = 'l', lwd = 2)
 Gather the data into a `data.frame` and fit a model using the
 `dynamic()` formula wrapper to specify a low-rank Gaussian Process
 smooth function to estimate the time-varying coefficient of
-$temperature$. We will mis-specify the $\rho$ parameter here as, in
-practice, it is never known
+$temperature$. The `dynamic()` function will automatically use a spline
+with the `gp` basis in `mgcv` if you supply a value for `rho`. If you do
+not supply a value for this argument, it will be estimated using a
+Hilbert space approximate GP following the documentation outlined in the
+`gp()` function in `brms`. We will mis-specify the $\rho$ parameter here
+as, in practice, it is never known
 
 ``` r
-data = data.frame(out, temp, time)
+data <- data.frame(out, temp, time)
 data_train <- data[1:190,]
 data_test <- data[191:200,]
 mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
@@ -1113,8 +1106,8 @@ mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
              data = data_train)
 ```
 
-Inspect the model summary, which now contains estimates for the
-observation errors
+Inspect the model summary, which shows how the `dynamic` wrapper was
+used to construct a low-rank Gaussian Process smooth function:
 
 ``` r
 summary(mod, include_betas = FALSE)
@@ -1147,17 +1140,6 @@ summary(mod, include_betas = FALSE)
 #>             2.5% 50% 97.5% Rhat n.eff
 #> (Intercept)    4   4   4.1    1  2056
 #> 
-#> GAM observation smoothing parameter (rho) estimates:
-#>                   2.5%  50% 97.5% Rhat n.eff
-#> s(time):temp_rho  -1.8 -1.5  -1.2    1  1635
-#> s(time):temp2_rho -1.4  1.5   3.8    1  1517
-#> 
-#> Approximate significance of GAM observation smooths:
-#>               edf    F p-value    
-#> s(time):temp 14.9 80.2  <2e-16 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
@@ -1166,8 +1148,9 @@ summary(mod, include_betas = FALSE)
 #> E-FMI indicated no pathological behavior
 ```
 
-Plot the estimated time-varying coefficient for the in-sample training
-period
+Because this model used a spline with a `gp` basis, it’s smooths can be
+visualised just like any other `gam`. Plot the estimated time-varying
+coefficient for the in-sample training period
 
 ``` r
 plot(mod, type = 'smooths')
@@ -1199,6 +1182,339 @@ plot(mod, type = 'forecast', newdata = data_test)
 
     #> Out of sample CRPS:
     #> [1] 1.281124
+
+The syntax is very similar if we wish to estimate the parameters of the
+underlying Gaussian Process, this time using a Hilbert space
+approximation. We simply omit the `rho` argument in `dynamic`:
+
+``` r
+mod <- mvgam(out ~ dynamic(temp, scale = FALSE),
+             family = gaussian(),
+             data = data_train)
+#> Using cmdstanr as the backend
+#> 
+#> In file included from stan/lib/stan_math/lib/boost_1.78.0/boost/multi_array/multi_array_ref.hpp:32,
+#>                  from stan/lib/stan_math/lib/boost_1.78.0/boost/multi_array.hpp:34,
+#>                  from stan/lib/stan_math/lib/boost_1.78.0/boost/numeric/odeint/algebra/multi_array_algebra.hpp:22,
+#>                  from stan/lib/stan_math/lib/boost_1.78.0/boost/numeric/odeint.hpp:63,
+#>                  from stan/lib/stan_math/stan/math/prim/functor/ode_rk45.hpp:9,
+#>                  from stan/lib/stan_math/stan/math/prim/functor/integrate_ode_rk45.hpp:6,
+#>                  from stan/lib/stan_math/stan/math/prim/functor.hpp:16,
+#>                  from stan/lib/stan_math/stan/math/rev/fun.hpp:200,
+#>                  from stan/lib/stan_math/stan/math/rev.hpp:10,
+#>                  from stan/lib/stan_math/stan/math.hpp:19,
+#>                  from stan/src/stan/model/model_header.hpp:4,
+#>                  from C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.hpp:2:
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:180:45: warning: 'template<class _Arg, class _Result> struct std::unary_function' is deprecated [-Wdeprecated-declarations]
+#>   180 |         : public boost::functional::detail::unary_function<typename unary_traits<Predicate>::argument_type,bool>
+#>       |                                             ^~~~~~~~~~~~~~
+#> In file included from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/string:48,
+#>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/locale_classes.h:40,
+#>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/ios_base.h:41,
+#>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/ios:42,
+#>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/istream:38,
+#>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/sstream:38,
+#>                  from C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/complex:45,
+#>                  from stan/lib/stan_math/lib/eigen_3.4.0/Eigen/Core:50,
+#>                  from stan/lib/stan_math/lib/eigen_3.4.0/Eigen/Dense:1,
+#>                  from stan/lib/stan_math/stan/math/prim/fun/Eigen.hpp:22,
+#>                  from stan/lib/stan_math/stan/math/rev.hpp:4:
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here
+#>   117 |     struct unary_function
+#>       |            ^~~~~~~~~~~~~~
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:214:45: warning: 'template<class _Arg1, class _Arg2, class _Result> struct std::binary_function' is deprecated [-Wdeprecated-declarations]
+#>   214 |         : public boost::functional::detail::binary_function<
+#>       |                                             ^~~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here
+#>   131 |     struct binary_function
+#>       |            ^~~~~~~~~~~~~~~
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:252:45: warning: 'template<class _Arg, class _Result> struct std::unary_function' is deprecated [-Wdeprecated-declarations]
+#>   252 |         : public boost::functional::detail::unary_function<
+#>       |                                             ^~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here
+#>   117 |     struct unary_function
+#>       |            ^~~~~~~~~~~~~~
+#> stan/lib/stan_ma
+#> th/lib/boost_1.78.0/boost/functional.hpp:299:45: warning: 'template<class _Arg, class _Result> struct std::unary_function' is deprecated [-Wdeprecated-declarations]
+#>   299 |         : public boost::functional::detail::unary_function<
+#>       |                                             ^~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here
+#>   117 |     struct unary_function
+#>       |            ^~~~~~~~~~~~~~
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:345:57: warning: 'template<class _Arg, class _Result> struct std::unary_function' is deprecated [-Wdeprecated-declarations]
+#>   345 |     class mem_fun_t : public boost::functional::detail::unary_function<T*, S>
+#>       |                                                         ^~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here
+#>   117 |     struct unary_function
+#>       |            ^~~~~~~~~~~~~~
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:361:58: warning: 'template<class _Arg1, class _Arg2, class _Result> struct std::binary_function' is deprecated [-Wdeprecated-declarations]
+#>   361 |     class mem_fun1_t : public boost::functional::detail::binary_function<T*, A, S>
+#>       |                                                          ^~~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here
+#>   131 |     struct binary_function
+#>       |            ^~~~~~~~~~~~~~~
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:377:63: warning: 'template<class _Arg, class _Result> struct std::unary_function' is deprecated [-Wdeprecated-declarations]
+#>   377 |     class const_mem_fun_t : public boost::functional::detail::unary_function<const T*, S>
+#>       |                                                               ^~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here
+#>   117 |     struct unary_function
+#>       |            ^~~~~~~~~~~~~~
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:393:64: warning: 'template<class _Arg1, class _Arg2, class _Result> struct std::binary_function' is deprecated [-Wdeprecated-declarations]
+#>   393 |     class const_mem_fun1_t : public boost::functional::detail::binary_function<const T*, A, S>
+#>       |                                                                ^~~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here
+#>   131 |     struct binary_function
+#>       |            ^~~~~~~~~~~~~~~
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:438:61: warning: 'template<class _Arg, class _Result> struct std::unary_function' is deprecated [-Wdeprecated-declarations]
+#>   438 |     class mem_fun_ref_t : public boost::functional::detail::unary_function<T&, S>
+#>       |                                                             ^~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here
+#>   117 |     struct unary_function
+#>       |            ^~~~~~~~~~~~~~
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:454:62: warning: 'template<class _Arg1, class _Arg2, class _Result> struct std::binary_function' is deprecated [-Wdeprecated-declarations]
+#>   454 |     class mem_fun1_ref_t : public boost::functional::detail::binary_function<T&, A, S>
+#>       |                                                              ^~~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c
+#> ++/12.2.0/bits/stl_function.h:131:12: note: declared here
+#>   131 |     struct binary_function
+#>       |            ^~~~~~~~~~~~~~~
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:470:67: warning: 'template<class _Arg, class _Result> struct std::unary_function' is deprecated [-Wdeprecated-declarations]
+#>   470 |     class const_mem_fun_ref_t : public boost::functional::detail::unary_function<const T&, S>
+#>       |                                                                   ^~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here
+#>   117 |     struct unary_function
+#>       |            ^~~~~~~~~~~~~~
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:487:68: warning: 'template<class _Arg1, class _Arg2, class _Result> struct std::binary_function' is deprecated [-Wdeprecated-declarations]
+#>   487 |     class const_mem_fun1_ref_t : public boost::functional::detail::binary_function<const T&, A, S>
+#>       |                                                                    ^~~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here
+#>   131 |     struct binary_function
+#>       |            ^~~~~~~~~~~~~~~
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:533:73: warning: 'template<class _Arg, class _Result> struct std::unary_function' is deprecated [-Wdeprecated-declarations]
+#>   533 |     class pointer_to_unary_function : public boost::functional::detail::unary_function<Arg,Result>
+#>       |                                                                         ^~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:117:12: note: declared here
+#>   117 |     struct unary_function
+#>       |            ^~~~~~~~~~~~~~
+#> stan/lib/stan_math/lib/boost_1.78.0/boost/functional.hpp:557:74: warning: 'template<class _Arg1, class _Arg2, class _Result> struct std::binary_function' is deprecated [-Wdeprecated-declarations]
+#>   557 |     class pointer_to_binary_functi
+#> on : public boost::functional::detail::binary_function<Arg1,Arg2,Result>
+#>       |                                                                          ^~~~~~~~~~~~~~~
+#> C:/RBuildTools/4.2/ucrt64/include/c++/12.2.0/bits/stl_function.h:131:12: note: declared here
+#>   131 |     struct binary_function
+#>       |            ^~~~~~~~~~~~~~~
+#> Init values were only set for a subset of parameters. 
+#> Missing init values for the following parameters:
+#>  - chain 1: alpha_gp_time_bytemp, rho_gp_time_bytemp, z_gp_time_bytemp, sigma_obs, lambda
+#>  - chain 2: alpha_gp_time_bytemp, rho_gp_time_bytemp, z_gp_time_bytemp, sigma_obs, lambda
+#>  - chain 3: alpha_gp_time_bytemp, rho_gp_time_bytemp, z_gp_time_bytemp, sigma_obs, lambda
+#>  - chain 4: alpha_gp_time_bytemp, rho_gp_time_bytemp, z_gp_time_bytemp, sigma_obs, lambda
+#> Running MCMC with 4 parallel chains...
+#> 
+#> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) 
+#> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup)
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 1 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 1
+#> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup)
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 2 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 2
+#> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup)
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 3 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 3
+#> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup)
+#> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:
+#> Chain 4 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/Nick/AppData/Local/Temp/RtmpIdGf68/model-745478b56c19.stan', line 99, column 4 to column 61)
+#> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,
+#> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.
+#> Chain 4
+#> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) 
+#> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) 
+#> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) 
+#> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) 
+#> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) 
+#> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) 
+#> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) 
+#> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) 
+#> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 3 finished in 3.0 seconds.
+#> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 1 finished in 3.5 seconds.
+#> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) 
+#> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 2 finished in 3.7 seconds.
+#> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) 
+#> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) 
+#> Chain 4 finished in 3.9 seconds.
+#> 
+#> All 4 chains finished successfully.
+#> Mean chain execution time: 3.5 seconds.
+#> Total execution time: 4.7 seconds.
+```
+
+This model summary now contains estimates for the marginal deviation and
+length scale parameters of the underlying Gaussian Process function:
+
+``` r
+summary(mod, include_betas = FALSE)
+#> GAM formula:
+#> out ~ gp(time, by = temp, c = 5/4, k = 40, scale = FALSE)
+#> 
+#> Family:
+#> gaussian
+#> 
+#> Link function:
+#> identity
+#> 
+#> Trend model:
+#> None
+#> 
+#> N series:
+#> 1 
+#> 
+#> N timepoints:
+#> 190 
+#> 
+#> Status:
+#> Fitted using Stan 
+#> 
+#> Observation error parameter estimates:
+#>              2.5%  50% 97.5% Rhat n.eff
+#> sigma_obs[1] 0.24 0.26   0.3    1  2848
+#> 
+#> GAM coefficient (beta) estimates:
+#>             2.5% 50% 97.5% Rhat n.eff
+#> (Intercept)    4   4   4.1    1  3367
+#> 
+#> GAM gp term marginal deviation (alpha) and length scale (rho) estimates:
+#>                     2.5%   50% 97.5% Rhat n.eff
+#> alpha_gp(time):temp 0.62  0.87   1.4    1   762
+#> rho_gp(time):temp   5.30 10.00  13.0    1   769
+#> 
+#> Stan MCMC diagnostics:
+#> n_eff / iter looks reasonable for all parameters
+#> Rhat looks reasonable for all parameters
+#> 0 of 2000 iterations ended with a divergence (0%)
+#> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
+#> E-FMI indicated no pathological behavior
+```
+
+We can use `plot_predictions` from the `marginaleffects` package to
+visualise the time-varying coefficient for the effect of `temp`, which
+is similar to what we estimated above:
+
+``` r
+plot_predictions(mod, 
+                 newdata = datagrid(time = unique,
+                                    temp = 1),
+                 by = 'time',
+                 type = 'link')
+```
+
+<img src="man/figures/README-unnamed-chunk-61-1.png" width="60%" style="display: block; margin: auto;" />
+
+Forecasts are also similar:
+
+``` r
+plot(mod, type = 'forecast', newdata = data_test)
+```
+
+<img src="man/figures/README-unnamed-chunk-62-1.png" width="60%" style="display: block; margin: auto;" />
+
+    #> Out of sample CRPS:
+    #> [1] 1.633331
 
 There are many more extended uses for `mvgam` models, including the
 ability to fit dynamic factor processes for analysing and forecasting
