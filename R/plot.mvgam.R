@@ -141,7 +141,7 @@ plot.mvgam = function(x, type = 'residuals',
         dplyr::filter(!label %in% gsub('gp(', 's(', gp_names, fixed = TRUE)) -> smooth_labs
     }
     n_smooths <- NROW(smooth_labs)
-    if(n_smooths == 0) stop("No smooth terms to plot. Use plot_effects() to visualise other effects",
+    if(n_smooths == 0) stop("No smooth terms to plot. Use plot_predictions() to visualise other effects",
                             call. = FALSE)
     smooth_labs$smooth_index <- 1:NROW(smooth_labs)
 

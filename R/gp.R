@@ -140,11 +140,7 @@ make_gp_additions = function(gp_details, data,
     gp_att_table[[covariate]]$first_coef <- min(coef_indices)
     gp_att_table[[covariate]]$last_coef <- max(coef_indices)
 
-    gp_names <- gp_att_table[[covariate]]$name
-    gp_names <- gsub('(', '_', gp_names, fixed = TRUE)
-    gp_names <- gsub(')', '_', gp_names, fixed = TRUE)
-    gp_names <- gsub(':', 'by', gp_names, fixed = TRUE)
-
+    gp_names <- clean_gpnames(gp_att_table[[covariate]]$name)
     gp_stan_lines <- paste0(gp_stan_lines,
                             paste0('array[',  gp_att_table[[covariate]]$k,
                                    '] int b_idx_',
@@ -322,8 +318,7 @@ scale_cov <- function(data, covariate, by, level, scale = TRUE,
   }
 
   if(is.na(max_dist)){
-    Xgp_max_dist <- (abs(max(Xgp, na.rm = TRUE) -
-                           min(Xgp, na.rm = TRUE)))
+    Xgp_max_dist <- sqrt(max(brms:::diff_quad(Xgp)))
   } else {
     Xgp_max_dist <- max_dist
   }
@@ -453,10 +448,7 @@ prep_gp_covariate = function(data,
 
   covariate_mean <- mean(Xgp, na.rm = TRUE)
   covariate_max_dist <- ifelse(scale,
-                               abs(max(Xgp,
-                                  na.rm = TRUE) -
-                                 min(Xgp,
-                                     na.rm = TRUE)),
+                               sqrt(max(brms:::diff_quad(Xgp))),
                                1)
 
   # Construct vector of eigenvalues for GP covariance matrix; the
@@ -484,7 +476,8 @@ prep_gp_covariate = function(data,
                                         scale = scale,
                                         initial_setup = TRUE)
 
-  # Make attributes table
+  # Make attributes table using a cleaned version of the covariate
+  # name to ensure there are no illegal characters in the Stan code
   byname <- ifelse(is.na(by), '', paste0(':', by))
   covariate_name <- paste0('gp(', covariate, ')', byname)
   if(!is.na(level)){
@@ -507,9 +500,7 @@ prep_gp_covariate = function(data,
 
   # Items to add to Stan data
   # Number of basis functions
-  covariate_name <- gsub('(', '_', covariate_name, fixed = TRUE)
-  covariate_name <- gsub(')', '_', covariate_name, fixed = TRUE)
-  covariate_name <- gsub(':', 'by', covariate_name, fixed = TRUE)
+  covariate_name <- clean_gpnames(covariate_name)
   data_lines <- paste0('int<lower=1> k_', covariate_name, '; // basis functions for approximate gp\n')
   append_dat <- list(k = k)
   names(append_dat) <- paste0('k_', covariate_name, '')
@@ -531,6 +522,26 @@ prep_gp_covariate = function(data,
        eigenfunctions = eigenfunctions)
 }
 
+#' Clean GP names so no illegal characters are used in Stan code
+#' @noRd
+clean_gpnames = function(gp_names){
+  gp_names_clean <- gsub('(', '_', gp_names, fixed = TRUE)
+  gp_names_clean <- gsub(')', '_', gp_names_clean, fixed = TRUE)
+  gp_names_clean <- gsub(':', 'by', gp_names_clean, fixed = TRUE)
+  gp_names_clean <- gsub('.', '_', gp_names_clean, fixed = TRUE)
+  gp_names_clean <- gsub(']', '_', gp_names_clean, fixed = TRUE)
+  gp_names_clean <- gsub('[', '_', gp_names_clean, fixed = TRUE)
+  gp_names_clean <- gsub(';', '_', gp_names_clean, fixed = TRUE)
+  gp_names_clean <- gsub(':', '_', gp_names_clean, fixed = TRUE)
+  gp_names_clean <- gsub("'", "", gp_names_clean, fixed = TRUE)
+  gp_names_clean <- gsub("\"", "", gp_names_clean, fixed = TRUE)
+  gp_names_clean <- gsub("%", "percent", gp_names_clean, fixed = TRUE)
+  gp_names_clean <- gsub("[.]+", "_", gp_names_clean, fixed = TRUE)
+  gp_names_clean
+}
+
+#' Update a Stan file with GP information
+#' @noRd
 add_gp_model_file = function(model_file, model_data, mgcv_model, gp_additions){
 
   rho_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_rho'))
@@ -547,9 +558,7 @@ add_gp_model_file = function(model_file, model_data, mgcv_model, gp_additions){
 
   # Replace the multi_normal_prec lines with spd_cov_exp_quad
   gp_names <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'name'))
-  gp_names_clean <- gsub('(', '_', gp_names, fixed = TRUE)
-  gp_names_clean <- gsub(')', '_', gp_names_clean, fixed = TRUE)
-  gp_names_clean <- gsub(':', 'by', gp_names_clean, fixed = TRUE)
+  gp_names_clean <- clean_gpnames(gp_names)
   s_to_remove <- list()
   for(i in seq_along(gp_names)){
     s_name <- gsub('gp(', 's(', gp_names[i], fixed = TRUE)

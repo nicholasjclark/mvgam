@@ -124,6 +124,9 @@ predict.mvgam = function(object, newdata,
     attr(all_linpreds, 'model.offset') <- 0
 
     # Trend stationary predictions
+    if(!process_error){
+      family_extracts <- list(sigma_obs = .Machine$double.eps)
+    }
     trend_predictions <- mvgam_predict(family = 'gaussian',
                                        Xp = all_linpreds,
                                        type = 'response',
