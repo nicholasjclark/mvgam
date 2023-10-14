@@ -32,10 +32,10 @@ test_that("dynamic to gp Hilbert is working properly", {
                'gp(time, by = covariate, c = 5/4, k = 17, scale = TRUE)',
                fixed = TRUE)
 
-  # k will be fixed at N if N <= 8
+  # k will be fixed at N-1 if N <= 8
   expect_match(attr(terms(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate),
                                                   N = 7)), 'term.labels'),
-               'gp(time, by = covariate, c = 5/4, k = 7, scale = TRUE)',
+               'gp(time, by = covariate, c = 5/4, k = 6, scale = TRUE)',
                fixed = TRUE)
 })
 

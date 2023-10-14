@@ -233,9 +233,9 @@ interpret_mvgam = function(formula, N){
       k <- term$k
       if(is.null(k)){
         if(N > 8){
-          k <- min(40, min(N, max(8, N)))
+          k <- min(40, min(N - 1, max(8, N - 1)))
         } else {
-          k <- N
+          k <- N - 1
         }
       }
 

@@ -121,7 +121,7 @@ plot_mvgam_smooth = function(object,
     if(any(grepl(object2$mgcv_model$smooth[[smooth_int]]$label,
           gsub('gp(', 's(', gp_names, fixed = TRUE),
           fixed = TRUE))){
-      stop(smooth, ' is a gp() term. Use plot_effects() instead to visualise',
+      stop(smooth, ' is a gp() term. Use plot_predictions() instead to visualise',
            call. = FALSE)
     }
   }
