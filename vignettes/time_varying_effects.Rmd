@@ -1,0 +1,226 @@
+---
+title: "Time-varying effects in the mvgam package"
+author: "Nicholas J Clark"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_vignette:
+    toc: yes
+vignette: >
+  %\VignetteIndexEntry{Time-varying effects in the mvgam package}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,   
+  dpi = 150,
+  fig.asp = 0.8,
+  fig.width = 6,
+  out.width = "60%",
+  fig.align = "center")
+library(mvgam)
+library(ggplot2)
+theme_set(theme_bw(base_size = 12, base_family = 'serif'))
+```
+
+The purpose of this vignette is to show how the `mvgam` package can be used to estimate and forecast regression coefficients that vary through time.
+
+## Time-varying effects
+Dynamic fixed-effect coefficients (often referred to as dynamic linear models) can be readily incorporated into GAMs / DGAMs. In `mvgam`, the `dynamic()` formula wrapper offers a convenient interface to set these up. The plan is to incorporate a range of dynamic options (such as random walk, AR1 etc...) but for the moment only low-rank Gaussian Process (GP) smooths are allowed (making use either of the `gp` basis in `mgcv` of of Hilbert space approximate GPs). These are advantageous over splines or random walk effects for several reasons. First, GPs will force the time-varying effect to be smooth. This often makes sense in reality, where we would not expect a regression coefficient to change rapidly from one time point to the next. Second, GPs provide information on the 'global' dynamics of a time-varying effect through their length-scale parameters. This means we can use them to provide accurate forecasts of how an effect is expected to change in the future, something that we couldn't do well if we used splines to estimate the effect. An example below illustrates:
+
+### Simulating time-varying effects
+Simulate a time-varying coefficient using a squared exponential Gaussian Process function with length scale $\rho$=10. We will do this using an internal function from `mvgam` (the `sim_gp` function):
+```{r}
+set.seed(1111)
+N <- 200
+beta_temp <- mvgam:::sim_gp(rnorm(1),
+                            alpha_gp = 0.75,
+                            rho_gp = 10,
+                            h = N) + 0.5
+```
+
+A plot of the time-varying coefficient shows that it changes smoothly through time:
+```{r}
+plot(beta_temp, type = 'l', lwd = 3, 
+     bty = 'l', xlab = 'Time', ylab = 'Coefficient',
+     col = 'darkred')
+box(bty = 'l', lwd = 2)
+```
+
+Next we need to simulate the values of the covariate, which we will call `temp` (to represent $temperature$). In this case we just use a standard normal distribution to simulate this covariate:
+```{r}
+temp <- rnorm(N, sd = 1)
+```
+
+Finally, simulate the outcome variable, which is a Gaussian observation process (with observation error) over the time-varying effect of $temperature$
+```{r}
+out <- rnorm(N, mean = 4 + beta_temp * temp,
+             sd = 0.25)
+time <- seq_along(temp)
+plot(out,  type = 'l', lwd = 3, 
+     bty = 'l', xlab = 'Time', ylab = 'Outcome',
+     col = 'darkred')
+box(bty = 'l', lwd = 2)
+```
+
+Gather the data into a `data.frame` for fitting models, and split the data into training and testing folds.
+```{r}
+data <- data.frame(out, temp, time)
+data_train <- data[1:190,]
+data_test <- data[191:200,]
+```
+
+Plot the series
+```{r}
+plot_mvgam_series(data = data_train, newdata = data_test, y = 'out')
+```
+
+### The `dynamic()` function
+Time-varying coefficients can be fairly easily set up using the `s()` or `gp()` wrapper functions in `mvgam` formulae by fitting a nonlinear effect of `time` and using the covariate of interest as the numeric `by` variable (see `?mgcv::s` or `?brms::gp` for more details). The `dynamic()` formula wrapper offers a way to automate this process, and will eventually allow for a broader variety of time-varying effects (such as random walk or AR processes). Depending on the arguments that are specified to `dynamic`, it will either set up a low-rank GP smooth function using `s()` with `bs = 'gp'` and a fixed value of the length scale parameter $\rho$, or it will set up a Hilbert space approximate GP using the `gp()` function with `c=5/4` so that $\rho$ is estimated (see `?dynamic` for more details). In this first example we will use the `s()` option, and will mis-specify the $\rho$ parameter here as, in practice, it is never known. This call to `dynamic()` will set up the following smooth: `s(time, by = temp, bs = "gp", m = c(-2, 8, 2), k = 20)`
+```{r, include=FALSE}
+mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 20),
+             family = gaussian(),
+             data = data_train)
+```
+
+```{r, eval=FALSE}
+mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 20),
+             family = gaussian(),
+             data = data_train)
+```
+
+Inspect the model summary, which shows how the `dynamic()` wrapper was used to construct a low-rank Gaussian Process smooth function:
+```{r}
+summary(mod, include_betas = FALSE)
+```
+
+Because this model used a spline with a `gp` basis, it's smooths can be visualised just like any other `gam`. Plot the estimated time-varying coefficient for the in-sample training period
+```{r}
+plot(mod, type = 'smooths')
+```
+
+We can also plot the estimates for the in-sample and out-of-sample periods to see how the Gaussian Process function produces sensible smooth forecasts. Here we supply the full dataset to the `newdata` argument in `plot_mvgam_smooth` to inspect posterior forecasts of the time-varying smooth function. Overlay the true simulated function to see that the model has adequately estimated it's dynamics in both the training and testing data partitions
+```{r}
+plot_mvgam_smooth(mod, smooth = 1, newdata = data)
+abline(v = 190, lty = 'dashed', lwd = 2)
+lines(beta_temp, lwd = 2.5, col = 'white')
+lines(beta_temp, lwd = 2)
+```
+
+We can also use `plot_predictions` from the `marginaleffects` package to visualise the time-varying coefficient for what the effect would be estimated to be at different values of $temperature$:
+```{r}
+plot_predictions(mod, 
+                 newdata = datagrid(time = unique,
+                                    temp = fivenum),
+                 by = c('time', 'temp', 'temp'),
+                 type = 'link')
+```
+
+This results in sensible forecasts of the observations as well
+```{r}
+plot(mod, type = 'forecast', newdata = data_test)
+```
+
+The syntax is very similar if we wish to estimate the parameters of the underlying Gaussian Process, this time using a Hilbert space approximation. We simply omit the `rho` argument in `dynamic` to make this happen. This will set up a call similar to `gp(time, by = 'temp', c = 5/4), k = 20`.
+```{r include=FALSE}
+mod <- mvgam(out ~ dynamic(temp, k = 20),
+             family = gaussian(),
+             data = data_train)
+```
+
+```{r eval=FALSE}
+mod <- mvgam(out ~ dynamic(temp, k = 20),
+             family = gaussian(),
+             data = data_train)
+```
+
+This model summary now contains estimates for the marginal deviation and length scale parameters of the underlying Gaussian Process function:
+```{r}
+summary(mod, include_betas = FALSE)
+```
+
+The `plot_predictions` call shows that the effect in this case is similar to what we estimated above:
+```{r}
+plot_predictions(mod, 
+                 newdata = datagrid(time = unique,
+                                    temp = fivenum),
+                 by = c('time', 'temp', 'temp'),
+                 type = 'link')
+```
+
+Forecasts are also similar:
+```{r}
+plot(mod, type = 'forecast', newdata = data_test)
+```
+
+## Salmon survival example
+Here we will use openly available data on marine survival of Chinook salmon to illustrate how time-varying effects can be used to improve ecological time series models. [Scheuerell and Williams (2005)]() used a dynamic linear model to examine the relationship between marine survival of Chinook salmon and an index of ocean upwelling strength along the west coast of the USA. The authors hypothesized that stronger upwelling in April should create better growing conditions for phytoplankton, which would then translate into more zooplankton and provide better foraging opportunities for juvenile salmon entering the ocean. Thus, for smolts entering the ocean. The data on survival is measured as a proportional variable and is available in the `MARSS` package:
+```{r}
+load(url('https://github.com/atsa-es/MARSS/raw/master/data/SalmonSurvCUI.rda'))
+dplyr::glimpse(SalmonSurvCUI)
+```
+
+First we need to prepare the data for modelling. The variable `CUI.apr` will be standardized to make it easier for the sampler to estimate underlying GP parameters for the time-varying effect. We also need to convert the survival back to a proportion, as in its current form it has been logit-transformed (this is because most time series packages cannot handle proportional data). As usual, we also need to create a `time` indicator and a `series` indicator for working in `mvgam`:
+```{r}
+SalmonSurvCUI %>%
+  # create a time variable
+  dplyr::mutate(time = dplyr::row_number()) %>%
+
+  # create a series variable
+  dplyr::mutate(series = as.factor('salmon')) %>%
+
+  # z-score the covariate CUI.apr
+  dplyr::mutate(CUI.apr = as.vector(scale(CUI.apr))) %>%
+
+  # convert logit-transformed survival back to proportional
+  dplyr::mutate(survival = plogis(logit.s)) -> model_data
+```
+
+
+# Initial model, State-Space Random Walk with no predictors
+mod0 <- mvgam(formula = survival ~ 1,
+             trend_model = 'RW',
+             family = betar(),
+             data = model_data,
+             run_model = TRUE)
+
+# A State-Space model with a time-varying effect of the coastal upwelling index
+# and AR1 dynamics. We use a Beta observation model to capture the restrictions
+# of our proportional observations
+mod1 <- mvgam(formula = survival ~ -1,
+              trend_formula = ~ dynamic(CUI.apr, k = 15),
+              trend_model = 'RW',
+              family = betar(),
+              data = model_data,
+              run_model = TRUE)
+summary(mod1, include_betas = FALSE)
+
+plot(mod1, type = 'trend')
+plot_predictions(mod1, newdata = datagrid(CUI.apr = fivenum,
+                                          time = unique),
+                 by = c('time', 'CUI.apr', 'CUI.apr'),
+                 type = 'link',
+                 conf_level = 0.8,
+                 process_error = TRUE)
+plot(mod1, type = 'forecast')
+
+# Compare models based on in-sample approximate leave-one-out cross-validation
+loo_compare(mod0, mod1)
+
+# Compare models based on approximate leave-future-out cross-validation
+lfo_mod0 <- lfo_cv(mod0, min_t = 25)
+lfo_mod1 <- lfo_cv(mod1, min_t = 25)
+
+plot(lfo_mod0)
+plot(lfo_mod1)
+
+# Plot ELPDs; values less than zero suggest the time-varying
+# predictor model gives better 1-step ahead forecasts
+plot(x = 1:length(lfo_mod0$elpds) + 25,
+     y = lfo_mod0$elpds - lfo_mod1$elpds,
+     ylab = 'ELPDmod0 - ELPDmod1',
+     xlab = 'Evaluation time point',
+     pch = 16,
+     bty = 'l')
+abline(h = 0, lty = 'dashed')
