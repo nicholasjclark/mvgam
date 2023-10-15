@@ -351,7 +351,7 @@ compare_mvgams(lynx_mvgam, lynx_mvgam_poor, fc_horizon = 10)
 
 Summary statistics of the two models' out of sample Discrete Rank Probability Score (DRPS) indicate that the well-specified model performs markedly better (lower DRPS) across most out of sample horizons.
 
-The second approximator uses more conventional leave-future-out comparisons. Time series models are often evaluated using an expanding window training technique, where the model is initially trained on some subset of data from `t = 1` to `t = n_train`, and then is used to produce forecasts for the next `fc_horizon` time steps `t = n_train + fc_horizon`. In the next iteration, the size of training data is expanded by a single time point and the process repeated. This is obviously computationally challenging for Bayesian time series models, as the number of refits can be very large. `mvgam` uses an approximation based on importance sampling. Briefly, we refit the model using the first `min_t` observations to perform a single exact `fc_horizon`-ahead forecast step. This forecast is evaluated against the `min_t + fc_horizon` out of sample observations using the Expected Log Predictive Density (ELPD). Next, we approximate each successive round of expanding window forecasts by moving forward one step at a time `for i in 1:N_evaluations` and re-weighting draws from the model's posterior predictive distribution using Pareto Smoothed Importance Sampling (PSIS). In each iteration `i`, PSIS weights are obtained for all observations that would have been included in the model if we had re-fit. If these importance ratios are stable, we consider the approximation adequate and use the re-weighted posterior's forecast for evaluating the next holdout set of testing observations (`(min_t + i + 1):(min_t + i + fc_horizon)`). This is similar to the process of particle filtering to update forecasts in light of new data by re-weighting the posterior draws using importance weights. But at some point the importance ratio variability will become too large and importance sampling will be unreliable. This is indicated by the estimated shape parameter `k` of the generalized Pareto distribution crossing a certain threshold `pareto_k_threshold`. Only then do we refit the model using all of the observations up to the time of the failure. We then restart the process and iterate forward until the next refit is triggered. The process is computationally much more efficient, as only a fraction of the evaluations typically requires refits (the algorithm is  described in detail by Bürkner et al. 2020).
+The second approximator uses more conventional leave-future-out comparisons. Time series models are often evaluated using an expanding window training technique, where the model is initially trained on some subset of data from `t = 1` to `t = n_train`, and then is used to produce forecasts for the next `fc_horizon` time steps `t = n_train + fc_horizon`. In the next iteration, the size of training data is expanded by a single time point and the process repeated. This is obviously computationally challenging for Bayesian time series models, as the number of refits can be very large. `mvgam` uses an approximation based on importance sampling. Briefly, we refit the model using the first `min_t` observations to perform a single exact `fc_horizon`-ahead forecast step. This forecast is evaluated against the `min_t + fc_horizon` out of sample observations using the Expected Log Predictive Density (ELPD). Next, we approximate each successive round of expanding window forecasts by moving forward one step at a time `for i in 1:N_evaluations` and re-weighting draws from the model's posterior predictive distribution using Pareto Smoothed Importance Sampling (PSIS). In each iteration `i`, PSIS weights are obtained for all observations that would have been included in the model if we had re-fit. If these importance ratios are stable, we consider the approximation adequate and use the re-weighted posterior's forecast for evaluating the next holdout set of testing observations (`(min_t + i + 1):(min_t + i + fc_horizon)`). This is similar to the process of particle filtering to update forecasts in light of new data by re-weighting the posterior draws using importance weights. But at some point the importance ratio variability will become too large and importance sampling will be unreliable. This is indicated by the estimated shape parameter `k` of the generalized Pareto distribution crossing a certain threshold `pareto_k_threshold`. Only then do we refit the model using all of the observations up to the time of the failure. We then restart the process and iterate forward until the next refit is triggered. The process is computationally much more efficient, as only a fraction of the evaluations typically requires refits (the algorithm isdescribed in detail by Bürkner et al. 2020).
 
 Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-future-out cross-validation for Bayesian time series models. Journal of Statistical Computation and Simulation. 90:14, 2499-2523.
 
@@ -479,110 +479,7 @@ for(i in 1:3){
 }
 ```
 
-## Dynamic coefficient models
-Dynamic fixed-effect coefficients (often referred to as dynamic linear models) can also be readily incorporated into GAMs / DGAMs. In `mvgam`, the `dynamic()` formula wrapper is used to set these up. The plan is to incorporate a range of dynamic options (such as random walk, AR1 etc...) but for the moment only low-rank Gaussian Process smooths are allowed (making use either of the `gp` basis in `mgcv` of of Hilbert space approximate GPs). An example below illustrates:
-  
-Simulate a time-varying coefficient using a squared exponential Gaussian Process function with length scale $\rho$=10
-```{r}
-set.seed(1111)
-N <- 200
-beta_temp <- mvgam:::sim_gp(rnorm(1),
-                            alpha_gp = 0.75,
-                            rho_gp = 10,
-                            h = N) + 0.5
-plot(beta_temp, type = 'l', lwd = 3, 
-     bty = 'l', xlab = 'Time', ylab = 'Coefficient',
-     col = 'darkred')
-box(bty = 'l', lwd = 2)
-```
-
-Now simulate the outcome, which is a Gaussian observation process (with observation error) over the time-varying effect of $temperature$
-```{r}
-temp <- rnorm(N, sd = 1)
-out <- rnorm(N, mean = 4 + beta_temp * temp,
-             sd = 0.25)
-time <- seq_along(temp)
-plot(out,  type = 'l', lwd = 3, 
-     bty = 'l', xlab = 'Time', ylab = 'Outcome',
-     col = 'darkred')
-box(bty = 'l', lwd = 2)
-```
-
-Gather the data into a `data.frame` and fit a model using the `dynamic()` formula wrapper to specify a low-rank Gaussian Process smooth function to estimate the time-varying coefficient of $temperature$. The `dynamic()` function will automatically use a spline with the `gp` basis in `mgcv` if you supply a value for `rho`. If you do not supply a value for this argument, it will be estimated using a Hilbert space approximate GP following the documentation outlined in the `gp()` function in `brms`. We will mis-specify the $\rho$ parameter here as, in practice, it is never known 
-```{r, include=FALSE}
-data <- data.frame(out, temp, time)
-data_train <- data[1:190,]
-data_test <- data[191:200,]
-mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
-             family = gaussian(),
-             data = data_train)
-```
-
-```{r, eval=FALSE}
-data <- data.frame(out, temp, time)
-data_train <- data[1:190,]
-data_test <- data[191:200,]
-mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE),
-             family = gaussian(),
-             data = data_train)
-```
-
-Inspect the model summary, which shows how the `dynamic` wrapper was used to construct a low-rank Gaussian Process smooth function:
-```{r}
-summary(mod, include_betas = FALSE)
-```
-
-Because this model used a spline with a `gp` basis, it's smooths can be visualised just like any other `gam`. Plot the estimated time-varying coefficient for the in-sample training period
-```{r}
-plot(mod, type = 'smooths')
-```
-
-Plot the estimates for the in-sample and out-of-sample periods to see how the Gaussian Process function produces sensible smooth forecasts. Overlay the true simulated function to see that the model has adequately estimated it's dynamics in both the training and testing data partitions
-```{r}
-plot_mvgam_smooth(mod, smooth = 1, newdata = data)
-abline(v = 190, lty = 'dashed', lwd = 2)
-lines(beta_temp, lwd = 2.5, col = 'white')
-lines(beta_temp, lwd = 2)
-```
-
-This results in sensible forecasts of the observations as well
-```{r}
-plot(mod, type = 'forecast', newdata = data_test)
-```
-
-The syntax is very similar if we wish to estimate the parameters of the underlying Gaussian Process, this time using a Hilbert space approximation. We simply omit the `rho` argument in `dynamic`:
-```{r include=FALSE}
-mod <- mvgam(out ~ dynamic(temp, scale = FALSE),
-             family = gaussian(),
-             data = data_train)
-```
-
-```{r eval=FALSE}
-mod <- mvgam(out ~ dynamic(temp, scale = FALSE),
-             family = gaussian(),
-             data = data_train)
-```
-
-This model summary now contains estimates for the marginal deviation and length scale parameters of the underlying Gaussian Process function:
-```{r}
-summary(mod, include_betas = FALSE)
-```
-
-We can use `plot_predictions` from the `marginaleffects` package to visualise the time-varying coefficient for the effect of `temp`, which is similar to what we estimated above:
-```{r}
-plot_predictions(mod, 
-                 newdata = datagrid(time = unique,
-                                    temp = 1),
-                 by = 'time',
-                 type = 'link')
-```
-
-Forecasts are also similar:
-```{r}
-plot(mod, type = 'forecast', newdata = data_test)
-```
-
-There are many more extended uses for `mvgam` models, including the ability to fit dynamic factor processes for analysing and forecasting sets of multivariate time series. See the package documentation for more details.
+There are many more extended uses for `mvgam` models, including the ability to fit dynamic coefficient models, dynamic factor and vector autoregressive processes for analysing and forecasting sets of multivariate time series and fitting hierarchical GAMs. See the package documentation for more details.
 
 ## License
 This project is licensed under an `MIT` open source license

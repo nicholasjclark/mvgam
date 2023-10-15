@@ -26,7 +26,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.6</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -44,6 +44,7 @@
     <a class="dropdown-item" href="../articles/data_in_mvgam.html">Formatting data for use in mvgam</a>
     <a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a>
     <a class="dropdown-item" href="../articles/shared_states.html">Shared latent states in mvgam</a>
+    <a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in the mvgam package</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in the mvgam package</a>
   </div>
 </li>
@@ -75,7 +76,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2023-09-29</h4>
+            <h4 data-toc-skip class="date">2023-10-15</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/shared_states.Rmd" class="external-link"><code>vignettes/shared_states.Rmd</code></a></small>
       <div class="d-none name"><code>shared_states.Rmd</code></div>
@@ -191,17 +192,22 @@ the supplied <code>trend_map</code>:</p>
 <span><span class="co">##   array[n_nonmissing] int&lt;lower=0&gt; obs_ind; // indices of nonmissing observations</span></span>
 <span><span class="co">## }</span></span>
 <span><span class="co">## transformed data {</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">## }</span></span>
 <span><span class="co">## parameters {</span></span>
 <span><span class="co">##   // raw basis coefficients</span></span>
 <span><span class="co">##   vector[num_basis] b_raw;</span></span>
 <span><span class="co">##   vector[num_basis_trend] b_raw_trend;</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // latent state SD terms</span></span>
 <span><span class="co">##   vector&lt;lower=0&gt;[n_lv] sigma;</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // latent state AR1 terms</span></span>
 <span><span class="co">##   vector&lt;lower=-1.5, upper=1.5&gt;[n_lv] ar1;</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // latent states</span></span>
 <span><span class="co">##   matrix[n, n_lv] LV;</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // smoothing parameters</span></span>
 <span><span class="co">##   vector&lt;lower=0&gt;[n_sp_trend] lambda_trend;</span></span>
 <span><span class="co">## }</span></span>
@@ -210,15 +216,20 @@ the supplied <code>trend_map</code>:</p>
 <span><span class="co">##   vector[n * n_lv] trend_mus;</span></span>
 <span><span class="co">##   matrix[n, n_series] trend;</span></span>
 <span><span class="co">##   matrix[n_series, n_lv] lv_coefs;</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // basis coefficients</span></span>
 <span><span class="co">##   vector[num_basis] b;</span></span>
 <span><span class="co">##   vector[num_basis_trend] b_trend;</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // observation model basis coefficients</span></span>
 <span><span class="co">##   b[1 : num_basis] = b_raw[1 : num_basis];</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // process model basis coefficients</span></span>
 <span><span class="co">##   b_trend[1 : num_basis_trend] = b_raw_trend[1 : num_basis_trend];</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // latent process linear predictors</span></span>
 <span><span class="co">##   trend_mus = X_trend * b_trend;</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // derived latent states</span></span>
 <span><span class="co">##   lv_coefs = Z;</span></span>
 <span><span class="co">##   for (i in 1 : n) {</span></span>
@@ -230,11 +241,15 @@ the supplied <code>trend_map</code>:</p>
 <span><span class="co">## model {</span></span>
 <span><span class="co">##   // prior for series...</span></span>
 <span><span class="co">##   b_raw[1] ~ student_t(3, 0, 2);</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // priors for AR parameters</span></span>
 <span><span class="co">##   ar1 ~ std_normal();</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // priors for latent state SD parameters</span></span>
 <span><span class="co">##   sigma ~ student_t(3, 0, 2.5);</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // dynamic process models</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // prior for s(season)_trend...</span></span>
 <span><span class="co">##   b_raw_trend[1 : 4] ~ multi_normal_prec(zero_trend[1 : 4],</span></span>
 <span><span class="co">##                                          S_trend1[1 : 4, 1 : 4]</span></span>
@@ -265,6 +280,7 @@ the supplied <code>trend_map</code>:</p>
 <span><span class="co">##   array[n, n_series] int ypred;</span></span>
 <span><span class="co">##   penalty = 1.0 / (sigma .* sigma);</span></span>
 <span><span class="co">##   rho_trend = log(lambda_trend);</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // posterior predictions</span></span>
 <span><span class="co">##   eta = X * b;</span></span>
 <span><span class="co">##   for (s in 1 : n_series) {</span></span>
@@ -351,14 +367,6 @@ observed time series. The model converges well</p>
 <span><span class="co">## s(season).2_trend -0.29 -0.0480  0.18    1  1271</span></span>
 <span><span class="co">## s(season).3_trend -0.15  0.0690  0.29    1  1579</span></span>
 <span><span class="co">## s(season).4_trend -0.15  0.0660  0.28    1  1704</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM process smoothing parameter (rho) estimates:</span></span>
-<span><span class="co">##                     2.5% 50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## s(season)_rho_trend  2.4 3.6   4.3    1  1685</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##            edf    F p-value</span></span>
-<span><span class="co">## s(season) 1.44 0.09    0.92</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
@@ -560,62 +568,37 @@ many spline coefficients in this model</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## Observation error parameter estimates:</span></span>
 <span><span class="co">##              2.5% 50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## sigma_obs[1] 0.54 1.3   2.0  1.1    42</span></span>
-<span><span class="co">## sigma_obs[2] 1.80 2.1   2.4  1.0  1183</span></span>
-<span><span class="co">## sigma_obs[3] 1.80 2.1   2.4  1.0  1436</span></span>
+<span><span class="co">## sigma_obs[1] 0.38 1.2   2.0 1.09    41</span></span>
+<span><span class="co">## sigma_obs[2] 1.90 2.2   2.5 1.01  1347</span></span>
+<span><span class="co">## sigma_obs[3] 1.90 2.1   2.4 1.00  2310</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">##                2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## (Intercept)     1.3  1.8  2.30 1.01   416</span></span>
-<span><span class="co">## seriessensor_2 -1.6 -1.0 -0.38 1.01   615</span></span>
-<span><span class="co">## seriessensor_3 -2.8 -2.2 -1.60 1.01   586</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM smoothing parameter (rho) estimates:</span></span>
-<span><span class="co">##                                      2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## s(temperature):seriessensor_1_rho   0.620 3.00   4.1 1.00   280</span></span>
-<span><span class="co">## s(temperature):seriessensor_12_rho -2.300 0.14   1.9 1.00   569</span></span>
-<span><span class="co">## s(temperature):seriessensor_2_rho   0.460 3.10   4.1 1.00   749</span></span>
-<span><span class="co">## s(temperature):seriessensor_22_rho -0.067 3.00   4.2 1.00   661</span></span>
-<span><span class="co">## s(temperature):seriessensor_3_rho   0.083 3.00   4.2 1.00   679</span></span>
-<span><span class="co">## s(temperature):seriessensor_32_rho -0.320 3.00   4.2 1.01   586</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">##                                 edf      F p-value    </span></span>
-<span><span class="co">## s(temperature):seriessensor_1 1.321   5.93 1.4e-06 ***</span></span>
-<span><span class="co">## s(temperature):seriessensor_2 0.952 185.49    0.14    </span></span>
-<span><span class="co">## s(temperature):seriessensor_3 1.110 200.39    0.04 *  </span></span>
-<span><span class="co">## ---</span></span>
-<span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
+<span><span class="co">## (Intercept)     1.3  1.8  2.30 1.01   240</span></span>
+<span><span class="co">## seriessensor_2 -1.7 -1.1 -0.36 1.00   400</span></span>
+<span><span class="co">## seriessensor_3 -2.9 -2.2 -1.50 1.01   411</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Process model AR parameter estimates:</span></span>
 <span><span class="co">##         2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## ar1[1] -0.17 0.16  0.56 1.01   359</span></span>
+<span><span class="co">## ar1[1] -0.13 0.16  0.53 1.02   327</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Process error parameter estimates:</span></span>
 <span><span class="co">##          2.5% 50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## sigma[1]    1 1.9   2.4 1.06    57</span></span>
+<span><span class="co">## sigma[1]    1   2   2.5 1.07    52</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM process model coefficient (beta) estimates:</span></span>
-<span><span class="co">##                          2.5%   50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## s(productivity).1_trend -0.17 0.068  0.95 1.02   144</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM process smoothing parameter (rho) estimates:</span></span>
-<span><span class="co">##                             2.5% 50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## s(productivity)_rho_trend  -1.30 2.6   4.0 1.05    98</span></span>
-<span><span class="co">## s(productivity)2_rho_trend  0.43 3.0   4.1 1.00   894</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##                   edf    F p-value</span></span>
-<span><span class="co">## s(productivity) 0.923 0.73    0.95</span></span>
+<span><span class="co">##                          2.5%  50% 97.5% Rhat n.eff</span></span>
+<span><span class="co">## s(productivity).1_trend -0.16 0.06   0.9 1.13    61</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">## Rhats above 1.05 found for 5 parameters</span></span>
+<span><span class="co">## Rhats above 1.05 found for 65 parameters</span></span>
 <span><span class="co">## *Diagnose further to investigate why the chains have not mixed</span></span>
-<span><span class="co">## 65 of 2000 iterations ended with a divergence (3.25%)</span></span>
-<span><span class="co">## *Try running with larger adapt_delta to remove the divergences</span></span>
+<span><span class="co">## 0 of 2000 iterations ended with a divergence (0%)</span></span>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
-<span><span class="co">## Chain 3: E-FMI = 0.1805</span></span>
+<span><span class="co">## Chain 1: E-FMI = 0.0571</span></span>
+<span><span class="co">## Chain 3: E-FMI = 0.1754</span></span>
+<span><span class="co">## Chain 4: E-FMI = 0.151</span></span>
 <span><span class="co">## *E-FMI below 0.2 indicates you may need to reparameterize your model</span></span></code></pre>
 </div>
 <div class="section level3">

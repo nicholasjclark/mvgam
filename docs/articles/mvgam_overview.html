@@ -26,7 +26,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.5</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.6</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -44,6 +44,7 @@
     <a class="dropdown-item" href="../articles/data_in_mvgam.html">Formatting data for use in mvgam</a>
     <a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a>
     <a class="dropdown-item" href="../articles/shared_states.html">Shared latent states in mvgam</a>
+    <a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in the mvgam package</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in the mvgam package</a>
   </div>
 </li>
@@ -75,7 +76,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2023-09-29</h4>
+            <h4 data-toc-skip class="date">2023-10-15</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/mvgam_overview.Rmd" class="external-link"><code>vignettes/mvgam_overview.Rmd</code></a></small>
       <div class="d-none name"><code>mvgam_overview.Rmd</code></div>
@@ -182,16 +183,16 @@ data using the <code>sim_mvgam</code> function. See
 <pre><code><span><span class="co">##    y season year   series time</span></span>
 <span><span class="co">## 1  0      1    1 series_1    1</span></span>
 <span><span class="co">## 2  1      1    1 series_2    1</span></span>
-<span><span class="co">## 3  1      1    1 series_3    1</span></span>
+<span><span class="co">## 3  0      1    1 series_3    1</span></span>
 <span><span class="co">## 4  0      1    1 series_4    1</span></span>
-<span><span class="co">## 5  3      2    1 series_1    2</span></span>
-<span><span class="co">## 6  4      2    1 series_2    2</span></span>
-<span><span class="co">## 7  3      2    1 series_3    2</span></span>
-<span><span class="co">## 8  2      2    1 series_4    2</span></span>
-<span><span class="co">## 9  3      3    1 series_1    3</span></span>
-<span><span class="co">## 10 4      3    1 series_2    3</span></span>
-<span><span class="co">## 11 3      3    1 series_3    3</span></span>
-<span><span class="co">## 12 4      3    1 series_4    3</span></span></code></pre>
+<span><span class="co">## 5  0      2    1 series_1    2</span></span>
+<span><span class="co">## 6  1      2    1 series_2    2</span></span>
+<span><span class="co">## 7  1      2    1 series_3    2</span></span>
+<span><span class="co">## 8  3      2    1 series_4    2</span></span>
+<span><span class="co">## 9  2      3    1 series_1    3</span></span>
+<span><span class="co">## 10 2      3    1 series_2    3</span></span>
+<span><span class="co">## 11 6      3    1 series_3    3</span></span>
+<span><span class="co">## 12 0      3    1 series_4    3</span></span></code></pre>
 <p>Notice how we have four different time series in these simulated
 data, but we do not spread the outcome values into different columns.
 Rather, there is only a single column for the outcome variable, labelled
@@ -383,9 +384,9 @@ following code:</p>
 <pre><code><span><span class="co">##                      param_name param_length           param_info</span></span>
 <span><span class="co">## 1             vector[1] mu_raw;            1 s(year_fac) pop mean</span></span>
 <span><span class="co">## 2 vector&lt;lower=0&gt;[1] sigma_raw;            1   s(year_fac) pop sd</span></span>
-<span><span class="co">##                               prior                example_change</span></span>
-<span><span class="co">## 1            mu_raw ~ std_normal(); mu_raw ~ normal(-0.14, 0.87);</span></span>
-<span><span class="co">## 2 sigma_raw ~ student_t(3, 0, 2.5); sigma_raw ~ exponential(0.4);</span></span>
+<span><span class="co">##                               prior                 example_change</span></span>
+<span><span class="co">## 1            mu_raw ~ std_normal();   mu_raw ~ normal(0.64, 0.33);</span></span>
+<span><span class="co">## 2 sigma_raw ~ student_t(3, 0, 2.5); sigma_raw ~ exponential(0.81);</span></span>
 <span><span class="co">##   new_lowerbound new_upperbound</span></span>
 <span><span class="co">## 1             NA             NA</span></span>
 <span><span class="co">## 2             NA             NA</span></span></code></pre>
@@ -418,35 +419,29 @@ posterior distributions for key parameters</p>
 <span><span class="co">## Fitted using Stan </span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM coefficient (beta) estimates:</span></span>
-<span><span class="co">##                 2.5% 50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## s(year_fac).1   1.80 2.1   2.3    1  2298</span></span>
-<span><span class="co">## s(year_fac).2   2.50 2.7   2.8    1  3349</span></span>
-<span><span class="co">## s(year_fac).3   3.00 3.1   3.2    1  3117</span></span>
-<span><span class="co">## s(year_fac).4   3.10 3.3   3.4    1  2002</span></span>
-<span><span class="co">## s(year_fac).5   1.90 2.1   2.3    1  2979</span></span>
-<span><span class="co">## s(year_fac).6   1.50 1.8   2.0    1  2507</span></span>
-<span><span class="co">## s(year_fac).7   1.80 2.0   2.3    1  2481</span></span>
-<span><span class="co">## s(year_fac).8   2.80 3.0   3.1    1  3505</span></span>
-<span><span class="co">## s(year_fac).9   3.10 3.2   3.4    1  2328</span></span>
-<span><span class="co">## s(year_fac).10  2.60 2.8   2.9    1  2838</span></span>
-<span><span class="co">## s(year_fac).11  3.00 3.1   3.2    1  2965</span></span>
-<span><span class="co">## s(year_fac).12  3.10 3.2   3.3    1  2962</span></span>
-<span><span class="co">## s(year_fac).13  2.00 2.2   2.4    1  2529</span></span>
-<span><span class="co">## s(year_fac).14  2.50 2.6   2.8    1  2972</span></span>
-<span><span class="co">## s(year_fac).15  1.90 2.2   2.4    1  2764</span></span>
-<span><span class="co">## s(year_fac).16  1.90 2.1   2.3    1  2624</span></span>
-<span><span class="co">## s(year_fac).17 -0.23 1.0   1.9    1   579</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">##             edf Chi.sq p-value    </span></span>
-<span><span class="co">## s(year_fac)  14  24803  &lt;2e-16 ***</span></span>
-<span><span class="co">## ---</span></span>
-<span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
+<span><span class="co">##                 2.5%  50% 97.5% Rhat n.eff</span></span>
+<span><span class="co">## s(year_fac).1   1.80 2.10   2.3    1  2055</span></span>
+<span><span class="co">## s(year_fac).2   2.50 2.70   2.8    1  2795</span></span>
+<span><span class="co">## s(year_fac).3   3.00 3.10   3.2    1  2939</span></span>
+<span><span class="co">## s(year_fac).4   3.10 3.30   3.4    1  2743</span></span>
+<span><span class="co">## s(year_fac).5   1.90 2.10   2.3    1  3080</span></span>
+<span><span class="co">## s(year_fac).6   1.50 1.80   2.0    1  2705</span></span>
+<span><span class="co">## s(year_fac).7   1.80 2.00   2.3    1  2583</span></span>
+<span><span class="co">## s(year_fac).8   2.80 3.00   3.1    1  2800</span></span>
+<span><span class="co">## s(year_fac).9   3.10 3.30   3.4    1  2984</span></span>
+<span><span class="co">## s(year_fac).10  2.60 2.80   2.9    1  3000</span></span>
+<span><span class="co">## s(year_fac).11  2.90 3.10   3.2    1  3330</span></span>
+<span><span class="co">## s(year_fac).12  3.10 3.20   3.3    1  2830</span></span>
+<span><span class="co">## s(year_fac).13  2.00 2.20   2.4    1  2733</span></span>
+<span><span class="co">## s(year_fac).14  2.50 2.60   2.8    1  2783</span></span>
+<span><span class="co">## s(year_fac).15  1.90 2.20   2.4    1  2484</span></span>
+<span><span class="co">## s(year_fac).16  1.90 2.10   2.3    1  3018</span></span>
+<span><span class="co">## s(year_fac).17 -0.41 0.99   1.8    1   561</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM group-level estimates:</span></span>
-<span><span class="co">##                2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## mean(year_fac) 2.00 2.40   2.7 1.02   174</span></span>
-<span><span class="co">## sd(year_fac)   0.47 0.68   1.1 1.00   290</span></span>
+<span><span class="co">##                2.5% 50% 97.5% Rhat n.eff</span></span>
+<span><span class="co">## mean(year_fac) 2.00 2.4   2.7 1.01   255</span></span>
+<span><span class="co">## sd(year_fac)   0.47 0.7   1.1 1.01   243</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
@@ -467,23 +462,23 @@ using:</p>
 <span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://pillar.r-lib.org/reference/glimpse.html" class="external-link">glimpse</a></span><span class="op">(</span><span class="va">beta_post</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## Rows: 2,000</span></span>
 <span><span class="co">## Columns: 17</span></span>
-<span><span class="co">## $ `s(year_fac).1`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.17090, 1.92701, 2.06362, 2.21355, 2.21521, 1.97239,…</span></span>
-<span><span class="co">## $ `s(year_fac).2`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.82774, 2.57356, 2.80398, 2.59356, 2.61916, 2.86662,…</span></span>
-<span><span class="co">## $ `s(year_fac).3`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 3.12799, 3.04932, 3.19618, 3.01114, 3.06263, 3.08242,…</span></span>
-<span><span class="co">## $ `s(year_fac).4`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 3.14124, 3.37986, 3.06560, 3.24896, 3.33392, 3.35692,…</span></span>
-<span><span class="co">## $ `s(year_fac).5`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.21846, 2.00607, 2.23213, 2.08506, 2.12254, 2.10114,…</span></span>
-<span><span class="co">## $ `s(year_fac).6`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.60781, 1.82210, 1.75417, 1.89297, 1.68509, 1.62503,…</span></span>
-<span><span class="co">## $ `s(year_fac).7`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.96925, 2.10885, 2.00875, 2.16186, 2.15932, 2.12258,…</span></span>
-<span><span class="co">## $ `s(year_fac).8`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.91465, 3.03525, 2.77397, 3.08147, 2.92264, 2.96548,…</span></span>
-<span><span class="co">## $ `s(year_fac).9`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 3.28419, 3.20462, 3.28123, 3.24700, 3.28069, 3.22159,…</span></span>
-<span><span class="co">## $ `s(year_fac).10` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.72472, 2.76431, 2.55903, 2.86652, 2.69919, 2.83858,…</span></span>
-<span><span class="co">## $ `s(year_fac).11` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 3.08483, 3.07024, 2.96895, 3.06589, 3.08704, 3.14831,…</span></span>
-<span><span class="co">## $ `s(year_fac).12` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 3.22793, 3.19292, 3.22120, 3.27567, 3.16874, 3.24757,…</span></span>
-<span><span class="co">## $ `s(year_fac).13` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.17250, 2.23570, 2.28734, 2.28451, 2.14119, 2.17611,…</span></span>
-<span><span class="co">## $ `s(year_fac).14` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.58793, 2.68866, 2.71610, 2.56932, 2.65579, 2.64623,…</span></span>
-<span><span class="co">## $ `s(year_fac).15` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.20725, 2.18666, 2.20828, 2.21709, 2.07369, 2.14360,…</span></span>
-<span><span class="co">## $ `s(year_fac).16` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.21906, 2.01068, 1.95277, 2.24458, 1.97281, 2.10644,…</span></span>
-<span><span class="co">## $ `s(year_fac).17` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 0.79256800, 0.61473500, 0.60951800, 0.88203100, 1.257…</span></span></code></pre>
+<span><span class="co">## $ `s(year_fac).1`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.08777, 2.14247, 2.07414, 2.16171, 2.06702, 2.06458,…</span></span>
+<span><span class="co">## $ `s(year_fac).2`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.65017, 2.59832, 2.83374, 2.62708, 2.56739, 2.88232,…</span></span>
+<span><span class="co">## $ `s(year_fac).3`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 3.11902, 3.05001, 3.10492, 3.18730, 2.99804, 3.01716,…</span></span>
+<span><span class="co">## $ `s(year_fac).4`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 3.31611, 3.23199, 3.25662, 3.21862, 3.29196, 3.32433,…</span></span>
+<span><span class="co">## $ `s(year_fac).5`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.99933, 2.15520, 2.17525, 2.15734, 2.06145, 2.01815,…</span></span>
+<span><span class="co">## $ `s(year_fac).6`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.70615, 1.82580, 1.79391, 1.72935, 1.70584, 1.71432,…</span></span>
+<span><span class="co">## $ `s(year_fac).7`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.04582, 2.08078, 2.06610, 2.19545, 2.01315, 2.08364,…</span></span>
+<span><span class="co">## $ `s(year_fac).8`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.92660, 3.00065, 2.90508, 2.80914, 3.15397, 2.98438,…</span></span>
+<span><span class="co">## $ `s(year_fac).9`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 3.21747, 3.23934, 3.19795, 3.32784, 3.14262, 3.20075,…</span></span>
+<span><span class="co">## $ `s(year_fac).10` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.68836, 2.68401, 2.80956, 2.76717, 2.84764, 2.67041,…</span></span>
+<span><span class="co">## $ `s(year_fac).11` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.94610, 3.05794, 3.08594, 3.04286, 3.06221, 3.02817,…</span></span>
+<span><span class="co">## $ `s(year_fac).12` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 3.22223, 3.20142, 3.24685, 3.18070, 3.21875, 3.23716,…</span></span>
+<span><span class="co">## $ `s(year_fac).13` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.23589, 2.20312, 2.09360, 2.11853, 2.31568, 2.19551,…</span></span>
+<span><span class="co">## $ `s(year_fac).14` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.63563, 2.63262, 2.63232, 2.68843, 2.64503, 2.51076,…</span></span>
+<span><span class="co">## $ `s(year_fac).15` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.27060, 2.25882, 2.10152, 2.12477, 2.20041, 2.15416,…</span></span>
+<span><span class="co">## $ `s(year_fac).16` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.95100, 1.98067, 2.24170, 2.03548, 2.20052, 1.93262,…</span></span>
+<span><span class="co">## $ `s(year_fac).17` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.318080, 1.320570, 1.490010, 1.332360, 1.463530, 0.5…</span></span></code></pre>
 <p>With any model fitted in <code>mvgam</code>, the underlying
 <code>Stan</code> code can be viewed using the <code>code</code>
 function:</p>
@@ -505,8 +500,10 @@ function:</p>
 <span><span class="co">## parameters {</span></span>
 <span><span class="co">##   // raw basis coefficients</span></span>
 <span><span class="co">##   vector[num_basis] b_raw;</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // random effect variances</span></span>
 <span><span class="co">##   vector&lt;lower=0&gt;[1] sigma_raw;</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // random effect means</span></span>
 <span><span class="co">##   vector[1] mu_raw;</span></span>
 <span><span class="co">## }</span></span>
@@ -518,8 +515,10 @@ function:</p>
 <span><span class="co">## model {</span></span>
 <span><span class="co">##   // prior for random effect population variances</span></span>
 <span><span class="co">##   sigma_raw ~ student_t(3, 0, 2.5);</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // prior for random effect population means</span></span>
 <span><span class="co">##   mu_raw ~ std_normal();</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // prior (non-centred) for s(year_fac)...</span></span>
 <span><span class="co">##   b_raw[1 : 17] ~ std_normal();</span></span>
 <span><span class="co">##   {</span></span>
@@ -531,6 +530,7 @@ function:</p>
 <span><span class="co">##   vector[total_obs] eta;</span></span>
 <span><span class="co">##   matrix[n, n_series] mus;</span></span>
 <span><span class="co">##   array[n, n_series] int ypred;</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // posterior predictions</span></span>
 <span><span class="co">##   eta = X * b;</span></span>
 <span><span class="co">##   for (s in 1 : n_series) {</span></span>
@@ -599,7 +599,7 @@ example):</p>
 <span><span class="co">##  $ test_observations : NULL</span></span>
 <span><span class="co">##  $ test_times        : NULL</span></span>
 <span><span class="co">##  $ hindcasts         :List of 1</span></span>
-<span><span class="co">##   ..$ PP: num [1:2000, 1:199] 10 7 4 5 11 6 9 10 8 12 ...</span></span>
+<span><span class="co">##   ..$ PP: num [1:2000, 1:199] 8 5 9 8 4 7 6 5 9 6 ...</span></span>
 <span><span class="co">##   .. ..- attr(*, "dimnames")=List of 2</span></span>
 <span><span class="co">##   .. .. ..$ : NULL</span></span>
 <span><span class="co">##   .. .. ..$ : chr [1:199] "ypred[1,1]" "ypred[2,1]" "ypred[3,1]" "ypred[4,1]" ...</span></span>
@@ -612,7 +612,7 @@ questions about drivers of variation:</p>
 <div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hindcast.mvgam.html">hindcast</a></span><span class="op">(</span><span class="va">model1</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">hc</span><span class="op">$</span><span class="va">hindcasts</span><span class="op">$</span><span class="va">PP</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## [1] -1.19890  3.45782</span></span></code></pre>
+<pre><code><span><span class="co">## [1] -1.36898  3.44743</span></span></code></pre>
 <p>Objects of class <code>mvgam_forecast</code> have an associated plot
 function as well:</p>
 <div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
@@ -664,14 +664,14 @@ sample values for un-modelled years</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model1b</span>, type <span class="op">=</span> <span class="st">'forecast'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="mvgam_overview_files/figure-html/unnamed-chunk-18-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample DRPS:</span></span>
-<span><span class="co">## [1] 182.1163</span></span></code></pre>
+<span><span class="co">## [1] 182.2699</span></span></code></pre>
 <p>We can also view the test data in the forecast plot to see that the
 predictions do not capture the temporal variation in the test set</p>
 <div class="sourceCode" id="cb45"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model1b</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
 <p><img src="mvgam_overview_files/figure-html/Plotting%20predictions%20against%20test%20data-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample DRPS:</span></span>
-<span><span class="co">## [1] 182.1163</span></span></code></pre>
+<span><span class="co">## [1] 182.2699</span></span></code></pre>
 <p>As with the <code>hindcast</code> function, we can use the
 <code>forecast</code> function to automatically extract the posterior
 distributions for these predictions. This also returns an object of
@@ -699,12 +699,12 @@ hindcasts and forecasts for each series in the data:</p>
 <span><span class="co">##   ..$ PP: int [1:39] NA 0 0 10 3 14 18 NA 28 46 ...</span></span>
 <span><span class="co">##  $ test_times        : num [1:39] 161 162 163 164 165 166 167 168 169 170 ...</span></span>
 <span><span class="co">##  $ hindcasts         :List of 1</span></span>
-<span><span class="co">##   ..$ PP: num [1:2000, 1:160] 14 3 7 10 3 9 10 6 9 10 ...</span></span>
+<span><span class="co">##   ..$ PP: num [1:2000, 1:160] 10 8 5 10 4 10 11 11 9 5 ...</span></span>
 <span><span class="co">##   .. ..- attr(*, "dimnames")=List of 2</span></span>
 <span><span class="co">##   .. .. ..$ : NULL</span></span>
 <span><span class="co">##   .. .. ..$ : chr [1:160] "ypred[1,1]" "ypred[2,1]" "ypred[3,1]" "ypred[4,1]" ...</span></span>
 <span><span class="co">##  $ forecasts         :List of 1</span></span>
-<span><span class="co">##   ..$ PP: num [1:2000, 1:39] 7 12 12 8 7 8 12 6 6 12 ...</span></span>
+<span><span class="co">##   ..$ PP: num [1:2000, 1:39] 6 8 9 9 7 3 11 14 9 5 ...</span></span>
 <span><span class="co">##   .. ..- attr(*, "dimnames")=List of 2</span></span>
 <span><span class="co">##   .. .. ..$ : NULL</span></span>
 <span><span class="co">##   .. .. ..$ : chr [1:39] "ypred[161,1]" "ypred[162,1]" "ypred[163,1]" "ypred[164,1]" ...</span></span>
@@ -758,35 +758,29 @@ are the same as before but we now have another predictor <span class="math inlin
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM coefficient (beta) estimates:</span></span>
 <span><span class="co">##                2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## ndvi           0.32 0.39  0.46    1  1651</span></span>
-<span><span class="co">## s(year_fac).1  1.10 1.40  1.70    1  2526</span></span>
-<span><span class="co">## s(year_fac).2  1.80 2.00  2.20    1  2109</span></span>
-<span><span class="co">## s(year_fac).3  2.20 2.40  2.60    1  2047</span></span>
-<span><span class="co">## s(year_fac).4  2.30 2.50  2.70    1  1965</span></span>
-<span><span class="co">## s(year_fac).5  1.20 1.40  1.70    1  2340</span></span>
-<span><span class="co">## s(year_fac).6  1.00 1.30  1.50    1  2467</span></span>
-<span><span class="co">## s(year_fac).7  1.10 1.40  1.70    1  2418</span></span>
-<span><span class="co">## s(year_fac).8  2.10 2.30  2.50    1  2204</span></span>
-<span><span class="co">## s(year_fac).9  2.70 2.90  3.00    1  1763</span></span>
-<span><span class="co">## s(year_fac).10 2.00 2.20  2.40    1  3117</span></span>
-<span><span class="co">## s(year_fac).11 2.30 2.40  2.60    1  1956</span></span>
-<span><span class="co">## s(year_fac).12 2.50 2.70  2.80    1  1850</span></span>
-<span><span class="co">## s(year_fac).13 1.40 1.60  1.90    1  2496</span></span>
-<span><span class="co">## s(year_fac).14 0.63 2.00  3.20    1  1616</span></span>
-<span><span class="co">## s(year_fac).15 0.66 2.00  3.30    1  1605</span></span>
-<span><span class="co">## s(year_fac).16 0.68 2.00  3.30    1  1609</span></span>
-<span><span class="co">## s(year_fac).17 0.51 2.00  3.20    1  1341</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">##              edf Chi.sq p-value    </span></span>
-<span><span class="co">## s(year_fac) 10.6   2778  &lt;2e-16 ***</span></span>
-<span><span class="co">## ---</span></span>
-<span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
+<span><span class="co">## ndvi           0.32 0.39  0.45    1  1861</span></span>
+<span><span class="co">## s(year_fac).1  1.10 1.40  1.70    1  2116</span></span>
+<span><span class="co">## s(year_fac).2  1.80 2.00  2.20    1  2295</span></span>
+<span><span class="co">## s(year_fac).3  2.20 2.40  2.60    1  2017</span></span>
+<span><span class="co">## s(year_fac).4  2.30 2.50  2.70    1  1910</span></span>
+<span><span class="co">## s(year_fac).5  1.20 1.40  1.70    1  2270</span></span>
+<span><span class="co">## s(year_fac).6  1.00 1.30  1.50    1  2332</span></span>
+<span><span class="co">## s(year_fac).7  1.10 1.40  1.70    1  2696</span></span>
+<span><span class="co">## s(year_fac).8  2.10 2.30  2.40    1  2134</span></span>
+<span><span class="co">## s(year_fac).9  2.70 2.90  3.00    1  1993</span></span>
+<span><span class="co">## s(year_fac).10 2.00 2.20  2.40    1  2222</span></span>
+<span><span class="co">## s(year_fac).11 2.30 2.40  2.60    1  1913</span></span>
+<span><span class="co">## s(year_fac).12 2.50 2.70  2.80    1  2084</span></span>
+<span><span class="co">## s(year_fac).13 1.40 1.60  1.80    1  2301</span></span>
+<span><span class="co">## s(year_fac).14 0.53 2.00  3.30    1  1550</span></span>
+<span><span class="co">## s(year_fac).15 0.59 2.00  3.30    1  1651</span></span>
+<span><span class="co">## s(year_fac).16 0.68 1.90  3.30    1  1188</span></span>
+<span><span class="co">## s(year_fac).17 0.68 2.00  3.20    1  1478</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM group-level estimates:</span></span>
 <span><span class="co">##                2.5% 50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## mean(year_fac) 1.60 2.0  2.40 1.02   306</span></span>
-<span><span class="co">## sd(year_fac)   0.41 0.6  0.98 1.01   425</span></span>
+<span><span class="co">## mean(year_fac) 1.60 2.0  2.30 1.01   403</span></span>
+<span><span class="co">## sd(year_fac)   0.41 0.6  0.96 1.01   396</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
@@ -801,24 +795,24 @@ at the posterior empirical quantiles for the fixed effect of
 <div class="sourceCode" id="cb52"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">model2</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">##                     2.5%      50%     97.5% Rhat n.eff</span></span>
-<span><span class="co">## ndvi           0.3180210 0.388884 0.4563258    1  1651</span></span>
-<span><span class="co">## s(year_fac).1  1.1289028 1.404220 1.6750223    1  2526</span></span>
-<span><span class="co">## s(year_fac).2  1.7863490 2.006545 2.2082520    1  2109</span></span>
-<span><span class="co">## s(year_fac).3  2.1900840 2.382505 2.5665230    1  2047</span></span>
-<span><span class="co">## s(year_fac).4  2.3298987 2.507305 2.6896960    1  1965</span></span>
-<span><span class="co">## s(year_fac).5  1.1915735 1.423840 1.6618915    1  2340</span></span>
-<span><span class="co">## s(year_fac).6  1.0139432 1.276340 1.5278685    1  2467</span></span>
-<span><span class="co">## s(year_fac).7  1.1361838 1.417590 1.6772018    1  2418</span></span>
-<span><span class="co">## s(year_fac).8  2.0806858 2.272900 2.4631117    1  2204</span></span>
-<span><span class="co">## s(year_fac).9  2.7207878 2.857380 2.9921475    1  1763</span></span>
-<span><span class="co">## s(year_fac).10 1.9705160 2.188075 2.3907243    1  3117</span></span>
-<span><span class="co">## s(year_fac).11 2.2719118 2.441285 2.6089167    1  1956</span></span>
-<span><span class="co">## s(year_fac).12 2.5437885 2.694280 2.8465677    1  1850</span></span>
-<span><span class="co">## s(year_fac).13 1.3778140 1.617650 1.8576188    1  2496</span></span>
-<span><span class="co">## s(year_fac).14 0.6318210 1.957230 3.2297487    1  1616</span></span>
-<span><span class="co">## s(year_fac).15 0.6559699 1.971350 3.2778882    1  1605</span></span>
-<span><span class="co">## s(year_fac).16 0.6839005 1.971785 3.3140757    1  1609</span></span>
-<span><span class="co">## s(year_fac).17 0.5091018 1.956910 3.2291137    1  1341</span></span></code></pre>
+<span><span class="co">## ndvi           0.3216203 0.389051 0.4538243    1  1861</span></span>
+<span><span class="co">## s(year_fac).1  1.1146590 1.405165 1.6640947    1  2116</span></span>
+<span><span class="co">## s(year_fac).2  1.7925582 2.001170 2.2009233    1  2295</span></span>
+<span><span class="co">## s(year_fac).3  2.1901150 2.381350 2.5658710    1  2017</span></span>
+<span><span class="co">## s(year_fac).4  2.3331473 2.507540 2.6978447    1  1910</span></span>
+<span><span class="co">## s(year_fac).5  1.2042223 1.425465 1.6573392    1  2270</span></span>
+<span><span class="co">## s(year_fac).6  1.0117455 1.270630 1.5109905    1  2332</span></span>
+<span><span class="co">## s(year_fac).7  1.1301372 1.413005 1.6833440    1  2696</span></span>
+<span><span class="co">## s(year_fac).8  2.0908810 2.273065 2.4480510    1  2134</span></span>
+<span><span class="co">## s(year_fac).9  2.7150655 2.856525 2.9892827    1  1993</span></span>
+<span><span class="co">## s(year_fac).10 1.9759485 2.184575 2.3769115    1  2222</span></span>
+<span><span class="co">## s(year_fac).11 2.2631538 2.435430 2.6060830    1  1913</span></span>
+<span><span class="co">## s(year_fac).12 2.5449458 2.691600 2.8456105    1  2084</span></span>
+<span><span class="co">## s(year_fac).13 1.3801233 1.614175 1.8464567    1  2301</span></span>
+<span><span class="co">## s(year_fac).14 0.5311729 1.984790 3.3247577    1  1550</span></span>
+<span><span class="co">## s(year_fac).15 0.5864818 1.963665 3.2666432    1  1651</span></span>
+<span><span class="co">## s(year_fac).16 0.6753530 1.935255 3.3469392    1  1188</span></span>
+<span><span class="co">## s(year_fac).17 0.6773514 1.955775 3.2443852    1  1478</span></span></code></pre>
 <p>Look at the estimated effect of <code>ndvi</code> using
 <code>plot.mvgam</code> with <code>type = 'pterms'</code></p>
 <div class="sourceCode" id="cb54"><pre class="downlit sourceCode r">
@@ -834,24 +828,24 @@ example:</p>
 <span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://pillar.r-lib.org/reference/glimpse.html" class="external-link">glimpse</a></span><span class="op">(</span><span class="va">beta_post</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## Rows: 2,000</span></span>
 <span><span class="co">## Columns: 18</span></span>
-<span><span class="co">## $ ndvi             <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 0.304919, 0.464657, 0.373376, 0.368993, 0.409840, 0.3…</span></span>
-<span><span class="co">## $ `s(year_fac).1`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.41109, 1.24829, 1.41042, 1.33049, 1.29280, 1.28950,…</span></span>
-<span><span class="co">## $ `s(year_fac).2`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.99207, 1.94499, 2.09395, 1.99955, 2.03538, 2.09708,…</span></span>
-<span><span class="co">## $ `s(year_fac).3`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.48748, 2.12028, 2.34510, 2.48895, 2.37439, 2.47162,…</span></span>
-<span><span class="co">## $ `s(year_fac).4`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.67001, 2.34559, 2.57889, 2.53766, 2.53629, 2.59954,…</span></span>
-<span><span class="co">## $ `s(year_fac).5`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.51588, 1.33323, 1.41067, 1.45378, 1.42670, 1.47473,…</span></span>
-<span><span class="co">## $ `s(year_fac).6`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.36078, 1.00574, 1.25032, 1.32989, 1.17077, 1.41943,…</span></span>
-<span><span class="co">## $ `s(year_fac).7`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.32657, 1.15984, 1.44284, 1.47496, 1.35803, 1.53510,…</span></span>
-<span><span class="co">## $ `s(year_fac).8`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.40193, 2.06741, 2.16715, 2.42840, 2.32092, 2.28942,…</span></span>
-<span><span class="co">## $ `s(year_fac).9`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.98027, 2.81006, 2.90066, 2.94567, 2.80246, 2.77922,…</span></span>
-<span><span class="co">## $ `s(year_fac).10` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.23481, 1.92900, 2.24070, 2.31284, 2.21067, 2.18084,…</span></span>
-<span><span class="co">## $ `s(year_fac).11` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.58423, 2.34485, 2.56087, 2.38700, 2.30325, 2.52027,…</span></span>
-<span><span class="co">## $ `s(year_fac).12` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.76730, 2.65040, 2.69095, 2.68690, 2.64471, 2.71229,…</span></span>
-<span><span class="co">## $ `s(year_fac).13` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.90601, 1.53921, 1.57718, 1.67496, 1.50084, 1.80437,…</span></span>
-<span><span class="co">## $ `s(year_fac).14` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.123290, 2.262950, 3.247780, 3.165960, 1.153960, 2.5…</span></span>
-<span><span class="co">## $ `s(year_fac).15` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.655070, 1.648800, 2.341440, 2.975160, 1.948020, 2.0…</span></span>
-<span><span class="co">## $ `s(year_fac).16` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.291050, 2.663980, 2.796340, 2.286830, 3.160790, 1.6…</span></span>
-<span><span class="co">## $ `s(year_fac).17` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.27499, 1.60278, 1.67215, 2.01080, 3.04853, 1.40261,…</span></span></code></pre>
+<span><span class="co">## $ ndvi             <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 0.375684, 0.390333, 0.339713, 0.370023, 0.404835, 0.4…</span></span>
+<span><span class="co">## $ `s(year_fac).1`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.47458, 1.41452, 1.49672, 1.58584, 1.30872, 1.39775,…</span></span>
+<span><span class="co">## $ `s(year_fac).2`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.83610, 1.92601, 2.10267, 2.05447, 2.09805, 1.92439,…</span></span>
+<span><span class="co">## $ `s(year_fac).3`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.40094, 2.27798, 2.55381, 2.38513, 2.40611, 2.23518,…</span></span>
+<span><span class="co">## $ `s(year_fac).4`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.52394, 2.45067, 2.64824, 2.53684, 2.50967, 2.40677,…</span></span>
+<span><span class="co">## $ `s(year_fac).5`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.31836, 1.52367, 1.51591, 1.45322, 1.47500, 1.27395,…</span></span>
+<span><span class="co">## $ `s(year_fac).6`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.26381, 1.34911, 1.36773, 1.26275, 1.39302, 1.26599,…</span></span>
+<span><span class="co">## $ `s(year_fac).7`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.16251, 1.41501, 1.64598, 1.43595, 1.49743, 1.37203,…</span></span>
+<span><span class="co">## $ `s(year_fac).8`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.23894, 2.27480, 2.28306, 2.38041, 2.26169, 2.22769,…</span></span>
+<span><span class="co">## $ `s(year_fac).9`  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.85659, 2.86155, 2.89435, 2.87647, 2.85726, 2.74715,…</span></span>
+<span><span class="co">## $ `s(year_fac).10` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.15973, 2.09225, 2.34812, 2.13091, 2.23958, 2.11584,…</span></span>
+<span><span class="co">## $ `s(year_fac).11` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.47975, 2.39507, 2.57238, 2.45041, 2.34497, 2.44290,…</span></span>
+<span><span class="co">## $ `s(year_fac).12` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.73684, 2.56383, 2.65334, 2.71001, 2.69356, 2.59746,…</span></span>
+<span><span class="co">## $ `s(year_fac).13` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.55459, 1.63042, 1.78083, 1.74594, 1.48090, 1.65159,…</span></span>
+<span><span class="co">## $ `s(year_fac).14` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.65272, 1.72826, 1.83324, 2.19301, 1.76764, 1.88520,…</span></span>
+<span><span class="co">## $ `s(year_fac).15` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.30615, 1.85719, 2.38957, 2.34671, 1.32910, 1.79179,…</span></span>
+<span><span class="co">## $ `s(year_fac).16` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1.34843, 1.39937, 1.50693, 1.89355, 2.41746, 1.84409,…</span></span>
+<span><span class="co">## $ `s(year_fac).17` <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.02884, 2.06031, 2.13480, 1.72701, 2.29392, 2.63798,…</span></span></code></pre>
 <p>The posterior distribution for the effect of <code>ndvi</code> is
 stored in the <code>ndvi</code> column. A quick histogram confirms our
 inference that <code>log(counts)</code> respond positively to increases
@@ -985,34 +979,23 @@ showing one here for simplicity. View the summary as before</p>
 <span><span class="co">## Fitted using Stan </span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM coefficient (beta) estimates:</span></span>
-<span><span class="co">##              2.5%   50%  97.5% Rhat n.eff</span></span>
-<span><span class="co">## (Intercept)  2.00  2.10  2.200 1.01   806</span></span>
-<span><span class="co">## ndvi         0.26  0.33  0.390 1.01   813</span></span>
-<span><span class="co">## s(time).1   -2.20 -1.10 -0.053 1.00   633</span></span>
-<span><span class="co">## s(time).2    0.44  1.30  2.200 1.00   396</span></span>
-<span><span class="co">## s(time).3   -0.53  0.43  1.400 1.00   414</span></span>
-<span><span class="co">## s(time).4    1.60  2.40  3.400 1.00   382</span></span>
-<span><span class="co">## s(time).5   -1.20 -0.23  0.770 1.00   396</span></span>
-<span><span class="co">## s(time).6   -0.56  0.35  1.400 1.00   410</span></span>
-<span><span class="co">## s(time).7   -1.60 -0.54  0.490 1.00   442</span></span>
-<span><span class="co">## s(time).8    0.57  1.50  2.400 1.00   383</span></span>
-<span><span class="co">## s(time).9    1.10  2.00  3.000 1.00   369</span></span>
-<span><span class="co">## s(time).10  -0.33  0.53  1.500 1.00   361</span></span>
-<span><span class="co">## s(time).11   0.79  1.70  2.700 1.00   381</span></span>
-<span><span class="co">## s(time).12   0.66  1.50  2.400 1.00   387</span></span>
-<span><span class="co">## s(time).13  -1.20 -0.34  0.630 1.00   508</span></span>
-<span><span class="co">## s(time).14  -7.40 -4.10 -1.100 1.00   547</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM observation smoothing parameter (rho) estimates:</span></span>
-<span><span class="co">##               2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## s(time)_rho  -0.15 0.83   1.6    1  1296</span></span>
-<span><span class="co">## s(time)2_rho  0.23 3.00   4.1    1   707</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">##         edf Chi.sq p-value    </span></span>
-<span><span class="co">## s(time)  10    710  &lt;2e-16 ***</span></span>
-<span><span class="co">## ---</span></span>
-<span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
+<span><span class="co">##              2.5%   50%   97.5% Rhat n.eff</span></span>
+<span><span class="co">## (Intercept)  2.00  2.10  2.2000 1.00   839</span></span>
+<span><span class="co">## ndvi         0.26  0.33  0.3900 1.00   927</span></span>
+<span><span class="co">## s(time).1   -2.20 -1.10  0.0024 1.00   514</span></span>
+<span><span class="co">## s(time).2    0.48  1.30  2.4000 1.00   374</span></span>
+<span><span class="co">## s(time).3   -0.54  0.44  1.6000 1.00   338</span></span>
+<span><span class="co">## s(time).4    1.60  2.50  3.6000 1.00   350</span></span>
+<span><span class="co">## s(time).5   -1.10 -0.20  0.8700 1.00   371</span></span>
+<span><span class="co">## s(time).6   -0.53  0.36  1.6000 1.00   363</span></span>
+<span><span class="co">## s(time).7   -1.50 -0.52  0.6100 1.00   370</span></span>
+<span><span class="co">## s(time).8    0.58  1.50  2.6000 1.01   341</span></span>
+<span><span class="co">## s(time).9    1.20  2.10  3.2000 1.00   334</span></span>
+<span><span class="co">## s(time).10  -0.38  0.54  1.6000 1.00   344</span></span>
+<span><span class="co">## s(time).11   0.85  1.70  2.9000 1.01   327</span></span>
+<span><span class="co">## s(time).12   0.66  1.50  2.5000 1.00   357</span></span>
+<span><span class="co">## s(time).13  -1.20 -0.31  0.7300 1.00   466</span></span>
+<span><span class="co">## s(time).14  -7.60 -4.10 -1.2000 1.00   428</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
@@ -1084,6 +1067,7 @@ how the spline is being penalized:</p>
 <span><span class="co">## parameters {</span></span>
 <span><span class="co">##   // raw basis coefficients</span></span>
 <span><span class="co">##   vector[num_basis] b_raw;</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // smoothing parameters</span></span>
 <span><span class="co">##   vector&lt;lower=0&gt;[n_sp] lambda;</span></span>
 <span><span class="co">## }</span></span>
@@ -1094,13 +1078,16 @@ how the spline is being penalized:</p>
 <span><span class="co">## }</span></span>
 <span><span class="co">## model {</span></span>
 <span><span class="co">##   // prior for (Intercept)...</span></span>
-<span><span class="co">##   b_raw[1] ~ student_t(3, 2.7, 2.5);</span></span>
+<span><span class="co">##   b_raw[1] ~ student_t(3, 2.6, 2.5);</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // prior for ndvi...</span></span>
 <span><span class="co">##   b_raw[2] ~ student_t(3, 0, 2);</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // prior for s(time)...</span></span>
 <span><span class="co">##   b_raw[3 : 16] ~ multi_normal_prec(zero[3 : 16],</span></span>
 <span><span class="co">##                                     S1[1 : 14, 1 : 14] * lambda[1]</span></span>
 <span><span class="co">##                                     + S1[1 : 14, 15 : 28] * lambda[2]);</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // priors for smoothing parameters</span></span>
 <span><span class="co">##   lambda ~ normal(10, 25);</span></span>
 <span><span class="co">##   {</span></span>
@@ -1114,6 +1101,7 @@ how the spline is being penalized:</p>
 <span><span class="co">##   vector[n_sp] rho;</span></span>
 <span><span class="co">##   array[n, n_series] int ypred;</span></span>
 <span><span class="co">##   rho = log(lambda);</span></span>
+<span><span class="co">##   </span></span>
 <span><span class="co">##   // posterior predictions</span></span>
 <span><span class="co">##   eta = X * b;</span></span>
 <span><span class="co">##   for (s in 1 : n_series) {</span></span>
@@ -1136,7 +1124,7 @@ enforce smoothness and reduce overfitting</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model3</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
 <p><img src="mvgam_overview_files/figure-html/unnamed-chunk-30-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample DRPS:</span></span>
-<span><span class="co">## [1] 287.6738</span></span></code></pre>
+<span><span class="co">## [1] 287.1662</span></span></code></pre>
 <p>Why is this happening? The forecasts are driven almost entirely by
 variation in the temporal spline, which is extrapolating linearly
 <em>forever</em> beyond the edge of the training data. Any slight
@@ -1216,32 +1204,21 @@ the latent AR1 process:</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM coefficient (beta) estimates:</span></span>
 <span><span class="co">##               2.5%     50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## (Intercept)  0.980  1.9000 2.500 1.20    23</span></span>
-<span><span class="co">## s(ndvi).1   -0.180 -0.0130 0.079 1.01   513</span></span>
-<span><span class="co">## s(ndvi).2   -0.140  0.0170 0.360 1.01   217</span></span>
-<span><span class="co">## s(ndvi).3   -0.051 -0.0012 0.047 1.00   731</span></span>
-<span><span class="co">## s(ndvi).4   -0.240  0.1300 1.400 1.02   169</span></span>
-<span><span class="co">## s(ndvi).5   -0.110  0.1500 0.370 1.01   430</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM observation smoothing parameter (rho) estimates:</span></span>
-<span><span class="co">##               2.5% 50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## s(ndvi)_rho  -0.62 2.7   4.1 1.03   178</span></span>
-<span><span class="co">## s(ndvi)2_rho  1.20 3.1   4.2 1.00   921</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">##          edf Chi.sq p-value  </span></span>
-<span><span class="co">## s(ndvi) 1.92   84.8   0.073 .</span></span>
-<span><span class="co">## ---</span></span>
-<span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
+<span><span class="co">## (Intercept)  1.300  1.9000 2.400 1.11    39</span></span>
+<span><span class="co">## s(ndvi).1   -0.170 -0.0110 0.070 1.01   345</span></span>
+<span><span class="co">## s(ndvi).2   -0.170  0.0180 0.410 1.00   143</span></span>
+<span><span class="co">## s(ndvi).3   -0.057 -0.0017 0.055 1.01   272</span></span>
+<span><span class="co">## s(ndvi).4   -0.240  0.1300 1.500 1.01   136</span></span>
+<span><span class="co">## s(ndvi).5   -0.085  0.1500 0.350 1.02   293</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Latent trend parameter AR estimates:</span></span>
 <span><span class="co">##          2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## ar1[1]   0.70 0.81  0.93 1.02   172</span></span>
-<span><span class="co">## sigma[1] 0.68 0.80  0.96 1.01   512</span></span>
+<span><span class="co">## ar1[1]   0.69 0.81  0.91 1.03   188</span></span>
+<span><span class="co">## sigma[1] 0.67 0.80  0.97 1.02   410</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">## Rhats above 1.05 found for 120 parameters</span></span>
+<span><span class="co">## Rhats above 1.05 found for 80 parameters</span></span>
 <span><span class="co">## *Diagnose further to investigate why the chains have not mixed</span></span>
 <span><span class="co">## 0 of 2000 iterations ended with a divergence (0%)</span></span>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
@@ -1258,7 +1235,7 @@ sample test data</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model4</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
 <p><img src="mvgam_overview_files/figure-html/unnamed-chunk-33-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample DRPS:</span></span>
-<span><span class="co">## [1] 152.0307</span></span></code></pre>
+<span><span class="co">## [1] 151.2721</span></span></code></pre>
 <p>The trend is evolving as an AR1 process, which we can also view:</p>
 <div class="sourceCode" id="cb78"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">model4</span>, type <span class="op">=</span> <span class="st">'trend'</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
@@ -1273,7 +1250,7 @@ value is preferred for this metric):</p>
 <span><span class="co">## Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span></span></code></pre>
 <pre><code><span><span class="co">##        elpd_diff se_diff</span></span>
 <span><span class="co">## model4    0.0       0.0 </span></span>
-<span><span class="co">## model3 -561.6      67.0</span></span></code></pre>
+<span><span class="co">## model3 -563.1      66.8</span></span></code></pre>
 <p>The higher estimated log predictive density (ELPD) value for the
 dynamic model suggests it provides a better fit to the in-sample
 data.</p>
@@ -1288,7 +1265,7 @@ lower value is preferred for this metric)</p>
 <span><span class="va">score_mod3</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fc_mod3</span>, score <span class="op">=</span> <span class="st">'drps'</span><span class="op">)</span></span>
 <span><span class="va">score_mod4</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fc_mod4</span>, score <span class="op">=</span> <span class="st">'drps'</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">score_mod4</span><span class="op">$</span><span class="va">PP</span><span class="op">$</span><span class="va">score</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">score_mod3</span><span class="op">$</span><span class="va">PP</span><span class="op">$</span><span class="va">score</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## [1] -135.6431</span></span></code></pre>
+<pre><code><span><span class="co">## [1] -135.8942</span></span></code></pre>
 <p>A strongly negative value here suggests the score for the dynamic
 model (model 4) is much smaller than the score for the model with a
 smooth function of time (model 3)</p>

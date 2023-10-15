@@ -16,6 +16,9 @@
     <loc>https://nicholasjclark.github.io/mvgam/articles/shared_states.html</loc>
   </url>
   <url>
+    <loc>https://nicholasjclark.github.io/mvgam/articles/time_varying_effects.html</loc>
+  </url>
+  <url>
     <loc>https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html</loc>
   </url>
   <url>
@@ -134,6 +137,9 @@
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/plot.mvgam_lfo.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/plot_effects.mvgam.html</loc>
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/plot_mvgam_factors.html</loc>

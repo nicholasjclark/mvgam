@@ -5,8 +5,9 @@ articles:
   data_in_mvgam: data_in_mvgam.html
   mvgam_overview: mvgam_overview.html
   shared_states: shared_states.html
+  time_varying_effects: time_varying_effects.html
   trend_formulas: trend_formulas.html
-last_built: 2023-09-29T00:36Z
+last_built: 2023-10-14T23:48Z
 urls:
   reference: https://nicholasjclark.github.io/mvgam/reference
   article: https://nicholasjclark.github.io/mvgam/articles
