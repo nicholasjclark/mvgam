@@ -115,17 +115,6 @@ plot_mvgam_smooth = function(object,
     smooth_int <- smooth
   }
 
-  # Check whether this is actually a gp() term
-  if(!is.null(attr(object2$mgcv_model, 'gp_att_table'))){
-    gp_names <- unlist(purrr::map(attr(object2$mgcv_model, 'gp_att_table'), 'name'))
-    if(any(grepl(object2$mgcv_model$smooth[[smooth_int]]$label,
-          gsub('gp(', 's(', gp_names, fixed = TRUE),
-          fixed = TRUE))){
-      stop(smooth, ' is a gp() term. Use plot_predictions() instead to visualise',
-           call. = FALSE)
-    }
-  }
-
   # Check whether this type of smooth is even plottable
   if(!object2$mgcv_model$smooth[[smooth_int]]$plot.me){
     stop(paste0('unable to plot ', object2$mgcv_model$smooth[[smooth_int]]$label,
@@ -290,14 +279,61 @@ plot_mvgam_smooth = function(object,
     # If this term has a by variable, need to use mgcv's plotting utilities
     if(object2$mgcv_model$smooth[[smooth_int]]$by != "NA"){
 
-      # Deal with by variables
-      by <- rep(1,length(pred_vals)); dat <- data.frame(x = pred_vals, by = by)
-      names(dat) <- c(object2$mgcv_model$smooth[[smooth_int]]$term,
-                      object2$mgcv_model$smooth[[smooth_int]]$by)
+      # Check if this is a gp() term
+      gp_term <- FALSE
+      if(!is.null(attr(object2$mgcv_model, 'gp_att_table'))){
+        gp_term <- object2$mgcv_model$smooth[[smooth_int]]$gp_term
+      }
 
-      Xp_term <- mgcv::PredictMat(object2$mgcv_model$smooth[[smooth_int]], dat)
-      Xp[,object2$mgcv_model$smooth[[smooth_int]]$first.para:
-           object2$mgcv_model$smooth[[smooth_int]]$last.para] <- Xp_term
+      if(gp_term){
+        object2$mgcv_model$smooth[[smooth_int]]$label <-
+          gsub('s(', 'gp(',
+               object2$mgcv_model$smooth[[smooth_int]]$label,
+               fixed = TRUE)
+        # Check if this is a factor by variable
+        is_fac <- is.factor(object2$obs_data[[object2$mgcv_model$smooth[[smooth_int]]$by]])
+
+        if(is_fac){
+          fac_levels <- levels(object2$obs_data[[object2$mgcv_model$smooth[[smooth_int]]$by]])
+          whichlevel <- vector()
+          for(i in seq_along(fac_levels)){
+            whichlevel[i] <- grepl(fac_levels[i], object2$mgcv_model$smooth[[smooth_int]]$label,
+                  fixed = TRUE)
+          }
+
+          pred_dat[[object2$mgcv_model$smooth[[smooth_int]]$by]] <-
+            rep(fac_levels[whichlevel], length(pred_dat$series))
+        }
+
+        if(!is_fac){
+          pred_dat[[object2$mgcv_model$smooth[[smooth_int]]$by]] <-
+            rep(1, length(pred_dat$series))
+        }
+
+        if(trend_effects){
+          Xp_term <- trend_Xp_matrix(newdata = pred_dat,
+                                trend_map = object2$trend_map,
+                                mgcv_model = object2$trend_mgcv_model)
+        } else {
+          Xp_term <- obs_Xp_matrix(newdata = pred_dat,
+                              mgcv_model = object2$mgcv_model)
+        }
+        Xp[,object2$mgcv_model$smooth[[smooth_int]]$first.para:
+             object2$mgcv_model$smooth[[smooth_int]]$last.para] <-
+          Xp_term[,object2$mgcv_model$smooth[[smooth_int]]$first.para:
+                    object2$mgcv_model$smooth[[smooth_int]]$last.para]
+
+      } else {
+        # Deal with by variables in non-gp() smooths
+        by <- rep(1,length(pred_vals)); dat <- data.frame(x = pred_vals, by = by)
+        names(dat) <- c(object2$mgcv_model$smooth[[smooth_int]]$term,
+                        object2$mgcv_model$smooth[[smooth_int]]$by)
+
+        Xp_term <- mgcv::PredictMat(object2$mgcv_model$smooth[[smooth_int]], dat)
+        Xp[,object2$mgcv_model$smooth[[smooth_int]]$first.para:
+             object2$mgcv_model$smooth[[smooth_int]]$last.para] <- Xp_term
+      }
+
     }
 
     # Extract GAM coefficients

@@ -652,7 +652,7 @@ mvgam = function(formula,
     # in the model.frame
     formula <- gp_to_s(formula)
     if(!keep_intercept){
-      formula <- update(formula, trend_y  ~ . -1)
+      formula <- update(formula, . ~ . - 1)
     }
   }
 

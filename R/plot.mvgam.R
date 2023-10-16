@@ -134,12 +134,6 @@ plot.mvgam = function(x, type = 'residuals',
                  mgcv_plottable = object2$mgcv_model$smooth[[x]]$plot.me)
     }))
 
-    # Filter out any GP terms
-    if(!is.null(attr(object2$mgcv_model, 'gp_att_table'))){
-      gp_names <- unlist(purrr::map(attr(object2$mgcv_model, 'gp_att_table'), 'name'))
-      smooth_labs %>%
-        dplyr::filter(!label %in% gsub('gp(', 's(', gp_names, fixed = TRUE)) -> smooth_labs
-    }
     n_smooths <- NROW(smooth_labs)
     if(n_smooths == 0) stop("No smooth terms to plot. Use plot_predictions() to visualise other effects",
                             call. = FALSE)

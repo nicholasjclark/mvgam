@@ -93,6 +93,7 @@ make_gp_additions = function(gp_details, data,
       coefs_replace[[x]] <- which_replace
     }
 
+  # Replace basis functions with gp() eigenfunctions
   newX <- model_data$X
 
   # Training data eigenfunctions
@@ -155,6 +156,22 @@ make_gp_additions = function(gp_details, data,
   # Add the GP attribute table to the mgcv_model
   attr(mgcv_model, 'gp_att_table') <- gp_att_table
 
+  # Assign GP labels to smooths
+  gp_assign <- data.frame(label = unlist(purrr::map(gp_att_table, 'name')),
+                          first.para = unlist(purrr::map(gp_att_table, 'first_coef')),
+                          last.para = unlist(purrr::map(gp_att_table, 'last_coef')),
+                          by = unlist(purrr::map(gp_att_table, 'by')))
+  for(i in seq_along(mgcv_model$smooth)){
+    if(mgcv_model$smooth[[i]]$label %in%
+       gsub('gp(', 's(', gp_assign$label, fixed = TRUE) &
+       mgcv_model$smooth[[i]]$first.para %in% gp_assign$first.para){
+      mgcv_model$smooth[[i]]$gp_term <- TRUE
+    } else {
+      mgcv_model$smooth[[i]]$gp_term <- FALSE
+    }
+  }
+
+  # Return
   return(list(model_data = model_data,
               mgcv_model = mgcv_model,
               gp_stan_lines = gp_stan_lines,
@@ -303,7 +320,7 @@ sim_hilbert_gp = function(alpha_gp,
 #' Mean-center and scale the particular covariate of interest
 #' so that the maximum Euclidean distance between any two points is 1
 #' @noRd
-scale_cov <- function(data, covariate, by, level, scale = TRUE,
+scale_cov <- function(data, covariate, by, level,
                       mean, max_dist){
   Xgp <- data[[covariate]]
   if(!is.na(by) &
@@ -311,26 +328,29 @@ scale_cov <- function(data, covariate, by, level, scale = TRUE,
       Xgp <- data[[covariate]][data[[by]] == level]
    }
 
-  if(is.na(mean)){
-    Xgp_mean <- mean(Xgp, na.rm = TRUE)
-  } else {
-    Xgp_mean <- mean
-  }
-
+  # Compute max Euclidean distance if not supplied
   if(is.na(max_dist)){
     Xgp_max_dist <- sqrt(max(brms:::diff_quad(Xgp)))
   } else {
     Xgp_max_dist <- max_dist
   }
 
-  if(scale){
-    # Mean center and divide by max euclidean distance
-    (Xgp - Xgp_mean) / Xgp_max_dist
+  # Scale
+  Xgp <- Xgp / Xgp_max_dist
 
+  # Compute mean if not supplied (after scaling)
+  if(is.na(mean)){
+    Xgp_mean <- mean(Xgp, na.rm = TRUE)
   } else {
-    # Just mean center
-    Xgp - Xgp_mean
+    Xgp_mean <- mean
   }
+
+  # Center
+  Xgp <- Xgp - Xgp_mean
+
+  return(list(Xgp = Xgp,
+              Xgp_mean = Xgp_mean,
+              Xgp_max_dist = Xgp_max_dist))
 }
 
 #' prep GP eigenfunctions
@@ -355,8 +375,7 @@ prep_eigenfunctions = function(data,
                               by = by,
                               level = level,
                               mean = mean,
-                              max_dist = max_dist,
-                              scale = scale)
+                              max_dist = max_dist)$Xgp
 
   # Construct matrix of eigenfunctions
   eigenfunctions <- matrix(NA, nrow = length(covariate_cent),
@@ -431,25 +450,24 @@ prep_gp_covariate = function(data,
   if(def_alpha == ''){
     def_alpha<- 'student_t(3, 0, 2.5);'
   }
-  # Prepare the covariate
-  covariate_cent <- scale_cov(data = data,
-                              covariate = covariate,
-                              scale = scale,
-                              by = by,
-                              mean = NA,
-                              max_dist = NA,
-                              level = level)
 
-  Xgp <- data[[covariate]]
-  if(!is.na(by) &
-     !is.na(level)){
-    Xgp <- data[[covariate]][data[[by]] == level]
+  # Prepare the covariate
+  if(scale){
+    max_dist <- NA
+  } else {
+    max_dist <- 1
   }
 
-  covariate_mean <- mean(Xgp, na.rm = TRUE)
-  covariate_max_dist <- ifelse(scale,
-                               sqrt(max(brms:::diff_quad(Xgp))),
-                               1)
+  covariate_cent <- scale_cov(data = data,
+                              covariate = covariate,
+                              by = by,
+                              mean = NA,
+                              max_dist = max_dist,
+                              level = level)
+
+  covariate_mean <- covariate_cent$Xgp_mean
+  covariate_max_dist <- covariate_cent$Xgp_max_dist
+  covariate_cent <- covariate_cent$Xgp
 
   # Construct vector of eigenvalues for GP covariance matrix; the
   # same eigenvalues are always used in prediction, so we only need to
@@ -469,9 +487,10 @@ prep_gp_covariate = function(data,
                                         covariate = covariate,
                                         by = by,
                                         level = level,
+                                        L = L,
                                         k = k,
                                         boundary = boundary,
-                                        mean = NA,
+                                        mean = covariate_mean,
                                         max_dist = covariate_max_dist,
                                         scale = scale,
                                         initial_setup = TRUE)

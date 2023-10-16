@@ -135,6 +135,9 @@ interpret_mvgam = function(formula, N){
 
   facs <- colnames(attr(terms.formula(formula), 'factors'))
 
+  # Check if formula has an intercept
+  keep_intercept <- attr(terms(formula), 'intercept') == 1
+
   # Re-arrange so that random effects always come last
   if(any(grepl('bs = \"re\"', facs, fixed = TRUE))){
     newfacs <- facs[!grepl('bs = \"re\"', facs, fixed = TRUE)]
@@ -261,6 +264,11 @@ interpret_mvgam = function(formula, N){
 
   } else {
     updated_formula <- newformula
+  }
+
+  if(!keep_intercept){
+    updated_formula <- update(updated_formula, . ~ . - 1)
+    attr(updated_formula, '.Environment') <- attr(newformula, '.Environment')
   }
 
   return(updated_formula)
