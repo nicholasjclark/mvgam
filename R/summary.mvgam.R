@@ -257,6 +257,17 @@ if(any(!is.na(object$sp_names))){
                                     has.Pvalue = TRUE, na.print = "NA",
                                     cs.ind = 1))
       }
+  } else {
+    if(!is.null(object$trend_call)){
+      cat("\nApproximate significance of GAM observation smooths:\n")
+    } else {
+      cat("\nApproximate significance of GAM observation smooths:\n")
+    }
+    suppressWarnings(printCoefmat(gam_sig_table,
+                                  digits = min(3, digits + 1),
+                                  signif.stars = getOption("show.signif.stars"),
+                                  has.Pvalue = TRUE, na.print = "NA",
+                                  cs.ind = 1))
   }
 }
 
@@ -630,7 +641,7 @@ if(!is.null(object$trend_call)){
 
       } else {
         gam_sig_table <- gam_sig_table[!rownames(gam_sig_table) %in%
-                                         gsub('gp(', 's(', gp_names, fixed = TRUE),,drop = FALSE]
+                                         gsub('gp(', 's(', gp_names, fixed = TRUE),drop = FALSE]
 
         cat("\nApproximate significance of GAM process smooths:\n")
         suppressWarnings(printCoefmat(gam_sig_table,
@@ -639,6 +650,13 @@ if(!is.null(object$trend_call)){
                                       has.Pvalue = TRUE, na.print = "NA",
                                       cs.ind = 1))
       }
+    } else {
+      cat("\nApproximate significance of GAM process smooths:\n")
+      suppressWarnings(printCoefmat(gam_sig_table,
+                                    digits = min(3, digits + 1),
+                                    signif.stars = getOption("show.signif.stars"),
+                                    has.Pvalue = TRUE, na.print = "NA",
+                                    cs.ind = 1))
     }
   }
 }
