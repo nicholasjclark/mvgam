@@ -158,15 +158,35 @@ plot_mvgam_smooth = function(object,
   if(length(unlist(strsplit(smooth, ','))) >= 2){
 
     # Use default mgcv plotting for bivariate smooths as it is quicker
-    suppressWarnings(plot(object2$mgcv_model, select = smooth_int,
-                          residuals = residuals,
-                          scheme = 2,
-                          main = '', too.far = 0,
-                          contour.col = 'black',
-                          hcolors = hcl.colors(25,
-                                               palette = 'Reds 2'),
-                          lwd = 1,
-                          seWithMean = TRUE))
+    if(inherits(object2$mgcv_model$smooth[[smooth_int]], 'tprs.smooth') |
+       inherits(object2$mgcv_model$smooth[[smooth_int]], 't2smooth') |
+       inherits(object2$mgcv_model$smooth[[smooth_int]], 'tensor.smooth')){
+      suppressWarnings(plot(object2$mgcv_model, select = smooth_int,
+                            residuals = residuals,
+                            scheme = 2,
+                            main = '', too.far = 0,
+                            contour.col = 'black',
+                            hcolors = hcl.colors(25,
+                                                 palette = 'Reds 2'),
+                            lwd = 1,
+                            seWithMean = TRUE))
+      box(col = 'white')
+      box(bty = 'l', lwd = 2)
+    } else {
+      suppressWarnings(plot(object2$mgcv_model, select = smooth_int,
+                            residuals = residuals,
+                            scheme = 2,
+                            main = '', too.far = 0,
+                            contour.col = 'black',
+                            hcolors = hcl.colors(25,
+                                                 palette = 'Reds 2'),
+                            lwd = 1,
+                            seWithMean = TRUE,
+                            ylab = 'Partial effect'))
+      box(col = 'white')
+      box(bty = 'l', lwd = 2)
+    }
+
     if(trend_effects){
       title(sub('series', 'trend', object2$mgcv_model$smooth[[smooth_int]]$label,
                 fixed = TRUE),

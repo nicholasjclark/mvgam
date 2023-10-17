@@ -905,8 +905,7 @@ mvgam = function(formula,
                                                      data = data_train,
                                                      family = family_to_mgcvfam(family),
                                                      drop.unused.levels = FALSE,
-                                                     control = list(nthreads = min(4, parallel::detectCores()-1),
-                                                                    maxit = 1)))$coefficients)
+                                                     control = list(maxit = 1)))$coefficients)
     xcols_drop <- grep('s(fakery', fakery_names, fixed = TRUE)
     if(!missing(knots)){
       ss_jagam <- mgcv::jagam(form_fake,
@@ -1008,9 +1007,9 @@ mvgam = function(formula,
     # Use the initialised GAM's estimates for parametric effects, but widen them
     # substantially to allow for better exploration of possible alternative model
     # configurations
-    beta_sims <- rmvn(1000, coef(ss_gam), ss_gam$Vp)
+    beta_sims <- rmvn(100, coef(ss_gam), ss_gam$Vp)
     ss_jagam$jags.data$p_taus <- apply(as.matrix(beta_sims[,1:n_terms]),
-                                       2, function(x) 1 / (sd(x) ^ 2)) * 0.5
+                                       2, function(x) 1 / (sd(x) ^ 2))
 
     base_model[grep('Parametric effect priors',
                       base_model) + 1] <- paste0('  for (i in 1:',
