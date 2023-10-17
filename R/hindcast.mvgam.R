@@ -93,6 +93,17 @@ if(series == 'all'){
 
     if(type == 'expected'){
 
+      # Extract family-specific parameters for this series
+      family_pars <- extract_family_pars(object = object)
+      par_extracts <- lapply(seq_along(family_pars), function(j){
+        if(is.matrix(family_pars[[j]])){
+          family_pars[[j]][, series]
+        } else {
+          family_pars[[j]]
+        }
+      })
+      names(par_extracts) <- names(family_pars)
+
       # Compute expectations as one long vector
       Xpmat <- matrix(as.vector(preds))
       attr(Xpmat, 'model.offset') <- 0
@@ -100,7 +111,7 @@ if(series == 'all'){
                                               Xp = Xpmat,
                                               type = 'expected',
                                               betas = 1,
-                                              family_pars = extract_family_pars(object = object))),
+                                              family_pars = par_extracts)),
                       nrow = NROW(preds))
     }
 

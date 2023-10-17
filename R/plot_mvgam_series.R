@@ -107,6 +107,9 @@ plot_mvgam_series = function(object,
     data_train$y <- data_train[[y]]
   }
 
+  # Drop unused levels in data_train
+  data_train$series <- droplevels(data_train$series)
+
 # Check variables in newdata / data_test
   if(!missing(newdata)){
     data_test <- newdata
@@ -142,6 +145,9 @@ plot_mvgam_series = function(object,
     } else {
       data_test$y <- data_test[[y]]
     }
+
+    # Drop unused levels in data_train
+    data_test$series <- droplevels(data_test$series)
   }
 
 # Choose models over data if both supplied
