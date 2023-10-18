@@ -630,7 +630,7 @@ get_mvgam_priors = function(formula,
                             param_info = c(paste(nonre_smooths,
                                                  'smooth parameters',
                                                  collapse = ', ')),
-                            prior = 'lambda ~ normal(10, 25);',
+                            prior = 'lambda ~ normal(5, 30);',
                             # Add an example for changing the prior; note that it is difficult to
                             # understand how to change individual smoothing parameter priors because each
                             # one acts on a different subset of the smooth function parameter space

@@ -642,11 +642,11 @@ ds_resids_beta = function(truth, fitted, draw, precision){
                             phi = precision)
   na_obs <- is.na(truth)
   a_obs <- pbeta(as.vector(truth[!na_obs]) - 1.e-6,
-                 shape1 = shape_pars$shape1,
-                 shape2 = shape_pars$shape2)
+                 shape1 = shape_pars$shape1[!na_obs],
+                 shape2 = shape_pars$shape2[!na_obs])
   b_obs <- pbeta(as.vector(truth[!na_obs]),
-                 shape1 = shape_pars$shape1,
-                 shape2 = shape_pars$shape2)
+                 shape1 = shape_pars$shape1[!na_obs],
+                 shape2 = shape_pars$shape2[!na_obs])
   u_obs <- runif(n = length(draw[!na_obs]),
                  min = pmin(a_obs, b_obs),
                  max = pmax(a_obs, b_obs))
@@ -737,10 +737,10 @@ ds_resids_lnorm = function(truth, fitted, sigma, draw){
   na_obs <- is.na(truth)
   a_obs <- plnorm(as.vector(truth[!na_obs]) - 1.e-6,
                  meanlog = log(fitted[!na_obs]),
-                 sdlog = sigma)
+                 sdlog = sigma[!na_obs])
   b_obs <- plnorm(as.vector(truth[!na_obs]),
                  meanlog = log(fitted[!na_obs]),
-                 sdlog = sigma)
+                 sdlog = sigma[!na_obs])
   u_obs <- runif(n = length(draw[!na_obs]),
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
@@ -760,11 +760,11 @@ ds_resids_lnorm = function(truth, fitted, sigma, draw){
 ds_resids_gamma = function(truth, fitted, shape, draw){
   na_obs <- is.na(truth)
   a_obs <- pgamma(as.vector(truth[!na_obs]) - 1.e-6,
-                  shape = shape,
-                  rate = shape / fitted[!na_obs])
+                  shape = shape[!na_obs],
+                  rate = shape[!na_obs] / fitted[!na_obs])
   b_obs <- pgamma(as.vector(truth[!na_obs]) - 1.e-6,
-                  shape = shape,
-                  rate = shape / fitted[!na_obs])
+                  shape = shape[!na_obs],
+                  rate = shape[!na_obs] / fitted[!na_obs])
   u_obs <- runif(n = length(draw[!na_obs]),
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
@@ -784,13 +784,13 @@ ds_resids_gamma = function(truth, fitted, shape, draw){
 ds_resids_student = function(truth, fitted, sigma, nu, draw){
   na_obs <- is.na(truth)
   a_obs <- pstudent_t(as.vector(truth[!na_obs]) - 1,
-                      df = nu,
+                      df = nu[!na_obs],
                       mu = fitted[!na_obs],
-                      sigma = sigma)
+                      sigma = sigma[!na_obs])
   b_obs <- pstudent_t(as.vector(truth[!na_obs]),
-                      df = nu,
+                      df = nu[!na_obs],
                       mu = fitted[!na_obs],
-                      sigma = sigma)
+                      sigma = sigma[!na_obs])
   u_obs <- runif(n = length(draw[!na_obs]),
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
