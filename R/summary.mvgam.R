@@ -238,8 +238,8 @@ if(!is.null(attr(object$mgcv_model, 'gp_att_table'))){
 if(any(!is.na(object$sp_names))){
   gam_sig_table <- summary(object$mgcv_model)$s.table[, c(1,3,4), drop = FALSE]
   if(!is.null(attr(object$mgcv_model, 'gp_att_table'))){
-    gp_names <- clean_gpnames(unlist(purrr::map(attr(object$mgcv_model,
-                                                     'gp_att_table'), 'name')))
+    gp_names <- unlist(purrr::map(attr(object$mgcv_model,
+                                       'gp_att_table'), 'name'))
     if(all(rownames(gam_sig_table) %in% gsub('gp(', 's(', gp_names, fixed = TRUE))){
 
     } else {

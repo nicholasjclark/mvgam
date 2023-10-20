@@ -1,12 +1,12 @@
 ---
-title: "Time-varying effects in the mvgam package"
+title: "Time-varying effects in mvgam"
 author: "Nicholas J Clark"
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_vignette:
     toc: yes
 vignette: >
-  %\VignetteIndexEntry{Time-varying effects in the mvgam package}
+  %\VignetteIndexEntry{Time-varying effects in mvgam}
   %\VignetteEngine{knitr::rmarkdown}
   \usepackage[utf8]{inputenc}
 ---

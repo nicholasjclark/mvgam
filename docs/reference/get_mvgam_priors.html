@@ -27,10 +27,11 @@ changed for a given mvgam model, as well listing their default distributions"><!
   <a href="#" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" role="button" aria-expanded="false" aria-haspopup="true" id="dropdown-articles">Articles</a>
   <div class="dropdown-menu" aria-labelledby="dropdown-articles">
     <a class="dropdown-item" href="../articles/data_in_mvgam.html">Formatting data for use in mvgam</a>
+    <a class="dropdown-item" href="../articles/forecast_evaluation.html">Forecasting and forecast evaluation in mvgam</a>
     <a class="dropdown-item" href="../articles/mvgam_overview.html">Overview of the mvgam package</a>
     <a class="dropdown-item" href="../articles/shared_states.html">Shared latent states in mvgam</a>
-    <a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in the mvgam package</a>
-    <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in the mvgam package</a>
+    <a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in mvgam</a>
+    <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in mvgam</a>
   </div>
 </li>
       </ul><form class="form-inline my-2 my-lg-0" role="search">
@@ -113,7 +114,7 @@ families are:</p><ul><li><p><code><a href="https://rdrr.io/pkg/mgcv/man/negbin.h
 <li><p><code><a href="mvgam_families.html">tweedie()</a></code> for count data (power parameter <code>p</code> fixed at <code>1.5</code>)</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> for real-valued data</p></li>
 <li><p><code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar()</a></code> for proportional data on <code>(0,1)</code></p></li>
-<li><p><code><a href="https://rdrr.io/pkg/brms/man/brmsfamily.html" class="external-link">lognormal()</a></code> for non-negative real-valued data</p></li>
+<li><p><code><a href="https://paul-buerkner.github.io/brms/reference/brmsfamily.html" class="external-link">lognormal()</a></code> for non-negative real-valued data</p></li>
 <li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
 </ul><p>See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
@@ -188,7 +189,7 @@ users can also modify the parameter bounds by modifying the <code>new_lowerbound
 This will be necessary if using restrictive distributions on some parameters, such as a Beta distribution
 for the trend sd parameters for example (Beta only has support on  <code>(0,1)</code>), so the upperbound cannot
 be above <code>1</code>. Another option is to make use of the prior modification functions in <code>brms</code>
-(i.e. <code><a href="https://rdrr.io/pkg/brms/man/set_prior.html" class="external-link">prior</a></code>) to change prior distributions and bounds (just use the name of the parameter that
+(i.e. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code>) to change prior distributions and bounds (just use the name of the parameter that
 you'd like to change as the <code>class</code> argument; see examples below)</p>
     </div>
     <div class="section level2">
@@ -307,7 +308,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar2 ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for smoothing parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(10, 25);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for overdispersion parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   phi_inv ~ student_t(3, 0, 0.1);</span>
@@ -376,7 +377,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6            vector&lt;lower=0&gt;[n_series] sigma;            3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7          vector&lt;lower=0&gt;[n_series] phi_inv;            3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                    param_info                             prior</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1 s(season) smooth parameters          lambda ~ normal(10, 25);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 s(season) smooth parameters           lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2          s(series) pop mean            mu_raw ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 3            s(series) pop sd sigma_raw ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 4       trend AR1 coefficient               ar1 ~ std_normal();</span>
@@ -384,13 +385,13 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.58);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(-0.23, 0.85);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.12);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.26, 0.85);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5       ar2 ~ normal(0.04, 0.5);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.37);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7 phi_inv ~ normal(-0.22, 0.25);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.54);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2   mu_raw ~ normal(0.21, 0.78);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.42);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.49, 0.66);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     ar2 ~ normal(-0.91, 0.73);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.85);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.92, 0.24);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>
@@ -491,7 +492,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar2 ~ normal(0, 0.25);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for smoothing parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(10, 25);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for overdispersion parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   phi_inv ~ student_t(3, 0, 0.1);</span>
@@ -550,9 +551,9 @@ example)</p>
 <span class="r-in"><span><span class="co"># The same can be done using brms functions; here we will also change the ar1 prior</span></span></span>
 <span class="r-in"><span><span class="co"># and put some bounds on the ar coefficients to enforce stationarity; we set the</span></span></span>
 <span class="r-in"><span><span class="co"># prior using the 'class' argument in all brms prior functions</span></span></span>
-<span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/pkg/brms/man/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">mu_raw</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              <span class="fu"><a href="https://rdrr.io/pkg/brms/man/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">ar1</span>, lb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, ub <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              <span class="fu"><a href="https://rdrr.io/pkg/brms/man/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">ar2</span>, lb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, ub <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">mu_raw</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">ar1</span>, lb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, ub <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">ar2</span>, lb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, ub <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">brmsprior</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             prior  class coef group resp dpar nlpar   lb   ub source</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  normal(0.2, 0.5) mu_raw                            &lt;NA&gt; &lt;NA&gt;   user</span>
@@ -649,7 +650,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar2 ~ normal(0, 0.25);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for smoothing parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(10, 25);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for overdispersion parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   phi_inv ~ student_t(3, 0, 0.1);</span>
@@ -795,7 +796,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar2 ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for smoothing parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(10, 25);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for overdispersion parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   phi_inv ~ student_t(3, 0, 0.1);</span>
@@ -923,10 +924,10 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar1 ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for smoothing parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(10, 25);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 3.1);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // trend estimates</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1 : n_series] ~ normal(0, sigma);</span>
@@ -964,8 +965,8 @@ example)</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Likewise using brms utilities (note that you can use</span></span></span>
 <span class="r-in"><span><span class="co"># Intercept rather than `(Intercept)`) to change priors on the intercept</span></span></span>
-<span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/pkg/brms/man/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">cov</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              <span class="fu"><a href="https://rdrr.io/pkg/brms/man/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">cov</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">brmsprior</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             prior     class coef group resp dpar nlpar   lb   ub source</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  normal(0.2, 0.5)       cov                            &lt;NA&gt; &lt;NA&gt;   user</span>
@@ -1031,10 +1032,10 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ar1 ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for smoothing parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(10, 25);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for latent trend variance parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 3.1);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // trend estimates</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   trend[1, 1 : n_series] ~ normal(0, sigma);</span>
