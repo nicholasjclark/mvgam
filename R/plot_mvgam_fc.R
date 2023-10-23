@@ -395,10 +395,17 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
       message()
     } else {
       if(object$family %in% c('poisson', 'negative binomial', 'tweedie')){
-        score <- sum(drps_mcmc_object(as.vector(truth),
-                                      fc)[,1], na.rm = TRUE)
-        cat('Out of sample DRPS:\n')
-        print(score)
+        if(max(fc, na.rm = TRUE) > 50000){
+          score <- sum(crps_mcmc_object(as.vector(truth),
+                                        fc)[,1], na.rm = TRUE)
+          cat('Out of sample CRPS:\n')
+          print(score)
+        } else {
+          score <- sum(drps_mcmc_object(as.vector(truth),
+                                        fc)[,1], na.rm = TRUE)
+          cat('Out of sample DRPS:\n')
+          print(score)
+        }
 
       } else {
         score <- sum(crps_mcmc_object(as.vector(truth),
@@ -649,10 +656,18 @@ plot.mvgam_forecast = function(x, series = 1,
       cat('No non-missing values in test_observations; cannot calculate forecast score\n')
     } else {
       if(object$family %in% c('poisson', 'negative binomial', 'tweedie')){
-        score <- sum(drps_mcmc_object(as.vector(truth),
-                                      fc)[,1], na.rm = TRUE)
-        cat('Out of sample DRPS:\n')
-        print(score)
+        if(max(fc, na.rm = TRUE) > 50000){
+          score <- sum(crps_mcmc_object(as.vector(truth),
+                                        fc)[,1], na.rm = TRUE)
+          cat('Out of sample CRPS:\n')
+          print(score)
+        } else {
+          score <- sum(drps_mcmc_object(as.vector(truth),
+                                        fc)[,1], na.rm = TRUE)
+          cat('Out of sample DRPS:\n')
+          print(score)
+        }
+
       } else {
         score <- sum(crps_mcmc_object(as.vector(truth),
                                       fc)[,1], na.rm = TRUE)

@@ -1,12 +1,12 @@
 ---
-title: "State-Space models in the mvgam package"
+title: "State-Space models in mvgam"
 author: "Nicholas J Clark"
 date: "`r Sys.Date()`"
 output:
   rmarkdown::html_vignette:
     toc: yes
 vignette: >
-  %\VignetteIndexEntry{State-Space models in the mvgam package}
+  %\VignetteIndexEntry{State-Space models in mvgam}
   %\VignetteEngine{knitr::rmarkdown}
   \usepackage[utf8]{inputenc}
 ---

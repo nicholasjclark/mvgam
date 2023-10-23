@@ -19,9 +19,9 @@
 #'if the fitted model contained multivariate trends (either as a dynamic factor or \code{VAR} process),
 #'as it saves recomputing the full set of trends for each series individually
 #'@param n_cores \code{integer} specifying number of cores for generating forecasts in parallel
-#'@param type When this has the value \code{link} (default) the linear predictor is calculated on the link scale.
+#'@param type When this has the value \code{link} the linear predictor is calculated on the link scale.
 #'If \code{expected} is used, predictions reflect the expectation of the response (the mean)
-#'but ignore uncertainty in the observation process. When \code{response} is used,
+#'but ignore uncertainty in the observation process. When \code{response} (default) is used,
 #'the predictions take uncertainty in the observation process into account to return
 #'predictions on the outcome scale. When \code{trend} is used, only the forecast distribution for the
 #'latent trend is returned
@@ -258,6 +258,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
 
   } else {
     # If forecasts already exist, simply extract them
+   data_test <- object$test_data
     last_train <- max(object$obs_data$time) -
       (min(object$obs_data$time) - 1)
 
@@ -467,7 +468,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
                                train_observations = series_obs,
                                train_times = unique(data_train$time),
                                test_observations = series_test,
-                               test_times = unique(object$test_data$time),
+                               test_times = unique(data_test$time),
                                hindcasts = series_hcs,
                                forecasts = series_fcs),
                           class = 'mvgam_forecast')
