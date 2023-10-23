@@ -1818,7 +1818,8 @@ mvgam = function(formula,
     if(lfo){
       to_remove <- c('trend', 'b_trend', 'b', 'b_raw', 'rho', 'sigma',
                      'alpha_gp', 'rho_gp', 'ar1', 'ar2', 'ar3',
-                     'LV', 'lv_coefs', 'penalty', 'Sigma')
+                     'LV', 'lv_coefs', 'penalty', 'Sigma', 'theta',
+                     'error')
       param <- param[!param %in% to_remove]
     }
 

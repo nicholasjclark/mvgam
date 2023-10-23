@@ -381,16 +381,26 @@ validate_variables = function(x, variable, regex = FALSE){
     to_extract <- trend_par_names(x$trend_model,
                                   x$use_lv,
                                   x$drift)
+
     to_extract <- to_extract[!to_extract %in% c('tau','trend',
                                                 'LV', 'penalty', 'lv_coefs')]
-    if(!is.null(x$trend_call) & x$trend_model %in% c('RW', 'AR1',
-                                                     'AR2', 'AR3')){
-      to_extract <- c(to_extract, 'sigma')
-    }
 
-    if(!is.null(x$trend_call) & x$trend_model %in% c('VAR1', 'VAR1cor')){
-      to_extract <- c(to_extract, 'Sigma')
+    # Determine which other trend params to include
+    included <- vector(length = length(to_extract))
+    for(i in 1:length(to_extract)){
+
+      # Check if it can be extracted
+      suppressWarnings(estimates <- try(mcmc_chains(x$model_output,
+                                                    params = to_extract[i]),
+                                        silent = TRUE))
+
+      if(inherits(estimates, 'try-error')){
+        included[i] <- FALSE
+      } else {
+        included[i] <- TRUE
+      }
     }
+    to_extract <- to_extract[included]
 
     newnames <- NULL
   }

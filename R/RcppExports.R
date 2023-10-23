@@ -11,3 +11,8 @@ var1_recursC <- function(A, linpreds, errors, drift, last_trends, h) {
     .Call(`_mvgam_var1_recursC`, A, linpreds, errors, drift, last_trends, h)
 }
 
+#' @noRd
+varma_recursC <- function(A, A2, A3, theta, linpreds, errors, drift, last_trends, h) {
+    .Call(`_mvgam_varma_recursC`, A, A2, A3, theta, linpreds, errors, drift, last_trends, h)
+}
+

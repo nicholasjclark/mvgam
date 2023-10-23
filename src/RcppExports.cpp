@@ -45,10 +45,30 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// varma_recursC
+arma::mat varma_recursC(arma::mat A, arma::mat A2, arma::mat A3, arma::mat theta, arma::mat linpreds, arma::mat errors, arma::rowvec drift, arma::mat last_trends, int h);
+RcppExport SEXP _mvgam_varma_recursC(SEXP ASEXP, SEXP A2SEXP, SEXP A3SEXP, SEXP thetaSEXP, SEXP linpredsSEXP, SEXP errorsSEXP, SEXP driftSEXP, SEXP last_trendsSEXP, SEXP hSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type A(ASEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type A2(A2SEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type A3(A3SEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type theta(thetaSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type linpreds(linpredsSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type errors(errorsSEXP);
+    Rcpp::traits::input_parameter< arma::rowvec >::type drift(driftSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type last_trends(last_trendsSEXP);
+    Rcpp::traits::input_parameter< int >::type h(hSEXP);
+    rcpp_result_gen = Rcpp::wrap(varma_recursC(A, A2, A3, theta, linpreds, errors, drift, last_trends, h));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_mvgam_ar3_recursC", (DL_FUNC) &_mvgam_ar3_recursC, 8},
     {"_mvgam_var1_recursC", (DL_FUNC) &_mvgam_var1_recursC, 6},
+    {"_mvgam_varma_recursC", (DL_FUNC) &_mvgam_varma_recursC, 9},
     {NULL, NULL, 0}
 };
 

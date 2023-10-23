@@ -188,6 +188,22 @@ validate_proportional = function(x){
 }
 
 #'@noRd
+validate_equaldims = function(x, y){
+  s <- substitute(x)
+  q <- substitute(y)
+
+  if(NCOL(x) != NCOL(y)){
+    stop("Argument '", s, "' and argument '", q, "' must have equal dimensions",
+         call. = FALSE)
+  }
+
+  if(NROW(x) != NROW(y)){
+    stop("Argument '", s, "' and argument '", q, "' must have equal dimensions",
+         call. = FALSE)
+  }
+}
+
+#'@noRd
 validate_pos_integer = function(x){
   s <- substitute(x)
   x <- base::suppressWarnings(as.numeric(x))

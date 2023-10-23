@@ -169,6 +169,179 @@ sim_var1 = function(drift, A, Sigma,
                h = h)
 }
 
+#' VARMA(1-3, 0-1) simulation function
+#' @noRd
+sim_varma = function(drift,
+                     A,
+                     A2,
+                     A3,
+                     theta,
+                     Sigma,
+                     last_trends,
+                     last_errors,
+                     Xp_trend = NULL,
+                     betas_trend = NULL,
+                     h){
+
+  # Validate dimensions
+  validate_equaldims(A, Sigma)
+  validate_equaldims(A2, Sigma)
+  validate_equaldims(A3, Sigma)
+  validate_equaldims(theta, Sigma)
+
+  if(NROW(last_trends) != 3){
+    stop('Last 3 state estimates are required, in matrix form',
+         call. = FALSE)
+  }
+
+  if(NROW(last_errors) != 3){
+    stop('Last 3 error estimates are required, in matrix form',
+         call. = FALSE)
+  }
+
+  if(missing(drift)){
+    drift <- rep(0, NROW(A))
+  }
+
+  if(length(drift) != NROW(A)){
+    stop('Number of drift parameters must match number of rows in VAR coefficient matrix "A"',
+         call. = FALSE)
+  }
+
+  # Linear predictor, if supplied
+  if(!is.null(Xp_trend)){
+    linpreds <- as.vector(((matrix(Xp_trend,
+                                   ncol = NCOL(Xp_trend)) %*%
+                              betas_trend)) +
+                            attr(Xp_trend, 'model.offset'))
+    linpreds <- matrix(linpreds, ncol = NROW(A),
+                       byrow = TRUE)
+    if(NROW(linpreds) != h + 3){
+      stop('trend linear predictor matrix should be h + 3 rows in dimension',
+           call. = FALSE)
+    }
+  } else {
+    linpreds <- matrix(0, nrow = h + 3, ncol = NROW(A))
+  }
+
+  # Draw forecast errors
+  errors <- rbind(last_errors,
+                  mvnfast::rmvn(h,
+                                mu = rep(0, NROW(A)),
+                                sigma = Sigma))
+
+  # Stochastic realisations
+  varma_recursC(A = A,
+                A2 = A2,
+                A3 = A3,
+                theta = theta,
+                drift = drift,
+                linpreds = linpreds,
+                errors = errors,
+                last_trends = last_trends,
+                h = h)
+}
+
+#' Generic function to take outputs from different trend models
+#' and prepare the objects needed to propagate VARMA(3,1) processes
+#' so that only a single Rcpp function is needed for propagating
+#' autoregressive trends
+#' @noRd
+prep_varma_params = function(ar1,
+                             ar2,
+                             ar3,
+                             A,
+                             A2,
+                             A3,
+                             drift,
+                             theta,
+                             Sigma,
+                             tau,
+                             Xp_trend,
+                             betas_trend,
+                             last_trends,
+                             last_errors,
+                             h){
+
+  # Construct Autoregressive matrices
+  if(missing(A) & missing(A2) & missing(A3)){
+    A <- A2 <- A3 <- matrix(0,
+                            ncol = length(ar1),
+                            nrow = length(ar1))
+    diag(A) <- ar1
+    diag(A2) <- ar2
+    diag(A3) <- ar3
+  }
+
+  if(missing(A2) & !missing(A)){
+    A2 <- matrix(0,
+                 ncol = NROW(A),
+                 nrow = NROW(A))
+  }
+
+  if(missing(A3) & !missing(A)){
+    A3 <- matrix(0,
+                 ncol = NROW(A),
+                 nrow = NROW(A))
+  }
+
+  # Drift terms
+  if(missing(drift)){
+    drift <- rep(0, NROW(A))
+  }
+
+  # Construct moving average matrix
+  if(missing(theta)){
+    theta <- matrix(0,
+                    ncol = NROW(A),
+                    nrow = NROW(A))
+  }
+
+  if(!is.matrix(theta)){
+    theta2 <- matrix(0,
+                     ncol = NROW(A),
+                     nrow = NROW(A))
+    diag(theta2) <- theta
+    theta <- theta2
+  }
+
+  # Construct covariance matrix
+  if(missing(Sigma)){
+    Sigma <- matrix(0,
+                    ncol = NROW(A),
+                    nrow = NROW(A))
+    diag(Sigma) <- 1 / tau
+  }
+
+  # Construct last trend estimates
+  if(!is.matrix(last_trends) | NROW(last_trends) == 1){
+    last_trends <- matrix(last_trends)
+  }
+
+  # Construct last error estimates
+  if(missing(last_errors)){
+    last_errors <- matrix(0,
+                          ncol = NROW(A),
+                          nrow = 3)
+  }
+
+  if(!is.matrix(last_errors) | NROW(last_errors) == 1){
+    last_errors <- matrix(last_errors)
+  }
+
+  return(list(A = A,
+              A2 = A2,
+              A3 = A3,
+              drift = drift,
+              theta = theta,
+              Sigma = Sigma,
+              last_trends = last_trends,
+              last_errors = last_errors,
+              Xp_trend = Xp_trend,
+              betas_trend = betas_trend,
+              h = h))
+}
+
 #' Simulate stationary VAR(p) phi matrices using the algorithm proposed by
 #' Ansley and Kohn (1986)
 #' @noRd
@@ -243,21 +416,24 @@ trend_par_names = function(trend_model,
 
   if(use_lv){
     if(trend_model == 'RW'){
-      param <- c('trend', 'LV', 'penalty', 'lv_coefs')
+      param <- c('trend', 'LV', 'penalty',
+                 'lv_coefs', 'theta', 'Sigma', 'error')
     }
 
     if(trend_model == 'AR1'){
-      param <- c('trend', 'ar1', 'LV', 'penalty', 'lv_coefs')
+      param <- c('trend', 'ar1', 'LV', 'penalty',
+                 'lv_coefs', 'theta', 'Sigma', 'error')
     }
 
     if(trend_model == 'AR2'){
       param <- c('trend', 'ar1', 'ar2', 'LV',
-                 'penalty', 'lv_coefs')
+                 'penalty', 'lv_coefs', 'theta', 'Sigma', 'error')
     }
 
     if(trend_model == 'AR3'){
       param <- c('trend', 'ar1', 'ar2', 'ar3',
-                 'LV', 'penalty', 'lv_coefs')
+                 'LV', 'penalty', 'lv_coefs', 'theta',
+                 'Sigma', 'error')
     }
 
     if(trend_model == 'GP'){
@@ -267,26 +443,30 @@ trend_par_names = function(trend_model,
 
     if(trend_model == 'VAR1'){
       param <- c('trend', 'A', 'Sigma',
-                 'lv_coefs', 'LV', 'P_real', 'sigma')
+                 'lv_coefs', 'LV', 'P_real', 'sigma',
+                 'theta', 'error')
     }
 
   }
 
   if(!use_lv){
     if(trend_model == 'RW'){
-      param <- c('trend', 'tau', 'sigma')
+      param <- c('trend', 'tau', 'sigma', 'theta', 'Sigma', 'error')
     }
 
     if(trend_model == 'AR1'){
-      param <- c('trend', 'tau', 'sigma', 'ar1')
+      param <- c('trend', 'tau', 'sigma', 'ar1',
+                 'theta', 'Sigma', 'error')
     }
 
     if(trend_model == 'AR2'){
-      param <- c('trend', 'tau', 'sigma', 'ar1', 'ar2')
+      param <- c('trend', 'tau', 'sigma', 'ar1', 'ar2',
+                 'theta', 'Sigma', 'error')
     }
 
     if(trend_model == 'AR3'){
-      param <- c('trend', 'tau', 'sigma', 'ar1', 'ar2', 'ar3')
+      param <- c('trend', 'tau', 'sigma', 'ar1', 'ar2',
+                 'ar3', 'theta', 'Sigma', 'error')
     }
 
     if(trend_model == 'GP'){
@@ -294,7 +474,8 @@ trend_par_names = function(trend_model,
     }
 
     if(trend_model == 'VAR1'){
-      param <- c('trend', 'A', 'Sigma', 'P_real', 'sigma')
+      param <- c('trend', 'A', 'Sigma', 'P_real',
+                 'sigma', 'theta', 'error')
     }
 
   }
@@ -326,11 +507,23 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
   # Extract into a named list
   if(length(pars_to_extract) > 0){
     out <- vector(mode = 'list')
+    included <- vector(length = length(pars_to_extract))
     for(i in 1:length(pars_to_extract)){
-      out[[i]] <- mcmc_chains(object$model_output,
-                                      params = pars_to_extract[i])
+
+      # Check if it can be extracted first
+      suppressWarnings(estimates <- try(mcmc_chains(object$model_output,
+                                                    params = pars_to_extract[i]),
+                                        silent = TRUE))
+
+      if(inherits(estimates, 'try-error')){
+        included[i] <- FALSE
+      } else {
+        included[i] <- TRUE
+        out[[i]] <- estimates
+      }
     }
-    names(out) <- pars_to_extract
+    out <- out[included]
+    names(out) <- pars_to_extract[included]
 
   } else {
     out <- list()
@@ -551,14 +744,14 @@ extract_general_trend_pars = function(samp_index, trend_pars){
   general_trend_pars <- lapply(seq_along(trend_pars), function(x){
 
     if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
-                                   'A', 'Sigma', 'b_gp')){
+                                   'A', 'Sigma', 'theta', 'b_gp')){
 
       if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
                                      'b_gp')){
         out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
       }
 
-      if(names(trend_pars)[x] %in% c('A', 'Sigma')){
+      if(names(trend_pars)[x] %in% c('A', 'Sigma', 'theta')){
         out <- unname(trend_pars[[x]][samp_index, ])
       }
 
@@ -586,7 +779,7 @@ extract_series_trend_pars = function(series, samp_index, trend_pars,
   trend_extracts <- lapply(seq_along(trend_pars), function(x){
 
     if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
-                                   'A', 'Sigma', 'b_gp')){
+                                   'A', 'Sigma', 'theta', 'b_gp')){
 
       if(!use_lv & names(trend_pars)[x] == 'b_gp'){
         out <- trend_pars[[x]][[series]][samp_index, ]
@@ -604,7 +797,7 @@ extract_series_trend_pars = function(series, samp_index, trend_pars,
         out <- lapply(trend_pars[[x]], `[`, samp_index, )
       }
 
-      if(names(trend_pars)[x] %in% c('A', 'Sigma')){
+      if(names(trend_pars)[x] %in% c('A', 'Sigma', 'theta')){
         out <- trend_pars[[x]][samp_index, ]
       }
 
@@ -657,21 +850,59 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
           Xp_trend_sub <- NULL
         }
 
-        sim_ar3(drift = ifelse('drift' %in% names(trend_pars),
-                               trend_pars$drift[lv],
-                               0),
-                ar1 = ar1,
-                ar2 = ifelse('ar2' %in% names(trend_pars),
-                             trend_pars$ar2[lv],
-                             0),
-                ar3 = ifelse('ar3' %in% names(trend_pars),
-                             trend_pars$ar3[lv],
-                             0),
-                tau = trend_pars$tau[lv],
-                Xp_trend = Xp_trend_sub,
-                betas_trend = betas_trend,
-                last_trends = tail(trend_pars$last_lvs[[lv]], 3),
-                h = h)
+        # Prep VARMA parameters
+        if('Sigma' %in% names(trend_pars)){
+          Sigma <- trend_pars$sigma
+        } else {
+          Sigma <- rlang::missing_arg()
+        }
+        varma_params <- prep_varma_params(drift = ifelse('drift' %in% names(trend_pars),
+                                                         trend_pars$drift[lv],
+                                                         0),
+                                          ar1 = ar1,
+                                          ar2 = ifelse('ar2' %in% names(trend_pars),
+                                                       trend_pars$ar2[lv],
+                                                       0),
+                                          ar3 = ifelse('ar3' %in% names(trend_pars),
+                                                       trend_pars$ar3[lv],
+                                                       0),
+                                          theta = ifelse('theta' %in% names(trend_pars),
+                                                         trend_pars$theta[lv],
+                                                         0),
+                                          tau = trend_pars$tau[lv],
+                                          Sigma = Sigma,
+                                          Xp_trend = Xp_trend_sub,
+                                          betas_trend = betas_trend,
+                                          last_trends = tail(trend_pars$last_lvs[[lv]], 3),
+                                          h = h)
+
+        # Propagate forward
+        sim_varma(A = varma_params$A,
+                  A2 = varma_params$A2,
+                  A3 = varma_params$A3,
+                  drift = varma_params$drift,
+                  theta = varma_params$theta,
+                  Sigma = varma_params$Sigma,
+                  last_trends = varma_params$last_trends,
+                  last_errors = varma_params$last_errors,
+                  Xp_trend = varma_params$Xp_trend,
+                  betas_trend = varma_params$betas_trend,
+                  h = varma_params$h)
+        # sim_ar3(drift = ifelse('drift' %in% names(trend_pars),
+        #                        trend_pars$drift[lv],
+        #                        0),
+        #         ar1 = ar1,
+        #         ar2 = ifelse('ar2' %in% names(trend_pars),
+        #                      trend_pars$ar2[lv],
+        #                      0),
+        #         ar3 = ifelse('ar3' %in% names(trend_pars),
+        #                      trend_pars$ar3[lv],
+        #                      0),
+        #         tau = trend_pars$tau[lv],
+        #         Xp_trend = Xp_trend_sub,
+        #         betas_trend = betas_trend,
+        #         last_trends = tail(trend_pars$last_lvs[[lv]], 3),
+        #         h = h)
       }))
     }
 
@@ -702,17 +933,36 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                          ncol = length(trend_pars$last_lvs),
                          byrow = TRUE)
 
-      # Reconstruct the last trend vector
-      last_trendvec <- unlist(lapply(trend_pars$last_lvs,
-                                     function(x) tail(x, 1)),
-                              use.names = FALSE)
+      # Reconstruct the last trend matrix
+      last_trendvec <- do.call(cbind,(lapply(trend_pars$last_lvs,
+                                             function(x) tail(x, 3))))
 
-      next_lvs <- sim_var1(A = Amat,
-                           Sigma = Sigmamat,
-                           last_trends = last_trendvec,
-                           Xp_trend = Xp_trend,
-                           betas_trend = betas_trend,
-                           h = h)
+      # Prep VARMA parameters
+      varma_params <- prep_varma_params(A = Amat,
+                                        Sigma = Sigmamat,
+                                        last_trends = last_trendvec,
+                                        Xp_trend = Xp_trend,
+                                        betas_trend = betas_trend,
+                                        h = h)
+
+      next_lvs <- sim_varma(A = varma_params$A,
+                            A2 = varma_params$A2,
+                            A3 = varma_params$A3,
+                            drift = varma_params$drift,
+                            theta = varma_params$theta,
+                            Sigma = varma_params$Sigma,
+                            last_trends = varma_params$last_trends,
+                            last_errors = varma_params$last_errors,
+                            Xp_trend = varma_params$Xp_trend,
+                            betas_trend = varma_params$betas_trend,
+                            h = varma_params$h)
+
+      # next_lvs <- sim_var1(A = Amat,
+      #                      Sigma = Sigmamat,
+      #                      last_trends = last_trendvec,
+      #                      Xp_trend = Xp_trend,
+      #                      betas_trend = betas_trend,
+      #                      h = h)
     }
 
     trend_fc <- next_lvs
@@ -730,21 +980,60 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
         ar1 <- 1
       }
 
-      trend_fc <-  sim_ar3(drift = ifelse('drift' %in% names(trend_pars),
-                                          trend_pars$drift,
-                                          0),
-                           ar1 = ar1,
-                           ar2 = ifelse('ar2' %in% names(trend_pars),
-                                        trend_pars$ar2,
-                                        0),
-                           ar3 = ifelse('ar3' %in% names(trend_pars),
-                                        trend_pars$ar3,
-                                        0),
-                           tau = trend_pars$tau,
-                           Xp_trend = Xp_trend,
-                           betas_trend = betas_trend,
-                           last_trends = tail(trend_pars$last_trends, 3),
-                           h = h)
+      # Construct VARMA parameters
+      if('Sigma' %in% names(trend_pars)){
+        Sigma <- trend_pars$sigma
+      } else {
+        Sigma <- rlang::missing_arg()
+      }
+      varma_params <- prep_varma_params(drift = ifelse('drift' %in% names(trend_pars),
+                                                       trend_pars$drift,
+                                                       0),
+                                        ar1 = ar1,
+                                        ar2 = ifelse('ar2' %in% names(trend_pars),
+                                                     trend_pars$ar2,
+                                                     0),
+                                        ar3 = ifelse('ar3' %in% names(trend_pars),
+                                                     trend_pars$ar3,
+                                                     0),
+                                        theta = ifelse('theta' %in% names(trend_pars),
+                                                     trend_pars$theta,
+                                                     0),
+                                        Sigma = Sigma,
+                                        tau = trend_pars$tau,
+                                        Xp_trend = Xp_trend,
+                                        betas_trend = betas_trend,
+                                        last_trends = tail(trend_pars$last_trends, 3),
+                                        h = h)
+
+      # Propagate forward
+      trend_fc <- sim_varma(A = varma_params$A,
+                            A2 = varma_params$A2,
+                            A3 = varma_params$A3,
+                            drift = varma_params$drift,
+                            theta = varma_params$theta,
+                            Sigma = varma_params$Sigma,
+                            last_trends = varma_params$last_trends,
+                            last_errors = varma_params$last_errors,
+                            Xp_trend = varma_params$Xp_trend,
+                            betas_trend = varma_params$betas_trend,
+                            h = varma_params$h)
+
+      # trend_fc <-  sim_ar3(drift = ifelse('drift' %in% names(trend_pars),
+      #                                     trend_pars$drift,
+      #                                     0),
+      #                      ar1 = ar1,
+      #                      ar2 = ifelse('ar2' %in% names(trend_pars),
+      #                                   trend_pars$ar2,
+      #                                   0),
+      #                      ar3 = ifelse('ar3' %in% names(trend_pars),
+      #                                   trend_pars$ar3,
+      #                                   0),
+      #                      tau = trend_pars$tau,
+      #                      Xp_trend = Xp_trend,
+      #                      betas_trend = betas_trend,
+      #                      last_trends = tail(trend_pars$last_trends, 3),
+      #                      h = h)
     }
 
     if(trend_model == 'GP'){
@@ -771,17 +1060,37 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                          ncol = length(trend_pars$last_lvs),
                          byrow = TRUE)
 
-      # Reconstruct the last trend vector
-      last_trendvec <- unlist(lapply(trend_pars$last_lvs,
-                                     function(x) tail(x, 1)),
-                              use.names = FALSE)
+      # Reconstruct the last trend matrix
+      last_trendvec <- do.call(cbind, (lapply(trend_pars$last_lvs,
+                                              function(x) tail(x, 3))))
 
-      trend_fc <- sim_var1(A = Amat,
-                           Sigma = Sigmamat,
-                           last_trends = last_trendvec,
-                           Xp_trend = Xp_trend,
-                           betas_trend = betas_trend,
-                           h = h)
+      # Prep VARMA parameters
+      varma_params <- prep_varma_params(A = Amat,
+                                        Sigma = Sigmamat,
+                                        last_trends = last_trendvec,
+                                        Xp_trend = Xp_trend,
+                                        betas_trend = betas_trend,
+                                        h = h)
+
+      # Propagate forward
+      trend_fc <- sim_varma(A = varma_params$A,
+                            A2 = varma_params$A2,
+                            A3 = varma_params$A3,
+                            drift = varma_params$drift,
+                            theta = varma_params$theta,
+                            Sigma = varma_params$Sigma,
+                            last_trends = varma_params$last_trends,
+                            last_errors = varma_params$last_errors,
+                            Xp_trend = varma_params$Xp_trend,
+                            betas_trend = varma_params$betas_trend,
+                            h = varma_params$h)
+
+      # trend_fc <- sim_var1(A = Amat,
+      #                      Sigma = Sigmamat,
+      #                      last_trends = last_trendvec,
+      #                      Xp_trend = Xp_trend,
+      #                      betas_trend = betas_trend,
+      #                      h = h)
     }
 
   }

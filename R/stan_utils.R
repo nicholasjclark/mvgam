@@ -3214,6 +3214,16 @@ repair_stanfit <- function(x) {
 read_csv_as_stanfit <- function(files, variables = NULL,
                                 sampler_diagnostics = NULL) {
 
+  if(!is.null(variables)){
+    # ensure that only relevant variables are read from CSV
+    metadata <- cmdstanr::read_cmdstan_csv(
+      files = files, variables = "", sampler_diagnostics = "")
+
+    all_vars <- brms:::repair_variable_names(metadata$metadata$variables)
+    all_vars <- unique(sub("\\[.+", "", all_vars))
+    variables <- variables[variables %in% all_vars]
+  }
+
   csfit <- cmdstanr::read_cmdstan_csv(
     files = files, variables = variables,
     sampler_diagnostics = sampler_diagnostics,
