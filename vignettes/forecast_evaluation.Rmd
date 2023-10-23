@@ -6,7 +6,7 @@ output:
   rmarkdown::html_vignette:
     toc: yes
 vignette: >
-  %\VignetteIndexEntry{Time-varying effects in mvgam}
+  %\VignetteIndexEntry{Forecasting and forecast evaluation in mvgam}
   %\VignetteEngine{knitr::rmarkdown}
   \usepackage[utf8]{inputenc}
 ---
@@ -122,12 +122,30 @@ mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) +
 
 The summary for this model now contains information on the GP parameters for each time series:
 ```{r}
-summary(mod2)
+summary(mod2, include_betas = FALSE)
 ```
 
-And we can plot the nonlinear effects as before:
+We can plot the posteriors for these parameters, and for any other parameter for that matter, using `bayesplot` routines. First the marginal deviation ($\alpha$) parameters:
+```{r}
+mcmc_plot(mod2, variable = c('alpha_gp'), regex = TRUE, type = 'areas')
+```
+
+And now the length scale ($\rho$) parameters:
+```{r}
+mcmc_plot(mod2, variable = c('rho_gp'), regex = TRUE, type = 'areas')
+```
+
+We can also plot the nonlinear effects as before:
 ```{r}
 plot(mod2, type = 'smooths')
+```
+These can also be plotted using `marginaleffects` utilities:
+```{r}
+require('ggplot2')
+plot_predictions(mod2, 
+                 condition = c('time', 'series', 'series'),
+                 type = 'link') +
+  theme(legend.position = 'none')
 ```
 
 The estimates for the temporal trends are fairly similar for the two models, but below we will see if they produce similar forecasts
@@ -234,7 +252,7 @@ plot(diff_scores, pch = 16, cex = 1.25, col = 'darkred',
               max(abs(diff_scores), na.rm = TRUE)),
      bty = 'l',
      xlab = 'Forecast horizon',
-     ylab = expression(energy[GP]~-~energy[spline]))
+     ylab = expression(CRPS[GP]~-~CRPS[spline]))
 abline(h = 0, lty = 'dashed', lwd = 2)
 gp_better <- length(which(diff_scores < 0))
 title(main = paste0('GP better in ', gp_better, ' of 25 evaluations',
@@ -249,7 +267,7 @@ plot(diff_scores, pch = 16, cex = 1.25, col = 'darkred',
               max(abs(diff_scores), na.rm = TRUE)),
      bty = 'l',
      xlab = 'Forecast horizon',
-     ylab = expression(energy[GP]~-~energy[spline]))
+     ylab = expression(CRPS[GP]~-~CRPS[spline]))
 abline(h = 0, lty = 'dashed', lwd = 2)
 gp_better <- length(which(diff_scores < 0))
 title(main = paste0('GP better in ', gp_better, ' of 25 evaluations',
@@ -263,7 +281,7 @@ plot(diff_scores, pch = 16, cex = 1.25, col = 'darkred',
               max(abs(diff_scores), na.rm = TRUE)),
      bty = 'l',
      xlab = 'Forecast horizon',
-     ylab = expression(energy[GP]~-~energy[spline]))
+     ylab = expression(CRPS[GP]~-~CRPS[spline]))
 abline(h = 0, lty = 'dashed', lwd = 2)
 gp_better <- length(which(diff_scores < 0))
 title(main = paste0('GP better in ', gp_better, ' of 25 evaluations',
@@ -272,7 +290,7 @@ title(main = paste0('GP better in ', gp_better, ' of 25 evaluations',
 
 ```
 
-The GP model does better, and the difference between scores grows quickly as the forecast horizon increases. This is not unexpected given the way that splines linearly extrapolate outside the range of training data
+The GP model consistently gives better forecasts, and the difference between scores grows quickly as the forecast horizon increases. This is not unexpected given the way that splines linearly extrapolate outside the range of training data
 
 ## Further reading
 The following papers and resources offer useful material about Bayesian forecasting and proper scoring rules:
