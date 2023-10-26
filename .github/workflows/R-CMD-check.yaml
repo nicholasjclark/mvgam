@@ -58,6 +58,7 @@ jobs:
               runjags
               stan-dev/cmdstanr
               testthat
+              usethis
               rcmdcheck
 
       - name: Build Cmdstan

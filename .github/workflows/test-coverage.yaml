@@ -40,6 +40,7 @@ jobs:
               runjags
               stan-dev/cmdstanr
               testthat
+              usethis
               rcmdcheck
               covr
 
