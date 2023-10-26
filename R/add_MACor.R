@@ -5,9 +5,422 @@
 #' as trend / LV (array[n] vector[n_lv]) so it can be
 #' extracted in the same way
 #' @noRd
-add_MaCor = function(model_file, trend_model = 'VAR1'){
+add_MaCor = function(model_file,
+                     add_ma = FALSE,
+                     add_cor = FALSE,
+                     trend_model = 'VAR1',
+                     drift = FALSE){
+
+  if(trend_model %in% c('RW', 'AR1', 'AR2')){
+
+    # Update transformed data
+    if(any(grepl('vector<lower=0>[n_lv] sigma;',
+                 model_file, fixed = TRUE))){
+      if(any(grepl('transformed data{', model_file, fixed = TRUE))){
+        model_file[grep('transformed data {', model_file, fixed = TRUE)] <-
+          paste0('transformed data {\n',
+                 'vector[n_series] trend_zeros = rep_vector(0.0, n_lv);')
+      } else {
+        model_file[grep('parameters {', model_file, fixed = TRUE)[1]] <-
+          paste0('transformed data {\n',
+                 'vector[n_series] trend_zeros = rep_vector(0.0, n_lv);\n',
+                 '}\nparameters {')
+      }
+
+    } else {
+      if(any(grepl('transformed data{', model_file, fixed = TRUE))){
+        model_file[grep('transformed data {', model_file, fixed = TRUE)] <-
+          paste0('transformed data {\n',
+                 'vector[n_series] trend_zeros = rep_vector(0.0, n_series);')
+      } else {
+        model_file[grep('parameters {', model_file, fixed = TRUE)[1]] <-
+          paste0('transformed data {\n',
+                 'vector[n_series] trend_zeros = rep_vector(0.0, n_series);\n',
+                 '}\nparameters {')
+      }
+
+    }
+    model_file <- readLines(textConnection(model_file), n = -1)
+
+    # Update parameters block
+    if(any(grepl('vector<lower=0>[n_lv] sigma;',
+                 model_file, fixed = TRUE))){
+
+      if(add_cor){
+        model_file[grep('vector<lower=0>[n_lv] sigma;',
+                        model_file, fixed = TRUE)] <-
+          paste0('vector<lower=0>[n_lv] sigma;\n',
+                 'cholesky_factor_corr[n_lv] L_Omega;')
+      }
+
+      model_file[grep('matrix[n, n_lv] LV;',
+                      model_file, fixed = TRUE)] <-
+        paste0('matrix[n, n_lv] LV;\n',
+               '// ma coefficients\n',
+               if(add_cor){
+                 'matrix<lower=-1,upper=1>[n_lv, n_lv] theta;'
+                 } else {
+                   'vector<lower=-1,upper=1>[n_lv] theta;'
+                 },
+               '\n// ma error parameters\n',
+               'vector[n_lv] error[n];')
+
+      model_file <- readLines(textConnection(model_file), n = -1)
+      end <- grep('matrix[n, n_lv] LV;',
+                  model_file, fixed = TRUE)
+      start <- end - 1
+      model_file <- model_file[-c(start:end)]
+    } else {
+      if(add_cor){
+        model_file[grep('vector<lower=0>[n_series] sigma;',
+                        model_file, fixed = TRUE)] <-
+          paste0('vector<lower=0>[n_series] sigma;\n',
+                 'cholesky_factor_corr[n_series] L_Omega;')
+      }
+
+      model_file[grep('matrix[n, n_series] trend;',
+                      model_file, fixed = TRUE)] <-
+        paste0('matrix[n, n_series] trend;\n',
+               '// ma coefficients\n',
+               if(add_cor){
+                 'matrix<lower=-1,upper=1>[n_series, n_series] theta;'
+               } else {
+                 'vector<lower=-1,upper=1>[n_series] theta;'
+               },
+               '\n// ma error parameters\n',
+               'vector[n_series] error[n];')
+
+      model_file <- readLines(textConnection(model_file), n = -1)
+      end <- grep('matrix[n, n_series] trend;',
+                  model_file, fixed = TRUE)
+      start <- end - 1
+      model_file <- model_file[-c(start:end)]
+    }
+    model_file <- readLines(textConnection(model_file), n = -1)
+
+    # Update transformed parameters
+    if(any(grepl('vector<lower=0>[n_lv] sigma;',
+                 model_file, fixed = TRUE))){
+      model_file[grep('matrix[n, n_series] trend;',
+                      model_file, fixed = TRUE)] <-
+        paste0('matrix[n, n_series] trend;\n',
+               if(add_cor){
+                 paste0('vector[n_lv] LV[n];\n',
+                        'vector[n_lv] epsilon[n];\n',
+                        '// LKJ form of covariance matrix\n',
+                        'matrix[n_lv, n_lv] L_Sigma;\n',
+                        '// computed error covariance matrix\n',
+                        'cov_matrix[n_lv] Sigma;')
+               } else {
+                 'matrix[n, n_lv] LV;\nmatrix[n, n_lv] epsilon;'
+               })
+
+      if(add_cor){
+        if(trend_model %in% c('AR1', 'RW')){
+          model_file[grep('// derived latent states',
+                          model_file, fixed = TRUE)] <-
+            paste0('// derived latent states\n',
+                   'LV[1] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'trend_mus[ytimes_trend[1, 1:n_lv]] + error[1];\n',
+                   'epsilon[1] = error[1];\n',
+                   'for (i in 2:n) {\n',
+                   '// lagged error ma process\n',
+                   'epsilon[i] = theta * error[i - 1];\n',
+                   '// full ARMA process\n',
+                   'LV[i] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'trend_mus[ytimes_trend[i, 1:n_lv]] + ',
+                   if(trend_model == 'AR1'){ 'ar1 .* '} else {NULL},
+                   '(LV[i - 1] - trend_mus[ytimes_trend[i - 1, 1:n_lv]]) + ',
+                   'epsilon[i] + error[i];\n',
+                   '}\n')
+        }
+
+        if(trend_model == 'AR2'){
+          model_file[grep('// derived latent states',
+                          model_file, fixed = TRUE)] <-
+            paste0('// derived latent states\n',
+                   'LV[1] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'trend_mus[ytimes_trend[1, 1:n_lv]] + error[1];\n',
+                   'epsilon[1] = error[1];\n',
+                   'epsilon[2] = theta * error[1];\n',
+                   'LV[2] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'trend_mus[ytimes_trend[2, 1:n_lv]] + ',
+                   'ar1 .* (LV[1] - trend_mus[ytimes_trend[1, 1:n_lv]]) + ',
+                   'epsilon[2] + error[2];\n',
+                   'for (i in 3:n) {\n',
+                   '// lagged error ma process\n',
+                   'epsilon[i] = theta * error[i - 1];\n',
+                   '// full ARMA process\n',
+                   'LV[i] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'trend_mus[ytimes_trend[i, 1:n_lv]] + ',
+                   'ar1 .* (LV[i - 1] - trend_mus[ytimes_trend[i - 1, 1:n_lv]]) + ',
+                   'ar2 .* (LV[i - 2] - trend_mus[ytimes_trend[i - 2, 1:n_lv]]) + ',
+                   'epsilon[i] + error[i];\n',
+                   '}\n')
+        }
+
+      } else {
+        if(trend_model %in% c('AR1', 'RW')){
+          model_file[grep('// derived latent states',
+                          model_file, fixed = TRUE)] <-
+            paste0('// derived latent states\n',
+                   'for(j in 1:n_lv){\n',
+                   'LV[1, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'trend_mus[ytimes_trend[1, j]] + error[1, j];\n',
+                   'epsilon[1, j] = error[1, j];\n',
+                   'for(i in 2:n){\n',
+                   '// lagged error ma process\n',
+                   'epsilon[i, j] = theta[j] * error[i-1, j];\n',
+                   '// full ARMA process\n',
+                   'LV[i, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'trend_mus[ytimes_trend[i, j]] + ',
+                   if(trend_model == 'AR1'){ 'ar1[j] * '} else {NULL},
+                   '(LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]) + ',
+                   'epsilon[i, j] + error[i, j];\n',
+                   '}\n}')
+        }
+
+        if(trend_model == 'AR2'){
+          model_file[grep('// derived latent states',
+                          model_file, fixed = TRUE)] <-
+            paste0('// derived latent states\n',
+                   'for(j in 1:n_lv){\n',
+                   'LV[1, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'trend_mus[ytimes_trend[1, j]] + error[1, j];\n',
+                   'epsilon[1, j] = error[1, j];\n',
+                   'epsilon[2, j] = theta[j] * error[1, j];\n',
+                   'LV[2, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'trend_mus[ytimes_trend[1, j]] + ',
+                   'ar1[j] * (LV[1, j] - trend_mus[ytimes_trend[1, j]]) + ',
+                   'epsilon[2, j] + error[2, j];\n',
+                   'for(i in 3:n){\n',
+                   '// lagged error ma process\n',
+                   'epsilon[i, j] = theta[j] * error[i-1, j];\n',
+                   '// full ARMA process\n',
+                   'LV[i, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'trend_mus[ytimes_trend[i, j]] + ',
+                   'ar1[j] * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]) + ',
+                   'ar2[j] * (LV[i - 2, j] - trend_mus[ytimes_trend[i - 2, j]]) + ',
+                   'epsilon[i, j] + error[i, j];\n',
+                   '}\n}')
+        }
+      }
+
+      if(add_cor){
+        model_file[grep('lv_coefs = Z;', model_file, fixed = TRUE)] <-
+          paste0('L_Sigma = diag_pre_multiply(sigma, L_Omega);\n',
+                 'Sigma = multiply_lower_tri_self_transpose(L_Sigma);\n',
+                 'lv_coefs = Z;')
+      }
+    } else {
+      model_file[grep('transformed parameters {',
+                      model_file, fixed = TRUE)] <-
+        paste0('transformed parameters {\n',
+               if(add_cor){
+                 paste0('vector[n_series] trend_raw[n];\n',
+                        'matrix[n, n_series] trend;\n',
+                        'vector[n_series] epsilon[n];\n',
+                        '// LKJ form of covariance matrix\n',
+                        'matrix[n_series, n_series] L_Sigma;\n',
+                        '// computed error covariance matrix\n',
+                        'cov_matrix[n_series] Sigma;')
+               } else {
+                 'matrix[n, n_series] trend;\nmatrix[n, n_series] epsilon;'
+               })
+
+      if(add_cor){
+        if(trend_model %in% c('AR1', 'RW')){
+          model_file[max(grep('= b_raw[',
+                          model_file, fixed = TRUE))] <-
+            paste0(model_file[max(grep('= b_raw[',
+                                       model_file, fixed = TRUE))],
+                   '\n// derived latent states\n',
+                   'trend_raw[1] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'error[1];\n',
+                   'epsilon[1] = error[1];\n',
+                   'for (i in 2:n) {\n',
+                   '// lagged error ma process\n',
+                   'epsilon[i] = theta * error[i - 1];\n',
+                   '// full ARMA process\n',
+                   'trend_raw[i] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   if(trend_model == 'AR1'){ 'ar1 .* '} else {NULL},
+                   'trend_raw[i - 1] + ',
+                   'epsilon[i] + error[i];\n',
+                   '}\n')
+        }
+
+        if(trend_model == 'AR2'){
+          model_file[max(grep('= b_raw[',
+                              model_file, fixed = TRUE))] <-
+            paste0(model_file[max(grep('= b_raw[',
+                                       model_file, fixed = TRUE))],
+                   '\n// derived latent states\n',
+                   'trend_raw[1] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'error[1];\n',
+                   'epsilon[1] = error[1];\n',
+                   'epsilon[2] = theta * error[1];\n',
+                   'trend_raw[2] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'ar1 .* trend_raw[1] + epsilon[2] + error[2];\n',
+                   'for (i in 3:n) {\n',
+                   '// lagged error ma process\n',
+                   'epsilon[i] = theta * error[i - 1];\n',
+                   '// full ARMA process\n',
+                   'trend_raw[i] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'ar1 .* trend_raw[i - 1] + ',
+                   'ar2 .* trend_raw[i - 2] + ',
+                   'epsilon[i] + error[i];\n',
+                   '}\n')
+        }
+
+      } else {
+        if(trend_model %in% c('AR1', 'RW')){
+          model_file[max(grep('= b_raw[',
+                              model_file, fixed = TRUE))] <-
+            paste0(model_file[max(grep('= b_raw[',
+                                       model_file, fixed = TRUE))],
+                   'for(j in 1:n_series){\n',
+                   'trend[1, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'error[1, j];\n',
+                   'epsilon[1, j] = error[1, j];\n',
+                   'for(i in 2:n){\n',
+                   '// lagged error ma process\n',
+                   'epsilon[i, j] = theta[j] * error[i-1, j];\n',
+                   '// full ARMA process\n',
+                   'trend[i, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   if(trend_model == 'AR1'){ 'ar1[j] * '} else {NULL},
+                   'trend[i - 1, j] + ',
+                   'epsilon[i, j] + error[i, j];\n',
+                   '}\n}')
+        }
+
+        if(trend_model == 'AR2'){
+          model_file[max(grep('= b_raw[',
+                              model_file, fixed = TRUE))] <-
+            paste0(model_file[max(grep('= b_raw[',
+                                       model_file, fixed = TRUE))],
+                   'for(j in 1:n_series){\n',
+                   'trend[1, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'error[1, j];\n',
+                   'epsilon[1, j] = error[1, j];\n',
+                   'epsilon[2, j] = theta[j] * error[1, j];\n',
+                   'trend[2, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'ar1[j] * trend[1, j] + ',
+                   'epsilon[2, j] + error[2, j];\n',
+                   'for(i in 3:n){\n',
+                   '// lagged error ma process\n',
+                   'epsilon[i, j] = theta[j] * error[i-1, j];\n',
+                   '// full ARMA process\n',
+                   'trend[i, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'ar1[j] * trend[i - 1, j] + ',
+                   'ar2[j] * trend[i - 2, j] + ',
+                   'epsilon[i, j] + error[i, j];\n',
+                   '}\n}')
+        }
+      }
+
+      model_file <- readLines(textConnection(model_file), n = -1)
+      if(add_cor){
+        model_file[grep('model {', model_file, fixed = TRUE) - 2] <-
+          paste0(model_file[grep('model {', model_file, fixed = TRUE) - 2],
+                 '\nL_Sigma = diag_pre_multiply(sigma, L_Omega);\n',
+                 'Sigma = multiply_lower_tri_self_transpose(L_Sigma);\n',
+                 'for (i in 1:n) {\n',
+                 'trend[i, 1:n_series] = to_row_vector(trend_raw[i]);\n',
+                 '}')
+      }
+    }
+    model_file <- readLines(textConnection(model_file), n = -1)
+
+    # Update model block
+    if(any(grepl('vector<lower=0>[n_lv] sigma;',
+                 model_file, fixed = TRUE))){
+      start <- grep('LV[1, j] ~ normal',
+                    model_file, fixed = TRUE) - 1
+      end <- grep('LV[i, j] ~ normal',
+                  model_file, fixed = TRUE) + 2
+      model_file <- model_file[-c(start:end)]
+      model_file[start] <- paste0(
+        model_file[start],
+        '\n',
+        '// contemporaneous errors\n',
+        if(add_cor){
+          paste0('L_Omega ~ lkj_corr_cholesky(2);\n',
+                 'for(i in 1:n) {\n',
+                 'error[i] ~ multi_normal_cholesky(trend_zeros, L_Sigma);\n',
+                 '}')
+        } else {
+          paste0('for(i in 1:n) {\n',
+                 'error[i] ~ normal(trend_zeros, sigma);\n',
+                 '}')
+        },
+        '\n// ma coefficients\n',
+        if(add_cor){
+          paste0('for(i in 1:n_lv){\n',
+          'for(j in 1:n_lv){\n',
+          'if (i != j)\n',
+          'theta[i, j] ~ std_normal();\n',
+          '}\n}')
+        } else {
+          'theta ~ std_normal();'
+        })
+    } else {
+      start <- grep('trend[1, 1:n_series] ~ normal(',
+                    model_file, fixed = TRUE) - 1
+      first <- grep(':n, s] ~ normal(', model_file, fixed = TRUE)
+      second <- grep('sigma[s]);', model_file, fixed = TRUE)
+      end <- intersect(first, second) + 1
+
+      model_file <- model_file[-c(start:end)]
+      model_file[start] <- paste0(
+        model_file[start],
+        '\n',
+        '// contemporaneous errors\n',
+        if(add_cor){
+          paste0('L_Omega ~ lkj_corr_cholesky(2);\n',
+                 'for(i in 1:n) {\n',
+                 'error[i] ~ multi_normal_cholesky(trend_zeros, L_Sigma);\n',
+                 '}')
+        } else {
+          paste0('for(i in 1:n) {\n',
+                 'error[i] ~ normal(trend_zeros, sigma);\n',
+                 '}')
+        },
+        '\n// ma coefficients\n',
+        if(add_cor){
+          paste0('for(i in 1:n_series){\n',
+                 'for(j in 1:n_series){\n',
+                 'if (i != j)\n',
+                 'theta[i, j] ~ std_normal();\n',
+                 '}\n}')
+        } else {
+          'theta ~ std_normal();'
+        })
+    }
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
 
   if(trend_model == 'VAR1'){
+    # Only ma can be added for VAR models currently
     # Replace the reverse mapping function with the MA representation
     start <- grep('/* Function to perform the reverse mapping*/',
                   model_file, fixed = TRUE)
@@ -153,7 +566,7 @@ add_MaCor = function(model_file, trend_model = 'VAR1'){
                         '// initial joint stationary VARMA process\n',
                         'vector[2 * n_lv] init;\n',
                         '// ma error parameters\n',
-                        'array[n] vector[n_lv] error;')
+                        'vector[n_lv] error[n];')
     } else {
       model_file[grep('matrix[n_series, n_series] P_real;',
                       model_file, fixed = TRUE)] <- paste0(
@@ -163,7 +576,7 @@ add_MaCor = function(model_file, trend_model = 'VAR1'){
                         '// initial joint stationary VARMA process\n',
                         'vector[2 * n_series] init;\n',
                         '// ma error parameters\n',
-                        'array[n] vector[n_series] error;')
+                        'vector[n_series] error[n];')
     }
 
     # Update transformed parameters
@@ -221,7 +634,7 @@ add_MaCor = function(model_file, trend_model = 'VAR1'){
         'for (i in 2 : n) {\n',
         '// lagged error ma process\n',
         'epsilon[i] = theta * error[i - 1];\n',
-        '// full VARMA proces\n',
+        '// full VARMA process\n',
         'LV[i] = trend_mus[ytimes_trend[i, 1 : n_lv]] + A * (LV[i - 1] - trend_mus[ytimes_trend[i - 1, 1 : n_lv]]) + epsilon[i] + error[i];\n',
         '}\n',
 
@@ -254,7 +667,7 @@ add_MaCor = function(model_file, trend_model = 'VAR1'){
                       model_file, fixed = TRUE)] <- paste0(
                         'cov_matrix[n_series * 2] Omega;\n',
                         '// raw latent trends\n',
-                        'vector[n_series] trend_raw[n];',
+                        'vector[n_series] trend_raw[n];\n',
                         '// trend estimates in matrix-form\n',
                         'matrix[n, n_series] trend;')
 
@@ -289,7 +702,7 @@ add_MaCor = function(model_file, trend_model = 'VAR1'){
         'for (i in 2 : n) {\n',
         '// lagged error ma process\n',
         'epsilon[i] = theta * error[i - 1];\n',
-        '// full VARMA proces\n',
+        '// full VARMA process\n',
         'trend_raw[i] = (A * trend_raw[i - 1]) + epsilon[i] + error[i];\n',
         '}\n',
 

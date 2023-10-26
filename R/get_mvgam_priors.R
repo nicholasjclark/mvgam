@@ -281,8 +281,39 @@ get_mvgam_priors = function(formula,
   family_char <- match.arg(arg = family$family,
                            choices = family_char_choices())
 
-  # Validate the trend argument
-  trend_model <- validate_trend_model(trend_model, drift = drift)
+  # Validate the trend arguments
+  orig_trend_model <- trend_model
+  trend_model <- validate_trend_model(orig_trend_model, drift = drift)
+  use_var1 <- use_var1cor <- add_ma <- add_cor <- FALSE
+  if(grepl('MA', trend_model, fixed = TRUE)){
+    add_ma <- TRUE
+  }
+  if(trend_model == 'VAR1'){
+    use_var1 <- TRUE
+  }
+  if(trend_model == 'VAR1cor'){
+    use_var1cor <- TRUE
+    trend_model <- 'VAR1'
+  }
+  if(trend_model == 'VARMA1,1cor'){
+    use_var1cor <- TRUE
+    trend_model <- 'VAR1'
+  }
+
+  if(use_lv & (add_ma | add_cor) & missing(trend_formula)){
+    stop('Cannot estimate moving averages or correlated errors for dynamic factors',
+         call. = FALSE)
+  }
+
+  if(drift && use_lv){
+    warning('Cannot identify drift terms in latent factor models; setting "drift = FALSE"')
+    drift <- FALSE
+  }
+
+  if(use_lv & trend_model == 'VAR1' & missing(trend_formula)){
+    stop('Cannot identify dynamic factor models that evolve as VAR processes',
+         call. = FALSE)
+  }
 
   # Check trend formula
   if(!missing(trend_formula)){

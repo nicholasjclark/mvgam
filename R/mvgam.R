@@ -731,10 +731,10 @@ mvgam = function(formula,
 
   # Validate the trend arguments
   orig_trend_model <- trend_model
-  trend_model <- validate_trend_model(orig_trend_model)
-  use_var1 <- use_var1cor <- use_ma <- FALSE
+  trend_model <- validate_trend_model(orig_trend_model, drift = drift)
+  use_var1 <- use_var1cor <- add_ma <- add_cor <- FALSE
   if(grepl('MA', trend_model, fixed = TRUE)){
-    use_ma <- TRUE
+    add_ma <- TRUE
   }
   if(trend_model == 'VAR1'){
     use_var1 <- TRUE
@@ -748,19 +748,24 @@ mvgam = function(formula,
     trend_model <- 'VAR1'
   }
 
+  if(use_lv & (add_ma | add_cor) & missing(trend_formula)){
+    stop('Cannot estimate moving averages or correlated errors for dynamic factors',
+         call. = FALSE)
+  }
+
   if(drift && use_lv){
     warning('Cannot identify drift terms in latent factor models; setting "drift = FALSE"')
     drift <- FALSE
   }
 
-  if(use_lv & trend_model == 'VAR1' & missing(trend_map)){
+  if(use_lv & trend_model == 'VAR1' & missing(trend_formula)){
     stop('Cannot identify dynamic factor models that evolve as VAR processes',
          call. = FALSE)
   }
 
   # JAGS cannot support latent GP or VAR trends
   if(!use_stan & trend_model %in% c('GP', 'VAR1')){
-    stop('gaussian process and VAR trends not supported for JAGS',
+    stop('Gaussian Process and VAR trends not supported for JAGS',
          call. = FALSE)
   }
 
@@ -1645,8 +1650,10 @@ mvgam = function(formula,
     }
 
     # Add any correlated error or moving average processes
-    if(use_ma){
+    if(add_ma | add_cor){
       vectorised$model_file <- add_MaCor(vectorised$model_file,
+                                         add_ma = add_ma,
+                                         add_cor = add_cor,
                                          trend_model = trend_model)
     }
 
