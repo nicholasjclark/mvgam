@@ -67,6 +67,7 @@ some features of `mvgam` which specifically rely on certain packages. The most i
 * `AR3` Autoregressive model with AR coefficients for lags 1, 2 and 3 
 * `VAR1` Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated errors 
 * `VAR1cor` Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously correlated (multivariate) errors 
+* `VARMA` Vector Autoregressive model with VAR coefficients for lag 1 and MA coefficients for lag 1; contemporaneously correlated (multivariate) errors 
 * `GP` Squared exponential Gaussian Process 
 * `None` No latent trend is fitted
   

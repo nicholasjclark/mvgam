@@ -118,14 +118,6 @@ update.mvgam = function(object, formula,
 
   if(missing(trend_model)){
     trend_model <- object$trend_model
-
-    if(trend_model == 'VAR1'){
-      if(any(is.na(mcmc_summary(object$model_output, 'Sigma')[,6]))){
-        trend_model <- 'VAR1'
-      } else {
-        trend_model <- 'VAR1cor'
-      }
-    }
   }
 
   if(missing(use_lv)){

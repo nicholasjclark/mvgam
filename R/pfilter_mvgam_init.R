@@ -116,7 +116,7 @@ family <- object$family
 family_pars <- extract_family_pars(object = object)
 
 # Trend model
-trend_model <- object$trend_model
+trend_model <- attr(object$model_data, 'trend_model')
 use_lv <- object$use_lv
 
 # Trend-specific parameters; keep only the last 3 estimates for RW / AR trends

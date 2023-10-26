@@ -123,6 +123,9 @@ the observation process. Available trend models are:
   contemporaneously uncorrelated errors
 - `VAR1cor` Vector Autoregressive model with VAR coefficients for lag 1;
   contemporaneously correlated (multivariate) errors
+- `VARMA` Vector Autoregressive model with VAR coefficients for lag 1
+  and MA coefficients for lag 1; contemporaneously correlated
+  (multivariate) errors
 - `GP` Squared exponential Gaussian Process
 - `None` No latent trend is fitted
 
@@ -143,14 +146,11 @@ well as its estimated autocorrelation function
 ``` r
 library(mvgam)
 #> Loading required package: mgcv
-#> Warning: package 'mgcv' was built under R version 4.2.2
 #> Loading required package: nlme
-#> This is mgcv 1.8-41. For overview type 'help("mgcv-package")'.
+#> This is mgcv 1.8-42. For overview type 'help("mgcv-package")'.
 #> Loading required package: Rcpp
-#> Warning: package 'Rcpp' was built under R version 4.2.3
 #> Loading required package: brms
-#> Warning: package 'brms' was built under R version 4.2.3
-#> Loading 'brms' package (version 2.19.0). Useful instructions
+#> Loading 'brms' package (version 2.20.1). Useful instructions
 #> can be found by typing help('brms'). A more detailed introduction
 #> to the package is available through vignette('brms_overview').
 #> 
@@ -162,9 +162,7 @@ library(mvgam)
 #> 
 #>     ar
 #> Loading required package: marginaleffects
-#> Warning: package 'marginaleffects' was built under R version 4.2.3
 #> Loading required package: insight
-#> Warning: package 'insight' was built under R version 4.2.3
 #> Welcome to mvgam. Please cite as: Clark, NJ, and Wells, K. 2022. Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. Methods in Ecology and Evolution, 2022, https://doi.org/10.1111/2041-210X.13974
 data(lynx)
 lynx_full = data.frame(year = 1821:1934, 
@@ -350,11 +348,11 @@ test_priors
 #> 6                    trend sd         sigma ~ student_t(3, 0, 2.5);
 #>                example_change new_lowerbound new_upperbound
 #> 1 (Intercept) ~ normal(0, 1);             NA             NA
-#> 2 lambda ~ exponential(0.01);             NA             NA
-#> 3  ar1 ~ normal(-0.57, 0.15);             NA             NA
-#> 4  ar2 ~ normal(-0.11, 0.26);             NA             NA
-#> 5   ar3 ~ normal(0.15, 0.54);             NA             NA
-#> 6  sigma ~ exponential(0.26);             NA             NA
+#> 2 lambda ~ exponential(0.13);             NA             NA
+#> 3   ar1 ~ normal(0.71, 0.27);             NA             NA
+#> 4  ar2 ~ normal(-0.79, 0.81);             NA             NA
+#> 5  ar3 ~ normal(-0.25, 0.19);             NA             NA
+#> 6  sigma ~ exponential(0.55);             NA             NA
 ```
 
 Any of the above priors can be changed by modifying the `prior` column
@@ -567,29 +565,29 @@ summary(lynx_mvgam)
 #> Fitted using Stan 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                2.5%    50%  97.5% Rhat n.eff
-#> (Intercept)   6.000  6.600 7.0000 1.01   335
-#> s(season).1  -0.640  0.039 0.7100 1.01  1010
-#> s(season).2  -0.230  0.840 1.9000 1.01   425
-#> s(season).3  -0.085  1.200 2.5000 1.01   379
-#> s(season).4  -0.510  0.420 1.4000 1.00   988
-#> s(season).5  -1.200 -0.160 0.9300 1.01   556
-#> s(season).6  -1.100 -0.013 1.1000 1.00   742
-#> s(season).7  -0.710  0.390 1.4000 1.01   746
-#> s(season).8  -1.000  0.290 1.8000 1.02   417
-#> s(season).9  -1.200 -0.280 0.7500 1.01   528
-#> s(season).10 -1.400 -0.700 0.0094 1.00   509
+#>                 2.5%    50%   97.5% Rhat n.eff
+#> (Intercept)   6.1000  6.600 7.00000 1.01   433
+#> s(season).1  -0.6000  0.046 0.71000 1.00  1023
+#> s(season).2  -0.2200  0.830 1.80000 1.00   516
+#> s(season).3   0.0029  1.200 2.50000 1.01   444
+#> s(season).4  -0.5200  0.420 1.40000 1.01  1026
+#> s(season).5  -1.2000 -0.130 0.92000 1.00   722
+#> s(season).6  -1.1000  0.014 1.00000 1.00   706
+#> s(season).7  -0.7400  0.340 1.40000 1.01   718
+#> s(season).8  -1.0000  0.230 1.80000 1.01   436
+#> s(season).9  -1.2000 -0.300 0.72000 1.01   512
+#> s(season).10 -1.4000 -0.680 0.00042 1.00   743
 #> 
 #> Approximate significance of GAM observation smooths:
 #>            edf Chi.sq p-value
-#> s(season) 3.83  19619    0.25
+#> s(season) 4.06  19919    0.23
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n.eff
-#> ar1[1]    0.74  1.10 1.400    1   625
-#> ar2[1]   -0.83 -0.40 0.038    1  1352
-#> ar3[1]   -0.48 -0.12 0.300    1   582
-#> sigma[1]  0.40  0.50 0.640    1  1107
+#> ar1[1]    0.74  1.10 1.400    1   756
+#> ar2[1]   -0.82 -0.40 0.077    1  1233
+#> ar3[1]   -0.50 -0.12 0.320    1   585
+#> sigma[1]  0.40  0.50 0.640    1  1240
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -699,7 +697,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-31-1.png" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample CRPS:
-    #> [1] 2803.262
+    #> [1] 2829.479
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -869,9 +867,9 @@ Total ELPDs per model are also a useful overall indicator of performance
 
 ``` r
 lfo_good$sum_ELPD
-#> [1] -133.313
+#> [1] -137.2266
 lfo_poor$sum_ELPD
-#> [1] -159.504
+#> [1] -162.8121
 ```
 
 As before, these metrics all favour the more complex model over the
@@ -960,36 +958,36 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Observation precision parameter estimates:
 #>        2.5% 50% 97.5% Rhat n.eff
-#> phi[1]  5.5 8.2    12    1  1671
-#> phi[2]  5.8 8.7    13    1  1613
-#> phi[3]  5.6 8.5    12    1  1970
+#> phi[1]  5.5 8.3    12    1  1756
+#> phi[2]  5.8 8.7    13    1  1625
+#> phi[3]  5.5 8.4    12    1  2102
 #> 
 #> GAM coefficient (beta) estimates:
 #>              2.5%  50% 97.5% Rhat n.eff
-#> (Intercept) -0.22 0.17  0.44 1.01   850
+#> (Intercept) -0.15 0.19  0.45    1  1090
 #> 
 #> Approximate significance of GAM observation smooths:
 #>                           edf Chi.sq p-value    
-#> s(season)                5.00  16.47 1.4e-05 ***
-#> s(season):seriesseries_1 3.83   0.13    0.97    
-#> s(season):seriesseries_2 3.72   0.08    0.99    
-#> s(season):seriesseries_3 3.78   0.88    0.59    
+#> s(season)                4.99  19.04 4.1e-06 ***
+#> s(season):seriesseries_1 3.20   0.14    0.98    
+#> s(season):seriesseries_2 3.45   0.12    0.98    
+#> s(season):seriesseries_3 3.83   0.91    0.55    
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
 #>              2.5%  50% 97.5% Rhat n.eff
-#> alpha_gp[1] 0.038 0.41  0.92 1.01   467
-#> alpha_gp[2] 0.370 0.70  1.20 1.00  1151
-#> alpha_gp[3] 0.180 0.48  0.97 1.00  1087
-#> rho_gp[1]   1.200 3.90 16.00 1.01   343
-#> rho_gp[2]   1.700 7.20 32.00 1.01   418
-#> rho_gp[3]   1.400 4.70 22.00 1.01   790
+#> alpha_gp[1] 0.055 0.42  0.90 1.00   721
+#> alpha_gp[2] 0.380 0.72  1.30 1.00  1299
+#> alpha_gp[3] 0.130 0.46  0.94 1.00   517
+#> rho_gp[1]   1.100 3.80 14.00 1.00  1099
+#> rho_gp[2]   1.800 7.20 33.00 1.01   459
+#> rho_gp[3]   1.400 4.90 21.00 1.00   759
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
-#> 12 of 2000 iterations ended with a divergence (0.6%)
+#> 7 of 2000 iterations ended with a divergence (0.35%)
 #> *Try running with larger adapt_delta to remove the divergences
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
@@ -1005,11 +1003,11 @@ for(i in 1:3){
 ```
 
     #> Out of sample CRPS:
-    #> [1] 2.122713
+    #> [1] 2.085648
     #> Out of sample CRPS:
-    #> [1] 1.843574
+    #> [1] 1.819833
     #> Out of sample CRPS:
-    #> [1] 1.777715
+    #> [1] 1.746567
 
 <img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />
 

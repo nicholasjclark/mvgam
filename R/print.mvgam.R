@@ -32,7 +32,7 @@ cat(paste0(family_links(object$family), '\n'))
 
 
 cat("Trend model:\n")
-cat(paste0(object$trend_model, '\n'))
+print(object$trend_model)
 
 
 if(object$use_lv){
@@ -98,8 +98,12 @@ print.mvgam_prefit = function(x, ...){
   cat(paste0(family_links(object$family), '\n'))
 
 
-  cat("Trend model:\n")
-  cat(paste0(object$trend_model, '\n'))
+  cat("\nTrend model:\n")
+  if(inherits(object$trend_model, 'mvgam_trend')){
+    print(object$trend_model$label)
+  } else {
+    cat(paste0(object$trend_model, '\n'))
+  }
 
 
   if(object$use_lv){

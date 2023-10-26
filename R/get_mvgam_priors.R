@@ -291,7 +291,8 @@ get_mvgam_priors = function(formula,
                               trend = 1:length(unique(data_train$series)))
     }
 
-    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'VAR1', 'VAR1cor')){
+    if(!trend_model %in% c('RW', 'AR1', 'AR2',
+                           'VAR1', 'VAR1cor', 'VARMA1,1cor')){
       stop('only RW, AR1, AR2 and VAR trends currently supported for trend predictor models',
            call. = FALSE)
     }
@@ -305,7 +306,7 @@ get_mvgam_priors = function(formula,
     # If trend_map correctly specified, set use_lv to TRUE for
     # most models (but not yet for VAR models, which require additional
     # modifications)
-    if(trend_model == 'VAR1'){
+    if(trend_model %in% c('VAR1', 'VAR1cor', 'VARMA1,1cor')){
       use_lv <- FALSE
     } else {
       use_lv <- TRUE
@@ -438,13 +439,14 @@ get_mvgam_priors = function(formula,
   } else {
 
     # JAGS cannot support latent GP or VAR trends
-    if(!use_stan & trend_model %in%c ('GP', 'VAR1', 'VAR1cor')){
-      warning('gaussian process and VAR trends not yet supported for JAGS; reverting to Stan')
+    if(!use_stan & trend_model %in%c ('GP', 'VAR1',
+                                      'VAR1cor', 'VARMA1,1cor')){
+      warning('gaussian process and VAR trends not supported for JAGS; reverting to Stan')
       use_stan <- TRUE
     }
 
     if(use_stan & family_char == 'tweedie'){
-      warning('Tweedie family not yet supported for stan; reverting to JAGS')
+      warning('Tweedie family not supported for Stan; reverting to JAGS')
       use_stan <- FALSE
     }
 
@@ -872,7 +874,7 @@ get_mvgam_priors = function(formula,
                                                       "hs[2] = 0.1;")))
     }
 
-    if(trend_model == 'VAR1cor'){
+    if(trend_model %in% c('VAR1cor', 'VARMA1,1cor')){
       trend_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma;'),
                              param_length = c(length(unique(data_train$series))),
                              param_info = c('trend sd'),

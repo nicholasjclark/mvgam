@@ -124,13 +124,33 @@ validate_family_resrictions = function(response, family){
 
 #'@noRd
 validate_trend_model = function(trend_model, drift = FALSE){
+  if(inherits(trend_model, 'mvgam_trend')){
+    ma_term <- if(trend_model$ma){ 'MA' } else { NULL }
+    cor_term <- if(trend_model$cor){ 'cor' } else { NULL }
+    trend_model <- paste0(trend_model$trend_model,
+                          trend_model$p,
+                          ma_term,
+                          cor_term)
+  }
+
   trend_model <- match.arg(arg = trend_model,
                            choices = trend_model_choices())
 
-  if(trend_model %in% c('VAR1','VAR1cor','GP') & drift){
+  if(trend_model == 'VAR'){
+    trend_model <- 'VAR1'
+  }
+  if(trend_model == 'VARcor'){
+    trend_model <- 'VAR1cor'
+  }
+  if(trend_model %in% c('VARMA', 'VARMAcor')){
+    trend_model <- 'VARMA1,1cor'
+  }
+
+  if(trend_model %in% c('VAR','VAR1','VAR1cor','VARMA1,1cor','GP') & drift){
     stop('drift terms not allowed for VAR or GP models',
          call. = FALSE)
   }
+
   return(trend_model)
 }
 

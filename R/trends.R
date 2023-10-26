@@ -9,6 +9,7 @@
 #'   \item \code{AR3} Autoregressive model with AR coefficients for lags 1, 2 and 3
 #'   \item \code{VAR1} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated process errors
 #'   \item \code{VAR1cor} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously correlated process errors
+#'   \item \code{VARMA} Vector Autoregressive model with VAR coefficients for lag 1 and MA coefficients for lag 1; contemporaneously correlated process errors
 #'   \item \code{GP} Squared exponential Gaussian Process
 #'   \item \code{None} No latent trend is fitted
 #'   }
@@ -33,13 +34,31 @@ NULL
 #### Generic trend information ####
 #' @noRd
 trend_model_choices = function(){
+  # Will make the commented out versions available soon
   c("RW",
+    # "RWMA",
+    # "RWcor",
+    # "RWMAcor",
     "GP",
     'AR1',
+    # 'AR1MA',
+    # 'AR1cor',
+    # 'AR1MAcor',
     'AR2',
+    # 'AR2MA',
+    # 'AR2cor',
+    # 'AR2MAcor',
     'AR3',
+    # 'AR3MA',
+    # 'AR3cor',
+    # 'AR3MAcor',
+    'VAR',
+    'VARcor',
     'VAR1',
     'VAR1cor',
+    'VARMA',
+    'VARMAcor',
+    'VARMA1,1cor',
     'None')
 }
 
@@ -499,7 +518,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
                               ending_time = NULL){
 
   # Get names of parameters to extract
-  pars_to_extract <- trend_par_names(trend_model = object$trend_model,
+  pars_to_extract <- trend_par_names(trend_model = attr(object$model_data, 'trend_model'),
                                      trend_map = object$trend_map,
                                      use_lv = object$use_lv,
                                      drift = object$drift)
@@ -531,7 +550,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
 
   # Latent trend loadings for dynamic factor models
   if(object$use_lv){
-    if(object$trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+    if(attr(object$model_data, 'trend_model') %in% c('RW', 'AR1', 'AR2', 'AR3')){
       # Just due to legacy reasons from working in JAGS, the simulation
       # functions use precision (tau) rather than SD (sigma)
       out$tau <- mcmc_chains(object$model_output, 'penalty')
@@ -553,7 +572,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
     })
 
   } else {
-    if(object$trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+    if(attr(object$model_data, 'trend_model') %in% c('RW', 'AR1', 'AR2', 'AR3')){
       out$sigma <- NULL
     }
   }
@@ -582,7 +601,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
               NROW()
           }
 
-          if(object$trend_model == 'GP'){
+          if(attr(object$model_data, 'trend_model') == 'GP'){
             if(!is.null(ending_time)){
               lv_estimates <- lv_estimates[, 1:ending_time]
             } else {
@@ -638,7 +657,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
     }
 
     if(!object$use_lv){
-      if(object$trend_model != 'None'){
+      if(attr(object$model_data, 'trend_model') != 'None'){
         out$last_trends <- lapply(seq_along(levels(object$obs_data$series)), function(series){
           if(object$fit_engine == 'stan'){
             trend_estimates <- mcmc_chains(object$model_output, 'trend')[,seq(series,
@@ -665,7 +684,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
           trend_estimates <- trend_estimates[,1:end_train]
 
           # Only need last 3 timesteps if this is not a GP trend model
-          if(object$trend_model == 'GP'){
+          if(attr(object$model_data, 'trend_model') == 'GP'){
             if(!is.null(ending_time)){
               trend_estimates <- trend_estimates[,1:ending_time]
             } else {
@@ -686,7 +705,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
 
         out$trend <- NULL
 
-        if(object$trend_model == 'VAR1'){
+        if(attr(object$model_data, 'trend_model') == 'VAR1'){
           # Need to ensure all series' trends are retained when subsampling
           # to produce draw-specific forecasts from VAR models
           out$last_lvs <- out$last_trends
@@ -699,7 +718,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
 
   # Extract centred training times and number of GP basis functions
   # if this is a GP model
-  if(object$trend_model == 'GP'){
+  if(attr(object$model_data, 'trend_model') == 'GP'){
     num_basis_line <- object$model_file[grep('num_gp_basis = ',
                                              object$model_file)]
     out$num_gp_basis <- as.numeric(unlist(regmatches(num_basis_line,
@@ -744,14 +763,14 @@ extract_general_trend_pars = function(samp_index, trend_pars){
   general_trend_pars <- lapply(seq_along(trend_pars), function(x){
 
     if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
-                                   'A', 'Sigma', 'theta', 'b_gp')){
+                                   'A', 'Sigma', 'theta', 'b_gp', 'error')){
 
       if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
                                      'b_gp')){
         out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
       }
 
-      if(names(trend_pars)[x] %in% c('A', 'Sigma', 'theta')){
+      if(names(trend_pars)[x] %in% c('A', 'Sigma', 'theta', 'error')){
         out <- unname(trend_pars[[x]][samp_index, ])
       }
 
@@ -779,7 +798,7 @@ extract_series_trend_pars = function(series, samp_index, trend_pars,
   trend_extracts <- lapply(seq_along(trend_pars), function(x){
 
     if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
-                                   'A', 'Sigma', 'theta', 'b_gp')){
+                                   'A', 'Sigma', 'theta', 'b_gp', 'error')){
 
       if(!use_lv & names(trend_pars)[x] == 'b_gp'){
         out <- trend_pars[[x]][[series]][samp_index, ]
@@ -797,7 +816,7 @@ extract_series_trend_pars = function(series, samp_index, trend_pars,
         out <- lapply(trend_pars[[x]], `[`, samp_index, )
       }
 
-      if(names(trend_pars)[x] %in% c('A', 'Sigma', 'theta')){
+      if(names(trend_pars)[x] %in% c('A', 'Sigma', 'theta', 'error')){
         out <- trend_pars[[x]][samp_index, ]
       }
 
@@ -934,13 +953,31 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                          byrow = TRUE)
 
       # Reconstruct the last trend matrix
-      last_trendvec <- do.call(cbind,(lapply(trend_pars$last_lvs,
+      last_trendmat <- do.call(cbind,(lapply(trend_pars$last_lvs,
                                              function(x) tail(x, 3))))
+
+      # If this is a moving average model, reconstruct theta matrix and
+      # last error matrix
+      if('theta' %in% names(trend_pars)){
+        thetamat <- matrix(trend_pars$theta,
+                           nrow = length(trend_pars$last_lvs),
+                           ncol = length(trend_pars$last_lvs),
+                           byrow = TRUE)
+        errormat <- rbind(rep(0, length(trend_pars$last_lvs)),
+                          rep(0, length(trend_pars$last_lvs)),
+                          tail(trend_pars$error, length(trend_pars$last_lvs)))
+
+      } else {
+        thetamat <- rlang::missing_arg()
+        errormat <- rlang::missing_arg()
+      }
 
       # Prep VARMA parameters
       varma_params <- prep_varma_params(A = Amat,
                                         Sigma = Sigmamat,
-                                        last_trends = last_trendvec,
+                                        last_trends = last_trendmat,
+                                        last_errors = errormat,
+                                        theta = thetamat,
                                         Xp_trend = Xp_trend,
                                         betas_trend = betas_trend,
                                         h = h)
@@ -1061,13 +1098,31 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                          byrow = TRUE)
 
       # Reconstruct the last trend matrix
-      last_trendvec <- do.call(cbind, (lapply(trend_pars$last_lvs,
+      last_trendmat <- do.call(cbind, (lapply(trend_pars$last_lvs,
                                               function(x) tail(x, 3))))
+
+      # If this is a moving average model, reconstruct theta matrix and
+      # last error matrix
+      if('theta' %in% names(trend_pars)){
+        thetamat <- matrix(trend_pars$theta,
+                           nrow = length(trend_pars$last_lvs),
+                           ncol = length(trend_pars$last_lvs),
+                           byrow = TRUE)
+        errormat <- rbind(rep(0, length(trend_pars$last_lvs)),
+                          rep(0, length(trend_pars$last_lvs)),
+                          tail(trend_pars$error, length(trend_pars$last_lvs)))
+
+      } else {
+        thetamat <- rlang::missing_arg()
+        errormat <- rlang::missing_arg()
+      }
 
       # Prep VARMA parameters
       varma_params <- prep_varma_params(A = Amat,
                                         Sigma = Sigmamat,
-                                        last_trends = last_trendvec,
+                                        last_trends = last_trendmat,
+                                        last_errors = errormat,
+                                        theta = thetamat,
                                         Xp_trend = Xp_trend,
                                         betas_trend = betas_trend,
                                         h = h)
