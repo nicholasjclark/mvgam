@@ -727,16 +727,23 @@ mvgam = function(formula,
 
   # Validate the family argument
   family <- validate_family(family)
-  family_char <- match.arg(arg = family$family,
-                           choices = family_char_choices())
+  family_char <- match.arg(arg = family$family, choices = family_char_choices())
 
   # Validate the trend arguments
-  trend_model <- validate_trend_model(trend_model)
-  use_var1 <- FALSE; use_var1cor <- FALSE
+  orig_trend_model <- trend_model
+  trend_model <- validate_trend_model(orig_trend_model)
+  use_var1 <- use_var1cor <- use_ma <- FALSE
+  if(grepl('MA', trend_model, fixed = TRUE)){
+    use_ma <- TRUE
+  }
   if(trend_model == 'VAR1'){
     use_var1 <- TRUE
   }
   if(trend_model == 'VAR1cor'){
+    use_var1cor <- TRUE
+    trend_model <- 'VAR1'
+  }
+  if(trend_model == 'VARMA1,1cor'){
     use_var1cor <- TRUE
     trend_model <- 'VAR1'
   }
@@ -819,34 +826,11 @@ mvgam = function(formula,
     warning('No point in latent variables if trend model is None; changing use_lv to FALSE')
   }
 
-  # If there are missing values in y, use predictions from an initial mgcv model to fill
-  # these in so that initial values to maintain the true size of the training dataset
-  orig_y <- data_train$y
-
   # Some general family-level restrictions can now be checked
+  orig_y <- data_train$y
   validate_family_resrictions(response = orig_y, family = family)
 
-  # Fill in missing observations in data_train so the size of the dataset is correct when
-  # building the initial JAGS model.
-  replace_nas = function(var){
-    if(all(is.na(var))){
-      # Sampling from uniform[0.1,0.99] will allow all the gam models
-      # to work, even though the Poisson / Negative Binomial will issue
-      # warnings. This is ok as we just need to produce the linear predictor matrix
-      # and store the coefficient names
-      var <- runif(length(var), 0.1, 0.99)
-    } else {
-      # If there are some non-missing observations,
-      # sample from the observed values to ensure
-      # distributional assumptions are met without warnings
-      var[which(is.na(var))] <-
-        sample(var[which(!is.na(var))],
-               length(which(is.na(var))),
-               replace = TRUE)
-    }
-    var
-  }
-
+  # Replace any NAs in the response for initial setup
   data_train[[terms(formula(formula))[[2]]]] <-
     replace_nas(data_train[[terms(formula(formula))[[2]]]])
 
@@ -868,11 +852,10 @@ mvgam = function(formula,
   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the Bayesian model later on;
   ss_gam <- try(mvgam_setup(formula = formula,
-                        knots = knots,
-                        family = family_to_mgcvfam(family),
-                        data = data_train,
-                        drop.unused.levels = FALSE,
-                        maxit = 5))
+                            knots = knots,
+                            family = family_to_mgcvfam(family),
+                            data = data_train),
+                silent = TRUE)
   if(inherits(ss_gam, 'try-error')){
     if(grepl('missing values', ss_gam[1])){
       stop(paste('Missing values found in data predictors:\n',
@@ -998,11 +981,6 @@ mvgam = function(formula,
                                                                base_model) + 1], perl = T))[[1]][1]
     n_terms <- as.numeric(sub(".*:", "", in_parenth))
     ss_jagam$jags.data$p_coefs <- coef(ss_gam)[1:n_terms]
-
-    rmvn <- function(n,mu,sig) {
-      L <- mgcv::mroot(sig); m <- ncol(L);
-      t(mu + L%*%matrix(rnorm(m*n),m,n))
-    }
 
     # Use the initialised GAM's estimates for parametric effects, but widen them
     # substantially to allow for better exploration of possible alternative model
@@ -1249,8 +1227,7 @@ mvgam = function(formula,
   }
 
   # Arrange by time then by series
-  X %>%
-    dplyr::arrange(time, series) -> X
+  X %>% dplyr::arrange(time, series) -> X
 
   # Matrix of indices in X that correspond to timepoints for each series
   ytimes <- matrix(NA, nrow = length(unique(X$time)),
@@ -1505,7 +1482,7 @@ mvgam = function(formula,
       param <- c(param, 'mu_raw', 'sigma_raw')
     }
 
-    # Sensible inits needed for the betas, sigmas and overdispersion parameters
+    # Sensible inits needed for the betas
     inits <- family_inits(family = family_char, trend_model,
                           smooths_included, model_data)
 
@@ -1667,6 +1644,12 @@ mvgam = function(formula,
       priors <- NULL
     }
 
+    # Add any correlated error or moving average processes
+    if(use_ma){
+      vectorised$model_file <- add_MaCor(vectorised$model_file,
+                                         trend_model = trend_model)
+    }
+
     # Tidy the representation
     vectorised$model_file <- sanitise_modelfile(vectorised$model_file)
 
@@ -1690,7 +1673,8 @@ mvgam = function(formula,
           vectorised$model_file <- .autoformat(tmp_file,
                                                overwrite_file = FALSE)
         }
-        vectorised$model_file <- readLines(textConnection(vectorised$model_file), n = -1)
+        vectorised$model_file <- readLines(textConnection(vectorised$model_file),
+                                           n = -1)
       }
 
       } else {
@@ -1702,10 +1686,12 @@ mvgam = function(formula,
                'int ypred[n, n_series];',
                vectorised$model_file, fixed = TRUE)
       }
-    }
+      }
+    attr(vectorised$model_data, 'trend_model') <- trend_model
 
   } else {
     # Set up data and model file for JAGS
+    attr(ss_jagam$jags.data, 'trend_model') <- trend_model
     trend_sp_names <- NA
     if(!smooths_included){
       inits <- NULL
@@ -1757,7 +1743,7 @@ mvgam = function(formula,
                                  NULL
                                },
                                family = family_char,
-                               trend_model = trend_model,
+                               trend_model = orig_trend_model,
                                trend_map = if(!missing(trend_map)){
                                  trend_map
                                } else {
@@ -2142,6 +2128,11 @@ mvgam = function(formula,
   } else {
     object = list(
       model_output = out_gam_mod,
+      model_data = if(use_stan){
+        vectorised$model_data
+      } else {
+        ss_jagam$jags.data
+      },
       fit_engine = fit_engine,
       family = family_char,
       obs_data = data_train,
@@ -2178,6 +2169,11 @@ mvgam = function(formula,
     # Compute estimated degrees of freedom for smooths
     object = list(
       model_output = out_gam_mod,
+      model_data = if(use_stan){
+        vectorised$model_data
+      } else {
+        ss_jagam$jags.data
+      },
       fit_engine = fit_engine,
       family = family_char,
       obs_data = data_train,
@@ -2210,6 +2206,8 @@ mvgam = function(formula,
   }
 
   #### Return the output as class mvgam ####
+  trim_data <- list()
+  attr(trim_data, 'trend_model') <- trend_model
   output <- structure(list(call = orig_formula,
                            trend_call = if(!missing(trend_formula)){
                              trend_formula
@@ -2217,7 +2215,7 @@ mvgam = function(formula,
                              NULL
                            },
                            family = family_char,
-                           trend_model = trend_model,
+                           trend_model = orig_trend_model,
                            trend_map = if(!missing(trend_map)){
                              trend_map
                            } else {
@@ -2234,7 +2232,7 @@ mvgam = function(formula,
                            model_data = if(return_model_data){
                              model_data
                            } else {
-                             NULL
+                             trim_data
                            },
                            inits = if(return_model_data){
                              inits

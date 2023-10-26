@@ -378,7 +378,7 @@ validate_variables = function(x, variable, regex = FALSE){
   }
 
   if(variable[1] == 'trend_params'){
-    to_extract <- trend_par_names(x$trend_model,
+    to_extract <- trend_par_names(attr(x$model_data, 'trend_model'),
                                   x$use_lv,
                                   x$drift)
 

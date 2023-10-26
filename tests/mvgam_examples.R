@@ -1,5 +1,6 @@
 # Small mvgam examples for testing post-fitting functions such as
 # predict, forecast, hindcast etc...
+library(mvgam)
 set.seed(1234)
 mvgam_examp_dat <- sim_mvgam(family = gaussian(),
                     T = 50)

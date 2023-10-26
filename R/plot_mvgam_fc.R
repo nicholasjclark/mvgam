@@ -195,7 +195,7 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
   if(dim(preds)[2] != length(all_obs)){
     s_name <- levels(object$obs_data$series)[series]
 
-    if(object$trend_model == 'None'){
+    if(attr(object$model_data, 'trend_model') == 'None'){
 
       if(class(object$obs_data)[1] == 'list'){
         series_obs <- which(data_test$series == s_name)

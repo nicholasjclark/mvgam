@@ -49,7 +49,12 @@ cat("\nLink function:\n")
 cat(paste0(family_links(object$family), '\n'))
 
 cat("\nTrend model:\n")
-cat(paste0(object$trend_model, '\n'))
+if(inherits(object$trend_model, 'mvgam_trend')){
+  print(object$trend_model$label)
+} else {
+  cat(paste0(object$trend_model, '\n'))
+}
+
 
 if(object$use_lv){
   if(!is.null(object$trend_call)){
@@ -272,8 +277,8 @@ if(any(!is.na(object$sp_names))){
 }
 
 if(object$use_lv){
-  if(object$trend_model != 'None'){
-    if(object$trend_model == 'RW'){
+  if(attr(object$model_data, 'trend_model') != 'None'){
+    if(attr(object$model_data, 'trend_model') == 'RW'){
       if(object$drift){
         if(!is.null(object$trend_call)){
           cat("\nProcess model drift estimates:\n")
@@ -293,14 +298,14 @@ if(object$use_lv){
       }
     }
 
-    if(object$trend_model == 'GP'){
+    if(attr(object$model_data, 'trend_model') == 'GP'){
       cat("\nLatent trend length scale (rho) estimates:\n")
       print(mcmc_summary(object$model_output, c('rho_gp'),
                          digits = digits,
                          variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
     }
 
-    if(object$trend_model == 'AR1'){
+    if(attr(object$model_data, 'trend_model') == 'AR1'){
       if(object$drift){
         if(!is.null(object$trend_call)){
           cat("\nProcess model drift and AR parameter estimates:\n")
@@ -338,7 +343,7 @@ if(object$use_lv){
       }
     }
 
-    if(object$trend_model == 'AR2'){
+    if(attr(object$model_data, 'trend_model') == 'AR2'){
       if(object$drift){
         if(!is.null(object$trend_call)){
           cat("\nProcess model drift and AR parameter estimates:\n")
@@ -380,7 +385,7 @@ if(object$use_lv){
       }
     }
 
-    if(object$trend_model == 'AR3'){
+    if(attr(object$model_data, 'trend_model') == 'AR3'){
       if(object$drift){
         if(!is.null(object$trend_call)){
           cat("\nProcess model drift and AR parameter estimates:\n")
@@ -422,7 +427,7 @@ if(object$use_lv){
       }
     }
 
-    if(object$trend_model == 'VAR1'){
+    if(attr(object$model_data, 'trend_model') == 'VAR1'){
       if(object$drift){
         if(!is.null(object$trend_call)){
           cat("\nProcess model drift and VAR parameter estimates:\n")
@@ -457,9 +462,9 @@ if(object$use_lv){
 
       if(!is.null(object$trend_call)){
         cat("\nProcess error parameter estimates:\n")
-        print(mcmc_summary(object$model_output, c('Sigma'),
-                           digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+        print(suppressWarnings(mcmc_summary(object$model_output, c('Sigma', 'theta'),
+                                            digits = digits,
+                                            variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       }
     }
@@ -467,8 +472,8 @@ if(object$use_lv){
 }
 
 if(!object$use_lv){
-  if(object$trend_model != 'None'){
-    if(object$trend_model == 'RW'){
+  if(attr(object$model_data, 'trend_model') != 'None'){
+    if(attr(object$model_data, 'trend_model') == 'RW'){
       if(object$drift){
         cat("\nLatent trend drift and sigma estimates:\n")
         print(mcmc_summary(object$model_output, c('drift', 'sigma'),
@@ -484,23 +489,23 @@ if(!object$use_lv){
       }
     }
 
-    if(object$trend_model == 'VAR1'){
+    if(attr(object$model_data, 'trend_model') == 'VAR1'){
       if(object$drift){
         cat("\nLatent trend drift and VAR parameter estimates:\n")
-        print(mcmc_summary(object$model_output, c('drift', 'A', 'Sigma'),
-                           digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+        print(suppressWarnings(mcmc_summary(object$model_output, c('drift', 'A', 'Sigma', 'theta'),
+                                            digits = digits,
+                                            variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       } else {
         cat("\nLatent trend VAR parameter estimates:\n")
-        print(mcmc_summary(object$model_output, c('A', 'Sigma'),
-                           digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+        print(suppressWarnings(mcmc_summary(object$model_output, c('A', 'Sigma', 'theta'),
+                                            digits = digits,
+                                            variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       }
     }
 
-    if(object$trend_model == 'AR1'){
+    if(attr(object$model_data, 'trend_model') == 'AR1'){
       if(object$drift){
         cat("\nLatent trend drift and AR parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('drift', 'ar1', 'sigma'),
@@ -516,7 +521,7 @@ if(!object$use_lv){
       }
     }
 
-    if(object$trend_model == 'AR2'){
+    if(attr(object$model_data, 'trend_model') == 'AR2'){
       if(object$drift){
         cat("\nLatent trend drift and AR parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'sigma'),
@@ -532,7 +537,7 @@ if(!object$use_lv){
       }
     }
 
-    if(object$trend_model == 'AR3'){
+    if(attr(object$model_data, 'trend_model') == 'AR3'){
       if(object$drift){
         cat("\nLatent trend drift and AR parameter estimates:\n")
         print(mcmc_summary(object$model_output, c('drift', 'ar1',
@@ -550,7 +555,7 @@ if(!object$use_lv){
       }
     }
 
-    if(object$trend_model == 'GP'){
+    if(attr(object$model_data, 'trend_model') == 'GP'){
         cat("\nLatent trend marginal deviation (alpha) and length scale (rho) estimates:\n")
         print(mcmc_summary(object$model_output, c('alpha_gp', 'rho_gp'),
                            digits = digits,
@@ -714,7 +719,11 @@ summary.mvgam_prefit = function(object, ...){
 
 
   cat("\nTrend model:\n")
-  cat(paste0(object$trend_model, '\n'))
+  if(inherits(object$trend_model, 'mvgam_trend')){
+    print(object$trend_model$label)
+  } else {
+    cat(paste0(object$trend_model, '\n'))
+  }
 
 
   if(object$use_lv){

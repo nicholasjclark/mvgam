@@ -145,7 +145,7 @@ eval_mvgam = function(object,
     stop('argument "object" must be of class "mvgam"')
   }
 
-  if(object$trend_model == 'None'){
+  if(attr(object$model_data, 'trend_model') == 'None'){
     stop('cannot compute rolling forecasts for mvgams that have no trend model',
          call. = FALSE)
   }
@@ -329,7 +329,7 @@ roll_eval_mvgam = function(object,
     stop('argument "object" must be of class "mvgam"')
   }
 
-  if(object$trend_model == 'None'){
+  if(attr(object$model_data, 'trend_model') == 'None'){
     stop('cannot compute rolling forecasts for mvgams that have no trend model',
          call. = FALSE)
   }
@@ -510,12 +510,12 @@ compare_mvgams = function(model1,
     stop('argument "model2" must be of class "mvgam"')
   }
 
-  if(model2$trend_model == 'None'){
+  if(model2$model_data$trend_model == 'None'){
     stop('cannot compare rolling forecasts for mvgams that have no trend model',
          call. = FALSE)
   }
 
-  if(model1$trend_model == 'None'){
+  if(model1$model_data$trend_model == 'None'){
     stop('cannot compare rolling forecasts for mvgams that have no trend model',
          call. = FALSE)
   }

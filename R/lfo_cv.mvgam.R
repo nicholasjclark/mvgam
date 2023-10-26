@@ -329,7 +329,7 @@ plot.mvgam_lfo = function(x, ...){
 summarize_posterior = function(object){
 
   # Extract the trend model
-  trend_model <- object$trend_model
+  trend_model <- attr(object$model_data, 'trend_model')
   if(trend_model == 'VAR1'){
     trend_model <- 'VAR1cor'
   }

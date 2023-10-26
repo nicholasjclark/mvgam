@@ -19,19 +19,22 @@ gaus_data <- sim_mvgam(family = gaussian(),
                        prop_missing = 0.2)
 gaus_ar1 <- mvgam(y ~ s(series, bs = 're') +
                     s(season, bs = 'cc') - 1,
-                  trend_model = 'AR1',
+                  # use the AR() wrapper here
+                  trend_model = AR(p = 1),
                   data = gaus_data$data_train,
                   family = gaussian(),
                   samples = 300,
                   parallel = FALSE)
 gaus_ar1fc <- mvgam(y ~ s(series, bs = 're') +
                       s(season, bs = 'cc') - 1,
-                  trend_model = 'AR1',
-                  data = gaus_data$data_train,
-                  newdata = gaus_data$data_test,
-                  family = gaussian(),
-                  samples = 300,
-                  parallel = FALSE)
+                    # Use the character string here to ensure
+                    # both versions work
+                    trend_model = 'AR1',
+                    data = gaus_data$data_train,
+                    newdata = gaus_data$data_test,
+                    family = gaussian(),
+                    samples = 300,
+                    parallel = FALSE)
 
 # Simple Beta models, using variational bayes to ensure this works as well
 set.seed(100)

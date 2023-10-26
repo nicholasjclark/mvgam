@@ -543,7 +543,7 @@ forecast_draws = function(object,
     # the process model operates as: AR * (process[t - 1] - mu[t-1]])
     # We therefore need the values of mu at the end of the training set
     # to correctly propagate the process model forward
-    if(use_lv & object$trend_model != 'GP'){
+    if(use_lv & attr(object$model_data, 'trend_model') != 'GP'){
       # Get the observed trend predictor matrix
       Xp_trend_last <- trend_Xp_matrix(newdata = object$obs_data,
                                        trend_map = object$trend_map,
@@ -585,7 +585,7 @@ forecast_draws = function(object,
   }
 
   # No need to compute in parallel if there was no trend model
-  if(object$trend_model == 'None'){
+  if(attr(object$model_data, 'trend_model') == 'None'){
     if(type == 'trend'){
       stop('No trend_model was used in this model',
            call. = FALSE)
@@ -642,7 +642,7 @@ forecast_draws = function(object,
   family_pars <- extract_family_pars(object = object)
 
   # Trend model
-  trend_model <- object$trend_model
+  trend_model <- attr(object$model_data, 'trend_model')
 
   # Trend-specific parameters
   if(missing(ending_time)){

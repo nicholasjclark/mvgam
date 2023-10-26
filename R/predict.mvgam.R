@@ -70,12 +70,12 @@ predict.mvgam = function(object, newdata,
                           mgcv_model = object$trend_mgcv_model)
 
     # Extract process error estimates
-    if(object$trend_model %in% c('RW','AR1','AR2','AR3')){
+    if(attr(object$model_data, 'trend_model') %in% c('RW','AR1','AR2','AR3')){
       family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
                                                   'sigma'))
     }
 
-    if(object$trend_model %in% c('VAR1')){
+    if(attr(object$model_data, 'trend_model') %in% c('VAR1')){
       if(object$use_lv){
         family_pars <- list(sigma_obs =
                               mcmc_chains(object$model_output, 'Sigma')[ ,
@@ -133,7 +133,7 @@ predict.mvgam = function(object, newdata,
                                        betas = 1,
                                        family_pars = family_extracts)
 
-  } else if(object$trend_model != 'None' & process_error){
+  } else if(attr(object$model_data, 'trend_model') != 'None' & process_error){
     # If no linear predictor for the trends but a dynamic trend model was used,
     # and the process_error flag is set to TRUE,
     # simulate from stationary time series to capture uncertainty
@@ -144,7 +144,7 @@ predict.mvgam = function(object, newdata,
 
     # Draw from fixed sigma for latent variable models
     if(object$use_lv & is.null(object$trend_map)){
-      if(object$trend_model != 'GP'){
+      if(attr(object$model_data, 'trend_model') != 'GP'){
         trends <- array(rnorm(n_draws * object$n_lv * NROW(newdata),
                               mean = 0,
                               sd = 0.1),
@@ -170,11 +170,11 @@ predict.mvgam = function(object, newdata,
 
     if(!object$use_lv){
 
-      if(object$trend_model %in% c('RW','AR1','AR2','AR3','VAR1')){
+      if(attr(object$model_data, 'trend_model') %in% c('RW','AR1','AR2','AR3','VAR1')){
         family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
                                                     'sigma'))
       }
-      if(object$trend_model %in% c('GP')){
+      if(attr(object$model_data, 'trend_model') %in% c('GP')){
         family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
                                                     'alpha_gp'))
       }
