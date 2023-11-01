@@ -36,22 +36,22 @@ NULL
 trend_model_choices = function(){
   # Will make the commented out versions available soon
   c("RW",
-    # "RWMA",
-    # "RWcor",
-    # "RWMAcor",
+    "RWMA",
+    "RWcor",
+    "RWMAcor",
     "GP",
     'AR1',
-    # 'AR1MA',
-    # 'AR1cor',
-    # 'AR1MAcor',
+    'AR1MA',
+    'AR1cor',
+    'AR1MAcor',
     'AR2',
-    # 'AR2MA',
-    # 'AR2cor',
-    # 'AR2MAcor',
+    'AR2MA',
+    'AR2cor',
+    'AR2MAcor',
     'AR3',
-    # 'AR3MA',
-    # 'AR3cor',
-    # 'AR3MAcor',
+    'AR3MA',
+    'AR3cor',
+    'AR3MAcor',
     'VAR',
     'VARcor',
     'VAR1',
@@ -60,6 +60,54 @@ trend_model_choices = function(){
     'VARMAcor',
     'VARMA1,1cor',
     'None')
+}
+
+# Additions needed for adding moving average / correlated process errors
+#' @noRd
+ma_cor_additions = function(trend_model){
+  use_var1 <- use_var1cor <- add_ma <- add_cor <- FALSE
+  if(grepl('MA', trend_model, fixed = TRUE)) add_ma <- TRUE
+
+  if(trend_model == 'RWMA') trend_model <- 'RW'
+
+  if(trend_model == 'AR1MA') trend_model <- 'AR1'
+
+  if(trend_model == 'AR2MA') trend_model <- 'AR2'
+
+  if(trend_model == 'AR3MA') trend_model <- 'AR3'
+
+  if(trend_model %in% c('RWcor', 'RWMAcor')){
+    add_cor <- TRUE
+    trend_model <- 'RW'
+  }
+
+  if(trend_model %in% c('AR1cor', 'AR1MAcor')){
+    add_cor <- TRUE
+    trend_model <- 'AR1'
+  }
+
+  if(trend_model %in% c('AR2cor', 'AR2MAcor')){
+    add_cor <- TRUE
+    trend_model <- 'AR2'
+  }
+
+  if(trend_model %in% c('AR3cor', 'AR3MAcor')){
+    add_cor <- TRUE
+    trend_model <- 'AR3'
+  }
+
+  if(trend_model == 'VAR1') use_var1 <- TRUE
+
+  if(trend_model %in% c('VAR1cor', 'VARMA1,1cor')){
+    use_var1cor <- TRUE
+    trend_model <- 'VAR1'
+  }
+
+  return(list(trend_model = trend_model,
+              use_var1 = use_var1,
+              use_var1cor = use_var1cor,
+              add_ma = add_ma,
+              add_cor = add_cor))
 }
 
 #' Squared exponential GP simulation function
@@ -871,7 +919,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
 
         # Prep VARMA parameters
         if('Sigma' %in% names(trend_pars)){
-          Sigma <- trend_pars$sigma
+          Sigma <- trend_pars$Sigma
         } else {
           Sigma <- rlang::missing_arg()
         }
@@ -907,21 +955,6 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                   Xp_trend = varma_params$Xp_trend,
                   betas_trend = varma_params$betas_trend,
                   h = varma_params$h)
-        # sim_ar3(drift = ifelse('drift' %in% names(trend_pars),
-        #                        trend_pars$drift[lv],
-        #                        0),
-        #         ar1 = ar1,
-        #         ar2 = ifelse('ar2' %in% names(trend_pars),
-        #                      trend_pars$ar2[lv],
-        #                      0),
-        #         ar3 = ifelse('ar3' %in% names(trend_pars),
-        #                      trend_pars$ar3[lv],
-        #                      0),
-        #         tau = trend_pars$tau[lv],
-        #         Xp_trend = Xp_trend_sub,
-        #         betas_trend = betas_trend,
-        #         last_trends = tail(trend_pars$last_lvs[[lv]], 3),
-        #         h = h)
       }))
     }
 
@@ -945,12 +978,47 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
 
     if(trend_model == 'VAR1'){
       # Reconstruct the A and Sigma matrices
-      Amat <- matrix(trend_pars$A, nrow = length(trend_pars$last_lvs),
-                     ncol = length(trend_pars$last_lvs),
-                     byrow = TRUE)
-      Sigmamat <- matrix(trend_pars$Sigma, nrow = length(trend_pars$last_lvs),
-                         ncol = length(trend_pars$last_lvs),
-                         byrow = TRUE)
+      if('A' %in% names(trend_pars)){
+        Amat <- matrix(trend_pars$A, nrow = length(trend_pars$last_lvs),
+                       ncol = length(trend_pars$last_lvs),
+                       byrow = TRUE)
+        ar1 <- rlang::missing_arg()
+      } else if('ar1' %in% names(trend_pars)){
+        ar1 <- trend_pars$ar1
+        Amat <- rlang::missing_arg()
+      } else {
+        ar1 <- rep(1, length(trend_pars$last_lvs))
+        Amat <- rlang::missing_arg()
+      }
+
+      if('ar2' %in% names(trend_pars)){
+        ar2 <- trend_pars$ar2
+      } else {
+        ar2 <- rep(0, length(trend_pars$last_lvs))
+      }
+
+      if('ar3' %in% names(trend_pars)){
+        ar3 <- trend_pars$ar3
+      } else {
+        ar3 <- rep(0, length(trend_pars$last_lvs))
+      }
+
+      if('Sigma' %in% names(trend_pars)){
+        Sigmamat <- matrix(trend_pars$Sigma, nrow = length(trend_pars$last_lvs),
+                           ncol = length(trend_pars$last_lvs),
+                           byrow = TRUE)
+      } else if('sigma' %in% names(trend_pars)){
+        Sigmamat <- matrix(0, nrow = length(trend_pars$last_lvs),
+                           ncol = length(trend_pars$last_lvs),
+                           byrow = TRUE)
+        diag(Sigmamat) <- trend_pars$sigma
+      } else {
+        Sigmamat <- matrix(0, nrow = length(trend_pars$last_lvs),
+                           ncol = length(trend_pars$last_lvs),
+                           byrow = TRUE)
+        diag(Sigmamat) <- 1 / trend_pars$tau
+      }
+
 
       # Reconstruct the last trend matrix
       last_trendmat <- do.call(cbind,(lapply(trend_pars$last_lvs,
@@ -974,6 +1042,9 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
 
       # Prep VARMA parameters
       varma_params <- prep_varma_params(A = Amat,
+                                        ar1 = ar1,
+                                        ar2 = ar2,
+                                        ar3 = ar3,
                                         Sigma = Sigmamat,
                                         last_trends = last_trendmat,
                                         last_errors = errormat,
@@ -1090,16 +1161,51 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
 
     if(trend_model == 'VAR1'){
       # Reconstruct the A and Sigma matrices
-      Amat <- matrix(trend_pars$A, nrow = length(trend_pars$last_lvs),
-                     ncol = length(trend_pars$last_lvs),
-                     byrow = TRUE)
-      Sigmamat <- matrix(trend_pars$Sigma, nrow = length(trend_pars$last_lvs),
-                         ncol = length(trend_pars$last_lvs),
-                         byrow = TRUE)
+      if('A' %in% names(trend_pars)){
+        Amat <- matrix(trend_pars$A, nrow = length(trend_pars$last_lvs),
+                       ncol = length(trend_pars$last_lvs),
+                       byrow = TRUE)
+        ar1 <- rlang::missing_arg()
+      } else if('ar1' %in% names(trend_pars)){
+        ar1 <- trend_pars$ar1
+        Amat <- rlang::missing_arg()
+      } else {
+        ar1 <- rep(1, length(trend_pars$last_lvs))
+        Amat <- rlang::missing_arg()
+      }
+
+      if('ar2' %in% names(trend_pars)){
+        ar2 <- trend_pars$ar2
+      } else {
+        ar2 <- rep(0, length(trend_pars$last_lvs))
+      }
+
+      if('ar3' %in% names(trend_pars)){
+        ar3 <- trend_pars$ar3
+      } else {
+        ar3 <- rep(0, length(trend_pars$last_lvs))
+      }
+
+      if('Sigma' %in% names(trend_pars)){
+        Sigmamat <- matrix(trend_pars$Sigma, nrow = length(trend_pars$last_lvs),
+                           ncol = length(trend_pars$last_lvs),
+                           byrow = TRUE)
+      } else if('sigma' %in% names(trend_pars)){
+        Sigmamat <- matrix(0, nrow = length(trend_pars$last_lvs),
+                           ncol = length(trend_pars$last_lvs),
+                           byrow = TRUE)
+        diag(Sigmamat) <- trend_pars$sigma
+      } else {
+        Sigmamat <- matrix(0, nrow = length(trend_pars$last_lvs),
+                           ncol = length(trend_pars$last_lvs),
+                           byrow = TRUE)
+        diag(Sigmamat) <- 1 / sqrt(trend_pars$tau)
+      }
+
 
       # Reconstruct the last trend matrix
-      last_trendmat <- do.call(cbind, (lapply(trend_pars$last_lvs,
-                                              function(x) tail(x, 3))))
+      last_trendmat <- do.call(cbind,(lapply(trend_pars$last_lvs,
+                                             function(x) tail(x, 3))))
 
       # If this is a moving average model, reconstruct theta matrix and
       # last error matrix
@@ -1119,6 +1225,9 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
 
       # Prep VARMA parameters
       varma_params <- prep_varma_params(A = Amat,
+                                        ar1 = ar1,
+                                        ar2 = ar2,
+                                        ar3 = ar3,
                                         Sigma = Sigmamat,
                                         last_trends = last_trendmat,
                                         last_errors = errormat,
@@ -1126,7 +1235,6 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                                         Xp_trend = Xp_trend,
                                         betas_trend = betas_trend,
                                         h = h)
-
       # Propagate forward
       trend_fc <- sim_varma(A = varma_params$A,
                             A2 = varma_params$A2,

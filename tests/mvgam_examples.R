@@ -14,10 +14,10 @@ mvgam_example1 <- mvgam(y ~ s(season, k = 7),
                         samples = 40,
                         chains = 1)
 
-# Univariate process with trend_formula
+# Univariate process with trend_formula and correlated process errors
 mvgam_example2 <- mvgam(y ~ 1,
                         trend_formula = ~ s(season, k = 7),
-                        trend_model = 'RW',
+                        trend_model = RW(cor = TRUE),
                         family = gaussian(),
                         data = mvgam_examp_dat$data_train,
                         burnin = 300,
@@ -33,10 +33,10 @@ mvgam_example3 <- mvgam(y ~ s(season, k = 7),
                         samples = 40,
                         chains = 1)
 
-# Multivariate process with trend_formula
+# Multivariate process with trend_formula and moving averages
 mvgam_example4 <- mvgam(y ~ 1,
                         trend_formula = ~ s(season, k = 7),
-                        trend_model = 'VAR1cor',
+                        trend_model = VAR(ma = TRUE, cor = TRUE),
                         family = gaussian(),
                         data = mvgam_examp_dat$data_train,
                         burnin = 300,

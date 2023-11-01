@@ -654,8 +654,17 @@ forecast_draws = function(object,
                                      ending_time = ending_time)
   }
 
-  # Add pre-computed eigenvalues and eigenfunctions for GPs
-  # if applicable
+  # Any model in which a an autoregressive process was included should be
+  # considered as VAR1 for forecasting purposes as this will make use of the
+  # faster c++ functions
+  if('Sigma' %in% names(trend_pars) |
+     'sigma' %in% names(trend_pars) |
+     'tau' %in% names(trend_pars)){
+    trend_model <- 'VAR1'
+    if(!'last_lvs' %in% names(trend_pars)){
+      trend_pars$last_lvs <- trend_pars$last_trends
+    }
+  }
 
   # Set up parallel environment for looping across posterior draws
   # to compute h-step ahead forecasts

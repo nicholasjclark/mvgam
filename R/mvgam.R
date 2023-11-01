@@ -732,21 +732,12 @@ mvgam = function(formula,
   # Validate the trend arguments
   orig_trend_model <- trend_model
   trend_model <- validate_trend_model(orig_trend_model, drift = drift)
-  use_var1 <- use_var1cor <- add_ma <- add_cor <- FALSE
-  if(grepl('MA', trend_model, fixed = TRUE)){
-    add_ma <- TRUE
-  }
-  if(trend_model == 'VAR1'){
-    use_var1 <- TRUE
-  }
-  if(trend_model == 'VAR1cor'){
-    use_var1cor <- TRUE
-    trend_model <- 'VAR1'
-  }
-  if(trend_model == 'VARMA1,1cor'){
-    use_var1cor <- TRUE
-    trend_model <- 'VAR1'
-  }
+
+  # Assess whether any additional moving average or correlated errors are needed
+  ma_cor_adds <- ma_cor_additions(trend_model)
+  trend_model <- ma_cor_adds$trend_model
+  use_var1 <- ma_cor_adds$use_var1; use_var1cor <- ma_cor_adds$use_var1cor
+  add_ma <- ma_cor_adds$add_ma; add_cor <- ma_cor_adds$add_cor
 
   if(use_lv & (add_ma | add_cor) & missing(trend_formula)){
     stop('Cannot estimate moving averages or correlated errors for dynamic factors',

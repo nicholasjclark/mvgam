@@ -71,6 +71,44 @@ test_that("forecast() works correctly", {
                NCOL(fc$forecasts$series_1),
                length(fc$test_observations$series_1))
 
+  fc <- forecast(mvgam:::mvgam_example2,
+                 newdata = mvgam:::mvgam_examp_dat$data_test)
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example2$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
+
+  fc <- forecast(mvgam:::mvgam_example2,
+                 newdata = mvgam:::mvgam_examp_dat$data_test,
+                 type = 'expected')
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example2$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
+
+  fc <- forecast(mvgam:::mvgam_example3,
+                 newdata = mvgam:::mvgam_examp_dat$data_test)
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example3$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
+
+  fc <- forecast(mvgam:::mvgam_example3,
+                 newdata = mvgam:::mvgam_examp_dat$data_test,
+                 type = 'expected')
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example3$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
+
   fc <- forecast(mvgam:::mvgam_example4,
                  newdata = mvgam:::mvgam_examp_dat$data_test)
   expect_true(inherits(fc$hindcasts, 'list'))

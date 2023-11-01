@@ -348,11 +348,11 @@ test_priors
 #> 6                    trend sd         sigma ~ student_t(3, 0, 2.5);
 #>                example_change new_lowerbound new_upperbound
 #> 1 (Intercept) ~ normal(0, 1);             NA             NA
-#> 2 lambda ~ exponential(0.13);             NA             NA
-#> 3   ar1 ~ normal(0.71, 0.27);             NA             NA
-#> 4  ar2 ~ normal(-0.79, 0.81);             NA             NA
-#> 5  ar3 ~ normal(-0.25, 0.19);             NA             NA
-#> 6  sigma ~ exponential(0.55);             NA             NA
+#> 2  lambda ~ exponential(0.6);             NA             NA
+#> 3  ar1 ~ normal(-0.31, 0.81);             NA             NA
+#> 4  ar2 ~ normal(-0.62, 0.53);             NA             NA
+#> 5   ar3 ~ normal(0.06, 0.28);             NA             NA
+#> 6  sigma ~ exponential(0.48);             NA             NA
 ```
 
 Any of the above priors can be changed by modifying the `prior` column
@@ -563,31 +563,34 @@ summary(lynx_mvgam)
 #> 
 #> Status:
 #> Fitted using Stan 
+#> 4 chains, each with iter = 1000; warmup = 500; thin = 1 
+#> Total post-warmup draws = 2000
+#> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                 2.5%    50%   97.5% Rhat n.eff
-#> (Intercept)   6.1000  6.600 7.00000 1.01   433
-#> s(season).1  -0.6000  0.046 0.71000 1.00  1023
-#> s(season).2  -0.2200  0.830 1.80000 1.00   516
-#> s(season).3   0.0029  1.200 2.50000 1.01   444
-#> s(season).4  -0.5200  0.420 1.40000 1.01  1026
-#> s(season).5  -1.2000 -0.130 0.92000 1.00   722
-#> s(season).6  -1.1000  0.014 1.00000 1.00   706
-#> s(season).7  -0.7400  0.340 1.40000 1.01   718
-#> s(season).8  -1.0000  0.230 1.80000 1.01   436
-#> s(season).9  -1.2000 -0.300 0.72000 1.01   512
-#> s(season).10 -1.4000 -0.680 0.00042 1.00   743
+#>                2.5%    50%  97.5% Rhat n_eff
+#> (Intercept)   6.100  6.600  7.000 1.00   799
+#> s(season).1  -0.630  0.016  0.680 1.00   916
+#> s(season).2  -0.200  0.790  1.800 1.01   378
+#> s(season).3  -0.021  1.200  2.500 1.01   314
+#> s(season).4  -0.460  0.430  1.400 1.00  1004
+#> s(season).5  -1.100 -0.080  0.950 1.01   461
+#> s(season).6  -1.000  0.015  1.000 1.01   522
+#> s(season).7  -0.710  0.340  1.400 1.00   621
+#> s(season).8  -0.920  0.240  1.800 1.01   313
+#> s(season).9  -1.100 -0.280  0.670 1.00   463
+#> s(season).10 -1.400 -0.670 -0.034 1.01   532
 #> 
 #> Approximate significance of GAM observation smooths:
 #>            edf Chi.sq p-value
-#> s(season) 4.06  19919    0.23
+#> s(season) 3.66  18184    0.25
 #> 
 #> Latent trend AR parameter estimates:
-#>           2.5%   50% 97.5% Rhat n.eff
-#> ar1[1]    0.74  1.10 1.400    1   756
-#> ar2[1]   -0.82 -0.40 0.077    1  1233
-#> ar3[1]   -0.50 -0.12 0.320    1   585
-#> sigma[1]  0.40  0.50 0.640    1  1240
+#>           2.5%   50% 97.5% Rhat n_eff
+#> ar1[1]    0.74  1.10 1.400 1.00   772
+#> ar2[1]   -0.84 -0.40 0.062 1.00  1666
+#> ar3[1]   -0.48 -0.13 0.320 1.01   432
+#> sigma[1]  0.40  0.50 0.650 1.00  1148
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -595,6 +598,11 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations ended with a divergence (0%)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
+#> 
+#> Samples were drawn using NUTS(diag_e) at Wed Nov 01 3:28:50 PM 2023.
+#> For each parameter, n_eff is a crude measure of effective sample size,
+#> and Rhat is the potential scale reduction factor on split MCMC chains
+#> (at convergence, Rhat = 1)
 ```
 
 As with any `MCMC` based software, we can inspect traceplots. Here for
@@ -697,7 +705,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-31-1.png" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample CRPS:
-    #> [1] 2829.479
+    #> [1] 2847.793
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -763,123 +771,6 @@ plot(lynx_mvgam, type = 'residuals')
 ```
 
 <img src="man/figures/README-unnamed-chunk-37-1.png" width="60%" style="display: block; margin: auto;" />
-
-## Comparing models based on forecasts
-
-Another useful utility of `mvgam` is the ability to use leave-future-out
-comparisons. Time series models are often evaluated using an expanding
-window training technique, where the model is initially trained on some
-subset of data from `t = 1` to `t = n_train`, and then is used to
-produce forecasts for the next `fc_horizon` time steps
-`t = n_train + fc_horizon`. In the next iteration, the size of training
-data is expanded by a single time point and the process repeated. This
-is obviously computationally challenging for Bayesian time series
-models, as the number of refits can be very large. `mvgam` uses an
-approximation based on importance sampling. Briefly, we refit the model
-using the first `min_t` observations to perform a single exact
-`fc_horizon`-ahead forecast step. This forecast is evaluated against the
-`min_t + fc_horizon` out of sample observations using the Expected Log
-Predictive Density (ELPD). Next, we approximate each successive round of
-expanding window forecasts by moving forward one step at a time
-`for i in 1:N_evaluations` and re-weighting draws from the model’s
-posterior predictive distribution using Pareto Smoothed Importance
-Sampling (PSIS). In each iteration `i`, PSIS weights are obtained for
-all observations that would have been included in the model if we had
-re-fit. If these importance ratios are stable, we consider the
-approximation adequate and use the re-weighted posterior’s forecast for
-evaluating the next holdout set of testing observations
-(`(min_t + i + 1):(min_t + i + fc_horizon)`). This is similar to the
-process of particle filtering to update forecasts in light of new data
-by re-weighting the posterior draws using importance weights. But at
-some point the importance ratio variability will become too large and
-importance sampling will be unreliable. This is indicated by the
-estimated shape parameter `k` of the generalized Pareto distribution
-crossing a certain threshold `pareto_k_threshold`. Only then do we refit
-the model using all of the observations up to the time of the failure.
-We then restart the process and iterate forward until the next refit is
-triggered. The process is computationally much more efficient, as only a
-fraction of the evaluations typically requires refits (the algorithm
-isdescribed in detail by Bürkner et al. 2020).
-
-Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate
-leave-future-out cross-validation for Bayesian time series models.
-Journal of Statistical Computation and Simulation. 90:14, 2499-2523.
-
-For this example, we simulate a single count-valued time series of
-length `T = 60`, using a latent `AR1` trend and a cyclic seasonal
-pattern. Two models are fit as before, the first is a complex but more
-correct model, while the second is simpler and mis-specified. We then
-run approximate leave-future-out cross-validation, setting `min_t = 36`
-so that the first refit uses all observations from `t = 1` to `t = 36`.
-This is done for both models so that we can compare approximate ELPD
-values when forecasting two time steps ahead (`fc_horizon = 2`)
-
-``` r
-set.seed(12345)
-simdat <- sim_mvgam(T = 60, prop_train = 1, n_series = 1,
-                    mu = 2,
-                    trend_model = 'AR1', trend_rel = 0.35)
-good <- mvgam(y ~ s(season, bs = 'cc', k = 8),
-              trend_model = 'AR1',
-              family = poisson(),
-              data = simdat$data_train)
-poor <- update(good, formula = y ~ 1,
-               trend_model = 'RW')
-lfo_good <- lfo_cv(good, min_t = 36,
-                   fc_horizon = 2)
-lfo_poor <- lfo_cv(poor, min_t = 36,
-                   fc_horizon = 2)
-```
-
-The `S3` plotting function for these `lfo_cv` objects will show the
-Pareto-k values and ELPD values over the evaluation time points. For the
-Pareto-k plot, a dashed red line indicates the specified threshold
-chosen for triggering model refits. For the ELPD plot, a dashed red line
-indicates the bottom 10% quantile of ELPD values. Points below this
-threshold may represent outliers that were more difficult to forecast
-
-``` r
-par(mar = c(4,4, 1, 1))
-plot(lfo_good)
-```
-
-<img src="man/figures/README-unnamed-chunk-40-1.png" width="60%" style="display: block; margin: auto;" />
-
-``` r
-par(mar = c(4,4, 1, 1))
-plot(lfo_poor)
-```
-
-<img src="man/figures/README-unnamed-chunk-41-1.png" width="60%" style="display: block; margin: auto;" />
-
-The model with the better ELPD values (higher values are better in this
-case) should be preferred. First we can calculate the proportion of
-forecast time points in which the first model gives better forecasts
-than the poor model
-
-``` r
-length(which((lfo_good$elpds - lfo_poor$elpds) > 0)) /
-  length(lfo_good$elpds)
-#> [1] 0.9090909
-```
-
-Total ELPDs per model are also a useful overall indicator of performance
-
-``` r
-lfo_good$sum_ELPD
-#> [1] -137.2266
-lfo_poor$sum_ELPD
-#> [1] -162.8121
-```
-
-As before, these metrics all favour the more complex model over the
-simpler “poor” model. This gives us confidence that the more complex
-model will perform better in future forecasting exercises. The first
-approximator is faster as it does not require refits, but caution is
-needed as the state of the latent trend at the evaluation time point has
-already been informed by both the past and future observations. The
-second approximator, using PSIS for approximate leave-future-out, should
-be preferred when computationally accessible.
 
 ## Extended observation families
 
@@ -955,15 +846,18 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Status:
 #> Fitted using Stan 
+#> 4 chains, each with iter = 1000; warmup = 500; thin = 1 
+#> Total post-warmup draws = 2000
+#> 
 #> 
 #> Observation precision parameter estimates:
-#>        2.5% 50% 97.5% Rhat n.eff
+#>        2.5% 50% 97.5% Rhat n_eff
 #> phi[1]  5.5 8.3    12    1  1756
 #> phi[2]  5.8 8.7    13    1  1625
 #> phi[3]  5.5 8.4    12    1  2102
 #> 
 #> GAM coefficient (beta) estimates:
-#>              2.5%  50% 97.5% Rhat n.eff
+#>              2.5%  50% 97.5% Rhat n_eff
 #> (Intercept) -0.15 0.19  0.45    1  1090
 #> 
 #> Approximate significance of GAM observation smooths:
@@ -976,7 +870,7 @@ summary(mod, include_betas = FALSE)
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
-#>              2.5%  50% 97.5% Rhat n.eff
+#>              2.5%  50% 97.5% Rhat n_eff
 #> alpha_gp[1] 0.055 0.42  0.90 1.00   721
 #> alpha_gp[2] 0.380 0.72  1.30 1.00  1299
 #> alpha_gp[3] 0.130 0.46  0.94 1.00   517
@@ -988,9 +882,14 @@ summary(mod, include_betas = FALSE)
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
 #> 7 of 2000 iterations ended with a divergence (0.35%)
-#> *Try running with larger adapt_delta to remove the divergences
+#>  *Try running with larger adapt_delta to remove the divergences
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
+#> 
+#> Samples were drawn using NUTS(diag_e) at Wed Nov 01 3:30:24 PM 2023.
+#> For each parameter, n_eff is a crude measure of effective sample size,
+#> and Rhat is the potential scale reduction factor on split MCMC chains
+#> (at convergence, Rhat = 1)
 ```
 
 Plot the hindcast and forecast distributions for each series

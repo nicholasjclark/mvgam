@@ -15,6 +15,7 @@ Supported mvgam trend models
 \item \code{AR3} Autoregressive model with AR coefficients for lags 1, 2 and 3
 \item \code{VAR1} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated process errors
 \item \code{VAR1cor} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously correlated process errors
+\item \code{VARMA} Vector Autoregressive model with VAR coefficients for lag 1 and MA coefficients for lag 1; contemporaneously correlated process errors
 \item \code{GP} Squared exponential Gaussian Process
 \item \code{None} No latent trend is fitted
 }

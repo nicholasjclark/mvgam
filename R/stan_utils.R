@@ -253,11 +253,11 @@ mcmc_summary = function(object,
       if (!methods::is(object, 'matrix'))
       {
         neff <- data.frame(round(coda::effectiveSize(object2), digits = 0))
-        colnames(neff) <- "n.eff"
+        colnames(neff) <- "n_eff"
       } else {
         warning('Number of effective samples cannot be calculated without individual chains (matrix input). NAs inserted.')
         neff <- data.frame(rep(NA, np))
-        colnames(neff) <- "n.eff"
+        colnames(neff) <- "n_eff"
       }
       x[[(length(x) + 1)]] <- neff
     }
@@ -653,7 +653,7 @@ mcmc_summary = function(object,
       {
         neff <- data.frame(round(rs_df["n.eff"][f_ind, 1], digits = 0))
       }
-      colnames(neff) <- "n.eff"
+      colnames(neff) <- "n_eff"
       x[[(length(x) + 1)]] <- neff
     }
 
@@ -3553,7 +3553,7 @@ check_div <- function(fit, quiet=FALSE, sampler_params) {
   if (!quiet) cat(sprintf('%s of %s iterations ended with a divergence (%s%%)\n',
                             n, N, round(100 * n / N, 4)))
   if (n > 0) {
-    if (!quiet) cat('*Try running with larger adapt_delta to remove the divergences\n')
+    if (!quiet) cat(' *Try running with larger adapt_delta to remove the divergences\n')
     if (quiet) return(FALSE)
   } else {
     if (quiet) return(TRUE)
@@ -3579,7 +3579,7 @@ check_treedepth <- function(fit, max_depth = 10, quiet=FALSE,
                   n, N, max_depth, round(100 * n / N, 4)))
 
   if (n > 0) {
-    if (!quiet) cat('*Run again with max_treedepth set to a larger value to avoid saturation\n')
+    if (!quiet) cat(' *Run with max_treedepth set to a larger value to avoid saturation\n')
     if (quiet) return(FALSE)
   } else {
     if (quiet) return(TRUE)
@@ -3611,7 +3611,7 @@ check_energy <- function(fit, quiet=FALSE, sampler_params) {
     if (!quiet) cat('E-FMI indicated no pathological behavior\n')
     if (quiet) return(TRUE)
   } else {
-    if (!quiet) cat('*E-FMI below 0.2 indicates you may need to reparameterize your model\n')
+    if (!quiet) cat(' *E-FMI below 0.2 indicates you may need to reparameterize your model\n')
     if (quiet) return(FALSE)
   }
 }
@@ -3645,7 +3645,7 @@ check_n_eff <- function(fit, quiet=FALSE, fit_summary) {
     if (!quiet){
       cat('n_eff / iter below 0.001 found for',
           length(which(ratios < 0.001)),
-          'parameters\n*Effective sample size is likely overestimated for these parameters\n')
+          'parameters\n *Effective sample size is likely overestimated for these parameters\n')
     }
     if (quiet) return(FALSE)
   }
@@ -3677,7 +3677,7 @@ check_rhat <- function(fit, quiet=FALSE, fit_summary) {
     if (!quiet){
       cat('Rhats above 1.05 found for',
           length(which(rhats > 1.05)),
-          'parameters\n*Diagnose further to investigate why the chains have not mixed\n')
+          'parameters\n *Diagnose further to investigate why the chains have not mixed\n')
     }
     if (quiet) return(FALSE)
   }

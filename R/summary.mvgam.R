@@ -86,6 +86,14 @@ if(object$fit_engine == 'jags'){
 if(object$fit_engine == 'stan'){
   cat('\nStatus:\n')
   cat('Fitted using Stan', '\n')
+
+  n_kept <- object$model_output@sim$n_save - object$model_output@sim$warmup2
+  cat(object$model_output@sim$chains, " chains, each with iter = ",
+      object$model_output@sim$iter,
+      "; warmup = ", object$model_output@sim$warmup, "; thin = ",
+      object$model_output@sim$thin, " \n",
+      "Total post-warmup draws = ", sum(n_kept), "\n\n", sep = '')
+
 }
 
 if(object$family == 'negative binomial'){
@@ -192,7 +200,6 @@ if(all(is.na(object$sp_names))){
     re_labs <- unlist(lapply(purrr::map(object$mgcv_model$smooth, 'term'),
                              paste, collapse = ','))[
                                unlist(purrr::map(object$mgcv_model$smooth, inherits, 'random.effect'))]
-    re_labs <- gsub('series', 'trend', re_labs)
     re_sds <- mcmc_summary(object$model_output, 'sigma_raw',
                            ISB = TRUE, digits = digits,
                            variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)]
@@ -285,15 +292,15 @@ if(object$use_lv){
         } else {
           cat("\nLatent trend drift estimates:\n")
         }
-        print(mcmc_summary(object$model_output, c('drift'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('drift', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
       } else {
         if(!is.null(object$trend_call)){
           cat("\nProcess error parameter estimates:\n")
-          print(mcmc_summary(object$model_output, c('sigma'),
+          print(suppressWarnings(mcmc_summary(object$model_output, c('sigma', 'theta'),
                              digits = digits,
-                             variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                             variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
         }
       }
     }
@@ -336,9 +343,9 @@ if(object$use_lv){
 
       if(!is.null(object$trend_call)){
         cat("\nProcess error parameter estimates:\n")
-        print(mcmc_summary(object$model_output, c('sigma'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('sigma', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       }
     }
@@ -378,9 +385,9 @@ if(object$use_lv){
 
       if(!is.null(object$trend_call)){
         cat("\nProcess error parameter estimates:\n")
-        print(mcmc_summary(object$model_output, c('sigma'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('sigma', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       }
     }
@@ -420,9 +427,9 @@ if(object$use_lv){
 
       if(!is.null(object$trend_call)){
         cat("\nProcess error parameter estimates:\n")
-        print(mcmc_summary(object$model_output, c('sigma'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('sigma', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       }
     }
@@ -476,15 +483,15 @@ if(!object$use_lv){
     if(attr(object$model_data, 'trend_model') == 'RW'){
       if(object$drift){
         cat("\nLatent trend drift and sigma estimates:\n")
-        print(mcmc_summary(object$model_output, c('drift', 'sigma'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('drift', 'sigma', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       } else {
         cat("\nLatent trend variance estimates:\n")
-        print(mcmc_summary(object$model_output, c('sigma'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('sigma', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       }
     }
@@ -508,15 +515,15 @@ if(!object$use_lv){
     if(attr(object$model_data, 'trend_model') == 'AR1'){
       if(object$drift){
         cat("\nLatent trend drift and AR parameter estimates:\n")
-        print(mcmc_summary(object$model_output, c('drift', 'ar1', 'sigma'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('drift', 'ar1', 'sigma', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       } else {
         cat("\nLatent trend parameter AR estimates:\n")
-        print(mcmc_summary(object$model_output, c('ar1', 'sigma'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('ar1', 'sigma', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       }
     }
@@ -524,15 +531,15 @@ if(!object$use_lv){
     if(attr(object$model_data, 'trend_model') == 'AR2'){
       if(object$drift){
         cat("\nLatent trend drift and AR parameter estimates:\n")
-        print(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'sigma'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('drift', 'ar1', 'ar2', 'sigma', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       } else {
         cat("\nLatent trend AR parameter estimates:\n")
-        print(mcmc_summary(object$model_output, c('ar1', 'ar2', 'sigma'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('ar1', 'ar2', 'sigma', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       }
     }
@@ -540,26 +547,26 @@ if(!object$use_lv){
     if(attr(object$model_data, 'trend_model') == 'AR3'){
       if(object$drift){
         cat("\nLatent trend drift and AR parameter estimates:\n")
-        print(mcmc_summary(object$model_output, c('drift', 'ar1',
-                                                  'ar2', 'ar3', 'sigma'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('drift', 'ar1',
+                                                  'ar2', 'ar3', 'sigma', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       } else {
         cat("\nLatent trend AR parameter estimates:\n")
-        print(mcmc_summary(object$model_output, c('ar1', 'ar2',
-                                                  'ar3', 'sigma'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('ar1', 'ar2',
+                                                  'ar3', 'sigma', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
       }
     }
 
     if(attr(object$model_data, 'trend_model') == 'GP'){
         cat("\nLatent trend marginal deviation (alpha) and length scale (rho) estimates:\n")
-        print(mcmc_summary(object$model_output, c('alpha_gp', 'rho_gp'),
+        print(suppressWarnings(mcmc_summary(object$model_output, c('alpha_gp', 'rho_gp'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield'))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank', 'meanfield')))[,c(3:7)])
 
 
     }
@@ -670,6 +677,12 @@ if(object$fit_engine == 'stan' & object$algorithm == 'sampling'){
   cat('\nStan MCMC diagnostics:\n')
   check_all_diagnostics(object$model_output,
                         max_treedepth = object$max_treedepth)
+
+  sampler <- attr(object$model_output@sim$samples[[1]], "args")$sampler_t
+  cat("\nSamples were drawn using ", sampler, " at ", object$model_output@date, ".\n",
+      "For each parameter, n_eff is a crude measure of effective sample size,\n",
+      "and Rhat is the potential scale reduction factor on split MCMC chains\n",
+      "(at convergence, Rhat = 1)\n", sep = '')
 
 }
 

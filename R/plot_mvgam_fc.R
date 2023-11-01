@@ -217,7 +217,7 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
                                 n_cores = n_cores)
     } else {
       fc_preds <- forecast.mvgam(object, data_test = data_test,
-                                 n_cores = n_cores, series = series)$forecasts[[1]]
+                                 n_cores = n_cores)$forecasts[[series]]
     }
     preds <- cbind(preds, fc_preds)
   }

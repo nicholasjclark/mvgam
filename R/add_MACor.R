@@ -14,33 +14,33 @@ add_MaCor = function(model_file,
   if(trend_model %in% c('RW', 'AR1', 'AR2')){
 
     # Update transformed data
-    if(any(grepl('vector<lower=0>[n_lv] sigma;',
-                 model_file, fixed = TRUE))){
-      if(any(grepl('transformed data{', model_file, fixed = TRUE))){
-        model_file[grep('transformed data {', model_file, fixed = TRUE)] <-
-          paste0('transformed data {\n',
-                 'vector[n_series] trend_zeros = rep_vector(0.0, n_lv);')
-      } else {
-        model_file[grep('parameters {', model_file, fixed = TRUE)[1]] <-
-          paste0('transformed data {\n',
-                 'vector[n_series] trend_zeros = rep_vector(0.0, n_lv);\n',
-                 '}\nparameters {')
-      }
+      if(any(grepl('vector<lower=0>[n_lv] sigma;',
+                   model_file, fixed = TRUE))){
+        if(any(grepl('transformed data {', model_file, fixed = TRUE))){
+          model_file[grep('transformed data {', model_file, fixed = TRUE)] <-
+            paste0('transformed data {\n',
+                   'vector[n_series] trend_zeros = rep_vector(0.0, n_lv);')
+        } else {
+          model_file[grep('parameters {', model_file, fixed = TRUE)[1]] <-
+            paste0('transformed data {\n',
+                   'vector[n_series] trend_zeros = rep_vector(0.0, n_lv);\n',
+                   '}\nparameters {')
+        }
 
-    } else {
-      if(any(grepl('transformed data{', model_file, fixed = TRUE))){
-        model_file[grep('transformed data {', model_file, fixed = TRUE)] <-
-          paste0('transformed data {\n',
-                 'vector[n_series] trend_zeros = rep_vector(0.0, n_series);')
       } else {
-        model_file[grep('parameters {', model_file, fixed = TRUE)[1]] <-
-          paste0('transformed data {\n',
-                 'vector[n_series] trend_zeros = rep_vector(0.0, n_series);\n',
-                 '}\nparameters {')
-      }
+        if(any(grepl('transformed data {', model_file, fixed = TRUE))){
+          model_file[grep('transformed data {', model_file, fixed = TRUE)] <-
+            paste0('transformed data {\n',
+                   'vector[n_series] trend_zeros = rep_vector(0.0, n_series);')
+        } else {
+          model_file[grep('parameters {', model_file, fixed = TRUE)[1]] <-
+            paste0('transformed data {\n',
+                   'vector[n_series] trend_zeros = rep_vector(0.0, n_series);\n',
+                   '}\nparameters {')
+        }
 
-    }
-    model_file <- readLines(textConnection(model_file), n = -1)
+      }
+      model_file <- readLines(textConnection(model_file), n = -1)
 
     # Update parameters block
     if(any(grepl('vector<lower=0>[n_lv] sigma;',
@@ -53,23 +53,28 @@ add_MaCor = function(model_file,
                  'cholesky_factor_corr[n_lv] L_Omega;')
       }
 
-      model_file[grep('matrix[n, n_lv] LV;',
-                      model_file, fixed = TRUE)] <-
-        paste0('matrix[n, n_lv] LV;\n',
-               '// ma coefficients\n',
-               if(add_cor){
-                 'matrix<lower=-1,upper=1>[n_lv, n_lv] theta;'
+        model_file[grep('matrix[n, n_lv] LV;',
+                        model_file, fixed = TRUE)] <-
+          paste0('matrix[n, n_lv] LV;\n',
+                 if(add_ma){
+                   paste0('// ma coefficients\n',
+                   if(add_cor){
+                     'matrix<lower=-1,upper=1>[n_lv, n_lv] theta;'
+                   } else {
+                     'vector<lower=-1,upper=1>[n_lv] theta;'
+                   })
                  } else {
-                   'vector<lower=-1,upper=1>[n_lv] theta;'
+                   NULL
                  },
-               '\n// ma error parameters\n',
-               'vector[n_lv] error[n];')
+                 '\n// dynamic error parameters\n',
+                 'vector[n_lv] error[n];')
 
       model_file <- readLines(textConnection(model_file), n = -1)
       end <- grep('matrix[n, n_lv] LV;',
                   model_file, fixed = TRUE)
       start <- end - 1
       model_file <- model_file[-c(start:end)]
+
     } else {
       if(add_cor){
         model_file[grep('vector<lower=0>[n_series] sigma;',
@@ -81,13 +86,18 @@ add_MaCor = function(model_file,
       model_file[grep('matrix[n, n_series] trend;',
                       model_file, fixed = TRUE)] <-
         paste0('matrix[n, n_series] trend;\n',
-               '// ma coefficients\n',
-               if(add_cor){
-                 'matrix<lower=-1,upper=1>[n_series, n_series] theta;'
+               if(add_ma){
+                 paste0(
+                   '// ma coefficients\n',
+                   if(add_cor){
+                     'matrix<lower=-1,upper=1>[n_series, n_series] theta;'
+                   } else {
+                     'vector<lower=-1,upper=1>[n_series] theta;'
+                   })
                } else {
-                 'vector<lower=-1,upper=1>[n_series] theta;'
+                 NULL
                },
-               '\n// ma error parameters\n',
+               '\n// dynamic error parameters\n',
                'vector[n_series] error[n];')
 
       model_file <- readLines(textConnection(model_file), n = -1)
@@ -106,13 +116,22 @@ add_MaCor = function(model_file,
         paste0('matrix[n, n_series] trend;\n',
                if(add_cor){
                  paste0('vector[n_lv] LV[n];\n',
-                        'vector[n_lv] epsilon[n];\n',
+                        if(add_ma){
+                          'vector[n_lv] epsilon[n];\n'
+                        } else {
+                          NULL
+                        },
                         '// LKJ form of covariance matrix\n',
                         'matrix[n_lv, n_lv] L_Sigma;\n',
                         '// computed error covariance matrix\n',
                         'cov_matrix[n_lv] Sigma;')
                } else {
-                 'matrix[n, n_lv] LV;\nmatrix[n, n_lv] epsilon;'
+                 paste0('matrix[n, n_lv] LV;\n',
+                        if(add_ma){
+                          'matrix[n, n_lv] epsilon;'
+                        } else {
+                          NULL
+                        })
                })
 
       if(add_cor){
@@ -123,17 +142,27 @@ add_MaCor = function(model_file,
                    'LV[1] = ',
                    if(drift){ 'drift + '} else {NULL},
                    'trend_mus[ytimes_trend[1, 1:n_lv]] + error[1];\n',
-                   'epsilon[1] = error[1];\n',
+                   if(add_ma){
+                     'epsilon[1] = error[1];\n'
+                   },
                    'for (i in 2:n) {\n',
-                   '// lagged error ma process\n',
-                   'epsilon[i] = theta * error[i - 1];\n',
-                   '// full ARMA process\n',
+                   if(add_ma){
+                     paste0('// lagged error ma process\n',
+                            'epsilon[i] = theta * error[i - 1];\n',
+                            '// full ARMA process\n')
+                   } else {
+                     '// full AR process\n'
+                   },
                    'LV[i] = ',
                    if(drift){ 'drift + '} else {NULL},
                    'trend_mus[ytimes_trend[i, 1:n_lv]] + ',
                    if(trend_model == 'AR1'){ 'ar1 .* '} else {NULL},
-                   '(LV[i - 1] - trend_mus[ytimes_trend[i - 1, 1:n_lv]]) + ',
-                   'epsilon[i] + error[i];\n',
+                   '(LV[i - 1] - trend_mus[ytimes_trend[i - 1, 1:n_lv]])',
+                   if(add_ma){
+                     '+ epsilon[i] + error[i];\n'
+                   } else {
+                     '+ error[i];\n'
+                   },
                    '}\n')
         }
 
@@ -144,23 +173,39 @@ add_MaCor = function(model_file,
                    'LV[1] = ',
                    if(drift){ 'drift + '} else {NULL},
                    'trend_mus[ytimes_trend[1, 1:n_lv]] + error[1];\n',
-                   'epsilon[1] = error[1];\n',
-                   'epsilon[2] = theta * error[1];\n',
+                   if(add_ma){
+                     paste0('epsilon[1] = error[1];\n',
+                            'epsilon[2] = theta * error[1];\n')
+                   } else {
+                     NULL
+                   },
                    'LV[2] = ',
                    if(drift){ 'drift + '} else {NULL},
                    'trend_mus[ytimes_trend[2, 1:n_lv]] + ',
                    'ar1 .* (LV[1] - trend_mus[ytimes_trend[1, 1:n_lv]]) + ',
-                   'epsilon[2] + error[2];\n',
+                   if(add_ma){
+                     'epsilon[2] + error[2];\n'
+                   } else {
+                     'error[2];\n'
+                   },
                    'for (i in 3:n) {\n',
-                   '// lagged error ma process\n',
-                   'epsilon[i] = theta * error[i - 1];\n',
-                   '// full ARMA process\n',
+                   if(add_ma){
+                     paste0('// lagged error ma process\n',
+                            'epsilon[i] = theta * error[i - 1];\n',
+                            '// full ARMA process\n')
+                   } else {
+                     '// full AR process\n'
+                   },
                    'LV[i] = ',
                    if(drift){ 'drift + '} else {NULL},
                    'trend_mus[ytimes_trend[i, 1:n_lv]] + ',
                    'ar1 .* (LV[i - 1] - trend_mus[ytimes_trend[i - 1, 1:n_lv]]) + ',
                    'ar2 .* (LV[i - 2] - trend_mus[ytimes_trend[i - 2, 1:n_lv]]) + ',
-                   'epsilon[i] + error[i];\n',
+                   if(add_ma){
+                     'epsilon[i] + error[i];\n'
+                   } else {
+                     'error[i];\n'
+                   },
                    '}\n')
         }
 
@@ -229,13 +274,22 @@ add_MaCor = function(model_file,
                if(add_cor){
                  paste0('vector[n_series] trend_raw[n];\n',
                         'matrix[n, n_series] trend;\n',
-                        'vector[n_series] epsilon[n];\n',
+                        if(add_ma){
+                          'vector[n_series] epsilon[n];\n'
+                        } else {
+                          NULL
+                        },
                         '// LKJ form of covariance matrix\n',
                         'matrix[n_series, n_series] L_Sigma;\n',
                         '// computed error covariance matrix\n',
                         'cov_matrix[n_series] Sigma;')
                } else {
-                 'matrix[n, n_series] trend;\nmatrix[n, n_series] epsilon;'
+                 paste0('matrix[n, n_series] trend;\n',
+                        if(add_ma){
+                          'matrix[n, n_series] epsilon;'
+                        } else {
+                          NULL
+                        })
                })
 
       if(add_cor){
@@ -248,16 +302,28 @@ add_MaCor = function(model_file,
                    'trend_raw[1] = ',
                    if(drift){ 'drift + '} else {NULL},
                    'error[1];\n',
-                   'epsilon[1] = error[1];\n',
+                   if(add_ma){
+                     'epsilon[1] = error[1];\n'
+                   } else {
+                     NULL
+                   },
                    'for (i in 2:n) {\n',
-                   '// lagged error ma process\n',
-                   'epsilon[i] = theta * error[i - 1];\n',
-                   '// full ARMA process\n',
+                   if(add_ma){
+                     paste0('// lagged error ma process\n',
+                            'epsilon[i] = theta * error[i - 1];\n',
+                            '// full ARMA process\n')
+                   } else {
+                     paste0('// full AR process\n')
+                   },
                    'trend_raw[i] = ',
                    if(drift){ 'drift + '} else {NULL},
                    if(trend_model == 'AR1'){ 'ar1 .* '} else {NULL},
                    'trend_raw[i - 1] + ',
-                   'epsilon[i] + error[i];\n',
+                   if(add_ma){
+                     'epsilon[i] + error[i];\n'
+                   } else {
+                     'error[i];\n'
+                   },
                    '}\n')
         }
 
@@ -270,20 +336,37 @@ add_MaCor = function(model_file,
                    'trend_raw[1] = ',
                    if(drift){ 'drift + '} else {NULL},
                    'error[1];\n',
-                   'epsilon[1] = error[1];\n',
-                   'epsilon[2] = theta * error[1];\n',
+                   if(add_ma){
+                     paste0('epsilon[1] = error[1];\n',
+                            'epsilon[2] = theta * error[1];\n')
+                   } else {
+                     NULL
+                   },
                    'trend_raw[2] = ',
                    if(drift){ 'drift + '} else {NULL},
-                   'ar1 .* trend_raw[1] + epsilon[2] + error[2];\n',
+                   'ar1 .* trend_raw[1] + ',
+                   if(add_ma){
+                     'epsilon[2] + error[2];\n'
+                   } else {
+                     'error[2];\n'
+                   },
                    'for (i in 3:n) {\n',
-                   '// lagged error ma process\n',
-                   'epsilon[i] = theta * error[i - 1];\n',
-                   '// full ARMA process\n',
+                   if(add_ma){
+                     paste0('// lagged error ma process\n',
+                            'epsilon[i] = theta * error[i - 1];\n',
+                            '// full ARMA process\n')
+                   } else {
+                     '// full AR process\n'
+                   },
                    'trend_raw[i] = ',
                    if(drift){ 'drift + '} else {NULL},
                    'ar1 .* trend_raw[i - 1] + ',
                    'ar2 .* trend_raw[i - 2] + ',
-                   'epsilon[i] + error[i];\n',
+                   if(add_ma){
+                     'epsilon[i] + error[i];\n'
+                   } else {
+                     'error[i];\n'
+                   },
                    '}\n')
         }
 
@@ -340,13 +423,22 @@ add_MaCor = function(model_file,
 
       model_file <- readLines(textConnection(model_file), n = -1)
       if(add_cor){
-        model_file[grep('model {', model_file, fixed = TRUE) - 2] <-
-          paste0(model_file[grep('model {', model_file, fixed = TRUE) - 2],
-                 '\nL_Sigma = diag_pre_multiply(sigma, L_Omega);\n',
+
+        last <- grep('model {', model_file, fixed = TRUE)
+        for(i in last:(last - 5)){
+          last <- i
+          if(trimws(model_file[i]) != '}'){
+          } else {
+            break
+          }
+        }
+
+        model_file[last] <-
+          paste0('\nL_Sigma = diag_pre_multiply(sigma, L_Omega);\n',
                  'Sigma = multiply_lower_tri_self_transpose(L_Sigma);\n',
                  'for (i in 1:n) {\n',
                  'trend[i, 1:n_series] = to_row_vector(trend_raw[i]);\n',
-                 '}')
+                 '}\n}')
       }
     }
     model_file <- readLines(textConnection(model_file), n = -1)
@@ -360,8 +452,6 @@ add_MaCor = function(model_file,
                   model_file, fixed = TRUE) + 2
       model_file <- model_file[-c(start:end)]
       model_file[start] <- paste0(
-        model_file[start],
-        '\n',
         '// contemporaneous errors\n',
         if(add_cor){
           paste0('L_Omega ~ lkj_corr_cholesky(2);\n',
@@ -373,16 +463,22 @@ add_MaCor = function(model_file,
                  'error[i] ~ normal(trend_zeros, sigma);\n',
                  '}')
         },
-        '\n// ma coefficients\n',
-        if(add_cor){
-          paste0('for(i in 1:n_lv){\n',
-          'for(j in 1:n_lv){\n',
-          'if (i != j)\n',
-          'theta[i, j] ~ std_normal();\n',
-          '}\n}')
+        if(add_ma){
+          paste0('\n// ma coefficients\n',
+                 if(add_cor){
+                   paste0('for(i in 1:n_lv){\n',
+                          'for(j in 1:n_lv){\n',
+                          'if (i != j)\n',
+                          'theta[i, j] ~ std_normal();\n',
+                          '}\n}')
+                 } else {
+                   'theta ~ std_normal();'
+                 })
         } else {
-          'theta ~ std_normal();'
-        })
+          NULL
+        },
+        '\n',
+        model_file[start])
     } else {
       start <- grep('trend[1, 1:n_series] ~ normal(',
                     model_file, fixed = TRUE) - 1
@@ -392,8 +488,6 @@ add_MaCor = function(model_file,
 
       model_file <- model_file[-c(start:end)]
       model_file[start] <- paste0(
-        model_file[start],
-        '\n',
         '// contemporaneous errors\n',
         if(add_cor){
           paste0('L_Omega ~ lkj_corr_cholesky(2);\n',
@@ -405,16 +499,22 @@ add_MaCor = function(model_file,
                  'error[i] ~ normal(trend_zeros, sigma);\n',
                  '}')
         },
-        '\n// ma coefficients\n',
-        if(add_cor){
-          paste0('for(i in 1:n_series){\n',
-                 'for(j in 1:n_series){\n',
-                 'if (i != j)\n',
-                 'theta[i, j] ~ std_normal();\n',
-                 '}\n}')
+        if(add_ma){
+          paste0('\n// ma coefficients\n',
+                 if(add_cor){
+                   paste0('for(i in 1:n_series){\n',
+                          'for(j in 1:n_series){\n',
+                          'if (i != j)\n',
+                          'theta[i, j] ~ std_normal();\n',
+                          '}\n}')
+                 } else {
+                   'theta ~ std_normal();'
+                 })
         } else {
-          'theta ~ std_normal();'
-        })
+          NULL
+        },
+        '\n',
+        model_file[start])
     }
     model_file <- readLines(textConnection(model_file), n = -1)
   }

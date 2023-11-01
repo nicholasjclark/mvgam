@@ -1,37 +1,35 @@
 context("RW,AR,VAR")
 
-test_that("MA and cor options should error for trends other than VAR", {
-  expect_error(mvgam(y ~ s(series, bs = 're') +
+test_that("MA and cor options should work for trends other than VAR", {
+  test <- mvgam(y ~ s(series, bs = 're') +
                        s(season, bs = 'cc') - 1,
                      trend_model = AR(p = 1, ma = TRUE),
                      data = gaus_data$data_train,
                      family = gaussian(),
-                     run_model = FALSE),
-               'Moving average terms not yet supported for AR models')
+                     run_model = FALSE)
+  expect_true(inherits(test, 'mvgam_prefit'))
 
-  expect_error(mvgam(y ~ s(series, bs = 're') +
+  test <- mvgam(y ~ s(series, bs = 're') +
                        s(season, bs = 'cc') - 1,
                      trend_model = AR(p = 1, cor = TRUE),
                      data = gaus_data$data_train,
                      family = gaussian(),
-                     run_model = FALSE),
-               'Correlated errors not yet supported for AR models')
+                     run_model = FALSE)
+  expect_true(inherits(test, 'mvgam_prefit'))
 
-  expect_error(mvgam(y ~ s(series, bs = 're') +
+  test <- mvgam(y ~ s(series, bs = 're') +
                        s(season, bs = 'cc') - 1,
                      trend_model = RW(ma = TRUE),
                      data = gaus_data$data_train,
                      family = gaussian(),
-                     run_model = FALSE),
-               'Moving average terms not yet supported for RW models')
+                     run_model = FALSE)
 
-  expect_error(mvgam(y ~ s(series, bs = 're') +
+  test <- mvgam(y ~ s(series, bs = 're') +
                        s(season, bs = 'cc') - 1,
                      trend_model = RW(cor = TRUE),
                      data = gaus_data$data_train,
                      family = gaussian(),
-                     run_model = FALSE),
-               'Correlated errors not yet supported for RW models')
+                     run_model = FALSE)
 })
 
 test_that("VARMAs are set up correctly", {

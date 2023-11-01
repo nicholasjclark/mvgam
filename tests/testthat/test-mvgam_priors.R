@@ -1,5 +1,39 @@
 context("mvgam_priors")
 
+test_that("get_mvgam_priors works for a variety of ma and cor trends", {
+  priors <- get_mvgam_priors(y ~ s(season, k = 7),
+                             trend_model = 'RW',
+                             family = gaussian(),
+                             data = mvgam:::mvgam_examp_dat$data_train)
+  expect_true(inherits(priors, 'data.frame'))
+
+  priors <- get_mvgam_priors(y ~ s(season, k = 7),
+                             trend_model = RW(),
+                             family = gaussian(),
+                             data = mvgam:::mvgam_examp_dat$data_train)
+  expect_true(inherits(priors, 'data.frame'))
+
+  priors <- get_mvgam_priors(y ~ s(season, k = 7),
+                             trend_model = RW(ma = TRUE),
+                             family = gaussian(),
+                             data = mvgam:::mvgam_examp_dat$data_train)
+  expect_true(inherits(priors, 'data.frame'))
+
+  priors <- get_mvgam_priors(y ~ s(season, k = 7),
+                             trend_model = AR(p = 2, ma = TRUE, cor = TRUE),
+                             family = gaussian(),
+                             data = mvgam:::mvgam_examp_dat$data_train)
+  expect_true(inherits(priors, 'data.frame'))
+
+  priors <- get_mvgam_priors(y ~ 1,
+                             trend_formula = ~ s(season, k = 7),
+                             trend_model = RW(ma = TRUE, cor = TRUE),
+                             family = gaussian(),
+                             data = mvgam:::mvgam_examp_dat$data_train)
+  expect_true(inherits(priors, 'data.frame'))
+
+})
+
 test_that("get_mvgam_priors finds all classes for which priors can be specified", {
   beta_data$data_train$cov <- rnorm(NROW(beta_data$data_train))
   beta_data$data_train$cov2 <- rnorm(NROW(beta_data$data_train))

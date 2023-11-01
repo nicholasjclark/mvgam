@@ -19,14 +19,14 @@
 #' @rdname RW
 #' @export
 RW = function(ma = FALSE, cor = FALSE){
-  if(ma){
-    stop('Moving average terms not yet supported for RW models',
-         call. = FALSE)
-  }
-  if(cor){
-    stop('Correlated errors not yet supported for RW models',
-         call. = FALSE)
-  }
+  # if(ma){
+  #   stop('Moving average terms not yet supported for RW models',
+  #        call. = FALSE)
+  # }
+  # if(cor){
+  #   stop('Correlated errors not yet supported for RW models',
+  #        call. = FALSE)
+  # }
   out <- structure(list(trend_model = 'RW',
                         ma = ma,
                         cor = cor,
@@ -37,14 +37,14 @@ RW = function(ma = FALSE, cor = FALSE){
 #' @rdname RW
 #' @export
 AR = function(p = 1, ma = FALSE, cor = FALSE){
-  if(ma){
-    stop('Moving average terms not yet supported for AR models',
-         call. = FALSE)
-  }
-  if(cor){
-    stop('Correlated errors not yet supported for AR models',
-         call. = FALSE)
-  }
+  # if(ma){
+  #   stop('Moving average terms not yet supported for AR models',
+  #        call. = FALSE)
+  # }
+  # if(cor){
+  #   stop('Correlated errors not yet supported for AR models',
+  #        call. = FALSE)
+  # }
   validate_pos_integer(p)
   if(p > 3){
     stop("Argument 'p' must be <= 3",
