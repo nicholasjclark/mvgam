@@ -2921,9 +2921,19 @@ add_trend_predictors = function(trend_formula,
         paste0('// dynamic process models\n',
                paste0(paste(plines, collapse = '\n')))
     } else {
-      model_file[grep("// dynamic factor estimates", model_file, fixed = TRUE)] <-
-        paste0('// dynamic process models\n',
-               paste0(paste(plines, collapse = '\n')))
+      if(any(grepl("// dynamic factor estimates", model_file, fixed = TRUE))){
+        model_file[grep("// dynamic factor estimates", model_file, fixed = TRUE)] <-
+          paste0('// dynamic process models\n',
+                 paste0(paste(plines, collapse = '\n')))
+      }
+
+      if(any(grepl("// trend means", model_file, fixed = TRUE))){
+        model_file[grep("// trend means", model_file, fixed = TRUE)] <-
+          paste0('// dynamic process models\n',
+                 paste0(paste(plines, collapse = '\n'),
+                        '// trend means'))
+      }
+
     }
 
   }

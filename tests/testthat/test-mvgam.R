@@ -225,5 +225,133 @@ test_that("trend_formula setup is working properly", {
 
 })
 
+# Check that parametric effect priors are properly incorporated in the
+# model for a wide variety of model forms
+test_that("parametric effect priors correctly incorporated in models", {
+  mod_data <- mvgam:::mvgam_examp_dat
+  mod_data$data_train$x1 <-
+    rnorm(NROW(mod_data$data_train))
+  mod_data$data_train$x2 <-
+    rnorm(NROW(mod_data$data_train))
+  mod_data$data_train$x3 <-
+    rnorm(NROW(mod_data$data_train))
 
+  # Observation formula; no trend
+  mod <- mvgam(y ~ s(season) + series:x1 +
+                 series:x2 + series:x3,
+               trend_model = 'None',
+               data = mod_data$data_train,
+               family = gaussian(),
+               run_model = FALSE)
+
+  expect_true(any(grepl('// prior for seriesseries_3:x1...',
+                        mod$model_file, fixed = TRUE)))
+  expect_true(any(grepl('// prior for (Intercept)...',
+                        mod$model_file, fixed = TRUE)))
+
+  para_names <- paste0(paste0('// prior for seriesseries_', 1:3,
+                              paste0(':x', 1:3, '...')))
+  for(i in seq_along(para_names)){
+    expect_true(any(grepl(para_names[i],
+                          mod$model_file, fixed = TRUE)))
+  }
+
+  priors <- get_mvgam_priors(y ~ s(season) + series:x1 +
+                               series:x2 + series:x3,
+                             trend_model = 'None',
+                             data = mod_data$data_train,
+                             family = gaussian())
+  expect_true(any(grepl('seriesseries_1:x2',
+                        priors$param_name)))
+  expect_true(any(grepl('seriesseries_2:x3',
+                        priors$param_name)))
+
+
+  # Observation formula; complex trend
+  mod <- mvgam(y ~ s(season) + series:x1 + series:x2 + series:x3,
+               trend_model = 'VARMA',
+               data = mod_data$data_train,
+               family = gaussian(),
+               run_model = FALSE)
+
+  expect_true(any(grepl('// prior for seriesseries_3:x1...',
+                        mod$model_file, fixed = TRUE)))
+  expect_true(any(grepl('// prior for (Intercept)...',
+                        mod$model_file, fixed = TRUE)))
+
+  para_names <- paste0(paste0('// prior for seriesseries_', 1:3,
+                              paste0(':x', 1:3, '...')))
+  for(i in seq_along(para_names)){
+    expect_true(any(grepl(para_names[i],
+                          mod$model_file, fixed = TRUE)))
+  }
+
+  priors <- get_mvgam_priors(y ~ s(season) + series:x1 +
+                               series:x2 + series:x3,
+                             trend_model = 'VARMA',
+                             data = mod_data$data_train,
+                             family = gaussian())
+  expect_true(any(grepl('seriesseries_1:x2',
+                        priors$param_name)))
+  expect_true(any(grepl('seriesseries_2:x3',
+                        priors$param_name)))
+
+  # Trend formula; RW
+  mod <- mvgam(y ~ 1,
+               trend_formula = ~ s(season) + trend:x1 +
+                 trend:x2 + trend:x3,
+               trend_model = 'RW',
+               data = mod_data$data_train,
+               family = gaussian(),
+               run_model = FALSE)
+
+  expect_true(any(grepl('// prior for (Intercept)...',
+                        mod$model_file, fixed = TRUE)))
+
+  para_names <- paste0(paste0('// prior for trendtrend', 1:3,
+                              paste0(':x', 1:3, '_trend...')))
+  for(i in seq_along(para_names)){
+    expect_true(any(grepl(para_names[i],
+                          mod$model_file, fixed = TRUE)))
+  }
+
+  priors <- get_mvgam_priors(y ~ 1,
+                             trend_formula = ~ s(season) + trend:x1 +
+                               trend:x2 + trend:x3,
+                             trend_model = 'RW',
+                             data = mod_data$data_train,
+                             family = gaussian())
+  expect_true(any(grepl('trendtrend1:x1_trend',
+                        priors$param_name)))
+  expect_true(any(grepl('trendtrend2:x3_trend',
+                        priors$param_name)))
+
+  # Trend formula; VARMA
+  mod <- mvgam(y ~ 1,
+               trend_formula = ~ s(season) + trend:x1 + trend:x2 + trend:x3,
+               trend_model = 'VARMA',
+               data = mod_data$data_train,
+               family = gaussian(),
+               run_model = FALSE)
+
+  expect_true(any(grepl('// prior for (Intercept)...',
+                        mod$model_file, fixed = TRUE)))
+
+  para_names <- paste0(paste0('// prior for trendtrend', 1:3,
+                              paste0(':x', 1:3, '_trend...')))
+  for(i in seq_along(para_names)){
+    expect_true(any(grepl(para_names[i],
+                          mod$model_file, fixed = TRUE)))
+  }
+
+  priors <- get_mvgam_priors(y ~ 1,
+                             trend_formula = ~ s(season) + trend:x1 + trend:x2 + trend:x3,
+                             trend_model = 'RW',
+                             data = mod_data$data_train,
+                             family = gaussian())
+  expect_true(any(grepl('trendtrend1:x1_trend',
+                        priors$param_name)))
+  expect_true(any(grepl('trendtrend2:x3_trend',
+                        priors$param_name)))
+})
 

@@ -510,21 +510,30 @@ add_stan_data = function(jags_file, stan_file,
     if(any(grep('## parametric effect priors', jags_file))){
 
       # Get indices of parametric effects
-      min_paras <- as.numeric(sub('.*(?=.$)', '',
-                                  sub("\\:.*", "",
-                                      jags_file[grep('## parametric effect', jags_file) + 1]), perl=T))
-      max_paras <- as.numeric(substr(sub(".*\\:", "",
-                                         jags_file[grep('## parametric effect', jags_file) + 1]),
-                                     1, 1))
-      para_indices <- seq(min_paras, max_paras)
-
-      # Get names of parametric terms
-      int_included <- attr(ss_gam$pterms, 'intercept') == 1L
-      other_pterms <- attr(ss_gam$pterms, 'term.labels')
-      all_paras <- other_pterms
-      if(int_included){
-        all_paras <- c('(Intercept)', all_paras)
-      }
+      smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
+        data.frame(label = ss_gam$smooth[[x]]$label,
+                   term = paste(ss_gam$smooth[[x]]$term, collapse = ','),
+                   class = class(ss_gam$smooth[[x]])[1])
+      }))
+      lpmat <- predict(ss_gam, type = 'lpmatrix',
+                       exclude = smooth_labs$label)
+      para_indices <- which(apply(lpmat, 2, function(x) !all(x == 0)) == TRUE)
+      all_paras <- names(para_indices)
+      # min_paras <- as.numeric(sub('.*(?=.$)', '',
+      #                             sub("\\:.*", "",
+      #                                 jags_file[grep('## parametric effect', jags_file) + 1]), perl=T))
+      # max_paras <- as.numeric(substr(sub(".*\\:", "",
+      #                                    jags_file[grep('## parametric effect', jags_file) + 1]),
+      #                                1, 1))
+      # para_indices <- seq(min_paras, max_paras)
+      #
+      # # Get names of parametric terms
+      # int_included <- attr(ss_gam$pterms, 'intercept') == 1L
+      # other_pterms <- attr(ss_gam$pterms, 'term.labels')
+      # all_paras <- other_pterms
+      # if(int_included){
+      #   all_paras <- c('(Intercept)', all_paras)
+      # }
 
       # Create prior lines for parametric terms
       para_lines <- vector()
