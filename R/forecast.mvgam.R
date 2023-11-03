@@ -37,6 +37,34 @@ forecast <- function(object, ...){
 
 #'@rdname forecast.mvgam
 #'@method forecast mvgam
+#' @examples
+#' \dontrun{
+#' simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
+#' mod <- mvgam(y ~ s(season, bs = 'cc'),
+#'             trend_model = 'AR1',
+#'             data = simdat$data_train)
+#'
+#' # Hindcasts on response scale
+#' hc <- hindcast(mod)
+#' str(hc)
+#' plot(hc, series = 1)
+#' plot(hc, series = 2)
+#' plot(hc, series = 3)
+#'
+#' # Forecasts on response scale
+#' fc <- forecast(mod, newdata = simdat$data_test)
+#' str(fc)
+#' plot(fc, series = 1)
+#' plot(fc, series = 2)
+#' plot(fc, series = 3)
+#'
+#' # Forecasts as expectations
+#' fc <- forecast(mod, newdata = simdat$data_test, type = 'expected')
+#' plot(fc, series = 1)
+#' plot(fc, series = 2)
+#' plot(fc, series = 3)
+#'
+#' }
 #'@export
 forecast.mvgam = function(object, newdata, data_test, series = 'all',
                           n_cores = 1,

@@ -5,7 +5,7 @@
 #'@param object \code{list} object of class `mvgam`
 #'@param include_betas Logical. Print a summary that includes posterior summaries
 #'of all linear predictor beta coefficients (including spline coefficients)?
-#'Defaults to \code{FALSE} for a more concise summary
+#'Defaults to \code{TRUE} but use \code{FALSE} for a more concise summary
 #'@param digits The number of significant digits for printing out the summary;
 #'  defaults to \code{2}.
 #'@param ... Ignored
@@ -584,15 +584,17 @@ if(!is.null(object$trend_call)){
                                   coef_names, fixed = TRUE)
     print(mvgam_coefs)
   } else {
-    coefs_include <- 1:object$trend_mgcv_model$nsdf
-    cat("\nGAM process model coefficient (beta) estimates:\n")
-    coef_names <- paste0(names(object$trend_mgcv_model$coefficients), '_trend')[coefs_include]
-    mvgam_coefs <- mcmc_summary(object$model_output, 'b_trend',
-                                digits = digits,
-                                variational = object$algorithm %in% c('fullrank', 'meanfield'))[coefs_include,c(3:7)]
-    rownames(mvgam_coefs) <- gsub('series', 'trend',
-                                  coef_names, fixed = TRUE)
-    print(mvgam_coefs)
+    if(object$trend_mgcv_model$nsdf > 0){
+      coefs_include <- 1:object$trend_mgcv_model$nsdf
+      cat("\nGAM process model coefficient (beta) estimates:\n")
+      coef_names <- paste0(names(object$trend_mgcv_model$coefficients), '_trend')[coefs_include]
+      mvgam_coefs <- mcmc_summary(object$model_output, 'b_trend',
+                                  digits = digits,
+                                  variational = object$algorithm %in% c('fullrank', 'meanfield'))[coefs_include,c(3:7)]
+      rownames(mvgam_coefs) <- gsub('series', 'trend',
+                                    coef_names, fixed = TRUE)
+      print(mvgam_coefs)
+    }
   }
 
   if(all(is.na(object$trend_sp_names))){

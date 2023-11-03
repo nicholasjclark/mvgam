@@ -5,7 +5,7 @@ specified by trend_model. Further modelling options include State-Space represen
 and dynamic processes to occur on the latent 'State' level while also capturing observation-level effects.
 Prior specifications are flexible and explicitly encourage users to apply
 prior distributions that actually reflect their beliefs. In addition, model fits can easily be assessed and
-compared with posterior predictive checks, forecast comparisons and leave-one-out / leave-future-out cross-validation."><title>Fit a Bayesian dynamic GAM to a univariate or multivariate set of discrete time series — mvgam • mvgam</title><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.2.2/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.2.2/bootstrap.bundle.min.js"></script><!-- Font Awesome icons --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css" integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk=" crossorigin="anonymous"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous"><!-- bootstrap-toc --><script src="https://cdn.jsdelivr.net/gh/afeld/bootstrap-toc@v1.0.1/dist/bootstrap-toc.min.js" integrity="sha256-4veVQbu7//Lk5TSmc7YV48MxtMy98e26cf5MrgZYnwo=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><!-- search --><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/autocomplete.js/0.38.0/autocomplete.jquery.min.js" integrity="sha512-GU9ayf+66Xx2TmpxqJpliWbT5PiGYxpaG8rfnBEk1LL8l1KGkRShhngwdXK1UgqhAzWpZHSiYPc09/NwDQIGyg==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/mark.min.js" integrity="sha512-5CYOlHXGh6QpOFA/TeTylKLWfB3ftPsde7AnmhuitiTX4K5SqCLBeKro6sPS8ilsz1Q4NRx3v8Ko2IBiszzdww==" crossorigin="anonymous"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Fit a Bayesian dynamic GAM to a univariate or multivariate set of discrete time series — mvgam"><meta property="og:description" content="This function estimates the posterior distribution for Generalised Additive Models (GAMs) that can include
+compared with posterior predictive checks, forecast comparisons and leave-one-out / leave-future-out cross-validation."><title>Fit a Bayesian dynamic GAM to a univariate or multivariate set of time series — mvgam • mvgam</title><script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"><link href="../deps/bootstrap-5.2.2/bootstrap.min.css" rel="stylesheet"><script src="../deps/bootstrap-5.2.2/bootstrap.bundle.min.js"></script><!-- Font Awesome icons --><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css" integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk=" crossorigin="anonymous"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous"><!-- bootstrap-toc --><script src="https://cdn.jsdelivr.net/gh/afeld/bootstrap-toc@v1.0.1/dist/bootstrap-toc.min.js" integrity="sha256-4veVQbu7//Lk5TSmc7YV48MxtMy98e26cf5MrgZYnwo=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><!-- search --><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/autocomplete.js/0.38.0/autocomplete.jquery.min.js" integrity="sha512-GU9ayf+66Xx2TmpxqJpliWbT5PiGYxpaG8rfnBEk1LL8l1KGkRShhngwdXK1UgqhAzWpZHSiYPc09/NwDQIGyg==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/mark.min.js" integrity="sha512-5CYOlHXGh6QpOFA/TeTylKLWfB3ftPsde7AnmhuitiTX4K5SqCLBeKro6sPS8ilsz1Q4NRx3v8Ko2IBiszzdww==" crossorigin="anonymous"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="Fit a Bayesian dynamic GAM to a univariate or multivariate set of time series — mvgam"><meta property="og:description" content="This function estimates the posterior distribution for Generalised Additive Models (GAMs) that can include
 smooth spline functions, specified in the GAM formula, as well as latent temporal processes,
 specified by trend_model. Further modelling options include State-Space representations to allow covariates
 and dynamic processes to occur on the latent 'State' level while also capturing observation-level effects.
@@ -22,7 +22,7 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.7</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -60,7 +60,7 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
 </nav><div class="container template-reference-topic">
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="" class="logo" alt=""><h1>Fit a Bayesian dynamic GAM to a univariate or multivariate set of discrete time series</h1>
+      <img src="" class="logo" alt=""><h1>Fit a Bayesian dynamic GAM to a univariate or multivariate set of time series</h1>
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/R/mvgam.R" class="external-link"><code>R/mvgam.R</code></a></small>
       <div class="d-none name"><code>mvgam.Rd</code></div>
     </div>
@@ -68,7 +68,7 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
     <div class="ref-description section level2">
     <p>This function estimates the posterior distribution for Generalised Additive Models (GAMs) that can include
 smooth spline functions, specified in the GAM formula, as well as latent temporal processes,
-specified by trend_model. Further modelling options include State-Space representations to allow covariates
+specified by <code>trend_model</code>. Further modelling options include State-Space representations to allow covariates
 and dynamic processes to occur on the latent 'State' level while also capturing observation-level effects.
 Prior specifications are flexible and explicitly encourage users to apply
 prior distributions that actually reflect their beliefs. In addition, model fits can easily be assessed and
@@ -102,7 +102,6 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
 <span>  parallel <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  threads <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  <span class="va">priors</span>,</span>
-<span>  <span class="va">upper_bounds</span>,</span>
 <span>  refit <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  lfo <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  use_stan <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -121,7 +120,8 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>formula</dt>
 <dd><p>A <code>character</code> string specifying the GAM observation model formula. These are exactly like the formula
-for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
+for a GLM except that smooth terms, <code>s()</code>, <code>te()</code>, <code>ti()</code>, <code>t2()</code>, as well as time-varying
+<code><a href="dynamic.html">dynamic()</a></code> terms, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).</p></dd>
 
 
@@ -151,9 +151,9 @@ functions within the <code>trend_formula</code></p></dd>
 <dt>data</dt>
 <dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable and covariates
 required by the GAM <code>formula</code>. Should include columns:
-<code>series</code> (character or factor index of the series IDs; if a factor, the number of levels should be identical
-to the number of unique series labels)
-<code>time</code> (numeric index of the time point for each observation).
+<code>series</code> (a <code>factor</code> index of the series IDs;the number of levels should be identical
+to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))
+<code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).
 Any other variables to be included in the linear predictor of <code>formula</code> must also be present</p></dd>
 
 
@@ -163,7 +163,7 @@ Any other variables to be included in the linear predictor of <code>formula</cod
 
 
 <dt>newdata</dt>
-<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing at least 'series' and 'time'
+<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing at least <code>series</code> and <code>time</code>
 in addition to any other variables included in the linear predictor of <code>formula</code>. If included, the
 observations in variable <code>y</code> will be set to <code>NA</code> when fitting the model so that posterior
 simulations can be obtained</p></dd>
@@ -194,20 +194,20 @@ the size of the returned object, unless <code>run_model == FALSE</code></p></dd>
 
 <dt>family</dt>
 <dd><p><code>family</code> specifying the exponential observation family for the series. Currently supported
-families are:</p><ul><li><p><code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code> for count data</p></li>
+families are:</p><ul><li><p><code>nb()</code> for count data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</p></li>
-<li><p><code><a href="mvgam_families.html">tweedie()</a></code> for count data (power parameter <code>p</code> fixed at <code>1.5</code>)</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> for real-valued data</p></li>
-<li><p><code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar()</a></code> for proportional data on <code>(0,1)</code></p></li>
-<li><p><code><a href="https://paul-buerkner.github.io/brms/reference/brmsfamily.html" class="external-link">lognormal()</a></code> for non-negative real-valued data</p></li>
+<li><p><code>betar()</code> for proportional data on <code>(0,1)</code></p></li>
+<li><p><code>lognormal()</code> for non-negative real-valued data</p></li>
 <li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
-</ul><p>See <a href="mvgam_families.html">mvgam_families</a> for more details</p></dd>
+</ul><p>Note that only <code>nb()</code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> are available if using <code>JAGS</code> as the backend.
+See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
 
 
 <dt>use_lv</dt>
 <dd><p><code>logical</code>. If <code>TRUE</code>, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. If <code>FALSE</code>, estimate independent latent trends for each series</p></dd>
+latent trends in a reduced dimension format. Defaults to <code>FALSE</code></p></dd>
 
 
 <dt>n_lv</dt>
@@ -227,17 +227,18 @@ for details</p></dd>
 
 
 <dt>trend_model</dt>
-<dd><p><code>character</code> specifying the time series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+<dd><p><code>character</code> or  <code>function</code> specifying the time series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
-<li><p><code>RW</code> (random walk with possible drift)</p></li>
-<li><p><code>AR1</code> (with possible drift)</p></li>
-<li><p><code>AR2</code> (with possible drift)</p></li>
-<li><p><code>AR3</code> (with possible drift)</p></li>
-<li><p><code>VAR1</code> (contemporaneously uncorrelated VAR1; only available in <code>Stan</code>)</p></li>
-<li><p><code>VAR1cor</code> (contemporaneously correlated VAR1; only available in <code>Stan</code>)</p></li>
-<li><p><code>GP</code> (Gaussian Process with squared exponential kernel;
+<li><p><code>'RW'</code> or <code><a href="RW.html">RW()</a></code></p></li>
+<li><p><code>'AR1'</code> or <code>AR(p = 1)</code></p></li>
+<li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
+<li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
+<li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
+<li><p><code>'GP'</code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
+</ul><p>For all types apart from <code>'GP'</code>, moving average and/or correlated
+process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
+multivariate Random Walk if <code>n_series &gt; 1</code>). See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
 
 
 <dt>drift</dt>
@@ -289,14 +290,6 @@ class <code>brmsprior</code> (see. <code><a href="https://paul-buerkner.github.i
 'Details' for more information on changing default prior distributions</p></dd>
 
 
-<dt>upper_bounds</dt>
-<dd><p>Optional <code>vector</code> of <code>integer</code> values specifying upper limits for each series. If supplied,
-this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
-is computationally expensive in <code>JAGS</code> but can lead to better estimates when true bounds exist. Default is to remove
-truncation entirely (i.e. there is no upper bound for each series). Currently not implemented
-in <code>Stan</code></p></dd>
-
-
 <dt>refit</dt>
 <dd><p>Logical indicating whether this is a refit, called using <a href="update.mvgam.html">update.mvgam</a>. Users should leave
 as <code>FALSE</code></p></dd>
@@ -311,7 +304,7 @@ leave this set as <code>FALSE</code></p></dd>
 
 <dt>use_stan</dt>
 <dd><p>Logical. If <code>TRUE</code>, the model will be compiled and sampled using
-the Hamiltonian Monte Carlo with a call to <code><a href="https://mc-stan.org/cmdstanr/reference/cmdstan_model.html" class="external-link">cmdstan_model</a></code> or
+Hamiltonian Monte Carlo with a call to <code><a href="https://mc-stan.org/cmdstanr/reference/cmdstan_model.html" class="external-link">cmdstan_model</a></code> or
 a call to <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code>. Note that
 there are many more options when using <code>Stan</code> vs <code>JAGS</code> (the only "advantage" of <code>JAGS</code> is the ability
 to use a Tweedie family).</p></dd>
@@ -340,7 +333,7 @@ distribution. Can be set globally for the current <span style="R">R</span> sessi
 
 
 <dt>save_all_pars</dt>
-<dd><p>A <code>Logical</code> flag to indicate if draws from all
+<dd><p><code>Logical</code> flag to indicate if draws from all
 variables defined in Stan's <code>parameters</code> block should be saved
 (default is <code>FALSE</code>).</p></dd>
 
@@ -421,7 +414,7 @@ principled workflow. Also note that models are parameterised using <code>drop.un
 to ensure predictions can be made for all levels of the supplied factor variable
 <br><br><em>Observation level parameters</em>: When more than one series is included in <code>data</code> and an
 observation family that contains more than one parameter is used, additional observation family parameters
-(i.e. <code>phi</code> for <code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code> or <code>sigma</code> for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>) are
+(i.e. <code>phi</code> for <code>nb()</code> or <code>sigma</code> for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>) are
 estimated independently for each series.
 <br><br><em>Factor regularisation</em>: When using a dynamic factor model for the trends with <code>JAGS</code> factor precisions are given
 regularized penalty priors to theoretically allow some factors to be dropped from the model by squeezing increasing
@@ -475,7 +468,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="co"># Formulate a model using Stan where series share a cyclic smooth for</span></span></span>
 <span class="r-in"><span><span class="co"># seasonality and each series has an independent random walk temporal process;</span></span></span>
 <span class="r-in"><span><span class="co"># Set run_model = FALSE to inspect the returned objects</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>             trend_model <span class="op">=</span> <span class="st">'RW'</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="st">'poisson'</span>,</span></span>
@@ -488,15 +481,11 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="co"># Inspect the data objects needed to condition the model</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">$</span><span class="va">model_data</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Inspect the initial value function used to initialise the MCMC chains</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span><span class="op">$</span><span class="va">inits</span></span></span>
-<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The following code can be used to run the model outside of mvgam; first using rstan</span></span></span>
 <span class="r-in"><span><span class="va">model_data</span> <span class="op">&lt;-</span> <span class="va">mod1</span><span class="op">$</span><span class="va">model_data</span></span></span>
 <span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mc-stan.org/rstan/" class="external-link">rstan</a></span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></span><span class="op">(</span>model_code <span class="op">=</span> <span class="va">mod1</span><span class="op">$</span><span class="va">model_file</span>,</span></span>
-<span class="r-in"><span>           data <span class="op">=</span> <span class="va">model_data</span>,</span></span>
-<span class="r-in"><span>           init <span class="op">=</span> <span class="va">mod1</span><span class="op">$</span><span class="va">inits</span><span class="op">)</span></span></span>
+<span class="r-in"><span>           data <span class="op">=</span> <span class="va">model_data</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now using cmdstanr</span></span></span>
 <span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mc-stan.org/cmdstanr/" class="external-link">cmdstanr</a></span><span class="op">)</span></span></span>
@@ -507,11 +496,10 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="va">cmd_mod</span><span class="op">$</span><span class="fu">sample</span><span class="op">(</span>data <span class="op">=</span> <span class="va">model_data</span>,</span></span>
 <span class="r-in"><span>                     chains <span class="op">=</span> <span class="fl">4</span>,</span></span>
 <span class="r-in"><span>                     parallel_chains <span class="op">=</span> <span class="fl">4</span>,</span></span>
-<span class="r-in"><span>                     refresh <span class="op">=</span> <span class="fl">100</span>,</span></span>
-<span class="r-in"><span>                     init <span class="op">=</span> <span class="va">mod1</span><span class="op">$</span><span class="va">inits</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                     refresh <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now fit the model using mvgam with the Stan backend</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              trend_model <span class="op">=</span> <span class="st">'RW'</span>,</span></span>
 <span class="r-in"><span>              family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
@@ -524,11 +512,12 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Residual diagnostics</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'residuals'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compute the forecast using covariate information in data_test</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span>object <span class="op">=</span> <span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'trend'</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
-<span class="r-in"><span>     series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span>object <span class="op">=</span> <span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
-<span class="r-in"><span>     series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod1</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot the estimated seasonal smooth function</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'smooths'</span><span class="op">)</span></span></span>
@@ -539,12 +528,11 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="co"># Plot partial residuals of the smooth</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, residuals <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot posterior realisations for the smooth</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, realisations <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot conditional response predictions using marginaleffects</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod1</span>, condition <span class="op">=</span> <span class="st">'season'</span>, points <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">plot_predictions</span><span class="op">(</span><span class="va">mod1</span>, condition <span class="op">=</span> <span class="st">'season'</span>, points <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Extract observation model beta coefficient draws as a data.frame</span></span></span>
 <span class="r-in"><span><span class="va">beta_draws_df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">mod1</span>, variable <span class="op">=</span> <span class="st">'betas'</span><span class="op">)</span></span></span>
@@ -566,7 +554,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span>                       trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>,<span class="fl">1</span>,<span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit the model using AR1 trends</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span></span>
 <span class="r-in"><span>              trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span></span>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">mod_data</span>,</span></span>
@@ -591,7 +579,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span>  <span class="va">beta_temp</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">1</span>, mean <span class="op">=</span> <span class="va">beta_temp</span><span class="op">[</span><span class="va">i</span> <span class="op">-</span> <span class="fl">1</span><span class="op">]</span>, sd <span class="op">=</span> <span class="fl">0.025</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Simulate the temperature covariate</span></span></span>
+<span class="r-in"><span><span class="co"># Simulate covariate called 'temp'</span></span></span>
 <span class="r-in"><span><span class="va">temp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">N</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate the Gaussian observation process</span></span></span>
 <span class="r-in"><span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">N</span>, mean <span class="op">=</span> <span class="fl">4</span> <span class="op">+</span> <span class="va">beta_temp</span> <span class="op">*</span> <span class="va">temp</span>,</span></span>
@@ -630,9 +618,9 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="co"># Fit a model that includes the offset in the linear predictor as well as</span></span></span>
 <span class="r-in"><span><span class="co"># hierarchical seasonal smooths</span></span></span>
 <span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset</a></span><span class="op">(</span><span class="va">offset</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>         <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>         <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>         <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, m <span class="op">=</span> <span class="fl">1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>         <span class="fu">s</span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>         <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>         <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, m <span class="op">=</span> <span class="fl">1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>         data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>         trend_model <span class="op">=</span> <span class="st">'None'</span>,</span></span>
 <span class="r-in"><span>         use_stan <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
@@ -678,106 +666,6 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span> <span class="op">}</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Example of a State Space model</span></span></span>
-<span class="r-in"><span><span class="co"># Simulate a true signal we are trying to track, which depends</span></span></span>
-<span class="r-in"><span><span class="co"># nonlinearly on some covariate 'productivity' as well as showing</span></span></span>
-<span class="r-in"><span><span class="co"># some temporal autocorrelation</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1111</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">signal_dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gamSim.html" class="external-link">gamSim</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">100</span>, eg <span class="op">=</span> <span class="fl">1</span>, scale <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">productivity</span> <span class="op">&lt;-</span> <span class="va">signal_dat</span><span class="op">$</span><span class="va">x1</span></span></span>
-<span class="r-in"><span><span class="va">true_signal</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/vector.html" class="external-link">as.vector</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/scale.html" class="external-link">scale</a></span><span class="op">(</span><span class="va">signal_dat</span><span class="op">$</span><span class="va">y</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>                         <span class="fu"><a href="https://rdrr.io/r/stats/arima.sim.html" class="external-link">arima.sim</a></span><span class="op">(</span><span class="fl">100</span>, model <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>ar <span class="op">=</span> <span class="fl">0.9</span>, sd <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">true_signal</span>, type <span class="op">=</span> <span class="st">'l'</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Simulate three sensors, all with different observation</span></span></span>
-<span class="r-in"><span><span class="co"># errors that depend nonlinearly on an external covariate 'temperature'</span></span></span>
-<span class="r-in"><span><span class="va">sim_series</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">n_series</span> <span class="op">=</span> <span class="fl">3</span>, <span class="va">true_signal</span><span class="op">)</span><span class="op">{</span></span></span>
-<span class="r-in"><span> <span class="va">temp_effects</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gamSim.html" class="external-link">gamSim</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">100</span>, eg <span class="op">=</span> <span class="fl">7</span>, scale <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span></span></span>
-<span class="r-in"><span> <span class="va">temperature</span> <span class="op">&lt;-</span> <span class="va">temp_effects</span><span class="op">$</span><span class="va">y</span></span></span>
-<span class="r-in"><span> <span class="va">alphas</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n_series</span>, sd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="va">n_series</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">series</span><span class="op">)</span><span class="op">{</span></span></span>
-<span class="r-in"><span>   <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>observed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">true_signal</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                               mean <span class="op">=</span> <span class="va">alphas</span><span class="op">[</span><span class="va">series</span><span class="op">]</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>                                      <span class="fu"><a href="https://rdrr.io/r/base/vector.html" class="external-link">as.vector</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/scale.html" class="external-link">scale</a></span><span class="op">(</span><span class="va">temp_effects</span><span class="op">[</span>, <span class="va">series</span> <span class="op">+</span> <span class="fl">1</span><span class="op">]</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>                                      <span class="va">true_signal</span>,</span></span>
-<span class="r-in"><span>                               sd <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">0.5</span>, <span class="fl">1.5</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">'sensor_'</span>, <span class="va">series</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">true_signal</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              temperature <span class="op">=</span> <span class="va">temperature</span>,</span></span>
-<span class="r-in"><span>              productivity <span class="op">=</span> <span class="va">productivity</span>,</span></span>
-<span class="r-in"><span>              true_signal <span class="op">=</span> <span class="va">true_signal</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="op">}</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span> <span class="op">}</span></span></span>
-<span class="r-in"><span><span class="va">model_dat</span> <span class="op">&lt;-</span> <span class="fu">sim_series</span><span class="op">(</span>true_signal <span class="op">=</span> <span class="va">true_signal</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
-<span class="r-in"><span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Plot the sensor observations</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">model_dat</span>, y <span class="op">=</span> <span class="st">'observed'</span>,</span></span>
-<span class="r-in"><span>                 series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="co"># Plot relationships between sensors and temperature</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">observed</span> <span class="op">~</span> <span class="va">temperature</span>, data <span class="op">=</span> <span class="va">model_dat</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
-<span class="r-in"><span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">series</span> <span class="op">==</span> <span class="st">'sensor_1'</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">observed</span> <span class="op">~</span> <span class="va">temperature</span>, data <span class="op">=</span> <span class="va">model_dat</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
-<span class="r-in"><span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">series</span> <span class="op">==</span> <span class="st">'sensor_2'</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">observed</span> <span class="op">~</span> <span class="va">temperature</span>, data <span class="op">=</span> <span class="va">model_dat</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
-<span class="r-in"><span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">series</span> <span class="op">==</span> <span class="st">'sensor_3'</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Plot the true signal against productivity</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">true_signal</span> <span class="op">~</span> <span class="va">productivity</span>, data <span class="op">=</span> <span class="va">model_dat</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Formulate and fit a model that allows each sensor's observation error</span></span></span>
-<span class="r-in"><span><span class="co"># to depend nonlinearly on temperature while allowing the true signal</span></span></span>
-<span class="r-in"><span><span class="co"># to depend nonlinearly on productivity. By fixing all trend values in</span></span></span>
-<span class="r-in"><span><span class="co"># the trend_map to 1, we are assuming that all observation sensors are</span></span></span>
-<span class="r-in"><span><span class="co"># tracking the same latent signal</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span></span></span>
-<span class="r-in"><span>             <span class="co"># formula for observations, allowing for different</span></span></span>
-<span class="r-in"><span>             <span class="co"># intercepts and smooth effects of temperature</span></span></span>
-<span class="r-in"><span>             <span class="va">observed</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">temperature</span>, by <span class="op">=</span> <span class="va">series</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span>            trend_formula <span class="op">=</span></span></span>
-<span class="r-in"><span>            <span class="co"># formula for the latent signal, which can depend</span></span></span>
-<span class="r-in"><span>            <span class="co"># nonlinearly on productivity</span></span></span>
-<span class="r-in"><span>            <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">productivity</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span>           trend_model <span class="op">=</span></span></span>
-<span class="r-in"><span>           <span class="co"># in addition to productivity effects, the signal is</span></span></span>
-<span class="r-in"><span>           <span class="co"># assumed to exhibit temporal autocorrelation</span></span></span>
-<span class="r-in"><span>           <span class="st">'AR1'</span>,</span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span>           trend_map <span class="op">=</span></span></span>
-<span class="r-in"><span>           <span class="co"># trend_map forces all sensors to track the same</span></span></span>
-<span class="r-in"><span>           <span class="co"># latent signal</span></span></span>
-<span class="r-in"><span>           <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">model_dat</span><span class="op">$</span><span class="va">series</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                      trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span>          <span class="co"># informative priors on process error</span></span></span>
-<span class="r-in"><span>          <span class="co"># and observation error will help with convergence</span></span></span>
-<span class="r-in"><span>          priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">sigma</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                     <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.5</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">sigma_obs</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span>          <span class="co"># Gaussian observations</span></span></span>
-<span class="r-in"><span>          family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>          data <span class="op">=</span> <span class="va">model_dat</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># View a reduced version of the model summary because there will be</span></span></span>
-<span class="r-in"><span><span class="co"># many spline coefficients in this model</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span>, include_betas <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Plot the estimated latent signal</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'trend'</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Overlay the true simulated signal</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/lines.html" class="external-link">lines</a></span><span class="op">(</span><span class="va">true_signal</span>, lwd <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Plot response of the signal to productivity</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, trend_effects <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Plot the responses of observation sensors to</span></span></span>
-<span class="r-in"><span><span class="co"># temperature</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'smooths'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 </code></pre></div>
     </div>

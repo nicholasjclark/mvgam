@@ -88,3 +88,21 @@ leave this set as \code{FALSE}}
 \description{
 This function allows a previously fitted \code{mvgam} model to be updated
 }
+\examples{
+\dontrun{
+# Simulate some data and fit a Poisson AR1 model
+simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+mod <- mvgam(y ~ s(season, bs = 'cc'),
+            trend_model = 'AR1',
+            data = simdat$data_train)
+summary(mod)
+
+# Update to an AR2 model
+updated_mod <- update(mod, trend_model = 'AR2')
+summary(updated_mod)
+
+# Now update to a Negative Binomial AR1
+updated_mod <- update(mod, family = nb())
+summary(updated_mod)
+}
+}

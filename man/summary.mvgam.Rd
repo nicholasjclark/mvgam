@@ -17,7 +17,7 @@
 
 \item{include_betas}{Logical. Print a summary that includes posterior summaries
 of all linear predictor beta coefficients (including spline coefficients)?
-Defaults to \code{FALSE} for a more concise summary}
+Defaults to \code{TRUE} but use \code{FALSE} for a more concise summary}
 
 \item{digits}{The number of significant digits for printing out the summary;
 defaults to \code{2}.}

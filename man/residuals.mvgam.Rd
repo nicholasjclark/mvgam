@@ -48,3 +48,16 @@ This method gives residuals as Dunn-Smyth (randomized quantile) residuals. Any
 observations that were missing (i.e. \code{NA}) in the original data will have missing values
 in the residuals
 }
+\examples{
+\dontrun{
+# Simulate some data and fit a model
+simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+mod <- mvgam(y ~ s(season, bs = 'cc'),
+            trend_model = 'AR1',
+            data = simdat$data_train)
+
+# Extract posterior residuals
+resids <- residuals(mod)
+str(resids)
+}
+}

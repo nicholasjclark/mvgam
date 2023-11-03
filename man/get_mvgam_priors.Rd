@@ -19,21 +19,25 @@ get_mvgam_priors(
 )
 }
 \arguments{
-\item{formula}{A \code{character} string specifying the GAM formula. These are exactly like the formula
-for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
-to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these)}
+\item{formula}{A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
+for a GLM except that smooth terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying
+\code{dynamic()} terms, can be added to the right hand side
+to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).}
 
 \item{trend_formula}{An optional \code{character} string specifying the GAM process model formula. If
 supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
 separately from the observation model. Should not have a response variable specified on the left-hand side
-of the formula (i.e. a valid option would be \code{~ season + s(year)}). This feature is experimental, and is only
-currently available for Random Walk trend models.}
+of the formula (i.e. a valid option would be \code{~ season + s(year)}). Also note that you should not use
+the identifier \code{series} in this formula to specify effects that vary across time series. Instead you should use
+\code{trend}. This will ensure that models in which a \code{trend_map} is supplied will still work consistently
+(i.e. by allowing effects to vary across process models, even when some time series share the same underlying
+process model). This feature is experimental, and is only currently available for Random Walk and AR trend models.}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
-\code{series} (character or factor index of the series IDs; if a factor, the number of levels should be identical
-to the number of unique series labels)
-\code{time} (numeric index of the time point for each observation).
+\code{series} (a \code{factor} index of the series IDs;the number of levels should be identical
+to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
+\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
 \item{data_train}{Deprecated. Still works in place of \code{data} but users are recommended to use
@@ -44,16 +48,16 @@ families are:
 \itemize{
 \item\code{nb()} for count data
 \item\code{poisson()} for count data
-\item\code{tweedie()} for count data (power parameter \code{p} fixed at \code{1.5})
 \item\code{gaussian()} for real-valued data
 \item\code{betar()} for proportional data on \verb{(0,1)}
 \item\code{lognormal()} for non-negative real-valued data
 \item\code{student_t()} for real-valued data
 \item\code{Gamma()} for non-negative real-valued data}
+Note that only \code{nb()} and \code{poisson()} are available if using \code{JAGS} as the backend.
 See \code{\link{mvgam_families}} for more details}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series}
+latent trends in a reduced dimension format. Defaults to \code{FALSE}}
 
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
 Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
@@ -66,18 +70,21 @@ dynamic factor trends. However, as \code{Stan} can estimate Hilbert base approxi
 are much more computationally tractable than full GPs for time series with \verb{>100} observations, estimation
 in \code{Stan} can support latent GP trends while estimation in \code{JAGS} cannot}
 
-\item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
+\item{trend_model}{\code{character} or  \code{function} specifying the time series dynamics for the latent trend. Options are:
 \itemize{
 \item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
-\item \code{RW} (random walk with possible drift)
-\item \code{AR1} (with possible drift)
-\item \code{AR2} (with possible drift)
-\item \code{AR3} (with possible drift)
-\item \code{VAR1} (contemporaneously uncorrelated VAR1; only available in \code{Stan})
-\item \code{VAR1cor} (contemporaneously correlated VAR1; only available in \code{Stan})
-\item \code{GP} (Gaussian Process with squared exponential kernel;
-only available in \code{Stan})} See \link{mvgam_trends} for more details}
+\item \code{'RW'} or \code{RW()}
+\item \code{'AR1'} or \code{AR(p = 1)}
+\item \code{'AR2'} or \code{AR(p = 2)}
+\item \code{'AR3'} or \code{AR(p = 3)}
+\item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
+\item \code{'GP'} (Gaussian Process with squared exponential kernel;
+only available in \code{Stan})}
+
+For all types apart from \code{'GP'}, moving average and/or correlated
+process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
+multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
 
 \item{trend_map}{Optional \code{data.frame} specifying which series should depend on which latent
 trends. Useful for allowing multiple series to depend on the same latent trend process, but with
@@ -86,12 +93,13 @@ different observation processes. If supplied, a latent factor model is set up by
 \code{series} and \code{trend}, with integer values in the \code{trend} column to state which trend each series
 should depend on. The \code{series} column should have a single unique entry for each series in the
 data (names should perfectly match factor levels of the \code{series} variable in \code{data}). See examples
-in \code{\link{mvgam}} for details}
+for details}
 
 \item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
 the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Therefore this defaults to \code{FALSE}}
+predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift parameters will also likely
+be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}}
 }
 \value{
 either a \code{data.frame} containing the prior definitions (if any suitable

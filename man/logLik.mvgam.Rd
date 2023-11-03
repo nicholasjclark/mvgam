@@ -36,3 +36,16 @@ testing observations)
 \description{
 Compute pointwise Log-Likelihoods from fitted \code{mvgam} objects
 }
+\examples{
+\dontrun{
+# Simulate some data and fit a model
+simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+mod <- mvgam(y ~ s(season, bs = 'cc'),
+            trend_model = 'AR1',
+            data = simdat$data_train)
+
+# Extract logLikelihood values
+lls <- logLik(mod)
+str(lls)
+}
+}

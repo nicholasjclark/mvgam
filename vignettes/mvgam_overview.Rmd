@@ -27,16 +27,85 @@ theme_set(theme_bw(base_size = 12, base_family = 'serif'))
 The purpose of this vignette is to give a general overview of the `mvgam` package and its primary functions.
 
 ## Dynamic GAMs
-Briefly, assume $\tilde{\boldsymbol{y}}_{t}$ is the conditional expectation of a response variable $\boldsymbol{y}$ at time $\boldsymbol{t}$. Assuming $\boldsymbol{y}$ is drawn from an exponential distribution with an invertible link function, the linear predictor for a Dynamic GAM is written as:
+`mvgam` is designed to propagate unobserved temporal processes to capture latent dynamics in the observed time series. This works in a state-space format, with the temporal *trend* evolving independently of the observation process. Briefly, assume $\tilde{\boldsymbol{y}}_{i,t}$ is the conditional expectation of response variable $\boldsymbol{i}$ at time $\boldsymbol{t}$. Assuming $\boldsymbol{y_i}$ is drawn from an exponential distribution with an invertible link function, the linear predictor for a multivariate Dynamic GAM can be written as:
 
-$$g(\tilde{\boldsymbol{y}}_{t})=\alpha+\sum\limits_{i=1}^I\boldsymbol{s}_{i,t}\boldsymbol{x}_{i,t}+\boldsymbol{z}_{t}\,,$$
+$$for~i~in~1:N_{series}~...$$
+$$for~t~in~1:N_{timepoints}~...$$
 
-Here $\alpha$ is the unknown intercept, the $\boldsymbol{s}$'s are unknown smooth functions of covariates ($\boldsymbol{x}$'s) and $\boldsymbol{z}$ is a dynamic latent trend. Each smooth function $\boldsymbol{s}_{i}$ is composed of basis expansions whose coefficients, which must be estimated, control the functional relationship between $\boldsymbol{x}_{i}$ and $log(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity. A larger set of basis functions allows greater flexibility. Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson, Negative Binomial, Tweedie-Poisson) that accommodate common ecological features such as zero-inflation or overdispersion, and that they can be formulated to include hierarchical smoothing for multivariate responses. For the dynamic component, in its most basic form we assume a random walk with drift:
+$$g^{-1}(\tilde{\boldsymbol{y}}_{i,t})=\alpha_{i}+\sum\limits_{j=1}^J\boldsymbol{s}_{i,j,t}\boldsymbol{x}_{j,t}+\boldsymbol{z}_{i,t}\,,$$
+Here $\alpha$ are the unknown intercepts, the $\boldsymbol{s}$'s are unknown smooth functions of covariates ($\boldsymbol{x}$'s), which can potentially vary among the response series, and $\boldsymbol{z}$ are dynamic latent processes. Each smooth function $\boldsymbol{s_j}$ is composed of basis expansions whose coefficients, which must be estimated, control the functional relationship between $\boldsymbol{x}_{j}$ and $g^{-1}(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity. A larger set of basis functions allows greater flexibility. Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson, Negative Binomial, Gamma) that accommodate common ecological features such as zero-inflation or overdispersion, and that they can be formulated to include hierarchical smoothing for multivariate responses. `mvgam` supports a number of different observation families, which are summarized below:
 
-$$\boldsymbol{z}_{t}=\phi+\boldsymbol{z}_{t-1}+\boldsymbol{e}_{t}\,,$$
+## Supported observation families
 
-where $\phi$ is an optional drift parameter (if the latent trend is assumed to not be stationary) and $\boldsymbol{e}$ is drawn from a zero-centred Gaussian distribution. This model is easily modified to include autoregressive terms, which `mvgam` accomodates up to `order = 3`. There are many other types of models that can be handled in `mvgam`, but this overview will just introduce a few of them.
+|Distribution      | Function        | Support                                           | Extra parameter(s)   |
+|:----------------:|:---------------:| :------------------------------------------------:|:--------------------:|
+|Gaussian (identity link)         | `gaussian()`    | Real values in $(-\infty, \infty)$                | $\sigma$             |
+|Student's T (identity link)      | `student-t()`   | Heavy-tailed real values in $(-\infty, \infty)$   | $\sigma$, $\nu$      |
+|LogNormal (identity link)        | `lognormal()`   | Positive real values in $[0, \infty)$             | $\sigma$             |
+|Gamma (log link)             | `Gamma()`       | Positive real values in $[0, \infty)$             | $\alpha$             |
+|Beta (logit link)              | `betar()`       | Real values (proportional) in $[0,1]$             | $\phi$               |
+|Poisson (log link)           | `poisson()`     | Non-negative integers in $(0,1,2,...)$            | -                    |
+|Negative Binomial2 (log link)| `nb()`          | Non-negative integers in $(0,1,2,...)$            | $\phi$               |
 
+For all supported observation families, any extra parameters that need to be estimated (i.e. the $\sigma$ in a Gaussian model or the $\phi$ in a Negative Binomial model) are estimated independently for each series. Note that default link functions cannot currently be changed in `mvgam`.
+
+## Supported temporal dynamic processes
+The dynamic processes can take a wide variety of forms, some of which can be multivariate to allow the different time series to interact or be correlated. When using the `mvgam()` function, the user chooses between different process models with the `trend_model` argument. Available process models are described in detail below.
+
+### Independent Random Walks
+Use `trend_model = 'RW'` or `trend_model = RW()` to set up a model where each series in `data` has independent latent temporal dynamics of the form:
+
+
+\begin{align*}
+z_{i,t} & \sim \text{Normal}(z_{i,t-1}, \sigma_i) \end{align*}
+
+Process error parameters $\sigma$ are modeled independently for each series. If a moving average process is required, use `trend_model = RW(ma = TRUE)` to set up the following:
+
+\begin{align*}
+z_{i,t} & = z_{i,t-1} + \theta_i * error_{i,t-1} + error_{i,t} \\
+error_{i,t} & \sim \text{Normal}(0, \sigma_i) \end{align*}
+
+Moving average coefficients $\theta$ are independently estimated for each series and will be forced to be stationary by default $(abs(\theta)<1)$. Only moving averages of order $q=1$ are currently allowed. 
+
+### Multivariate Random Walks
+If more than one series is included in `data` $(N_{series} > 1)$, a multivariate Random Walk can be set up using `trend_model = RW(cor = TRUE)`, resulting in the following:
+
+\begin{align*}
+z_{t} & \sim \text{MVNormal}(z_{t-1}, \Sigma) \end{align*}
+
+Where the latent process estimate $z_t$ now takes the form of a vector. The covariance matrix $\Sigma$ will capture contemporaneously correlated process errors. It is parameterised using a Cholesky factorization, which requires priors on the series-level variances $\sigma$ and on the strength of correlations using `Stan`'s `lkj_corr_cholesky` distribution.
+
+Moving average terms can also be included for multivariate random walks, in which case the moving average coefficients $\theta$ will be parameterised as an $N_{series} * N_{series}$ matrix
+
+### Autoregressive processes
+Autoregressive models up to $p=3$, in which the autoregressive coefficients are estimated independently for each series, can be used by specifying `trend_model = 'AR1'`, `trend_model = 'AR2'`, `trend_model = 'AR3'`, or `trend_model = AR(p = 1, 2, or 3)`. For example, a univariate AR(1) model takes the form:
+
+\begin{align*}
+z_{i,t} & \sim \text{Normal}(ar1_i * z_{i,t-1}, \sigma_i) \end{align*}
+
+
+All options are the same as for Random Walks, but additional options will be available for placing priors on the autoregressive coefficients. By default, these coefficients will not be forced into stationarity, but users can impose this restriction by changing the upper and lower bounds on their priors. See `?get_mvgam_priors` for more details.
+
+### Vector Autoregressive processes
+A Vector Autoregression of order $p=1$ can be specified if $N_{series} > 1$ using `trend_model = 'VAR1'` or `trend_model = VAR()`. A VAR(1) model takes the form:
+
+\begin{align*}
+z_{t} & \sim \text{Normal}(A * z_{t-1}, \Sigma) \end{align*}
+
+Where $A$ is an $N_{series} * N_{series}$ matrix of autoregressive coefficients in which the diagonals capture lagged self-dependence (i.e. the effect of a process at time $t$ on its own estimate at time $t+1$), while off-diagonals capture lagged cross-dependence (i.e. the effect of a process at time $t$ on the process for another series at time $t+1$). By default, the covariance matrix $\Sigma$ will assume no process error covariance by fixing the off-diagonals to $0$. To allow for correlated errors, use `trend_model = 'VAR1cor'` or `trend_model = VAR(cor = TRUE)`. A moving average of order $q=1$ can also be included using `trend_model = VAR(ma = TRUE, cor = TRUE)`.
+
+Note that for all VAR models, stationarity of the process is enforced with a structured prior distribution that is described in detail in [Heaps 2022](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648)
+  
+Heaps, Sarah E. "[Enforcing stationarity through the prior in vector autoregressions.](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648)" *Journal of Computational and Graphical Statistics* 32.1 (2023): 74-83.
+
+### Gaussian Processes
+The final option for modelling temporal dynamics is to use a Gaussian Process with squared exponential kernel. These are set up independently for each series (there is currently no multivariate GP option), using `trend_model = 'GP'`. The dynamics for each latent process are modelled as:
+
+\begin{align*}
+z & \sim \text{MVNormal}(0, \Sigma_{error}) \\
+\Sigma_{error}[t_i, t_j] & = \alpha^2 * exp(-0.5 * ((|t_i - t_j| / \rho))^2) \end{align*}
+
+The latent dynamic process evolves from a complex, high-dimensional Multivariate Normal distribution which depends on $\rho$ (often called the length scale parameter) to control how quickly the correlations between the model's errors decay as a function of time. For these models, covariance decays exponentially fast with the squared distance (in time) between the observations. The functions also depend on a parameter $\alpha$, which controls the marginal variability of the temporal function at all points; in other words it controls how much the GP term contributes to the linear predictor. `mvgam` capitalizes on some advances that allow GPs to be approximated using Hilbert space basis functions, which [considerably speed up computation at little cost to accuracy or prediction performance](https://link.springer.com/article/10.1007/s11222-022-10167-2){target="_blank"}.
 
 ## Example time series data
 

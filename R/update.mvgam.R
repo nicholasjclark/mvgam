@@ -55,6 +55,23 @@
 #'post-processing. But other downstream functions will not work properly, so users should always
 #'leave this set as `FALSE`
 #'@param ... Other arguments to be passed to \code{\link{mvgam}}
+#' @examples
+#' \dontrun{
+#' # Simulate some data and fit a Poisson AR1 model
+#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' mod <- mvgam(y ~ s(season, bs = 'cc'),
+#'             trend_model = 'AR1',
+#'             data = simdat$data_train)
+#' summary(mod)
+#'
+#' # Update to an AR2 model
+#' updated_mod <- update(mod, trend_model = 'AR2')
+#' summary(updated_mod)
+#'
+#' # Now update to a Negative Binomial AR1
+#' updated_mod <- update(mod, family = nb())
+#' summary(updated_mod)
+#'}
 #'@export
 update.mvgam = function(object, formula,
                         trend_formula,

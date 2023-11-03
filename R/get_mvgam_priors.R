@@ -3,63 +3,7 @@
 #'This function lists the parameters that can have their prior distributions
 #'changed for a given `mvgam` model, as well listing their default distributions
 #'
-#'
-#'@param formula A \code{character} string specifying the GAM formula. These are exactly like the formula
-#'for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
-#'to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these)
-#'@param trend_formula An optional \code{character} string specifying the GAM process model formula. If
-#'supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
-#'separately from the observation model. Should not have a response variable specified on the left-hand side
-#'of the formula (i.e. a valid option would be `~ season + s(year)`). This feature is experimental, and is only
-#'currently available for Random Walk trend models.
-#'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
-#'required by the GAM \code{formula}. Should include columns:
-#'`series` (character or factor index of the series IDs; if a factor, the number of levels should be identical
-#'to the number of unique series labels)
-#'`time` (numeric index of the time point for each observation).
-#'Any other variables to be included in the linear predictor of \code{formula} must also be present
-#'@param data_train Deprecated. Still works in place of \code{data} but users are recommended to use
-#'\code{data} instead for more seamless integration into `R` workflows
-#'@param family \code{family} specifying the exponential observation family for the series. Currently supported
-#'families are:
-#'\itemize{
-#'   \item`nb()` for count data
-#'   \item`poisson()` for count data
-#'   \item`tweedie()` for count data (power parameter `p` fixed at `1.5`)
-#'   \item`gaussian()` for real-valued data
-#'   \item`betar()` for proportional data on `(0,1)`
-#'   \item`lognormal()` for non-negative real-valued data
-#'   \item`student_t()` for real-valued data
-#'   \item`Gamma()` for non-negative real-valued data}
-#'See \code{\link{mvgam_families}} for more details
-#'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-#'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
-#'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
-#'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}
-#'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
-#'\itemize{
-#'   \item `None` (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
-#'   \item `RW` (random walk with possible drift)
-#'   \item `AR1` (with possible drift)
-#'   \item `AR2` (with possible drift)
-#'   \item `AR3` (with possible drift)
-#'   \item `VAR1` (contemporaneously uncorrelated VAR1; only available in \code{Stan})
-#'   \item `VAR1cor` (contemporaneously correlated VAR1; only available in \code{Stan})
-#'   \item `GP` (Gaussian Process with squared exponential kernel;
-#'only available in \code{Stan})} See [mvgam_trends] for more details
-#'@param trend_map Optional `data.frame` specifying which series should depend on which latent
-#'trends. Useful for allowing multiple series to depend on the same latent trend process, but with
-#'different observation processes. If supplied, a latent factor model is set up by setting
-#'`use_lv = TRUE` and using the mapping to set up the shared trends. Needs to have column names
-#'`series` and `trend`, with integer values in the `trend` column to state which trend each series
-#'should depend on. The `series` column should have a single unique entry for each series in the
-#'data (names should perfectly match factor levels of the `series` variable in `data`). See examples
-#'in \code{\link{mvgam}} for details
-#'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
-#'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
-#'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-#'predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Therefore this defaults to \code{FALSE}
+#' @inheritParams mvgam
 #'@param use_stan Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
 #'the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if `cmdstanr` is not available,
 #'a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
@@ -290,6 +234,11 @@ get_mvgam_priors = function(formula,
   trend_model <- ma_cor_adds$trend_model
   use_var1 <- ma_cor_adds$use_var1; use_var1cor <- ma_cor_adds$use_var1cor
   add_ma <- ma_cor_adds$add_ma; add_cor <- ma_cor_adds$add_cor
+
+  if(length(unique(data_train$series)) == 1 & add_cor){
+    warning('Correlated process errors not possible with only 1 series')
+    add_cor <- FALSE
+  }
 
   if(use_lv & (add_ma | add_cor) & missing(trend_formula)){
     stop('Cannot estimate moving averages or correlated errors for dynamic factors',
