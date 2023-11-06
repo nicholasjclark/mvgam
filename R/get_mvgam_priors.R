@@ -531,6 +531,11 @@ get_mvgam_priors = function(formula,
                    attr(ss_gam, 'condition')),
              call. = FALSE)
       }
+
+      if(grepl('fewer unique', ss_gam[1])){
+        stop('A term has fewer unique covariate combinations than specified maximum degrees of freedom',
+             call. = FALSE)
+      }
     }
 
     # Parametric effect priors

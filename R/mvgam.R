@@ -858,6 +858,11 @@ mvgam = function(formula,
                  attr(ss_gam, 'condition')),
            call. = FALSE)
     }
+
+    if(grepl('fewer unique', ss_gam[1])){
+      stop('A term has fewer unique covariate combinations than specified maximum degrees of freedom',
+           call. = FALSE)
+    }
   }
 
   # Check the test data for NAs as well using predict.gam

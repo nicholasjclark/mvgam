@@ -2,12 +2,15 @@
 % Please edit documentation in R/formula.mvgam.R
 \name{formula.mvgam}
 \alias{formula.mvgam}
+\alias{formula.mvgam_prefit}
 \title{Extract model.frame from a fitted mvgam object}
 \usage{
 \method{formula}{mvgam}(x, trend_effects = FALSE, ...)
+
+\method{formula}{mvgam_prefit}(x, trend_effects = FALSE, ...)
 }
 \arguments{
-\item{x}{\code{mvgam} object}
+\item{x}{\code{mvgam} or \code{mvgam_prefit} object}
 
 \item{trend_effects}{\code{logical}, return the model.frame from the
 observation model (if \code{FALSE}) or from the underlying process

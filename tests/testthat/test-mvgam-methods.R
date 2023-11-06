@@ -1,5 +1,18 @@
 context("tests for mvgam and mvgam_forecast class methods")
 
+expect_ggplot <- function(object, ...) {
+  testthat::expect_true(is(object, "ggplot"), ...)
+}
+
+test_that("conditional_effects works properly", {
+  effects <- conditional_effects(mvgam:::mvgam_example1)
+  lapply(effects, expect_ggplot)
+
+  effects <- conditional_effects(mvgam:::mvgam_example2)
+  lapply(effects, expect_ggplot)
+})
+
+
 test_that("model.frame gives expected output structure", {
   mod_data <- model.frame(gaus_ar1)
 

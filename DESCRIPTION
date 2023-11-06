@@ -57,6 +57,7 @@ Suggests:
     rjags,
     coda,
     runjags,
+    usethis,
     testthat
 LinkingTo: Rcpp, RcppArmadillo
 VignetteBuilder: knitr

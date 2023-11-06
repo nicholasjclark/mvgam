@@ -347,11 +347,9 @@ plot_predictions(model2,
                  points = 0.5, rug = TRUE)
 ```
 
-Now it is easier to get a sense of the nonlinear but positive relationship estimated between `ndvi` and `count`. Plotting on the link scale should give an almost identical plot to the `pterms` plot from `mvgam` above, which shows the linear effect on the link scale:
+Now it is easier to get a sense of the nonlinear but positive relationship estimated between `ndvi` and `count`. Like `brms`, `mvgam` has the simple `conditional_effects` function to make quick and informative plots for main effects. This will likely be your go-to function for quickly understanding patterns from fitted `mvgam` models
 ```{r warning=FALSE}
-plot_predictions(model2, 
-                 condition = "ndvi",
-                 type = 'link')
+plot(conditional_effects(model2), ask = FALSE)
 ```
 
 ## Adding predictors as smooths
@@ -407,12 +405,15 @@ plot(model3, type = 'smooths', derivatives = TRUE)
 
 Here, values above `>0` indicate the function was increasing at that time point, while values `<0` indicate the function was declining. The most rapid declines appear to have been happening around timepoints 50 and again toward the end of the training period, for example.
 
-### Conditional smooths
-We can use `plot_predictions` to view the conditional smooth of time on the scale of the outcome variable:
+### Conditional effects
+Use `conditional_effects` again for useful plots on the outcome scale:
 ```{r warning=FALSE}
-plot_predictions(model3, 
-                 condition = "time",
-                 points = 0.5, rug = TRUE)
+plot(conditional_effects(model3), ask = FALSE)
+```
+
+Or on the link scale:
+```{r warning=FALSE}
+plot(conditional_effects(model3, type = 'link'), ask = FALSE)
 ```
 
 Inspect the underlying `Stan` code to gain some idea of how the spline is being penalized:

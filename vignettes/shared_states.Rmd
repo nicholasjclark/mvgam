@@ -104,6 +104,11 @@ The summary of this model is informative as it shows that only two latent proces
 summary(full_mod)
 ```
 
+Quick plots of all main effects can be made using `conditional_effects()`:
+```{r}
+plot(conditional_effects(full_mod, type = 'link'), ask = FALSE)
+```
+
 Even more informative are the plots of the latent processes. Both series 1 and 2 share the exact same estimates, while the estimates for series 3 are different:
 ```{r}
 plot(full_mod, type = 'trend', series = 1)
@@ -121,7 +126,7 @@ plot(full_mod, type = 'forecast', series = 3)
 ## Example: signal detection
 Now we will explore a more complicated example. Here we simulate a true hidden signal that we are trying to track. This signal depends nonlinearly on some covariate (called `productivity`, which represents a measure of how productive the landscape is). The signal also demonstrates a fairly large amount of temporal autocorrelation:
 ```{r}
- set.seed(543210)
+set.seed(543210)
 # simulate a nonlinear relationship using the mgcv function gamSim
 signal_dat <- gamSim(n = 100, eg = 1, scale = 1)
 
@@ -129,7 +134,7 @@ signal_dat <- gamSim(n = 100, eg = 1, scale = 1)
 productivity <- signal_dat$x2
 
 # simulate the true signal, which already has a nonlinear relationship
-# with productivitity; we will add in a fairly strong AR1 process to 
+# with productivity; we will add in a fairly strong AR1 process to 
 # contribute to the signal
 true_signal <- as.vector(scale(signal_dat$y) +
                          arima.sim(100, model = list(ar = 0.8, sd = 0.1)))
@@ -289,7 +294,12 @@ And here are the estimated relationships between the sensor observations and the
 plot(mod, type = 'smooths')
 ```
 
-We can get more useful plots of these effects using the `plot_predictions` function from the `marginaleffects` package, which will plot effects on the scale of the observations for a more meaningful interpretation:
+All main effects can be quickly plotted with `conditional_effects`:
+```{r}
+plot(conditional_effects(mod, type = 'link'), ask = FALSE)
+```
+
+`conditional_effects` is simply a wrapper to the more flexible `plot_predictions` function from the `marginaleffects` package. We can get more useful plots of these effects using this function for further customisation:
 ```{r}
 plot_predictions(mod, 
                  condition = c('temperature', 'series', 'series'),

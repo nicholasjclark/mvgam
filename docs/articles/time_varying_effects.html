@@ -26,7 +26,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.7</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,7 +77,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2023-11-01</h4>
+            <h4 data-toc-skip class="date">2023-11-06</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/time_varying_effects.Rmd" class="external-link"><code>vignettes/time_varying_effects.Rmd</code></a></small>
       <div class="d-none name"><code>time_varying_effects.Rmd</code></div>
@@ -166,7 +166,7 @@ and split the data into training and testing folds.</p>
 <code>mvgam</code> formulae by fitting a nonlinear effect of
 <code>time</code> and using the covariate of interest as the numeric
 <code>by</code> variable (see <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">?mgcv::s</a></code> or
-<code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">?brms::gp</a></code> for more details). The <code><a href="../reference/dynamic.html">dynamic()</a></code>
+<code><a href="https://rdrr.io/pkg/brms/man/gp.html" class="external-link">?brms::gp</a></code> for more details). The <code><a href="../reference/dynamic.html">dynamic()</a></code>
 formula wrapper offers a way to automate this process, and will
 eventually allow for a broader variety of time-varying effects (such as
 random walk or AR processes). Depending on the arguments that are
@@ -216,15 +216,15 @@ function:</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## Observation error parameter estimates:</span></span>
 <span><span class="co">##              2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## sigma_obs[1] 0.23 0.25  0.28    1  1843</span></span>
+<span><span class="co">## sigma_obs[1] 0.23 0.25  0.28    1  2723</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM coefficient (beta) estimates:</span></span>
 <span><span class="co">##             2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## (Intercept)    4   4   4.1    1  2045</span></span>
+<span><span class="co">## (Intercept)    4   4   4.1    1  3477</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
 <span><span class="co">##               edf    F p-value    </span></span>
-<span><span class="co">## s(time):temp 16.7 55.3  &lt;2e-16 ***</span></span>
+<span><span class="co">## s(time):temp 15.7 55.3  &lt;2e-16 ***</span></span>
 <span><span class="co">## ---</span></span>
 <span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">## </span></span>
@@ -235,7 +235,7 @@ function:</p>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Wed Nov 01 2:57:44 PM 2023.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Nov 06 1:01:35 PM 2023.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
@@ -278,7 +278,7 @@ values of <span class="math inline">\(temperature\)</span>:</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
 <p><img src="time_varying_effects_files/figure-html/unnamed-chunk-13-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 1.311023</span></span></code></pre>
+<span><span class="co">## [1] 1.304376</span></span></code></pre>
 <p>The syntax is very similar if we wish to estimate the parameters of
 the underlying Gaussian Process, this time using a Hilbert space
 approximation. We simply omit the <code>rho</code> argument in
@@ -319,25 +319,26 @@ function:</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## Observation error parameter estimates:</span></span>
 <span><span class="co">##              2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## sigma_obs[1] 0.24 0.26  0.29    1  2185</span></span>
+<span><span class="co">## sigma_obs[1] 0.24 0.26  0.29    1  2569</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM coefficient (beta) estimates:</span></span>
 <span><span class="co">##             2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## (Intercept)    4   4   4.1    1  3948</span></span>
+<span><span class="co">## (Intercept)    4   4   4.1    1  3735</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM gp term marginal deviation (alpha) and length scale (rho) estimates:</span></span>
 <span><span class="co">##                      2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## alpha_gp(time):temp 0.630 0.890 1.400    1   657</span></span>
-<span><span class="co">## rho_gp(time):temp   0.029 0.053 0.069    1   828</span></span>
+<span><span class="co">## alpha_gp(time):temp 0.620 0.880 1.400    1   608</span></span>
+<span><span class="co">## rho_gp(time):temp   0.027 0.053 0.068    1   581</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
 <span><span class="co">## Rhat looks reasonable for all parameters</span></span>
-<span><span class="co">## 0 of 2000 iterations ended with a divergence (0%)</span></span>
+<span><span class="co">## 1 of 2000 iterations ended with a divergence (0.05%)</span></span>
+<span><span class="co">##  *Try running with larger adapt_delta to remove the divergences</span></span>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Wed Nov 01 2:58:33 PM 2023.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Nov 06 1:02:26 PM 2023.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
@@ -364,7 +365,7 @@ in the approximate GP smooth model above:</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></code></pre></div>
 <p><img src="time_varying_effects_files/figure-html/unnamed-chunk-19-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 1.654291</span></span></code></pre>
+<span><span class="co">## [1] 1.644826</span></span></code></pre>
 </div>
 </div>
 <div class="section level2">
@@ -401,7 +402,7 @@ indicator for working in <code>mvgam</code>:</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">SalmonSurvCUI</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="co"># create a time variable</span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>time <span class="op">=</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/row_number.html" class="external-link">row_number</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>time <span class="op">=</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/ranking.html" class="external-link">row_number</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span></span>
 <span>  <span class="co"># create a series variable</span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="st">'salmon'</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
@@ -472,25 +473,24 @@ observation model parameters:</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## Observation precision parameter estimates:</span></span>
 <span><span class="co">##        2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## phi[1]  160 300   560 1.01   500</span></span>
+<span><span class="co">## phi[1]  150 310   590 1.01   603</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM coefficient (beta) estimates:</span></span>
 <span><span class="co">##             2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## (Intercept) -4.3 -3.3  -2.5  1.1    59</span></span>
+<span><span class="co">## (Intercept) -4.3 -3.3  -2.5 1.03   108</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Latent trend variance estimates:</span></span>
 <span><span class="co">##          2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## sigma[1] 0.17 0.33  0.55 1.02   200</span></span>
+<span><span class="co">## sigma[1] 0.17 0.33  0.54 1.02   184</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">## Rhats above 1.05 found for 43 parameters</span></span>
-<span><span class="co">##  *Diagnose further to investigate why the chains have not mixed</span></span>
+<span><span class="co">## Rhat looks reasonable for all parameters</span></span>
 <span><span class="co">## 0 of 2000 iterations ended with a divergence (0%)</span></span>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Wed Nov 01 2:59:16 PM 2023.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Nov 06 1:03:19 PM 2023.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
@@ -558,35 +558,34 @@ time-varying GP parameters:</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## Observation precision parameter estimates:</span></span>
 <span><span class="co">##        2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## phi[1]  190 360   650    1   780</span></span>
+<span><span class="co">## phi[1]  180 360   670 1.01   705</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">##             2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## (Intercept) -3.9 -3.2  -2.3 1.09    61</span></span>
+<span><span class="co">## (Intercept)   -4 -3.2  -2.4 1.03    70</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Process error parameter estimates:</span></span>
 <span><span class="co">##          2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## sigma[1] 0.17 0.3  0.51 1.02   224</span></span>
+<span><span class="co">## sigma[1] 0.15 0.3  0.51 1.03   164</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM process model coefficient (beta) estimates:</span></span>
 <span><span class="co">##                           2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## gp(time):CUI.apr.1_trend -0.55 0.76   3.4    1   883</span></span>
+<span><span class="co">## gp(time):CUI.apr.1_trend -0.72 0.82   3.2 1.01   894</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM process model gp term marginal deviation (alpha) and length scale (rho) estimates:</span></span>
 <span><span class="co">##                                2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## alpha_gp_time_byCUI_apr_trend 0.038 0.32   1.3    1   712</span></span>
-<span><span class="co">## rho_gp_time_byCUI_apr_trend   1.400 6.60  37.0    1   577</span></span>
+<span><span class="co">## alpha_gp_time_byCUI_apr_trend 0.042 0.33   1.3 1.01   478</span></span>
+<span><span class="co">## rho_gp_time_byCUI_apr_trend   1.500 6.40  32.0 1.01   497</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">## Rhats above 1.05 found for 40 parameters</span></span>
-<span><span class="co">##  *Diagnose further to investigate why the chains have not mixed</span></span>
-<span><span class="co">## 80 of 2000 iterations ended with a divergence (4%)</span></span>
+<span><span class="co">## Rhat looks reasonable for all parameters</span></span>
+<span><span class="co">## 59 of 2000 iterations ended with a divergence (2.95%)</span></span>
 <span><span class="co">##  *Try running with larger adapt_delta to remove the divergences</span></span>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Wed Nov 01 3:00:13 PM 2023.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Nov 06 1:04:19 PM 2023.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
@@ -646,7 +645,7 @@ leave-one-out cross-validation as implemented in the popular
 <span><span class="co">## Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span></span></code></pre>
 <pre><code><span><span class="co">##      elpd_diff se_diff</span></span>
 <span><span class="co">## mod1  0.0       0.0   </span></span>
-<span><span class="co">## mod0 -2.1       1.5</span></span></code></pre>
+<span><span class="co">## mod0 -2.2       1.7</span></span></code></pre>
 <p>The second model has the larger Expected Log Predictive Density
 (ELPD), meaning that it is slightly favoured over the simpler model that
 did not include the time-varying upwelling effect. However, the two
@@ -668,10 +667,10 @@ more about how this process works in Bürkner et al. 2020).</p>
 better 1-step ahead forecasts, with a higher total forecast ELPD</p>
 <div class="sourceCode" id="cb45"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">lfo_mod0</span><span class="op">$</span><span class="va">elpds</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## [1] 34.62673</span></span></code></pre>
+<pre><code><span><span class="co">## [1] 34.83638</span></span></code></pre>
 <div class="sourceCode" id="cb47"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">lfo_mod1</span><span class="op">$</span><span class="va">elpds</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## [1] 36.76761</span></span></code></pre>
+<pre><code><span><span class="co">## [1] 36.20507</span></span></code></pre>
 <p>We can also plot the ELPDs for each model as a contrast. Here, values
 less than zero suggest the time-varying predictor model (Mod1) gives
 better 1-step ahead forecasts:</p>
