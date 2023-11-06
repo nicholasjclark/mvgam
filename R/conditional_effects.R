@@ -93,8 +93,8 @@ conditional_effects.mvgam = function(x,
     cond_labs <- strsplit(as.character(effects), split = ":")
   }
 
-  if(any(lengths(cond_labs) > 2L)) {
-    stop("To display interactions of order higher than 2 ",
+  if(any(lengths(cond_labs) > 3L)) {
+    stop("To display interactions of order higher than 3 ",
          "please use plot_predictions()",
          call. = FALSE)
   }
