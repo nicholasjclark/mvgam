@@ -9,20 +9,51 @@ Supported mvgam trend models
 \details{
 \code{mvgam} currently supports the following dynamic trend models:
 \itemize{
-\item \code{RW} Random Walk
-\item \code{AR1} Autoregressive model with AR coefficient for lag 1
-\item \code{AR2} Autoregressive model with AR coefficients for lags 1 and 2
-\item \code{AR3} Autoregressive model with AR coefficients for lags 1, 2 and 3
-\item \code{VAR1} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously uncorrelated process errors
-\item \code{VAR1cor} Vector Autoregressive model with VAR coefficients for lag 1; contemporaneously correlated process errors
-\item \code{VARMA} Vector Autoregressive model with VAR coefficients for lag 1 and MA coefficients for lag 1; contemporaneously correlated process errors
-\item \code{GP} Squared exponential Gaussian Process
-\item \code{None} No latent trend is fitted
+\item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+\item \code{RW()}
+\item \verb{AR(p = 1, 2, or 3)}
+\item \code{VAR()}(only available in \code{Stan})
+\item \code{'GP'} (Gaussian Process with squared exponential kernel;
+only available in \code{Stan})}
+
+For all types apart from \code{'GP'}, moving average and/or correlated
+process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
+multivariate Random Walk if \code{data} contains \verb{>1} series). Character strings can also be supplied
+instead of the various trend functions. The full list of possible models that are
+currently supported is:
+\itemize{
+\item 'RW'
+\item 'RWMA'
+\item 'RWcor'
+\item 'RWMAcor'
+\item 'AR1'
+\item 'AR1MA'
+\item 'AR1cor'
+\item 'AR1MAcor'
+\item 'AR2'
+\item 'AR2MA'
+\item 'AR2cor'
+\item 'AR2MAcor'
+\item 'AR3'
+\item 'AR3MA'
+\item 'AR3cor'
+\item 'AR3MAcor'
+\item 'VAR'
+\item 'VARcor'
+\item 'VAR1' (same as 'VAR')
+\item 'VAR1cor' (same as 'VARcor')
+\item 'VARMA'
+\item 'VARMAcor'
+\item 'VARMA1,1cor'
+\item 'GP'
+\item 'None'
 }
 
+Note that only \code{RW}, \code{AR1}, \code{AR2} and \code{AR3} are available if
+using \code{JAGS}. All trend models are supported if using \code{Stan}.
 Dynamic factor models can be used in which the latent factors evolve as either
-\code{RW}, \code{AR1}, \code{AR2}, \code{AR3} or \code{GP}. Note that only \code{RW}, \code{AR1}, \code{AR2} and \code{AR3} are available if
-using \code{JAGS}. All trend models are supported if using \code{Stan}. For multivariate trend models
+\code{RW}, \code{AR1-3} or \code{GP}. For \code{VAR} models
 (i.e. \code{VAR} and \code{VARcor} models), users can either fix the trend error covariances to be \code{0}
 (using \code{VAR}) or estimate them and potentially allow for contemporaneously correlated errors using
 \code{VARcor}. For all \code{VAR} models, stationarity of
@@ -35,4 +66,7 @@ parameters using functionality in \link{get_mvgam_priors} and the \code{priors} 
 \references{
 Sarah E. Heaps (2022) Enforcing stationarity through the prior in Vector Autoregressions.
 Journal of Computational and Graphical Statistics. 32:1, 1-10.
+}
+\seealso{
+\code{\link{RW}}, \code{\link{AR}}, \code{\link{VAR}}
 }

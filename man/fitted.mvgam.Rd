@@ -66,11 +66,25 @@ for obtaining summaries of the computed draws.
 }
 \details{
 This method gives the actual fitted values from the model (i.e. what you
-will see if you generate hindcasts from the fitted model using \code{\link{hindcast.mvgam}}). These
+will see if you generate hindcasts from the fitted model using \code{\link{hindcast.mvgam}}
+with \code{type = 'expected'}). These
 predictions can be overly precise if a flexible dynamic trend component was included
 in the model. This is in contrast to the set of predict functions (i.e.
 \code{\link{posterior_epred.mvgam}} or \code{\link{predict.mvgam}}), which will assume
 any dynamic trend component has reached stationarity when returning hypothetical predictions
+}
+\examples{
+\dontrun{
+# Simulate some data and fit a model
+simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+mod <- mvgam(y ~ s(season, bs = 'cc'),
+            trend_model = 'AR1',
+            data = simdat$data_train)
+
+# Extract fitted values (posterior expectations)
+expectations <- fitted(mod)
+str(expectations)
+}
 }
 \seealso{
 \code{\link{hindcast.mvgam}}

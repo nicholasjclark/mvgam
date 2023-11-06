@@ -61,6 +61,19 @@ of a \code{mvgam} model, while the forecasting functions
 \code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better suited to generate h-step ahead forecasts
 that respect the temporal dynamics of estimated latent trends.
 }
+\examples{
+\dontrun{
+# Simulate some data and fit a model
+simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+mod <- mvgam(y ~ s(season, bs = 'cc'),
+            trend_model = 'AR1',
+            data = simdat$data_train)
+
+# Extract linear predictor values
+linpreds <- posterior_linpred(mod)
+str(linpreds)
+}
+}
 \seealso{
 \code{\link{posterior_epred.mvgam}} \code{\link{posterior_predict.mvgam}}
 

@@ -36,6 +36,18 @@
 #' and \code{n_obs} is the number of observations in \code{newdata}
 #' @seealso \code{\link{hindcast.mvgam}} \code{\link{posterior_linpred.mvgam}} \code{\link{posterior_predict.mvgam}}
 #' @aliases posterior_epred
+#' @examples
+#' \dontrun{
+#' # Simulate some data and fit a model
+#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' mod <- mvgam(y ~ s(season, bs = 'cc'),
+#'             trend_model = 'AR1',
+#'             data = simdat$data_train)
+#'
+#'# Compute posterior expectations
+#'expectations <- posterior_epred(mod)
+#'str(expectations)
+#'}
 #' @export
 posterior_epred.mvgam = function(object, newdata,
                                  data_test,
@@ -82,6 +94,18 @@ posterior_epred.mvgam = function(object, newdata,
 #' where \code{n_samples} is the number of posterior samples from the fitted object
 #' and \code{n_obs} is the number of observations in \code{newdata}
 #' @seealso \code{\link{hindcast.mvgam}} \code{\link{posterior_epred.mvgam}} \code{\link{posterior_predict.mvgam}}
+#' @examples
+#' \dontrun{
+#' # Simulate some data and fit a model
+#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' mod <- mvgam(y ~ s(season, bs = 'cc'),
+#'             trend_model = 'AR1',
+#'             data = simdat$data_train)
+#'
+#'# Extract linear predictor values
+#'linpreds <- posterior_linpred(mod)
+#'str(linpreds)
+#'}
 #' @export
 posterior_linpred.mvgam = function(object,
                                    transform = FALSE,
@@ -137,6 +161,18 @@ posterior_linpred.mvgam = function(object,
 #' where \code{n_samples} is the number of posterior samples from the fitted object
 #' and \code{n_obs} is the number of observations in \code{newdata}
 #' @seealso \code{\link{hindcast.mvgam}} \code{\link{posterior_linpred.mvgam}} \code{\link{posterior_epred.mvgam}}
+#' @examples
+#' \dontrun{
+#' # Simulate some data and fit a model
+#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' mod <- mvgam(y ~ s(season, bs = 'cc'),
+#'             trend_model = 'AR1',
+#'             data = simdat$data_train)
+#'
+#'# Compute posterior predictions
+#'predictions <- posterior_predict(mod)
+#'str(predictions)
+#'}
 #' @export
 posterior_predict.mvgam = function(object, newdata,
                                    data_test,
@@ -160,7 +196,8 @@ posterior_predict.mvgam = function(object, newdata,
 #' @inheritParams predict.mvgam
 #' @param object An object of class `mvgam`
 #' @details This method gives the actual fitted values from the model (i.e. what you
-#' will see if you generate hindcasts from the fitted model using \code{\link{hindcast.mvgam}}). These
+#' will see if you generate hindcasts from the fitted model using \code{\link{hindcast.mvgam}}
+#' with `type = 'expected'`). These
 #' predictions can be overly precise if a flexible dynamic trend component was included
 #' in the model. This is in contrast to the set of predict functions (i.e.
 #' \code{\link{posterior_epred.mvgam}} or \code{\link{predict.mvgam}}), which will assume
@@ -178,6 +215,18 @@ posterior_predict.mvgam = function(object, newdata,
 #'   \code{robust}). The remaining columns starting with \code{Q} contain
 #'   quantile estimates as specified via argument \code{probs}.
 #' @seealso \code{\link{hindcast.mvgam}}
+#' @examples
+#' \dontrun{
+#' # Simulate some data and fit a model
+#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' mod <- mvgam(y ~ s(season, bs = 'cc'),
+#'             trend_model = 'AR1',
+#'             data = simdat$data_train)
+#'
+#'# Extract fitted values (posterior expectations)
+#'expectations <- fitted(mod)
+#'str(expectations)
+#'}
 #' @export
 fitted.mvgam <- function(object, process_error = TRUE,
                         scale = c("response", "linear"),

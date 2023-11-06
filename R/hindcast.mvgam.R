@@ -25,6 +25,34 @@ hindcast <- function(object, ...){
 
 #'@rdname hindcast.mvgam
 #'@method hindcast mvgam
+#' @examples
+#' \dontrun{
+#' simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
+#' mod <- mvgam(y ~ s(season, bs = 'cc'),
+#'             trend_model = 'AR1',
+#'             data = simdat$data_train)
+#'
+#' # Hindcasts on response scale
+#' hc <- hindcast(mod)
+#' str(hc)
+#' plot(hc, series = 1)
+#' plot(hc, series = 2)
+#' plot(hc, series = 3)
+#'
+#' # Hindcasts as expectations
+#' hc <- hindcast(mod, type = 'expected')
+#' str(hc)
+#' plot(hc, series = 1)
+#' plot(hc, series = 2)
+#' plot(hc, series = 3)
+#'
+#' # Estimated latent trends
+#' hc <- hindcast(mod, type = 'trend')
+#' str(hc)
+#' plot(hc, series = 1)
+#' plot(hc, series = 2)
+#' plot(hc, series = 3)
+#' }
 #'@export
 hindcast.mvgam = function(object, series = 'all',
                           type = 'response',

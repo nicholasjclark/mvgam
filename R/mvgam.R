@@ -1,8 +1,8 @@
-#'Fit a Bayesian dynamic GAM to a univariate or multivariate set of discrete time series
+#'Fit a Bayesian dynamic GAM to a univariate or multivariate set of time series
 #'
 #'This function estimates the posterior distribution for Generalised Additive Models (GAMs) that can include
 #'smooth spline functions, specified in the GAM formula, as well as latent temporal processes,
-#'specified by trend_model. Further modelling options include State-Space representations to allow covariates
+#'specified by `trend_model`. Further modelling options include State-Space representations to allow covariates
 #'and dynamic processes to occur on the latent 'State' level while also capturing observation-level effects.
 #'Prior specifications are flexible and explicitly encourage users to apply
 #'prior distributions that actually reflect their beliefs. In addition, model fits can easily be assessed and
@@ -12,7 +12,8 @@
 #'@importFrom stats formula terms rnorm update.formula predict
 #'@importFrom rlang missing_arg
 #'@param formula A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
-#'for a GLM except that smooth terms, s, te, ti and t2, can be added to the right hand side
+#'for a GLM except that smooth terms, `s()`, `te()`, `ti()`, `t2()`, as well as time-varying
+#'`dynamic()` terms, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).
 #'@param trend_formula An optional \code{character} string specifying the GAM process model formula. If
 #'supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
@@ -30,13 +31,13 @@
 #'functions within the `trend_formula`
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula}. Should include columns:
-#'`series` (character or factor index of the series IDs; if a factor, the number of levels should be identical
-#'to the number of unique series labels)
-#'`time` (numeric index of the time point for each observation).
+#'`series` (a \code{factor} index of the series IDs;the number of levels should be identical
+#'to the number of unique series labels (i.e. `n_series = length(levels(data$series))`))
+#'`time` (\code{numeric} or \code{integer} index of the time point for each observation).
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
 #'@param data_train Deprecated. Still works in place of \code{data} but users are recommended to use
 #'\code{data} instead for more seamless integration into `R` workflows
-#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least `series` and `time`
 #'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
 #'observations in variable \code{y} will be set to \code{NA} when fitting the model so that posterior
 #'simulations can be obtained
@@ -56,29 +57,32 @@
 #'\itemize{
 #'   \item`nb()` for count data
 #'   \item`poisson()` for count data
-#'   \item`tweedie()` for count data (power parameter `p` fixed at `1.5`)
 #'   \item`gaussian()` for real-valued data
 #'   \item`betar()` for proportional data on `(0,1)`
 #'   \item`lognormal()` for non-negative real-valued data
 #'   \item`student_t()` for real-valued data
 #'   \item`Gamma()` for non-negative real-valued data}
-#'See [mvgam_families] for more details
+#'Note that only `nb()` and `poisson()` are available if using `JAGS` as the backend.
+#'See \code{\link{mvgam_families}} for more details
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-#'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
+#'latent trends in a reduced dimension format. Defaults to \code{FALSE}
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
 #'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}
-#'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
+#'@param trend_model \code{character} or  \code{function} specifying the time series dynamics for the latent trend. Options are:
 #'\itemize{
 #'   \item `None` (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 #'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
-#'   \item `RW` (random walk with possible drift)
-#'   \item `AR1` (with possible drift)
-#'   \item `AR2` (with possible drift)
-#'   \item `AR3` (with possible drift)
-#'   \item `VAR1` (contemporaneously uncorrelated VAR1; only available in \code{Stan})
-#'   \item `VAR1cor` (contemporaneously correlated VAR1; only available in \code{Stan})
-#'   \item `GP` (Gaussian Process with squared exponential kernel;
-#'only available in \code{Stan})} See [mvgam_trends] for more details
+#'   \item `'RW'` or `RW()`
+#'   \item `'AR1'` or `AR(p = 1)`
+#'   \item `'AR2'` or `AR(p = 2)`
+#'   \item `'AR3'` or `AR(p = 3)`
+#'   \item `'VAR1'`  or `VAR()`(only available in \code{Stan})
+#'   \item `'GP'` (Gaussian Process with squared exponential kernel;
+#'only available in \code{Stan})}
+#'
+#'For all types apart from `'GP'`, moving average and/or correlated
+#'process error terms can also be estimated (for example, `RW(cor = TRUE)` will set up a
+#'multivariate Random Walk if `n_series > 1`). See [mvgam_trends] for more details
 #'@param trend_map Optional `data.frame` specifying which series should depend on which latent
 #'trends. Useful for allowing multiple series to depend on the same latent trend process, but with
 #'different observation processes. If supplied, a latent factor model is set up by setting
@@ -118,13 +122,8 @@
 #'lighter version of the model with no residuals and fewer monitored parameters to speed up
 #'post-processing. But other downstream functions will not work properly, so users should always
 #'leave this set as `FALSE`
-#'@param upper_bounds Optional \code{vector} of \code{integer} values specifying upper limits for each series. If supplied,
-#'this generates a modified likelihood where values above the bound are given a likelihood of zero. Note this modification
-#'is computationally expensive in \code{JAGS} but can lead to better estimates when true bounds exist. Default is to remove
-#'truncation entirely (i.e. there is no upper bound for each series). Currently not implemented
-#'in `Stan`
 #'@param use_stan Logical. If \code{TRUE}, the model will be compiled and sampled using
-#'the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or
+#'Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or
 #'a call to \code{\link[rstan]{stan}}. Note that
 #'there are many more options when using `Stan` vs `JAGS` (the only "advantage" of `JAGS` is the ability
 #'to use a Tweedie family).
@@ -141,7 +140,7 @@
 #'  \code{"brms.algorithm"} option (see \code{\link{options}}).
 #'@param autoformat \code{Logical}. Use the `stanc` parser to automatically format the
 #'`Stan` code and check for deprecations. Defaults to `TRUE`
-#' @param save_all_pars A \code{Logical} flag to indicate if draws from all
+#' @param save_all_pars \code{Logical} flag to indicate if draws from all
 #'   variables defined in Stan's \code{parameters} block should be saved
 #'   (default is \code{FALSE}).
 #'@param max_treedepth positive integer placing a cap on the number of simulation steps evaluated during each iteration when
@@ -276,15 +275,11 @@
 #' # Inspect the data objects needed to condition the model
 #' str(mod1$model_data)
 #'
-#' # Inspect the initial value function used to initialise the MCMC chains
-#' mod1$inits
-#'
 #' # The following code can be used to run the model outside of mvgam; first using rstan
 #' model_data <- mod1$model_data
 #' library(rstan)
 #' fit <- stan(model_code = mod1$model_file,
-#'            data = model_data,
-#'            init = mod1$inits)
+#'            data = model_data)
 #'
 #' # Now using cmdstanr
 #' library(cmdstanr)
@@ -295,8 +290,7 @@
 #' fit <- cmd_mod$sample(data = model_data,
 #'                      chains = 4,
 #'                      parallel_chains = 4,
-#'                      refresh = 100,
-#'                      init = mod1$inits)
+#'                      refresh = 100)
 #'
 #' # Now fit the model using mvgam with the Stan backend
 #' mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
@@ -312,11 +306,12 @@
 #' plot(mod1, type = 'trend', series = 1)
 #' plot(mod1, type = 'forecast', series = 1)
 #'
+#' # Residual diagnostics
+#' plot(mod1, type = 'residuals', series = 1)
+#'
 #' # Compute the forecast using covariate information in data_test
-#' plot(object = mod1, type = 'trend', newdata = dat$data_test,
-#'      series = 1)
-#' plot(object = mod1, type = 'forecast', newdata = dat$data_test,
-#'      series = 1)
+#' fc <- forecast(mod1, newdata = dat$data_test)
+#' plot(fc)
 #'
 #' # Plot the estimated seasonal smooth function
 #' plot(mod1, type = 'smooths')
@@ -326,7 +321,6 @@
 #'
 #' # Plot partial residuals of the smooth
 #' plot(mod1, type = 'smooths', residuals = TRUE)
-#'
 #'
 #' # Plot posterior realisations for the smooth
 #' plot(mod1, type = 'smooths', realisations = TRUE)
@@ -379,7 +373,7 @@
 #'   beta_temp[i] <- rnorm(1, mean = beta_temp[i - 1], sd = 0.025)
 #'}
 #'
-#' # Simulate the temperature covariate
+#' # Simulate covariate called 'temp'
 #' temp <- rnorm(N, sd = 1)
 #' # Simulate the Gaussian observation process
 #' out <- rnorm(N, mean = 4 + beta_temp * temp,
@@ -466,106 +460,6 @@
 #'  }
 #' layout(1)
 #'
-#' # Example of a State Space model
-#' # Simulate a true signal we are trying to track, which depends
-#' # nonlinearly on some covariate 'productivity' as well as showing
-#' # some temporal autocorrelation
-#' set.seed(1111)
-#' signal_dat <- gamSim(n = 100, eg = 1, scale = 0.1)
-#' productivity <- signal_dat$x1
-#' true_signal <- as.vector(scale(signal_dat$y) +
-#'                          arima.sim(100, model = list(ar = 0.9, sd = 0.1)))
-#' plot(true_signal, type = 'l')
-#'
-#' # Simulate three sensors, all with different observation
-#' # errors that depend nonlinearly on an external covariate 'temperature'
-#' sim_series = function(n_series = 3, true_signal){
-#'  temp_effects <- gamSim(n = 100, eg = 7, scale = 0.1)
-#'  temperature <- temp_effects$y
-#'  alphas <- rnorm(n_series, sd = 2)
-#'
-#'  do.call(rbind, lapply(seq_len(n_series), function(series){
-#'    data.frame(observed = rnorm(length(true_signal),
-#'                                mean = alphas[series] +
-#'                                       as.vector(scale(temp_effects[, series + 1])) +
-#'                                       true_signal,
-#'                                sd = runif(1, 0.5, 1.5)),
-#'               series = paste0('sensor_', series),
-#'               time = 1:length(true_signal),
-#'               temperature = temperature,
-#'               productivity = productivity,
-#'               true_signal = true_signal)
-#'   }))
-#'  }
-#' model_dat <- sim_series(true_signal = true_signal) %>%
-#'  dplyr::mutate(series = factor(series))
-#'
-#' # Plot the sensor observations
-#' plot_mvgam_series(data = model_dat, y = 'observed',
-#'                  series = 'all')
-#' # Plot relationships between sensors and temperature
-#' plot(observed ~ temperature, data = model_dat %>%
-#'   dplyr::filter(series == 'sensor_1'))
-#' plot(observed ~ temperature, data = model_dat %>%
-#'   dplyr::filter(series == 'sensor_2'))
-#' plot(observed ~ temperature, data = model_dat %>%
-#'   dplyr::filter(series == 'sensor_3'))
-#'
-#' # Plot the true signal against productivity
-#' plot(true_signal ~ productivity, data = model_dat)
-#'
-#' # Formulate and fit a model that allows each sensor's observation error
-#' # to depend nonlinearly on temperature while allowing the true signal
-#' # to depend nonlinearly on productivity. By fixing all trend values in
-#' # the trend_map to 1, we are assuming that all observation sensors are
-#' # tracking the same latent signal
-#' mod <- mvgam(formula =
-#'              # formula for observations, allowing for different
-#'              # intercepts and smooth effects of temperature
-#'              observed ~ series + s(temperature, by = series, k = 8),
-#'
-#'             trend_formula =
-#'             # formula for the latent signal, which can depend
-#'             # nonlinearly on productivity
-#'             ~ s(productivity, k = 8),
-#'
-#'            trend_model =
-#'            # in addition to productivity effects, the signal is
-#'            # assumed to exhibit temporal autocorrelation
-#'            'AR1',
-#'
-#'            trend_map =
-#'            # trend_map forces all sensors to track the same
-#'            # latent signal
-#'            data.frame(series = unique(model_dat$series),
-#'                       trend = c(1, 1, 1)),
-#'
-#'           # informative priors on process error
-#'           # and observation error will help with convergence
-#'           priors = c(prior(normal(2, 2), class = sigma),
-#'                      prior(normal(0.5, 0.5), class = sigma_obs)),
-#'
-#'           # Gaussian observations
-#'           family = gaussian(),
-#'           data = model_dat)
-#'
-#' # View a reduced version of the model summary because there will be
-#' # many spline coefficients in this model
-#' summary(mod, include_betas = FALSE)
-#'
-#' # Plot the estimated latent signal
-#' plot(mod, type = 'trend')
-#'
-#' # Overlay the true simulated signal
-#' lines(true_signal, lwd = 3)
-#'
-#' # Plot response of the signal to productivity
-#' plot(mod, type = 'smooths', trend_effects = TRUE)
-#'
-#' # Plot the responses of observation sensors to
-#' # temperature
-#'
-#' plot(mod, type = 'smooths')
 #' }
 #'@export
 
@@ -593,7 +487,6 @@ mvgam = function(formula,
                  parallel = TRUE,
                  threads = 1,
                  priors,
-                 upper_bounds,
                  refit = FALSE,
                  lfo = FALSE,
                  use_stan = TRUE,
@@ -739,6 +632,11 @@ mvgam = function(formula,
   use_var1 <- ma_cor_adds$use_var1; use_var1cor <- ma_cor_adds$use_var1cor
   add_ma <- ma_cor_adds$add_ma; add_cor <- ma_cor_adds$add_cor
 
+  if(length(unique(data_train$series)) == 1 & add_cor){
+    warning('Correlated process errors not possible with only 1 series')
+    add_cor <- FALSE
+  }
+
   if(use_lv & (add_ma | add_cor) & missing(trend_formula)){
     stop('Cannot estimate moving averages or correlated errors for dynamic factors',
          call. = FALSE)
@@ -798,13 +696,8 @@ mvgam = function(formula,
     n_lv <- max(trend_map$trend)
   }
 
-  # Upper bounds needs to be same length as number of series
-  if(!missing(upper_bounds)){
-    if(length(upper_bounds) != length(unique(data_train$series))){
-      upper_bounds <- rep(upper_bounds,
-                          length(unique(data_train$series)))[1:length(unique(data_train$series))]
-    }
-  }
+  # Upper bounds no longer supported as they are fairly useless
+  upper_bounds <- rlang::missing_arg()
 
   # Number of latent variables cannot be greater than number of series
   if(use_lv){
