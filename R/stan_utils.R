@@ -3224,12 +3224,20 @@ repair_stanfit <- function(x) {
 read_csv_as_stanfit <- function(files, variables = NULL,
                                 sampler_diagnostics = NULL) {
 
+  # Code borrowed from brms: https://github.com/paul-buerkner/brms/R/backends.R#L603
+  repair_names <- function(x) {
+    x <- sub("\\.", "[", x)
+    x <- gsub("\\.", ",", x)
+    x[grep("\\[", x)] <- paste0(x[grep("\\[", x)], "]")
+    x
+  }
+
   if(!is.null(variables)){
     # ensure that only relevant variables are read from CSV
     metadata <- cmdstanr::read_cmdstan_csv(
       files = files, variables = "", sampler_diagnostics = "")
 
-    all_vars <- brms:::repair_variable_names(metadata$metadata$variables)
+    all_vars <- repair_names(metadata$metadata$variables)
     all_vars <- unique(sub("\\[.+", "", all_vars))
     variables <- variables[variables %in% all_vars]
   }

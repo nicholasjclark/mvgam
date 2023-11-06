@@ -15,7 +15,7 @@
   ...
 )
 
-\method{plot}{mvgam_conditional_effects}(x, plot = TRUE, ask = TRUE, theme = NULL)
+\method{plot}{mvgam_conditional_effects}(x, plot = TRUE, ask = TRUE, theme = NULL, ...)
 
 \method{print}{mvgam_conditional_effects}(x, ...)
 }
@@ -57,7 +57,7 @@ and \code{\link[bayesplot:theme_default]{theme_default}}.}
 \value{
 \code{conditional_effects} returns an object of class
 \code{mvgam_conditional_effects} which is a
-named list with one slot per effect containing a \code{\link{ggplot}} object,
+named list with one slot per effect containing a \code{\link[ggplot2]{ggplot}} object,
 which can be further customized using the \pkg{ggplot2} package.
 The corresponding \code{plot} method will draw these plots in the active graphic device
 }

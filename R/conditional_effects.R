@@ -3,6 +3,7 @@
 #' Display conditional effects of one or more numeric and/or categorical
 #' predictors in `mvgam` models, including two-way interaction effects.
 #' @importFrom brms conditional_effects
+#' @importFrom marginaleffects plot_predictions
 #' @importFrom graphics plot
 #' @importFrom grDevices devAskNewPage
 #' @inheritParams brms::conditional_effects.brmsfit
@@ -17,7 +18,7 @@
 #' @param ... other arguments to pass to \code{\link[marginaleffects]{plot_predictions}}
 #' @return `conditional_effects` returns an object of class
 #' \code{mvgam_conditional_effects} which is a
-#'  named list with one slot per effect containing a \code{\link{ggplot}} object,
+#'  named list with one slot per effect containing a \code{\link[ggplot2]{ggplot}} object,
 #'  which can be further customized using the \pkg{ggplot2} package.
 #'  The corresponding `plot` method will draw these plots in the active graphic device
 #'
@@ -152,7 +153,8 @@ conditional_effects.mvgam = function(x,
 plot.mvgam_conditional_effects = function(x,
                                           plot = TRUE,
                                           ask = TRUE,
-                                          theme = NULL){
+                                          theme = NULL,
+                                          ...){
   out <- x
   for(i in seq_along(out)){
     if(plot){

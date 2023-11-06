@@ -317,6 +317,60 @@ sim_hilbert_gp = function(alpha_gp,
   as.vector((diag_SPD * b_gp) %*% t(eigenfunctions))
 }
 
+#' @noRd
+seq_cols <- function(x) {
+  seq_len(NCOL(x))
+}
+
+#' compute the mth eigen function of an approximate GP
+#' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L289
+#' @noRd
+eigen_fun_cov_exp_quad <- function(x, m, L) {
+  x <- as.matrix(x)
+  D <- ncol(x)
+  stopifnot(length(m) == D, length(L) == D)
+  out <- vector("list", D)
+  for (i in seq_cols(x)) {
+    out[[i]] <- 1 / sqrt(L[i]) *
+      sin((m[i] * pi) / (2 * L[i]) * (x[, i] + L[i]))
+  }
+  Reduce("*", out)
+}
+
+#' compute squared differences
+#' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L241
+#' @param x vector or matrix
+#' @param x_new optional vector of matrix with the same ncol as x
+#' @return an nrow(x) times nrow(x_new) matrix
+#' @details if matrices are passed results are summed over the columns
+#' @noRd
+diff_quad <- function(x, x_new = NULL) {
+  x <- as.matrix(x)
+  if (is.null(x_new)) {
+    x_new <- x
+  } else {
+    x_new <- as.matrix(x_new)
+  }
+  .diff_quad <- function(x1, x2) (x1 - x2)^2
+  out <- 0
+  for (i in seq_cols(x)) {
+    out <- out + outer(x[, i], x_new[, i], .diff_quad)
+  }
+  out
+}
+
+#' extended range of input data for which predictions should be made
+#' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L301
+#' @noRd
+choose_L <- function(x, c) {
+  if (!length(x)) {
+    range <- 1
+  } else {
+    range <- max(1, max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+  }
+  c * range
+}
+
 #' Mean-center and scale the particular covariate of interest
 #' so that the maximum Euclidean distance between any two points is 1
 #' @noRd
@@ -330,7 +384,7 @@ scale_cov <- function(data, covariate, by, level,
 
   # Compute max Euclidean distance if not supplied
   if(is.na(max_dist)){
-    Xgp_max_dist <- sqrt(max(brms:::diff_quad(Xgp)))
+    Xgp_max_dist <- sqrt(max(diff_quad(Xgp)))
   } else {
     Xgp_max_dist <- max_dist
   }
@@ -381,13 +435,13 @@ prep_eigenfunctions = function(data,
   eigenfunctions <- matrix(NA, nrow = length(covariate_cent),
                            ncol = k)
   if(missing(L)){
-    L <- brms:::choose_L(covariate_cent, boundary)
+    L <- choose_L(covariate_cent, boundary)
   }
 
   for(m in 1:k){
-    eigenfunctions[, m] <- brms:::eigen_fun_cov_exp_quad(x = matrix(covariate_cent),
-                                                         m = m,
-                                                         L = L)
+    eigenfunctions[, m] <- eigen_fun_cov_exp_quad(x = matrix(covariate_cent),
+                                                  m = m,
+                                                  L = L)
   }
 
   # Multiply eigenfunctions by the 'by' variable if one is supplied
@@ -473,7 +527,7 @@ prep_gp_covariate = function(data,
   # same eigenvalues are always used in prediction, so we only need to
   # create them when prepping the data. They will need to be included in
   # the Stan data list
-  L <- brms:::choose_L(covariate_cent, boundary)
+  L <- choose_L(covariate_cent, boundary)
   eigenvalues <- vector()
   for(m in 1:k){
     eigenvalues[m] <- sqrt(lambda(boundary = L,
