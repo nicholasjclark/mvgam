@@ -14,6 +14,8 @@
 #' @param rug `Logical`. Indicates if displays tick marks should be plotted on the
 #' axes to mark the distribution of raw data, but only if `type == 'response'`.
 #'  Default is `TRUE`.
+#' @param ask `Logical`. Indicates if the user is prompted before a new page is plotted.
+#' Only used if plot is `TRUE`. Default is `FALSE`.
 #' @param type `character` specifying the scale of predictions (either 'response' or 'link')
 #' @param ... other arguments to pass to \code{\link[marginaleffects]{plot_predictions}}
 #' @return `conditional_effects` returns an object of class
@@ -152,7 +154,7 @@ conditional_effects.mvgam = function(x,
 #' @export
 plot.mvgam_conditional_effects = function(x,
                                           plot = TRUE,
-                                          ask = TRUE,
+                                          ask = FALSE,
                                           theme = NULL,
                                           ...){
   out <- x

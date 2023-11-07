@@ -15,7 +15,7 @@
   ...
 )
 
-\method{plot}{mvgam_conditional_effects}(x, plot = TRUE, ask = TRUE, theme = NULL, ...)
+\method{plot}{mvgam_conditional_effects}(x, plot = TRUE, ask = FALSE, theme = NULL, ...)
 
 \method{print}{mvgam_conditional_effects}(x, ...)
 }
@@ -45,9 +45,8 @@ Default is \code{TRUE}.}
 plotted directly in the active graphic device.
 Defaults to \code{TRUE}.}
 
-\item{ask}{Logical; indicates if the user is prompted
-before a new page is plotted.
-Only used if \code{plot} is \code{TRUE}.}
+\item{ask}{\code{Logical}. Indicates if the user is prompted before a new page is plotted.
+Only used if plot is \code{TRUE}. Default is \code{FALSE}.}
 
 \item{theme}{A \code{\link[ggplot2:theme]{theme}} object
 modifying the appearance of the plots.
