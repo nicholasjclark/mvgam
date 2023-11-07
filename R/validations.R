@@ -190,6 +190,12 @@ validate_trend_formula = function(formula){
     stop('Argument "trend_formula" should not have the identifier "series" in it.\nUse "trend" instead for varying effects',
          call. = FALSE)
   }
+
+  if(!is.null(attr(terms(formula(formula)), 'offset'))){
+    stop('Offsets not allowed in argument "trend_formula"',
+         call. = FALSE)
+  }
+
 }
 
 #'@noRd

@@ -308,9 +308,12 @@
 #'
 #' # Residual diagnostics
 #' plot(mod1, type = 'residuals', series = 1)
+#' resids <- residuals(mod1)
+#' str(resids)
 #'
 #' # Compute the forecast using covariate information in data_test
 #' fc <- forecast(mod1, newdata = dat$data_test)
+#' str(fc)
 #' plot(fc)
 #'
 #' # Plot the estimated seasonal smooth function
@@ -326,6 +329,7 @@
 #' plot(mod1, type = 'smooths', realisations = TRUE)
 #'
 #' # Plot conditional response predictions using marginaleffects
+#' plot(conditional_effects(mod1), ask = FALSE)
 #' plot_predictions(mod1, condition = 'season', points = 0.5)
 #'
 #' # Extract observation model beta coefficient draws as a data.frame
@@ -371,24 +375,25 @@
 #' beta_temp[1] <- 0.4
 #' for(i in 2:N){
 #'   beta_temp[i] <- rnorm(1, mean = beta_temp[i - 1], sd = 0.025)
-#'}
+#' }
 #'
-#' # Simulate covariate called 'temp'
+#' # Simulate a covariate called 'temp'
 #' temp <- rnorm(N, sd = 1)
+#'
 #' # Simulate the Gaussian observation process
 #' out <- rnorm(N, mean = 4 + beta_temp * temp,
 #'              sd = 0.5)
 #'
 #' # Gather necessary data into a data.frame; split into training / testing
-#'data = data.frame(out, temp, time = seq_along(temp))
-#'data_train <- data[1:180,]
-#'data_test <- data[181:200,]
+#' data = data.frame(out, temp, time = seq_along(temp))
+#' data_train <- data[1:180,]
+#' data_test <- data[181:200,]
 #'
 #' # Fit the model using the dynamic() formula helper
 #' mod <- mvgam(formula = out ~ dynamic(temp, rho = 8),
 #'              family = gaussian(),
-#'             data = data_train,
-#'             newdata = data_test)
+#'              data = data_train,
+#'              newdata = data_test)
 #'
 #' # Inspect the model summary, forecast and time-varying coefficient distribution
 #' summary(mod)
@@ -412,12 +417,12 @@
 #' # Fit a model that includes the offset in the linear predictor as well as
 #' # hierarchical seasonal smooths
 #' mod1 <- mvgam(formula = y ~ offset(offset) +
-#'          s(series, bs = 're') +
-#'          s(season, bs = 'cc') +
-#'          s(season, by = series, m = 1, k = 5),
-#'          data = dat$data_train,
-#'          trend_model = 'None',
-#'          use_stan = TRUE)
+#'               s(series, bs = 're') +
+#'               s(season, bs = 'cc') +
+#'               s(season, by = series, m = 1, k = 5),
+#'              data = dat$data_train,
+#'              trend_model = 'None',
+#'              use_stan = TRUE)
 #'
 #' # Inspect the model file to see the modification to the linear predictor
 #' # (eta)

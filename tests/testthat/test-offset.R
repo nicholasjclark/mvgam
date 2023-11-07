@@ -64,3 +64,17 @@ test_that("offset incorporated into link-level linpred for NB", {
   expect_true(!is.null(testmod$model_data$off_set))
 })
 
+
+test_that("offset not allowed in trend_formula", {
+  data = data.frame(out = rpois(100, lambda = 5),
+                    x = rnorm(100),
+                    pop = rnorm(100),
+                    time = 1:100)
+  expect_error(mvgam(out ~ 1,
+                     trend_formula = ~ x + offset(pop),
+                     trend_model = 'AR1',
+                     data = data,
+                     family = nb(),
+                     run_model = FALSE),
+               'Offsets not allowed in argument "trend_formula"')
+})

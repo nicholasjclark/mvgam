@@ -154,7 +154,7 @@ if(object$family == 'Gamma'){
       print(mvgam_coefs)
 
     } else {
-      if(length(object$mgcv_model$nsdf) > 0){
+      if(object$mgcv_model$nsdf > 0){
         coefs_keep <- 1:object$mgcv_model$nsdf
 
         cat("\nGAM observation model coefficient (beta) estimates:\n")
@@ -179,7 +179,7 @@ if(object$family == 'Gamma'){
       rownames(mvgam_coefs) <- coef_names
       print(mvgam_coefs)
     } else {
-      if(length(object$mgcv_model$nsdf) > 0){
+      if(object$mgcv_model$nsdf > 0){
         cat("\nGAM coefficient (beta) estimates:\n")
         coefs_keep <- 1:object$mgcv_model$nsdf
         coef_names <- names(object$mgcv_model$coefficients)[coefs_keep]
