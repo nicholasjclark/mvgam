@@ -15,7 +15,7 @@
   ...
 )
 
-\method{plot}{mvgam_conditional_effects}(x, plot = TRUE, ask = FALSE, theme = NULL, ...)
+\method{plot}{mvgam_conditional_effects}(x, plot = TRUE, ask = FALSE, ...)
 
 \method{print}{mvgam_conditional_effects}(x, ...)
 }
@@ -47,11 +47,6 @@ Defaults to \code{TRUE}.}
 
 \item{ask}{\code{Logical}. Indicates if the user is prompted before a new page is plotted.
 Only used if plot is \code{TRUE}. Default is \code{FALSE}.}
-
-\item{theme}{A \code{\link[ggplot2:theme]{theme}} object
-modifying the appearance of the plots.
-For some basic themes see \code{\link[ggplot2:ggtheme]{ggtheme}}
-and \code{\link[bayesplot:theme_default]{theme_default}}.}
 }
 \value{
 \code{conditional_effects} returns an object of class

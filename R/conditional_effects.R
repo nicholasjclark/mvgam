@@ -3,6 +3,7 @@
 #' Display conditional effects of one or more numeric and/or categorical
 #' predictors in `mvgam` models, including two-way interaction effects.
 #' @importFrom brms conditional_effects
+#' @importFrom ggplot2 scale_colour_discrete scale_fill_discrete theme_classic
 #' @importFrom marginaleffects plot_predictions
 #' @importFrom graphics plot
 #' @importFrom grDevices devAskNewPage
@@ -114,7 +115,8 @@ conditional_effects.mvgam = function(x,
                                      rug = rug,
                                      ...) +
           scale_fill_discrete(label = roundlabs) +
-          scale_colour_discrete(label = roundlabs)
+          scale_colour_discrete(label = roundlabs) +
+          theme_classic()
 
       }
 
@@ -128,7 +130,8 @@ conditional_effects.mvgam = function(x,
                                      rug = rug,
                                      ...) +
           scale_fill_discrete(label = roundlabs) +
-          scale_colour_discrete(label = roundlabs)
+          scale_colour_discrete(label = roundlabs) +
+          theme_classic()
       }
 
       if(length(cond_labs[[i]]) == 3){
@@ -142,7 +145,8 @@ conditional_effects.mvgam = function(x,
                                      rug = rug,
                                      ...) +
           scale_fill_discrete(label = roundlabs) +
-          scale_colour_discrete(label = roundlabs)
+          scale_colour_discrete(label = roundlabs) +
+          theme_classic()
       }
 
 
@@ -161,7 +165,6 @@ conditional_effects.mvgam = function(x,
 plot.mvgam_conditional_effects = function(x,
                                           plot = TRUE,
                                           ask = FALSE,
-                                          theme = NULL,
                                           ...){
   out <- x
   for(i in seq_along(out)){

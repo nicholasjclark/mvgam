@@ -755,10 +755,8 @@ mvgam = function(formula,
       stop(paste('Missing values found in data predictors:\n',
                  attr(ss_gam, 'condition')),
            call. = FALSE)
-    }
-
-    if(grepl('fewer unique', ss_gam[1])){
-      stop('A term has fewer unique covariate combinations than specified maximum degrees of freedom',
+    } else {
+      stop(paste(ss_gam[1]),
            call. = FALSE)
     }
   }
