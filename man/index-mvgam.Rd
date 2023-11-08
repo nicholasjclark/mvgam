@@ -15,7 +15,7 @@
 \method{variables}{mvgam}(x, ...)
 }
 \arguments{
-\item{x}{\code{list} object of class \code{mvgam}}
+\item{x}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{...}{Arguments passed to individual methods (if applicable).}
 }

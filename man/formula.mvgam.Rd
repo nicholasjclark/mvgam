@@ -3,7 +3,7 @@
 \name{formula.mvgam}
 \alias{formula.mvgam}
 \alias{formula.mvgam_prefit}
-\title{Extract model.frame from a fitted mvgam object}
+\title{Extract formulae from mvgam objects}
 \usage{
 \method{formula}{mvgam}(x, trend_effects = FALSE, ...)
 
@@ -12,17 +12,17 @@
 \arguments{
 \item{x}{\code{mvgam} or \code{mvgam_prefit} object}
 
-\item{trend_effects}{\code{logical}, return the model.frame from the
+\item{trend_effects}{\code{logical}, return the formula from the
 observation model (if \code{FALSE}) or from the underlying process
 model (if\code{TRUE})}
 
 \item{...}{Ignored}
 }
 \value{
-A \code{matrix} containing the fitted model frame
+A \code{formula} object
 }
 \description{
-Extract model.frame from a fitted mvgam object
+Extract formulae from mvgam objects
 }
 \author{
 Nicholas J Clark

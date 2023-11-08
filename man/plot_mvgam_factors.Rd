@@ -7,8 +7,6 @@
 plot_mvgam_factors(object, plot = TRUE)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}}
-
 \item{plot}{\code{logical} specifying whether factors should be plotted}
 }
 \value{

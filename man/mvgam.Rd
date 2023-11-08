@@ -106,6 +106,7 @@ families are:
 \item\code{student_t()} for real-valued data
 \item\code{Gamma()} for non-negative real-valued data}
 Note that only \code{nb()} and \code{poisson()} are available if using \code{JAGS} as the backend.
+Default is \code{poisson()}.
 See \code{\link{mvgam_families}} for more details}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'

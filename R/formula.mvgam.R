@@ -1,13 +1,13 @@
-#'Extract model.frame from a fitted mvgam object
+#'Extract formulae from mvgam objects
 #'
 #'@rdname formula.mvgam
 #'@param x `mvgam` or `mvgam_prefit` object
-#'@param trend_effects \code{logical}, return the model.frame from the
+#'@param trend_effects \code{logical}, return the formula from the
 #'observation model (if \code{FALSE}) or from the underlying process
 #'model (if\code{TRUE})
 #'@param ... Ignored
 #'@author Nicholas J Clark
-#'@return A \code{matrix} containing the fitted model frame
+#'@return A \code{formula} object
 #'@export
 formula.mvgam = function(x, trend_effects = FALSE, ...){
   # Check trend_effects

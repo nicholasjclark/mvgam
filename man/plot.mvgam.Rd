@@ -32,7 +32,7 @@ factors}
 \item{series}{\code{integer} specifying which series in the set is to be plotted. This is ignored
 if \code{type == 're'}}
 
-\item{residuals}{\code{logical}. If \code{TRUE} and \code{type = residuals}, posterior quantiles of partial residuals are added
+\item{residuals}{\code{logical}. If \code{TRUE} and \code{type = 'smooths'}, posterior quantiles of partial residuals are added
 to plots of 1-D smooths as a series of ribbon rectangles.
 Partial residuals for a smooth term are the median Dunn-Smyth residuals that would be obtained by dropping the term
 concerned from the model, while leaving all other estimates fixed (i.e. the

@@ -4,9 +4,7 @@
 #'
 #'@importFrom grDevices hcl.colors
 #'@importFrom stats quantile predict
-#'@param object \code{list} object returned from \code{mvgam}
-#'@param trend_effects logical. If `TRUE` and a `trend_formula` was used in model
-#'fitting, terms from the trend (i.e. process) model will be plotted
+#'@inheritParams plot.mvgam
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param smooth either a \code{character} or \code{integer} specifying which smooth term to be plotted
 #'@param residuals \code{logical}. If \code{TRUE} then posterior quantiles of partial residuals are added

@@ -19,8 +19,10 @@
 \item{type}{The type of the plot.
 Supported types are (as names) \code{hist}, \code{dens},
 \code{hist_by_chain}, \code{dens_overlay},
-\code{violin}, \code{intervals}, \code{areas}, \code{acf},
-\code{acf_bar},\code{trace}, \code{trace_highlight}, \code{scatter},
+\code{violin}, \code{intervals}, \code{areas},
+\code{areas_ridges}, \code{combo}, \code{acf},
+\code{acf_bar}, \code{trace}, \code{trace_highlight},
+\code{scatter}, \code{violin},
 \code{rhat}, \code{rhat_hist}, \code{neff}, \code{neff_hist}
 and \code{nuts_energy}.
 For an overview on the various plot types see
@@ -57,5 +59,11 @@ mod <- mvgam(y ~ s(season, bs = 'cc'),
             data = simdat$data_train)
 mcmc_plot(mod)
 mcmc_plot(mod, type = 'neff_hist')
+mcmc_plot(mod, variable = 'betas', type = 'areas')
+mcmc_plot(mod, variable = 'trend_params', type = 'combo')
 }
+}
+\seealso{
+\code{\link{mvgam_draws}} for an overview of some of the shortcut strings
+that can be used for argument \code{variable}
 }

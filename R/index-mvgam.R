@@ -12,7 +12,7 @@ NULL
 
 #' @rdname index-mvgam
 #' @importFrom posterior variables
-#' @param x \code{list} object of class `mvgam`
+#' @param x \code{list} object returned from \code{mvgam}. See [mvgam()]
 #' @method variables mvgam
 #' @export
 #' @export variables

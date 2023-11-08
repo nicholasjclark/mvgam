@@ -3,9 +3,7 @@
 #'This function plots posterior empirical quantiles for random effect smooths (bs = re)
 #'
 #'@importFrom graphics layout title
-#'@param object \code{list} object returned from \code{mvgam}
-#'@param trend_effects logical. If `TRUE` and a `trend_formula` was used in model
-#'fitting, terms from the trend (i.e. process) model will be plotted
+#'@inheritParams plot.mvgam
 #'@details Posterior empirical quantiles of random effect coefficient estimates
 #'(on the link scale) are calculated and visualised as ribbon plots.
 #'Labels for coefficients are taken from the levels of the original factor variable

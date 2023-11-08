@@ -54,6 +54,7 @@ families are:
 \item\code{student_t()} for real-valued data
 \item\code{Gamma()} for non-negative real-valued data}
 Note that only \code{nb()} and \code{poisson()} are available if using \code{JAGS} as the backend.
+Default is \code{poisson()}.
 See \code{\link{mvgam_families}} for more details}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
@@ -62,13 +63,11 @@ latent trends in a reduced dimension format. Defaults to \code{FALSE}}
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
 Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
 
-\item{use_stan}{Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
-the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if \code{cmdstanr} is not available,
-a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
-not all options that are available in \code{JAGS} can be used, including: no option for a Tweedie family and no option for
-dynamic factor trends. However, as \code{Stan} can estimate Hilbert base approximate Gaussian Processes, which
-are much more computationally tractable than full GPs for time series with \verb{>100} observations, estimation
-in \code{Stan} can support latent GP trends while estimation in \code{JAGS} cannot}
+\item{use_stan}{Logical. If \code{TRUE}, the model will be compiled and sampled using
+Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or
+a call to \code{\link[rstan]{stan}}. Note that
+there are many more options when using \code{Stan} vs \code{JAGS} (the only "advantage" of \code{JAGS} is the ability
+to use a Tweedie family).}
 
 \item{trend_model}{\code{character} or  \code{function} specifying the time series dynamics for the latent trend. Options are:
 \itemize{
@@ -241,7 +240,7 @@ code(mod2)
 
 }
 \seealso{
-\code{\link{mvgam}}
+\code{\link{mvgam}} \code{\link[brms]{prior}}
 }
 \author{
 Nicholas J Clark

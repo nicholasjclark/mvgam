@@ -35,6 +35,7 @@
 #'   and create more bespoke conditional effects plots.
 #' @name conditional_effects.mvgam
 #' @author Nicholas J Clark
+#' @seealso \code{\link[marginaleffects]{plot_predictions}}, \code{\link[marginaleffects]{plot_slopes}}
 #' @examples
 #' \dontrun{
 #' # Simulate some data

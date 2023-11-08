@@ -63,6 +63,7 @@
 #'   \item`student_t()` for real-valued data
 #'   \item`Gamma()` for non-negative real-valued data}
 #'Note that only `nb()` and `poisson()` are available if using `JAGS` as the backend.
+#'Default is `poisson()`.
 #'See \code{\link{mvgam_families}} for more details
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. Defaults to \code{FALSE}

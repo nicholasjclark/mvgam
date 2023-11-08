@@ -5,7 +5,7 @@
 #'@importFrom graphics layout title
 #'@importFrom stats complete.cases qqnorm qqline acf pacf na.pass
 #'@importFrom mgcv bam
-#'@param object \code{list} object returned from \code{mvgam}
+#'@inheritParams plot.mvgam
 #'@param series \code{integer} specifying which series in the set is to be plotted
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'y', and 'time'
 #'in addition to any other variables included in the linear predictor of \code{formula}. If included, the

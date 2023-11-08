@@ -39,7 +39,21 @@
 #'series (for \code{type == 'hist'}), kernel density or empirical CDF estimates for
 #'posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
 #'Integral Transform histogram (for \code{type == 'pit'}).
+#' @examples
+#' \dontrun{
+#' # Simulate some smooth effects and fit a model
+#' set.seed(0)
+#' dat <- mgcv::gamSim(1, n = 200, scale = 2)
+#' dat$time <- 1:NROW(dat)
+#' mod <- mvgam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
+#'             data = dat,
+#'             family = gaussian())
 #'
+#' # Posterior checks
+#' ppc(mod, type = 'hist')
+#' ppc(mod, type = 'density')
+#' ppc(mod, type = 'cdf')
+#' }
 #'@export
 ppc <- function(object, ...){
   UseMethod("ppc", object)

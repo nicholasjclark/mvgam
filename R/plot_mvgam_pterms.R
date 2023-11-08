@@ -4,9 +4,7 @@
 #'
 #'@importFrom graphics layout title rug bxp
 #'@importFrom stats coef predict
-#'@param object \code{list} object returned from \code{mvgam}
-#'@param trend_effects logical. If `TRUE` and a `trend_formula` was used in model
-#'fitting, terms from the trend (i.e. process) model will be plotted
+#'@inheritParams plot.mvgam
 #'@details Posterior empirical quantiles of each parametric term's partial effect estimates
 #'(on the link scale) are calculated and visualised as ribbon plots. These effects can
 #'be interpreted as the partial effect that a parametric term contributes when all other

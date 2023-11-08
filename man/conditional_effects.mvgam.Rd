@@ -101,6 +101,9 @@ conditional_effects(mod)
 conditional_effects(mod, conf_level = 0.5, type = 'link')
 }
 }
+\seealso{
+\code{\link[marginaleffects]{plot_predictions}}, \code{\link[marginaleffects]{plot_slopes}}
+}
 \author{
 Nicholas J Clark
 }

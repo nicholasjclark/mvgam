@@ -4,13 +4,6 @@
 #'changed for a given `mvgam` model, as well listing their default distributions
 #'
 #' @inheritParams mvgam
-#'@param use_stan Logical. If \code{TRUE} and if \code{rstan} is installed, the model will be compiled and sampled using
-#'the Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or, if `cmdstanr` is not available,
-#'a call to \code{\link[rstan]{stan}}. Note that this functionality is still in development and
-#'not all options that are available in \code{JAGS} can be used, including: no option for a Tweedie family and no option for
-#'dynamic factor trends. However, as \code{Stan} can estimate Hilbert base approximate Gaussian Processes, which
-#'are much more computationally tractable than full GPs for time series with `>100` observations, estimation
-#'in \code{Stan} can support latent GP trends while estimation in \code{JAGS} cannot
 #'@details Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and
 #'altered. To make alterations, change the contents of the `prior` column and supplying this
 #'\code{data.frame} to the `mvgam` function using the argument `priors`. If using `Stan` as the backend,
@@ -26,7 +19,7 @@
 #' ensure that the code is legal (i.e. to check that lower bounds are smaller than upper bounds, for
 #' example)
 #'@author Nicholas J Clark
-#'@seealso \code{\link{mvgam}}
+#'@seealso \code{\link{mvgam}} \code{\link[brms]{prior}}
 #'@return either a \code{data.frame} containing the prior definitions (if any suitable
 #'priors can be altered by the user) or \code{NULL}, indicating that no priors in the model
 #'can be modified through the `mvgam` interface

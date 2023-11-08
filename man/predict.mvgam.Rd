@@ -7,7 +7,7 @@
 \method{predict}{mvgam}(object, newdata, data_test, type = "link", process_error = TRUE, ...)
 }
 \arguments{
-\item{object}{Object of class \code{mvgam}}
+\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the
 variables included in the linear predictor of \code{formula}. If not supplied,

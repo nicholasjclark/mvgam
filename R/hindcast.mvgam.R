@@ -1,23 +1,17 @@
 #'@title Extract hindcasts for a fitted \code{mvgam} object
 #'@name hindcast.mvgam
 #'@importFrom stats predict
-#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
+#'@inheritParams predict.mvgam
 #'@param series Either a \code{integer} specifying which series in the set is to be forecast,
 #'or the character string \code{'all'}, specifying that all series should be forecast. This is preferable
 #'if the fitted model contained multivariate trends (either as a dynamic factor or \code{VAR} process),
 #'as it saves recomputing the full set of trends for each series individually
-#'@param type When this has the value \code{link} the linear predictor is calculated on the link scale.
-#'If \code{expected} is used, predictions reflect the expectation of the response (the mean)
-#'but ignore uncertainty in the observation process. When \code{response} (default) is used,
-#'the predictions take uncertainty in the observation process into account to return
-#'predictions on the outcome scale. When \code{trend} is used, only the hindcast distribution for the
-#'latent trend is returned
 #'@param ... Ignored
 #'@details Posterior retrodictions are drawn from the fitted \code{mvgam} and
 #'organized into a convenient format
 #'@return An object of class \code{mvgam_forecast} containing hindcast distributions.
 #'See \code{\link{mvgam_forecast-class}} for details.
-#'
+#'#'@seealso \code{\link{forecast.mvgam}}
 #'@export
 hindcast <- function(object, ...){
   UseMethod("hindcast", object)

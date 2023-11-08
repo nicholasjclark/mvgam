@@ -3,7 +3,7 @@
 #'@importFrom parallel clusterExport stopCluster setDefaultCluster
 #'@importFrom stats predict
 #'@importFrom rlang missing_arg
-#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
+#'@inheritParams predict.mvgam
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
 #'in addition to any other variables included in the linear predictor of the original \code{formula}. If included, the
 #'covariate information in \code{newdata} will be used to generate forecasts from the fitted model equations. If
@@ -19,17 +19,11 @@
 #'if the fitted model contained multivariate trends (either as a dynamic factor or \code{VAR} process),
 #'as it saves recomputing the full set of trends for each series individually
 #'@param n_cores \code{integer} specifying number of cores for generating forecasts in parallel
-#'@param type When this has the value \code{link} the linear predictor is calculated on the link scale.
-#'If \code{expected} is used, predictions reflect the expectation of the response (the mean)
-#'but ignore uncertainty in the observation process. When \code{response} (default) is used,
-#'the predictions take uncertainty in the observation process into account to return
-#'predictions on the outcome scale. When \code{trend} is used, only the forecast distribution for the
-#'latent trend is returned
 #'@param ... Ignored
 #'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to simulate a forecast distribution
 #'@return An object of class \code{mvgam_forecast} containing hindcast and forecast distributions.
 #'See \code{\link{mvgam_forecast-class}} for details.
-#'
+#'@seealso \code{\link{hindcast}}, \code{\link{score}}
 #'@export
 forecast <- function(object, ...){
   UseMethod("forecast", object)

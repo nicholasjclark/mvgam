@@ -59,18 +59,22 @@ Compute probabilistic forecast scores for mvgam objects
 }
 \examples{
 \dontrun{
-#Simulate observations for three count-valued time series
+# Simulate observations for three count-valued time series
 data <- sim_mvgam()
-#Fit a dynamic model using 'newdata' to automatically produce forecasts
+# Fit a dynamic model using 'newdata' to automatically produce forecasts
 mod <- mvgam(y ~ 1,
             trend_model = 'RW',
             data = data$data_train,
             newdata = data$data_test)
 
-#Extract forecasts into a 'mvgam_forecast' object
+# Extract forecasts into a 'mvgam_forecast' object
 fc <- forecast(mod)
 
-#Score forecasts
-score(fc, score = 'drps')
+# Compute Discrete Rank Probability Scores and 0.90 interval coverages
+fc_scores <- score(fc, score = 'drps')
+str(fc_scores)
 }
+}
+\seealso{
+\code{\link{forecast.mvgam}}
 }

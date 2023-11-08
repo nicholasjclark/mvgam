@@ -2,7 +2,6 @@
 #'
 #'This function takes a fitted \code{mvgam} object and produces plots of smooth functions, forecasts, trends and
 #'uncertainty components
-#'
 #'@param x \code{list} object returned from \code{mvgam}. See [mvgam()]
 #'@param type \code{character} specifying which type of plot to return. Options are:
 #'series,
@@ -14,7 +13,7 @@
 #'trend,
 #'uncertainty,
 #'factors
-#'@param residuals \code{logical}. If \code{TRUE} and `type = residuals`, posterior quantiles of partial residuals are added
+#'@param residuals \code{logical}. If \code{TRUE} and `type = 'smooths'`, posterior quantiles of partial residuals are added
 #'to plots of 1-D smooths as a series of ribbon rectangles.
 #'Partial residuals for a smooth term are the median Dunn-Smyth residuals that would be obtained by dropping the term
 #'concerned from the model, while leaving all other estimates fixed (i.e. the

@@ -74,3 +74,19 @@ can also be compared to out of sample observations as long as these observations
 'data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
 'hanging' style
 }
+\examples{
+\dontrun{
+# Simulate some smooth effects and fit a model
+set.seed(0)
+dat <- mgcv::gamSim(1, n = 200, scale = 2)
+dat$time <- 1:NROW(dat)
+mod <- mvgam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
+            data = dat,
+            family = gaussian())
+
+# Posterior checks
+ppc(mod, type = 'hist')
+ppc(mod, type = 'density')
+ppc(mod, type = 'cdf')
+}
+}
