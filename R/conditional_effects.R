@@ -112,7 +112,9 @@ conditional_effects.mvgam = function(x,
                                      type = type,
                                      points = points,
                                      rug = rug,
-                                     ...)
+                                     ...) +
+          scale_fill_discrete(label = roundlabs) +
+          scale_colour_discrete(label = roundlabs)
 
       }
 
@@ -124,7 +126,9 @@ conditional_effects.mvgam = function(x,
                                      type = type,
                                      points = points,
                                      rug = rug,
-                                     ...)
+                                     ...) +
+          scale_fill_discrete(label = roundlabs) +
+          scale_colour_discrete(label = roundlabs)
       }
 
       if(length(cond_labs[[i]]) == 3){
@@ -136,7 +140,9 @@ conditional_effects.mvgam = function(x,
                                      type = type,
                                      points = points,
                                      rug = rug,
-                                     ...)
+                                     ...) +
+          scale_fill_discrete(label = roundlabs) +
+          scale_colour_discrete(label = roundlabs)
       }
 
 
@@ -167,6 +173,35 @@ plot.mvgam_conditional_effects = function(x,
     }
   }
   invisible(out)
+}
+
+#' A helper function so ggplot2 labels in the legend don't have
+#' ridiculous numbers of digits for numeric bins
+#' @noRd
+decimalplaces <- function(x) {
+  x <- as.numeric(x)
+  if (abs(x - round(x)) > .Machine$double.eps^0.5) {
+    nchar(strsplit(sub('0+$', '', as.character(x)), ".",
+                   fixed = TRUE)[[1]][[2]])
+  } else {
+    return(0)
+  }
+}
+
+#' A helper function so ggplot2 labels in the legend don't have
+#' ridiculous numbers of digits for numeric bins
+#' @noRd
+roundlabs = function(x){
+  if(all(suppressWarnings(is.na(as.numeric(x))))){
+    out <- x
+  } else if(all(sapply(x, decimalplaces) == 0)) {
+    out <- x
+  }else if(all(sapply(x, decimalplaces) <= 1)) {
+    out <- sprintf("%.1f", as.numeric(x))
+    } else {
+    out <- sprintf("%.4f", as.numeric(x))
+  }
+  out
 }
 
 #' @rdname conditional_effects.mvgam
