@@ -89,6 +89,16 @@ plot(conditional_effects(mod, conf_level = 0.7), ask = FALSE)
 
 # Plot all main effects on the link scale
 plot(conditional_effects(mod, type = 'link'), ask = FALSE)
+
+# Works the same for smooth terms
+set.seed(0)
+dat <- mgcv::gamSim(1, n = 200, scale = 2)
+dat$time <- 1:NROW(dat)
+mod <- mvgam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
+            data = dat,
+            family = gaussian())
+conditional_effects(mod)
+conditional_effects(mod, conf_level = 0.5, type = 'link')
 }
 }
 \author{
