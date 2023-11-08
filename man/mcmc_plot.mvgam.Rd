@@ -22,7 +22,7 @@ Supported types are (as names) \code{hist}, \code{dens},
 \code{violin}, \code{intervals}, \code{areas},
 \code{areas_ridges}, \code{combo}, \code{acf},
 \code{acf_bar}, \code{trace}, \code{trace_highlight},
-\code{scatter}, \code{violin},
+\code{scatter}, \code{hex}, \code{pairs}, \code{violin},
 \code{rhat}, \code{rhat_hist}, \code{neff}, \code{neff_hist}
 and \code{nuts_energy}.
 For an overview on the various plot types see

@@ -5,6 +5,7 @@
 #'@importFrom graphics layout title rug bxp
 #'@importFrom stats coef predict
 #'@inheritParams plot.mvgam
+#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
 #'@details Posterior empirical quantiles of each parametric term's partial effect estimates
 #'(on the link scale) are calculated and visualised as ribbon plots. These effects can
 #'be interpreted as the partial effect that a parametric term contributes when all other

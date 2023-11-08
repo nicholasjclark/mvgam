@@ -3,7 +3,7 @@
 #'This function takes a fitted \code{mvgam} object and returns plots and summary statistics for
 #'the latent dynamic factors
 #'
-#'@inheritParams plot.mvgam
+#'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
 #'@param plot \code{logical} specifying whether factors should be plotted
 #'@author Nicholas J Clark
 #'@details If the model in \code{object} was estimated using dynamic factors, it is possible that not all factors

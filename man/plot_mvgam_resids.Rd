@@ -7,6 +7,8 @@
 plot_mvgam_resids(object, series = 1, newdata, data_test)
 }
 \arguments{
+\item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'y', and 'time'
