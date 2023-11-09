@@ -248,11 +248,17 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
       dplyr::arrange(time) %>%
       dplyr::pull(y)
 
-    if(tolower(object$family) %in% c('beta', 'lognormal', 'gamma')){
+    if(tolower(object$family) %in% c('beta')){
       ylim <- c(min(cred, min(ytrain, na.rm = TRUE)),
                 max(cred, max(ytrain, na.rm = TRUE)))
       ymin <- max(0, ylim[1])
       ymax <- min(1, ylim[2])
+      ylim <- c(ymin, ymax)
+    } else if(tolower(object$family) %in% c('lognormal', 'gamma')){
+      ylim <- c(min(cred, min(ytrain, na.rm = TRUE)),
+                max(cred, max(ytrain, na.rm = TRUE)))
+      ymin <- max(0, ylim[1])
+      ymax <- max(ylim)
       ylim <- c(ymin, ymax)
     } else {
       ylim <- c(min(cred, min(ytrain, na.rm = TRUE)),

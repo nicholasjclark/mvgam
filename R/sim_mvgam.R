@@ -47,7 +47,7 @@
 #'be replicated `n_series` times. Defaults to small random values between `-0.5` and `0.5` on the link scale
 #'@param prop_missing \code{numeric} stating proportion of observations that are missing. Should be between
 #'\code{0} and \code{0.8}, inclusive
-#'@param prop_train \code{numeric} stating the proportion of data to use for training. Should be between \code{0.25} and \code{0.75}
+#'@param prop_train \code{numeric} stating the proportion of data to use for training. Should be between \code{0.2} and \code{1}
 #'@return A \code{list} object containing outputs needed for \code{\link{mvgam}}, including 'data_train' and 'data_test',
 #'as well as some additional information about the simulated seasonality and trend dependencies
 #'@examples

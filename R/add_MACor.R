@@ -11,7 +11,7 @@ add_MaCor = function(model_file,
                      trend_model = 'VAR1',
                      drift = FALSE){
 
-  if(trend_model %in% c('RW', 'AR1', 'AR2')){
+  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
 
     # Update transformed data
       if(any(grepl('vector<lower=0>[n_lv] sigma;',
@@ -370,6 +370,60 @@ add_MaCor = function(model_file,
                    '}\n')
         }
 
+        if(trend_model == 'AR3'){
+          model_file[max(grep('= b_raw[',
+                              model_file, fixed = TRUE))] <-
+            paste0(model_file[max(grep('= b_raw[',
+                                       model_file, fixed = TRUE))],
+                   '\n// derived latent states\n',
+                   'trend_raw[1] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'error[1];\n',
+                   if(add_ma){
+                     paste0('epsilon[1] = error[1];\n',
+                            'epsilon[2] = theta * error[1];\n',
+                            'epsilon[3] = theta * error[2];\n')
+                   } else {
+                     NULL
+                   },
+                   'trend_raw[2] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'ar1 .* trend_raw[1] + ',
+                   if(add_ma){
+                     'epsilon[2] + error[2];\n'
+                   } else {
+                     'error[2];\n'
+                   },
+                   'trend_raw[3] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'ar1 .* trend_raw[2] + ',
+                   'ar2 .* trend_raw[1] + ',
+                   if(add_ma){
+                     'epsilon[3] + error[3];\n'
+                   } else {
+                     'error[3];\n'
+                   },
+                   'for (i in 4:n) {\n',
+                   if(add_ma){
+                     paste0('// lagged error ma process\n',
+                            'epsilon[i] = theta * error[i - 1];\n',
+                            '// full ARMA process\n')
+                   } else {
+                     '// full AR process\n'
+                   },
+                   'trend_raw[i] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'ar1 .* trend_raw[i - 1] + ',
+                   'ar2 .* trend_raw[i - 2] + ',
+                   'ar3 .* trend_raw[i - 3] + ',
+                   if(add_ma){
+                     'epsilon[i] + error[i];\n'
+                   } else {
+                     'error[i];\n'
+                   },
+                   '}\n')
+        }
+
       } else {
         if(trend_model %in% c('AR1', 'RW')){
           model_file[max(grep('= b_raw[',
@@ -416,6 +470,40 @@ add_MaCor = function(model_file,
                    if(drift){ 'drift[j] + '} else {NULL},
                    'ar1[j] * trend[i - 1, j] + ',
                    'ar2[j] * trend[i - 2, j] + ',
+                   'epsilon[i, j] + error[i, j];\n',
+                   '}\n}')
+        }
+
+        if(trend_model == 'AR3'){
+          model_file[max(grep('= b_raw[',
+                              model_file, fixed = TRUE))] <-
+            paste0(model_file[max(grep('= b_raw[',
+                                       model_file, fixed = TRUE))],
+                   'for(j in 1:n_series){\n',
+                   'trend[1, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'error[1, j];\n',
+                   'epsilon[1, j] = error[1, j];\n',
+                   'epsilon[2, j] = theta[j] * error[1, j];\n',
+                   'epsilon[3, j] = theta[j] * error[2, j];\n',
+                   'trend[2, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'ar1[j] * trend[1, j] + ',
+                   'epsilon[2, j] + error[2, j];\n',
+                   'trend[3, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'ar1[j] * trend[2, j] + ',
+                   'ar2[j] * trend[1, j] + ',
+                   'epsilon[2, j] + error[2, j];\n',
+                   'for(i in 4:n){\n',
+                   '// lagged error ma process\n',
+                   'epsilon[i, j] = theta[j] * error[i-1, j];\n',
+                   '// full ARMA process\n',
+                   'trend[i, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'ar1[j] * trend[i - 1, j] + ',
+                   'ar2[j] * trend[i - 2, j] + ',
+                   'ar3[j] * trend[i - 3, j] + ',
                    'epsilon[i, j] + error[i, j];\n',
                    '}\n}')
         }
@@ -469,10 +557,10 @@ add_MaCor = function(model_file,
                    paste0('for(i in 1:n_lv){\n',
                           'for(j in 1:n_lv){\n',
                           'if (i != j)\n',
-                          'theta[i, j] ~ std_normal();\n',
+                          'theta[i, j] ~ normal(0, 0.2);\n',
                           '}\n}')
                  } else {
-                   'theta ~ std_normal();'
+                   'theta ~ normal(0, 0.2);'
                  })
         } else {
           NULL
@@ -505,10 +593,10 @@ add_MaCor = function(model_file,
                    paste0('for(i in 1:n_series){\n',
                           'for(j in 1:n_series){\n',
                           'if (i != j)\n',
-                          'theta[i, j] ~ std_normal();\n',
+                          'theta[i, j] ~ normal(0, 0.2);\n',
                           '}\n}')
                  } else {
-                   'theta ~ std_normal();'
+                   'theta ~ normal(0, 0.2);'
                  })
         } else {
           NULL
