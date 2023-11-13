@@ -183,7 +183,8 @@
 #'\cr
 #'*Priors*: A \code{\link[mgcv]{jagam}} model file is generated from \code{formula} and
 #'modified to include any latent
-#'temporal processes. Prior distributions for most important model parameters can be
+#'temporal processes. Default priors for intercepts and any scale parameters are generated
+#'using the same practice as \pkg{brms}. Prior distributions for most important model parameters can be
 #'altered by the user to inspect model
 #'sensitivities to given priors (see \code{\link{get_mvgam_priors}} for details).
 #'Note that latent trends are estimated on the link scale so choose priors
@@ -730,9 +731,9 @@ mvgam = function(formula,
     replace_nas(data_train[[terms(formula(formula))[[2]]]])
 
   # Compute default priors
-  def_priors <- adapt_brms_priors(c(make_default_scales(data_train[[terms(formula(formula))[[2]]]],
+  def_priors <- adapt_brms_priors(c(make_default_scales(orig_y,
                                                         family),
-                                    make_default_int(data_train[[terms(formula(formula))[[2]]]],
+                                    make_default_int(orig_y,
                                                      family)),
                                   formula = orig_formula,
                                   trend_formula = trend_formula,

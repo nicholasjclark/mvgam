@@ -433,25 +433,6 @@ get_mvgam_priors = function(formula,
 
     # Fill in missing observations in data_train so the size of the dataset is correct when
     # building the initial JAGS model.
-    replace_nas = function(var){
-      if(all(is.na(var))){
-        # Sampling from uniform[0.1,0.99] will allow all the gam models
-        # to work, even though the Poisson / Negative Binomial will issue
-        # warnings. This is ok as we just need to produce the linear predictor matrix
-        # and store the coefficient names
-        var <- runif(length(var), 0.1, 0.99)
-      } else {
-        # If there are some non-missing observations,
-        # sample from the observed values to ensure
-        # distributional assumptions are met without warnings
-        var[which(is.na(var))] <-
-          sample(var[which(!is.na(var))],
-                 length(which(is.na(var))),
-                 replace = TRUE)
-      }
-      var
-    }
-
     data_train[[terms(formula(formula))[[2]]]] <-
       replace_nas(data_train[[terms(formula(formula))[[2]]]])
 
@@ -509,7 +490,7 @@ get_mvgam_priors = function(formula,
       if(int_included){
         all_paras <- c('(Intercept)', all_paras)
         # Compute default intercept prior using brms
-        def_int <- make_default_int(response = data_train[[terms(formula(formula))[[2]]]],
+        def_int <- make_default_int(response = data_train$y,
                                     family = family)
         para_priors <- c(paste0(def_int$class, ' ~ ', def_int$prior, ';'),
                          para_priors)
@@ -1240,12 +1221,18 @@ make_default_scales = function(response, family){
 
 #' @noRd
 make_default_int = function(response, family){
-  int_prior <- get_prior(y ~ 1,
-                         data = data.frame(y = response),
-                         family = family_to_brmsfam(family))
-  int_prior$prior[which(int_prior$class == 'Intercept')]
-  prior_string(int_prior$prior[which(int_prior$class == 'Intercept')],
-               class = '(Intercept)')
+  if(all(is.na(response))){
+    out <- prior_string("student_t(3, 0, 3.5)",
+                        class = '(Intercept)')
+  } else {
+    resp_dat <- data.frame(y = response[!is.na(response)])
+    int_prior <- get_prior(y ~ 1,
+                           data = resp_dat,
+                           family = family_to_brmsfam(family))
+    out <- prior_string(int_prior$prior[which(int_prior$class == 'Intercept')],
+                         class = '(Intercept)')
+  }
+  return(out)
 }
 
 #' @noRd
@@ -1266,25 +1253,33 @@ update_default_scales = function(response,
                 call. = FALSE))
   }
 
-  y <- response
-  link <- family$link
-  if(link %in% c("log", "inverse", "1/mu^2")) {
-    # avoid Inf in link(y)
-    y <- ifelse(y == 0, y + 0.1, y)
+  if(all(is.na(response))){
+    out <- paste0("student_t(",
+                  paste0(as.character(c(df, '0', '3')),
+                         collapse = ", "), ")")
+  } else {
+    y <- response[!is.na(response)]
+    link <- family$link
+    if(link %in% c("log", "inverse", "1/mu^2")) {
+      # avoid Inf in link(y)
+      y <- ifelse(y == 0, y + 0.1, y)
+    }
+
+    y_link <- suppressWarnings(linkfun(y, link = link))
+    scale_y <- round(mad(y_link), 1)
+    if(is.finite(scale_y)) {
+      scale <- max(scale, scale_y)
+    }
+    if(!center){
+      location_y <- round(median(y_link), 1)
+      if (is.finite(location_y)) {
+        location <- location_y
+      }
+    }
+    out <- paste0("student_t(",
+                  paste0(as.character(c(df, location, scale)),
+                         collapse = ", "), ")")
   }
 
-  y_link <- suppressWarnings(linkfun(y, link = link))
-  scale_y <- round(mad(y_link), 1)
-  if(is.finite(scale_y)) {
-    scale <- max(scale, scale_y)
-  }
-  if(!center){
-    location_y <- round(median(y_link), 1)
-    if (is.finite(location_y)) {
-      location <- location_y
-    }
-  }
-  paste0("student_t(",
-         paste0(as.character(c(df, location, scale)),
-                collapse = ", "), ")")
+  return(out)
 }

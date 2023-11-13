@@ -266,7 +266,8 @@ in a Bayesian framework using Markov Chain Monte Carlo.
 \cr
 \emph{Priors}: A \code{\link[mgcv]{jagam}} model file is generated from \code{formula} and
 modified to include any latent
-temporal processes. Prior distributions for most important model parameters can be
+temporal processes. Default priors for intercepts and any scale parameters are generated
+using the same practice as \pkg{brms}. Prior distributions for most important model parameters can be
 altered by the user to inspect model
 sensitivities to given priors (see \code{\link{get_mvgam_priors}} for details).
 Note that latent trends are estimated on the link scale so choose priors
