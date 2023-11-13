@@ -1122,7 +1122,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
 
       # Construct VARMA parameters
       if('Sigma' %in% names(trend_pars)){
-        Sigma <- trend_pars$sigma
+        Sigma <- trend_pars$Sigma
       } else {
         Sigma <- rlang::missing_arg()
       }
@@ -1231,7 +1231,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
         Sigmamat <- matrix(0, nrow = length(trend_pars$last_lvs),
                            ncol = length(trend_pars$last_lvs),
                            byrow = TRUE)
-        diag(Sigmamat) <- 1 / sqrt(trend_pars$tau)
+        diag(Sigmamat) <- 1 / trend_pars$tau
       }
 
 

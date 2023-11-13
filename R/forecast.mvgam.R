@@ -676,7 +676,7 @@ forecast_draws = function(object,
                                      ending_time = ending_time)
   }
 
-  # Any model in which a an autoregressive process was included should be
+  # Any model in which an autoregressive process was included should be
   # considered as VAR1 for forecasting purposes as this will make use of the
   # faster c++ functions
   if('Sigma' %in% names(trend_pars) |
