@@ -349,7 +349,7 @@ family_to_mgcvfam = function(family){
   } else if(family$family == 'student'){
     gaussian()
   } else if(family$family == 'lognormal'){
-    mgcv::Tweedie(p = 1.5, link = 'identity')
+    gaussian()
   } else if(family$family == 'tweedie'){
     mgcv::Tweedie(p = 1.5, link = 'log')
   } else {

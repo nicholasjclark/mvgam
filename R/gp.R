@@ -603,7 +603,8 @@ prep_gp_covariate = function(data,
 #' Clean GP names so no illegal characters are used in Stan code
 #' @noRd
 clean_gpnames = function(gp_names){
-  gp_names_clean <- gsub('(', '_', gp_names, fixed = TRUE)
+  gp_names_clean <- gsub(' ', '_', gp_names, fixed = TRUE)
+  gp_names_clean <- gsub('(', '_', gp_names_clean, fixed = TRUE)
   gp_names_clean <- gsub(')', '_', gp_names_clean, fixed = TRUE)
   gp_names_clean <- gsub(':', 'by', gp_names_clean, fixed = TRUE)
   gp_names_clean <- gsub('.', '_', gp_names_clean, fixed = TRUE)
