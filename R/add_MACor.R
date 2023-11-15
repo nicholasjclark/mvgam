@@ -294,10 +294,17 @@ add_MaCor = function(model_file,
 
       if(add_cor){
         if(trend_model %in% c('AR1', 'RW')){
-          model_file[max(grep('= b_raw[',
-                          model_file, fixed = TRUE))] <-
-            paste0(model_file[max(grep('= b_raw[',
-                                       model_file, fixed = TRUE))],
+          if(any(grepl('= mu_raw[',
+                      model_file, fixed = TRUE))){
+            insert_line <- max(grep('= mu_raw[',
+                                    model_file, fixed = TRUE))
+          } else if(any(grepl('= b_raw[',
+                              model_file, fixed = TRUE))){
+            insert_line <- max(grep('= b_raw[',
+                                    model_file, fixed = TRUE))
+          }
+          model_file[insert_line] <-
+            paste0(model_file[insert_line],
                    '\n// derived latent states\n',
                    'trend_raw[1] = ',
                    if(drift){ 'drift + '} else {NULL},
@@ -328,10 +335,17 @@ add_MaCor = function(model_file,
         }
 
         if(trend_model == 'AR2'){
-          model_file[max(grep('= b_raw[',
-                              model_file, fixed = TRUE))] <-
-            paste0(model_file[max(grep('= b_raw[',
-                                       model_file, fixed = TRUE))],
+          if(any(grepl('= mu_raw[',
+                       model_file, fixed = TRUE))){
+            insert_line <- max(grep('= mu_raw[',
+                                    model_file, fixed = TRUE))
+          } else if(any(grepl('= b_raw[',
+                              model_file, fixed = TRUE))){
+            insert_line <- max(grep('= b_raw[',
+                                    model_file, fixed = TRUE))
+          }
+          model_file[insert_line] <-
+            paste0(model_file[insert_line],
                    '\n// derived latent states\n',
                    'trend_raw[1] = ',
                    if(drift){ 'drift + '} else {NULL},
@@ -371,10 +385,17 @@ add_MaCor = function(model_file,
         }
 
         if(trend_model == 'AR3'){
-          model_file[max(grep('= b_raw[',
-                              model_file, fixed = TRUE))] <-
-            paste0(model_file[max(grep('= b_raw[',
-                                       model_file, fixed = TRUE))],
+          if(any(grepl('= mu_raw[',
+                       model_file, fixed = TRUE))){
+            insert_line <- max(grep('= mu_raw[',
+                                    model_file, fixed = TRUE))
+          } else if(any(grepl('= b_raw[',
+                              model_file, fixed = TRUE))){
+            insert_line <- max(grep('= b_raw[',
+                                    model_file, fixed = TRUE))
+          }
+          model_file[insert_line] <-
+            paste0(model_file[insert_line],
                    '\n// derived latent states\n',
                    'trend_raw[1] = ',
                    if(drift){ 'drift + '} else {NULL},
@@ -426,10 +447,17 @@ add_MaCor = function(model_file,
 
       } else {
         if(trend_model %in% c('AR1', 'RW')){
-          model_file[max(grep('= b_raw[',
-                              model_file, fixed = TRUE))] <-
-            paste0(model_file[max(grep('= b_raw[',
-                                       model_file, fixed = TRUE))],
+          if(any(grepl('= mu_raw[',
+                       model_file, fixed = TRUE))){
+            insert_line <- max(grep('= mu_raw[',
+                                    model_file, fixed = TRUE))
+          } else if(any(grepl('= b_raw[',
+                              model_file, fixed = TRUE))){
+            insert_line <- max(grep('= b_raw[',
+                                    model_file, fixed = TRUE))
+          }
+          model_file[insert_line] <-
+            paste0(model_file[insert_line],
                    'for(j in 1:n_series){\n',
                    'trend[1, j] = ',
                    if(drift){ 'drift[j] + '} else {NULL},
@@ -448,10 +476,17 @@ add_MaCor = function(model_file,
         }
 
         if(trend_model == 'AR2'){
-          model_file[max(grep('= b_raw[',
-                              model_file, fixed = TRUE))] <-
-            paste0(model_file[max(grep('= b_raw[',
-                                       model_file, fixed = TRUE))],
+          if(any(grepl('= mu_raw[',
+                       model_file, fixed = TRUE))){
+            insert_line <- max(grep('= mu_raw[',
+                                    model_file, fixed = TRUE))
+          } else if(any(grepl('= b_raw[',
+                              model_file, fixed = TRUE))){
+            insert_line <- max(grep('= b_raw[',
+                                    model_file, fixed = TRUE))
+          }
+          model_file[insert_line] <-
+            paste0(model_file[insert_line],
                    'for(j in 1:n_series){\n',
                    'trend[1, j] = ',
                    if(drift){ 'drift[j] + '} else {NULL},
@@ -475,10 +510,17 @@ add_MaCor = function(model_file,
         }
 
         if(trend_model == 'AR3'){
-          model_file[max(grep('= b_raw[',
-                              model_file, fixed = TRUE))] <-
-            paste0(model_file[max(grep('= b_raw[',
-                                       model_file, fixed = TRUE))],
+          if(any(grepl('= mu_raw[',
+                       model_file, fixed = TRUE))){
+            insert_line <- max(grep('= mu_raw[',
+                                    model_file, fixed = TRUE))
+          } else if(any(grepl('= b_raw[',
+                              model_file, fixed = TRUE))){
+            insert_line <- max(grep('= b_raw[',
+                                    model_file, fixed = TRUE))
+          }
+          model_file[insert_line] <-
+            paste0(model_file[insert_line],
                    'for(j in 1:n_series){\n',
                    'trend[1, j] = ',
                    if(drift){ 'drift[j] + '} else {NULL},

@@ -197,7 +197,7 @@ if(all(is.na(object$sp_names))){
 
 } else {
   if(any(unlist(purrr::map(object$mgcv_model$smooth, inherits, 'random.effect')))){
-    re_labs <- unlist(lapply(purrr::map(object$mgcv_model$smooth, 'term'),
+    re_labs <- unlist(lapply(purrr::map(object$mgcv_model$smooth, 'label'),
                              paste, collapse = ','))[
                                unlist(purrr::map(object$mgcv_model$smooth, inherits, 'random.effect'))]
     re_sds <- mcmc_summary(object$model_output, 'sigma_raw',
@@ -601,7 +601,7 @@ if(!is.null(object$trend_call)){
 
   } else {
     if(any(unlist(purrr::map(object$trend_mgcv_model$smooth, inherits, 'random.effect')))){
-      re_labs <- unlist(lapply(purrr::map(object$trend_mgcv_model$smooth, 'term'),
+      re_labs <- unlist(lapply(purrr::map(object$trend_mgcv_model$smooth, 'label'),
                                paste, collapse = ','))[
                                  unlist(purrr::map(object$trend_mgcv_model$smooth, inherits, 'random.effect'))]
       re_labs <- gsub('series', 'trend', re_labs)
