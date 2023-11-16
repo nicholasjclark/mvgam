@@ -342,13 +342,15 @@ family_to_brmsfam = function(family){
 }
 
 #' Set which family to use when setting up the gam object
+#' Stick to Gaussian where possible to ensure the initial setup
+#' doesn't fail
 #' @noRd
 family_to_mgcvfam = function(family){
   if(family$family == 'beta'){
     mgcv::betar()
   } else if(family$family == 'student'){
     gaussian()
-  } else if(family$family == 'lognormal'){
+  } else if(family$family %in% c('gamma', 'Gamma', 'lognormal')){
     gaussian()
   } else if(family$family == 'tweedie'){
     mgcv::Tweedie(p = 1.5, link = 'log')

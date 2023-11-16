@@ -50,7 +50,7 @@ make_gp_additions = function(gp_details, data,
 
     # Find the correct k to ensure that the total number of coefficients
     # when using gp(k = k) is the same as when using s(k = k + 1)
-    smooth_terms <- unlist(purrr::map(mgcv_model$smooth, 'term'))
+    smooth_terms <- unlist(paste0(purrr::map(mgcv_model$smooth, 'term')))
     smooth_bys <- unlist(purrr::map(mgcv_model$smooth, 'by'))
     if(any(smooth_bys == 'NA')){
       smooth_bys[smooth_bys == 'NA'] <- NA
