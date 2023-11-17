@@ -1059,7 +1059,7 @@ mvgam = function(formula,
       temp_dat_test <- data.frame(time = data_test$time,
                                   series = data_test$series)
 
-      X$time <- rbind(temp_dat_train, temp_dat_test) %>%
+      X$index..time..index <- rbind(temp_dat_train, temp_dat_test) %>%
         dplyr::left_join(rbind(temp_dat_train, temp_dat_test) %>%
                            dplyr::select(time) %>%
                            dplyr::distinct() %>%
@@ -1076,7 +1076,7 @@ mvgam = function(formula,
 
     } else {
 
-    X$time <- rbind(data_train, data_test[,1:NCOL(data_train)]) %>%
+    X$index..time..index <- rbind(data_train, data_test[,1:NCOL(data_train)]) %>%
       dplyr::left_join(rbind(data_train, data_test[,1:NCOL(data_train)]) %>%
                          dplyr::select(time) %>%
                          dplyr::distinct() %>%
@@ -1102,7 +1102,7 @@ mvgam = function(formula,
 
     if(class(data_train)[1] == 'list'){
       temp_dat <- data.frame(time = data_train$time)
-      X$time <- temp_dat %>%
+      X$index..time..index <- temp_dat %>%
         dplyr::left_join(temp_dat %>%
                            dplyr::select(time) %>%
                            dplyr::distinct() %>%
@@ -1111,7 +1111,7 @@ mvgam = function(formula,
                          by = c('time')) %>%
         dplyr::pull(time)
     } else {
-      X$time <- data_train %>%
+      X$index..time..index <- data_train %>%
         dplyr::left_join(data_train %>%
                            dplyr::select(time) %>%
                            dplyr::distinct() %>%
@@ -1126,10 +1126,10 @@ mvgam = function(formula,
   }
 
   # Arrange by time then by series
-  X %>% dplyr::arrange(time, series) -> X
+  X %>% dplyr::arrange(index..time..index, series) -> X
 
   # Matrix of indices in X that correspond to timepoints for each series
-  ytimes <- matrix(NA, nrow = length(unique(X$time)),
+  ytimes <- matrix(NA, nrow = length(unique(X$index..time..index)),
                    ncol = length(unique(X$series)))
   for(i in 1:length(unique(X$series))){
     ytimes[,i] <- which(X$series == i)
@@ -1147,7 +1147,7 @@ mvgam = function(formula,
   ss_jagam$jags.data$n <- NROW(ytimes)
   ss_jagam$jags.data$n_series <- NCOL(ytimes)
   ss_jagam$jags.data$X <- as.matrix(X %>%
-                                     dplyr::select(-time, -series, -outcome))
+                                     dplyr::select(-index..time..index, -series, -outcome))
   if(NCOL(ss_jagam$jags.data$X) == 1){
     if(offset){
       model_file[grep('eta <-', model_file, fixed = TRUE)] <- 'eta <- X * b + offset'
