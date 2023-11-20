@@ -279,7 +279,8 @@ adapt_brms_priors = function(priors,
                              n_lv,
                              trend_model = 'None',
                              trend_map,
-                             drift = FALSE){
+                             drift = FALSE,
+                             warnings = FALSE){
 
   # Replace any call to 'Intercept' with '(Intercept)' to match mgcv style
   priors[] <- lapply(priors, function(x)
@@ -318,7 +319,8 @@ adapt_brms_priors = function(priors,
                                      priors_df$prior, fixed = TRUE)] <-
         priors$ub[i]
 
-    } else if(any(grepl(paste0(priors$coef[i], ' ~ '),
+    } else if(priors$coef[i] != '' &
+              any(grepl(paste0(priors$coef[i], ' ~ '),
                         priors_df$prior, fixed = TRUE))){
 
       # Update the prior distribution
@@ -335,10 +337,27 @@ adapt_brms_priors = function(priors,
                                      priors_df$prior, fixed = TRUE)] <-
         priors$ub[i]
 
+    } else if(priors$class[i] == 'b'){
+      # Update all fixed effect priors
+      if(any(grepl('fixed effect', priors_df$param_info))){
+
+        for(j in 1:NROW(priors_df)){
+          if(grepl('fixed effect', priors_df$param_info[j])){
+            priors_df$prior[j] <-
+              paste0(paste(trimws(
+                strsplit(priors_df$prior[j],
+                         "[~]")[[1]][1]), '~ '),
+                priors$prior[i], ';')
+          }
+        }
+      }
+
     } else {
-      warning(paste0('no match found in model_file for parameter: ',
-              paste0(priors$class[i], ', ', priors$coef[i])),
-              call. = FALSE)
+      if(warnings){
+        warning(paste0('no match found in model_file for parameter: ',
+                       paste0(priors$class[i], ' ', priors$coef[i])),
+                call. = FALSE)
+      }
     }
   }
 

@@ -2857,7 +2857,9 @@ add_trend_predictors = function(trend_formula,
         paste0("int<lower=0> n_nonmissing; // number of nonmissing observations\n",
                paste(S_lines, collapse = '\n'))
 
-      S_mats <- trend_mvgam$model_data[paste0('S', 1:length(S_lines))]
+      # Pull out S matrices (don't always start at 1!)
+      S_mats <- trend_mvgam$model_data[grepl("S[0-9]",
+                                   names(trend_mvgam$model_data))]
       names(S_mats) <- gsub('S', 'S_trend', names(S_mats))
       model_data <- append(model_data, S_mats)
     }

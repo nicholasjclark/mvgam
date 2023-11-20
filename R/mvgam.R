@@ -589,7 +589,8 @@ mvgam = function(formula,
                                   n_lv = n_lv,
                                   trend_model = trend_model,
                                   trend_map = trend_map,
-                                  drift = drift)
+                                  drift = drift,
+                                  warnings = TRUE)
     }
   }
 

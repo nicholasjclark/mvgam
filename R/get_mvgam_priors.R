@@ -135,6 +135,18 @@
 #'              run_model = FALSE)
 #'code(mod2)
 #'
+#'# The "class = 'b'" shortcut can be used to put the same prior on all
+#'# 'fixed' effect coefficients (apart from any intercepts)
+#'set.seed(0)
+#'dat <- mgcv::gamSim(1, n = 200, scale = 2)
+#'dat$time <- 1:NROW(dat)
+#'mod <- mvgam(y ~ x0 + x1 + s(x2) + s(x3),
+#'             priors = prior(normal(0, 0.75), class = 'b'),
+#'             data = dat,
+#'             family = gaussian(),
+#'             run_model = FALSE)
+#'code(mod)
+#'
 #'@export
 get_mvgam_priors = function(formula,
                             trend_formula,
