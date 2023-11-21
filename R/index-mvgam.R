@@ -138,7 +138,7 @@ variables.mvgam = function(x, ...){
                        'ar1', 'ar2',
                        'ar3', 'A',
                        'Sigma', 'error', 'theta',
-                       'k_trend', 'delta', 'm_trend'), collapse = '|'),
+                       'k_trend', 'delta_trend', 'm_trend'), collapse = '|'),
                parnames) &
          !grepl('sigma_obs', parnames, fixed = TRUE) &
          !grepl('sigma_raw', parnames, fixed = TRUE))){
@@ -147,7 +147,7 @@ variables.mvgam = function(x, ...){
                                 'ar1', 'ar2',
                                 'ar3', 'A',
                                 'Sigma', 'error', 'theta',
-                                'k_trend', 'delta', 'm_trend'), collapse = '|'),
+                                'k_trend', 'delta_trend', 'm_trend'), collapse = '|'),
                         parnames) &
       !grepl('sigma_obs', parnames, fixed = TRUE) &
       !grepl('sigma_raw', parnames, fixed = TRUE)

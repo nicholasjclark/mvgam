@@ -57,10 +57,11 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{'AR2'} or \code{AR(p = 2)}
 \item \code{'AR3'} or \code{AR(p = 3)}
 \item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
+\item \verb{'PWlogistic}, \verb{'PWlinear} or \code{PW()} (only available in \code{Stan})
 \item \code{'GP'} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all types apart from \code{'GP'}, moving average and/or correlated
+For all types apart from \code{'GP'} and \code{PW()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
 multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
 

@@ -732,27 +732,27 @@ get_mvgam_priors = function(formula,
 
     if(trend_model %in% c('PWlinear', 'PWlogistic')){
       # Need to fix this as a next priority
-      trend_df <- NULL
-      # trend_df <- data.frame(param_name = c('vector[n_series] k_trend;',
-      #                                       'vector[n_series] m_trend;'),
-      #                        param_length = length(unique(data_train$series)),
-      #                        param_info = c('base trend growth rates',
-      #                                       'trend offset parameters'),
-      #                        prior = c('k_trend ~ std_normal();',
-      #                                  'm_trend ~ student_t(3, 0, 2.5);'),
-      #                        example_change = c(paste0(
-      #                          'k ~ normal(',
-      #                          round(runif(min = -1, max = 1, n = 1), 2),
-      #                          ', ',
-      #                          round(runif(min = 0.1, max = 1, n = 1), 2),
-      #                          ');'),
-      #                          paste0(
-      #                            'm ~ normal(',
-      #                            round(runif(min = -1, max = 1, n = 1), 2),
-      #                            ', ',
-      #                            round(runif(min = 0.1, max = 1, n = 1), 2),
-      #                            ');')))
-      #
+      # trend_df <- NULL
+      trend_df <- data.frame(param_name = c('vector[n_series] k_trend;',
+                                            'vector[n_series] m_trend;'),
+                             param_length = length(unique(data_train$series)),
+                             param_info = c('base trend growth rates',
+                                            'trend offset parameters'),
+                             prior = c('k_trend ~ std_normal();',
+                                       'm_trend ~ student_t(3, 0, 2.5);'),
+                             example_change = c(paste0(
+                               'k ~ normal(',
+                               round(runif(min = -1, max = 1, n = 1), 2),
+                               ', ',
+                               round(runif(min = 0.1, max = 1, n = 1), 2),
+                               ');'),
+                               paste0(
+                                 'm ~ normal(',
+                                 round(runif(min = -1, max = 1, n = 1), 2),
+                                 ', ',
+                                 round(runif(min = 0.1, max = 1, n = 1), 2),
+                                 ');')))
+
 
     }
     if(trend_model == 'GP'){

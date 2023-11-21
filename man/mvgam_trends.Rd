@@ -14,6 +14,7 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{RW()}
 \item \verb{AR(p = 1, 2, or 3)}
 \item \code{VAR()}(only available in \code{Stan})
+\item \code{PW()} (piecewise linear or logistic trends; only available in \code{Stan})
 \item \code{'GP'} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
@@ -46,6 +47,8 @@ currently supported is:
 \item 'VARMA'
 \item 'VARMAcor'
 \item 'VARMA1,1cor'
+\item 'PWlinear'
+\item 'PWlogistic'
 \item 'GP'
 \item 'None'
 }
@@ -61,12 +64,17 @@ the latent process is enforced through the prior using the parameterisation give
 Heaps (2022). Stationarity is not enforced when using \code{AR1}, \code{AR2} or \code{AR3} models,
 though this can be changed by the user by specifying lower and upper bounds on autoregressive
 parameters using functionality in \link{get_mvgam_priors} and the \code{priors} argument in
-\link{mvgam}
+\link{mvgam}. Piecewise trends follow the formulation in the popular \code{prophet} package produced
+by \code{Facebook}, where users can allow for changepoints to control the potential flexibility
+of the trend. See Taylor and Letham (2018) for details
 }
 \references{
 Sarah E. Heaps (2022) Enforcing stationarity through the prior in Vector Autoregressions.
 Journal of Computational and Graphical Statistics. 32:1, 1-10.
+
+Sean J. Taylor and Benjamin Letham (2018) Forecasting at scale.
+The American Statistician 72.1, 37-45.
 }
 \seealso{
-\code{\link{RW}}, \code{\link{AR}}, \code{\link{VAR}}
+\code{\link{RW}}, \code{\link{AR}}, \code{\link{VAR}}, \code{\link{PW}}
 }

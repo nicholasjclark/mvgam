@@ -15,11 +15,36 @@
 #'   Large values will allow many changepoints and a more flexible trend, while
 #'   small values will allow few changepoints. Default is `0.05`.
 #' @param growth Character string specifying either 'linear' or 'logistic' growth of
-#' the trend. If 'logistic', a variable labelled 'cap' MUST be in \code{data} to specify the
-#' maximum saturation point for the trend (see examples in \code{\link{mvgam}} for details).
+#' the trend. If 'logistic', a variable labelled `cap` MUST be in \code{data} to specify the
+#' maximum saturation point for the trend (see details and examples in \code{\link{mvgam}} for
+#' more information).
 #' Default is 'linear'.
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \code{mvgam}
+#' @details
+#'*Offsets and intercepts*:
+#' For each of these trend models, an offset parameter is included in the trend
+#' estimation process. This parameter will be incredibly difficult to identify
+#' if you also include an intercept in the observation formula. For that reason,
+#' it is highly recommended that you drop the intercept from the formula
+#' (i.e. `y ~ x + 0` or `y ~ x - 1`, where `x` are your optional predictor terms).
+#'\cr
+#'\cr
+#'*Logistic growth and the cap variable*:
+#' When forecasting growth, there is often some maximum achievable point that
+#' a time series can reach. For example, total market size, total population size
+#' or carrying capacity in population dynamics. It can be advantageous for the forecast
+#' to saturate at or near this point so that predictions are more sensible.
+#' This function allows you to make forecasts using a logistic growth trend model,
+#' with a specified carrying capacity. Note that this capacity does not need to be static
+#' over time, it can vary with each series x timepoint combination if necessary. But you
+#' must supply a `cap` value for each observation in the data when using `growth = 'logistic'`.
+#' For observation families that use a non-identity link function, the `cap` value will
+#' be internally transformed to the link scale (i.e. your specified `cap` will be log
+#' transformed if you are using a `poisson()` or `nb()` family). It is therefore important
+#' that you specify the `cap` values on the scale of your outcome. Note also that
+#' no missing values are allowed in `cap`.
+#'
 #' @rdname piecewise_trends
 #' @export
 PW = function(n_changepoints = 10,
@@ -64,14 +89,26 @@ add_piecewise = function(model_file,
     if(!(exists('cap', where = data_train))) {
       stop('Capacities must be supplied as a variable named "cap" for logistic growth',
            call. = FALSE)
-
     }
+
+    if(any(is.na(data_train$cap))){
+      stop('Missing values found for some "cap" terms',
+           call. = FALSE)
+    }
+
     # Matrix of capacities per series (these must operate on the link scale)
     all_caps <- data.frame(series = as.numeric(data_train$series),
                            time = data_train$time,
                            cap = suppressWarnings(linkfun(data_train$cap,
                                                           link = family$link))) %>%
       dplyr::arrange(time, series)
+
+    if(any(is.na(all_caps$cap)) | any(is.infinite(all_caps$cap))){
+      stop(paste0('Missing or infinite values found for some "cap" terms\n',
+                  'after transforming to the ',
+                  family$link, ' link scale'),
+           call. = FALSE)
+    }
 
     if(!is.null(data_test)){
       if(!(exists('cap', where = data_test))) {
@@ -85,6 +122,13 @@ add_piecewise = function(model_file,
                                    cap = suppressWarnings(linkfun(data_test$cap,
                                                                   link = family$link)))) %>%
         dplyr::arrange(time, series)
+
+      if(any(is.na(all_caps$cap)) | any(is.infinite(all_caps$cap))){
+        stop(paste0('Missing or infinite values found for some "cap" terms\n',
+                    'after transforming to the ',
+                    family$link, ' link scale'),
+             call. = FALSE)
+      }
     }
 
     cap <- matrix(NA, nrow = length(unique(all_caps$time)),
@@ -317,7 +361,7 @@ add_piecewise = function(model_file,
            "// trend offset parameters\n",
            "vector[n_series] m_trend;\n\n",
            "// trend rate adjustments per series\n",
-           "matrix[n_changepoints, n_series] delta;\n")
+           "matrix[n_changepoints, n_series] delta_trend;\n")
   model_file <- readLines(textConnection(model_file), n = -1)
 
   # Update the transformed parameters block
@@ -333,9 +377,9 @@ add_piecewise = function(model_file,
     '// trend estimates\n',
     'for (s in 1 : n_series) {\n',
     if(trend_model == 'PWlogistic'){
-      'trend[1 : n, s] = logistic_trend(k_trend[s], m_trend[s], to_vector(delta[,s]), time, to_vector(cap[,s]), A, t_change, n_changepoints);\n'
+      'trend[1 : n, s] = logistic_trend(k_trend[s], m_trend[s], to_vector(delta_trend[,s]), time, to_vector(cap[,s]), A, t_change, n_changepoints);\n'
     } else {
-      'trend[1 : n, s] = linear_trend(k_trend[s], m_trend[s], to_vector(delta[,s]), time, A, t_change);\n'
+      'trend[1 : n, s] = linear_trend(k_trend[s], m_trend[s], to_vector(delta_trend[,s]), time, A, t_change);\n'
     },
 
     '}\n')
@@ -353,13 +397,15 @@ add_piecewise = function(model_file,
     paste0('// trend parameter priors\n',
            'm_trend ~ student_t(3, 0, 2.5);\n',
            'k_trend ~ std_normal();\n',
-           'to_vector(delta) ~ double_exponential(0, changepoint_scale);\n',
+           'to_vector(delta_trend) ~ double_exponential(0, changepoint_scale);\n',
            model_file[grep("// likelihood functions", model_file, fixed = TRUE) - 1])
+  model_file <- readLines(textConnection(model_file), n = -1)
 
   # Update the generated quantities block
   model_file <- model_file[-grep("vector[n_series] tau;", model_file, fixed = TRUE)]
   tau_start <- grep("tau[s] = pow(sigma[s], -2.0);", model_file, fixed = TRUE) - 1
   model_file <- model_file[-c(tau_start:(tau_start + 2))]
+  model_file <- readLines(textConnection(model_file), n = -1)
 
   #### Return ####
   return(list(model_file = model_file,

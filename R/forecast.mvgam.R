@@ -744,6 +744,14 @@ forecast_draws = function(object,
                             time = data_test$time,
                             cap = suppressWarnings(linkfun(data_test$cap,
                                                            link = family$link)))
+
+          if(any(is.na(cap$cap)) | any(is.infinite(cap$cap))){
+            stop(paste0('Missing or infinite values found for some "cap" terms\n',
+                        'after transforming to the ',
+                        family$link, ' link scale'),
+                 call. = FALSE)
+          }
+
         } else {
           cap <- NULL
         }

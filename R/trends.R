@@ -8,6 +8,7 @@
 #'   \item `RW()`
 #'   \item `AR(p = 1, 2, or 3)`
 #'   \item `VAR()`(only available in \code{Stan})
+#'   \item `PW()` (piecewise linear or logistic trends; only available in \code{Stan})
 #'   \item `'GP'` (Gaussian Process with squared exponential kernel;
 #'only available in \code{Stan})}
 #'
@@ -40,6 +41,8 @@
 #'\item 'VARMA'
 #'\item 'VARMAcor'
 #'\item 'VARMA1,1cor'
+#'\item 'PWlinear'
+#'\item 'PWlogistic'
 #'\item 'GP'
 #'\item 'None'
 #'}
@@ -56,10 +59,15 @@
 #'Heaps (2022). Stationarity is not enforced when using `AR1`, `AR2` or `AR3` models,
 #'though this can be changed by the user by specifying lower and upper bounds on autoregressive
 #'parameters using functionality in [get_mvgam_priors] and the `priors` argument in
-#'[mvgam]
-#'@seealso \code{\link{RW}}, \code{\link{AR}}, \code{\link{VAR}}
+#'[mvgam]. Piecewise trends follow the formulation in the popular `prophet` package produced
+#'by `Facebook`, where users can allow for changepoints to control the potential flexibility
+#'of the trend. See Taylor and Letham (2018) for details
+#'@seealso \code{\link{RW}}, \code{\link{AR}}, \code{\link{VAR}}, \code{\link{PW}}
 #' @references Sarah E. Heaps (2022) Enforcing stationarity through the prior in Vector Autoregressions.
 #' Journal of Computational and Graphical Statistics. 32:1, 1-10.
+#'
+#' Sean J. Taylor and Benjamin Letham (2018) Forecasting at scale.
+#' The American Statistician 72.1, 37-45.
 #' @name mvgam_trends
 NULL
 
@@ -642,7 +650,7 @@ trend_par_names = function(trend_model,
     }
 
     if(trend_model %in% c('PWlinear', 'PWlogistic')){
-      param <- c('trend', 'delta', 'k_trend', 'm_trend')
+      param <- c('trend', 'delta_trend', 'k_trend', 'm_trend')
     }
 
   }
@@ -698,24 +706,24 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
 
   # delta params for piecewise trends
   if(attr(object$model_data, 'trend_model') %in% c('PWlinear', 'PWlogistic')){
-    out$delta <- lapply(seq_along(levels(object$obs_data$series)), function(series){
+    out$delta_trend <- lapply(seq_along(levels(object$obs_data$series)), function(series){
       if(object$fit_engine == 'stan'){
-        delta_estimates <- mvgam:::mcmc_chains(object$model_output, 'delta')[,seq(series,
-                                                                          dim(mvgam:::mcmc_chains(object$model_output,
-                                                                                          'delta'))[2],
+        delta_estimates <- mvgam:::mcmc_chains(object$model_output, 'delta_trend')[,seq(series,
+                                                                          dim(mcmc_chains(object$model_output,
+                                                                                          'delta_trend'))[2],
                                                                           by = NCOL(object$ytimes))]
       } else {
-        delta_estimates <- mcmc_chains(object$model_output, 'delta')[,starts[series]:ends[series]]
+        delta_estimates <- mcmc_chains(object$model_output, 'delta_trend')[,starts[series]:ends[series]]
       }
     })
     if(attr(object$model_data, 'trend_model') == 'PWlogistic'){
       out$cap <- lapply(seq_along(levels(object$obs_data$series)), function(series){
-        t(replicate(NROW(out$delta[[1]]), object$trend_model$cap[,series]))
+        t(replicate(NROW(out$delta_trend[[1]]), object$trend_model$cap[,series]))
       })
     }
-    out$changepoints <- t(replicate(NROW(out$delta[[1]]), object$trend_model$changepoints))
-    out$change_freq <- replicate(NROW(out$delta[[1]]), object$trend_model$change_freq)
-    out$change_scale <- replicate(NROW(out$delta[[1]]), object$trend_model$changepoint_scale)
+    out$changepoints <- t(replicate(NROW(out$delta_trend[[1]]), object$trend_model$changepoints))
+    out$change_freq <- replicate(NROW(out$delta_trend[[1]]), object$trend_model$change_freq)
+    out$change_scale <- replicate(NROW(out$delta_trend[[1]]), object$trend_model$changepoint_scale)
   }
 
   # Latent trend loadings for dynamic factor models
@@ -934,10 +942,10 @@ extract_general_trend_pars = function(samp_index, trend_pars){
 
     if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
                                    'A', 'Sigma', 'theta', 'b_gp', 'error',
-                                   'delta', 'cap')){
+                                   'delta_trend', 'cap')){
 
       if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
-                                     'b_gp', 'delta', 'cap')){
+                                     'b_gp', 'delta_trend', 'cap')){
         out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
       }
 
@@ -1381,7 +1389,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
     }
 
     if(trend_model == 'PWlinear'){
-      trend_fc <- do.call(cbind, lapply(seq_along(trend_pars$delta), function(x){
+      trend_fc <- do.call(cbind, lapply(seq_along(trend_pars$delta_trend), function(x){
 
         # Sample forecast horizon changepoints
         n_changes <- stats::rpois(1, (trend_pars$change_freq *
@@ -1397,7 +1405,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
         t_change_new <- sample(min(time):max(time), n_changes)
 
         # Combine with changepoints from the history
-        deltas <- c(trend_pars$delta[[x]], deltas_new)
+        deltas <- c(trend_pars$delta_trend[[x]], deltas_new)
         changepoint_ts <- c(trend_pars$changepoints, t_change_new)
 
         # Generate a trend draw
@@ -1413,7 +1421,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
     }
 
     if(trend_model == 'PWlogistic'){
-      trend_fc <- do.call(cbind, lapply(seq_along(trend_pars$delta), function(x){
+      trend_fc <- do.call(cbind, lapply(seq_along(trend_pars$delta_trend), function(x){
 
         # Sample forecast horizon changepoints
         n_changes <- stats::rpois(1, (trend_pars$change_freq *
@@ -1428,7 +1436,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
         t_change_new <- sample(min(time):max(time), n_changes)
 
         # Combine with changepoints from the history
-        deltas <- c(trend_pars$delta[[x]], deltas_new)
+        deltas <- c(trend_pars$delta_trend[[x]], deltas_new)
         changepoint_ts <- c(trend_pars$changepoints, t_change_new)
 
         # Get historical capacities

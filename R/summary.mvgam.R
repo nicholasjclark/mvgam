@@ -480,6 +480,20 @@ if(object$use_lv){
 
 if(!object$use_lv){
   if(attr(object$model_data, 'trend_model') != 'None'){
+    if(attr(object$model_data, 'trend_model') %in% c('PWlinear', 'PWlogistic')){
+      cat("\nLatent trend growth rate estimates:\n")
+      print(suppressWarnings(mcmc_summary(object$model_output, c('k_trend'),
+                                          digits = digits,
+                                          variational = object$algorithm %in%
+                                            c('fullrank', 'meanfield')))[,c(3:7)])
+
+      cat("\nLatent trend offset estimates:\n")
+      print(suppressWarnings(mcmc_summary(object$model_output, c('m_trend'),
+                                          digits = digits,
+                                          variational = object$algorithm %in%
+                                            c('fullrank', 'meanfield')))[,c(3:7)])
+    }
+
     if(attr(object$model_data, 'trend_model') == 'RW'){
       if(object$drift){
         cat("\nLatent trend drift and sigma estimates:\n")

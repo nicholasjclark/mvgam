@@ -133,10 +133,11 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{'AR2'} or \code{AR(p = 2)}
 \item \code{'AR3'} or \code{AR(p = 3)}
 \item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
+\item \verb{'PWlogistic}, \verb{'PWlinear} or \code{PW()} (only available in \code{Stan})
 \item \code{'GP'} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all types apart from \code{'GP'}, moving average and/or correlated
+For all types apart from \code{'GP'} and \code{PW()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
 multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
 
@@ -253,7 +254,12 @@ in a Bayesian framework using Markov Chain Monte Carlo.
 \cr
 \cr
 \emph{Formula syntax}: Details of the formula syntax used by \pkg{mvgam} can be found in
-\code{\link[mgcv]{formula.gam}}.
+\code{\link[mgcv]{formula.gam}}. Note that it is possible to supply an empty formula where
+there are no predictors or intercepts in the observation model (i.e. \code{y ~ 0} or \code{y ~ -1}).
+In this case, an intercept-only observation model will be set up but the intercept coefficient
+will be fixed at zero. This can be handy if you wish to fit pure State-Space models where
+the variation in the dynamic trend controls the average expectation, and/or where intercepts
+are non-identifiable (as in piecewise trends, see examples below)
 \cr
 \cr
 \emph{Families and link functions}: Details of families supported by \pkg{mvgam} can be found in
@@ -428,7 +434,7 @@ trend_map <- data.frame(series = unique(mod_data$series),
                        trend = c(1,1,2))
 
 # Fit the model using AR1 trends
-mod1 <- mvgam(y ~ s(season, bs = 'cc'),
+mod <- mvgam(y ~ s(season, bs = 'cc'),
               trend_map = trend_map,
               trend_model = 'AR1',
               data = mod_data,
@@ -436,12 +442,12 @@ mod1 <- mvgam(y ~ s(season, bs = 'cc'),
 
 # The mapping matrix is now supplied as data to the model in the 'Z' element
 mod1$model_data$Z
-code(mod1)
+code(mod)
 
 # The first two series share an identical latent trend; the third is different
-plot(mod1, type = 'trend', series = 1)
-plot(mod1, type = 'trend', series = 2)
-plot(mod1, type = 'trend', series = 3)
+plot(mod, type = 'trend', series = 1)
+plot(mod, type = 'trend', series = 2)
+plot(mod, type = 'trend', series = 3)
 
 # Example of how to use dynamic coefficients
 # Simulate a time-varying coefficient for the effect of temperature
@@ -492,7 +498,7 @@ dat$data_test$offset <- 0.5 * as.numeric(dat$data_test$series)
 
 # Fit a model that includes the offset in the linear predictor as well as
 # hierarchical seasonal smooths
-mod1 <- mvgam(formula = y ~ offset(offset) +
+mod <- mvgam(formula = y ~ offset(offset) +
               s(series, bs = 're') +
               s(season, bs = 'cc') +
               s(season, by = series, m = 1, k = 5),
@@ -502,25 +508,25 @@ mod1 <- mvgam(formula = y ~ offset(offset) +
 
 # Inspect the model file to see the modification to the linear predictor
 # (eta)
-mod1$model_file
+mod$model_file
 
 # Forecasts for the first two series will differ in magnitude
 layout(matrix(1:2, ncol = 2))
-plot(mod1, type = 'forecast', series = 1, newdata = dat$data_test,
+plot(mod, type = 'forecast', series = 1, newdata = dat$data_test,
      ylim = c(0, 75))
-plot(mod1, type = 'forecast', series = 2, newdata = dat$data_test,
+plot(mod, type = 'forecast', series = 2, newdata = dat$data_test,
      ylim = c(0, 75))
 layout(1)
 
 # Changing the offset for the testing data should lead to changes in
 # the forecast
 dat$data_test$offset <- dat$data_test$offset - 2
-plot(mod1, 'forecast', newdata = dat$data_test)
+plot(mod, 'forecast', newdata = dat$data_test)
 
 # Relative Risks can be computed by fixing the offset to the same value
 # for each series
 dat$data_test$offset <- rep(1, NROW(dat$data_test))
-preds_rr <- predict(mod1, type = 'link', newdata = dat$data_test)
+preds_rr <- predict(mod, type = 'link', newdata = dat$data_test)
 series1_inds <- which(dat$data_test$series == 'series_1')
 series2_inds <- which(dat$data_test$series == 'series_2')
 
@@ -541,6 +547,66 @@ for(i in 2:50){
  }
 layout(1)
 
+# Example of logistic growth with possible changepoints
+# Simple logistic growth model
+dNt = function(r, N, k){
+   r * N * (k - N)
+}
+
+# Iterate growth through time
+Nt = function(r, N, t, k) {
+for (i in 1:(t - 1)) {
+
+ # population at next time step is current population + growth,
+ # but we introduce several 'shocks' as changepoints
+ if(i \%in\% c(5, 15, 25, 41, 45, 60, 80)){
+   N[i + 1] <- max(1, N[i] + dNt(r + runif(1, -0.1, 0.1),
+                                 N[i], k))
+   } else {
+   N[i + 1] <- max(1, N[i] + dNt(r, N[i], k))
+   }
+  }
+ N
+}
+
+# Simulate expected values
+set.seed(11)
+expected <- Nt(0.004, 2, 100, 30)
+plot(expected, xlab = 'Time')
+
+# Take Poisson draws
+y <- rpois(100, expected)
+plot(y, xlab = 'Time')
+
+# Assemble data into dataframe and model. We set a
+# fixed carrying capacity of 35 for this example, but note that
+# this value is not required to be fixed at each timepoint
+mod_data <- data.frame(y = y,
+                       time = 1:100,
+                       cap = 35,
+                       series = as.factor('series_1'))
+plot_mvgam_series(data = mod_data)
+
+# The intercept is nonidentifiable when using piecewise
+# trends because the trend functions have their own offset
+# parameters 'm'; it is recommended to always drop intercepts
+# when using these trend models
+mod <- mvgam(y ~ 0,
+             trend_model = PW(growth = 'logistic'),
+             family = poisson(),
+             data = mod_data)
+summary(mod)
+
+# Plot the posterior hindcast
+plot(mod, type = 'forecast')
+
+# View the changepoints with ggplot2 utilities
+library(ggplot2)
+mcmc_plot(mod, variable = 'delta_trend',
+          regex = TRUE) +
+scale_y_discrete(labels = mod$trend_model$changepoints) +
+labs(y = 'Potential changepoint',
+     x = 'Rate change')
 }
 }
 \references{
