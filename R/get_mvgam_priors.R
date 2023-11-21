@@ -201,22 +201,18 @@ get_mvgam_priors = function(formula,
   }
 
   # Check for missing rhs in formula
+  # If there are no terms in the observation formula (i.e. y ~ -1),
+  # we will use an intercept-only observation formula and fix
+  # the intercept coefficient at zero
   drop_obs_intercept <- FALSE
   if(length(attr(terms(formula), 'term.labels')) == 0 &
      !attr(terms(formula), 'intercept') == 1){
-    if(!missing(trend_formula)){
-      # If there are no terms in the observation formula (i.e. y ~ -1),
-      # but a trend_formula is supplied, we will use an intercept-only
-      # observation formula and fix the intercept coefficient at zero
-      formula_envir <- attr(formula, '.Environment')
-      formula <- formula(paste(rlang::f_lhs(formula), '~ 1'))
-      attr(formula, '.Environment') <- formula_envir
-      drop_obs_intercept <- TRUE
-    } else {
-      stop('argument "formula" contains no terms',
-           call. = FALSE)
-    }
+    formula_envir <- attr(formula, '.Environment')
+    formula <- formula(paste(rlang::f_lhs(formula), '~ 1'))
+    attr(formula, '.Environment') <- formula_envir
+    drop_obs_intercept <- TRUE
   }
+
   if(is.null(orig_formula)){
     orig_formula <- formula
   }
@@ -245,6 +241,11 @@ get_mvgam_priors = function(formula,
     add_cor <- FALSE
   }
 
+  if(use_lv & trend_model %in% c('PWlinear', 'PWlogistic')){
+    stop('Cannot estimate piecewise trends using dynamic factors',
+         call. = FALSE)
+  }
+
   if(use_lv & (add_ma | add_cor) & missing(trend_formula)){
     stop('Cannot estimate moving averages or correlated errors for dynamic factors',
          call. = FALSE)
@@ -260,6 +261,18 @@ get_mvgam_priors = function(formula,
          call. = FALSE)
   }
 
+  # JAGS cannot support latent GP, VAR or piecewise trends
+  if(!use_stan & trend_model %in% c('GP', 'VAR1', 'PWlinear', 'PWlogistic')){
+    stop('Gaussian Process, VAR and piecewise trends not supported for JAGS',
+         call. = FALSE)
+  }
+
+  # Stan cannot support Tweedie
+  if(use_stan & family_char == 'tweedie'){
+    stop('Tweedie family not supported for stan',
+         call. = FALSE)
+  }
+
   # Check trend formula
   if(!missing(trend_formula)){
     if(missing(trend_map)){
@@ -267,9 +280,9 @@ get_mvgam_priors = function(formula,
                               trend = 1:length(unique(data_train$series)))
     }
 
-    if(!trend_model %in% c('RW', 'AR1', 'AR2',
+    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'AR3',
                            'VAR1', 'VAR1cor', 'VARMA1,1cor')){
-      stop('only RW, AR1, AR2 and VAR trends currently supported for trend predictor models',
+      stop('only RW, AR1, AR2, AR3 and VAR trends currently supported for trend predictor models',
            call. = FALSE)
     }
   }
@@ -414,11 +427,10 @@ get_mvgam_priors = function(formula,
 
   } else {
 
-    # JAGS cannot support latent GP or VAR trends
-    if(!use_stan & trend_model %in%c ('GP', 'VAR1',
-                                      'VAR1cor', 'VARMA1,1cor')){
-      warning('gaussian process and VAR trends not supported for JAGS; reverting to Stan')
-      use_stan <- TRUE
+    # JAGS cannot support latent GP, VAR or piecewise trends
+    if(!use_stan & trend_model %in% c('GP', 'VAR1', 'PWlinear', 'PWlogistic')){
+      stop('Gaussian Process, VAR and piecewise trends not supported for JAGS',
+           call. = FALSE)
     }
 
     if(use_stan & family_char == 'tweedie'){
@@ -718,6 +730,31 @@ get_mvgam_priors = function(formula,
       trend_df <- NULL
     }
 
+    if(trend_model %in% c('PWlinear', 'PWlogistic')){
+      # Need to fix this as a next priority
+      trend_df <- NULL
+      # trend_df <- data.frame(param_name = c('vector[n_series] k_trend;',
+      #                                       'vector[n_series] m_trend;'),
+      #                        param_length = length(unique(data_train$series)),
+      #                        param_info = c('base trend growth rates',
+      #                                       'trend offset parameters'),
+      #                        prior = c('k_trend ~ std_normal();',
+      #                                  'm_trend ~ student_t(3, 0, 2.5);'),
+      #                        example_change = c(paste0(
+      #                          'k ~ normal(',
+      #                          round(runif(min = -1, max = 1, n = 1), 2),
+      #                          ', ',
+      #                          round(runif(min = 0.1, max = 1, n = 1), 2),
+      #                          ');'),
+      #                          paste0(
+      #                            'm ~ normal(',
+      #                            round(runif(min = -1, max = 1, n = 1), 2),
+      #                            ', ',
+      #                            round(runif(min = 0.1, max = 1, n = 1), 2),
+      #                            ');')))
+      #
+
+    }
     if(trend_model == 'GP'){
       if(use_lv){
         trend_df <- data.frame(param_name = c('vector<lower=0>[n_lv] rho_gp;'),
@@ -1248,22 +1285,23 @@ make_default_int = function(response, family){
 }
 
 #' @noRd
+linkfun = function (x, link) {
+  switch(link, identity = x, log = log(x), logm1 = logm1(x),
+         log1p = log1p(x), inverse = 1/x, sqrt = sqrt(x), `1/mu^2` = 1/x^2,
+         tan_half = tan(x/2), logit = plogis(x), probit = qnorm(x),
+         cauchit = qcauchy(x), probit_approx = qnorm(x),
+         squareplus = (x^2 - 1)/x,
+         stop("Link '", link, "' is not supported.",
+              call. = FALSE))
+}
+
+#' @noRd
 update_default_scales = function(response,
                                  family,
                                  df = 3,
                                  center = TRUE,
                                  location = 0,
                                  scale = 2.5){
-
-  linkfun = function (x, link) {
-    switch(link, identity = x, log = log(x), logm1 = logm1(x),
-           log1p = log1p(x), inverse = 1/x, sqrt = sqrt(x), `1/mu^2` = 1/x^2,
-           tan_half = tan(x/2), logit = plogis(x), probit = qnorm(x),
-           cauchit = qcauchy(x), probit_approx = qnorm(x),
-           squareplus = (x^2 - 1)/x,
-           stop("Link '", link, "' is not supported.",
-                call. = FALSE))
-  }
 
   if(all(is.na(response))){
     out <- paste0("student_t(",

@@ -91,6 +91,8 @@ trend_model_choices = function(){
     'VARMA',
     'VARMAcor',
     'VARMA1,1cor',
+    'PWlinear',
+    'PWlogistic',
     'None')
 }
 
@@ -140,6 +142,68 @@ ma_cor_additions = function(trend_model){
               use_var1cor = use_var1cor,
               add_ma = add_ma,
               add_cor = add_cor))
+}
+
+#' Evaluate the piecewise linear function
+#' This code is borrowed from the {prophet} R package
+#' All credit goes directly to the prophet development team
+#' https://github.com/facebook/prophet/blob/main/R/R/prophet.R
+#' @param t Vector of times on which the function is evaluated.
+#' @param deltas Vector of rate changes at each changepoint.
+#' @param k Float initial rate.
+#' @param m Float initial offset.
+#' @param changepoint_ts Vector of changepoint times.
+#'
+#' @return Vector y(t).
+#'
+#' @noRd
+piecewise_linear <- function(t, deltas, k, m = 0, changepoint_ts) {
+  # Intercept changes
+  gammas <- -changepoint_ts * deltas
+  # Get cumulative slope and intercept at each t
+  k_t <- rep(k, length(t))
+  m_t <- rep(m, length(t))
+  for (s in 1:length(changepoint_ts)) {
+    indx <- t >= changepoint_ts[s]
+    k_t[indx] <- k_t[indx] + deltas[s]
+    m_t[indx] <- m_t[indx] + gammas[s]
+  }
+  y <- k_t * t + m_t
+  return(y)
+}
+
+#' Evaluate the piecewise logistic function.
+#' This code is borrowed from the {prophet} R package
+#' All credit goes directly to the prophet development team
+#' https://github.com/facebook/prophet/blob/main/R/R/prophet.R
+#' @param t Vector of times on which the function is evaluated.
+#' @param cap Vector of capacities at each t.
+#' @param deltas Vector of rate changes at each changepoint.
+#' @param k Float initial rate.
+#' @param m Float initial offset.
+#' @param changepoint_ts Vector of changepoint times.
+#'
+#' @return Vector y(t).
+#'
+#' @noRd
+piecewise_logistic <- function(t, cap, deltas, k, m, changepoint_ts) {
+  # Compute offset changes
+  k.cum <- c(k, cumsum(deltas) + k)
+  gammas <- rep(0, length(changepoint_ts))
+  for (i in 1:length(changepoint_ts)) {
+    gammas[i] <- ((changepoint_ts[i] - m - sum(gammas))
+                  * (1 - k.cum[i] / k.cum[i + 1]))
+  }
+  # Get cumulative rate and offset at each t
+  k_t <- rep(k, length(t))
+  m_t <- rep(m, length(t))
+  for (s in 1:length(changepoint_ts)) {
+    indx <- t >= changepoint_ts[s]
+    k_t[indx] <- k_t[indx] + deltas[s]
+    m_t[indx] <- m_t[indx] + gammas[s]
+  }
+  y <- cap / (1 + exp(-k_t * (t - m_t)))
+  return(y)
 }
 
 #' Squared exponential GP simulation function
@@ -577,6 +641,10 @@ trend_par_names = function(trend_model,
                  'sigma', 'theta', 'error')
     }
 
+    if(trend_model %in% c('PWlinear', 'PWlogistic')){
+      param <- c('trend', 'delta', 'k_trend', 'm_trend')
+    }
+
   }
 
   if(trend_model != 'None'){
@@ -626,6 +694,28 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
 
   } else {
     out <- list()
+  }
+
+  # delta params for piecewise trends
+  if(attr(object$model_data, 'trend_model') %in% c('PWlinear', 'PWlogistic')){
+    out$delta <- lapply(seq_along(levels(object$obs_data$series)), function(series){
+      if(object$fit_engine == 'stan'){
+        delta_estimates <- mvgam:::mcmc_chains(object$model_output, 'delta')[,seq(series,
+                                                                          dim(mvgam:::mcmc_chains(object$model_output,
+                                                                                          'delta'))[2],
+                                                                          by = NCOL(object$ytimes))]
+      } else {
+        delta_estimates <- mcmc_chains(object$model_output, 'delta')[,starts[series]:ends[series]]
+      }
+    })
+    if(attr(object$model_data, 'trend_model') == 'PWlogistic'){
+      out$cap <- lapply(seq_along(levels(object$obs_data$series)), function(series){
+        t(replicate(NROW(out$delta[[1]]), object$trend_model$cap[,series]))
+      })
+    }
+    out$changepoints <- t(replicate(NROW(out$delta[[1]]), object$trend_model$changepoints))
+    out$change_freq <- replicate(NROW(out$delta[[1]]), object$trend_model$change_freq)
+    out$change_scale <- replicate(NROW(out$delta[[1]]), object$trend_model$changepoint_scale)
   }
 
   # Latent trend loadings for dynamic factor models
@@ -843,10 +933,11 @@ extract_general_trend_pars = function(samp_index, trend_pars){
   general_trend_pars <- lapply(seq_along(trend_pars), function(x){
 
     if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
-                                   'A', 'Sigma', 'theta', 'b_gp', 'error')){
+                                   'A', 'Sigma', 'theta', 'b_gp', 'error',
+                                   'delta', 'cap')){
 
       if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
-                                     'b_gp')){
+                                     'b_gp', 'delta', 'cap')){
         out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
       }
 
@@ -922,10 +1013,11 @@ extract_series_trend_pars = function(series, samp_index, trend_pars,
 }
 
 #' Wrapper function to forecast trends
+#' @importFrom extraDistr rlaplace
 #' @noRd
 forecast_trend = function(trend_model, use_lv, trend_pars,
                           Xp_trend = NULL, betas_trend = NULL,
-                          h = 1, time = NULL){
+                          h = 1, time = NULL, cap = NULL){
 
   # Propagate dynamic factors forward
   if(use_lv){
@@ -1286,6 +1378,80 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
       #                      Xp_trend = Xp_trend,
       #                      betas_trend = betas_trend,
       #                      h = h)
+    }
+
+    if(trend_model == 'PWlinear'){
+      trend_fc <- do.call(cbind, lapply(seq_along(trend_pars$delta), function(x){
+
+        # Sample forecast horizon changepoints
+        n_changes <- stats::rpois(1, (trend_pars$change_freq *
+                                        (max(time) -
+                                           min(time))))
+
+        # Sample deltas
+        deltas_new <- extraDistr::rlaplace(n_changes,
+                                           mu = 0,
+                                           sigma = trend_pars$change_scale + 1e-8)
+
+        # Spread changepoints evenly across the forecast horizon
+        t_change_new <- sample(min(time):max(time), n_changes)
+
+        # Combine with changepoints from the history
+        deltas <- c(trend_pars$delta[[x]], deltas_new)
+        changepoint_ts <- c(trend_pars$changepoints, t_change_new)
+
+        # Generate a trend draw
+        draw <- piecewise_linear(t = 1:max(time),
+                                 deltas = deltas,
+                                 k = trend_pars$k_trend[x],
+                                 m = trend_pars$m_trend[x],
+                                 changepoint_ts = changepoint_ts)
+
+        # Keep only the forecast horizon estimates
+        tail(draw, max(time) - min(time))
+      }))
+    }
+
+    if(trend_model == 'PWlogistic'){
+      trend_fc <- do.call(cbind, lapply(seq_along(trend_pars$delta), function(x){
+
+        # Sample forecast horizon changepoints
+        n_changes <- stats::rpois(1, (trend_pars$change_freq *
+                                        (max(time) - min(time))))
+
+        # Sample deltas
+        deltas_new <- extraDistr::rlaplace(n_changes,
+                                           mu = 0,
+                                           sigma = trend_pars$change_scale + 1e-8)
+
+        # Spread changepoints evenly across the forecast horizon
+        t_change_new <- sample(min(time):max(time), n_changes)
+
+        # Combine with changepoints from the history
+        deltas <- c(trend_pars$delta[[x]], deltas_new)
+        changepoint_ts <- c(trend_pars$changepoints, t_change_new)
+
+        # Get historical capacities
+        oldcaps <- trend_pars$cap[[x]]
+
+        # And forecast capacities
+        newcaps = cap %>%
+          dplyr::filter(series == levels(cap$series)[x]) %>%
+          dplyr::arrange(time) %>%
+          dplyr::pull(cap)
+        caps <- c(oldcaps, newcaps)
+
+        # Generate a trend draw
+        draw <- piecewise_logistic(t = 1:max(time),
+                                   cap = caps,
+                                   deltas = deltas,
+                                   k = trend_pars$k_trend[x],
+                                   m = trend_pars$m_trend[x],
+                                   changepoint_ts = changepoint_ts)
+
+        # Keep only the forecast horizon estimates
+        tail(draw, max(time) - min(time))
+      }))
     }
 
   }

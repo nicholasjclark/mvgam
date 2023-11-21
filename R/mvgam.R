@@ -557,22 +557,18 @@ mvgam = function(formula,
   }
 
   # Check for missing rhs in formula
+  # If there are no terms in the observation formula (i.e. y ~ -1),
+  # we will use an intercept-only observation formula and fix
+  # the intercept coefficient at zero
   drop_obs_intercept <- FALSE
   if(length(attr(terms(formula), 'term.labels')) == 0 &
      !attr(terms(formula), 'intercept') == 1){
-    if(!missing(trend_formula)){
-      # If there are no terms in the observation formula (i.e. y ~ -1),
-      # but a trend_formula is supplied, we will use an intercept-only
-      # observation formula and fix the intercept coefficient at zero
-      formula_envir <- attr(formula, '.Environment')
-      formula <- formula(paste(rlang::f_lhs(formula), '~ 1'))
-      attr(formula, '.Environment') <- formula_envir
-      drop_obs_intercept <- TRUE
-    } else {
-      stop('argument "formula" contains no terms',
-           call. = FALSE)
-    }
+    formula_envir <- attr(formula, '.Environment')
+    formula <- formula(paste(rlang::f_lhs(formula), '~ 1'))
+    attr(formula, '.Environment') <- formula_envir
+    drop_obs_intercept <- TRUE
   }
+
   if(is.null(orig_formula)){
     orig_formula <- formula
   }
@@ -641,8 +637,23 @@ mvgam = function(formula,
   add_ma <- ma_cor_adds$add_ma; add_cor <- ma_cor_adds$add_cor
 
   if(length(unique(data_train$series)) == 1 & add_cor){
-    warning('Correlated process errors not possible with only 1 series')
+    warning('Correlated process errors not possible with only 1 series',
+            call. = FALSE)
     add_cor <- FALSE
+  }
+
+  if(trend_model %in% c('PWlinear', 'PWlogistic')){
+    if(attr(terms(formula), 'intercept') == 1 & !drop_obs_intercept){
+      warning(paste0('It is difficult / impossible to estimate intercepts\n',
+                     'and piecewise trend offset parameters. You may want to\n',
+                     'consider dropping the intercept from the formula'),
+              call. = FALSE)
+    }
+  }
+
+  if(use_lv & trend_model %in% c('PWlinear', 'PWlogistic')){
+    stop('Cannot estimate piecewise trends using dynamic factors',
+         call. = FALSE)
   }
 
   if(use_lv & (add_ma | add_cor) & missing(trend_formula)){
@@ -651,7 +662,8 @@ mvgam = function(formula,
   }
 
   if(drift && use_lv){
-    warning('Cannot identify drift terms in latent factor models; setting "drift = FALSE"')
+    warning('Cannot identify drift terms in latent factor models; setting "drift = FALSE"',
+            call. = FALSE)
     drift <- FALSE
   }
 
@@ -660,9 +672,9 @@ mvgam = function(formula,
          call. = FALSE)
   }
 
-  # JAGS cannot support latent GP or VAR trends
-  if(!use_stan & trend_model %in% c('GP', 'VAR1')){
-    stop('Gaussian Process and VAR trends not supported for JAGS',
+  # JAGS cannot support latent GP, VAR or piecewise trends
+  if(!use_stan & trend_model %in% c('GP', 'VAR1', 'PWlinear', 'PWlogistic')){
+    stop('Gaussian Process, VAR and piecewise trends not supported for JAGS',
          call. = FALSE)
   }
 
@@ -682,8 +694,8 @@ mvgam = function(formula,
                               trend = 1:length(unique(data_train$series)))
     }
 
-    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'VAR1')){
-      stop('only RW, AR1, AR2 and VAR trends currently supported for trend predictor models',
+    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'VAR1')){
+      stop('only RW, AR1, AR2, AR3 and VAR trends currently supported for trend predictor models',
            call. = FALSE)
     }
   }
@@ -742,7 +754,12 @@ mvgam = function(formula,
                                   family = family,
                                   use_lv = use_lv,
                                   n_lv = n_lv,
-                                  trend_model = trend_model,
+                                  trend_model =
+                                    if(trend_model %in% c('PWlinear', 'PWlogistic')){
+                                      'RW'
+                                    } else {
+                                      trend_model
+                                    },
                                   trend_map = trend_map,
                                   drift = drift)
 
@@ -975,7 +992,9 @@ mvgam = function(formula,
   # Modify lines needed for the specified trend model
   model_file <- add_trend_lines(model_file, stan = FALSE,
                                 use_lv = use_lv,
-                                trend_model = if(trend_model %in% c('RW', 'VAR1')){'RW'} else {trend_model},
+                                trend_model = if(trend_model %in%
+                                                 c('RW', 'VAR1',
+                                                   'PWlinear', 'PWlogistic')){'RW'} else {trend_model},
                                 drift = drift)
 
   # Use informative priors based on the fitted mgcv model to speed convergence
@@ -1353,7 +1372,9 @@ mvgam = function(formula,
     # Add necessary trend structure
     base_stan_model <- add_trend_lines(model_file = base_stan_model,
                                        stan = TRUE,
-                                       trend_model = if(trend_model %in% c('RW', 'VAR1')){'RW'} else {trend_model},
+                                       trend_model = if(trend_model %in% c('RW', 'VAR1',
+                                                                           'PWlinear',
+                                                                           'PWlogistic')){'RW'} else {trend_model},
                                        use_lv = use_lv,
                                        drift = drift)
 
@@ -1499,13 +1520,24 @@ mvgam = function(formula,
 
     # Drop observation intercept if specified
     if(drop_obs_intercept){
-      vectorised$model_file[grep('// observation model basis coefficients',
-                                 vectorised$model_file,
-                      fixed = TRUE) + 1] <-
-        paste0(vectorised$model_file[grep('// observation model basis coefficients',
-                                          vectorised$model_file,
-                               fixed = TRUE) + 1],
-               '\n', '// (Intercept) fixed at zero\n', "b[1] = 0;")
+      if(any(grepl('// observation model basis coefficients',
+                  vectorised$model_file,
+                  fixed = TRUE))){
+        vectorised$model_file[grep('// observation model basis coefficients',
+                                   vectorised$model_file,
+                                   fixed = TRUE) + 1] <-
+          paste0(vectorised$model_file[grep('// observation model basis coefficients',
+                                            vectorised$model_file,
+                                            fixed = TRUE) + 1],
+                 '\n', '// (Intercept) fixed at zero\n', "b[1] = 0;")
+      } else {
+        vectorised$model_file[grep('b[1:num_basis] = b_raw[1:num_basis]',
+                                   vectorised$model_file,
+                                   fixed = TRUE)] <-
+          paste0('b[1:num_basis] = b_raw[1:num_basis];\n',
+                 '// (Intercept) fixed at zero\n', "b[1] = 0;")
+      }
+
       vectorised$model_file <- readLines(textConnection(vectorised$model_file), n = -1)
     }
 
@@ -1536,6 +1568,21 @@ mvgam = function(formula,
       param <- c(param, alpha_params, rho_params)
     }
 
+    # Update for any piecewise trends
+    if(trend_model %in% c('PWlinear', 'PWlogistic')){
+      pw_additions <- add_piecewise(vectorised$model_file,
+                                    vectorised$model_data,
+                                    data_train,
+                                    data_test,
+                                    orig_trend_model,
+                                    family)
+      vectorised$model_file <- pw_additions$model_file
+      vectorised$model_data <- pw_additions$model_data
+      orig_trend_model$changepoints <- pw_additions$model_data$t_change
+      orig_trend_model$change_freq <- pw_additions$model_data$change_freq
+      orig_trend_model$cap <- pw_additions$model_data$cap
+    }
+
     # Add in any user-specified priors
     if(!missing(priors)){
       vectorised$model_file <- update_priors(vectorised$model_file, priors,
@@ -1544,7 +1591,8 @@ mvgam = function(formula,
       priors <- NULL
     }
 
-    # Add any correlated error or moving average processes
+    # Add any correlated error or moving average processes; this comes after
+    # priors as currently there is no option to change priors on these parameters
     if(add_ma | add_cor){
       vectorised$model_file <- add_MaCor(vectorised$model_file,
                                          add_ma = add_ma,

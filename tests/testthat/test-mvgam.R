@@ -91,13 +91,13 @@ test_that("median coefs should be stored in the mgcv object", {
             coef(gaus_ar1)[,2]))
 })
 
-test_that("empty obs formula should error if no trend_formula", {
-  expect_error(mvgam(y ~ -1,
+test_that("empty obs formula is allowed, even if no trend_formula", {
+  mod <- mvgam(y ~ -1,
                      trend_model = 'AR1',
                      data = gaus_data$data_train,
                      family = gaussian(),
-                     run_model = FALSE),
-               'argument "formula" contains no terms')
+                     run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
 })
 
 test_that("empty obs formula allowed if trend_formula supplied", {

@@ -248,6 +248,20 @@ validate_pos_integer = function(x){
     }
   }
 }
+#'@noRd
+validate_pos_real = function(x){
+  s <- substitute(x)
+  x <- base::suppressWarnings(as.numeric(x))
+  if (length(x) != 1L || anyNA(x)) {
+    stop("Argument '", s, "' must be a single numeric value",
+         call. = FALSE)
+  }
+
+  if(sign(x) != 1){
+    stop("Argument '", s, "' must be a positive real value",
+         call. = FALSE)
+  }
+}
 
 #'@noRd
 validate_trendmap = function(trend_map,

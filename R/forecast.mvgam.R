@@ -733,7 +733,21 @@ forecast_draws = function(object,
       general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
                                                        samp_index = samp_index)
 
-      if(use_lv || trend_model == 'VAR1'){
+      if(use_lv || trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic')){
+        if(trend_model == 'PWlogistic'){
+          if(!(exists('cap', where = data_test))) {
+            stop('Capacities must also be supplied in "newdata" for logistic growth predictions',
+                 call. = FALSE)
+          }
+          family <- eval(parse(text = family))
+          cap <- data.frame(series = data_test$series,
+                            time = data_test$time,
+                            cap = suppressWarnings(linkfun(data_test$cap,
+                                                           link = family$link)))
+        } else {
+          cap <- NULL
+        }
+
         # Propagate all trends / lvs forward jointly using sampled trend parameters
         trends <- forecast_trend(trend_model = trend_model,
                                  use_lv = use_lv,
@@ -741,7 +755,8 @@ forecast_draws = function(object,
                                  h = fc_horizon,
                                  betas_trend = betas_trend,
                                  Xp_trend = Xp_trend,
-                                 time = sort(unique(data_test$time)))
+                                 time = unique(data_test$time - min(object$obs_data$time) + 1),
+                                 cap = cap)
       }
 
       # Loop across series and produce the next trend estimate
@@ -753,11 +768,11 @@ forecast_draws = function(object,
                                                     trend_pars = trend_pars,
                                                     use_lv = use_lv)
 
-        if(use_lv || trend_model == 'VAR1'){
+        if(use_lv || trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic')){
           if(use_lv){
             # Multiply lv states with loadings to generate the series' forecast trend state
             out <- as.numeric(trends %*% trend_extracts$lv_coefs)
-          } else if(trend_model == 'VAR1'){
+          } else if(trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic')){
             out <- trends[,series]
           }
 

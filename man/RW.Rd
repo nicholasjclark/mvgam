@@ -14,14 +14,12 @@ VAR(ma = FALSE, cor = FALSE)
 }
 \arguments{
 \item{ma}{\code{Logical} Include moving average terms of order \code{1}?
-Default is \code{FALSE}. Note, this option is only currently operational
-for fitting VARMA models. Support for other models (AR and RW) is upcoming.}
+Default is \code{FALSE}.}
 
 \item{cor}{\code{Logical} Include correlated process errors as part of a
 multivariate normal process model? If \code{TRUE} and if \code{n_series > 1}
 in the supplied data, a fully structured covariance matrix will be estimated
-for the process errors. Default is \code{FALSE}. Note, this option is only currently operational
-for fitting VAR / VARMA models. Support for other models (AR and RW) is upcoming.}
+for the process errors. Default is \code{FALSE}.}
 
 \item{p}{A non-negative integer specifying the autoregressive (AR) order.
 Default is \code{1}. Cannot currently be larger than \code{3}}
