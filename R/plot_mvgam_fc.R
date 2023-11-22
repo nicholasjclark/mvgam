@@ -553,7 +553,7 @@ plot.mvgam_forecast = function(x, series = 1,
       }
 
       if(object$family %in% c('lognormal', 'Gamma')){
-        ylim <- c(0, ylim[2])
+        ylim <- c(max(0, ylim[1]), ylim[2])
       }
     }
 

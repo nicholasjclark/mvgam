@@ -1397,12 +1397,14 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                                            min(time))))
 
         # Sample deltas
+        lambda <- median(abs(c(trend_pars$delta_trend[[x]]))) + 1e-8
         deltas_new <- extraDistr::rlaplace(n_changes,
                                            mu = 0,
-                                           sigma = trend_pars$change_scale + 1e-8)
+                                           sigma = lambda)
 
         # Spread changepoints evenly across the forecast horizon
-        t_change_new <- sample(min(time):max(time), n_changes)
+        t_change_new <- unique(sample(min(time):max(time), n_changes,
+                                      replace = TRUE))
 
         # Combine with changepoints from the history
         deltas <- c(trend_pars$delta_trend[[x]], deltas_new)
@@ -1428,12 +1430,14 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                                         (max(time) - min(time))))
 
         # Sample deltas
+        lambda <- median(abs(c(trend_pars$delta_trend[[x]]))) + 1e-8
         deltas_new <- extraDistr::rlaplace(n_changes,
                                            mu = 0,
-                                           sigma = trend_pars$change_scale + 1e-8)
+                                           sigma = lambda)
 
         # Spread changepoints evenly across the forecast horizon
-        t_change_new <- sample(min(time):max(time), n_changes)
+        t_change_new <- unique(sample(min(time):max(time), n_changes,
+                                      replace = TRUE))
 
         # Combine with changepoints from the history
         deltas <- c(trend_pars$delta_trend[[x]], deltas_new)
@@ -1443,8 +1447,9 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
         oldcaps <- trend_pars$cap[[x]]
 
         # And forecast capacities
+        s_name <- levels(cap$series)[x]
         newcaps = cap %>%
-          dplyr::filter(series == levels(cap$series)[x]) %>%
+          dplyr::filter(series == s_name) %>%
           dplyr::arrange(time) %>%
           dplyr::pull(cap)
         caps <- c(oldcaps, newcaps)

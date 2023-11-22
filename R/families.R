@@ -5,22 +5,22 @@
 #' be changed
 #' @details \code{mvgam} currently supports the following standard observation families:
 #'\itemize{
-#'   \item \code{\link[stats]{gaussian}} for real-valued data
-#'   \item \code{\link[stats]{poisson}} for count data
-#'   \item \code{\link[stats]{Gamma}} for non-negative real-valued data
+#'   \item \code{\link[stats]{gaussian}} with identity link, for real-valued data
+#'   \item \code{\link[stats]{poisson}} with log-link, for count data
+#'   \item \code{\link[stats]{Gamma}} with log-link, for non-negative real-valued data
 #'   }
 #'
 #'In addition, the following extended families from the \code{mgcv} package are supported:
 #'\itemize{
-#'   \item \code{\link[mgcv]{betar}} for proportional data on `(0,1)`
-#'   \item \code{\link[mgcv]{nb}} for count data
+#'   \item \code{\link[mgcv]{betar}} with logit-link, for proportional data on `(0,1)`
+#'   \item \code{\link[mgcv]{nb}} with log-link, for count data
 #'   }
 #'
 #'Finally, \code{mvgam} supports the three extended families described here:
 #'\itemize{
-#'   \item \code{\link[brms]{lognormal}} for non-negative real-valued data
-#'   \item \code{tweedie} for count data (power parameter `p` fixed at `1.5`)
-#'   \item `student_t()` (or \code{\link[brms]{student}}) for real-valued data
+#'   \item \code{\link[brms]{lognormal}} with identity-link, for non-negative real-valued data
+#'   \item \code{tweedie} with log-link, for count data (power parameter `p` fixed at `1.5`)
+#'   \item `student_t()` (or \code{\link[brms]{student}}) with identity-link, for real-valued data
 #'   }
 #'Note that only `poisson()`, `nb()`, and `tweedie()` are available if
 #'using `JAGS`. All families, apart from `tweedie()`, are supported if
@@ -336,7 +336,9 @@ family_to_brmsfam = function(family){
     brms::student()
   } else if(family$family == 'negative binomial'){
     brms::negbinomial()
-  }else {
+  } else if(family$family == 'Gamma'){
+    Gamma(link = 'log')
+  } else {
     family
   }
 }

@@ -87,6 +87,10 @@ add_piecewise = function(model_file,
   changepoint_range <- orig_trend_model$changepoint_range
   changepoint_scale <- orig_trend_model$changepoint_scale
 
+  if(family$family == 'Gamma'){
+    family <- Gamma(link = 'log')
+  }
+
   if(trend_model == 'PWlogistic'){
     if(!(exists('cap', where = data_train))) {
       stop('Capacities must be supplied as a variable named "cap" for logistic growth',
@@ -164,9 +168,9 @@ add_piecewise = function(model_file,
     scaled_test_time <- unique(data_test$time - min(data_train$time) + 1)
     t_change_new <- unique(floor(seq.int(min(scaled_test_time),
                                          max(scaled_test_time),
-                                         length.out = n_changes)))
+                                         length.out = n_new_changes)))
     t_change <- c(t_change, t_change_new)
-    n_changepoints <- n_changepoints + n_newchanges
+    n_changepoints <- n_changepoints + n_new_changes
     scaled_time <- c(scaled_time, scaled_test_time)
   }
 
@@ -219,8 +223,6 @@ add_piecewise = function(model_file,
              '}\n',
 
              'vector logistic_trend(\n',
-             '/* Function to adjust a logistic trend using a carrying capacity */\n',
-             '/* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/\n',
              'real k,\n',
              'real m,\n',
              'vector delta,\n',
@@ -230,6 +232,8 @@ add_piecewise = function(model_file,
              'vector t_change,\n',
              'int S\n',
              ') {\n',
+             '/* Function to adjust a logistic trend using a carrying capacity */\n',
+             '/* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/\n',
              'vector[S] gamma;\n',
              'gamma = logistic_gamma(k, m, delta, t_change, S);\n',
              'return cap .* inv_logit((k + A * delta) .* (t - (m + A * gamma)));\n',
@@ -289,8 +293,6 @@ add_piecewise = function(model_file,
              '}\n',
 
              'vector logistic_trend(\n',
-             '/* Function to adjust a logistic trend using a carrying capacity */\n',
-             '/* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/\n',
              'real k,\n',
              'real m,\n',
              'vector delta,\n',
@@ -300,6 +302,8 @@ add_piecewise = function(model_file,
              'vector t_change,\n',
              'int S\n',
              ') {\n',
+             '/* Function to adjust a logistic trend using a carrying capacity */\n',
+             '/* credit goes to the Prophet development team at Meta (https://github.com/facebook/prophet/tree/main)*/\n',
              'vector[S] gamma;\n',
              'gamma = logistic_gamma(k, m, delta, t_change, S);\n',
              'return cap .* inv_logit((k + A * delta) .* (t - (m + A * gamma)));\n',

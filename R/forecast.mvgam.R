@@ -509,6 +509,7 @@ forecast_draws = function(object,
 
   # Check arguments
   validate_pos_integer(n_cores)
+  data_test <- validate_series_time(data_test, name = 'newdata')
   n_series <- NCOL(object$ytimes)
   use_lv <- object$use_lv
 
@@ -739,11 +740,14 @@ forecast_draws = function(object,
             stop('Capacities must also be supplied in "newdata" for logistic growth predictions',
                  call. = FALSE)
           }
-          family <- eval(parse(text = family))
+          family_links <- eval(parse(text = family))
+          if(family_links()$family == 'Gamma'){
+            family_links <- Gamma(link = 'log')
+          }
           cap <- data.frame(series = data_test$series,
                             time = data_test$time,
                             cap = suppressWarnings(linkfun(data_test$cap,
-                                                           link = family$link)))
+                                                           link = family_links$link)))
 
           if(any(is.na(cap$cap)) | any(is.infinite(cap$cap))){
             stop(paste0('Missing or infinite values found for some "cap" terms\n',
