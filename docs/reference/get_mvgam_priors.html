@@ -12,7 +12,7 @@ changed for a given mvgam model, as well listing their default distributions"><!
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.7</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -121,6 +121,7 @@ families are:</p><ul><li><p><code>nb()</code> for count data</p></li>
 <li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
 </ul><p>Note that only <code>nb()</code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> are available if using <code>JAGS</code> as the backend.
+Default is <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>.
 See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
 
 
@@ -135,13 +136,11 @@ Cannot be <code>&gt;n_series</code>. Defaults arbitrarily to <code>min(2, floor(
 
 
 <dt>use_stan</dt>
-<dd><p>Logical. If <code>TRUE</code> and if <code>rstan</code> is installed, the model will be compiled and sampled using
-the Hamiltonian Monte Carlo with a call to <code><a href="https://mc-stan.org/cmdstanr/reference/cmdstan_model.html" class="external-link">cmdstan_model</a></code> or, if <code>cmdstanr</code> is not available,
-a call to <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code>. Note that this functionality is still in development and
-not all options that are available in <code>JAGS</code> can be used, including: no option for a Tweedie family and no option for
-dynamic factor trends. However, as <code>Stan</code> can estimate Hilbert base approximate Gaussian Processes, which
-are much more computationally tractable than full GPs for time series with <code>&gt;100</code> observations, estimation
-in <code>Stan</code> can support latent GP trends while estimation in <code>JAGS</code> cannot</p></dd>
+<dd><p>Logical. If <code>TRUE</code>, the model will be compiled and sampled using
+Hamiltonian Monte Carlo with a call to <code><a href="https://mc-stan.org/cmdstanr/reference/cmdstan_model.html" class="external-link">cmdstan_model</a></code> or
+a call to <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code>. Note that
+there are many more options when using <code>Stan</code> vs <code>JAGS</code> (the only "advantage" of <code>JAGS</code> is the ability
+to use a Tweedie family).</p></dd>
 
 
 <dt>trend_model</dt>
@@ -152,9 +151,10 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
 <li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
 <li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
+<li><p><code>'PWlogistic</code>, <code>'PWlinear</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>For all types apart from <code>'GP'</code>, moving average and/or correlated
+</ul><p>For all types apart from <code>'GP'</code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
 process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
 multivariate Random Walk if <code>n_series &gt; 1</code>). See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
 
@@ -208,7 +208,7 @@ example)</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="mvgam.html">mvgam</a></code></p></div>
+    <div class="dont-index"><p><code><a href="mvgam.html">mvgam</a></code> <code><a href="https://rdrr.io/pkg/brms/man/set_prior.html" class="external-link">prior</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -390,14 +390,14 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5       trend AR2 coefficient               ar2 ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                  example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.2);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(0.11, 0.85);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3   sigma_raw ~ exponential(1);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.4, 0.83);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5    ar2 ~ normal(-0.74, 0.88);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6    sigma ~ exponential(0.65);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7 phi_inv ~ normal(0.04, 0.92);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.15);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(-0.43, 0.94);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3  sigma_raw ~ exponential(0.9);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.79, 0.26);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(0.59, 0.56);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.57);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7 phi_inv ~ normal(-0.91, 0.54);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>
@@ -1072,6 +1072,117 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   for (s in 1 : n_series) {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     mus[1 : n, s] = eta[ytimes[1 : n, s]] + trend[1 : n, s];</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     ypred[1 : n, s] = poisson_log_rng(mus[1 : n, s]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># The "class = 'b'" shortcut can be used to put the same prior on all</span></span></span>
+<span class="r-in"><span><span class="co"># 'fixed' effect coefficients (apart from any intercepts)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gamSim.html" class="external-link">gamSim</a></span><span class="op">(</span><span class="fl">1</span>, n <span class="op">=</span> <span class="fl">200</span>, scale <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Gu &amp; Wahba 4 term additive model</span>
+<span class="r-in"><span><span class="va">dat</span><span class="op">$</span><span class="va">time</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NROW</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x0</span> <span class="op">+</span> <span class="va">x1</span> <span class="op">+</span> <span class="fu">s</span><span class="op">(</span><span class="va">x2</span><span class="op">)</span> <span class="op">+</span> <span class="fu">s</span><span class="op">(</span><span class="va">x3</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>            priors <span class="op">=</span> <span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.75</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'b'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>            data <span class="op">=</span> <span class="va">dat</span>,</span></span>
+<span class="r-in"><span>            family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>            run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> // Stan model code generated by package mvgam</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> functions {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector rep_each(vector x, int K) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     int N = rows(x);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     vector[N * K] y;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     int pos = 1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     for (n in 1 : N) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       for (k in 1 : K) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         y[pos] = x[n];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         pos += 1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>       }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     return y;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> data {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; total_obs; // total number of observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n; // number of timepoints per series</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_sp; // number of smoothing parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_series; // number of series</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; num_basis; // total number of basis coefficients</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] zero; // prior locations for basis coefficients</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[total_obs, num_basis] X; // mgcv GAM design matrix</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   array[n, n_series] int&lt;lower=0&gt; ytimes; // time-ordered matrix (which col in X belongs to each [time, series] observation?)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[9, 18] S1; // mgcv smooth penalty matrix S1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[9, 18] S2; // mgcv smooth penalty matrix S2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_nonmissing] flat_ys; // flattened nonmissing observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n_nonmissing, num_basis] flat_xs; // X values for nonmissing observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   array[n_nonmissing] int&lt;lower=0&gt; obs_ind; // indices of nonmissing observations</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> parameters {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // raw basis coefficients</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] b_raw;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // gaussian observation error</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] sigma_obs;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // smoothing parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_sp] lambda;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> transformed parameters {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // basis coefficients</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] b;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b[1 : num_basis] = b_raw[1 : num_basis];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> model {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for (Intercept)...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[1] ~ student_t(3, 7.4, 3.7);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for x0...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[2] ~ normal(0, 0.75);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for x1...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[3] ~ normal(0, 0.75);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(x2)...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[4 : 12] ~ multi_normal_prec(zero[4 : 12],</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                     S1[1 : 9, 1 : 9] * lambda[1]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                     + S1[1 : 9, 10 : 18] * lambda[2]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // prior for s(x3)...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   b_raw[13 : 21] ~ multi_normal_prec(zero[13 : 21],</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                      S2[1 : 9, 1 : 9] * lambda[3]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                      + S2[1 : 9, 10 : 18] * lambda[4]);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for smoothing parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   lambda ~ normal(5, 30);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // priors for observation error parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   sigma_obs ~ student_t(3, 0, 3.7);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     // likelihood functions</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     vector[n_nonmissing] flat_sigma_obs;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     flat_sigma_obs = rep_each(sigma_obs, n)[obs_ind];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     flat_ys ~ normal_id_glm(flat_xs, 0.0, b, flat_sigma_obs);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> generated quantities {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[total_obs] eta;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n, n_series] sigma_obs_vec;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   matrix[n, n_series] mus;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector[n_sp] rho;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   array[n, n_series] real ypred;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   rho = log(lambda);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   // posterior predictions</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   eta = X * b;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for (s in 1 : n_series) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     sigma_obs_vec[1 : n, s] = rep_vector(sigma_obs[s], n);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   for (s in 1 : n_series) {</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     mus[1 : n, s] = eta[ytimes[1 : n, s]];</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     ypred[1 : n, s] = normal_rng(mus[1 : n, s], sigma_obs_vec[1 : n, s]);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> }</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>

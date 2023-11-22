@@ -22,7 +22,7 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.7</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -202,6 +202,7 @@ families are:</p><ul><li><p><code>nb()</code> for count data</p></li>
 <li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
 </ul><p>Note that only <code>nb()</code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> are available if using <code>JAGS</code> as the backend.
+Default is <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>.
 See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
 
 
@@ -234,9 +235,10 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
 <li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
 <li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
+<li><p><code>'PWlogistic</code>, <code>'PWlinear</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>For all types apart from <code>'GP'</code>, moving average and/or correlated
+</ul><p>For all types apart from <code>'GP'</code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
 process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
 multivariate Random Walk if <code>n_series &gt; 1</code>). See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
 
@@ -385,14 +387,20 @@ which exacerbates the problem of forecasting ahead. As GAMs are very naturally v
 must model time series that show complex distributional features and missing data, parameters for <code>mvgam</code> models are estimated
 in a Bayesian framework using Markov Chain Monte Carlo.
 <br><br><em>Formula syntax</em>: Details of the formula syntax used by <span class="pkg">mvgam</span> can be found in
-<code><a href="https://rdrr.io/pkg/mgcv/man/formula.gam.html" class="external-link">formula.gam</a></code>.
+<code><a href="https://rdrr.io/pkg/mgcv/man/formula.gam.html" class="external-link">formula.gam</a></code>. Note that it is possible to supply an empty formula where
+there are no predictors or intercepts in the observation model (i.e. <code>y ~ 0</code> or <code>y ~ -1</code>).
+In this case, an intercept-only observation model will be set up but the intercept coefficient
+will be fixed at zero. This can be handy if you wish to fit pure State-Space models where
+the variation in the dynamic trend controls the average expectation, and/or where intercepts
+are non-identifiable (as in piecewise trends, see examples below)
 <br><br><em>Families and link functions</em>: Details of families supported by <span class="pkg">mvgam</span> can be found in
 <code><a href="mvgam_families.html">mvgam_families</a></code>.
 <br><br><em>Trend models</em>: Details of latent trend models supported by <span class="pkg">mvgam</span> can be found in
 <code><a href="mvgam_trends.html">mvgam_trends</a></code>.
 <br><br><em>Priors</em>: A <code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code> model file is generated from <code>formula</code> and
 modified to include any latent
-temporal processes. Prior distributions for most important model parameters can be
+temporal processes. Default priors for intercepts and any scale parameters are generated
+using the same practice as <span class="pkg">brms</span>. Prior distributions for most important model parameters can be
 altered by the user to inspect model
 sensitivities to given priors (see <code><a href="get_mvgam_priors.html">get_mvgam_priors</a></code> for details).
 Note that latent trends are estimated on the link scale so choose priors
@@ -514,9 +522,12 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Residual diagnostics</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'residuals'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">resids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/residuals.html" class="external-link">residuals</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">resids</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compute the forecast using covariate information in data_test</span></span></span>
 <span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod1</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot the estimated seasonal smooth function</span></span></span>
@@ -532,6 +543,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, realisations <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot conditional response predictions using marginaleffects</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span>, ask <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">plot_predictions</span><span class="op">(</span><span class="va">mod1</span>, condition <span class="op">=</span> <span class="st">'season'</span>, points <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Extract observation model beta coefficient draws as a data.frame</span></span></span>
@@ -554,7 +566,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span>                       trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>,<span class="fl">1</span>,<span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit the model using AR1 trends</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span></span>
 <span class="r-in"><span>              trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span></span>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">mod_data</span>,</span></span>
@@ -562,12 +574,12 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The mapping matrix is now supplied as data to the model in the 'Z' element</span></span></span>
 <span class="r-in"><span><span class="va">mod1</span><span class="op">$</span><span class="va">model_data</span><span class="op">$</span><span class="va">Z</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The first two series share an identical latent trend; the third is different</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Example of how to use dynamic coefficients</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate a time-varying coefficient for the effect of temperature</span></span></span>
@@ -579,8 +591,9 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span>  <span class="va">beta_temp</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">1</span>, mean <span class="op">=</span> <span class="va">beta_temp</span><span class="op">[</span><span class="va">i</span> <span class="op">-</span> <span class="fl">1</span><span class="op">]</span>, sd <span class="op">=</span> <span class="fl">0.025</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Simulate covariate called 'temp'</span></span></span>
+<span class="r-in"><span><span class="co"># Simulate a covariate called 'temp'</span></span></span>
 <span class="r-in"><span><span class="va">temp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">N</span>, sd <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Simulate the Gaussian observation process</span></span></span>
 <span class="r-in"><span><span class="va">out</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">N</span>, mean <span class="op">=</span> <span class="fl">4</span> <span class="op">+</span> <span class="va">beta_temp</span> <span class="op">*</span> <span class="va">temp</span>,</span></span>
 <span class="r-in"><span>             sd <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
@@ -593,8 +606,8 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="co"># Fit the model using the dynamic() formula helper</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">out</span> <span class="op">~</span> <span class="fu"><a href="dynamic.html">dynamic</a></span><span class="op">(</span><span class="va">temp</span>, rho <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            data <span class="op">=</span> <span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>            newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></span>
+<span class="r-in"><span>             data <span class="op">=</span> <span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>             newdata <span class="op">=</span> <span class="va">data_test</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the model summary, forecast and time-varying coefficient distribution</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
@@ -617,35 +630,35 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a model that includes the offset in the linear predictor as well as</span></span></span>
 <span class="r-in"><span><span class="co"># hierarchical seasonal smooths</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset</a></span><span class="op">(</span><span class="va">offset</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>         <span class="fu">s</span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>         <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>         <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, m <span class="op">=</span> <span class="fl">1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>         data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>         trend_model <span class="op">=</span> <span class="st">'None'</span>,</span></span>
-<span class="r-in"><span>         use_stan <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset</a></span><span class="op">(</span><span class="va">offset</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>              <span class="fu">s</span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, m <span class="op">=</span> <span class="fl">1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>             data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>             trend_model <span class="op">=</span> <span class="st">'None'</span>,</span></span>
+<span class="r-in"><span>             use_stan <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the model file to see the modification to the linear predictor</span></span></span>
 <span class="r-in"><span><span class="co"># (eta)</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span><span class="op">$</span><span class="va">model_file</span></span></span>
+<span class="r-in"><span><span class="va">mod</span><span class="op">$</span><span class="va">model_file</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Forecasts for the first two series will differ in magnitude</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span>, ncol <span class="op">=</span> <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">1</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">1</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
 <span class="r-in"><span>     ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">75</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">2</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">2</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span>,</span></span>
 <span class="r-in"><span>     ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">75</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Changing the offset for the testing data should lead to changes in</span></span></span>
 <span class="r-in"><span><span class="co"># the forecast</span></span></span>
 <span class="r-in"><span><span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">$</span><span class="va">offset</span> <span class="op">&lt;-</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">$</span><span class="va">offset</span> <span class="op">-</span> <span class="fl">2</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, <span class="st">'forecast'</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, <span class="st">'forecast'</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Relative Risks can be computed by fixing the offset to the same value</span></span></span>
 <span class="r-in"><span><span class="co"># for each series</span></span></span>
 <span class="r-in"><span><span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">$</span><span class="va">offset</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NROW</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">preds_rr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'link'</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">preds_rr</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'link'</span>, newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">series1_inds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">$</span><span class="va">series</span> <span class="op">==</span> <span class="st">'series_1'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">series2_inds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">$</span><span class="va">series</span> <span class="op">==</span> <span class="st">'series_2'</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
@@ -666,6 +679,66 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span> <span class="op">}</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Example of logistic growth with possible changepoints</span></span></span>
+<span class="r-in"><span><span class="co"># Simple logistic growth model</span></span></span>
+<span class="r-in"><span><span class="va">dNt</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">r</span>, <span class="va">N</span>, <span class="va">k</span><span class="op">)</span><span class="op">{</span></span></span>
+<span class="r-in"><span>   <span class="va">r</span> <span class="op">*</span> <span class="va">N</span> <span class="op">*</span> <span class="op">(</span><span class="va">k</span> <span class="op">-</span> <span class="va">N</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Iterate growth through time</span></span></span>
+<span class="r-in"><span><span class="va">Nt</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">r</span>, <span class="va">N</span>, <span class="va">t</span>, <span class="va">k</span><span class="op">)</span> <span class="op">{</span></span></span>
+<span class="r-in"><span><span class="kw">for</span> <span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="op">(</span><span class="va">t</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span> <span class="co"># population at next time step is current population + growth,</span></span></span>
+<span class="r-in"><span> <span class="co"># but we introduce several 'shocks' as changepoints</span></span></span>
+<span class="r-in"><span> <span class="kw">if</span><span class="op">(</span><span class="va">i</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">25</span>, <span class="fl">41</span>, <span class="fl">45</span>, <span class="fl">60</span>, <span class="fl">80</span><span class="op">)</span><span class="op">)</span><span class="op">{</span></span></span>
+<span class="r-in"><span>   <span class="va">N</span><span class="op">[</span><span class="va">i</span> <span class="op">+</span> <span class="fl">1</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fl">1</span>, <span class="va">N</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">+</span> <span class="fu">dNt</span><span class="op">(</span><span class="va">r</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fl">1</span>, <span class="op">-</span><span class="fl">0.1</span>, <span class="fl">0.1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                 <span class="va">N</span><span class="op">[</span><span class="va">i</span><span class="op">]</span>, <span class="va">k</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>   <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span></span>
+<span class="r-in"><span>   <span class="va">N</span><span class="op">[</span><span class="va">i</span> <span class="op">+</span> <span class="fl">1</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fl">1</span>, <span class="va">N</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">+</span> <span class="fu">dNt</span><span class="op">(</span><span class="va">r</span>, <span class="va">N</span><span class="op">[</span><span class="va">i</span><span class="op">]</span>, <span class="va">k</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>   <span class="op">}</span></span></span>
+<span class="r-in"><span>  <span class="op">}</span></span></span>
+<span class="r-in"><span> <span class="va">N</span></span></span>
+<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Simulate expected values</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">11</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">expected</span> <span class="op">&lt;-</span> <span class="fu">Nt</span><span class="op">(</span><span class="fl">0.004</span>, <span class="fl">2</span>, <span class="fl">100</span>, <span class="fl">30</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">expected</span>, xlab <span class="op">=</span> <span class="st">'Time'</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Take Poisson draws</span></span></span>
+<span class="r-in"><span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Poisson.html" class="external-link">rpois</a></span><span class="op">(</span><span class="fl">100</span>, <span class="va">expected</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">y</span>, xlab <span class="op">=</span> <span class="st">'Time'</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Assemble data into dataframe and model. We set a</span></span></span>
+<span class="r-in"><span><span class="co"># fixed carrying capacity of 35 for this example, but note that</span></span></span>
+<span class="r-in"><span><span class="co"># this value is not required to be fixed at each timepoint</span></span></span>
+<span class="r-in"><span><span class="va">mod_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="va">y</span>,</span></span>
+<span class="r-in"><span>                       time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">100</span>,</span></span>
+<span class="r-in"><span>                       cap <span class="op">=</span> <span class="fl">35</span>,</span></span>
+<span class="r-in"><span>                       series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="st">'series_1'</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">mod_data</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># The intercept is nonidentifiable when using piecewise</span></span></span>
+<span class="r-in"><span><span class="co"># trends because the trend functions have their own offset</span></span></span>
+<span class="r-in"><span><span class="co"># parameters 'm'; it is recommended to always drop intercepts</span></span></span>
+<span class="r-in"><span><span class="co"># when using these trend models</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fl">0</span>,</span></span>
+<span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu"><a href="piecewise_trends.html">PW</a></span><span class="op">(</span>growth <span class="op">=</span> <span class="st">'logistic'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>             data <span class="op">=</span> <span class="va">mod_data</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Plot the posterior hindcast</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># View the changepoints with ggplot2 utilities</span></span></span>
+<span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">mcmc_plot</span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="st">'delta_trend'</span>,</span></span>
+<span class="r-in"><span>          regex <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_discrete.html" class="external-link">scale_y_discrete</a></span><span class="op">(</span>labels <span class="op">=</span> <span class="va">mod</span><span class="op">$</span><span class="va">trend_model</span><span class="op">$</span><span class="va">changepoints</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>y <span class="op">=</span> <span class="st">'Potential changepoint'</span>,</span></span>
+<span class="r-in"><span>     x <span class="op">=</span> <span class="st">'Rate change'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 </code></pre></div>
     </div>

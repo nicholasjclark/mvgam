@@ -107,6 +107,21 @@ z & \sim \text{MVNormal}(0, \Sigma_{error}) \\
 
 The latent dynamic process evolves from a complex, high-dimensional Multivariate Normal distribution which depends on $\rho$ (often called the length scale parameter) to control how quickly the correlations between the model's errors decay as a function of time. For these models, covariance decays exponentially fast with the squared distance (in time) between the observations. The functions also depend on a parameter $\alpha$, which controls the marginal variability of the temporal function at all points; in other words it controls how much the GP term contributes to the linear predictor. `mvgam` capitalizes on some advances that allow GPs to be approximated using Hilbert space basis functions, which [considerably speed up computation at little cost to accuracy or prediction performance](https://link.springer.com/article/10.1007/s11222-022-10167-2){target="_blank"}.
 
+### Piecewise logistic and linear trends
+Modeling growth for many types of time series is often similar to modeling population growth in natural ecosystems, where there series exhibits nonlinear growth that saturates at some particular carrying capacity. The logistic trend model available in {`mvgam`} allows for a time-varying capacity $C(t)$ as well as a non-constant growth rate. Changes in the base growth rate $k$ are incorporated by explicitly defining changepoints throughout the training period where the growth rate is allowed to vary. The changepoint vector $a$ is represented as a vector of `1`s and `0`s, and the rate of growth at time $t$ is represented as $k+a(t)^T\delta$. Potential changepoints are selected uniformly across the training period, and the number of changepoints, as well as the flexibility of the potential rate changes at these changepoints, can be controlled using `trend_model = PW()`. The full piecewise logistic growth model is then:
+
+\begin{align*}
+z_t & = \frac{C_t}{1 + \exp(-(k+a(t)^T\delta)(t-(m+a(t)^T\gamma)))}  \end{align*}
+
+For time series that do not appear to exhibit saturating growth, a piece-wise constant rate of growth can often provide a useful trend model. The piecewise linear trend is defined as:
+
+\begin{align*}
+z_t & = (k+a(t)^T\delta)t + (m+a(t)^T\gamma)  \end{align*}
+
+In both trend models, $m$ is an offset parameter that controls the trend intercept. Because of this parameter, it is not recommended that you include an intercept in your observation formula because this will not be identifiable. You can read about the full description of piecewise linear and logistic trends [in this paper by Taylor and Letham](https://www.tandfonline.com/doi/abs/10.1080/00031305.2017.1380080){target="_blank"}. 
+
+Sean J. Taylor and Benjamin Letham. "[Forecasting at scale.](https://www.tandfonline.com/doi/full/10.1080/00031305.2017.1380080)" *The American Statistician* 72.1 (2018): 37-45.
+
 ## Example time series data
 
 The 'portal_data' object contains time series of rodent captures from the Portal Project, [a long-term monitoring study based near the town of Portal, Arizona](https://portal.weecology.org/){target="_blank"}. Researchers have been operating a standardized set of baited traps within 24 experimental plots at this site since the 1970's. Sampling follows the lunar monthly cycle, with observations occurring on average about 28 days apart. However, missing observations do occur due to difficulties accessing the site (weather events, COVID disruptions etc..). You can read about the full sampling protocol [in this preprint by Ernest et al on the Biorxiv](https://www.biorxiv.org/content/10.1101/332783v3.full){target="_blank"}. 

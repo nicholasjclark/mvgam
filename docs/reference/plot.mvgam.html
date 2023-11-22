@@ -12,7 +12,7 @@ uncertainty components"><!-- mathjax --><script src="https://cdnjs.cloudflare.co
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.7</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -100,7 +100,7 @@ if <code>type == 're'</code></p></dd>
 
 
 <dt>residuals</dt>
-<dd><p><code>logical</code>. If <code>TRUE</code> and <code>type = residuals</code>, posterior quantiles of partial residuals are added
+<dd><p><code>logical</code>. If <code>TRUE</code> and <code>type = 'smooths'</code>, posterior quantiles of partial residuals are added
 to plots of 1-D smooths as a series of ribbon rectangles.
 Partial residuals for a smooth term are the median Dunn-Smyth residuals that would be obtained by dropping the term
 concerned from the model, while leaving all other estimates fixed (i.e. the

@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.7</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -80,7 +80,7 @@
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>object</dt>
-<dd><p>A fitted <code>mvgam</code> model</p></dd>
+<dd><p><code>list</code> object returned from <code>mvgam</code>. See <code><a href="mvgam.html">mvgam()</a></code></p></dd>
 
 
 <dt>formula</dt>
@@ -93,36 +93,43 @@ to be supplied</p></dd>
 <dd><p>An optional <code>character</code> string specifying the GAM process model formula. If
 supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
 separately from the observation model. Should not have a response variable specified on the left-hand side
-of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). This feature is experimental, and is only
-currently available for Random Walk trend models.</p></dd>
+of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). Also note that you should not use
+the identifier <code>series</code> in this formula to specify effects that vary across time series. Instead you should use
+<code>trend</code>. This will ensure that models in which a <code>trend_map</code> is supplied will still work consistently
+(i.e. by allowing effects to vary across process models, even when some time series share the same underlying
+process model). This feature is experimental, and is only currently available for Random Walk and AR trend models.</p></dd>
 
 
 <dt>data</dt>
 <dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable and covariates
 required by the GAM <code>formula</code>. Should include columns:
-'series' (character or factor index of the series IDs)
-'time' (numeric index of the time point for each observation).
+<code>series</code> (a <code>factor</code> index of the series IDs;the number of levels should be identical
+to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))
+<code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).
 Any other variables to be included in the linear predictor of <code>formula</code> must also be present</p></dd>
 
 
 <dt>newdata</dt>
-<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing at least 'series' and 'time'
+<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing at least <code>series</code> and <code>time</code>
 in addition to any other variables included in the linear predictor of <code>formula</code>. If included, the
 observations in variable <code>y</code> will be set to <code>NA</code> when fitting the model so that posterior
 simulations can be obtained</p></dd>
 
 
 <dt>trend_model</dt>
-<dd><p><code>character</code> specifying the time series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+<dd><p><code>character</code> or  <code>function</code> specifying the time series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
-<li><p><code>RW</code> (random walk with possible drift)</p></li>
-<li><p><code>AR1</code> (with possible drift)</p></li>
-<li><p><code>AR2</code> (with possible drift)</p></li>
-<li><p><code>AR3</code> (with possible drift)</p></li>
-<li><p><code>VAR1</code> (with possible drift; only available in <code>Stan</code>)</p></li>
-<li><p><code>GP</code> (Gaussian Process with squared exponential kernel;
+<li><p><code>'RW'</code> or <code><a href="RW.html">RW()</a></code></p></li>
+<li><p><code>'AR1'</code> or <code>AR(p = 1)</code></p></li>
+<li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
+<li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
+<li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
+<li><p><code>'PWlogistic</code>, <code>'PWlinear</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
+<li><p><code>'GP'</code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul></dd>
+</ul><p>For all types apart from <code>'GP'</code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
+process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
+multivariate Random Walk if <code>n_series &gt; 1</code>). See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
 
 
 <dt>trend_map</dt>
@@ -133,12 +140,12 @@ different observation processes. If supplied, a latent factor model is set up by
 <code>series</code> and <code>trend</code>, with integer values in the <code>trend</code> column to state which trend each series
 should depend on. The <code>series</code> column should have a single unique entry for each series in the
 data (names should perfectly match factor levels of the <code>series</code> variable in <code>data</code>). See examples
-in <code><a href="mvgam.html">mvgam</a></code> for details</p></dd>
+for details</p></dd>
 
 
 <dt>use_lv</dt>
 <dd><p><code>logical</code>. If <code>TRUE</code>, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. If <code>FALSE</code>, estimate independent latent trends for each series</p></dd>
+latent trends in a reduced dimension format. Defaults to <code>FALSE</code></p></dd>
 
 
 <dt>n_lv</dt>
@@ -148,13 +155,23 @@ Cannot be <code>&gt;n_series</code>. Defaults arbitrarily to <code>min(2, floor(
 
 <dt>family</dt>
 <dd><p><code>family</code> specifying the exponential observation family for the series. Currently supported
-families are: <code>nb()</code>, <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code><a href="mvgam_families.html">tweedie()</a></code>, <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>, <code>betar()</code>, <code>lognormal()</code>, <code><a href="mvgam_families.html">student_t()</a></code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code></p></dd>
+families are:</p><ul><li><p><code>nb()</code> for count data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> for real-valued data</p></li>
+<li><p><code>betar()</code> for proportional data on <code>(0,1)</code></p></li>
+<li><p><code>lognormal()</code> for non-negative real-valued data</p></li>
+<li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
+</ul><p>Note that only <code>nb()</code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> are available if using <code>JAGS</code> as the backend.
+Default is <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>.
+See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
 
 
 <dt>priors</dt>
 <dd><p>An optional <code>data.frame</code> with prior
-definitions. See <code><a href="get_mvgam_priors.html">get_mvgam_priors</a></code> and
-<a href="mvgam.html">mvgam</a> for more information on changing default prior distributions</p></dd>
+definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
+class <code>brmsprior</code> (see. <code><a href="https://rdrr.io/pkg/brms/man/set_prior.html" class="external-link">prior</a></code> for details). See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and
+'Details' for more information on changing default prior distributions</p></dd>
 
 
 <dt>lfo</dt>

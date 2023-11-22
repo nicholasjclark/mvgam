@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.7</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -65,6 +65,7 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code><a href="RW.html">RW()</a></code></p></li>
 <li><p><code>AR(p = 1, 2, or 3)</code></p></li>
 <li><p><code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
+<li><p><code><a href="piecewise_trends.html">PW()</a></code> (piecewise linear or logistic trends; only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
 </ul><p>For all types apart from <code>'GP'</code>, moving average and/or correlated
@@ -94,6 +95,8 @@ currently supported is:</p><ul><li><p>'RW'</p></li>
 <li><p>'VARMA'</p></li>
 <li><p>'VARMAcor'</p></li>
 <li><p>'VARMA1,1cor'</p></li>
+<li><p>'PWlinear'</p></li>
+<li><p>'PWlogistic'</p></li>
 <li><p>'GP'</p></li>
 <li><p>'None'</p></li>
 </ul><p>Note that only <code>RW</code>, <code>AR1</code>, <code>AR2</code> and <code>AR3</code> are available if
@@ -107,16 +110,20 @@ the latent process is enforced through the prior using the parameterisation give
 Heaps (2022). Stationarity is not enforced when using <code>AR1</code>, <code>AR2</code> or <code>AR3</code> models,
 though this can be changed by the user by specifying lower and upper bounds on autoregressive
 parameters using functionality in <a href="get_mvgam_priors.html">get_mvgam_priors</a> and the <code>priors</code> argument in
-<a href="mvgam.html">mvgam</a></p>
+<a href="mvgam.html">mvgam</a>. Piecewise trends follow the formulation in the popular <code>prophet</code> package produced
+by <code>Facebook</code>, where users can allow for changepoints to control the potential flexibility
+of the trend. See Taylor and Letham (2018) for details</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
     <p>Sarah E. Heaps (2022) Enforcing stationarity through the prior in Vector Autoregressions.
 Journal of Computational and Graphical Statistics. 32:1, 1-10.</p>
+<p>Sean J. Taylor and Benjamin Letham (2018) Forecasting at scale.
+The American Statistician 72.1, 37-45.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="RW.html">RW</a></code>, <code><a href="RW.html">AR</a></code>, <code><a href="RW.html">VAR</a></code></p></div>
+    <div class="dont-index"><p><code><a href="RW.html">RW</a></code>, <code><a href="RW.html">AR</a></code>, <code><a href="RW.html">VAR</a></code>, <code><a href="piecewise_trends.html">PW</a></code></p></div>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

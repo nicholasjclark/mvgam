@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.7</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -83,12 +83,12 @@ as it saves recomputing the full set of trends for each series individually</p><
 
 
 <dt>type</dt>
-<dd><p>When this has the value <code>link</code> the linear predictor is calculated on the link scale.
+<dd><p>When this has the value <code>link</code> (default) the linear predictor is calculated on the link scale.
 If <code>expected</code> is used, predictions reflect the expectation of the response (the mean)
-but ignore uncertainty in the observation process. When <code>response</code> (default) is used,
+but ignore uncertainty in the observation process. When <code>response</code> is used,
 the predictions take uncertainty in the observation process into account to return
-predictions on the outcome scale. When <code>trend</code> is used, only the hindcast distribution for the
-latent trend is returned</p></dd>
+predictions on the outcome scale. When <code>variance</code> is used, the variance of the response
+with respect to the mean (mean-variance relationship) is returned</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -96,7 +96,10 @@ latent trend is returned</p></dd>
     
 
 <p>An object of class <code>mvgam_forecast</code> containing hindcast distributions.
-See <code><a href="mvgam_forecast-class.html">mvgam_forecast-class</a></code> for details.</p>
+See <code><a href="mvgam_forecast-class.html">mvgam_forecast-class</a></code> for details.
+#'@seealso <code><a href="forecast.mvgam.html">forecast.mvgam</a></code></p>
+
+
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>

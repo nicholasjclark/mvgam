@@ -12,7 +12,7 @@ implemented in the bayesplot package"><!-- mathjax --><script src="https://cdnjs
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,7 +63,7 @@ implemented in the <span class="pkg">bayesplot</span> package</p>
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span></span>
+<span><span class="fu">mcmc_plot</span><span class="op">(</span></span>
 <span>  <span class="va">object</span>,</span>
 <span>  type <span class="op">=</span> <span class="st">"intervals"</span>,</span>
 <span>  variable <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -83,8 +83,10 @@ implemented in the <span class="pkg">bayesplot</span> package</p>
 <dd><p>The type of the plot.
 Supported types are (as names) <code>hist</code>, <code>dens</code>,
 <code>hist_by_chain</code>, <code>dens_overlay</code>,
-<code>violin</code>, <code>intervals</code>, <code>areas</code>, <code>acf</code>,
-<code>acf_bar</code>,<code>trace</code>, <code>trace_highlight</code>, <code>scatter</code>,
+<code>violin</code>, <code>intervals</code>, <code>areas</code>,
+<code>areas_ridges</code>, <code>combo</code>, <code>acf</code>,
+<code>acf_bar</code>, <code>trace</code>, <code>trace_highlight</code>,
+<code>scatter</code>, <code>hex</code>, <code>pairs</code>, <code>violin</code>,
 <code>rhat</code>, <code>rhat_hist</code>, <code>neff</code>, <code>neff_hist</code>
 and <code>nuts_energy</code>.
 For an overview on the various plot types see
@@ -121,16 +123,23 @@ more details.</p></dd>
 <p>A <code><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></code> object
 that can be further customized using the <span class="pkg">ggplot2</span> package.</p>
     </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><code><a href="mvgam_draws.html">mvgam_draws</a></code> for an overview of some of the shortcut strings
+that can be used for argument <code>variable</code></p></div>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">1</span>, trend_model <span class="op">=</span> <span class="st">'AR1'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span></span>
 <span class="r-in"><span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'neff_hist'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">mcmc_plot</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">mcmc_plot</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'neff_hist'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">mcmc_plot</span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="st">'betas'</span>, type <span class="op">=</span> <span class="st">'areas'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">mcmc_plot</span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="st">'trend_params'</span>, type <span class="op">=</span> <span class="st">'combo'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 </code></pre></div>
     </div>

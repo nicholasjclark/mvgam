@@ -65,3 +65,6 @@ transformed if you are using a \code{poisson()} or \code{nb()} family). It is th
 that you specify the \code{cap} values on the scale of your outcome. Note also that
 no missing values are allowed in \code{cap}.
 }
+\references{
+Taylor, Sean J., and Benjamin Letham. "Forecasting at scale." The American Statistician 72.1 (2018): 37-45.
+}

@@ -19,6 +19,7 @@
 #' maximum saturation point for the trend (see details and examples in \code{\link{mvgam}} for
 #' more information).
 #' Default is 'linear'.
+#' @references Taylor, Sean J., and Benjamin Letham. "Forecasting at scale." The American Statistician 72.1 (2018): 37-45.
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \code{mvgam}
 #' @details
@@ -46,6 +47,7 @@
 #' no missing values are allowed in `cap`.
 #'
 #' @rdname piecewise_trends
+#'
 #' @export
 PW = function(n_changepoints = 10,
               changepoint_range = 0.8,

@@ -16,7 +16,7 @@ trend models."><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/li
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.7</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -79,16 +79,14 @@ trend models.</p>
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>ma</dt>
 <dd><p><code>Logical</code> Include moving average terms of order <code>1</code>?
-Default is <code>FALSE</code>. Note, this option is only currently operational
-for fitting VARMA models. Support for other models (AR and RW) is upcoming.</p></dd>
+Default is <code>FALSE</code>.</p></dd>
 
 
 <dt>cor</dt>
 <dd><p><code>Logical</code> Include correlated process errors as part of a
 multivariate normal process model? If <code>TRUE</code> and if <code>n_series &gt; 1</code>
 in the supplied data, a fully structured covariance matrix will be estimated
-for the process errors. Default is <code>FALSE</code>. Note, this option is only currently operational
-for fitting VAR / VARMA models. Support for other models (AR and RW) is upcoming.</p></dd>
+for the process errors. Default is <code>FALSE</code>.</p></dd>
 
 
 <dt>p</dt>
