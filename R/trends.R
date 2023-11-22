@@ -1408,7 +1408,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
 
         # Combine with changepoints from the history
         deltas <- c(trend_pars$delta_trend[[x]], deltas_new)
-        changepoint_ts <- c(trend_pars$changepoints, t_change_new)
+        changepoint_ts <- sort(c(trend_pars$changepoints, t_change_new))
 
         # Generate a trend draw
         draw <- piecewise_linear(t = 1:max(time),
@@ -1441,7 +1441,7 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
 
         # Combine with changepoints from the history
         deltas <- c(trend_pars$delta_trend[[x]], deltas_new)
-        changepoint_ts <- c(trend_pars$changepoints, t_change_new)
+        changepoint_ts <- sort(c(trend_pars$changepoints, t_change_new))
 
         # Get historical capacities
         oldcaps <- trend_pars$cap[[x]]
