@@ -26,7 +26,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.7</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,7 +77,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2023-11-06</h4>
+            <h4 data-toc-skip class="date">2023-11-23</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/shared_states.Rmd" class="external-link"><code>vignettes/shared_states.Rmd</code></a></small>
       <div class="d-none name"><code>shared_states.Rmd</code></div>
@@ -357,30 +357,30 @@ observed time series. The model converges well</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">##                 2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## seriesseries_1 -0.15 0.081  0.31 1.00  1436</span></span>
-<span><span class="co">## seriesseries_2  0.91 1.100  1.20 1.00  1242</span></span>
-<span><span class="co">## seriesseries_3  1.90 2.100  2.30 1.01   455</span></span>
+<span><span class="co">## seriesseries_1 -0.15 0.087  0.32    1  1680</span></span>
+<span><span class="co">## seriesseries_2  0.92 1.100  1.20    1  1131</span></span>
+<span><span class="co">## seriesseries_3  1.90 2.100  2.30    1   420</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Process model AR parameter estimates:</span></span>
-<span><span class="co">##         2.5%    50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## ar1[1] -0.72 -0.430 -0.10 1.01   649</span></span>
-<span><span class="co">## ar1[2] -0.30 -0.017  0.26 1.00  1666</span></span>
+<span><span class="co">##         2.5%    50%  97.5% Rhat n_eff</span></span>
+<span><span class="co">## ar1[1] -0.73 -0.440 -0.062    1   658</span></span>
+<span><span class="co">## ar1[2] -0.30 -0.011  0.270    1  1947</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Process error parameter estimates:</span></span>
 <span><span class="co">##          2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## sigma[1] 0.34 0.49  0.67 1.01   352</span></span>
-<span><span class="co">## sigma[2] 0.59 0.73  0.91 1.00  1247</span></span>
+<span><span class="co">## sigma[1] 0.33 0.48  0.67    1   455</span></span>
+<span><span class="co">## sigma[2] 0.59 0.73  0.91    1  1195</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM process model coefficient (beta) estimates:</span></span>
-<span><span class="co">##                    2.5%    50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## s(season).1_trend -0.21 -0.011  0.20    1  1372</span></span>
-<span><span class="co">## s(season).2_trend -0.28 -0.048  0.17    1  1714</span></span>
-<span><span class="co">## s(season).3_trend -0.16  0.074  0.31    1  1685</span></span>
-<span><span class="co">## s(season).4_trend -0.14  0.069  0.28    1  1625</span></span>
+<span><span class="co">##                    2.5%     50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">## s(season).1_trend -0.23 -0.0037  0.22 1.00  1544</span></span>
+<span><span class="co">## s(season).2_trend -0.28 -0.0500  0.17 1.00  1409</span></span>
+<span><span class="co">## s(season).3_trend -0.14  0.0750  0.29 1.00  1687</span></span>
+<span><span class="co">## s(season).4_trend -0.13  0.0700  0.28 1.01  1479</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##            edf   F p-value</span></span>
-<span><span class="co">## s(season) 2.14 0.1    0.91</span></span>
+<span><span class="co">##            edf    F p-value</span></span>
+<span><span class="co">## s(season) 1.48 0.11     0.9</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
@@ -389,7 +389,7 @@ observed time series. The model converges well</p>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Nov 06 12:58:08 PM 2023.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Thu Nov 23 8:39:40 AM 2023.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
@@ -598,52 +598,48 @@ many spline coefficients in this model</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## Observation error parameter estimates:</span></span>
 <span><span class="co">##              2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## sigma_obs[1] 0.32 1.1   1.9 1.05    52</span></span>
-<span><span class="co">## sigma_obs[2] 1.80 2.1   2.3 1.00  2337</span></span>
-<span><span class="co">## sigma_obs[3] 1.80 2.1   2.3 1.00  2451</span></span>
+<span><span class="co">## sigma_obs[1] 0.37 1.1   1.8 1.03    56</span></span>
+<span><span class="co">## sigma_obs[2] 1.80 2.0   2.3 1.00  2000</span></span>
+<span><span class="co">## sigma_obs[3] 1.80 2.1   2.4 1.00  1722</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM observation model coefficient (beta) estimates:</span></span>
-<span><span class="co">##                 2.5%   50%  97.5% Rhat n_eff</span></span>
-<span><span class="co">## (Intercept)     0.76  1.70  2.500 1.01   365</span></span>
-<span><span class="co">## seriessensor_2 -2.10 -0.98  0.430 1.00   612</span></span>
-<span><span class="co">## seriessensor_3 -3.50 -2.00 -0.017 1.00   410</span></span>
+<span><span class="co">##                 2.5%  50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">## (Intercept)     0.77  1.7  2.50 1.01   449</span></span>
+<span><span class="co">## seriessensor_2 -2.10 -1.0  0.29 1.00   660</span></span>
+<span><span class="co">## seriessensor_3 -3.50 -2.0 -0.13 1.01   513</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
 <span><span class="co">##                        edf    F p-value    </span></span>
-<span><span class="co">## s(temperature)        7.49 8.44  &lt;2e-16 ***</span></span>
-<span><span class="co">## s(series,temperature) 2.10 0.93   8e-04 ***</span></span>
+<span><span class="co">## s(temperature)        7.07 7.54 &lt; 2e-16 ***</span></span>
+<span><span class="co">## s(series,temperature) 2.19 0.95 0.00093 ***</span></span>
 <span><span class="co">## ---</span></span>
 <span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Process model AR parameter estimates:</span></span>
-<span><span class="co">##        2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## ar1[1] -0.2 0.1  0.44    1   483</span></span>
+<span><span class="co">##         2.5%  50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">## ar1[1] -0.19 0.11  0.42    1   647</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Process error parameter estimates:</span></span>
 <span><span class="co">##          2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## sigma[1]  1.1 1.9   2.4 1.02    91</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM process model coefficient (beta) estimates:</span></span>
-<span><span class="co">##                          2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## s(productivity).1_trend -0.19 0.039  0.64 1.02   172</span></span>
+<span><span class="co">## sigma[1]  1.2 1.9   2.4 1.02   121</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##                   edf    F p-value</span></span>
-<span><span class="co">## s(productivity) 0.817 0.26    0.98</span></span>
+<span><span class="co">##                   edf   F p-value</span></span>
+<span><span class="co">## s(productivity) 0.763 0.3    0.99</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">## Rhats above 1.05 found for 1 parameters</span></span>
+<span><span class="co">## Rhats above 1.05 found for 28 parameters</span></span>
 <span><span class="co">##  *Diagnose further to investigate why the chains have not mixed</span></span>
-<span><span class="co">## 5 of 2000 iterations ended with a divergence (0.25%)</span></span>
+<span><span class="co">## 4 of 2000 iterations ended with a divergence (0.2%)</span></span>
 <span><span class="co">##  *Try running with larger adapt_delta to remove the divergences</span></span>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
-<span><span class="co">## Chain 1: E-FMI = 0.0724</span></span>
-<span><span class="co">## Chain 2: E-FMI = 0.0958</span></span>
-<span><span class="co">## Chain 4: E-FMI = 0.1968</span></span>
+<span><span class="co">## Chain 1: E-FMI = 0.1021</span></span>
+<span><span class="co">## Chain 2: E-FMI = 0.1137</span></span>
+<span><span class="co">## Chain 3: E-FMI = 0.1822</span></span>
 <span><span class="co">##  *E-FMI below 0.2 indicates you may need to reparameterize your model</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Nov 06 1:00:19 PM 2023.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Thu Nov 23 8:42:55 AM 2023.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>

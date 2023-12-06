@@ -126,7 +126,7 @@ This results in sensible forecasts of the observations as well
 plot(mod, type = 'forecast', newdata = data_test)
 ```
 
-The syntax is very similar if we wish to estimate the parameters of the underlying Gaussian Process, this time using a Hilbert space approximation. We simply omit the `rho` argument in `dynamic` to make this happen. This will set up a call similar to `gp(time, by = 'temp', c = 5/4), k = 20)`.
+The syntax is very similar if we wish to estimate the parameters of the underlying Gaussian Process, this time using a Hilbert space approximation. We simply omit the `rho` argument in `dynamic` to make this happen. This will set up a call similar to `gp(time, by = 'temp', c = 5/4, k = 40)`.
 ```{r include=FALSE}
 mod <- mvgam(out ~ dynamic(temp, k = 40),
              family = gaussian(),
