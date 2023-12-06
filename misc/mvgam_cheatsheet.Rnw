@@ -25,7 +25,7 @@ fc <- forecast(model, newdata = simdat$data_test)
 
 \begin{frame}[fragile]
   \frametitle{{\fontsize{41}{43} \selectfont \textcolor{mygray}{mvgam ::}} {\fontsize{25}{25} \textbf{\textcolor{mygray}{CHEATSHEET}}}}
-\vspace{-0.1in}
+\vspace{-0.6in}
   \begin{columns}
     \begin{column}{0.02\paperwidth} % left margin space
     \end{column}
@@ -33,6 +33,7 @@ fc <- forecast(model, newdata = simdat$data_test)
     \begin{column}{0.3\paperwidth}
 
 \begin{block}
+\noindent\makebox[\linewidth]{\rule{0.3\paperwidth}{0.2pt}}
 
 The \texttt{mvgam} package provides tools for fitting and interrogating univariate or multivariate time series models that can include nonlinear smooth functions of covariates, dynamic temporal processes and random effects. A wide variety of latent dynamic processes can be specified. The package also provides tools for interpreting effects, computing and scoring forecasts, as well as generating model code and data objects for further customisation. Models are fitted using \texttt{Stan} for full Bayesian inference.
 
@@ -128,7 +129,8 @@ Use \texttt{\color{Orchid} code(model)} to see the auto-generated \texttt{Stan} 
 
 
 \begin{column}{0.3\paperwidth}
-\vspace{0.35in}
+\vspace{0.52in}
+\noindent\makebox[\linewidth]{\rule{0.3\paperwidth}{0.2pt}}
 \begin{block}{{\fontsize{21}{21} \selectfont \color{BrickRed} Diagnostics and Inference}}
 
 \smallskip
@@ -186,7 +188,8 @@ post_contrasts %>%
 
 
 \begin{column}{0.3\paperwidth}
-\vspace{0.22in}
+\vspace{0.37in}
+\noindent\makebox[\linewidth]{\rule{0.3\paperwidth}{0.2pt}}
 \begin{block}{{\fontsize{21}{21} \selectfont \color{BrickRed} Prediction and forecasting}}
 
 \smallskip

@@ -111,6 +111,11 @@ smooth functions and residuals, and evaluate models through posterior
 predictive checks or forecast comparisons. Please see the package
 documentation for more detailed examples.
 
+## Usage
+
+[![`mvgam` usage
+cheatsheet](https://github.com/nicholasjclark/mvgam/blob/main/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/blob/main/misc/mvgam_cheatsheet.pdf)
+
 ## Vignettes
 
 You can set `build_vignettes = TRUE` when installing with either

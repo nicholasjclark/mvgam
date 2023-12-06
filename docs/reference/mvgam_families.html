@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -73,15 +73,15 @@ be changed</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p><code>mvgam</code> currently supports the following standard observation families:</p><ul><li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></code> for real-valued data</p></li>
-<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></code> for count data</p></li>
-<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma</a></code> for non-negative real-valued data</p></li>
-</ul><p>In addition, the following extended families from the <code>mgcv</code> package are supported:</p><ul><li><p><code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar</a></code> for proportional data on <code>(0,1)</code></p></li>
-<li><p><code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb</a></code> for count data</p></li>
-</ul><p>Finally, <code>mvgam</code> supports the three extended families described here:</p><ul><li><p><code><a href="https://paul-buerkner.github.io/brms/reference/brmsfamily.html" class="external-link">lognormal</a></code> for non-negative real-valued data</p></li>
-<li><p><code>tweedie</code> for count data (power parameter <code>p</code> fixed at <code>1.5</code>)</p></li>
-<li><p><code>student_t()</code> (or <code><a href="https://paul-buerkner.github.io/brms/reference/brmsfamily.html" class="external-link">student</a></code>) for real-valued data</p></li>
-</ul><p>Note that only <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code>, and <code>tweedie()</code> are available if
+    <p><code>mvgam</code> currently supports the following standard observation families:</p><ul><li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></code> with identity link, for real-valued data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></code> with log-link, for count data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma</a></code> with log-link, for non-negative real-valued data</p></li>
+</ul><p>In addition, the following extended families from the <code>mgcv</code> package are supported:</p><ul><li><p><code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar</a></code> with logit-link, for proportional data on <code>(0,1)</code></p></li>
+<li><p><code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb</a></code> with log-link, for count data</p></li>
+</ul><p>Finally, <code>mvgam</code> supports the three extended families described here:</p><ul><li><p><code><a href="https://rdrr.io/pkg/brms/man/brmsfamily.html" class="external-link">lognormal</a></code> with identity-link, for non-negative real-valued data</p></li>
+<li><p><code>tweedie</code> with log-link, for count data (power parameter <code>p</code> fixed at <code>1.5</code>)</p></li>
+<li><p><code>student_t()</code> (or <code><a href="https://rdrr.io/pkg/brms/man/brmsfamily.html" class="external-link">student</a></code>) with identity-link, for real-valued data</p></li>
+</ul><p>Note that only <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code>nb()</code>, and <code>tweedie()</code> are available if
 using <code>JAGS</code>. All families, apart from <code>tweedie()</code>, are supported if
 using <code>Stan</code>.</p>
 <p>Note that currently it is not possible to change the default link

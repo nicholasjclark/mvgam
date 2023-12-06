@@ -66,9 +66,9 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>AR(p = 1, 2, or 3)</code></p></li>
 <li><p><code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
 <li><p><code><a href="piecewise_trends.html">PW()</a></code> (piecewise linear or logistic trends; only available in <code>Stan</code>)</p></li>
-<li><p><code>'GP'</code> (Gaussian Process with squared exponential kernel;
+<li><p><code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>For all types apart from <code>'GP'</code>, moving average and/or correlated
+</ul><p>For all types apart from <code><a href="GP.html">GP()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
 process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
 multivariate Random Walk if <code>data</code> contains <code>&gt;1</code> series). Character strings can also be supplied
 instead of the various trend functions. The full list of possible models that are
@@ -123,7 +123,7 @@ The American Statistician 72.1, 37-45.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="RW.html">RW</a></code>, <code><a href="RW.html">AR</a></code>, <code><a href="RW.html">VAR</a></code>, <code><a href="piecewise_trends.html">PW</a></code></p></div>
+    <div class="dont-index"><p><code><a href="RW.html">RW</a></code>, <code><a href="RW.html">AR</a></code>, <code><a href="RW.html">VAR</a></code>, <code><a href="piecewise_trends.html">PW</a></code>, <code><a href="GP.html">GP</a></code></p></div>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

@@ -10,6 +10,7 @@
 
 \definecolor{mygray}{gray}{0.3}
 \setbeamertemplate{itemize item}{\color{mygray}$\blacktriangleright$}
+\addtobeamertemplate{frametitle}{\vskip 0.4in}{}
 
 \usepackage{eso-pic}
 \setlength{\paperwidth}{16.5in}
@@ -37,11 +38,11 @@
   \vskip0pt%
 }
 \newcommand\AtPagemyUpperLeft[1]{\AtPageLowerLeft{%
-    \put(\LenToUnit{0.9\paperwidth},\LenToUnit{0.925\paperheight}){#1}}}
+    \put(\LenToUnit{0.88\paperwidth},\LenToUnit{0.88\paperheight}){#1}}}
 \AddToShipoutPictureFG{
   \AtPagemyUpperLeft{{
-      \href{http://mc-stan.org/}{\includegraphics[scale=0.2,keepaspectratio]{../logos/Stan.png}}
+      \href{http://mc-stan.org/}{\includegraphics[scale=0.25,keepaspectratio]{../logos/Stan.png}}
       \hspace{0.025in}
-      \href{http://ggplot2.tidyverse.org}{\includegraphics[scale=0.4,keepaspectratio]{../logos/ggplot2.png}}
+      \href{http://ggplot2.tidyverse.org}{\includegraphics[scale=0.5,keepaspectratio]{../logos/ggplot2.png}}
 }}
 }%

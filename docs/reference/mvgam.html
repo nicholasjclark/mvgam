@@ -236,9 +236,9 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
 <li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
 <li><p><code>'PWlogistic</code>, <code>'PWlinear</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
-<li><p><code>'GP'</code> (Gaussian Process with squared exponential kernel;
+<li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>For all types apart from <code>'GP'</code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
+</ul><p>For all types apart from <code><a href="GP.html">GP()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
 process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
 multivariate Random Walk if <code>n_series &gt; 1</code>). See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
 
@@ -387,7 +387,7 @@ which exacerbates the problem of forecasting ahead. As GAMs are very naturally v
 must model time series that show complex distributional features and missing data, parameters for <code>mvgam</code> models are estimated
 in a Bayesian framework using Markov Chain Monte Carlo.
 <br><br><em>Formula syntax</em>: Details of the formula syntax used by <span class="pkg">mvgam</span> can be found in
-<code><a href="https://rdrr.io/pkg/mgcv/man/formula.gam.html" class="external-link">formula.gam</a></code>. Note that it is possible to supply an empty formula where
+<code><a href="mvgam_formulae.html">mvgam_formulae</a></code>. Note that it is possible to supply an empty formula where
 there are no predictors or intercepts in the observation model (i.e. <code>y ~ 0</code> or <code>y ~ -1</code>).
 In this case, an intercept-only observation model will be set up but the intercept coefficient
 will be fixed at zero. This can be handy if you wish to fit pure State-Space models where
@@ -439,7 +439,7 @@ via the software <code>Stan</code> (using either the <code>cmdstanr</code> or <c
 There are great advantages when using <code>Stan</code> over Gibbs / Metropolis Hastings samplers, which includes the option
 to estimate smooth latent trends via <a href="https://arxiv.org/abs/2004.11408" class="external-link">Hilbert space approximate Gaussian Processes</a>.
 This often makes sense for ecological series, which we expect to change smoothly. In <code>mvgam</code>, latent squared
-exponential GP trends are approximated using by default <code>40</code> basis functions, which saves computational
+exponential GP trends are approximated using by default <code>20</code> basis functions, which saves computational
 costs compared to fitting full GPs while adequately estimating
 GP <code>alpha</code> and <code>rho</code> parameters. Because of the many advantages of <code>Stan</code> over <code>JAGS</code>,
 <em>further development of the package will only be applied to <code>Stan</code></em>. This includes the planned addition
@@ -453,7 +453,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code></p></div>
+    <div class="dont-index"><p><code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/gam.models.html" class="external-link">gam.models</a></code>,</p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
