@@ -13,6 +13,9 @@ The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Dyn
 Install the development version from `GitHub` using:
 `devtools::install_github("nicholasjclark/mvgam")`. Note that to actually condition models with MCMC sampling, either the `JAGS` software must be installed (along with the `R` packages `rjags` and `runjags`) or the `Stan` software must be installed (along with either `rstan` and/or `cmdstanr`). Only `rstan` is listed as a dependency of `mvgam` to ensure that installation is less difficult. If users wish to fit the models using `mvgam`, please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/), for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan), or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/). You will need a fairly recent version of `Stan` to ensure all the model syntax is recognized. If you see warnings such as `variable "array" does not exist`, this is usually a sign that you need to update your version of `Stan`. We highly recommend you use `Cmdstan` through the `cmdstanr` interface as the backend. This is because `Cmdstan` is easier to install, is more up to date with new features, and uses less memory than `Rstan`. See [this documentation from the `Cmdstan` team for more information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan). 
 
+## Cheatsheet
+[![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
+
 ## Getting started
 `mvgam` was originally designed to analyse and forecast non-negative integer-valued data (counts). These data are traditionally challenging to analyse with existing time-series analysis packages. But further development of `mvgam` has resulted in support for a growing number of observation families that extend to other types of data. Currently, the package can handle data for the following families:  
   
@@ -65,9 +68,6 @@ for(i in 1:3){
 ![](man/figures/README-beta_fc-1.png)
 
 Various `S3` functions can be used to inspect parameter estimates, plot smooth functions and residuals, and evaluate models through posterior predictive checks or forecast comparisons. Please see the package documentation for more detailed examples.
-
-## Usage
-[![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/blob/main/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/blob/main/misc/mvgam_cheatsheet.pdf)
 
 ## Vignettes
 You can set `build_vignettes = TRUE` when installing with either `devtools::install_github` or `remotes::install_github`, but be aware this will slow down the installation drastically. Instead, you can always access the vignette htmls online at [https://nicholasjclark.github.io/mvgam/articles/](https://nicholasjclark.github.io/mvgam/articles/)

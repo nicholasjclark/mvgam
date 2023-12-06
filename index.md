@@ -39,6 +39,11 @@ and uses less memory than `Rstan`. See [this documentation from the
 `Cmdstan` team for more
 information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan).
 
+## Cheatsheet
+
+[![`mvgam` usage
+cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
+
 ## Getting started
 
 `mvgam` was originally designed to analyse and forecast non-negative
@@ -110,11 +115,6 @@ Various `S3` functions can be used to inspect parameter estimates, plot
 smooth functions and residuals, and evaluate models through posterior
 predictive checks or forecast comparisons. Please see the package
 documentation for more detailed examples.
-
-## Usage
-
-[![`mvgam` usage
-cheatsheet](https://github.com/nicholasjclark/mvgam/blob/main/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/blob/main/misc/mvgam_cheatsheet.pdf)
 
 ## Vignettes
 
