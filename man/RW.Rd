@@ -29,7 +29,7 @@ An object of class \code{mvgam_trend}, which contains a list of
 arguments to be interpreted by the parsing functions in \code{mvgam}
 }
 \description{
-Set up a autoregressive or autoregressive moving average trend models
+Set up autoregressive or autoregressive moving average trend models
 in \code{mvgam}. These functions do not evaluate their arguments –
 they exist purely to help set up a model with particular autoregressive
 trend models.

@@ -1,6 +1,6 @@
 #' Specify autoregressive dynamic processes
 #'
-#' Set up a autoregressive or autoregressive moving average trend models
+#' Set up autoregressive or autoregressive moving average trend models
 #' in \code{mvgam}. These functions do not evaluate their arguments –
 #' they exist purely to help set up a model with particular autoregressive
 #' trend models.

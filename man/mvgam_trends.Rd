@@ -15,10 +15,10 @@ and the observation process is the only source of error; similarly to what is es
 \item \verb{AR(p = 1, 2, or 3)}
 \item \code{VAR()}(only available in \code{Stan})
 \item \code{PW()} (piecewise linear or logistic trends; only available in \code{Stan})
-\item \code{'GP'} (Gaussian Process with squared exponential kernel;
+\item \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all types apart from \code{'GP'}, moving average and/or correlated
+For all types apart from \code{GP()} and \code{PW()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
 multivariate Random Walk if \code{data} contains \verb{>1} series). Character strings can also be supplied
 instead of the various trend functions. The full list of possible models that are
@@ -76,5 +76,5 @@ Sean J. Taylor and Benjamin Letham (2018) Forecasting at scale.
 The American Statistician 72.1, 37-45.
 }
 \seealso{
-\code{\link{RW}}, \code{\link{AR}}, \code{\link{VAR}}, \code{\link{PW}}
+\code{\link{RW}}, \code{\link{AR}}, \code{\link{VAR}}, \code{\link{PW}}, \code{\link{GP}}
 }

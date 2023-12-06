@@ -134,10 +134,10 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{'AR3'} or \code{AR(p = 3)}
 \item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
 \item \verb{'PWlogistic}, \verb{'PWlinear} or \code{PW()} (only available in \code{Stan})
-\item \code{'GP'} (Gaussian Process with squared exponential kernel;
+\item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all types apart from \code{'GP'} and \code{PW()}, moving average and/or correlated
+For all types apart from \code{GP()} and \code{PW()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
 multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
 
@@ -254,7 +254,7 @@ in a Bayesian framework using Markov Chain Monte Carlo.
 \cr
 \cr
 \emph{Formula syntax}: Details of the formula syntax used by \pkg{mvgam} can be found in
-\code{\link[mgcv]{formula.gam}}. Note that it is possible to supply an empty formula where
+\code{\link{mvgam_formulae}}. Note that it is possible to supply an empty formula where
 there are no predictors or intercepts in the observation model (i.e. \code{y ~ 0} or \code{y ~ -1}).
 In this case, an intercept-only observation model will be set up but the intercept coefficient
 will be fixed at zero. This can be handy if you wish to fit pure State-Space models where
@@ -322,7 +322,7 @@ via the software \code{Stan} (using either the \code{cmdstanr} or \code{rstan} i
 There are great advantages when using \code{Stan} over Gibbs / Metropolis Hastings samplers, which includes the option
 to estimate smooth latent trends via \href{https://arxiv.org/abs/2004.11408}{Hilbert space approximate Gaussian Processes}.
 This often makes sense for ecological series, which we expect to change smoothly. In \code{mvgam}, latent squared
-exponential GP trends are approximated using by default \code{40} basis functions, which saves computational
+exponential GP trends are approximated using by default \code{20} basis functions, which saves computational
 costs compared to fitting full GPs while adequately estimating
 GP \code{alpha} and \code{rho} parameters. Because of the many advantages of \code{Stan} over \code{JAGS},
 \emph{further development of the package will only be applied to \code{Stan}}. This includes the planned addition
@@ -614,7 +614,7 @@ Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (D
 Methods in Ecology and Evolution. 14:3, 771-784.
 }
 \seealso{
-\code{\link[mgcv]{jagam}}, \code{\link[mgcv]{gam}}
+\code{\link[mgcv]{jagam}}, \code{\link[mgcv]{gam}}, \code{\link[mgcv]{gam.models}},
 }
 \author{
 Nicholas J Clark

@@ -19,7 +19,7 @@
 #' ensure that the code is legal (i.e. to check that lower bounds are smaller than upper bounds, for
 #' example)
 #'@author Nicholas J Clark
-#'@seealso \code{\link{mvgam}} \code{\link[brms]{prior}}
+#'@seealso \code{\link{mvgam}}, \code{\link{mvgam_formulae}}, \code{\link[brms]{prior}}
 #'@return either a \code{data.frame} containing the prior definitions (if any suitable
 #'priors can be altered by the user) or \code{NULL}, indicating that no priors in the model
 #'can be modified through the `mvgam` interface

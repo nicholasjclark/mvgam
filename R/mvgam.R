@@ -79,10 +79,10 @@
 #'   \item `'AR3'` or `AR(p = 3)`
 #'   \item `'VAR1'`  or `VAR()`(only available in \code{Stan})
 #'   \item `'PWlogistic`, `'PWlinear` or `PW()` (only available in \code{Stan})
-#'   \item `'GP'` (Gaussian Process with squared exponential kernel;
+#'   \item `'GP'` or `GP()` (Gaussian Process with squared exponential kernel;
 #'only available in \code{Stan})}
 #'
-#'For all types apart from `'GP'` and `PW()`, moving average and/or correlated
+#'For all types apart from `GP()` and `PW()`, moving average and/or correlated
 #'process error terms can also be estimated (for example, `RW(cor = TRUE)` will set up a
 #'multivariate Random Walk if `n_series > 1`). See [mvgam_trends] for more details
 #'@param trend_map Optional `data.frame` specifying which series should depend on which latent
@@ -171,7 +171,7 @@
 #'\cr
 #'\cr
 #'*Formula syntax*: Details of the formula syntax used by \pkg{mvgam} can be found in
-#'\code{\link[mgcv]{formula.gam}}. Note that it is possible to supply an empty formula where
+#'\code{\link{mvgam_formulae}}. Note that it is possible to supply an empty formula where
 #'there are no predictors or intercepts in the observation model (i.e. `y ~ 0` or `y ~ -1`).
 #'In this case, an intercept-only observation model will be set up but the intercept coefficient
 #'will be fixed at zero. This can be handy if you wish to fit pure State-Space models where
@@ -239,7 +239,7 @@
 #'There are great advantages when using `Stan` over Gibbs / Metropolis Hastings samplers, which includes the option
 #'to estimate smooth latent trends via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408).
 #'This often makes sense for ecological series, which we expect to change smoothly. In `mvgam`, latent squared
-#'exponential GP trends are approximated using by default \code{40} basis functions, which saves computational
+#'exponential GP trends are approximated using by default \code{20} basis functions, which saves computational
 #'costs compared to fitting full GPs while adequately estimating
 #'GP \code{alpha} and \code{rho} parameters. Because of the many advantages of `Stan` over `JAGS`,
 #'*further development of the package will only be applied to `Stan`*. This includes the planned addition
@@ -248,7 +248,7 @@
 #'@author Nicholas J Clark
 #'@references Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 #'Methods in Ecology and Evolution. 14:3, 771-784.
-#'@seealso \code{\link[mgcv]{jagam}}, \code{\link[mgcv]{gam}}
+#'@seealso \code{\link[mgcv]{jagam}}, \code{\link[mgcv]{gam}}, \code{\link[mgcv]{gam.models}},
 #'@return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
 #'unsampled covariate values), Dunn-Smyth residuals for each series and key information needed

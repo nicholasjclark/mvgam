@@ -9,10 +9,10 @@
 #'   \item `AR(p = 1, 2, or 3)`
 #'   \item `VAR()`(only available in \code{Stan})
 #'   \item `PW()` (piecewise linear or logistic trends; only available in \code{Stan})
-#'   \item `'GP'` (Gaussian Process with squared exponential kernel;
+#'   \item `GP()` (Gaussian Process with squared exponential kernel;
 #'only available in \code{Stan})}
 #'
-#'For all types apart from `'GP'`, moving average and/or correlated
+#'For all types apart from `GP()` and `PW()`, moving average and/or correlated
 #'process error terms can also be estimated (for example, `RW(cor = TRUE)` will set up a
 #'multivariate Random Walk if `data` contains `>1` series). Character strings can also be supplied
 #'instead of the various trend functions. The full list of possible models that are
@@ -62,7 +62,7 @@
 #'[mvgam]. Piecewise trends follow the formulation in the popular `prophet` package produced
 #'by `Facebook`, where users can allow for changepoints to control the potential flexibility
 #'of the trend. See Taylor and Letham (2018) for details
-#'@seealso \code{\link{RW}}, \code{\link{AR}}, \code{\link{VAR}}, \code{\link{PW}}
+#'@seealso \code{\link{RW}}, \code{\link{AR}}, \code{\link{VAR}}, \code{\link{PW}}, \code{\link{GP}}
 #' @references Sarah E. Heaps (2022) Enforcing stationarity through the prior in Vector Autoregressions.
 #' Journal of Computational and Graphical Statistics. 32:1, 1-10.
 #'

@@ -1,3 +1,28 @@
+#' Specify dynamic Gaussian processes
+#'
+#' Set up low-rank approximate Gaussian Process trend models using Hilbert
+#' basis expansions in \code{mvgam}. This function does not evaluate its arguments –
+#' it exists purely to help set up a model with particular GP
+#' trend models.
+#' @return An object of class \code{mvgam_trend}, which contains a list of
+#' arguments to be interpreted by the parsing functions in \code{mvgam}
+#' @details A GP trend is estimated for each series using
+#' [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408).
+#' In `mvgam`, latent squared exponential GP trends are approximated using by
+#' default \code{20} basis functions and using a multiplicative factor of `c = 5/4`,
+#' which saves computational costs compared to fitting full GPs while adequately estimating
+#' GP \code{alpha} and \code{rho} parameters.
+#' @rdname GP
+#' @seealso \code{\link[brms]{gp}}
+#' @export
+GP = function(){
+  out <- structure(list(trend_model = 'GP',
+                        ma = FALSE,
+                        cor = FALSE,
+                        label = match.call()),
+                   class = 'mvgam_trend')
+}
+
 #' Make gp() attributes table and necessary stan lines
 #' @noRd
 make_gp_additions = function(gp_details, data,
