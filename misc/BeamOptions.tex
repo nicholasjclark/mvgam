@@ -1,0 +1,47 @@
+\setbeamertemplate{bibliography item}[text]
+\setbeamertemplate{caption}[numbered]
+\usepackage{url,lmodern}
+\usepackage{amsmath,amsfonts,amssymb,graphicx,
+  amsthm,subfigure,multirow,hyperref,textcomp,natbib}
+\usepackage[iso,american]{isodate}
+\usepackage{listings}
+\usepackage[dvipsnames]{xcolor}
+\hypersetup{colorlinks=true,urlcolor=BrickRed,linkcolor=BrickRed}
+
+\definecolor{mygray}{gray}{0.3}
+\setbeamertemplate{itemize item}{\color{mygray}$\blacktriangleright$}
+
+\usepackage{eso-pic}
+\setlength{\paperwidth}{16.5in}
+\setlength{\paperheight}{10.5in}
+\setlength{\mathindent}{5pt}
+\usepackage{lmodern}
+\setbeamertemplate{navigation symbols}{}
+
+\defbeamertemplate*{footline}{infolines theme} { \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.333333\paperwidth,ht=2.25ex,dp=1ex,center]{author
+        in head/foot}%
+      \usebeamerfont{author in
+        head/foot}\insertshortauthor%~~(\insertshortinstitute)
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.333333\paperwidth,ht=2.25ex,dp=1ex,center]{title
+        in head/foot}%
+      \usebeamerfont{title in head/foot}\insertshorttitle
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.333333\paperwidth,ht=2.25ex,dp=1ex,right]{date
+        in head/foot}%
+      \usebeamerfont{date in head/foot}\insertshortdate{}\hspace*{2em}
+      \insertframenumber{} / \inserttotalframenumber\hspace*{2ex}
+    \end{beamercolorbox}}%
+  \vskip0pt%
+}
+\newcommand\AtPagemyUpperLeft[1]{\AtPageLowerLeft{%
+    \put(\LenToUnit{0.9\paperwidth},\LenToUnit{0.925\paperheight}){#1}}}
+\AddToShipoutPictureFG{
+  \AtPagemyUpperLeft{{
+      \href{http://mc-stan.org/}{\includegraphics[scale=0.2,keepaspectratio]{../logos/Stan.png}}
+      \hspace{0.025in}
+      \href{http://ggplot2.tidyverse.org}{\includegraphics[scale=0.4,keepaspectratio]{../logos/ggplot2.png}}
+}}
+}%
