@@ -23,17 +23,19 @@ if(!is.null(object$trend_call)){
   print(object$call)
 }
 
-cat("Family:\n")
+cat("\nFamily:\n")
 cat(paste0(object$family, '\n'))
 
-
-cat("Link function:\n")
+cat("\nLink function:\n")
 cat(paste0(family_links(object$family), '\n'))
 
 
-cat("Trend model:\n")
-print(object$trend_model)
-
+cat("\nTrend model:\n")
+if(inherits(object$trend_model, 'mvgam_trend')){
+  print(object$trend_model$label)
+} else {
+  cat(paste0(object$trend_model, '\n'))
+}
 
 if(object$use_lv){
   cat("N latent factors:\n")
@@ -41,33 +43,35 @@ if(object$use_lv){
 
 }
 
-cat('N series:\n')
+cat('\nN series:\n')
 cat(NCOL(object$ytimes), '\n')
 
 
 if(!is.null(object$upper_bounds)){
-  cat('Upper bounds:\n')
+  cat('\nUpper bounds:\n')
   cat(object$upper_bounds, '\n')
 
 }
 
-cat('N observations:\n')
-if(class(object$obs_data)[1] == 'list'){
-  cat(length(object$obs_data$y), '\n')
-} else {
-  cat(NROW(object$obs_data), '\n')
-}
+cat('\nN timepoints:\n')
+cat(max(object$obs_data$time), '\n')
 
 
 if(object$fit_engine == 'jags'){
-  cat('Status:\n')
+  cat('\nStatus:\n')
   cat('Fitted using JAGS', '\n')
-
 }
 
 if(object$fit_engine == 'stan'){
-  cat('Status:\n')
+  cat('\nStatus:\n')
   cat('Fitted using Stan', '\n')
+
+  n_kept <- object$model_output@sim$n_save - object$model_output@sim$warmup2
+  cat(object$model_output@sim$chains, " chains, each with iter = ",
+      object$model_output@sim$iter,
+      "; warmup = ", object$model_output@sim$warmup, "; thin = ",
+      object$model_output@sim$thin, " \n",
+      "Total post-warmup draws = ", sum(n_kept), "\n\n", sep = '')
 
 }
 
@@ -90,11 +94,10 @@ print.mvgam_prefit = function(x, ...){
     print(object$call)
   }
 
-  cat("Family:\n")
+  cat("\nFamily:\n")
   cat(paste0(object$family, '\n'))
 
-
-  cat("Link function:\n")
+  cat("\nLink function:\n")
   cat(paste0(family_links(object$family), '\n'))
 
 
@@ -106,25 +109,22 @@ print.mvgam_prefit = function(x, ...){
   }
 
 
+
   if(object$use_lv){
-    cat("N latent factors:\n")
+    cat("\nN latent factors:\n")
     cat(object$n_lv, '\n')
 
   }
 
-  cat('N series:\n')
+  cat('\nN series:\n')
   cat(NCOL(object$ytimes), '\n')
 
 
-  cat('N observations:\n')
-  if(class(object$obs_data)[1] == 'list'){
-    cat(length(object$obs_data$y), '\n')
-  } else {
-    cat(NROW(object$obs_data), '\n')
-  }
+  cat('\nN timepoints:\n')
+  cat(max(object$obs_data$time), '\n')
 
 
-  cat('Status:\n')
+  cat('\nStatus:\n')
   cat('Not fitted', '\n')
 
 }

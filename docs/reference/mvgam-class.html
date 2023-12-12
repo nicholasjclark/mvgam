@@ -12,7 +12,7 @@ Run methods(class = "mvgam") to see an overview of available methods.'><!-- math
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -111,7 +111,7 @@ will be returned. Othwerise <code>NULL</code></p></li>
 <li><p><code>fit_engine</code> <code>Character</code> describing the fit engine, either as <code>stan</code> or <code>jags</code></p></li>
 <li><p><code>backend</code> <code>Character</code> describing the backend used for modelling, either as <code>rstan</code>, <code>cmdstanr</code> or <code>rjags</code></p></li>
 <li><p><code>algorithm</code> <code>Character</code> describing the algorithm used for finding the posterior,
-either as <code>sampling</code>, <code>meanfield</code> or <code>fullrank</code></p></li>
+either as <code>sampling</code>, <code>laplace</code>, <code>pathfinder</code>, <code>meanfield</code> or <code>fullrank</code></p></li>
 <li><p><code>max_treedepth</code> If the model was fitted using <code>Stan</code>, the value supplied for the maximum
 treedepth tuning parameter is returned (see <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code> for details).
 Otherwise <code>NULL</code></p></li>

@@ -83,7 +83,9 @@ changed for a given <code>mvgam</code> model, as well listing their default dist
 <dd><p>A <code>character</code> string specifying the GAM observation model formula. These are exactly like the formula
 for a GLM except that smooth terms, <code>s()</code>, <code>te()</code>, <code>ti()</code>, <code>t2()</code>, as well as time-varying
 <code><a href="dynamic.html">dynamic()</a></code> terms, can be added to the right hand side
-to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).</p></dd>
+to specify that the linear predictor depends on smooth functions of predictors
+(or linear functionals of these). Details of the formula syntax used by <span class="pkg">mvgam</span>
+can be found in <code><a href="mvgam_formulae.html">mvgam_formulae</a></code></p></dd>
 
 
 <dt>trend_formula</dt>
@@ -94,7 +96,7 @@ of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). A
 the identifier <code>series</code> in this formula to specify effects that vary across time series. Instead you should use
 <code>trend</code>. This will ensure that models in which a <code>trend_map</code> is supplied will still work consistently
 (i.e. by allowing effects to vary across process models, even when some time series share the same underlying
-process model). This feature is experimental, and is only currently available for Random Walk and AR trend models.</p></dd>
+process model). This feature is only currently available for <code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="RW.html">VAR()</a></code> trend models</p></dd>
 
 
 <dt>data</dt>
@@ -127,20 +129,20 @@ See <code><a href="mvgam_families.html">mvgam_families</a></code> for more detai
 
 <dt>use_lv</dt>
 <dd><p><code>logical</code>. If <code>TRUE</code>, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. Defaults to <code>FALSE</code></p></dd>
+latent trends in a reduced dimension format. Only available for
+<code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="GP.html">GP()</a></code> trend models. Defaults to <code>FALSE</code></p></dd>
 
 
 <dt>n_lv</dt>
 <dd><p><code>integer</code> the number of latent dynamic factors to use if <code>use_lv == TRUE</code>.
-Cannot be <code>&gt;n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
+Cannot be <code>&gt; n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
 
 
 <dt>use_stan</dt>
 <dd><p>Logical. If <code>TRUE</code>, the model will be compiled and sampled using
 Hamiltonian Monte Carlo with a call to <code><a href="https://mc-stan.org/cmdstanr/reference/cmdstan_model.html" class="external-link">cmdstan_model</a></code> or
 a call to <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code>. Note that
-there are many more options when using <code>Stan</code> vs <code>JAGS</code> (the only "advantage" of <code>JAGS</code> is the ability
-to use a Tweedie family).</p></dd>
+there are many more options when using <code>Stan</code> vs <code>JAGS</code></p></dd>
 
 
 <dt>trend_model</dt>
@@ -151,10 +153,10 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
 <li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
 <li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
-<li><p><code>'PWlogistic</code>, <code>'PWlinear</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
+<li><p><code>'PWlogistic</code>, <code>'PWlinear'</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>For all types apart from <code><a href="GP.html">GP()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
+</ul><p>For all trend types apart from <code><a href="GP.html">GP()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
 process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
 multivariate Random Walk if <code>n_series &gt; 1</code>). See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
 
@@ -172,7 +174,8 @@ for details</p></dd>
 
 <dt>drift</dt>
 <dd><p><code>logical</code> estimate a drift parameter in the latent trend components. Useful if the latent
-trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
+trend is expected to broadly follow a non-zero slope. Only available for
+<code><a href="RW.html">RW()</a></code> and <code><a href="RW.html">AR()</a></code> trend models. Note that if the latent trend is more or less stationary,
 the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
 predictor (which it is by default when calling <code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>). Drift parameters will also likely
 be unidentifiable if using dynamic factor models. Therefore this defaults to <code>FALSE</code></p></dd>
@@ -195,7 +198,7 @@ users can also modify the parameter bounds by modifying the <code>new_lowerbound
 This will be necessary if using restrictive distributions on some parameters, such as a Beta distribution
 for the trend sd parameters for example (Beta only has support on  <code>(0,1)</code>), so the upperbound cannot
 be above <code>1</code>. Another option is to make use of the prior modification functions in <code>brms</code>
-(i.e. <code><a href="https://rdrr.io/pkg/brms/man/set_prior.html" class="external-link">prior</a></code>) to change prior distributions and bounds (just use the name of the parameter that
+(i.e. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code>) to change prior distributions and bounds (just use the name of the parameter that
 you'd like to change as the <code>class</code> argument; see examples below)</p>
     </div>
     <div class="section level2">
@@ -208,7 +211,7 @@ example)</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="mvgam.html">mvgam</a></code>, <code><a href="mvgam_formulae.html">mvgam_formulae</a></code>, <code><a href="https://rdrr.io/pkg/brms/man/set_prior.html" class="external-link">prior</a></code></p></div>
+    <div class="dont-index"><p><code><a href="mvgam.html">mvgam</a></code>, <code><a href="mvgam_formulae.html">mvgam_formulae</a></code>, <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -391,13 +394,13 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.98);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2   mu_raw ~ normal(0.45, 0.95);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.55);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.57, 0.85);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5     ar2 ~ normal(-0.58, 0.22);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.46);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.51, 0.22);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.95);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2   mu_raw ~ normal(-0.7, 0.74);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.58);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4       ar1 ~ normal(0.57, 0.7);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(0.73, 0.91);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.67);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.04, 0.12);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>

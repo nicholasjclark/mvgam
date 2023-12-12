@@ -97,7 +97,7 @@ of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). A
 the identifier <code>series</code> in this formula to specify effects that vary across time series. Instead you should use
 <code>trend</code>. This will ensure that models in which a <code>trend_map</code> is supplied will still work consistently
 (i.e. by allowing effects to vary across process models, even when some time series share the same underlying
-process model). This feature is experimental, and is only currently available for Random Walk and AR trend models.</p></dd>
+process model). This feature is only currently available for <code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="RW.html">VAR()</a></code> trend models</p></dd>
 
 
 <dt>data</dt>
@@ -124,10 +124,10 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
 <li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
 <li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
-<li><p><code>'PWlogistic</code>, <code>'PWlinear</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
+<li><p><code>'PWlogistic</code>, <code>'PWlinear'</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>For all types apart from <code><a href="GP.html">GP()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
+</ul><p>For all trend types apart from <code><a href="GP.html">GP()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
 process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
 multivariate Random Walk if <code>n_series &gt; 1</code>). See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
 
@@ -145,12 +145,13 @@ for details</p></dd>
 
 <dt>use_lv</dt>
 <dd><p><code>logical</code>. If <code>TRUE</code>, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. Defaults to <code>FALSE</code></p></dd>
+latent trends in a reduced dimension format. Only available for
+<code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="GP.html">GP()</a></code> trend models. Defaults to <code>FALSE</code></p></dd>
 
 
 <dt>n_lv</dt>
 <dd><p><code>integer</code> the number of latent dynamic factors to use if <code>use_lv == TRUE</code>.
-Cannot be <code>&gt;n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
+Cannot be <code>&gt; n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
 
 
 <dt>family</dt>
@@ -170,7 +171,7 @@ See <code><a href="mvgam_families.html">mvgam_families</a></code> for more detai
 <dt>priors</dt>
 <dd><p>An optional <code>data.frame</code> with prior
 definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
-class <code>brmsprior</code> (see. <code><a href="https://rdrr.io/pkg/brms/man/set_prior.html" class="external-link">prior</a></code> for details). See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and
+class <code>brmsprior</code> (see. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code> for details). See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and
 'Details' for more information on changing default prior distributions</p></dd>
 
 

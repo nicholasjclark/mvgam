@@ -122,7 +122,9 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
 <dd><p>A <code>character</code> string specifying the GAM observation model formula. These are exactly like the formula
 for a GLM except that smooth terms, <code>s()</code>, <code>te()</code>, <code>ti()</code>, <code>t2()</code>, as well as time-varying
 <code><a href="dynamic.html">dynamic()</a></code> terms, can be added to the right hand side
-to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).</p></dd>
+to specify that the linear predictor depends on smooth functions of predictors
+(or linear functionals of these). Details of the formula syntax used by <span class="pkg">mvgam</span>
+can be found in <code><a href="mvgam_formulae.html">mvgam_formulae</a></code></p></dd>
 
 
 <dt>trend_formula</dt>
@@ -133,14 +135,14 @@ of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). A
 the identifier <code>series</code> in this formula to specify effects that vary across time series. Instead you should use
 <code>trend</code>. This will ensure that models in which a <code>trend_map</code> is supplied will still work consistently
 (i.e. by allowing effects to vary across process models, even when some time series share the same underlying
-process model). This feature is experimental, and is only currently available for Random Walk and AR trend models.</p></dd>
+process model). This feature is only currently available for <code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="RW.html">VAR()</a></code> trend models</p></dd>
 
 
 <dt>knots</dt>
 <dd><p>An optional <code>list</code> containing user specified knot values to be used for basis construction.
 For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
 (note that the number of knots is not always just <code>k</code>). Different terms can use different numbers of knots,
-unless they share a covariate.</p></dd>
+unless they share a covariate</p></dd>
 
 
 <dt>trend_knots</dt>
@@ -208,12 +210,13 @@ See <code><a href="mvgam_families.html">mvgam_families</a></code> for more detai
 
 <dt>use_lv</dt>
 <dd><p><code>logical</code>. If <code>TRUE</code>, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. Defaults to <code>FALSE</code></p></dd>
+latent trends in a reduced dimension format. Only available for
+<code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="GP.html">GP()</a></code> trend models. Defaults to <code>FALSE</code></p></dd>
 
 
 <dt>n_lv</dt>
 <dd><p><code>integer</code> the number of latent dynamic factors to use if <code>use_lv == TRUE</code>.
-Cannot be <code>&gt;n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
+Cannot be <code>&gt; n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
 
 
 <dt>trend_map</dt>
@@ -235,17 +238,18 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
 <li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
 <li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
-<li><p><code>'PWlogistic</code>, <code>'PWlinear</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
+<li><p><code>'PWlogistic</code>, <code>'PWlinear'</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>For all types apart from <code><a href="GP.html">GP()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
+</ul><p>For all trend types apart from <code><a href="GP.html">GP()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
 process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
 multivariate Random Walk if <code>n_series &gt; 1</code>). See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
 
 
 <dt>drift</dt>
 <dd><p><code>logical</code> estimate a drift parameter in the latent trend components. Useful if the latent
-trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
+trend is expected to broadly follow a non-zero slope. Only available for
+<code><a href="RW.html">RW()</a></code> and <code><a href="RW.html">AR()</a></code> trend models. Note that if the latent trend is more or less stationary,
 the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
 predictor (which it is by default when calling <code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>). Drift parameters will also likely
 be unidentifiable if using dynamic factor models. Therefore this defaults to <code>FALSE</code></p></dd>
@@ -253,13 +257,13 @@ be unidentifiable if using dynamic factor models. Therefore this defaults to <co
 
 <dt>chains</dt>
 <dd><p><code>integer</code> specifying the number of parallel chains for the model. Ignored
-if using Variational Inference with <code>algorithm = 'meanfield'</code> or <code>algorithm = 'fullrank'</code></p></dd>
+if <code>algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')</code></p></dd>
 
 
 <dt>burnin</dt>
 <dd><p><code>integer</code> specifying the number of warmup iterations of the Markov chain to run
 to tune sampling algorithms. Ignored
-if using Variational Inference with <code>algorithm = 'meanfield'</code> or <code>algorithm = 'fullrank'</code></p></dd>
+if <code>algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')</code></p></dd>
 
 
 <dt>samples</dt>
@@ -269,7 +273,7 @@ sampling the posterior distribution</p></dd>
 
 <dt>thin</dt>
 <dd><p>Thinning interval for monitors.  Ignored
-if using Variational Inference with <code>algorithm = 'meanfield'</code> or <code>algorithm = 'fullrank'</code></p></dd>
+if <code>algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')</code></p></dd>
 
 
 <dt>parallel</dt>
@@ -288,7 +292,7 @@ up by any other means. Only available when using <code>Cmdstan</code> as the bac
 <dt>priors</dt>
 <dd><p>An optional <code>data.frame</code> with prior
 definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
-class <code>brmsprior</code> (see. <code><a href="https://rdrr.io/pkg/brms/man/set_prior.html" class="external-link">prior</a></code> for details). See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and
+class <code>brmsprior</code> (see. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code> for details). See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and
 'Details' for more information on changing default prior distributions</p></dd>
 
 
@@ -308,8 +312,7 @@ leave this set as <code>FALSE</code></p></dd>
 <dd><p>Logical. If <code>TRUE</code>, the model will be compiled and sampled using
 Hamiltonian Monte Carlo with a call to <code><a href="https://mc-stan.org/cmdstanr/reference/cmdstan_model.html" class="external-link">cmdstan_model</a></code> or
 a call to <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code>. Note that
-there are many more options when using <code>Stan</code> vs <code>JAGS</code> (the only "advantage" of <code>JAGS</code> is the ability
-to use a Tweedie family).</p></dd>
+there are many more options when using <code>Stan</code> vs <code>JAGS</code></p></dd>
 
 
 <dt>backend</dt>
@@ -317,16 +320,23 @@ to use a Tweedie family).</p></dd>
 the Stan model (if <code>use_stan = TRUE</code>). Options are "cmdstanr" (the default) or "rstan". Can be set globally
 for the current R session via the <code>"brms.backend"</code> option (see <code><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></code>). Details on
 the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
-https://mc-stan.org/cmdstanr/, respectively.</p></dd>
+https://mc-stan.org/cmdstanr/, respectively</p></dd>
 
 
 <dt>algorithm</dt>
 <dd><p>Character string naming the estimation approach to use.
 Options are <code>"sampling"</code> for MCMC (the default), <code>"meanfield"</code> for
-variational inference with independent normal distributions or
+variational inference with factorized normal distributions,
 <code>"fullrank"</code> for variational inference with a multivariate normal
-distribution. Can be set globally for the current <span style="R">R</span> session via the
-<code>"brms.algorithm"</code> option (see <code><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></code>).</p></dd>
+distribution, <code>"laplace"</code> for a Laplace approximation (only available
+when using cmdstanr as the backend) or <code>"pathfinder"</code> for the pathfinder
+algorithm (only currently available when using cmdstanr as the backend).
+Can be set globally for the current <span style="R">R</span> session via the
+<code>"brms.algorithm"</code> option (see <code><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></code>). Limited testing
+suggests that <code>"meanfield"</code> performs best out of the non-MCMC approximations for
+dynamic GAMs, possibly because of the difficulties estimating covariances among the
+many spline parameters and latent trend parameters. But rigorous testing has not
+been carried out</p></dd>
 
 
 <dt>autoformat</dt>
@@ -353,7 +363,7 @@ unless you see a warning message about divergent transitions, in which case you 
 to a value closer to <code>1</code> (e.g. from <code>0.95</code> to <code>0.99</code>, or from <code>0.99</code> to <code>0.999</code>, etc).
 The step size used by the numerical integrator is a function of <code>adapt_delta</code> in that increasing
 <code>adapt_delta</code> will result in a smaller step size and fewer divergences. Increasing <code>adapt_delta</code> will
-typically result in a slower sampler, but it will always lead to a more robust sampler.</p></dd>
+typically result in a slower sampler, but it will always lead to a more robust sampler</p></dd>
 
 
 <dt>jags_path</dt>
@@ -366,7 +376,9 @@ for modelling if <code>use_stan == FALSE</code>. If missing, the path will be re
 For <code>backend = "rstan"</code> the arguments are passed to
 <code><a href="https://mc-stan.org/rstan/reference/stanmodel-method-sampling.html" class="external-link">sampling</a></code> or <code><a href="https://mc-stan.org/rstan/reference/stanmodel-method-vb.html" class="external-link">vb</a></code>.
 For <code>backend = "cmdstanr"</code> the arguments are passed to the
-<code><a href="https://mc-stan.org/cmdstanr/reference/model-method-sample.html" class="external-link">cmdstanr::sample</a></code> or <code><a href="https://mc-stan.org/cmdstanr/reference/model-method-variational.html" class="external-link">cmdstanr::variational</a></code> method.</p></dd>
+<code><a href="https://mc-stan.org/cmdstanr/reference/model-method-sample.html" class="external-link">cmdstanr::sample</a></code>, <code><a href="https://mc-stan.org/cmdstanr/reference/model-method-variational.html" class="external-link">cmdstanr::variational</a></code>,
+<code><a href="https://mc-stan.org/cmdstanr/reference/model-method-laplace.html" class="external-link">cmdstanr::laplace</a></code> or
+<code><a href="https://mc-stan.org/cmdstanr/reference/model-method-pathfinder.html" class="external-link">cmdstanr::pathfinder</a></code> method</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -376,7 +388,8 @@ For <code>backend = "cmdstanr"</code> the arguments are passed to the
 <p>A <code>list</code> object of class <code>mvgam</code> containing model output, the text representation of the model file,
 the mgcv model output (for easily generating simulations at
 unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
-for other functions in the package. See <code><a href="mvgam-class.html">mvgam-class</a></code> for details.</p>
+for other functions in the package. See <code><a href="mvgam-class.html">mvgam-class</a></code> for details.
+Use <code>methods(class = "mvgam")</code> for an overview on available methods.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -385,7 +398,9 @@ but we do not want to rely on extrapolating from a smooth term (which can someti
 In addition, smooths can often try to wiggle excessively to capture any autocorrelation that is present in a time series,
 which exacerbates the problem of forecasting ahead. As GAMs are very naturally viewed through a Bayesian lens, and we often
 must model time series that show complex distributional features and missing data, parameters for <code>mvgam</code> models are estimated
-in a Bayesian framework using Markov Chain Monte Carlo.
+in a Bayesian framework using Markov Chain Monte Carlo by default. A general overview is provided
+in the primary vignettes: <code><a href="../articles/mvgam_overview.html">vignette("mvgam_overview")</a></code> and <code><a href="../articles/data_in_mvgam.html">vignette("data_in_mvgam")</a></code>.
+For a full list of available vignettes see <code>vignette(package = "mvgam")</code>
 <br><br><em>Formula syntax</em>: Details of the formula syntax used by <span class="pkg">mvgam</span> can be found in
 <code><a href="mvgam_formulae.html">mvgam_formulae</a></code>. Note that it is possible to supply an empty formula where
 there are no predictors or intercepts in the observation model (i.e. <code>y ~ 0</code> or <code>y ~ -1</code>).
@@ -429,7 +444,7 @@ regularized penalty priors to theoretically allow some factors to be dropped fro
 factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
 capture dependencies in the data, so it can often be advantageous to set <code>n_lv</code> to a slightly larger number. However
 larger numbers of factors do come with additional computational costs so these should be balanced as well. When using
-<code>Stan</code>, all factors are parameterised with <code>sd = 0.1</code>
+<code>Stan</code>, all factors are parameterised with fixed variance parameters
 <br><br><em>Residuals</em>: For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics
 If the fitted model is appropriate then Dunn-Smyth residuals will be standard normal in distribution and no
 autocorrelation will be evident. When a particular observation is missing, the residual is calculated by comparing independent

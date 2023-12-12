@@ -22,7 +22,9 @@ get_mvgam_priors(
 \item{formula}{A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
 for a GLM except that smooth terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying
 \code{dynamic()} terms, can be added to the right hand side
-to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).}
+to specify that the linear predictor depends on smooth functions of predictors
+(or linear functionals of these). Details of the formula syntax used by \pkg{mvgam}
+can be found in \code{\link{mvgam_formulae}}}
 
 \item{trend_formula}{An optional \code{character} string specifying the GAM process model formula. If
 supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
@@ -31,7 +33,7 @@ of the formula (i.e. a valid option would be \code{~ season + s(year)}). Also no
 the identifier \code{series} in this formula to specify effects that vary across time series. Instead you should use
 \code{trend}. This will ensure that models in which a \code{trend_map} is supplied will still work consistently
 (i.e. by allowing effects to vary across process models, even when some time series share the same underlying
-process model). This feature is experimental, and is only currently available for Random Walk and AR trend models.}
+process model). This feature is only currently available for \code{RW()}, \code{AR()} and \code{VAR()} trend models}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
@@ -58,16 +60,16 @@ Default is \code{poisson()}.
 See \code{\link{mvgam_families}} for more details}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. Defaults to \code{FALSE}}
+latent trends in a reduced dimension format. Only available for
+\code{RW()}, \code{AR()} and \code{GP()} trend models. Defaults to \code{FALSE}}
 
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
-Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
+Cannot be \code{> n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
 
 \item{use_stan}{Logical. If \code{TRUE}, the model will be compiled and sampled using
 Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or
 a call to \code{\link[rstan]{stan}}. Note that
-there are many more options when using \code{Stan} vs \code{JAGS} (the only "advantage" of \code{JAGS} is the ability
-to use a Tweedie family).}
+there are many more options when using \code{Stan} vs \code{JAGS}}
 
 \item{trend_model}{\code{character} or  \code{function} specifying the time series dynamics for the latent trend. Options are:
 \itemize{
@@ -78,11 +80,11 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{'AR2'} or \code{AR(p = 2)}
 \item \code{'AR3'} or \code{AR(p = 3)}
 \item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
-\item \verb{'PWlogistic}, \verb{'PWlinear} or \code{PW()} (only available in \code{Stan})
+\item \verb{'PWlogistic}, \code{'PWlinear'} or \code{PW()} (only available in \code{Stan})
 \item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all types apart from \code{GP()} and \code{PW()}, moving average and/or correlated
+For all trend types apart from \code{GP()} and \code{PW()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
 multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
 
@@ -96,7 +98,8 @@ data (names should perfectly match factor levels of the \code{series} variable i
 for details}
 
 \item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
-trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
+trend is expected to broadly follow a non-zero slope. Only available for
+\code{RW()} and \code{AR()} trend models. Note that if the latent trend is more or less stationary,
 the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
 predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift parameters will also likely
 be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}}

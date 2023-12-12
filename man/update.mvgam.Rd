@@ -34,7 +34,7 @@ of the formula (i.e. a valid option would be \code{~ season + s(year)}). Also no
 the identifier \code{series} in this formula to specify effects that vary across time series. Instead you should use
 \code{trend}. This will ensure that models in which a \code{trend_map} is supplied will still work consistently
 (i.e. by allowing effects to vary across process models, even when some time series share the same underlying
-process model). This feature is experimental, and is only currently available for Random Walk and AR trend models.}
+process model). This feature is only currently available for \code{RW()}, \code{AR()} and \code{VAR()} trend models}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
@@ -57,11 +57,11 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{'AR2'} or \code{AR(p = 2)}
 \item \code{'AR3'} or \code{AR(p = 3)}
 \item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
-\item \verb{'PWlogistic}, \verb{'PWlinear} or \code{PW()} (only available in \code{Stan})
+\item \verb{'PWlogistic}, \code{'PWlinear'} or \code{PW()} (only available in \code{Stan})
 \item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all types apart from \code{GP()} and \code{PW()}, moving average and/or correlated
+For all trend types apart from \code{GP()} and \code{PW()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
 multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
 
@@ -75,10 +75,11 @@ data (names should perfectly match factor levels of the \code{series} variable i
 for details}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. Defaults to \code{FALSE}}
+latent trends in a reduced dimension format. Only available for
+\code{RW()}, \code{AR()} and \code{GP()} trend models. Defaults to \code{FALSE}}
 
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
-Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
+Cannot be \code{> n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
 
 \item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
 families are:

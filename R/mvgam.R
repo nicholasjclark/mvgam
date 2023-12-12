@@ -14,7 +14,9 @@
 #'@param formula A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
 #'for a GLM except that smooth terms, `s()`, `te()`, `ti()`, `t2()`, as well as time-varying
 #'`dynamic()` terms, can be added to the right hand side
-#'to specify that the linear predictor depends on smooth functions of predictors (or linear functionals of these).
+#'to specify that the linear predictor depends on smooth functions of predictors
+#'(or linear functionals of these). Details of the formula syntax used by \pkg{mvgam}
+#'can be found in \code{\link{mvgam_formulae}}
 #'@param trend_formula An optional \code{character} string specifying the GAM process model formula. If
 #'supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
 #'separately from the observation model. Should not have a response variable specified on the left-hand side
@@ -22,11 +24,11 @@
 #'the identifier `series` in this formula to specify effects that vary across time series. Instead you should use
 #'`trend`. This will ensure that models in which a `trend_map` is supplied will still work consistently
 #'(i.e. by allowing effects to vary across process models, even when some time series share the same underlying
-#'process model). This feature is experimental, and is only currently available for Random Walk and AR trend models.
+#'process model). This feature is only currently available for `RW()`, `AR()` and `VAR()` trend models
 #'@param knots An optional \code{list} containing user specified knot values to be used for basis construction.
 #'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
 #'(note that the number of knots is not always just `k`). Different terms can use different numbers of knots,
-#'unless they share a covariate.
+#'unless they share a covariate
 #'@param trend_knots As for `knots` above, this is an optional \code{list} of knot values for smooth
 #'functions within the `trend_formula`
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
@@ -66,9 +68,10 @@
 #'Default is `poisson()`.
 #'See \code{\link{mvgam_families}} for more details
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-#'latent trends in a reduced dimension format. Defaults to \code{FALSE}
+#'latent trends in a reduced dimension format. Only available for
+#'`RW()`, `AR()` and `GP()` trend models. Defaults to \code{FALSE}
 #'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
-#'Cannot be \code{>n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}
+#'Cannot be \code{> n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}
 #'@param trend_model \code{character} or  \code{function} specifying the time series dynamics for the latent trend. Options are:
 #'\itemize{
 #'   \item `None` (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
@@ -78,11 +81,11 @@
 #'   \item `'AR2'` or `AR(p = 2)`
 #'   \item `'AR3'` or `AR(p = 3)`
 #'   \item `'VAR1'`  or `VAR()`(only available in \code{Stan})
-#'   \item `'PWlogistic`, `'PWlinear` or `PW()` (only available in \code{Stan})
+#'   \item `'PWlogistic`, `'PWlinear'` or `PW()` (only available in \code{Stan})
 #'   \item `'GP'` or `GP()` (Gaussian Process with squared exponential kernel;
 #'only available in \code{Stan})}
 #'
-#'For all types apart from `GP()` and `PW()`, moving average and/or correlated
+#'For all trend types apart from `GP()` and `PW()`, moving average and/or correlated
 #'process error terms can also be estimated (for example, `RW(cor = TRUE)` will set up a
 #'multivariate Random Walk if `n_series > 1`). See [mvgam_trends] for more details
 #'@param trend_map Optional `data.frame` specifying which series should depend on which latent
@@ -94,19 +97,20 @@
 #'data (names should perfectly match factor levels of the `series` variable in `data`). See examples
 #'for details
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
-#'trend is expected to broadly follow a non-zero slope. Note that if the latent trend is more or less stationary,
+#'trend is expected to broadly follow a non-zero slope. Only available for
+#'`RW()` and `AR()` trend models. Note that if the latent trend is more or less stationary,
 #'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
 #'predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift parameters will also likely
 #'be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}
 #'@param chains \code{integer} specifying the number of parallel chains for the model. Ignored
-#'if using Variational Inference with `algorithm = 'meanfield'` or `algorithm = 'fullrank'`
+#'if `algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')`
 #'@param burnin \code{integer} specifying the number of warmup iterations of the Markov chain to run
 #'to tune sampling algorithms. Ignored
-#'if using Variational Inference with `algorithm = 'meanfield'` or `algorithm = 'fullrank'`
+#'if `algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')`
 #'@param samples \code{integer} specifying the number of post-warmup iterations of the Markov chain to run for
 #'sampling the posterior distribution
 #'@param thin Thinning interval for monitors.  Ignored
-#'if using Variational Inference with `algorithm = 'meanfield'` or `algorithm = 'fullrank'`
+#'if `algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')`
 #'@param parallel \code{logical} specifying whether multiple cores should be used for
 #'generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to use will be
 #'\code{min(c(chains, parallel::detectCores() - 1))}
@@ -127,19 +131,25 @@
 #'@param use_stan Logical. If \code{TRUE}, the model will be compiled and sampled using
 #'Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or
 #'a call to \code{\link[rstan]{stan}}. Note that
-#'there are many more options when using `Stan` vs `JAGS` (the only "advantage" of `JAGS` is the ability
-#'to use a Tweedie family).
+#'there are many more options when using `Stan` vs `JAGS`
 #'@param backend Character string naming the package to use as the backend for fitting
 #'the Stan model (if `use_stan = TRUE`). Options are "cmdstanr" (the default) or "rstan". Can be set globally
 #'for the current R session via the \code{"brms.backend"} option (see \code{\link{options}}). Details on
 #'the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
-#'https://mc-stan.org/cmdstanr/, respectively.
+#'https://mc-stan.org/cmdstanr/, respectively
 #'@param algorithm Character string naming the estimation approach to use.
 #'  Options are \code{"sampling"} for MCMC (the default), \code{"meanfield"} for
-#'  variational inference with independent normal distributions or
+#'  variational inference with factorized normal distributions,
 #'  \code{"fullrank"} for variational inference with a multivariate normal
-#'  distribution. Can be set globally for the current \R session via the
-#'  \code{"brms.algorithm"} option (see \code{\link{options}}).
+#'  distribution, \code{"laplace"} for a Laplace approximation (only available
+#'  when using cmdstanr as the backend) or \code{"pathfinder"} for the pathfinder
+#'  algorithm (only currently available when using cmdstanr as the backend).
+#'  Can be set globally for the current \R session via the
+#'  \code{"brms.algorithm"} option (see \code{\link{options}}). Limited testing
+#'  suggests that `"meanfield"` performs best out of the non-MCMC approximations for
+#'  dynamic GAMs, possibly because of the difficulties estimating covariances among the
+#'  many spline parameters and latent trend parameters. But rigorous testing has not
+#'  been carried out
 #'@param autoformat \code{Logical}. Use the `stanc` parser to automatically format the
 #'`Stan` code and check for deprecations. Defaults to `TRUE`
 #' @param save_all_pars \code{Logical} flag to indicate if draws from all
@@ -154,20 +164,24 @@
 #'to a value closer to `1` (e.g. from `0.95` to `0.99`, or from `0.99` to `0.999`, etc).
 #'The step size used by the numerical integrator is a function of `adapt_delta` in that increasing
 #'`adapt_delta` will result in a smaller step size and fewer divergences. Increasing `adapt_delta` will
-#'typically result in a slower sampler, but it will always lead to a more robust sampler.
+#'typically result in a slower sampler, but it will always lead to a more robust sampler
 #'@param jags_path Optional character vector specifying the path to the location of the `JAGS` executable (.exe) to use
 #'for modelling if `use_stan == FALSE`. If missing, the path will be recovered from a call to \code{\link[runjags]{findjags}}
 #'@param ... Further arguments passed to Stan.
 #'For \code{backend = "rstan"} the arguments are passed to
 #'\code{\link[rstan]{sampling}} or \code{\link[rstan]{vb}}.
 #'For \code{backend = "cmdstanr"} the arguments are passed to the
-#'\code{cmdstanr::sample} or \code{cmdstanr::variational} method.
+#'\code{cmdstanr::sample}, \code{cmdstanr::variational},
+#'\code{cmdstanr::laplace} or
+#'\code{cmdstanr::pathfinder} method
 #'@details Dynamic GAMs are useful when we wish to predict future values from time series that show temporal dependence
 #'but we do not want to rely on extrapolating from a smooth term (which can sometimes lead to unpredictable and unrealistic behaviours).
 #'In addition, smooths can often try to wiggle excessively to capture any autocorrelation that is present in a time series,
 #'which exacerbates the problem of forecasting ahead. As GAMs are very naturally viewed through a Bayesian lens, and we often
 #'must model time series that show complex distributional features and missing data, parameters for `mvgam` models are estimated
-#'in a Bayesian framework using Markov Chain Monte Carlo.
+#'in a Bayesian framework using Markov Chain Monte Carlo by default. A general overview is provided
+#'in the primary vignettes: `vignette("mvgam_overview")` and `vignette("data_in_mvgam")`.
+#'For a full list of available vignettes see `vignette(package = "mvgam")`
 #'\cr
 #'\cr
 #'*Formula syntax*: Details of the formula syntax used by \pkg{mvgam} can be found in
@@ -225,7 +239,7 @@
 #'factors' variances to zero. This is done to help protect against selecting too many latent factors than are needed to
 #'capture dependencies in the data, so it can often be advantageous to set `n_lv` to a slightly larger number. However
 #'larger numbers of factors do come with additional computational costs so these should be balanced as well. When using
-#'`Stan`, all factors are parameterised with `sd = 0.1`
+#'`Stan`, all factors are parameterised with fixed variance parameters
 #'\cr
 #'\cr
 #'*Residuals*: For each series, randomized quantile (i.e. Dunn-Smyth) residuals are calculated for inspecting model diagnostics
@@ -253,6 +267,7 @@
 #'the mgcv model output (for easily generating simulations at
 #'unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
 #'for other functions in the package. See \code{\link{mvgam-class}} for details.
+#'Use `methods(class = "mvgam")` for an overview on available methods.
 #'
 #'@examples
 #'\dontrun{
@@ -1417,7 +1432,9 @@ mvgam = function(formula,
   if(use_stan){
     algorithm <- match.arg(algorithm, c('sampling',
                                         'meanfield',
-                                        'fullrank'))
+                                        'fullrank',
+                                        'pathfinder',
+                                        'laplace'))
     backend <- match.arg(backend, c('rstan',
                                     'cmdstanr'))
     fit_engine <- 'stan'
@@ -1733,7 +1750,7 @@ mvgam = function(formula,
   }
 
   # Remove lp__ from monitor params if VB is to be used
-  if(algorithm %in% c('meanfield', 'fullrank')){
+  if(algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')){
     param <- param[!param %in% 'lp__']
   }
 
@@ -1850,6 +1867,18 @@ mvgam = function(formula,
           warning('Your version of Cmdstan is < 2.24.0; some mvgam models may not work properly!')
         }
 
+        if(algorithm == 'pathfinder'){
+          if(cmdstanr::cmdstan_version() < "2.33"){
+            stop('Your version of Cmdstan is < 2.33; the "pathfinder" algorithm is not available',
+                 call. = FALSE)
+          }
+
+          if(utils::packageVersion('cmdstanr') < '0.6.1.9000'){
+            stop('Your version of cmdstanr is < 0.6.1.9000; the "pathfinder" algorithm is not available',
+                 call. = FALSE)
+          }
+        }
+
         # Prepare threading
         if(cmdstanr::cmdstan_version() >= "2.29.0"){
           if(threads > 1){
@@ -1941,11 +1970,29 @@ mvgam = function(formula,
           param <- param[!param %in% 'lp__']
           fit1 <- cmd_mod$variational(data = model_data,
                                       threads = if(threads > 1){ threads } else { NULL },
-                                      refresh = 100,
+                                      refresh = 500,
                                       output_samples = samples,
                                       algorithm = algorithm,
                                       ...)
-          }
+        }
+
+        if(algorithm %in% c('laplace')){
+          param <- param[!param %in% 'lp__']
+          fit1 <- cmd_mod$laplace(data = model_data,
+                                     threads = if(threads > 1){ threads } else { NULL },
+                                     refresh = 500,
+                                     draws = samples,
+                                     ...)
+        }
+
+        if(algorithm %in% c('pathfinder')){
+          param <- param[!param %in% 'lp__']
+          fit1 <- cmd_mod$pathfinder(data = model_data,
+                                      num_threads = if(threads > 1){ threads } else { NULL },
+                                      refresh = 500,
+                                      draws = samples,
+                                      ...)
+        }
 
         # Convert model files to stan_fit class for consistency
         if(save_all_pars){
@@ -1957,7 +2004,8 @@ mvgam = function(formula,
 
         out_gam_mod <- repair_stanfit(out_gam_mod)
 
-        if(algorithm %in% c('meanfield', 'fullrank')){
+        if(algorithm %in% c('meanfield', 'fullrank',
+                            'pathfinder', 'laplace')){
           out_gam_mod@sim$iter <- samples
           out_gam_mod@sim$thin <- 1
           out_gam_mod@stan_args[[1]]$method <- 'sampling'
@@ -1972,7 +2020,15 @@ mvgam = function(formula,
           warning('Your version of Stan is < 2.24.0; some mvgam models may not work properly!')
         }
 
+        if(algorithm == 'pathfinder'){
+          stop('The "pathfinder" algorithm is not yet available in rstan',
+               call. = FALSE)
+        }
 
+        if(algorithm == 'laplace'){
+          stop('The "laplace" algorithm is not yet available in rstan',
+               call. = FALSE)
+        }
         options(mc.cores = parallel::detectCores())
 
         # Fit the model in rstan using custom control parameters
@@ -2173,7 +2229,9 @@ mvgam = function(formula,
     # Add the posterior median coefficients
     p <- mcmc_summary(out_gam_mod, 'b',
                       variational = algorithm %in% c('meanfield',
-                                                     'fullrank'))[,c(4)]
+                                                     'fullrank',
+                                                     'pathfinder',
+                                                     'laplace'))[,c(4)]
     names(p) <- names(ss_gam$coefficients)
     ss_gam$coefficients <- p
 
@@ -2202,7 +2260,9 @@ mvgam = function(formula,
 
       p <- mcmc_summary(out_gam_mod, 'b_trend',
                         variational = algorithm %in% c('meanfield',
-                                                       'fullrank'))[,c(4)]
+                                                       'fullrank',
+                                                       'pathfinder',
+                                                       'laplace'))[,c(4)]
       names(p) <- names(trend_mgcv_model$coefficients)
       trend_mgcv_model$coefficients <- p
 
