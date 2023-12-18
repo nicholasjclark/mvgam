@@ -79,7 +79,7 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
 
   trend_test <- newdata
   trend_indicators <- vector(length = length(trend_test$time))
-  for(i in 1:length(trend_test[[1]])){
+  for(i in 1:length(trend_test$time)){
     trend_indicators[i] <- trend_map$trend[which(trend_map$series ==
                                                    trend_test$series[i])]
   }
