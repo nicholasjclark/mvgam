@@ -612,8 +612,8 @@ mvgam = function(formula,
   validate_pos_integer(samples)
   validate_pos_integer(thin)
 
-  # Check for gp and mo terms in the validated formula
-  orig_formula <- gp_terms <- mo_terms <- NULL
+  # Check for gp terms in the validated formula
+  orig_formula <- gp_terms <- NULL
   if(any(grepl('gp(', attr(terms(formula), 'term.labels'), fixed = TRUE))){
 
     # Check that there are no multidimensional gp terms
@@ -990,7 +990,10 @@ mvgam = function(formula,
                     base_model)] <- c('  ## parametric effect priors (regularised for identifiability)')
   }
 
-  # For any random effect smooths, use the non-centred parameterisation to avoid degeneracies
+  # For any random effect smooths,
+  # use the non-centred parameterisation to avoid degeneracies
+  # For monotonic smooths, need to determine which direction to place
+  # coefficient constraints
   smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
     data.frame(label = ss_gam$smooth[[x]]$label, class = class(ss_gam$smooth[[x]])[1])
   }))
@@ -1644,6 +1647,15 @@ mvgam = function(formula,
                                                    vectorised$model_file, fixed = TRUE,
                                                    value = TRUE), fixed = TRUE)))
       param <- c(param, alpha_params, rho_params)
+    }
+
+    # Update for any monotonic term updates
+    if(any(smooth_labs$class %in% c('moi.smooth', 'mod.smooth'))){
+      final_mono_updates <- add_mono_model_file(model_file = vectorised$model_file,
+                                                model_data = vectorised$model_data,
+                                                mgcv_model = ss_gam)
+      vectorised$model_file <- final_mono_updates$model_file
+      vectorised$model_data <- final_mono_updates$model_data
     }
 
     # Update for any piecewise trends

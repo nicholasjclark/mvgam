@@ -1,7 +1,7 @@
 Package: mvgam
 Title: Multivariate (Dynamic) Generalized Additive Models
-Version: 1.0.8
-Date: 2023-11-01
+Version: 1.0.9
+Date: 2023-12-21
 Authors@R:
     person("Nicholas J", "Clark", , "nicholas.j.clark1214@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-7131-3301"))
@@ -30,6 +30,7 @@ Imports:
     rstantools (>= 2.1.1),
     bayesplot (>= 1.5.0),
     ggplot2 (>= 2.0.0),
+    splines2,
     extraDistr,
     matrixStats,
     parallel,
