@@ -587,16 +587,12 @@ mvgam = function(formula,
                  jags_path,
                  ...){
 
-  # Check arguments
+  # Check data arguments
   if(missing("data") & missing("data_train")){
     stop('Argument "data" is missing with no default')
   }
-  if(!missing("data")){
-    data_train <- data
-  }
-  if(!missing("newdata")){
-    data_test <- newdata
-  }
+  if(!missing("data")) data_train <- data
+  if(!missing("newdata")) data_test <- newdata
   orig_data <- data_train
 
   # Ensure series and time variables are present
@@ -626,15 +622,13 @@ mvgam = function(formula,
     # Indices of gp() terms in formula
     gp_terms <- which_are_gp(formula)
 
-    # Extract GP attributes
+    # Extract attributes
     gp_details <- get_gp_attributes(formula)
 
     # Replace with s() terms so the correct terms are included
     # in the model.frame
     formula <- gp_to_s(formula)
-    if(!keep_intercept){
-      formula <- update(formula, . ~ . - 1)
-    }
+    if(!keep_intercept) formula <- update(formula, . ~ . - 1)
   }
 
   # Check for missing rhs in formula
@@ -650,9 +644,7 @@ mvgam = function(formula,
     drop_obs_intercept <- TRUE
   }
 
-  if(is.null(orig_formula)){
-    orig_formula <- formula
-  }
+  if(is.null(orig_formula)) orig_formula <- formula
 
   # Check for brmspriors
   if(!missing(priors)){
@@ -673,14 +665,11 @@ mvgam = function(formula,
 
   # Ensure series and time variables are present
   data_train <- validate_series_time(data_train, name = 'data')
-  if(!missing(data_test)){
-    data_test <- validate_series_time(data_test, name = 'newdata')
-  }
+  if(!missing(data_test)) data_test <- validate_series_time(data_test,
+                                                            name = 'newdata')
 
   # Lighten the final object if this is an lfo run
-  if(lfo){
-    return_model_data <- FALSE
-  }
+  if(lfo) return_model_data <- FALSE
 
   # Validate observation formula
   formula <- interpret_mvgam(formula, N = max(data_train$time))
@@ -696,12 +685,8 @@ mvgam = function(formula,
   }
 
   # Ensure fitting software can be located
-  if(!use_stan & run_model){
-    find_jags(jags_path = jags_path)
-  }
-  if(use_stan & run_model){
-    find_stan()
-  }
+  if(!use_stan & run_model) find_jags(jags_path = jags_path)
+  if(use_stan & run_model) find_stan()
 
   # Validate the family argument
   family <- validate_family(family)
@@ -730,11 +715,9 @@ mvgam = function(formula,
                      'consider dropping the intercept from the formula'),
               call. = FALSE)
     }
-  }
 
-  if(use_lv & trend_model %in% c('PWlinear', 'PWlogistic')){
-    stop('Cannot estimate piecewise trends using dynamic factors',
-         call. = FALSE)
+    if(use_lv) stop('Cannot estimate piecewise trends using dynamic factors',
+                    call. = FALSE)
   }
 
   if(use_lv & (add_ma | add_cor) & missing(trend_formula)){
@@ -930,15 +913,11 @@ mvgam = function(formula,
   # fitted gam model to speed convergence; remove initial betas so that the
   # chains can start in very different regions of the parameter space
   ss_jagam$jags.ini$b <- NULL
-
   if(length(ss_gam$sp) == length(ss_jagam$jags.ini$lambda)){
     ss_jagam$jags.ini$lambda <- ss_gam$sp
     ss_jagam$jags.ini$lambda[log(ss_jagam$jags.ini$lambda) > 10] <- exp(10)
   }
-
-  if(length(ss_gam$smooth) == 0){
-    ss_jagam$jags.ini$lambda <- NULL
-  }
+  if(length(ss_gam$smooth) == 0) ss_jagam$jags.ini$lambda <- NULL
 
   # Fill y with NAs if this is a simulation from the priors
   if(prior_simulation){
@@ -976,8 +955,7 @@ mvgam = function(formula,
     ss_jagam$jags.data$p_coefs <- coef(ss_gam)[1:n_terms]
 
     # Use the initialised GAM's estimates for parametric effects, but widen them
-    # substantially to allow for better exploration of possible alternative model
-    # configurations
+    # substantially to allow for better exploration
     beta_sims <- rmvn(100, coef(ss_gam), ss_gam$Vp)
     ss_jagam$jags.data$p_taus <- apply(as.matrix(beta_sims[,1:n_terms]),
                                        2, function(x) 1 / (sd(x) ^ 2))
@@ -990,7 +968,7 @@ mvgam = function(formula,
                     base_model)] <- c('  ## parametric effect priors (regularised for identifiability)')
   }
 
-  # For any random effect smooths, use the non-centred parameterisation to avoid degeneracies
+  # For any random effect smooths, use non-centred parameterisation to avoid degeneracies
   smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
     data.frame(label = ss_gam$smooth[[x]]$label, class = class(ss_gam$smooth[[x]])[1])
   }))
@@ -1030,7 +1008,6 @@ mvgam = function(formula,
       base_model[grep(re_smooths[i],
                       base_model, fixed = T)[smooth_number]] <- paste0('  ## prior (non-centred) for ', re_smooths[i], '...')
     }
-
   }
 
   base_model[grep('smoothing parameter priors',
@@ -1250,7 +1227,6 @@ mvgam = function(formula,
     } else{
       model_file[grep('eta <-', model_file, fixed = TRUE)] <- 'eta <- X * b'
     }
-
   }
 
   if(!missing(upper_bounds)){
@@ -1262,9 +1238,7 @@ mvgam = function(formula,
   }
 
   # Machine epsilon for minimum allowable non-zero rate
-  if(family_char == 'negative binomial'){
-    ss_jagam$jags.data$min_eps <- .Machine$double.eps
-  }
+  if(family_char == 'negative binomial') ss_jagam$jags.data$min_eps <- .Machine$double.eps
 
   # Number of latent variables to use
   if(use_lv){
@@ -1280,9 +1254,7 @@ mvgam = function(formula,
       }
   }
 
-  if(missing(upper_bounds)){
-    upper_bounds <- NULL
-  }
+  if(missing(upper_bounds)) upper_bounds <- NULL
 
   if(use_lv){
     n_lv <- ss_jagam$jags.data$n_lv
@@ -1292,9 +1264,7 @@ mvgam = function(formula,
     }
   }
 
-  if(missing(data_test)){
-    data_test <- NULL
-  }
+  if(missing(data_test)) data_test <- NULL
 
   # Remove Smooth penalty matrix if no smooths were used in the formula
   if(!smooths_included){
@@ -1518,9 +1488,7 @@ mvgam = function(formula,
 
     # If a VAR model is used, enforce stationarity using methods described by
     # Heaps 2022 (Enforcing stationarity through the prior in vector autoregressions)
-    if(use_var1){
-      vectorised$model_file <- stationarise_VAR(vectorised$model_file)
-    }
+    if(use_var1) vectorised$model_file <- stationarise_VAR(vectorised$model_file)
 
     if(use_var1cor){
       param <- c(param, 'L_Omega')
@@ -1548,9 +1516,7 @@ mvgam = function(formula,
       # If trend formula specified, add the predictors for the trend models
       if(!missing(trend_formula)){
 
-        if(missing(trend_knots)){
-          trend_knots <- missing_arg()
-        }
+        if(missing(trend_knots)) trend_knots <- missing_arg()
 
         trend_pred_setup <- add_trend_predictors(
           trend_formula = trend_formula,

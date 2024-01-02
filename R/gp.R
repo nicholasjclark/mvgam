@@ -60,17 +60,14 @@ make_gp_additions = function(gp_details, data,
     dplyr::arrange(row_id, level) %>%
     dplyr::select(-row_id) -> gp_details
 
-  # Prepare the GP objects and Stan data lines;
-  # Data updates need to happen BEFORE calling vectorise
-  # model_file modifications can happen AFTER drop_obs_intercept
-  # to ensure everything behaves predictably
+  # Prepare the GP objects and Stan data lines
   gp_covariates <- gp_details$gp_covariates
   scale <- gp_details$scale
   boundary <- gp_details$boundary
   by <- gp_details$by
   level <- gp_details$level
 
-  # Prep the covariate for GP modelling
+  # Prep the covariates for GP modelling
   gp_data <- lapply(seq_along(gp_covariates), function(x){
 
     # Find the correct k to ensure that the total number of coefficients
@@ -215,7 +212,7 @@ which_are_gp = function(formula){
   return(grep('gp(', termlabs, fixed = TRUE))
 }
 
-#' Convert gp() terms to s() terms for initial model construction#'
+#' Convert gp() terms to s() terms for initial model construction
 #' @importFrom stats drop.terms
 #' @noRd
 gp_to_s <- function(formula){
@@ -288,7 +285,6 @@ get_gp_attributes = function(formula){
 }
 
 
-#' Propagate a Hilbert basis GP
 #' Evaluate Laplacian eigenfunction for a given GP basis function
 #' @noRd
 phi = function(boundary, m, centred_covariate) {
@@ -352,7 +348,7 @@ seq_cols <- function(x) {
   seq_len(NCOL(x))
 }
 
-#' compute the mth eigen function of an approximate GP
+#' Compute the mth eigen function of an approximate GP
 #' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L289
 #' @noRd
 eigen_fun_cov_exp_quad <- function(x, m, L) {
@@ -367,7 +363,7 @@ eigen_fun_cov_exp_quad <- function(x, m, L) {
   Reduce("*", out)
 }
 
-#' compute squared differences
+#' Compute squared differences
 #' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L241
 #' @param x vector or matrix
 #' @param x_new optional vector of matrix with the same ncol as x
@@ -389,7 +385,7 @@ diff_quad <- function(x, x_new = NULL) {
   out
 }
 
-#' extended range of input data for which predictions should be made
+#' Extended range of input data for which predictions should be made
 #' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L301
 #' @noRd
 choose_L <- function(x, c) {
@@ -437,7 +433,7 @@ scale_cov <- function(data, covariate, by, level,
               Xgp_max_dist = Xgp_max_dist))
 }
 
-#' prep GP eigenfunctions
+#' Prep GP eigenfunctions
 #' @noRd
 prep_eigenfunctions = function(data,
                                covariate,
