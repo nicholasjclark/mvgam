@@ -708,7 +708,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
   if(attr(object$model_data, 'trend_model') %in% c('PWlinear', 'PWlogistic')){
     out$delta_trend <- lapply(seq_along(levels(object$obs_data$series)), function(series){
       if(object$fit_engine == 'stan'){
-        delta_estimates <- mvgam:::mcmc_chains(object$model_output, 'delta_trend')[,seq(series,
+        delta_estimates <- mcmc_chains(object$model_output, 'delta_trend')[,seq(series,
                                                                           dim(mcmc_chains(object$model_output,
                                                                                           'delta_trend'))[2],
                                                                           by = NCOL(object$ytimes))]
