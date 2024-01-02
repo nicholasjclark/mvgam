@@ -40,7 +40,6 @@
 #' \cr
 #' Ramsay, J. O. (1988). Monotone regression splines in action. Statistical Science, 3(4), 425--441.
 #' @importFrom mgcv smooth.construct
-#' @importFrom splines2 iSpline
 #' @export
 #' @author Nicholas J Clark
 #' @rdname monotonic
@@ -175,7 +174,7 @@ smooth.construct.moi.smooth.spec <- function(object, data, knots){
   boundary <- c(xl - xr * 0.01, xu + xr * 0.01)
 
   # Generate basis functions
-  i_spline_basis <- iSpline(x,
+  i_spline_basis <- splines2::iSpline(x,
                             knots = k,
                             degree = nk,
                             Boundary.knots = boundary,
@@ -266,7 +265,7 @@ smooth.construct.mod.smooth.spec <- function(object, data, knots){
   boundary <- c(xl - xr * 0.01, xu + xr * 0.01)
 
   # Generate basis functions
-  i_spline_basis <- iSpline(x,
+  i_spline_basis <- splines2::iSpline(x,
                             knots = k,
                             degree = nk,
                             Boundary.knots = boundary,

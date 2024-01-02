@@ -1021,7 +1021,6 @@ extract_series_trend_pars = function(series, samp_index, trend_pars,
 }
 
 #' Wrapper function to forecast trends
-#' @importFrom extraDistr rlaplace
 #' @noRd
 forecast_trend = function(trend_model, use_lv, trend_pars,
                           Xp_trend = NULL, betas_trend = NULL,
