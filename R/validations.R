@@ -248,6 +248,17 @@ validate_pos_integer = function(x){
     }
   }
 }
+
+#'@noRd
+validate_even <- function(x){
+  s <- substitute(x)
+  x <- base::suppressWarnings(as.numeric(x))
+  if(x %% 2 != 0) {
+    stop("Argument '", s, "'  must be an even integer",
+         call. = FALSE)
+  }
+}
+
 #'@noRd
 validate_pos_real = function(x){
   s <- substitute(x)
