@@ -33,6 +33,10 @@
 #'
 series_to_mvgam <- function(series, freq, train_prop = 0.85){
 
+  # Check for xts and lubridate packages
+  insight::check_if_installed("xts")
+  insight::check_if_installed("lubridate")
+
   # Check series format
   type <- 'wrong'
   if(is.ts(series)) {

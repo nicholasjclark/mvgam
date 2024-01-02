@@ -84,6 +84,9 @@ validate_family = function(family){
   if(family$family == 'Beta regression')
     family$family <- 'beta'
 
+  if(family$family == 'tweedie')
+    insight::check_if_installed("tweedie",
+                                reason = 'to simulate from Tweedie distributions')
   return(family)
 }
 
@@ -151,6 +154,9 @@ validate_trend_model = function(trend_model, drift = FALSE){
          call. = FALSE)
   }
 
+  if(trend_model %in% c('PWlinear', 'PWlogistic'))
+    insight::check_if_installed("extraDistr",
+                                reason = 'to simulate from piecewise trends')
   return(trend_model)
 }
 

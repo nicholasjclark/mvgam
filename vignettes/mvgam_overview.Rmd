@@ -122,8 +122,13 @@ In both trend models, $m$ is an offset parameter that controls the trend interce
 
 Sean J. Taylor and Benjamin Letham. "[Forecasting at scale.](https://www.tandfonline.com/doi/full/10.1080/00031305.2017.1380080)" *The American Statistician* 72.1 (2018): 37-45.
 
-## Example time series data
+## Regression formulae
+`mvgam` supports an observation model regression formula, built off the `mvgcv` package, as well as an optional process model regression formula. The formulae supplied to \code{\link{mvgam}} are exactly like those supplied to `glm()` except that smooth terms, `s()`,
+`te()`, `ti()` and `t2()`, time-varying effects using `dynamic()`, monotonically increasing (using `s(x, bs = 'moi')`) or decreasing splines (using `s(x, bs = 'mod')`; see `?smooth.construct.moi.smooth.spec` for details), as well as Gaussian Process functions using `gp()`, can be added to the right hand side (and `.` is not supported in `mvgam` formulae). See `?mvgam_formulae` for more guidance.
+  
+For setting up State-Space models, the ptional process model formula can be used (see \href{https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html}{the State-Space model vignette} and \href{https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html}{the shared latent states vignette} for guidance on using trend formulae).
 
+## Example time series data
 The 'portal_data' object contains time series of rodent captures from the Portal Project, [a long-term monitoring study based near the town of Portal, Arizona](https://portal.weecology.org/){target="_blank"}. Researchers have been operating a standardized set of baited traps within 24 experimental plots at this site since the 1970's. Sampling follows the lunar monthly cycle, with observations occurring on average about 28 days apart. However, missing observations do occur due to difficulties accessing the site (weather events, COVID disruptions etc..). You can read about the full sampling protocol [in this preprint by Ernest et al on the Biorxiv](https://www.biorxiv.org/content/10.1101/332783v3.full){target="_blank"}. 
 ```{r Access time series data}
 data("portal_data")

@@ -114,6 +114,8 @@
 #' }
 smooth.construct.moi.smooth.spec <- function(object, data, knots){
 
+  insight::check_if_installed("splines2")
+
   # Check arguments
   object$p.order <- 1
   if(object$bs.dim < 0)
@@ -202,6 +204,8 @@ smooth.construct.moi.smooth.spec <- function(object, data, knots){
 #' @author Nicholas J Clark
 #' @rdname monotonic
 smooth.construct.mod.smooth.spec <- function(object, data, knots){
+
+  insight::check_if_installed("splines2")
 
   # Check arguments
   object$p.order <- 1
@@ -293,6 +297,8 @@ smooth.construct.mod.smooth.spec <- function(object, data, knots){
 #' @export
 Predict.matrix.moi.smooth <- function(object, data){
 
+  insight::check_if_installed("splines2")
+
   # Ensure extrapolation is flat (1st degree penalty behaviour)
   x <- data[[object$term]]
   boundary <- object$boundary
@@ -311,6 +317,8 @@ Predict.matrix.moi.smooth <- function(object, data){
 #' @importFrom mgcv Predict.matrix
 #' @export
 Predict.matrix.mod.smooth <- function(object, data){
+
+  insight::check_if_installed("splines2")
 
   # Ensure extrapolation is flat (1st degree penalty behaviour)
   x <- data[[object$term]]

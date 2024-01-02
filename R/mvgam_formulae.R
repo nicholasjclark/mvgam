@@ -19,7 +19,7 @@
 #' \code{\link[mgcv]{ti}} and
 #' \code{\link[mgcv]{t2}},
 #' time-varying effects using \code{\link{dynamic}},
-#' monotonically increasing (using `s(x, bs = 'moi')`) or
+#' monotonically increasing (using `s(x, bs = 'moi')`)
 #' or decreasing splines (using `s(x, bs = 'mod')`;
 #' see \code{\link{smooth.construct.moi.smooth.spec}} for
 #' details), as well as

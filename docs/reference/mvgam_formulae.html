@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.9</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -72,12 +72,17 @@ the variation in the dynamic trend controls the average expectation, and/or wher
 are non-identifiable.
 <br><br>
 The formulae supplied to <code><a href="mvgam.html">mvgam</a></code> are exactly like those supplied to
-<code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm</a></code> except that smooth terms, <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></code>,
+<code><a href="https://rdrr.io/r/stats/glm.html" class="external-link">glm</a></code> except that smooth terms,
+<code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></code>,
 <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te</a></code>,
 <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti</a></code> and
 <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2</a></code>,
-time-varying effects using <code><a href="dynamic.html">dynamic</a></code>, as well as
-Gaussian Process functions using <code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp</a></code>,
+time-varying effects using <code><a href="dynamic.html">dynamic</a></code>,
+monotonically increasing (using <code>s(x, bs = 'moi')</code>) or
+or decreasing splines (using <code>s(x, bs = 'mod')</code>;
+see <code><a href="monotonic.html">smooth.construct.moi.smooth.spec</a></code> for
+details), as well as
+Gaussian Process functions using <code><a href="https://rdrr.io/pkg/brms/man/gp.html" class="external-link">gp</a></code>,
 can be added to the right hand side (and <code>.</code> is not supported in <code>mvgam</code> formulae).
 <br><br>
 Further details on specifying different kinds of smooth functions, and how to control their behaviours

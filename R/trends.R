@@ -1389,6 +1389,8 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
     }
 
     if(trend_model == 'PWlinear'){
+      insight::check_if_installed("extraDistr",
+                                  reason = 'to simulate from piecewise trends')
       trend_fc <- do.call(cbind, lapply(seq_along(trend_pars$delta_trend), function(x){
 
         # Sample forecast horizon changepoints
@@ -1423,6 +1425,8 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
     }
 
     if(trend_model == 'PWlogistic'){
+      insight::check_if_installed("extraDistr",
+                                  reason = 'to simulate from piecewise trends')
       trend_fc <- do.call(cbind, lapply(seq_along(trend_pars$delta_trend), function(x){
 
         # Sample forecast horizon changepoints
