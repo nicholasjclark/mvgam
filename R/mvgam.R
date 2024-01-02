@@ -968,14 +968,11 @@ mvgam = function(formula,
                     base_model)] <- c('  ## parametric effect priors (regularised for identifiability)')
   }
 
-<<<<<<< HEAD
   # For any random effect smooths, use non-centred parameterisation to avoid degeneracies
-=======
   # For any random effect smooths,
   # use the non-centred parameterisation to avoid degeneracies
   # For monotonic smooths, need to determine which direction to place
   # coefficient constraints
->>>>>>> 5d33eab45987d8a751ddce5f798cfc5e3bedd526
   smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
     data.frame(label = ss_gam$smooth[[x]]$label, class = class(ss_gam$smooth[[x]])[1])
   }))
