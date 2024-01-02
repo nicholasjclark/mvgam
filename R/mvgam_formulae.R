@@ -13,11 +13,15 @@
 #' \cr
 #' \cr
 #' The formulae supplied to \code{\link{mvgam}} are exactly like those supplied to
-#' \code{\link{glm}} except that smooth terms, \code{\link[mgcv]{s}},
+#' \code{\link{glm}} except that smooth terms,
+#' \code{\link[mgcv]{s}},
 #' \code{\link[mgcv]{te}},
 #' \code{\link[mgcv]{ti}} and
 #' \code{\link[mgcv]{t2}},
-#' time-varying effects using \code{\link{dynamic}}, as well as
+#' time-varying effects using \code{\link{dynamic}},
+#' monotonically increasing (using `s(x, bs = 'moi')`) or
+#' or decreasing splines (using `s(x, bs = 'mod')`; see \code{\link{monotonic}} for
+#' details), as well as
 #' Gaussian Process functions using \code{\link[brms]{gp}},
 #' can be added to the right hand side (and \code{.} is not supported in \code{mvgam} formulae).
 #' \cr
@@ -31,7 +35,8 @@
 #' \code{\link[mgcv]{jagam}},
 #' \code{\link[mgcv]{gam}},
 #' \code{\link[mgcv]{s}},
-#' \code{\link[stats]{formula}}
+#' \code{\link[stats]{formula}},
+#' \code{\link{monotonic}}
 #' @author Nicholas J Clark
 #' @name mvgam_formulae
 NULL

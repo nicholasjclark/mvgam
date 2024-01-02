@@ -2613,7 +2613,8 @@ add_trend_predictors = function(trend_formula,
       model_data <- append(model_data, idx_data)
 
       idx_lines <- c(grep('int trend_idx', trend_model_file),
-                     grep('// gp basis coefficient indices', trend_model_file))
+                     grep('// gp basis coefficient indices', trend_model_file),
+                     grep('// monotonic basis coefficient indices', trend_model_file))
       model_file[min(grep('data {', model_file, fixed = TRUE))] <-
         paste0('data {\n',
                paste(trend_model_file[idx_lines],

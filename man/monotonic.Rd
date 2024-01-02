@@ -97,6 +97,35 @@ plot_predictions(mod2,
                  points = 0.5)
 
 plot(mod2, type = 'smooth', realisations = TRUE)
+
+# 'by' terms that produce a different smooth for each level of the 'by'
+# factor are also allowed
+set.seed(123123)
+x <- runif(80) * 4 - 1
+x <- sort(x)
+
+# Two different monotonic smooths, one for each factor level
+f <- exp(4 * x) / (1 + exp(4 * x))
+f2 <- exp(3.5 * x) / (1 + exp(3 * x))
+fac <- c(rep('a', 80), rep('b', 80))
+y <- c(f + rnorm(80) * 0.1,
+       f2 + rnorm(80) * 0.2)
+plot(x, y[1:80])
+plot(x, y[81:160])
+
+# Gather all data into a data.frame, including the factor 'by' variable
+mod_data <- data.frame(y, x, fac = as.factor(fac))
+mod_data$time <- 1:NROW(mod_data)
+
+# Fit a model with different smooths per factor level
+mod <- mvgam(y ~ s(x, bs = 'moi', by = fac, k = 8),
+             data = mod_data,
+             family = gaussian())
+
+# Visualise the different monotonic functions
+plot_predictions(mod, condition = c('x', 'fac', 'fac'),
+                 points = 0.5)
+plot(mod, type = 'smooth', realisations = TRUE)
 }
 }
 \references{
