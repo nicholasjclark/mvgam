@@ -79,8 +79,8 @@ arguments.}
 
 \item{newdata}{Grid of predictor values at which we evaluate the slopes.
 \itemize{
-\item \code{NULL} (default): Unit-level slopes for each observed value in the original dataset. See \code{\link[insight:get_data]{insight::get_data()}}
-\item data frame: Unit-level slopes for each row of the \code{newdata} data frame.
+\item Warning: Please avoid modifying your dataset between fitting the model and calling a \code{marginaleffects} function. This can sometimes lead to unexpected results.
+\item \code{NULL} (default): Unit-level slopes for each observed value in the dataset (empirical distribution). The dataset is retrieved using \code{\link[insight:get_data]{insight::get_data()}}, which tries to extract data from the environment. This may produce unexpected results if the original data frame has been altered since fitting the model.
 \item \code{\link[marginaleffects:datagrid]{datagrid()}} call to specify a custom grid of regressors. For example:
 \itemize{
 \item \code{newdata = datagrid(cyl = c(4, 6))}: \code{cyl} variable equal to 4 and 6 and other regressors fixed at their means or modes.
@@ -101,8 +101,7 @@ compute contrasts or slopes. This can differ based on the model
 type, but will typically be a string such as: "response", "link", "probs",
 or "zero". When an unsupported string is entered, the model-specific list of
 acceptable values is returned in an error message. When \code{type} is \code{NULL}, the
-default value is used. This default is the first model-related row in
-the \code{marginaleffects:::type_dictionary} dataframe.}
+first entry in the error message is used by default.}
 
 \item{process_error}{\code{logical}. If \code{TRUE}, uncertainty in the latent
 process (or trend) model is incorporated in predictions}

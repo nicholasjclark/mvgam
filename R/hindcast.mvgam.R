@@ -129,8 +129,24 @@ if(series == 'all'){
       # Compute expectations as one long vector
       Xpmat <- matrix(as.vector(preds))
       attr(Xpmat, 'model.offset') <- 0
+
+      if(object$family == 'nmix'){
+        latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
+                                                                                   dim(mcmc_chains(object$model_output, 'ypred'))[2],
+                                                                                   by = NCOL(object$ytimes))][,1:last_train])
+
+        n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
+        cap <- as.vector(t(replicate(n_draws,
+                                     object$obs_data$cap[which(as.numeric(object$obs_data$series) == series)])))
+      } else {
+        latent_lambdas <- NULL
+        cap <- NULL
+      }
+
       preds <- matrix(as.vector(mvgam_predict(family = object$family,
                                               Xp = Xpmat,
+                                              latent_lambdas = latent_lambdas,
+                                              cap = cap,
                                               type = 'expected',
                                               betas = 1,
                                               family_pars = par_extracts)),
@@ -190,8 +206,25 @@ if(series == 'all'){
     })
     names(par_extracts) <- names(family_pars)
 
+    if(object$family == 'nmix'){
+      latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
+                                                                                 dim(mcmc_chains(object$model_output, 'ypred'))[2],
+                                                                                 by = NCOL(object$ytimes))])
+      cap <- object$obs_data$cap[which(as.numeric(object$obs_data$series) == series)]
+
+      n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
+      cap <- as.vector(t(replicate(n_draws,
+                                   object$obs_data$cap[which(as.numeric(object$obs_data$series) == series)])))
+
+    } else {
+      latent_lambdas <- NULL
+      cap <- NULL
+    }
+
     preds <- matrix(as.vector(mvgam_predict(family = object$family,
                                             Xp = Xpmat,
+                                            latent_lambdas = latent_lambdas,
+                                            cap = cap,
                                             type = 'expected',
                                             betas = 1,
                                             family_pars = par_extracts)),

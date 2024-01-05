@@ -689,12 +689,26 @@ mvgam = function(formula,
   if(use_stan & run_model) find_stan()
 
   # Validate the family argument
-  family <- validate_family(family)
+  family <- validate_family(family, use_stan = use_stan)
   family_char <- match.arg(arg = family$family, choices = family_char_choices())
 
   # Validate the trend arguments
   orig_trend_model <- trend_model
   trend_model <- validate_trend_model(orig_trend_model, drift = drift)
+
+  # Check for N-mixture modifications
+  add_nmix <- FALSE
+  if(family_char == 'nmix'){
+    family <- poisson(); family_char <- 'poisson'; add_nmix <- TRUE
+    if(missing(trend_formula)){
+      stop('Argument "trend_formula" required for nmix models',
+           call. = FALSE)
+    }
+    use_lv <- TRUE
+    if(orig_trend_model == 'None'){
+      trend_model <- 'RW'
+    }
+  }
 
   # Assess whether any additional moving average or correlated errors are needed
   ma_cor_adds <- ma_cor_additions(trend_model)
@@ -969,8 +983,6 @@ mvgam = function(formula,
   }
 
   # For any random effect smooths, use non-centred parameterisation to avoid degeneracies
-  # For any random effect smooths,
-  # use the non-centred parameterisation to avoid degeneracies
   # For monotonic smooths, need to determine which direction to place
   # coefficient constraints
   smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
@@ -1655,6 +1667,18 @@ mvgam = function(formula,
                                          add_ma = add_ma,
                                          add_cor = add_cor,
                                          trend_model = trend_model)
+    }
+
+    # Add updates for an N-mixture model
+    if(add_nmix){
+      nmix_additions <- add_nmixture(vectorised$model_file,
+                                     vectorised$model_data,
+                                     trend_model = orig_trend_model,
+                                     data_train,
+                                     data_test)
+      vectorised$model_file <- nmix_additions$model_file
+      vectorised$model_data <- nmix_additions$model_data
+      family <- nmix(); family_char <- 'nmix'
     }
 
     # Tidy the representation

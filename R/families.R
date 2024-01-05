@@ -10,17 +10,19 @@
 #'   \item \code{\link[stats]{Gamma}} with log-link, for non-negative real-valued data
 #'   }
 #'
-#'In addition, the following extended families from the \code{mgcv} package are supported:
+#'In addition, the following extended families from the \code{mgcv} and \code{brms} packages are supported:
 #'\itemize{
 #'   \item \code{\link[mgcv]{betar}} with logit-link, for proportional data on `(0,1)`
 #'   \item \code{\link[mgcv]{nb}} with log-link, for count data
+#'   \item \code{\link[brms]{lognormal}} with identity-link, for non-negative real-valued data
 #'   }
 #'
 #'Finally, \code{mvgam} supports the three extended families described here:
 #'\itemize{
-#'   \item \code{\link[brms]{lognormal}} with identity-link, for non-negative real-valued data
 #'   \item \code{tweedie} with log-link, for count data (power parameter `p` fixed at `1.5`)
 #'   \item `student_t()` (or \code{\link[brms]{student}}) with identity-link, for real-valued data
+#'   \item \code{nmix} with log-link, for count data with imperfect detection modeled via a
+#'   State-Space Poisson-Binomial N-Mixture model
 #'   }
 #'Note that only `poisson()`, `nb()`, and `tweedie()` are available if
 #'using `JAGS`. All families, apart from `tweedie()`, are supported if
@@ -51,12 +53,22 @@ student_t = function(link = 'identity'){
             class = c("extended.family", "family"))
 }
 
+#' @export
+nmix = function(link = 'log'){
+  linktemp <- make.link('log')
+  structure(list(family = "nmix", link = 'log', linkfun = linktemp$linkfun,
+                 linkinv = linktemp$linkinv, mu.eta = linktemp$mu.eta,
+                 valideta = linktemp$valideta),
+            class = c("extended.family", "family"))
+}
+
 #### Non-exported functions for performing family-specific tasks ####
 #' Family options in character format
 #' @noRd
 family_char_choices = function(){
   c('negative binomial',
     "poisson",
+    "nmix",
     "tweedie",
     "beta",
     "gaussian",
@@ -78,6 +90,8 @@ beta_shapes = function(mu, phi) {
 #' @param Xp A `mgcv` linear predictor matrix
 #' @param family \code{character}. The `family` slot of the model's family argument
 #' @param betas Vector of regression coefficients of length `NCOL(Xp)`
+#' @param latent_lambdas Optional vector of latent abundance estimates, only used for N-Mixture models
+#' @param cap Optional vector of latent abundance maximum capacities, only used for N-Mixture models
 #' @param type Either `link`, `expected`, `response` or `variance`
 #' @param family_pars Additional arguments for each specific observation process (i.e.
 #' overdispersion parameter if `family == "nb"`)
@@ -89,10 +103,64 @@ beta_shapes = function(mu, phi) {
 #' variance as a function of the mean
 #' @noRd
 mvgam_predict = function(Xp, family, betas,
+                         latent_lambdas,
+                         cap,
                          type = 'link',
                          family_pars,
                          density = FALSE,
                          truth = NULL){
+
+  # Poisson-Binomial N-Mixture (requires family parameter
+  # 'cap' as well as 'latent_lambdas' argument)
+  if(family == 'nmix'){
+    insight::check_if_installed("extraDistr",
+                                reason = 'to simulate from N-Mixture distributions')
+
+    # Calculate detection probability (on logit scale)
+    p <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                            betas) + attr(Xp, 'model.offset'))
+
+    # Latent mean of State vector
+    lambdas <- as.vector(latent_lambdas)
+
+    # User-specified cap on latent abundance
+    cap <- as.vector(cap)
+
+    if(type ==  'link'){
+      # 'link' predictions are expectations of the latent abundance
+      out <- lambdas
+
+      if(density){
+        out <- vector(length = length(truth))
+        for(i in seq_along(truth)){
+          ks <- truth[i]:cap[i]
+          lik_binom <- dbinom(truth, size = ks, p = p[i], log = TRUE)
+          lik_poisson <- dpois(x = ks, lambda = lambdas[i], log = TRUE)
+          loglik = lik_binom + lik_poisson
+          out[i] <- log_sum_exp(loglik)
+        }
+      }
+
+    } else if(type == 'response'){
+      xpred <- extraDistr::rtpois(n = length(lambdas),
+                                  lambda = lambdas,
+                                  b = cap)
+      out <- rbinom(length(lambdas), size = xpred, prob = p)
+
+    } else if(type == 'variance'){
+      xpred <- extraDistr::rtpois(n = length(lambdas),
+                                  lambda = lambdas,
+                                  b = cap)
+      # Variance of a Binomial distribution
+      out <- xpred * p * (1 - p)
+    } else {
+      # Expectations
+      xpred <- extraDistr::rtpois(n = length(lambdas),
+                                  lambda = lambdas,
+                                  b = cap)
+      out <- xpred * p
+    }
+  }
 
   # Gaussian observations (requires family parameter 'sigma_obs')
   if(family == 'gaussian'){
@@ -356,6 +424,8 @@ family_to_mgcvfam = function(family){
     gaussian()
   } else if(family$family == 'tweedie'){
     mgcv::Tweedie(p = 1.5, link = 'log')
+  } else if(family$family == 'nmix'){
+    poisson()
   } else {
     family
   }
@@ -377,7 +447,9 @@ family_links = function(family){
   if(family %in% c('gaussian', 'lognormal', 'student')){
     out <- 'identity'
   }
-  if(family %in% c('Gamma', 'poisson', 'negative binomial', 'tweedie')){
+  if(family %in% c('Gamma', 'poisson',
+                   'negative binomial',
+                   'tweedie', 'nmix')){
     out <- 'log'
   }
   if(family == 'beta'){
@@ -427,6 +499,9 @@ family_par_names = function(family){
   if(family == 'poisson'){
     out <- c()
   }
+  if(family == 'nmix'){
+    out <- c()
+  }
   return(out)
 }
 
@@ -452,7 +527,7 @@ family_inits = function(family, trend_model,
 
 #' Define which parameters to monitor / extract
 #' @noRd
-extract_family_pars = function(object){
+extract_family_pars = function(object, newdata = NULL){
 
   # Get names of parameters to extract
   pars_to_extract <- family_par_names(object$family)
@@ -610,7 +685,7 @@ family_prior_info = function(family, use_stan, data){
                           )))
   }
 
-  if(family == 'poisson'){
+  if(family %in% c('nmix','poisson')){
     prior_df <- NULL
   }
 

@@ -25,17 +25,19 @@ Supported mvgam families
 \item \code{\link[stats]{Gamma}} with log-link, for non-negative real-valued data
 }
 
-In addition, the following extended families from the \code{mgcv} package are supported:
+In addition, the following extended families from the \code{mgcv} and \code{brms} packages are supported:
 \itemize{
 \item \code{\link[mgcv]{betar}} with logit-link, for proportional data on \verb{(0,1)}
 \item \code{\link[mgcv]{nb}} with log-link, for count data
+\item \code{\link[brms]{lognormal}} with identity-link, for non-negative real-valued data
 }
 
 Finally, \code{mvgam} supports the three extended families described here:
 \itemize{
-\item \code{\link[brms]{lognormal}} with identity-link, for non-negative real-valued data
 \item \code{tweedie} with log-link, for count data (power parameter \code{p} fixed at \code{1.5})
 \item \code{student_t()} (or \code{\link[brms]{student}}) with identity-link, for real-valued data
+\item \code{nmix} with log-link, for count data with imperfect detection modeled via a
+State-Space Poisson-Binomial N-Mixture model
 }
 Note that only \code{poisson()}, \code{nb()}, and \code{tweedie()} are available if
 using \code{JAGS}. All families, apart from \code{tweedie()}, are supported if

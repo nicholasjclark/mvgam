@@ -304,8 +304,19 @@ fitted.mvgam <- function(object, process_error = TRUE,
     # Expectations as a vector
     Xp <- as.matrix(as.vector(mus))
     attr(Xp, 'model.offset') <- 0
+
+    if(family == 'nmix'){
+      latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend'))
+      n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
+      cap <- as.vector(t(replicate(n_draws, object$obs_data$cap)))
+    } else {
+      latent_lambdas <- NULL
+      cap <- NULL
+    }
     pred_vec <- mvgam_predict(family = family,
                               family_pars = family_extracts,
+                              latent_lambdas = latent_lambdas,
+                              cap = cap,
                               type = type,
                               Xp = Xp,
                               betas = 1)

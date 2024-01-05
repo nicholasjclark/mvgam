@@ -222,13 +222,27 @@ get_mvgam_priors = function(formula,
   data_train <- validate_obs_formula(formula, data = data_train, refit = FALSE)
 
   # Validate the family argument
-  family <- validate_family(family)
+  family <- validate_family(family, use_stan = use_stan)
   family_char <- match.arg(arg = family$family,
                            choices = family_char_choices())
 
   # Validate the trend arguments
   orig_trend_model <- trend_model
   trend_model <- validate_trend_model(orig_trend_model, drift = drift)
+
+  # Check for N-mixture modifications
+  add_nmix <- FALSE
+  if(family_char == 'nmix'){
+    family <- poisson(); family_char <- 'poisson'; add_nmix <- TRUE
+    if(missing(trend_formula)){
+      stop('Argument "trend_formula" required for nmix models',
+           call. = FALSE)
+    }
+    use_lv <- TRUE
+    if(orig_trend_model == 'None'){
+      trend_model <- 'RW'
+    }
+  }
 
   # Assess whether any additional moving average or correlated errors are needed
   ma_cor_adds <- ma_cor_additions(trend_model)
@@ -1273,7 +1287,11 @@ make_default_int = function(response, family){
   if(all(is.na(response))){
     out <- prior_string("student_t(3, 0, 3.5)",
                         class = '(Intercept)')
-  } else {
+  } else if(family$family == 'nmix'){
+    # Intercept prior in N-Mixtures applies to avg detection probability
+    out <- prior_string("normal(0, 1.5)",
+                        class = '(Intercept)')
+    } else {
     resp_dat <- data.frame(y = response[!is.na(response)])
     int_prior <- get_prior(y ~ 1,
                            data = resp_dat,

@@ -255,15 +255,29 @@ predict.mvgam = function(object, newdata,
 
   # Pre-multiply the linear predictors, including any offset and trend
   # predictions if applicable
-  all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
-                                              function(row) Xp %*% row +
-                                                attr(Xp, 'model.offset')))) +
-                              trend_predictions)
+  if(family == 'nmix'){
+    all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
+                                                function(row) Xp %*% row +
+                                                  attr(Xp, 'model.offset')))))
+    latent_lambdas <- trend_predictions
+    cap <- as.vector(t(replicate(NROW(betas),
+                                 object$obs_data$cap[which(as.numeric(object$obs_data$series) == series)])))
+  } else {
+    all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
+                                                function(row) Xp %*% row +
+                                                  attr(Xp, 'model.offset')))) +
+                                trend_predictions)
+    latent_lambdas <- NULL
+    cap <- NULL
+  }
+
   attr(all_linpreds, 'model.offset') <- 0
 
   # Calculate vectorized predictions
   predictions_vec <- mvgam_predict(family = family,
                                    Xp = all_linpreds,
+                                   latent_lambdas = latent_lambdas,
+                                   cap = cap,
                                    type = type,
                                    betas = 1,
                                    family_pars = family_extracts)

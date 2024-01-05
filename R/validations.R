@@ -58,7 +58,7 @@ validate_series_time = function(data, name = 'data'){
 }
 
 #'@noRd
-validate_family = function(family){
+validate_family = function(family, use_stan = TRUE){
   if(is.character(family)){
     if(family == 'beta')
       family <- betar()
@@ -87,6 +87,10 @@ validate_family = function(family){
   if(family$family == 'tweedie')
     insight::check_if_installed("tweedie",
                                 reason = 'to simulate from Tweedie distributions')
+
+  if(!family$family %in% c('poisson', 'negative binomial', 'tweedie') & !use_stan)
+    stop('JAGS only supports poisson(), nb() or tweedie() families',
+         call. = FALSE)
   return(family)
 }
 
