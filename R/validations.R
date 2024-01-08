@@ -260,6 +260,25 @@ validate_pos_integer = function(x){
 }
 
 #'@noRd
+validate_pos_integers = function(x){
+  s <- substitute(x)
+
+  val_pos = function(y, s){
+    y <- base::suppressWarnings(as.numeric(y))
+    if(sign(y) != 1){
+      stop("Negative values in ", s, " detected",
+           call. = FALSE)
+    } else {
+      if(y%%1 != 0){
+        stop("Non-integer values in ", s, " detected",
+             call. = FALSE)
+      }
+    }
+  }
+  res <- lapply(seq_along(x), function(i) val_pos(x[i], s))
+}
+
+#'@noRd
 validate_even <- function(x){
   s <- substitute(x)
   x <- base::suppressWarnings(as.numeric(x))

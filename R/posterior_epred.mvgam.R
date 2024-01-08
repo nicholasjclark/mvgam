@@ -306,7 +306,7 @@ fitted.mvgam <- function(object, process_error = TRUE,
     attr(Xp, 'model.offset') <- 0
 
     if(family == 'nmix'){
-      latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend'))
+      latent_lambdas <- exp(as.vector(mcmc_chains(object$model_output, 'trend')))
       n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
       cap <- as.vector(t(replicate(n_draws, object$obs_data$cap)))
     } else {

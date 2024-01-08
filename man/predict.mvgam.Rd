@@ -21,7 +21,9 @@ If \code{expected} is used, predictions reflect the expectation of the response 
 but ignore uncertainty in the observation process. When \code{response} is used,
 the predictions take uncertainty in the observation process into account to return
 predictions on the outcome scale. When \code{variance} is used, the variance of the response
-with respect to the mean (mean-variance relationship) is returned}
+with respect to the mean (mean-variance relationship) is returned. Two special cases are also allowed:
+type \code{latent_N} will return the estimated latent abundances from an N-mixture distribution,
+while type \code{detection} will return the estimated detection probability from an N-mixture distribution}
 
 \item{process_error}{Logical. If \code{TRUE} and a dynamic trend model was fit,
 expected uncertainty in the process model is accounted for by using draws

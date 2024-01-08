@@ -192,6 +192,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
             latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
                                                                                        dim(mcmc_chains(object$model_output, 'ypred'))[2],
                                                                                        by = NCOL(object$ytimes))][,1:last_train])
+            latent_lambdas <- exp(latent_lambdas)
             n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
             cap <- as.vector(t(replicate(n_draws,
                                          object$obs_data$cap[which(as.numeric(object$obs_data$series) == series)])))
@@ -272,6 +273,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
           latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
                                                                                      n_cols,
                                                                                      by = NCOL(object$ytimes))])
+          latent_lambdas <- exp(latent_lambdas)
           cap <- as.vector(t(replicate(n_draws,
                              object$obs_data$cap[which(as.numeric(object$obs_data$series) == series)])))
         } else {
@@ -360,6 +362,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
             latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
                                                                                        n_cols,
                                                                                        by = NCOL(object$ytimes))])
+            latent_lambdas <- exp(latent_lambdas)
             cap <- as.vector(t(replicate(n_draws,
                                          c(object$obs_data$cap[which(as.numeric(object$obs_data$series) == series)],
                                            object$test_data$cap[which(as.numeric(object$test_data$series) == series)]))))
@@ -421,6 +424,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
             latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
                                                                                        n_cols,
                                                                                        by = NCOL(object$ytimes))])
+            latent_lambdas <- exp(latent_lambdas)
             cap <- as.vector(t(replicate(n_draws,
                                          object$test_data$cap[which(as.numeric(object$test_data$series) == series)])))
 
@@ -508,6 +512,7 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
           latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
                                                                                      n_cols,
                                                                                      by = NCOL(object$ytimes))])
+          latent_lambdas <- exp(latent_lambdas)
           cap <- as.vector(t(replicate(n_draws,
                                        c(object$obs_data$cap[which(as.numeric(object$obs_data$series) == series)],
                                          object$test_data$cap[which(as.numeric(object$test_data$series) == series)]))))
@@ -889,7 +894,7 @@ forecast_draws = function(object,
 
           if(family == 'nmix'){
             Xpmat <- Xp[which(as.numeric(data_test$series) == series),]
-            latent_lambdas <- trend_states[, series]
+            latent_lambdas <- exp(trend_states[, series])
             pred_betas <- betas
             cap <- data_test$cap[which(as.numeric(object$obs_data$series) == series)]
           } else {
@@ -968,7 +973,7 @@ forecast_draws = function(object,
         # Generate predictions
         if(family == 'nmix'){
           Xpmat <- Xp
-          latent_lambdas <- trends
+          latent_lambdas <- exp(trends)
           pred_betas <- betas
           cap <- series_test$cap
         } else {

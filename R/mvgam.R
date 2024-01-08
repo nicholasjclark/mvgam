@@ -705,7 +705,7 @@ mvgam = function(formula,
            call. = FALSE)
     }
     use_lv <- TRUE
-    if(orig_trend_model == 'None'){
+    if(trend_model == 'None'){
       trend_model <- 'RW'
     }
   }
@@ -825,7 +825,11 @@ mvgam = function(formula,
   def_priors <- adapt_brms_priors(c(make_default_scales(orig_y,
                                                         family),
                                     make_default_int(orig_y,
-                                                     family)),
+                                                     family = if(add_nmix){
+                                                       nmix()
+                                                     } else {
+                                                       family
+                                                     })),
                                   formula = orig_formula,
                                   trend_formula = trend_formula,
                                   data = orig_data,
@@ -1673,12 +1677,13 @@ mvgam = function(formula,
     if(add_nmix){
       nmix_additions <- add_nmixture(vectorised$model_file,
                                      vectorised$model_data,
-                                     trend_model = orig_trend_model,
-                                     data_train,
-                                     data_test)
+                                     orig_trend_model = orig_trend_model,
+                                     data_train = data_train,
+                                     data_test = data_test)
       vectorised$model_file <- nmix_additions$model_file
       vectorised$model_data <- nmix_additions$model_data
       family <- nmix(); family_char <- 'nmix'
+      param <- c(param, 'detprob', 'latent_ypred')
     }
 
     # Tidy the representation

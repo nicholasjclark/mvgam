@@ -233,13 +233,13 @@ get_mvgam_priors = function(formula,
   # Check for N-mixture modifications
   add_nmix <- FALSE
   if(family_char == 'nmix'){
-    family <- poisson(); family_char <- 'poisson'; add_nmix <- TRUE
-    if(missing(trend_formula)){
-      stop('Argument "trend_formula" required for nmix models',
+    add_nmix <- TRUE
+    if(!(exists('cap', where = data_train))) {
+      stop('Max abundances must be supplied as a variable named "cap" for N-mixture models',
            call. = FALSE)
     }
     use_lv <- TRUE
-    if(orig_trend_model == 'None'){
+    if(trend_model == 'None'){
       trend_model <- 'RW'
     }
   }
@@ -295,7 +295,7 @@ get_mvgam_priors = function(formula,
     }
 
     if(!trend_model %in% c('RW', 'AR1', 'AR2', 'AR3',
-                           'VAR1', 'VAR1cor', 'VARMA1,1cor')){
+                           'VAR1', 'VAR1cor', 'VARMA1,1cor', 'None')){
       stop('only RW, AR1, AR2, AR3 and VAR trends currently supported for trend predictor models',
            call. = FALSE)
     }
@@ -437,6 +437,13 @@ get_mvgam_priors = function(formula,
       if(any(grepl('Intercept', out$param_name))){
         out <- out[-grep('Intercept', out$param_name),]
       }
+    }
+
+    # Remove sigma prior if this is an N-mixture with no dynamics
+    if(add_nmix){
+      out <- out[-grep('vector<lower=0>[n_lv] sigma;',
+                       out$param_name,
+                       fixed = TRUE),]
     }
 
   } else {

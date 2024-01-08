@@ -92,7 +92,9 @@ beta_shapes = function(mu, phi) {
 #' @param betas Vector of regression coefficients of length `NCOL(Xp)`
 #' @param latent_lambdas Optional vector of latent abundance estimates, only used for N-Mixture models
 #' @param cap Optional vector of latent abundance maximum capacities, only used for N-Mixture models
-#' @param type Either `link`, `expected`, `response` or `variance`
+#' @param type Either `link`, `expected`, `response`, `variance`,
+#' `latent_N` (only applies to N-mixture distributions) or
+#' `detection` (only applies to N-mixture distributions)
 #' @param family_pars Additional arguments for each specific observation process (i.e.
 #' overdispersion parameter if `family == "nb"`)
 #' @param density logical. Rather than calculating a prediction, evaluate the log-likelihood.
@@ -102,7 +104,9 @@ beta_shapes = function(mu, phi) {
 #' response distributions in future. Use `type = variance` for computing family-level
 #' variance as a function of the mean
 #' @noRd
-mvgam_predict = function(Xp, family, betas,
+mvgam_predict = function(Xp,
+                         family,
+                         betas,
                          latent_lambdas,
                          cap,
                          type = 'link',
@@ -110,15 +114,26 @@ mvgam_predict = function(Xp, family, betas,
                          density = FALSE,
                          truth = NULL){
 
+  if(type == 'latent_N' & family != 'nmix'){
+    stop('"latent_N" type only available for N-mixture models',
+         call. = FALSE)
+  }
+
+  if(type == 'detection' & family != 'nmix'){
+    stop('"detection" type only available for N-mixture models',
+         call. = FALSE)
+  }
+
   # Poisson-Binomial N-Mixture (requires family parameter
   # 'cap' as well as 'latent_lambdas' argument)
   if(family == 'nmix'){
     insight::check_if_installed("extraDistr",
                                 reason = 'to simulate from N-Mixture distributions')
 
-    # Calculate detection probability (on logit scale)
+    # Calculate detection probability and convert to probability scale
     p <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                             betas) + attr(Xp, 'model.offset'))
+    p <- plogis(p)
 
     # Latent mean of State vector
     lambdas <- as.vector(latent_lambdas)
@@ -126,22 +141,56 @@ mvgam_predict = function(Xp, family, betas,
     # User-specified cap on latent abundance
     cap <- as.vector(cap)
 
-    if(type ==  'link'){
+    if(type == 'detection'){
+      out <- p
+    } else if(type == 'link'){
       # 'link' predictions are expectations of the latent abundance
       out <- lambdas
 
       if(density){
         out <- vector(length = length(truth))
         for(i in seq_along(truth)){
-          ks <- truth[i]:cap[i]
-          lik_binom <- dbinom(truth, size = ks, p = p[i], log = TRUE)
-          lik_poisson <- dpois(x = ks, lambda = lambdas[i], log = TRUE)
-          loglik = lik_binom + lik_poisson
-          out[i] <- log_sum_exp(loglik)
+          if(is.na(truth[i])){
+            out[i] <- NA
+          } else {
+            ks <- truth[i]:cap[i]
+            lik_binom <- dbinom(truth[i], size = ks, p = p[i], log = TRUE)
+            lik_poisson <- dpois(x = ks, lambda = lambdas[i], log = TRUE)
+            loglik <- lik_binom + lik_poisson
+            out[i] <- log_sum_exp(loglik)
+          }
         }
       }
 
-    } else if(type == 'response'){
+    } else if(type == 'latent_N'){
+      if(missing(truth)){
+        # Type 'latent_N' returns the latent abundance
+        # estimates, ignoring detection probability if there is
+        # no 'truth' variable supplied
+        out <- extraDistr::rtpois(n = length(lambdas),
+                                  lambda = lambdas,
+                                  b = cap)
+      } else {
+        # If true observed N is supplied, we can calculate the
+        # most likely latent N given the covariates and the estimated
+        # detection probability
+        out <- vector(length = length(truth))
+        for(i in seq_along(truth)){
+          if(is.na(truth[i])){
+            out[i] <- NA
+          } else {
+            ks <- truth[i]:cap[i]
+            lik_binom <- dbinom(truth[i], size = ks, p = p[i], log = TRUE)
+            lik_poisson <- dpois(x = ks, lambda = lambdas[i], log = TRUE)
+            loglik <- lik_binom + lik_poisson
+            lik <- exp(loglik)
+            probs <- lik / sum(lik)
+            out[i] <- sample(x = ks, size = 1, prob = probs)
+          }
+        }
+      }
+
+      } else if(type == 'response'){
       xpred <- extraDistr::rtpois(n = length(lambdas),
                                   lambda = lambdas,
                                   b = cap)
@@ -499,9 +548,11 @@ family_par_names = function(family){
   if(family == 'poisson'){
     out <- c()
   }
+
   if(family == 'nmix'){
     out <- c()
   }
+
   return(out)
 }
 
@@ -694,6 +745,34 @@ family_prior_info = function(family, use_stan, data){
 
 #' Family-specific Dunn-Smyth residual functions
 #' @noRd
+ds_resids_nmix = function(truth, fitted, draw,
+                          p, N){
+  na_obs <- is.na(truth)
+  a_obs <- pbinom(ifelse(as.vector(truth[!na_obs]) - 1.e-6 > 0,
+                         as.vector(truth[!na_obs]) - 1.e-6,
+                         0),
+                 size = N[!na_obs],
+                 prob = p[!na_obs])
+  b_obs <- pbinom(as.vector(truth[!na_obs]),
+                  size = N[!na_obs],
+                  prob = p[!na_obs])
+  u_obs <- runif(n = length(draw[!na_obs]),
+                 min = pmin(a_obs, b_obs),
+                 max = pmax(a_obs, b_obs))
+
+  if(any(is.na(truth))){
+    u <- vector(length = length(truth))
+    u[na_obs] <- NaN
+    u[!na_obs] <- u_obs
+  } else {
+    u <- u_obs
+  }
+  dsres_out <- qnorm(u)
+  dsres_out[is.infinite(dsres_out)] <- NaN
+  dsres_out
+}
+
+#' @noRd
 ds_resids_nb = function(truth, fitted, draw, size){
   na_obs <- is.na(truth)
 
@@ -842,7 +921,7 @@ ds_resids_gamma = function(truth, fitted, shape, draw){
   a_obs <- pgamma(as.vector(truth[!na_obs]) - 1.e-6,
                   shape = shape[!na_obs],
                   rate = shape[!na_obs] / fitted[!na_obs])
-  b_obs <- pgamma(as.vector(truth[!na_obs]) - 1.e-6,
+  b_obs <- pgamma(as.vector(truth[!na_obs]),
                   shape = shape[!na_obs],
                   rate = shape[!na_obs] / fitted[!na_obs])
   u_obs <- runif(n = length(draw[!na_obs]),
@@ -899,7 +978,7 @@ get_forecast_resids = function(object, series, truth, preds, family,
   }
 
   if(family == 'negative binomial'){
-    size <- mcmc_chains(object$model_output, 'phi')[,series]
+    size <- mcmc_chains(object$model_output, 'phi')
     series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_nb(truth = truth,
                                     fitted = preds[x, ],
@@ -909,7 +988,7 @@ get_forecast_resids = function(object, series, truth, preds, family,
   }
 
   if(family == 'gaussian'){
-    sigma <- mcmc_chains(object$model_output, 'sigma_obs')[,series]
+    sigma <- mcmc_chains(object$model_output, 'sigma_obs')
     series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_gaus(truth = truth,
                                     fitted = preds[x, ],
@@ -919,7 +998,7 @@ get_forecast_resids = function(object, series, truth, preds, family,
   }
 
   if(family == 'lognormal'){
-    sigma <- mcmc_chains(object$model_output, 'sigma_obs')[,series]
+    sigma <- mcmc_chains(object$model_output, 'sigma_obs')
     series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_lnorm(truth = truth,
                                       fitted = preds[x, ],
@@ -929,8 +1008,8 @@ get_forecast_resids = function(object, series, truth, preds, family,
   }
 
   if(family == 'student'){
-    sigma <- mcmc_chains(object$model_output, 'sigma_obs')[,series]
-    nu <- mcmc_chains(object$model_output, 'nu')[,series]
+    sigma <- mcmc_chains(object$model_output, 'sigma_obs')
+    nu <- mcmc_chains(object$model_output, 'nu')
     series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_student(truth = truth,
                                        fitted = preds[x, ],
@@ -941,7 +1020,7 @@ get_forecast_resids = function(object, series, truth, preds, family,
   }
 
   if(family == 'beta'){
-    precision <- mcmc_chains(object$model_output, 'phi')[,series]
+    precision <- mcmc_chains(object$model_output, 'phi')
     series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_beta(truth = truth,
                                        fitted = preds[x, ],
@@ -951,7 +1030,7 @@ get_forecast_resids = function(object, series, truth, preds, family,
   }
 
   if(family == 'Gamma'){
-    shapes <- mcmc_chains(object$model_output, 'shape')[,series]
+    shapes <- mcmc_chains(object$model_output, 'shape')
     series_residuals <- do.call(rbind, lapply(sample_seq, function(x){
       suppressWarnings(ds_resids_gamma(truth = truth,
                                       fitted = preds[x, ],
@@ -983,19 +1062,15 @@ get_forecast_resids = function(object, series, truth, preds, family,
 get_mvgam_resids = function(object, n_cores = 1){
 
   # Check arguments
-  if(sign(n_cores) != 1){
-    stop('argument "n_cores" must be a positive integer',
-         call. = FALSE)
-  } else {
-    if(n_cores%%1 != 0){
-      stop('argument "n_cores" must be a positive integer',
-           call. = FALSE)
-    }
-  }
+  validate_pos_integer(n_cores)
 
   # Extract necessary model elements; for Stan models, expectations are
   # stored on the link scale
   preds <- hindcast(object, type = 'expected')
+  if(object$family == 'nmix'){
+    p <- mcmc_chains(object$model_output, 'detprob')
+    N <- mcmc_chains(object$model_output, 'latent_ypred')
+  }
   n_series <- NCOL(object$ytimes)
   obs_series <- object$obs_data$series
   series_levels <- levels(obs_series)
@@ -1037,6 +1112,11 @@ get_mvgam_resids = function(object, n_cores = 1){
     # (not the out of sample predictions, if any were computed in the model)
     preds <- preds[,1:length(truth)]
 
+    if(family == 'nmix'){
+      N <- N[,1:length(truth)]
+      p <- p[,1:length(truth)]
+    }
+
     # Create a truth matrix for vectorised residual computation
     truth_mat <- matrix(rep(truth, NROW(preds)),
                         nrow = NROW(preds),
@@ -1051,6 +1131,15 @@ get_mvgam_resids = function(object, n_cores = 1){
                                       fitted = as.vector(preds),
                                       draw = as.vector(preds[draw_seq,]),
                                       sigma = as.vector(sigma_mat)),
+                       nrow = NROW(preds))
+    }
+
+    if(family == 'nmix'){
+      resids <- matrix(ds_resids_nmix(truth = as.vector(truth_mat),
+                                      fitted = as.vector(preds),
+                                      draw = as.vector(preds[draw_seq,]),
+                                      N = as.vector(N),
+                                      p = as.vector(p)),
                        nrow = NROW(preds))
     }
 

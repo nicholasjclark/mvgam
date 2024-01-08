@@ -6,9 +6,221 @@ add_nmixture = function(model_file,
                         data_test = NULL,
                         orig_trend_model){
 
-  # Check that 'cap' is in data_train and data_test
-  # Perform necessary checks on 'cap' (Positive integer, no missing values)
+  if(inherits(orig_trend_model, 'mvgam_trend')){
+    orig_trend_model <- orig_trend_model$trend_model
+  }
+
+  #### Perform necessary checks on 'cap' (positive integers, no missing values) ####
+  if(!(exists('cap', where = data_train))) {
+    stop('Max abundances must be supplied as a variable named "cap" for N-mixture models',
+         call. = FALSE)
+  }
+  cap <- data_train$cap
+  if(!is.null(data_test)){
+    if(!(exists('cap', where = data_test))) {
+      stop('Max abundances must be supplied in test data as a variable named "cap" for N-mixture models',
+           call. = FALSE)
+    }
+    cap <- c(cap, data_test$cap)
+  }
+
+  validate_pos_integers(cap)
+
+  if(any(is.na(cap)) | any(is.infinite(cap))){
+    stop(paste0('Missing or infinite values found for some "cap" terms'),
+         call. = FALSE)
+  }
+
+  model_data$cap <- as.vector(cap)[which(as.vector(model_data$y_observed) == 1)]
+
+  #### Update the model file appropriately ####
   # If orig_trend_model is 'None', this will be set up as a RW model so need
   # to remove sigma and change the process model lines
+  if(orig_trend_model == 'None'){
+    # Replace Random Walk trends with no dynamic trend
+    start_replace <- grep('LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);',
+                          model_file, fixed = TRUE) - 1
+    end_replace <- grep('LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]] + LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]], sigma[j]);',
+                        model_file, fixed = TRUE) + 2
+    model_file <- model_file[-c(start_replace:end_replace)]
+    model_file[grep('trend_mus = X_trend * b_trend;',
+                    model_file,
+                    fixed = TRUE)] <- paste0('trend_mus = X_trend * b_trend;',
+                                             '\n',
+                                             'for(j in 1:n_lv){\n',
+                                             'LV[1:n, j] = trend_mus[ytimes_trend[1:n, j]];\n',
+                                             '}\n')
+    model_file <- readLines(textConnection(model_file), n = -1)
 
+    # Remove sigma and penalty parameters
+    start_replace <- grep('// latent state SD terms',
+                          model_file, fixed = TRUE)
+    end_replace <- start_replace + 1
+    model_file <- model_file[-c(start_replace:end_replace)]
+    model_file <- model_file[-grep('vector[n_lv] penalty;',
+                                   model_file, fixed = TRUE)]
+    model_file <- model_file[-grep('penalty = 1.0 / (sigma .* sigma);',
+                                   model_file, fixed = TRUE)]
+    model_file <- model_file[-c(grep('// priors for latent state SD parameters',
+                                     model_file, fixed = TRUE),
+                                grep('// priors for latent state SD parameters',
+                                     model_file, fixed = TRUE) + 1)]
+
+    # LV has to be declared in transformed params, not params
+    model_file <- model_file[-c(grep('matrix[n, n_lv] LV;',
+                                     model_file, fixed = TRUE) - 1,
+                                grep('matrix[n, n_lv] LV;',
+                                     model_file, fixed = TRUE))]
+
+    model_file[grep("transformed parameters {", model_file, fixed = TRUE)] <-
+      paste0("transformed parameters {\n",
+             "// latent states\n",
+             "matrix[n, n_lv] LV;\n")
+  }
+
+  # Add functions for N-mixtures
+  if(any(grepl('functions {', model_file, fixed = TRUE))){
+    model_file[grep('functions {', model_file, fixed = TRUE)] <-
+      paste0('functions {\n',
+             '/* Functions to return the log probability of a Poisson Binomial Mixture */\n',
+             '/* see Bollen et al 2023 for details (https://doi.org/10.1002/ece3.10595)*/\n',
+             'real poisbin_lpmf(int count, int k, real lambda, real p) {\n',
+             'if (count > k) {\n',
+             'return negative_infinity();\n',
+             '}\n',
+             'return poisson_log_lpmf(k | lambda) + binomial_logit_lpmf(count | k, p);\n',
+             '}\n',
+             'vector pb_logp(int count, int max_k,\n',
+             'real lambda, real p) {\n',
+             'vector[max_k + 1] lp;\n',
+             'for (k in 0:(count - 1))\n',
+             'lp[k + 1] = negative_infinity();\n',
+             'for (k in count:max_k)\n',
+             'lp[k + 1] = poisbin_lpmf(count | k, lambda, p);\n',
+             'return lp;\n',
+             '}\n',
+             'real pb_lpmf(int count, int max_k,\n',
+             'real lambda, real p) {\n',
+             'vector[max_k + 1] lp;\n',
+             'lp = pb_logp(count, max_k, lambda, p);\n',
+             'return log_sum_exp(lp);\n',
+             '}\n',
+             '/* Function to generated truncated Poisson variates */\n',
+             'int trunc_pois_rng(int count, int max_k,\n',
+             'real lambda, real p) {\n',
+             'vector[max_k + 1] lp;\n',
+             'lp = pb_logp(count, max_k, lambda, p);\n',
+             'return categorical_rng(softmax(lp)) - 1;\n',
+             '}\n')
+  } else {
+    model_file[grep('Stan model code', model_file)] <-
+      paste0('// Stan model code generated by package mvgam\n',
+             'functions {\n',
+             '/* Functions to return the log probability of a Poisson Binomial Mixture */\n',
+             '/* see Bollen et al 2023 for details (https://doi.org/10.1002/ece3.10595)*/\n',
+             'real poisbin_lpmf(int count, int k, real lambda, real p) {\n',
+             'if (count > k) {\n',
+             'return negative_infinity();\n',
+             '}\n',
+             'return poisson_log_lpmf(k | lambda) + binomial_logit_lpmf(count | k, p);\n',
+             '}\n',
+             'vector pb_logp(int count, int max_k,\n',
+             'real lambda, real p) {\n',
+             'vector[max_k + 1] lp;\n',
+             'for (k in 0:(count - 1))\n',
+             'lp[k + 1] = negative_infinity();\n',
+             'for (k in count:max_k)\n',
+             'lp[k + 1] = poisbin_lpmf(count | k, lambda, p);\n',
+             'return lp;\n',
+             '}\n',
+             'real pb_lpmf(int count, int max_k,\n',
+             'real lambda, real p) {\n',
+             'vector[max_k + 1] lp;\n',
+             'lp = pb_logp(count, max_k, lambda, p);\n',
+             'return log_sum_exp(lp);\n',
+             '}\n',
+             '/* Function to generated truncated Poisson variates */\n',
+             'int trunc_pois_rng(int count, int max_k,\n',
+             'real lambda, real p) {\n',
+             'vector[max_k + 1] lp;\n',
+             'lp = pb_logp(count, max_k, lambda, p);\n',
+             'return categorical_rng(softmax(lp)) - 1;\n',
+             '}\n}\n')
+  }
+  model_file <- readLines(textConnection(model_file), n = -1)
+
+  # Update the data block
+  model_file[grep('int<lower=0> n_nonmissing; // number of nonmissing observations', model_file, fixed = TRUE)] <-
+    paste0("int<lower=0> n_nonmissing; // number of nonmissing observations\n",
+           "int<lower=0> cap[n_nonmissing]; // upper limits of latent abundances\n")
+  model_file <- readLines(textConnection(model_file), n = -1)
+
+  # Update the transformed parameters block
+  model_file[grep("transformed parameters {", model_file, fixed = TRUE)] <-
+    paste0("transformed parameters {\n",
+           "// detection probability\n",
+           "vector[total_obs] p;\n")
+
+  model_file[grep('// latent process linear predictors',
+                  model_file, fixed = TRUE)] <- paste0('// detection probability\n',
+                                                       'p = X * b;\n\n',
+                                                       '// latent process linear predictors')
+  model_file <- readLines(textConnection(model_file), n = -1)
+
+  # Update the model block
+  model_file[grep('vector[n_nonmissing] flat_trends;',
+                  model_file, fixed = TRUE)] <- paste0('vector[n_nonmissing] flat_trends;\n',
+                                                       'vector[n_nonmissing] flat_ps;')
+  model_file <- readLines(textConnection(model_file), n = -1)
+
+  model_file[grep('flat_trends = (to_vector(trend))[obs_ind];',
+                  model_file, fixed = TRUE)] <- paste0('flat_trends = (to_vector(trend))[obs_ind];\n',
+                                                       'flat_ps = p[obs_ind];')
+  model_file <- readLines(textConnection(model_file), n = -1)
+
+  model_file[grep('flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends),',
+                  model_file, fixed = TRUE)] <- paste0('for (i in 1:n_nonmissing){\n',
+                                                       'target += pb_lpmf(flat_ys[i] | cap[i], flat_trends[i], p[i]);\n',
+                                                       '}')
+  model_file <- model_file[-grep('0.0,append_row(b, 1.0));',
+                                 model_file, fixed = TRUE)]
+  model_file <- readLines(textConnection(model_file), n = -1)
+
+  # Update the generated quantities block
+  model_file[grep('array[n, n_series] int ypred;',
+                  model_file, fixed = TRUE)] <- paste0('array[n, n_series] int ypred;\n',
+                                                       'array[n, n_series] int latent_ypred;\n',
+                                                       'array[total_obs] int latent_truncpred;\n',
+                                                       'vector[total_obs] flattrend;\n',
+                                                       'vector[total_obs] detprob;\n',
+                                                       'detprob = inv_logit(p);')
+  model_file <- readLines(textConnection(model_file), n = -1)
+
+  model_file <- model_file[-grep('ypred[1:n, s] = poisson_log_rng(mus[1:n, s]);',
+                                 model_file, fixed = TRUE)]
+  model_file[grep('eta = X * b;',
+                   model_file, fixed = TRUE)] <-
+    paste0('eta = X * b;\n',
+           'flattrend = to_vector(trend);\n',
+           'for(i in 1:total_obs){\n',
+           'latent_truncpred[i] = trunc_pois_rng(0, cap[i], flattrend[i], p[i]);\n',
+           '}\n',
+           'for(i in obs_ind){\n',
+           'latent_truncpred[i] = trunc_pois_rng(flat_ys[i], cap[i], flattrend[i], p[i]);\n',
+           '}')
+
+  model_file[grep('mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];',
+                  model_file, fixed = TRUE)] <- paste0('// true latent abundance\n',
+                                                       'latent_ypred[1:n, s] = latent_truncpred[ytimes[1:n, s]];\n',
+                                                       '// observed abundance\n',
+                                                       'ypred[1:n, s] = binomial_rng(latent_ypred[1:n, s], detprob[ytimes[1:n, s]]);\n',
+                                                       '// expected values\n',
+                                                       'for(i in 1:n){\n',
+                                                       'mus[i, s] = detprob[ytimes[i, s]] * latent_ypred[i, s];\n',
+                                                       '}')
+  model_file <- readLines(textConnection(model_file), n = -1)
+
+  #### Return ####
+  return(list(model_file = model_file,
+              model_data = model_data))
 }
