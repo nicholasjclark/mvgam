@@ -678,7 +678,8 @@ if(!is.null(object$trend_call)){
 
       } else {
         gam_sig_table <- gam_sig_table[!rownames(gam_sig_table) %in%
-                                         gsub('gp(', 's(', gp_names, fixed = TRUE),drop = FALSE]
+                                         gsub('gp(', 's(', gp_names, fixed = TRUE),,
+                                       drop = FALSE]
 
         cat("\nApproximate significance of GAM process smooths:\n")
         suppressWarnings(printCoefmat(gam_sig_table,
