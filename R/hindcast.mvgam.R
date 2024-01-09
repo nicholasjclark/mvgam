@@ -133,6 +133,11 @@ if(series == 'all'){
       attr(Xpmat, 'model.offset') <- 0
 
       if(object$family == 'nmix'){
+        if(type != 'expected'){
+          preds <- mcmc_chains(object$model_output, 'detprob')[,object$ytimes[1:last_train, series]]
+          Xpmat <- matrix(qlogis(as.vector(preds)))
+          attr(Xpmat, 'model.offset') <- 0
+        }
         latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
                                                                                    dim(mcmc_chains(object$model_output, 'ypred'))[2],
                                                                                    by = NCOL(object$ytimes))][,1:last_train])
@@ -146,14 +151,21 @@ if(series == 'all'){
         cap <- NULL
       }
 
-      preds <- matrix(as.vector(mvgam_predict(family = object$family,
-                                              Xp = Xpmat,
-                                              latent_lambdas = latent_lambdas,
-                                              cap = cap,
-                                              type = type,
-                                              betas = 1,
-                                              family_pars = par_extracts)),
-                      nrow = NROW(preds))
+      if(type == 'latent_N'){
+        preds <- mcmc_chains(object$model_output, 'latent_ypred')[,seq(series,
+                                                                       dim(mcmc_chains(object$model_output, 'ypred'))[2],
+                                                                       by = NCOL(object$ytimes))][,1:last_train]
+      } else {
+        preds <- matrix(as.vector(mvgam_predict(family = object$family,
+                                                Xp = Xpmat,
+                                                latent_lambdas = latent_lambdas,
+                                                cap = cap,
+                                                type = type,
+                                                betas = 1,
+                                                family_pars = par_extracts)),
+                        nrow = NROW(preds))
+      }
+
     }
 
     preds
@@ -212,6 +224,12 @@ if(series == 'all'){
     names(par_extracts) <- names(family_pars)
 
     if(object$family == 'nmix'){
+      if(type != 'expected'){
+        preds <- mcmc_chains(object$model_output, 'detprob')[,object$ytimes[, series]]
+        Xpmat <- matrix(qlogis(as.vector(preds)))
+        attr(Xpmat, 'model.offset') <- 0
+      }
+
       latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
                                                                                  dim(mcmc_chains(object$model_output, 'ypred'))[2],
                                                                                  by = NCOL(object$ytimes))])
@@ -227,6 +245,11 @@ if(series == 'all'){
       cap <- NULL
     }
 
+    if(type == 'latent_N'){
+      preds <- mcmc_chains(object$model_output, 'latent_ypred')[,seq(series,
+                                                                     dim(mcmc_chains(object$model_output, 'ypred'))[2],
+                                                                     by = NCOL(object$ytimes))]
+    } else {
     preds <- matrix(as.vector(mvgam_predict(family = object$family,
                                             Xp = Xpmat,
                                             latent_lambdas = latent_lambdas,
@@ -235,6 +258,7 @@ if(series == 'all'){
                                             betas = 1,
                                             family_pars = par_extracts)),
                     nrow = NROW(preds))
+    }
   }
 
   # Extract hindcasts

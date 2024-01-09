@@ -152,6 +152,8 @@ logLik.mvgam = function(object,
   attr(Xp, 'model.offset') <- 0
 
   if(family == 'nmix'){
+    Xp <- as.matrix(qlogis(as.vector(mcmc_chains(object$model_output, 'detprob'))))
+    attr(Xp, 'model.offset') <- 0
     latent_lambdas <- exp(as.vector(mcmc_chains(object$model_output, 'trend')))
     n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
     cap <- as.vector(t(replicate(n_draws, all_dat$cap)))

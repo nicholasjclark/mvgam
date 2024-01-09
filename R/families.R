@@ -164,9 +164,6 @@ mvgam_predict = function(Xp,
 
     } else if(type == 'latent_N'){
       if(missing(truth)){
-        # Type 'latent_N' returns the latent abundance
-        # estimates, ignoring detection probability if there is
-        # no 'truth' variable supplied
         out <- extraDistr::rtpois(n = length(lambdas),
                                   lambda = lambdas,
                                   b = cap)
@@ -189,8 +186,7 @@ mvgam_predict = function(Xp,
           }
         }
       }
-
-      } else if(type == 'response'){
+    } else if(type == 'response'){
       xpred <- extraDistr::rtpois(n = length(lambdas),
                                   lambda = lambdas,
                                   b = cap)

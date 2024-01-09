@@ -538,6 +538,30 @@ plot.mvgam_forecast = function(x, series = 1,
     ylim <- range(cred)
   }
 
+  if(type == 'detection'){
+    if(missing(ylab)){
+      ylab <- paste0('Pr(detection) for ', s_name)
+    }
+    if(missing(ylim)){
+      ylim <- c(min(cred),
+                max(cred) * 1.1)
+      ylim <- c(max(0, ylim[1]),
+                min(1, ylim[2]))
+    }
+  }
+
+  if(type == 'latent_N'){
+    if(missing(ylab)){
+      ylab <- paste0('Latent abundance for ', s_name)
+    }
+    if(missing(ylim)){
+      ylim <- c(min(cred),
+                max(cred) * 1.1)
+      ylim <- c(max(0, ylim[1]),
+                ylim[2])
+    }
+  }
+
   if(type == 'response'){
 
     if(missing(ylim)){
