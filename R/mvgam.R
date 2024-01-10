@@ -1169,17 +1169,22 @@ mvgam = function(formula,
 
     } else {
 
-    X$index..time..index <- rbind(data_train, data_test[,1:NCOL(data_train)]) %>%
-      dplyr::left_join(rbind(data_train, data_test[,1:NCOL(data_train)]) %>%
-                         dplyr::select(time) %>%
-                         dplyr::distinct() %>%
-                         dplyr::arrange(time) %>%
-                         dplyr::mutate(time = dplyr::row_number()),
-                       by = c('time')) %>%
-      dplyr::pull(time)
+      if(NCOL(data_train) != NCOL(data_test)){
+        stop('"data" and "newdata" have different numbers of columns',
+             call. = FALSE)
+      }
+
+      X$index..time..index <- dplyr::bind_rows(data_train, data_test) %>%
+        dplyr::left_join(dplyr::bind_rows(data_train, data_test) %>%
+                           dplyr::select(time) %>%
+                           dplyr::distinct() %>%
+                           dplyr::arrange(time) %>%
+                           dplyr::mutate(time = dplyr::row_number()),
+                         by = c('time')) %>%
+        dplyr::pull(time)
 
     # Add a series identifier variable
-    X$series <- as.numeric(rbind(data_train, data_test)$series)
+    X$series <- as.numeric(dplyr::bind_rows(data_train, data_test)$series)
 
     # Add an outcome variable
     X$outcome <- c(data_train$y, rep(NA, NROW(data_test)))
@@ -1551,6 +1556,7 @@ mvgam = function(formula,
           },
           model_file = vectorised$model_file,
           model_data = vectorised$model_data,
+          nmix = add_nmix,
           drift = drift)
 
         vectorised$model_file <- trend_pred_setup$model_file

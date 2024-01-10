@@ -115,7 +115,7 @@ validate_family_resrictions = function(response, family){
   if(family$family %in%  c('poisson', 'negative binomial',
                            'tweedie')){
     if(any(response < 0)){
-      stop(paste0('Values < 0 not allowed for ', family$family, ' responses'),
+      stop(paste0('Values < 0 not allowed for count family responses'),
            call. = FALSE)
     }
   }

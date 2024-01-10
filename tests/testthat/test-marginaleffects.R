@@ -21,12 +21,16 @@ test_that("get_predict gives expected output structure", {
 test_that("averages give expected output structures", {
   ems <- avg_predictions(gaus_ar1)
   expect_equal(NROW(ems), 1)
+  expect_true(all(c("estimate", "conf.low", "conf.high") %in% colnames(ems)))
 
   ems <- avg_predictions(gaus_ar1, variables = list(season = c(1, 6, 12)))
   expect_equal(NROW(ems), 3)
+  expect_true(all(c("season", "estimate",
+                    "conf.low", "conf.high") %in% colnames(ems)))
 
   ems <- predictions(gaus_ar1, by = 'series')
   expect_equal(NROW(ems), 3)
+
 })
 
 

@@ -338,9 +338,13 @@ get_mvgam_priors = function(formula,
                                         fixed = TRUE),
                                    collapse = " "))
 
-    # Drop any intercept from the formula
-    if(attr(terms(trend_formula), 'intercept') == 1){
-      trend_formula <- update(trend_formula, trend_y  ~ . -1)
+    # Drop any intercept from the formula if this is not an N-mixture model
+    if(family_char != 'nmix'){
+      if(attr(terms(trend_formula), 'intercept') == 1){
+        trend_formula <- update(trend_formula, trend_y  ~ . -1)
+      } else {
+        trend_formula <- update(trend_formula, trend_y  ~ .)
+      }
     } else {
       trend_formula <- update(trend_formula, trend_y  ~ .)
     }
@@ -388,7 +392,7 @@ get_mvgam_priors = function(formula,
     # Modify some of the term names and return
     if(any(grepl('fixed effect', trend_prior_df$param_info))){
       para_lines <- grep('fixed effect', trend_prior_df$param_info)
-      for(i in seq_along(para_lines)){
+      for(i in para_lines){
         trend_prior_df$param_name[i] <- paste0(trend_prior_df$param_name[i], '_trend')
         trend_prior_df$prior[i] <- paste0(trimws(strsplit(trend_prior_df$prior[i],
                                                          "[~]")[[1]][1]),
@@ -398,6 +402,21 @@ get_mvgam_priors = function(formula,
                                           '_trend ~ normal(0, 1);')
       }
     }
+
+    if(any(grepl('(Intercept)', trend_prior_df$param_info))){
+      para_lines <- grep('(Intercept)', trend_prior_df$param_info)
+      for(i in para_lines){
+        trend_prior_df$param_name[i] <- paste0(trend_prior_df$param_name[i], '_trend')
+        trend_prior_df$prior[i] <- paste0(trimws(strsplit(trend_prior_df$prior[i],
+                                                          "[~]")[[1]][1]),
+                                          '_trend ~ student_t(3, 0, 2);')
+        trend_prior_df$example_change[i] <- paste0(trimws(strsplit(trend_prior_df$example_change[i],
+                                                                   "[~]")[[1]][1]),
+                                                   '_trend ~ normal(0, 1);')
+        trend_prior_df$param_info[i] <- '(Intercept) for the trend'
+      }
+    }
+
     trend_prior_df[] <- lapply(trend_prior_df, function(x)
       gsub("lambda", "lambda_trend", x))
     trend_prior_df[] <- lapply(trend_prior_df, function(x)
@@ -435,7 +454,10 @@ get_mvgam_priors = function(formula,
     # observation model
     if(drop_obs_intercept){
       if(any(grepl('Intercept', out$param_name))){
-        out <- out[-grep('Intercept', out$param_name),]
+        which_obs_int <- grep('Intercept', out$param_name) &
+          !grep('(Intercept)_trend', out$param_name)
+        if(length(which_obs_int) > 0L)
+          out <- out[-which_obs_int,]
       }
     }
 

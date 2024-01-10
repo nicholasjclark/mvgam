@@ -33,6 +33,11 @@ add_nmixture = function(model_file,
 
   model_data$cap <- as.vector(cap)
 
+  if(any(model_data$cap < model_data$y)){
+    stop(paste0('Some "cap" terms are < the observed counts. This is not allowed'),
+         call. = FALSE)
+  }
+
   #### Update the model file appropriately ####
   # If orig_trend_model is 'None', this will be set up as a RW model so need
   # to remove sigma and change the process model lines
@@ -92,6 +97,8 @@ add_nmixture = function(model_file,
              '}\n',
              'vector pb_logp(int count, int max_k,\n',
              'real lambda, real p) {\n',
+             'if (max_k < count)\n',
+             'reject("cap variable max_k must be >= observed counts");\n',
              'vector[max_k + 1] lp;\n',
              'for (k in 0:(count - 1))\n',
              'lp[k + 1] = negative_infinity();\n',
@@ -105,7 +112,7 @@ add_nmixture = function(model_file,
              'lp = pb_logp(count, max_k, lambda, p);\n',
              'return log_sum_exp(lp);\n',
              '}\n',
-             '/* Functions to generated truncated Poisson variates */\n',
+             '/* Functions to generate truncated Poisson variates */\n',
              'int nmix_rng(int count, int max_k,\n',
              'real lambda, real p) {\n',
              'vector[max_k + 1] lp;\n',
@@ -145,6 +152,8 @@ add_nmixture = function(model_file,
              '}\n',
              'vector pb_logp(int count, int max_k,\n',
              'real lambda, real p) {\n',
+             'if (max_k < count)\n',
+             'reject("cap variable max_k must be >= observed counts");\n',
              'vector[max_k + 1] lp;\n',
              'for (k in 0:(count - 1))\n',
              'lp[k + 1] = negative_infinity();\n',
@@ -158,7 +167,7 @@ add_nmixture = function(model_file,
              'lp = pb_logp(count, max_k, lambda, p);\n',
              'return log_sum_exp(lp);\n',
              '}\n',
-             '/* Functions to generated truncated Poisson variates */\n',
+             '/* Functions to generate truncated Poisson variates */\n',
              'int nmix_rng(int count, int max_k,\n',
              'real lambda, real p) {\n',
              'vector[max_k + 1] lp;\n',

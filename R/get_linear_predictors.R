@@ -9,8 +9,11 @@ obs_Xp_matrix = function(newdata, mgcv_model){
   if(inherits(Xp, 'try-error')){
     testdat <- data.frame(time = newdata$time)
 
-    terms_include <- names(mgcv_model$coefficients)[which(!names(mgcv_model$coefficients)
-                                                          %in% '(Intercept)')]
+    terms_include <- insight::find_predictors(mgcv_model)$conditional
+    if(any(terms_include %in% names(trend_test) == FALSE)){
+      stop('not all required variables have been supplied in newdata!',
+           call. = FALSE)
+    }
     if(length(terms_include) > 0){
       newnames <- vector()
       newnames[1] <- 'time'
@@ -93,15 +96,18 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
                                     silent = TRUE))
 
   if(inherits(Xp_trend, 'try-error')){
-    testdat <- data.frame(series = trends_test$series)
+    testdat <- data.frame(series = trend_test$series)
 
-    terms_include <- names(mgcv_model$coefficients)[which(!names(mgcv_model$coefficients)
-                                                          %in% '(Intercept)')]
+    terms_include <- insight::find_predictors(mgcv_model)$conditional
+    if(any(terms_include %in% names(trend_test) == FALSE)){
+      stop('not all required variables have been supplied in newdata!',
+           call. = FALSE)
+    }
     if(length(terms_include) > 0){
       newnames <- vector()
       newnames[1] <- 'series'
       for(i in 1:length(terms_include)){
-        testdat <- cbind(testdat, data.frame(trends_test[[terms_include[i]]]))
+        testdat <- cbind(testdat, data.frame(trend_test[[terms_include[i]]]))
         newnames[i+1] <- terms_include[i]
       }
       colnames(testdat) <- newnames
