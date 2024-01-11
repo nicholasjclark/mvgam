@@ -57,15 +57,17 @@ add_nmixture = function(model_file,
                                              '}\n')
     model_file <- readLines(textConnection(model_file), n = -1)
 
-    # Remove sigma and penalty parameters
+    # Remove sigma parameters
     start_replace <- grep('// latent state SD terms',
                           model_file, fixed = TRUE)
     end_replace <- start_replace + 1
     model_file <- model_file[-c(start_replace:end_replace)]
-    model_file <- model_file[-grep('vector[n_lv] penalty;',
-                                   model_file, fixed = TRUE)]
-    model_file <- model_file[-grep('penalty = 1.0 / (sigma .* sigma);',
-                                   model_file, fixed = TRUE)]
+    # model_file <- model_file[-grep('vector[n_lv] penalty;',
+    #                                model_file, fixed = TRUE)]
+    # model_file <- model_file[-grep('penalty = 1.0 / (sigma .* sigma);',
+    #                                model_file, fixed = TRUE)]
+    model_file[grep("penalty = 1.0 / (sigma .* sigma);", model_file, fixed = TRUE)] <-
+      'penalty = rep_vector(1e12, n_lv);'
     model_file <- model_file[-c(grep('// priors for latent state SD parameters',
                                      model_file, fixed = TRUE),
                                 grep('// priors for latent state SD parameters',

@@ -15,7 +15,8 @@
 #'for a GLM except that smooth terms, `s()`, `te()`, `ti()`, `t2()`, as well as time-varying
 #'`dynamic()` terms, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors
-#'(or linear functionals of these). Details of the formula syntax used by \pkg{mvgam}
+#'(or linear functionals of these). In `nmix()` family models, the `formula` is used to
+#'set up a linear predictor for the detection probability. Details of the formula syntax used by \pkg{mvgam}
 #'can be found in \code{\link{mvgam_formulae}}
 #'@param trend_formula An optional \code{character} string specifying the GAM process model formula. If
 #'supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
@@ -24,7 +25,9 @@
 #'the identifier `series` in this formula to specify effects that vary across time series. Instead you should use
 #'`trend`. This will ensure that models in which a `trend_map` is supplied will still work consistently
 #'(i.e. by allowing effects to vary across process models, even when some time series share the same underlying
-#'process model). This feature is only currently available for `RW()`, `AR()` and `VAR()` trend models
+#'process model). This feature is only currently available for `RW()`, `AR()` and `VAR()` trend models.
+#'In `nmix()` family models, the `trend_formula` is used to set up a linear predictor for the underlying
+#'latent abundance
 #'@param knots An optional \code{list} containing user specified knot values to be used for basis construction.
 #'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
 #'(note that the number of knots is not always just `k`). Different terms can use different numbers of knots,
@@ -63,7 +66,11 @@
 #'   \item`betar()` for proportional data on `(0,1)`
 #'   \item`lognormal()` for non-negative real-valued data
 #'   \item`student_t()` for real-valued data
-#'   \item`Gamma()` for non-negative real-valued data}
+#'   \item`Gamma()` for non-negative real-valued data
+#'   \item`nmix()` for count data with imperfect detection modeled via a
+#'   State-Space N-Mixture model. The latent states are Poisson, capturing the 'true' latent
+#'   abundance, while the observation process is Binomial to account for imperfect detection.
+#'   See \code{\link{mvgam_families}} for an example of how to use this family}
 #'Note that only `nb()` and `poisson()` are available if using `JAGS` as the backend.
 #'Default is `poisson()`.
 #'See \code{\link{mvgam_families}} for more details

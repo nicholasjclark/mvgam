@@ -107,12 +107,22 @@ if(series == 'all'){
                          'trend' = 'trend',
                          'latent_N' = 'mus',
                          'detection' = 'mus')
+    if(object$family == 'nmix' &
+       type == 'link'){
+      to_extract <- 'trend'
+    }
+
     if(object$fit_engine == 'stan'){
       preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
                                                                  dim(mcmc_chains(object$model_output, 'ypred'))[2],
                                                                  by = NCOL(object$ytimes))][,1:last_train]
     } else {
       preds <- mcmc_chains(object$model_output, to_extract)[,starts[series]:ends[series]][,1:last_train]
+    }
+
+    if(object$family == 'nmix' &
+       type == 'link'){
+      preds <- exp(preds)
     }
 
     if(type %in% c('expected', 'latent_N', 'detection')){
@@ -133,11 +143,9 @@ if(series == 'all'){
       attr(Xpmat, 'model.offset') <- 0
 
       if(object$family == 'nmix'){
-        if(type != 'expected'){
-          preds <- mcmc_chains(object$model_output, 'detprob')[,object$ytimes[1:last_train, series]]
-          Xpmat <- matrix(qlogis(as.vector(preds)))
-          attr(Xpmat, 'model.offset') <- 0
-        }
+        preds <- mcmc_chains(object$model_output, 'detprob')[,object$ytimes[1:last_train, series]]
+        Xpmat <- matrix(qlogis(as.vector(preds)))
+        attr(Xpmat, 'model.offset') <- 0
         latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
                                                                                    dim(mcmc_chains(object$model_output, 'ypred'))[2],
                                                                                    by = NCOL(object$ytimes))][,1:last_train])
@@ -198,6 +206,11 @@ if(series == 'all'){
                        'latent_N' = 'mus',
                        'detection' = 'mus')
 
+  if(object$family == 'nmix' &
+     type == 'link'){
+    to_extract <- 'trend'
+  }
+
   # Extract forecasts
   if(object$fit_engine == 'stan'){
     preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
@@ -205,6 +218,11 @@ if(series == 'all'){
                                                                by = NCOL(object$ytimes))]
   } else {
     preds <- mcmc_chains(object$model_output, to_extract)[,starts[series]:ends[series]]
+  }
+
+  if(object$family == 'nmix' &
+     type == 'link'){
+    preds <- exp(preds)
   }
 
   if(type %in% c('expected', 'latent_N', 'detection')){
@@ -224,11 +242,9 @@ if(series == 'all'){
     names(par_extracts) <- names(family_pars)
 
     if(object$family == 'nmix'){
-      if(type != 'expected'){
-        preds <- mcmc_chains(object$model_output, 'detprob')[,object$ytimes[, series]]
-        Xpmat <- matrix(qlogis(as.vector(preds)))
-        attr(Xpmat, 'model.offset') <- 0
-      }
+      preds <- mcmc_chains(object$model_output, 'detprob')[,object$ytimes[, series]]
+      Xpmat <- matrix(qlogis(as.vector(preds)))
+      attr(Xpmat, 'model.offset') <- 0
 
       latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
                                                                                  dim(mcmc_chains(object$model_output, 'ypred'))[2],

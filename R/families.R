@@ -21,16 +21,150 @@
 #'\itemize{
 #'   \item \code{tweedie} with log-link, for count data (power parameter `p` fixed at `1.5`)
 #'   \item `student_t()` (or \code{\link[brms]{student}}) with identity-link, for real-valued data
-#'   \item \code{nmix} with log-link, for count data with imperfect detection modeled via a
-#'   State-Space Poisson-Binomial N-Mixture model
+#'   \item \code{nmix} for count data with imperfect detection modeled via a
+#'   State-Space N-Mixture model. The latent states are Poisson (with log link), capturing the 'true' latent
+#'   abundance, while the observation process is Binomial to account for imperfect detection. The
+#'   observation formula in these models is used to set up a linear predictor for the detection
+#'   probability (with logit link). See the example below for a more detailed worked explanation
+#'   of the `nmix()` family
 #'   }
-#'Note that only `poisson()`, `nb()`, and `tweedie()` are available if
-#'using `JAGS`. All families, apart from `tweedie()`, are supported if
-#'using `Stan`.
+#' Only `poisson()`, `nb()`, and `tweedie()` are available if
+#' using `JAGS`. All families, apart from `tweedie()`, are supported if
+#' using `Stan`.
 #' @name mvgam_families
 #' @details Note that currently it is not possible to change the default link
 #' functions in `mvgam`, so any call to change these will be silently ignored
 #' @author Nicholas J Clark
+#' @examples
+#' \dontrun{
+#' # An N-mixture example using family nmix()
+#' # Simulate data from a Poisson-Binomial N-Mixture model
+#' # True abundance is predicted by a single nonlinear function of temperature
+#' # as well as a nonlinear long-term trend (as a Gaussian Process function)
+#' set.seed(123)
+#' gamdat <- gamSim(n = 80); N <- NROW(gamdat)
+#' abund_linpred <- gamdat$y; temperature <- gamdat$x2
+#' trend <- mvgam:::sim_gp(rnorm(3, 0, 0.1), alpha_gp = 3,
+#'                         rho_gp = 16, h = N)
+#' true_abund <- floor(10 + abund_linpred + trend)
+#'
+#' # Detection probability increases linearly with decreasing rainfall
+#' rainfall <- rnorm(N)
+#' detect_linpred <- 0.4 + -0.55 * rainfall
+#' detect_prob <- plogis(detect_linpred)
+#'
+#' # Simulate observed counts
+#' obs_abund <- rbinom(N, size = true_abund, prob = detect_prob)
+#'
+#' # Plot true and observed time series
+#' plot(true_abund,
+#'      type = 'l',
+#'      ylab = 'Abundance',
+#'      xlab = 'Time',
+#'      ylim = c(0, max(true_abund)),
+#'      bty = 'l',
+#'      lwd = 2)
+#' lines(obs_abund, col = 'darkred', lwd = 2)
+#' title(main = 'True = black; observed = red')
+#'
+#' # Gather data into a dataframe suitable for mvgam modelling;
+#' # This will require a 'cap' variable specifying the maximum K to marginalise
+#' # over when estimating latent abundance (it does NOT have to be a fixed value)
+#' model_dat <- data.frame(obs_abund,
+#'                         temperature,
+#'                         rainfall,
+#'                         cap = max(obs_abund) + 20,
+#'                         time = 1:N,
+#'                         series = as.factor('series1'))
+#'
+#' # Training and testing folds
+#' data_train <- model_dat %>% dplyr::filter(time <= 74)
+#' data_test <- model_dat %>% dplyr::filter(time > 74)
+#'
+#' # Fit a model with informative priors on the two intercept parameters
+#' # and on the length scale of the GP temporal trend parameter
+#' # Note that the 'trend_formula' applies to the latent count process
+#' # (a Poisson process with log-link), while the 'formula' applies to the
+#' # detection probability (logit link)
+#' mod <- mvgam(formula = obs_abund ~ rainfall,
+#'              trend_formula = ~ s(temperature, k = 5) +
+#'                gp(time, k = 10, c = 5/4, scale = FALSE),
+#'              family = nmix(),
+#'              data = data_train,
+#'              newdata = data_test,
+#'              priors = c(prior(std_normal(), class = '(Intercept)'),
+#'                         prior(normal(2, 2), class = '(Intercept)_trend'),
+#'                         prior(normal(15, 5), class = 'rho_gp_trend(time)')))
+#'
+#' # Model summary and diagnostics
+#' summary(mod)
+#' plot(mod, type = 'residuals')
+#'
+#' # Intercept parameters
+#' mcmc_plot(mod,
+#'           variable = "Intercept",
+#'           regex = TRUE,
+#'           type = 'hist')
+#'
+#' # Hindcasts and forecasts of latent abundance (with truth overlain)
+#' fc <- forecast(mod, type = 'latent_N')
+#' plot(fc); points(true_abund, pch = 16, cex = 0.8)
+#'
+#' # Latent abundance predictions are restricted based on 'cap'
+#' max(model_dat$cap); range(fc$forecasts[[1]])
+#'
+#' # Hindcasts and forecasts of detection probability (with truth overlain)
+#' fc <- forecast(mod, type = 'detection')
+#' plot(fc); points(detect_prob, pch = 16, cex = 0.8)
+#'
+#' # Hindcasts and forecasts of observations
+#' # (after accounting for detection error)
+#' fc <- forecast(mod, type = 'response')
+#' plot(fc)
+#'
+#' # Hindcasts and forecasts of response expectations
+#' # (with truth overlain)
+#' fc <- forecast(object = mod, type = 'expected')
+#' plot(fc); points(detect_prob * true_abund, pch = 16, cex = 0.8)
+#'
+#' # Plot conditional effects
+#' library(ggplot2)
+#'
+#' # Effects on true abundance can be visualised using type = 'link'
+#' abund_plots <- plot(conditional_effects(mod,
+#'                                         type = 'link',
+#'                                         effects = c('temperature', 'time')),
+#'                     plot = FALSE)
+#'
+#' # Effect of temperature on abundance
+#' abund_plots[[1]] +
+#'   ylab('Latent abundance')
+#'
+#' # Long-term trend in abundance
+#' abund_plots[[2]] +
+#'   ylab('Latent abundance')
+#'
+#' # Effect of rainfall on detection probability
+#' det_plot <- plot(conditional_effects(mod,
+#'                                      type = 'detection',
+#'                                      effects = 'rainfall'),
+#'                  plot = FALSE
+#' det_plot[[1]] +
+#'   ylab('Pr(detection)')
+#'
+#' # More targeted plots can use marginaleffects capabilities;
+#' # Here visualise how response predictions might change
+#' # if we considered different possible 'cap' limits on latent
+#' # abundance and different rainfall measurements
+#' plot_predictions(mod, condition = list('temperature',
+#'                                        cap = c(15, 20, 40),
+#'                                        rainfall = c(-1, 1)),
+#'                 type = 'response',
+#'                 conf_level = 0.5) +
+#'  ylab('Observed abundance') +
+#'  theme_classic()
+#' }
+#'
 NULL
 
 #' @rdname mvgam_families
@@ -53,6 +187,7 @@ student_t = function(link = 'identity'){
             class = c("extended.family", "family"))
 }
 
+#' @rdname mvgam_families
 #' @export
 nmix = function(link = 'log'){
   linktemp <- make.link('log')
