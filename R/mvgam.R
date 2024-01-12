@@ -2224,14 +2224,12 @@ mvgam = function(formula,
       fit_engine = fit_engine,
       family = family_char,
       obs_data = data_train,
+      test_data = data_test,
       ytimes = ytimes)
     class(object) <- 'mvgam'
-    series_resids <- get_mvgam_resids(object,
-      n_cores = if(parallel){
-        min(c(chains, parallel::detectCores() - 1))
-        } else {
-          1
-        })
+    # Use the much faster vectorized residual
+    # calculation function now
+    series_resids <- dsresids_vec(object)
   }
 
   if(prior_simulation){

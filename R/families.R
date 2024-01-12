@@ -887,7 +887,7 @@ ds_resids_nmix = function(truth, fitted, draw,
   b_obs <- pbinom(as.vector(truth[!na_obs]),
                   size = N[!na_obs],
                   prob = p[!na_obs])
-  u_obs <- runif(n = length(draw[!na_obs]),
+  u_obs <- runif(n = length(truth[!na_obs]),
                  min = pmin(a_obs, b_obs),
                  max = pmax(a_obs, b_obs))
 
@@ -912,7 +912,7 @@ ds_resids_nb = function(truth, fitted, draw, size){
               pbeta(p, size[!na_obs],
                     pmax(as.vector(truth[!na_obs]), 1)), 0)
   b_obs <- pbeta(p, size[!na_obs], as.vector(truth[!na_obs]) + 1)
-  u_obs <- runif(n = length(draw[!na_obs]), min = a_obs, max = b_obs)
+  u_obs <- runif(n = length(truth[!na_obs]), min = a_obs, max = b_obs)
 
   if(any(is.na(truth))){
     u <- vector(length = length(truth))
@@ -937,7 +937,7 @@ ds_resids_beta = function(truth, fitted, draw, precision){
   b_obs <- pbeta(as.vector(truth[!na_obs]),
                  shape1 = shape_pars$shape1[!na_obs],
                  shape2 = shape_pars$shape2[!na_obs])
-  u_obs <- runif(n = length(draw[!na_obs]),
+  u_obs <- runif(n = length(truth[!na_obs]),
                  min = pmin(a_obs, b_obs),
                  max = pmax(a_obs, b_obs))
 
@@ -960,7 +960,7 @@ ds_resids_pois = function(truth, fitted, draw){
                  lambda = fitted[!na_obs])
   b_obs <- ppois(as.vector(truth[!na_obs]),
                  lambda = fitted[!na_obs])
-  u_obs <- runif(n = length(draw[!na_obs]),
+  u_obs <- runif(n = length(truth[!na_obs]),
                  min = pmin(a_obs, b_obs),
                  max = pmax(a_obs, b_obs))
 
@@ -983,7 +983,7 @@ ds_resids_tw = function(truth, fitted, draw){
                  lambda = fitted[!na_obs])
   b_obs <- ppois(as.vector(truth[!na_obs]),
                  lambda = fitted[!na_obs])
-  u_obs <- runif(n = length(draw[!na_obs]),
+  u_obs <- runif(n = length(truth[!na_obs]),
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
@@ -1007,7 +1007,7 @@ ds_resids_gaus = function(truth, fitted, sigma, draw){
   b_obs <- pnorm(as.vector(truth[!na_obs]),
                  mean = fitted[!na_obs],
                  sd = sigma)
-  u_obs <- runif(n = length(draw[!na_obs]),
+  u_obs <- runif(n = length(truth[!na_obs]),
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
@@ -1031,7 +1031,7 @@ ds_resids_lnorm = function(truth, fitted, sigma, draw){
   b_obs <- plnorm(as.vector(truth[!na_obs]),
                  meanlog = log(fitted[!na_obs]),
                  sdlog = sigma[!na_obs])
-  u_obs <- runif(n = length(draw[!na_obs]),
+  u_obs <- runif(n = length(truth[!na_obs]),
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
@@ -1055,7 +1055,7 @@ ds_resids_gamma = function(truth, fitted, shape, draw){
   b_obs <- pgamma(as.vector(truth[!na_obs]),
                   shape = shape[!na_obs],
                   rate = shape[!na_obs] / fitted[!na_obs])
-  u_obs <- runif(n = length(draw[!na_obs]),
+  u_obs <- runif(n = length(truth[!na_obs]),
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
@@ -1081,7 +1081,7 @@ ds_resids_student = function(truth, fitted, sigma, nu, draw){
                       df = nu[!na_obs],
                       mu = fitted[!na_obs],
                       sigma = sigma[!na_obs])
-  u_obs <- runif(n = length(draw[!na_obs]),
+  u_obs <- runif(n = length(truth[!na_obs]),
                  min = pmin(a_obs, b_obs), max = pmax(a_obs, b_obs))
 
   if(any(is.na(truth))){
@@ -1267,8 +1267,8 @@ get_mvgam_resids = function(object, n_cores = 1){
 
     if(family == 'nmix'){
       resids <- matrix(ds_resids_nmix(truth = as.vector(truth_mat),
-                                      fitted = as.vector(preds),
-                                      draw = as.vector(preds[draw_seq,]),
+                                      fitted = 1,
+                                      draw = 1,
                                       N = as.vector(N),
                                       p = as.vector(p)),
                        nrow = NROW(preds))
@@ -1356,5 +1356,136 @@ get_mvgam_resids = function(object, n_cores = 1){
 
   })
   names(series_resids) <- series_levels
+  return(series_resids)
+}
+
+#' @noRd
+dsresids_vec = function(object){
+
+  family <- object$family
+  obs_series <- object$obs_data$series
+  series_levels <- levels(obs_series)
+  fit_engine <- object$fit_engine
+
+  # Need to know which series each observation belongs to so we can
+  # pull out appropriate family-level parameters (overdispersions, shapes, etc...)
+  all_dat <- data.frame(series = object$obs_data$series,
+                        time = object$obs_data$time,
+                        y = object$obs_data$y) %>%
+    dplyr::arrange(time, series)
+
+  truth <- all_dat$y
+  last_train <- NROW(all_dat)
+  series_obs <- as.numeric(all_dat$series)
+
+  # Extract expectations and necessary generated quantities
+  # and subset to only include training data
+  preds <- posterior_epred(object)[,1:last_train, drop = FALSE]
+
+  if(family == 'nmix'){
+    p <- mcmc_chains(object$model_output, 'detprob')[,1:last_train, drop = FALSE]
+    N <- mcmc_chains(object$model_output, 'latent_ypred')[,1:last_train, drop = FALSE]
+  }
+
+  # Family-specific parameters
+  family <- object$family
+  family_pars <- extract_family_pars(object = object)
+  n_series <- NCOL(object$ytimes)
+
+  # Family parameters spread into a vector
+  family_extracts <- lapply(seq_along(family_pars), function(j){
+    if(is.matrix(family_pars[[j]])){
+      as.vector(family_pars[[j]][, series_obs])
+    } else {
+      family_pars[[j]][]
+    }
+  })
+  names(family_extracts) <- names(family_pars)
+
+  # Create a truth matrix for vectorised residual computation
+  truth_mat <- matrix(rep(truth, NROW(preds)),
+                      nrow = NROW(preds),
+                      byrow = TRUE)
+
+  # Calculate DS residual distributions
+  if(family == 'gaussian'){
+    resids <- matrix(ds_resids_gaus(truth = as.vector(truth_mat),
+                                    fitted = as.vector(preds),
+                                    draw = 1,
+                                    sigma = family_extracts$sigma_obs),
+                     nrow = NROW(preds))
+  }
+
+  if(family == 'nmix'){
+    resids <- matrix(ds_resids_nmix(truth = as.vector(truth_mat),
+                                    fitted = 1,
+                                    draw = 1,
+                                    N = as.vector(N),
+                                    p = as.vector(p)),
+                     nrow = NROW(preds))
+  }
+
+  if(family == 'student'){
+    resids <- matrix(ds_resids_student(truth = as.vector(truth_mat),
+                                       fitted = as.vector(preds),
+                                       draw = 1,
+                                       sigma = family_extracts$sigma_obs,
+                                       nu = family_extracts$nu),
+                     nrow = NROW(preds))
+  }
+
+  if(family == 'lognormal'){
+    resids <- matrix(ds_resids_lnorm(truth = as.vector(truth_mat),
+                                     fitted = as.vector(preds),
+                                     draw = 1,
+                                     sigma = family_extracts$sigma_obs),
+                     nrow = NROW(preds))
+  }
+
+  if(family == 'poisson'){
+    resids <- matrix(ds_resids_pois(truth = as.vector(truth_mat),
+                                    fitted = as.vector(preds),
+                                    draw = 1),
+                     nrow = NROW(preds))
+  }
+
+  if(family == 'beta'){
+    resids <- matrix(ds_resids_beta(truth = as.vector(truth_mat),
+                                    fitted = as.vector(preds),
+                                    draw = 1,
+                                    precision = family_extracts$phi),
+                     nrow = NROW(preds))
+  }
+
+  if(family == 'Gamma'){
+    resids <- matrix(ds_resids_gamma(truth = as.vector(truth_mat),
+                                     fitted = as.vector(preds),
+                                     draw = 1,
+                                     shape = family_extracts$shape),
+                     nrow = NROW(preds))
+  }
+
+  if(family == 'negative binomial'){
+    resids <- matrix(ds_resids_nb(truth = as.vector(truth_mat),
+                                  fitted = as.vector(preds),
+                                  draw = 1,
+                                  size = family_extracts$size),
+                     nrow = NROW(preds))
+  }
+
+  if(family == 'tweedie'){
+    resids <- matrix(ds_resids_tw(truth = as.vector(truth_mat),
+                                  fitted = as.vector(preds),
+                                  draw = 1),
+                     nrow = NROW(preds))
+  }
+
+  # Convert to a list of series-level matrices and return
+  series_resids <- lapply(seq_len(n_series), function(series){
+    inds_keep <- which(series_obs == series)
+    resids[, inds_keep]
+  })
+  names(series_resids) <- levels(all_dat$series)
+
   return(series_resids)
 }

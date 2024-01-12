@@ -41,8 +41,8 @@ validate_series_time = function(data, name = 'data'){
     identical(as.numeric(sort(time)),
               as.numeric(seq.int(from = min_time, to = max_time)))
   }
-  min_time <- min(data$time)
-  max_time <- max(data$time)
+  min_time <- as.numeric(min(data$time))
+  max_time <- as.numeric(max(data$time))
   data.frame(series = data$series,
              time = data$time) %>%
     dplyr::group_by(series) %>%
