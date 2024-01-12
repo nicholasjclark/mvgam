@@ -60,6 +60,7 @@ package can handle data for the following families:
 - `betar()` for proportional data on `(0,1)`
 - `poisson()` for count data
 - `nb()` for overdispersed count data
+- `nmix()` for count data with imperfect detection
 - `tweedie()` for overdispersed count data
 
 Note that only `poisson()`, `nb()`, and `tweedie()` are available if

@@ -7,10 +7,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <meta name="description" content="Fit Bayesian Dynamic Generalised Additive Models to sets of time series. 
              The primary purpose of the package is to build dynamic nonlinear models that incorporate 
-             the flexibility of GAMs in the linear predictor and latent trend components that are useful 
-             for time series analysis and forecasting. Estimation is performed using Markov Chain Monte Carlo (MCMC) with
-             either the Gibbs sampling software JAGS or with Hamiltonian Monte Carlo in the software Stan. The package also includes 
-             utilities for online updating of  forecast distributions with a recursive particle filter that 
+             the flexibility of GAMs in observation and latent (possibly dynamic) process components 
+             for time series analysis and forecasting. Estimation is performed using Markov Chain Monte Carlo (MCMC)
+             with Hamiltonian Monte Carlo in the software Stan. The package also includes 
+             utilities for online updating of forecast distributions with a recursive particle filter that 
              uses sequential importance sampling to assimilate new observations as they become available. 
              References: Clark &amp; Wells (2022) &lt;https://doi.org/10.1111/2041-210X.13974&gt;.">
 <title>Multivariate (Dynamic) Generalized Additive Models • mvgam</title>
@@ -21,10 +21,10 @@
 <!-- bootstrap-toc --><script src="https://cdn.jsdelivr.net/gh/afeld/bootstrap-toc@v1.0.1/dist/bootstrap-toc.min.js" integrity="sha256-4veVQbu7//Lk5TSmc7YV48MxtMy98e26cf5MrgZYnwo=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><!-- search --><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/autocomplete.js/0.38.0/autocomplete.jquery.min.js" integrity="sha512-GU9ayf+66Xx2TmpxqJpliWbT5PiGYxpaG8rfnBEk1LL8l1KGkRShhngwdXK1UgqhAzWpZHSiYPc09/NwDQIGyg==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/mark.min.js" integrity="sha512-5CYOlHXGh6QpOFA/TeTylKLWfB3ftPsde7AnmhuitiTX4K5SqCLBeKro6sPS8ilsz1Q4NRx3v8Ko2IBiszzdww==" crossorigin="anonymous"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="Multivariate (Dynamic) Generalized Additive Models">
 <meta property="og:description" content="Fit Bayesian Dynamic Generalised Additive Models to sets of time series. 
              The primary purpose of the package is to build dynamic nonlinear models that incorporate 
-             the flexibility of GAMs in the linear predictor and latent trend components that are useful 
-             for time series analysis and forecasting. Estimation is performed using Markov Chain Monte Carlo (MCMC) with
-             either the Gibbs sampling software JAGS or with Hamiltonian Monte Carlo in the software Stan. The package also includes 
-             utilities for online updating of  forecast distributions with a recursive particle filter that 
+             the flexibility of GAMs in observation and latent (possibly dynamic) process components 
+             for time series analysis and forecasting. Estimation is performed using Markov Chain Monte Carlo (MCMC)
+             with Hamiltonian Monte Carlo in the software Stan. The package also includes 
+             utilities for online updating of forecast distributions with a recursive particle filter that 
              uses sequential importance sampling to assimilate new observations as they become available. 
              References: Clark &amp; Wells (2022) &lt;https://doi.org/10.1111/2041-210X.13974&gt;.">
 <!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
@@ -40,7 +40,7 @@
     
     <a class="navbar-brand me-2" href="index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.91</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -119,6 +119,8 @@
 <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</li>
 <li>
 <code>nb()</code> for overdispersed count data</li>
+<li>
+<code><a href="reference/mvgam_families.html">nmix()</a></code> for count data with imperfect detection</li>
 <li>
 <code><a href="reference/mvgam_families.html">tweedie()</a></code> for overdispersed count data</li>
 </ul>

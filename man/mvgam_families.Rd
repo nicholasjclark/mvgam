@@ -182,7 +182,6 @@ plot_predictions(mod, condition = list('temperature',
  ylab('Observed abundance') +
  theme_classic()
 }
-
 }
 \author{
 Nicholas J Clark

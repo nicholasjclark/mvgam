@@ -35,6 +35,30 @@
 #' @details Note that currently it is not possible to change the default link
 #' functions in `mvgam`, so any call to change these will be silently ignored
 #' @author Nicholas J Clark
+#'
+NULL
+
+#' @rdname mvgam_families
+#' @export
+tweedie = function(link = 'log'){
+  linktemp <- make.link('log')
+  structure(list(family = "tweedie", link = 'log', linkfun = linktemp$linkfun,
+                 linkinv = linktemp$linkinv, mu.eta = linktemp$mu.eta,
+                 valideta = linktemp$valideta),
+            class = c("extended.family", "family"))
+}
+
+#' @rdname mvgam_families
+#' @export
+student_t = function(link = 'identity'){
+  linktemp <- make.link('identity')
+  structure(list(family = "student", link = 'identity', linkfun = linktemp$linkfun,
+                 linkinv = linktemp$linkinv, mu.eta = linktemp$mu.eta,
+                 valideta = linktemp$valideta),
+            class = c("extended.family", "family"))
+}
+
+#' @rdname mvgam_families
 #' @examples
 #' \dontrun{
 #' # An N-mixture example using family nmix()
@@ -164,30 +188,6 @@
 #'  ylab('Observed abundance') +
 #'  theme_classic()
 #' }
-#'
-NULL
-
-#' @rdname mvgam_families
-#' @export
-tweedie = function(link = 'log'){
-  linktemp <- make.link('log')
-  structure(list(family = "tweedie", link = 'log', linkfun = linktemp$linkfun,
-                 linkinv = linktemp$linkinv, mu.eta = linktemp$mu.eta,
-                 valideta = linktemp$valideta),
-            class = c("extended.family", "family"))
-}
-
-#' @rdname mvgam_families
-#' @export
-student_t = function(link = 'identity'){
-  linktemp <- make.link('identity')
-  structure(list(family = "student", link = 'identity', linkfun = linktemp$linkfun,
-                 linkinv = linktemp$linkinv, mu.eta = linktemp$mu.eta,
-                 valideta = linktemp$valideta),
-            class = c("extended.family", "family"))
-}
-
-#' @rdname mvgam_families
 #' @export
 nmix = function(link = 'log'){
   linktemp <- make.link('log')
