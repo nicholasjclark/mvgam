@@ -14,7 +14,11 @@ The formula syntax is based on that of the package `mgcv` to provide a
 familiar GAM modelling interface. The motivation for the package and
 some of its primary objectives are described in detail by [Clark & Wells
 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974)
-(published in *Methods in Ecology and Evolution*).
+(published in *Methods in Ecology and Evolution*). An introduction to
+the package and some worked examples are also shown in this seminar:
+<a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
+target="_blank">Ecological Forecasting with Dynamic Generalized Additive
+Models</a>.
 
 ## Installation
 
@@ -128,9 +132,11 @@ always access the vignette htmls online at
 ## Other resources
 
 A number of case studies have been compiled to highlight how DGAMs can
-be estimated using MCMC sampling. These are hosted currently on `RPubs`
-at the following links:
+be estimated using MCMC sampling:
 
+- <a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
+  target="_blank">Ecological Forecasting with Dynamic Generalized Additive
+  Models</a>
 - [mvgam case study 1: model comparison and data
   assimilation](https://rpubs.com/NickClark47/mvgam)
 - [mvgam case study 2: multivariate

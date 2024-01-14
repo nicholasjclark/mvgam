@@ -27,7 +27,7 @@ theme_set(theme_bw(base_size = 12, base_family = 'serif'))
 The purpose of this vignette is to give a general overview of the `mvgam` package and its primary functions.
 
 ## Dynamic GAMs
-`mvgam` is designed to propagate unobserved temporal processes to capture latent dynamics in the observed time series. This works in a state-space format, with the temporal *trend* evolving independently of the observation process. Briefly, assume $\tilde{\boldsymbol{y}}_{i,t}$ is the conditional expectation of response variable $\boldsymbol{i}$ at time $\boldsymbol{t}$. Assuming $\boldsymbol{y_i}$ is drawn from an exponential distribution with an invertible link function, the linear predictor for a multivariate Dynamic GAM can be written as:
+`mvgam` is designed to propagate unobserved temporal processes to capture latent dynamics in the observed time series. This works in a state-space format, with the temporal *trend* evolving independently of the observation process. An introduction to the package and some worked examples are also shown in this seminar: [Ecological Forecasting with Dynamic Generalized Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ){target="_blank"}. Briefly, assume $\tilde{\boldsymbol{y}}_{i,t}$ is the conditional expectation of response variable $\boldsymbol{i}$ at time $\boldsymbol{t}$. Assuming $\boldsymbol{y_i}$ is drawn from an exponential distribution with an invertible link function, the linear predictor for a multivariate Dynamic GAM can be written as:
 
 $$for~i~in~1:N_{series}~...$$
 $$for~t~in~1:N_{timepoints}~...$$

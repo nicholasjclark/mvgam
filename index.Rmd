@@ -7,7 +7,7 @@ output: github_document
 ## mvgam
 **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Dynamic Generalized Additive Models (DGAMs) for time series with dynamic trend components. The package provides an interface to fit Bayesian DGAMs using either `JAGS` or `Stan` as the backend, but note that users are strongly encouraged to opt for `Stan` over `JAGS`. The formula syntax is based on that of the package `mgcv` to provide a familiar GAM modelling interface. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*).
+The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Dynamic Generalized Additive Models (DGAMs) for time series with dynamic trend components. The package provides an interface to fit Bayesian DGAMs using either `JAGS` or `Stan` as the backend, but note that users are strongly encouraged to opt for `Stan` over `JAGS`. The formula syntax is based on that of the package `mgcv` to provide a familiar GAM modelling interface. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*). An introduction to the package and some worked examples are also shown in this seminar: [Ecological Forecasting with Dynamic Generalized Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ){target="_blank"}.
   
 ## Installation
 Install the development version from `GitHub` using:
@@ -74,8 +74,9 @@ Various `S3` functions can be used to inspect parameter estimates, plot smooth f
 You can set `build_vignettes = TRUE` when installing with either `devtools::install_github` or `remotes::install_github`, but be aware this will slow down the installation drastically. Instead, you can always access the vignette htmls online at [https://nicholasjclark.github.io/mvgam/articles/](https://nicholasjclark.github.io/mvgam/articles/)
 
 ## Other resources
-A number of case studies have been compiled to highlight how DGAMs can be estimated using MCMC sampling. These are hosted currently on `RPubs` at the following links:
+A number of case studies have been compiled to highlight how DGAMs can be estimated using MCMC sampling:
   
+* [Ecological Forecasting with Dynamic Generalized Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ){target="_blank"}
 * [mvgam case study 1: model comparison and data assimilation](https://rpubs.com/NickClark47/mvgam)
 * [mvgam case study 2: multivariate models](https://rpubs.com/NickClark47/mvgam2)
 * [mvgam case study 3: distributed lag models](https://rpubs.com/NickClark47/mvgam3)

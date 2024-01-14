@@ -26,6 +26,7 @@ The goal of `mvgam` is to fit Bayesian Dynamic Generalized Additive Models to ti
 ## Resources
 A series of [vignettes cover data formatting, forecasting and several extended case studies of DGAMs](https://nicholasjclark.github.io/mvgam/){target="_blank"}. A number of other examples have also been compiled:
   
+* [Ecological Forecasting with Dynamic Generalized Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ){target="_blank"}
 * [mvgam case study 1: model comparison and data assimilation](https://rpubs.com/NickClark47/mvgam){target="_blank"}
 * [mvgam case study 2: multivariate models](https://rpubs.com/NickClark47/mvgam2){target="_blank"}
 * [mvgam case study 3: distributed lag models](https://rpubs.com/NickClark47/mvgam3){target="_blank"}
@@ -212,6 +213,7 @@ plot(lynx_mvgam, type = 'residuals')
 * `poisson()` for count data
 * `nb()` for overdispersed count data
 * `tweedie()` for overdispersed count data
+* `nmix()` for count data with imperfect detection
   
 Note that only `poisson()`, `nb()`, and `tweedie()` are available if using `JAGS`. All families, apart from `tweedie()`, are supported if using `Stan`. See `??mvgam_families` for more information. Below is a simple example for simulating and modelling proportional data with `Beta` observations over a set of seasonal series with independent Gaussian Process dynamic trends:
 ```{r beta_sim, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=6.5, dpi=160}

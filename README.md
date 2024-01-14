@@ -24,6 +24,9 @@ target="_blank">vignettes cover data formatting, forecasting and several
 extended case studies of DGAMs</a>. A number of other examples have also
 been compiled:
 
+- <a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
+  target="_blank">Ecological Forecasting with Dynamic Generalized Additive
+  Models</a>
 - <a href="https://rpubs.com/NickClark47/mvgam" target="_blank">mvgam case
   study 1: model comparison and data assimilation</a>
 - <a href="https://rpubs.com/NickClark47/mvgam2" target="_blank">mvgam
@@ -314,29 +317,29 @@ summary(lynx_mvgam)
 #> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                2.5%    50% 97.5% Rhat n_eff
-#> (Intercept)   5.900  6.600  7.00 1.01   302
-#> s(season).1  -0.610  0.035  0.69 1.00   910
-#> s(season).2  -0.180  0.840  1.90 1.00   341
-#> s(season).3  -0.031  1.300  2.50 1.00   313
-#> s(season).4  -0.470  0.420  1.40 1.00   901
-#> s(season).5  -1.300 -0.180  0.91 1.00   385
-#> s(season).6  -1.100 -0.057  1.10 1.00   534
-#> s(season).7  -0.700  0.390  1.40 1.00   631
-#> s(season).8  -0.970  0.340  1.90 1.00   282
-#> s(season).9  -1.100 -0.230  0.75 1.00   392
-#> s(season).10 -1.300 -0.680 -0.01 1.01   548
+#>               2.5%    50% 97.5% Rhat n_eff
+#> (Intercept)   6.10  6.600 7.000 1.00   355
+#> s(season).1  -0.59  0.046 0.710 1.00  1022
+#> s(season).2  -0.26  0.770 1.800 1.00   443
+#> s(season).3  -0.12  1.100 2.400 1.00   399
+#> s(season).4  -0.51  0.410 1.300 1.00   890
+#> s(season).5  -1.20 -0.130 0.950 1.01   503
+#> s(season).6  -1.00 -0.011 1.100 1.01   699
+#> s(season).7  -0.71  0.340 1.400 1.00   711
+#> s(season).8  -0.92  0.180 1.800 1.00   371
+#> s(season).9  -1.10 -0.290 0.710 1.00   476
+#> s(season).10 -1.30 -0.660 0.027 1.00   595
 #> 
 #> Approximate significance of GAM observation smooths:
 #>            edf Chi.sq p-value
-#> s(season) 4.43  19440    0.24
+#> s(season) 5.08  17751    0.25
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n_eff
-#> ar1[1]    0.71  1.10 1.400    1   594
-#> ar2[1]   -0.81 -0.38 0.074    1  1367
-#> ar3[1]   -0.47 -0.11 0.340    1   401
-#> sigma[1]  0.40  0.50 0.640    1  1125
+#> ar1[1]    0.74  1.10 1.400    1   635
+#> ar2[1]   -0.84 -0.40 0.062    1  1514
+#> ar3[1]   -0.47 -0.13 0.290    1   540
+#> sigma[1]  0.40  0.50 0.640    1  1154
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -345,7 +348,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Wed Dec 06 5:18:32 PM 2023.
+#> Samples were drawn using NUTS(diag_e) at Mon Jan 15 8:57:57 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -450,6 +453,7 @@ plotted on the outcome scale, for example:
 ``` r
 require(ggplot2)
 #> Loading required package: ggplot2
+#> Warning: package 'ggplot2' was built under R version 4.3.2
 plot_predictions(lynx_mvgam, condition = 'season', points = 0.5) +
   theme_classic()
 ```
@@ -466,7 +470,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-21-1.png" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample CRPS:
-    #> [1] 2832.494
+    #> [1] 2892.767
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -524,6 +528,7 @@ families. Currently, the package can handle data for the following:
 - `poisson()` for count data
 - `nb()` for overdispersed count data
 - `tweedie()` for overdispersed count data
+- `nmix()` for count data with imperfect detection
 
 Note that only `poisson()`, `nb()`, and `tweedie()` are available if
 using `JAGS`. All families, apart from `tweedie()`, are supported if
@@ -587,41 +592,41 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Observation precision parameter estimates:
 #>        2.5% 50% 97.5% Rhat n_eff
-#> phi[1]  5.5 8.3    12    1  1641
-#> phi[2]  5.6 8.6    13    1  1725
-#> phi[3]  5.8 8.5    12    1  2063
+#> phi[1]  5.4 8.3    12    1  1692
+#> phi[2]  5.6 8.7    13    1  1512
+#> phi[3]  5.6 8.4    12    1  1786
 #> 
 #> GAM coefficient (beta) estimates:
-#>              2.5%  50% 97.5% Rhat n_eff
-#> (Intercept) -0.24 0.18  0.45    1   799
+#>              2.5% 50% 97.5% Rhat n_eff
+#> (Intercept) -0.15 0.2  0.46 1.01   891
 #> 
 #> Approximate significance of GAM observation smooths:
 #>                           edf Chi.sq p-value    
-#> s(season)                5.00  16.30 1.1e-05 ***
-#> s(season):seriesseries_1 3.83   0.12    0.97    
-#> s(season):seriesseries_2 3.72   0.08    0.99    
-#> s(season):seriesseries_3 3.78   0.83    0.57    
+#> s(season)                5.00  15.00 1.2e-05 ***
+#> s(season):seriesseries_1 3.82   0.12    0.98    
+#> s(season):seriesseries_2 3.94   0.09    0.98    
+#> s(season):seriesseries_3 3.99   0.74    0.51    
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
 #>              2.5%  50% 97.5% Rhat n_eff
-#> alpha_gp[1] 0.046 0.42  0.95    1   573
-#> alpha_gp[2] 0.350 0.71  1.30    1  1098
-#> alpha_gp[3] 0.180 0.48  0.97    1  1077
-#> rho_gp[1]   1.200 3.90 13.00    1  1487
-#> rho_gp[2]   1.700 7.30 34.00    1   399
-#> rho_gp[3]   1.400 4.90 20.00    1   834
+#> alpha_gp[1] 0.095 0.42  0.94 1.00   793
+#> alpha_gp[2] 0.370 0.73  1.30 1.00   901
+#> alpha_gp[3] 0.150 0.46  0.94 1.00   899
+#> rho_gp[1]   1.200 3.80 13.00 1.01   451
+#> rho_gp[2]   1.800 7.50 33.00 1.03   254
+#> rho_gp[3]   1.200 4.60 19.00 1.00  1281
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
-#> 4 of 2000 iterations ended with a divergence (0.2%)
+#> 3 of 2000 iterations ended with a divergence (0.15%)
 #>  *Try running with larger adapt_delta to remove the divergences
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Wed Dec 06 5:19:47 PM 2023.
+#> Samples were drawn using NUTS(diag_e) at Mon Jan 15 8:59:01 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -637,11 +642,11 @@ for(i in 1:3){
 ```
 
     #> Out of sample CRPS:
-    #> [1] 2.09906
+    #> [1] 2.079879
     #> Out of sample CRPS:
-    #> [1] 1.843141
+    #> [1] 1.843941
     #> Out of sample CRPS:
-    #> [1] 1.754107
+    #> [1] 1.728574
 
 <img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />
 

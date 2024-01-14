@@ -10,4 +10,4 @@ utils::globalVariables(c("y", "year", "smooth_vals", "smooth_num",
                          "term", "data_test", "object", "row_num", "trends_test",
                          "trend", "trend_series", "trend_y", ".", "gam",
                          "group", "mod", "row_id", "byvar", "direction",
-                         "index..time..index"))
+                         "index..time..index", "trend_test"))
