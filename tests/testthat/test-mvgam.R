@@ -31,7 +31,7 @@ test_that("response variable must follow family-specific restrictions", {
                             data = gaus_data$data_train,
                             family = poisson(),
                             run_model = FALSE),
-               'Values < 0 not allowed for poisson responses')
+               'Values < 0 not allowed for count family responses')
 })
 
 test_that("trend_model must be correctly specified", {

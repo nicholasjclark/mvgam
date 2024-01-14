@@ -41,8 +41,8 @@ validate_series_time = function(data, name = 'data'){
     identical(as.numeric(sort(time)),
               as.numeric(seq.int(from = min_time, to = max_time)))
   }
-  min_time <- min(data$time)
-  max_time <- max(data$time)
+  min_time <- as.numeric(min(data$time))
+  max_time <- as.numeric(max(data$time))
   data.frame(series = data$series,
              time = data$time) %>%
     dplyr::group_by(series) %>%
@@ -58,7 +58,7 @@ validate_series_time = function(data, name = 'data'){
 }
 
 #'@noRd
-validate_family = function(family){
+validate_family = function(family, use_stan = TRUE){
   if(is.character(family)){
     if(family == 'beta')
       family <- betar()
@@ -87,6 +87,10 @@ validate_family = function(family){
   if(family$family == 'tweedie')
     insight::check_if_installed("tweedie",
                                 reason = 'to simulate from Tweedie distributions')
+
+  if(!family$family %in% c('poisson', 'negative binomial', 'tweedie') & !use_stan)
+    stop('JAGS only supports poisson(), nb() or tweedie() families',
+         call. = FALSE)
   return(family)
 }
 
@@ -111,7 +115,7 @@ validate_family_resrictions = function(response, family){
   if(family$family %in%  c('poisson', 'negative binomial',
                            'tweedie')){
     if(any(response < 0)){
-      stop(paste0('Values < 0 not allowed for ', family$family, ' responses'),
+      stop(paste0('Values < 0 not allowed for count family responses'),
            call. = FALSE)
     }
   }
@@ -253,6 +257,25 @@ validate_pos_integer = function(x){
            call. = FALSE)
     }
   }
+}
+
+#'@noRd
+validate_pos_integers = function(x){
+  s <- substitute(x)
+
+  val_pos = function(y, s){
+    y <- base::suppressWarnings(as.numeric(y))
+    if(sign(y) != 1){
+      stop("Negative values in ", s, " detected",
+           call. = FALSE)
+    } else {
+      if(y%%1 != 0){
+        stop("Non-integer values in ", s, " detected",
+             call. = FALSE)
+      }
+    }
+  }
+  res <- lapply(seq_along(x), function(i) val_pos(x[i], s))
 }
 
 #'@noRd

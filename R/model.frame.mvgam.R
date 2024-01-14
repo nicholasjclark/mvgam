@@ -26,8 +26,10 @@ model.frame.mvgam = function(formula, trend_effects = FALSE, ...){
     # Now add the observed response, in case there are any
     # NAs there that need to be updated
     out[,resp] <- formula$obs_data$y
-  }
 
+    # Ensure 'cap' is included if this is an N-mixture model
+    out$cap <- formula$obs_data$cap
+  }
   return(out)
 }
 
@@ -52,6 +54,9 @@ model.frame.mvgam_prefit = function(formula, trend_effects = FALSE, ...){
     # NAs there that need to be updated
     out[,resp] <- formula$obs_data$y
   }
+
+  # Ensure 'cap' is included if this is an N-mixture model
+  out$cap <- formula$obs_data$cap
 
   return(out)
 }

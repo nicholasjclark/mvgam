@@ -1,16 +1,16 @@
 Package: mvgam
 Title: Multivariate (Dynamic) Generalized Additive Models
-Version: 1.0.9
-Date: 2023-12-21
+Version: 1.0.91
+Date: 2024-01-12
 Authors@R:
     person("Nicholas J", "Clark", , "nicholas.j.clark1214@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0001-7131-3301"))
 Description: Fit Bayesian Dynamic Generalised Additive Models to sets of time series. 
              The primary purpose of the package is to build dynamic nonlinear models that incorporate 
-             the flexibility of GAMs in the linear predictor and latent trend components that are useful 
-             for time series analysis and forecasting. Estimation is performed using Markov Chain Monte Carlo (MCMC) with
-             either the Gibbs sampling software JAGS or with Hamiltonian Monte Carlo in the software Stan. The package also includes 
-             utilities for online updating of  forecast distributions with a recursive particle filter that 
+             the flexibility of GAMs in observation and latent (possibly dynamic) process components 
+             for time series analysis and forecasting. Estimation is performed using Markov Chain Monte Carlo (MCMC)
+             with Hamiltonian Monte Carlo in the software Stan. The package also includes 
+             utilities for online updating of forecast distributions with a recursive particle filter that 
              uses sequential importance sampling to assimilate new observations as they become available. 
              References: Clark & Wells (2022) <https://doi.org/10.1111/2041-210X.13974>.
 URL: https://github.com/nicholasjclark/mvgam, https://nicholasjclark.github.io/mvgam/

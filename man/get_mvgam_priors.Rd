@@ -23,7 +23,8 @@ get_mvgam_priors(
 for a GLM except that smooth terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying
 \code{dynamic()} terms, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors
-(or linear functionals of these). Details of the formula syntax used by \pkg{mvgam}
+(or linear functionals of these). In \code{nmix()} family models, the \code{formula} is used to
+set up a linear predictor for the detection probability. Details of the formula syntax used by \pkg{mvgam}
 can be found in \code{\link{mvgam_formulae}}}
 
 \item{trend_formula}{An optional \code{character} string specifying the GAM process model formula. If
@@ -33,7 +34,9 @@ of the formula (i.e. a valid option would be \code{~ season + s(year)}). Also no
 the identifier \code{series} in this formula to specify effects that vary across time series. Instead you should use
 \code{trend}. This will ensure that models in which a \code{trend_map} is supplied will still work consistently
 (i.e. by allowing effects to vary across process models, even when some time series share the same underlying
-process model). This feature is only currently available for \code{RW()}, \code{AR()} and \code{VAR()} trend models}
+process model). This feature is only currently available for \code{RW()}, \code{AR()} and \code{VAR()} trend models.
+In \code{nmix()} family models, the \code{trend_formula} is used to set up a linear predictor for the underlying
+latent abundance}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula}. Should include columns:
@@ -54,7 +57,11 @@ families are:
 \item\code{betar()} for proportional data on \verb{(0,1)}
 \item\code{lognormal()} for non-negative real-valued data
 \item\code{student_t()} for real-valued data
-\item\code{Gamma()} for non-negative real-valued data}
+\item\code{Gamma()} for non-negative real-valued data
+\item\code{nmix()} for count data with imperfect detection modeled via a
+State-Space N-Mixture model. The latent states are Poisson, capturing the 'true' latent
+abundance, while the observation process is Binomial to account for imperfect detection.
+See \code{\link{mvgam_families}} for an example of how to use this family}
 Note that only \code{nb()} and \code{poisson()} are available if using \code{JAGS} as the backend.
 Default is \code{poisson()}.
 See \code{\link{mvgam_families}} for more details}

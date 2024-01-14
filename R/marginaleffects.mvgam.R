@@ -282,6 +282,15 @@ find_predictors.mvgam = function(x, effects = c('fixed',
   } else {
     preds <- obs_preds
   }
+
+  if(x$family == 'nmix'){
+    if(flatten){
+      preds <- c(preds, 'cap')
+    } else {
+      preds$conditional <- c(preds$conditional, 'cap')
+    }
+  }
+
   return(preds)
 }
 
@@ -322,6 +331,15 @@ find_predictors.mvgam_prefit = function(x, effects = c('fixed',
   } else {
     preds <- obs_preds
   }
+
+  if(x$family == 'nmix'){
+    if(flatten){
+      preds <- c(preds, 'cap')
+    } else {
+      preds$conditional <- c(preds$conditional, 'cap')
+    }
+  }
+
   return(preds)
 }
 

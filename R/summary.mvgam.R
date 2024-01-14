@@ -64,7 +64,6 @@ if(object$use_lv){
     cat("\nN latent factors:\n")
     cat(object$n_lv, '\n')
   }
-
 }
 
 cat('\nN series:\n')
@@ -297,10 +296,20 @@ if(object$use_lv){
                            variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder')))[,c(3:7)])
       } else {
         if(!is.null(object$trend_call)){
-          cat("\nProcess error parameter estimates:\n")
-          print(suppressWarnings(mcmc_summary(object$model_output, c('sigma', 'theta'),
-                             digits = digits,
-                             variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder')))[,c(3:7)])
+          if(inherits(object$trend_model, 'mvgam_trend')){
+            trend_model <- object$trend_model$trend_model
+          } else {
+            trend_model <- object$trend_model
+          }
+          if(trend_model == 'None'){
+
+          } else {
+            cat("\nProcess error parameter estimates:\n")
+            print(suppressWarnings(mcmc_summary(object$model_output, c('sigma', 'theta'),
+                                                digits = digits,
+                                                variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder')))[,c(3:7)])
+
+          }
         }
       }
     }
@@ -669,7 +678,8 @@ if(!is.null(object$trend_call)){
 
       } else {
         gam_sig_table <- gam_sig_table[!rownames(gam_sig_table) %in%
-                                         gsub('gp(', 's(', gp_names, fixed = TRUE),drop = FALSE]
+                                         gsub('gp(', 's(', gp_names, fixed = TRUE),,
+                                       drop = FALSE]
 
         cat("\nApproximate significance of GAM process smooths:\n")
         suppressWarnings(printCoefmat(gam_sig_table,

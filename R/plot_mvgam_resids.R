@@ -86,19 +86,19 @@ if(class(data_train)[1] == 'list'){
 }
 
 if(missing(data_test)){
-  # Resids and predictions for only the training period
-  series_residuals <- series_residuals[, 1:obs_length]
-
-  if(object$fit_engine == 'stan'){
-
-    # For stan objects, mus is stored as a vector in column-major order
-    linkfun <- family_invlinks(object$family)
-    preds <- linkfun(mcmc_chains(object$model_output, 'mus')[,seq(series,
-                                                                    dim(mcmc_chains(object$model_output, 'mus'))[2],
-                                                                    by = NCOL(object$ytimes))][, 1:obs_length])
-  } else {
-    preds <- mcmc_chains(object$model_output, 'mus')[,starts[series]:ends[series]][, 1:obs_length]
-  }
+  # # Resids and predictions for only the training period
+  # series_residuals <- series_residuals[, 1:obs_length]
+  #
+  # if(object$fit_engine == 'stan'){
+  #
+  #   # For stan objects, mus is stored as a vector in column-major order
+  #   linkfun <- family_invlinks(object$family)
+  #   preds <- linkfun(mcmc_chains(object$model_output, 'mus')[,seq(series,
+  #                                                                   dim(mcmc_chains(object$model_output, 'mus'))[2],
+  #                                                                   by = NCOL(object$ytimes))][, 1:obs_length])
+  # } else {
+  #   preds <- mcmc_chains(object$model_output, 'mus')[,starts[series]:ends[series]][, 1:obs_length]
+  # }
 
 } else {
 

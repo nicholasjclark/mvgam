@@ -75,6 +75,10 @@ test_that("predict has reasonable outputs", {
                c(300, NROW(beta_data$data_train)))
   expect_lt(max(beta_preds), 1.00000001)
   expect_gt(max(beta_preds), -0.0000001)
+
+  expect_error(predict(beta_gp, type = 'latent_N'),
+               '"latent_N" type only available for N-mixture models',
+               fixed = TRUE)
 })
 
 test_that("get_predict has reasonable outputs", {

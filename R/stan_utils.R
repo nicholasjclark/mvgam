@@ -2414,6 +2414,7 @@ add_trend_predictors = function(trend_formula,
                                 data_test,
                                 model_file,
                                 model_data,
+                                nmix = FALSE,
                                 drift = FALSE){
 
   #### Creating the trend mvgam model file and data structures ####
@@ -2428,9 +2429,14 @@ add_trend_predictors = function(trend_formula,
     trend_knots <- rlang::missing_arg()
   }
 
-  # Drop any intercept from the formula
-  if(attr(terms(trend_formula), 'intercept') == 1){
-    trend_formula <- update(trend_formula, trend_y  ~ . -1)
+  # Drop any intercept from the formula if this is not an N-mixture model
+  # as the intercept will almost surely be unidentifiable
+  if(!nmix){
+    if(attr(terms(trend_formula), 'intercept') == 1){
+      trend_formula <- update(trend_formula, trend_y  ~ . -1)
+    } else {
+      trend_formula <- update(trend_formula, trend_y  ~ .)
+    }
   } else {
     trend_formula <- update(trend_formula, trend_y  ~ .)
   }
@@ -2900,7 +2906,8 @@ add_trend_predictors = function(trend_formula,
   }
 
   # Add any parametric effect beta lines
-  if(length(attr(trend_mvgam$mgcv_model$pterms, 'term.labels')) != 0L){
+  if(length(attr(trend_mvgam$mgcv_model$pterms, 'term.labels')) != 0L ||
+     attr(terms(trend_formula), 'intercept') == 1){
     trend_parametrics <- TRUE
 
     smooth_labs <- do.call(rbind, lapply(seq_along(trend_mvgam$mgcv_model$smooth), function(x){

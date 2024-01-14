@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.91</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -61,7 +61,9 @@
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">tweedie</span><span class="op">(</span>link <span class="op">=</span> <span class="st">"log"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">student_t</span><span class="op">(</span>link <span class="op">=</span> <span class="st">"identity"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">student_t</span><span class="op">(</span>link <span class="op">=</span> <span class="st">"identity"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">nmix</span><span class="op">(</span>link <span class="op">=</span> <span class="st">"log"</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -76,12 +78,18 @@ be changed</p></dd>
     <p><code>mvgam</code> currently supports the following standard observation families:</p><ul><li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></code> with identity link, for real-valued data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></code> with log-link, for count data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma</a></code> with log-link, for non-negative real-valued data</p></li>
-</ul><p>In addition, the following extended families from the <code>mgcv</code> package are supported:</p><ul><li><p><code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar</a></code> with logit-link, for proportional data on <code>(0,1)</code></p></li>
+</ul><p>In addition, the following extended families from the <code>mgcv</code> and <code>brms</code> packages are supported:</p><ul><li><p><code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar</a></code> with logit-link, for proportional data on <code>(0,1)</code></p></li>
 <li><p><code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb</a></code> with log-link, for count data</p></li>
-</ul><p>Finally, <code>mvgam</code> supports the three extended families described here:</p><ul><li><p><code><a href="https://rdrr.io/pkg/brms/man/brmsfamily.html" class="external-link">lognormal</a></code> with identity-link, for non-negative real-valued data</p></li>
-<li><p><code>tweedie</code> with log-link, for count data (power parameter <code>p</code> fixed at <code>1.5</code>)</p></li>
-<li><p><code>student_t()</code> (or <code><a href="https://rdrr.io/pkg/brms/man/brmsfamily.html" class="external-link">student</a></code>) with identity-link, for real-valued data</p></li>
-</ul><p>Note that only <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code>nb()</code>, and <code>tweedie()</code> are available if
+<li><p><code><a href="https://paul-buerkner.github.io/brms/reference/brmsfamily.html" class="external-link">lognormal</a></code> with identity-link, for non-negative real-valued data</p></li>
+</ul><p>Finally, <code>mvgam</code> supports the three extended families described here:</p><ul><li><p><code>tweedie</code> with log-link, for count data (power parameter <code>p</code> fixed at <code>1.5</code>)</p></li>
+<li><p><code>student_t()</code> (or <code><a href="https://paul-buerkner.github.io/brms/reference/brmsfamily.html" class="external-link">student</a></code>) with identity-link, for real-valued data</p></li>
+<li><p><code>nmix</code> for count data with imperfect detection modeled via a
+State-Space N-Mixture model. The latent states are Poisson (with log link), capturing the 'true' latent
+abundance, while the observation process is Binomial to account for imperfect detection. The
+observation formula in these models is used to set up a linear predictor for the detection
+probability (with logit link). See the example below for a more detailed worked explanation
+of the <code>nmix()</code> family</p></li>
+</ul><p>Only <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code>nb()</code>, and <code>tweedie()</code> are available if
 using <code>JAGS</code>. All families, apart from <code>tweedie()</code>, are supported if
 using <code>Stan</code>.</p>
 <p>Note that currently it is not possible to change the default link
@@ -92,6 +100,10 @@ functions in <code>mvgam</code>, so any call to change these will be silently ig
     <p>Nicholas J Clark</p>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    
+    </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside></div>
 

@@ -67,12 +67,27 @@ logLik.mvgam = function(object,
   if(!missing(newdata)){
     all_dat <- data.frame(series = newdata$series,
                           y = newdata$y)
+
+    if(object$family == 'nmix'){
+      all_dat$cap <- newdata$cap
+    }
+
   } else {
     if(is.null(object$test_data)){
       all_dat <- data.frame(series = object$obs_data$series,
                             time = object$obs_data$time,
                             y = object$obs_data$y) %>%
         dplyr::arrange(time, series)
+
+      if(object$family == 'nmix'){
+        all_dat$cap <- data.frame(series = object$obs_data$series,
+                                  time = object$obs_data$time,
+                                  cap = object$obs_data$cap) %>%
+          dplyr::select(series, time, cap) %>%
+          dplyr::arrange(time, series) %>%
+          dplyr::pull(cap)
+      }
+
     } else {
       all_dat <- data.frame(series = c(object$obs_data$series,
                                        object$test_data$series),
@@ -81,6 +96,19 @@ logLik.mvgam = function(object,
                             y = c(object$obs_data$y,
                                   object$test_data$y)) %>%
         dplyr::arrange(time, series)
+
+      if(object$family == 'nmix'){
+        all_dat$cap <- data.frame(series =  c(object$obs_data$series,
+                                              object$test_data$series),
+                                  time = c(object$obs_data$time,
+                                           object$test_data$time),
+                                  cap = c(object$obs_data$cap,
+                                          object$test_data$cap)) %>%
+          dplyr::select(series, time, cap) %>%
+          dplyr::arrange(time, series) %>%
+          dplyr::pull(cap)
+      }
+
     }
   }
 
@@ -122,9 +150,22 @@ logLik.mvgam = function(object,
   # Log-likelihood as a vector
   Xp <- as.matrix(as.vector(mus))
   attr(Xp, 'model.offset') <- 0
+
+  if(family == 'nmix'){
+    Xp <- as.matrix(qlogis(as.vector(mcmc_chains(object$model_output, 'detprob'))))
+    attr(Xp, 'model.offset') <- 0
+    latent_lambdas <- exp(as.vector(mcmc_chains(object$model_output, 'trend')))
+    n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
+    cap <- as.vector(t(replicate(n_draws, all_dat$cap)))
+  } else {
+    latent_lambdas <- NULL
+    cap <- NULL
+  }
   log_lik_vec <- mvgam_predict(family = family,
                                family_pars = family_extracts,
                                truth = as.vector(truth_mat),
+                               latent_lambdas = latent_lambdas,
+                               cap = cap,
                                type = 'link',
                                Xp = Xp,
                                betas = 1,

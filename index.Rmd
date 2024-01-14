@@ -26,6 +26,7 @@ Install the development version from `GitHub` using:
 * `betar()` for proportional data on `(0,1)`
 * `poisson()` for count data
 * `nb()` for overdispersed count data
+* `nmix()` for count data with imperfect detection
 * `tweedie()` for overdispersed count data
   
 Note that only `poisson()`, `nb()`, and `tweedie()` are available if using `JAGS`. All families, apart from `tweedie()`, are supported if using `Stan`. See `??mvgam_families` for more information. Below is a simple example for simulating and modelling proportional data with `Beta` observations over a set of seasonal series with independent Gaussian Process dynamic trends:

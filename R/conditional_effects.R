@@ -17,7 +17,14 @@
 #'  Default is `TRUE`.
 #' @param ask `Logical`. Indicates if the user is prompted before a new page is plotted.
 #' Only used if plot is `TRUE`. Default is `FALSE`.
-#' @param type `character` specifying the scale of predictions (either 'response' or 'link')
+#' @param type `character` specifying the scale of predictions.
+#' When this has the value \code{link} (default) the linear predictor is calculated on the link scale.
+#' If \code{expected} is used, predictions reflect the expectation of the response (the mean)
+#' but ignore uncertainty in the observation process. When \code{response} is used,
+#' the predictions take uncertainty in the observation process into account to return
+#' predictions on the outcome scale. Two special cases are also allowed:
+#' type `latent_N` will return the estimated latent abundances from an N-mixture distribution,
+#' while type `detection` will return the estimated detection probability from an N-mixture distribution
 #' @param ... other arguments to pass to \code{\link[marginaleffects]{plot_predictions}}
 #' @return `conditional_effects` returns an object of class
 #' \code{mvgam_conditional_effects} which is a
@@ -76,7 +83,9 @@ conditional_effects.mvgam = function(x,
                                      ...){
 
   use_def_effects <- is.null(effects)
-  type <- match.arg(type, c('response', 'link'))
+  type <- match.arg(type, c('response', 'link',
+                            'detection', 'latent_N',
+                            'expected'))
   if(type == 'response'){
     if(points){
       points <- 0.5

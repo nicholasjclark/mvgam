@@ -15,7 +15,8 @@
 #'for a GLM except that smooth terms, `s()`, `te()`, `ti()`, `t2()`, as well as time-varying
 #'`dynamic()` terms, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors
-#'(or linear functionals of these). Details of the formula syntax used by \pkg{mvgam}
+#'(or linear functionals of these). In `nmix()` family models, the `formula` is used to
+#'set up a linear predictor for the detection probability. Details of the formula syntax used by \pkg{mvgam}
 #'can be found in \code{\link{mvgam_formulae}}
 #'@param trend_formula An optional \code{character} string specifying the GAM process model formula. If
 #'supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
@@ -24,7 +25,9 @@
 #'the identifier `series` in this formula to specify effects that vary across time series. Instead you should use
 #'`trend`. This will ensure that models in which a `trend_map` is supplied will still work consistently
 #'(i.e. by allowing effects to vary across process models, even when some time series share the same underlying
-#'process model). This feature is only currently available for `RW()`, `AR()` and `VAR()` trend models
+#'process model). This feature is only currently available for `RW()`, `AR()` and `VAR()` trend models.
+#'In `nmix()` family models, the `trend_formula` is used to set up a linear predictor for the underlying
+#'latent abundance
 #'@param knots An optional \code{list} containing user specified knot values to be used for basis construction.
 #'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
 #'(note that the number of knots is not always just `k`). Different terms can use different numbers of knots,
@@ -63,7 +66,11 @@
 #'   \item`betar()` for proportional data on `(0,1)`
 #'   \item`lognormal()` for non-negative real-valued data
 #'   \item`student_t()` for real-valued data
-#'   \item`Gamma()` for non-negative real-valued data}
+#'   \item`Gamma()` for non-negative real-valued data
+#'   \item`nmix()` for count data with imperfect detection modeled via a
+#'   State-Space N-Mixture model. The latent states are Poisson, capturing the 'true' latent
+#'   abundance, while the observation process is Binomial to account for imperfect detection.
+#'   See \code{\link{mvgam_families}} for an example of how to use this family}
 #'Note that only `nb()` and `poisson()` are available if using `JAGS` as the backend.
 #'Default is `poisson()`.
 #'See \code{\link{mvgam_families}} for more details
@@ -689,12 +696,26 @@ mvgam = function(formula,
   if(use_stan & run_model) find_stan()
 
   # Validate the family argument
-  family <- validate_family(family)
+  family <- validate_family(family, use_stan = use_stan)
   family_char <- match.arg(arg = family$family, choices = family_char_choices())
 
   # Validate the trend arguments
   orig_trend_model <- trend_model
   trend_model <- validate_trend_model(orig_trend_model, drift = drift)
+
+  # Check for N-mixture modifications
+  add_nmix <- FALSE
+  if(family_char == 'nmix'){
+    family <- poisson(); family_char <- 'poisson'; add_nmix <- TRUE
+    if(missing(trend_formula)){
+      stop('Argument "trend_formula" required for nmix models',
+           call. = FALSE)
+    }
+    use_lv <- TRUE
+    if(trend_model == 'None'){
+      trend_model <- 'RW'
+    }
+  }
 
   # Assess whether any additional moving average or correlated errors are needed
   ma_cor_adds <- ma_cor_additions(trend_model)
@@ -811,7 +832,11 @@ mvgam = function(formula,
   def_priors <- adapt_brms_priors(c(make_default_scales(orig_y,
                                                         family),
                                     make_default_int(orig_y,
-                                                     family)),
+                                                     family = if(add_nmix){
+                                                       nmix()
+                                                     } else {
+                                                       family
+                                                     })),
                                   formula = orig_formula,
                                   trend_formula = trend_formula,
                                   data = orig_data,
@@ -969,8 +994,6 @@ mvgam = function(formula,
   }
 
   # For any random effect smooths, use non-centred parameterisation to avoid degeneracies
-  # For any random effect smooths,
-  # use the non-centred parameterisation to avoid degeneracies
   # For monotonic smooths, need to determine which direction to place
   # coefficient constraints
   smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
@@ -1153,17 +1176,22 @@ mvgam = function(formula,
 
     } else {
 
-    X$index..time..index <- rbind(data_train, data_test[,1:NCOL(data_train)]) %>%
-      dplyr::left_join(rbind(data_train, data_test[,1:NCOL(data_train)]) %>%
-                         dplyr::select(time) %>%
-                         dplyr::distinct() %>%
-                         dplyr::arrange(time) %>%
-                         dplyr::mutate(time = dplyr::row_number()),
-                       by = c('time')) %>%
-      dplyr::pull(time)
+      if(NCOL(data_train) != NCOL(data_test)){
+        stop('"data" and "newdata" have different numbers of columns',
+             call. = FALSE)
+      }
+
+      X$index..time..index <- dplyr::bind_rows(data_train, data_test) %>%
+        dplyr::left_join(dplyr::bind_rows(data_train, data_test) %>%
+                           dplyr::select(time) %>%
+                           dplyr::distinct() %>%
+                           dplyr::arrange(time) %>%
+                           dplyr::mutate(time = dplyr::row_number()),
+                         by = c('time')) %>%
+        dplyr::pull(time)
 
     # Add a series identifier variable
-    X$series <- as.numeric(rbind(data_train, data_test)$series)
+    X$series <- as.numeric(dplyr::bind_rows(data_train, data_test)$series)
 
     # Add an outcome variable
     X$outcome <- c(data_train$y, rep(NA, NROW(data_test)))
@@ -1535,6 +1563,7 @@ mvgam = function(formula,
           },
           model_file = vectorised$model_file,
           model_data = vectorised$model_data,
+          nmix = add_nmix,
           drift = drift)
 
         vectorised$model_file <- trend_pred_setup$model_file
@@ -1655,6 +1684,19 @@ mvgam = function(formula,
                                          add_ma = add_ma,
                                          add_cor = add_cor,
                                          trend_model = trend_model)
+    }
+
+    # Add updates for an N-mixture model
+    if(add_nmix){
+      nmix_additions <- add_nmixture(vectorised$model_file,
+                                     vectorised$model_data,
+                                     orig_trend_model = orig_trend_model,
+                                     data_train = data_train,
+                                     data_test = data_test)
+      vectorised$model_file <- nmix_additions$model_file
+      vectorised$model_data <- nmix_additions$model_data
+      family <- nmix(); family_char <- 'nmix'
+      param <- c(param, 'detprob', 'latent_ypred')
     }
 
     # Tidy the representation
@@ -2182,14 +2224,12 @@ mvgam = function(formula,
       fit_engine = fit_engine,
       family = family_char,
       obs_data = data_train,
+      test_data = data_test,
       ytimes = ytimes)
     class(object) <- 'mvgam'
-    series_resids <- get_mvgam_resids(object,
-      n_cores = if(parallel){
-        min(c(chains, parallel::detectCores() - 1))
-        } else {
-          1
-        })
+    # Use the much faster vectorized residual
+    # calculation function now
+    series_resids <- dsresids_vec(object)
   }
 
   if(prior_simulation){

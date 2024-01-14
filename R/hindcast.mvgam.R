@@ -53,7 +53,7 @@ hindcast.mvgam = function(object, series = 'all',
                           ...){
 
   # Check arguments
-  if (!(inherits(object, "mvgam"))) {
+  if(!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
 
@@ -80,7 +80,7 @@ hindcast.mvgam = function(object, series = 'all',
   }
 
   type <- match.arg(arg = type, choices = c("link", "response", "trend",
-                                            "expected"))
+                                            "expected", "latent_N", "detection"))
 
   if(series != 'all'){
     s_name <- levels(data_train$series)[series]
@@ -104,16 +104,30 @@ if(series == 'all'){
                          'link' = 'mus',
                          'expected' = 'mus',
                          'response' = 'ypred',
-                         'trend' = 'trend')
+                         'trend' = 'trend',
+                         'latent_N' = 'mus',
+                         'detection' = 'mus')
+    if(object$family == 'nmix' &
+       type == 'link'){
+      to_extract <- 'trend'
+    }
+
     if(object$fit_engine == 'stan'){
       preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
                                                                  dim(mcmc_chains(object$model_output, 'ypred'))[2],
-                                                                 by = NCOL(object$ytimes))][,1:last_train]
+                                                                 by = NCOL(object$ytimes)),
+                                                                 drop = FALSE][,1:last_train]
     } else {
-      preds <- mcmc_chains(object$model_output, to_extract)[,starts[series]:ends[series]][,1:last_train]
+      preds <- mcmc_chains(object$model_output, to_extract)[,starts[series]:ends[series],
+                                                            drop = FALSE][,1:last_train]
     }
 
-    if(type == 'expected'){
+    if(object$family == 'nmix' &
+       type == 'link'){
+      preds <- exp(preds)
+    }
+
+    if(type %in% c('expected', 'latent_N', 'detection')){
 
       # Extract family-specific parameters for this series
       family_pars <- extract_family_pars(object = object)
@@ -129,12 +143,42 @@ if(series == 'all'){
       # Compute expectations as one long vector
       Xpmat <- matrix(as.vector(preds))
       attr(Xpmat, 'model.offset') <- 0
-      preds <- matrix(as.vector(mvgam_predict(family = object$family,
-                                              Xp = Xpmat,
-                                              type = 'expected',
-                                              betas = 1,
-                                              family_pars = par_extracts)),
-                      nrow = NROW(preds))
+
+      if(object$family == 'nmix'){
+        preds <- mcmc_chains(object$model_output, 'detprob')[,object$ytimes[1:last_train, series],
+                                                             drop = FALSE]
+        Xpmat <- matrix(qlogis(as.vector(preds)))
+        attr(Xpmat, 'model.offset') <- 0
+        latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
+                                                                                   dim(mcmc_chains(object$model_output, 'ypred'))[2],
+                                                                                   by = NCOL(object$ytimes)),
+                                                                              drop = FALSE][,1:last_train])
+
+        latent_lambdas <- exp(latent_lambdas)
+        n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
+        cap <- as.vector(t(replicate(n_draws,
+                                     object$obs_data$cap[which(as.numeric(object$obs_data$series) == series)])))
+      } else {
+        latent_lambdas <- NULL
+        cap <- NULL
+      }
+
+      if(type == 'latent_N'){
+        preds <- mcmc_chains(object$model_output, 'latent_ypred')[,seq(series,
+                                                                       dim(mcmc_chains(object$model_output, 'ypred'))[2],
+                                                                       by = NCOL(object$ytimes)),
+                                                                  drop = FALSE][,1:last_train]
+      } else {
+        preds <- matrix(as.vector(mvgam_predict(family = object$family,
+                                                Xp = Xpmat,
+                                                latent_lambdas = latent_lambdas,
+                                                cap = cap,
+                                                type = type,
+                                                betas = 1,
+                                                family_pars = par_extracts)),
+                        nrow = NROW(preds))
+      }
+
     }
 
     preds
@@ -163,18 +207,32 @@ if(series == 'all'){
                        'link' = 'mus',
                        'expected' = 'mus',
                        'response' = 'ypred',
-                       'trend' = 'trend')
+                       'trend' = 'trend',
+                       'latent_N' = 'mus',
+                       'detection' = 'mus')
+
+  if(object$family == 'nmix' &
+     type == 'link'){
+    to_extract <- 'trend'
+  }
 
   # Extract forecasts
   if(object$fit_engine == 'stan'){
     preds <- mcmc_chains(object$model_output, to_extract)[,seq(series,
                                                                dim(mcmc_chains(object$model_output, 'ypred'))[2],
-                                                               by = NCOL(object$ytimes))]
+                                                               by = NCOL(object$ytimes)),
+                                                          drop = FALSE]
   } else {
-    preds <- mcmc_chains(object$model_output, to_extract)[,starts[series]:ends[series]]
+    preds <- mcmc_chains(object$model_output, to_extract)[,starts[series]:ends[series],
+                                                          drop = FALSE]
   }
 
-  if(type == 'expected'){
+  if(object$family == 'nmix' &
+     type == 'link'){
+    preds <- exp(preds)
+  }
+
+  if(type %in% c('expected', 'latent_N', 'detection')){
 
     # Compute expectations as one long vector
     Xpmat <- matrix(as.vector(preds))
@@ -190,12 +248,42 @@ if(series == 'all'){
     })
     names(par_extracts) <- names(family_pars)
 
+    if(object$family == 'nmix'){
+      preds <- mcmc_chains(object$model_output, 'detprob')[,object$ytimes[, series]]
+      Xpmat <- matrix(qlogis(as.vector(preds)))
+      attr(Xpmat, 'model.offset') <- 0
+
+      latent_lambdas <- as.vector(mcmc_chains(object$model_output, 'trend')[,seq(series,
+                                                                                 dim(mcmc_chains(object$model_output, 'ypred'))[2],
+                                                                                 by = NCOL(object$ytimes)),
+                                                                            drop = FALSE])
+      latent_lambdas <- exp(latent_lambdas)
+      cap <- object$obs_data$cap[which(as.numeric(object$obs_data$series) == series)]
+
+      n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
+      cap <- as.vector(t(replicate(n_draws,
+                                   object$obs_data$cap[which(as.numeric(object$obs_data$series) == series)])))
+
+    } else {
+      latent_lambdas <- NULL
+      cap <- NULL
+    }
+
+    if(type == 'latent_N'){
+      preds <- mcmc_chains(object$model_output, 'latent_ypred')[,seq(series,
+                                                                     dim(mcmc_chains(object$model_output, 'ypred'))[2],
+                                                                     by = NCOL(object$ytimes)),
+                                                                drop = FALSE]
+    } else {
     preds <- matrix(as.vector(mvgam_predict(family = object$family,
                                             Xp = Xpmat,
-                                            type = 'expected',
+                                            latent_lambdas = latent_lambdas,
+                                            cap = cap,
+                                            type = type,
                                             betas = 1,
                                             family_pars = par_extracts)),
                     nrow = NROW(preds))
+    }
   }
 
   # Extract hindcasts

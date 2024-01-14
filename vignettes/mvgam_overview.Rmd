@@ -46,6 +46,7 @@ Here $\alpha$ are the unknown intercepts, the $\boldsymbol{s}$'s are unknown smo
 |Beta (logit link)              | `betar()`       | Real values (proportional) in $[0,1]$             | $\phi$               |
 |Poisson (log link)           | `poisson()`     | Non-negative integers in $(0,1,2,...)$            | -                    |
 |Negative Binomial2 (log link)| `nb()`          | Non-negative integers in $(0,1,2,...)$            | $\phi$               |
+|Poisson Binomial N-mixture (log link)| `nmix()`  | Non-negative integers in $(0,1,2,...)$            | -               |
 
 For all supported observation families, any extra parameters that need to be estimated (i.e. the $\sigma$ in a Gaussian model or the $\phi$ in a Negative Binomial model) are estimated independently for each series. Note that default link functions cannot currently be changed in `mvgam`.
 

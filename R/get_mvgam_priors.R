@@ -222,13 +222,27 @@ get_mvgam_priors = function(formula,
   data_train <- validate_obs_formula(formula, data = data_train, refit = FALSE)
 
   # Validate the family argument
-  family <- validate_family(family)
+  family <- validate_family(family, use_stan = use_stan)
   family_char <- match.arg(arg = family$family,
                            choices = family_char_choices())
 
   # Validate the trend arguments
   orig_trend_model <- trend_model
   trend_model <- validate_trend_model(orig_trend_model, drift = drift)
+
+  # Check for N-mixture modifications
+  add_nmix <- FALSE
+  if(family_char == 'nmix'){
+    add_nmix <- TRUE
+    if(!(exists('cap', where = data_train))) {
+      stop('Max abundances must be supplied as a variable named "cap" for N-mixture models',
+           call. = FALSE)
+    }
+    use_lv <- TRUE
+    if(trend_model == 'None'){
+      trend_model <- 'RW'
+    }
+  }
 
   # Assess whether any additional moving average or correlated errors are needed
   ma_cor_adds <- ma_cor_additions(trend_model)
@@ -281,7 +295,7 @@ get_mvgam_priors = function(formula,
     }
 
     if(!trend_model %in% c('RW', 'AR1', 'AR2', 'AR3',
-                           'VAR1', 'VAR1cor', 'VARMA1,1cor')){
+                           'VAR1', 'VAR1cor', 'VARMA1,1cor', 'None')){
       stop('only RW, AR1, AR2, AR3 and VAR trends currently supported for trend predictor models',
            call. = FALSE)
     }
@@ -324,9 +338,13 @@ get_mvgam_priors = function(formula,
                                         fixed = TRUE),
                                    collapse = " "))
 
-    # Drop any intercept from the formula
-    if(attr(terms(trend_formula), 'intercept') == 1){
-      trend_formula <- update(trend_formula, trend_y  ~ . -1)
+    # Drop any intercept from the formula if this is not an N-mixture model
+    if(family_char != 'nmix'){
+      if(attr(terms(trend_formula), 'intercept') == 1){
+        trend_formula <- update(trend_formula, trend_y  ~ . -1)
+      } else {
+        trend_formula <- update(trend_formula, trend_y  ~ .)
+      }
     } else {
       trend_formula <- update(trend_formula, trend_y  ~ .)
     }
@@ -374,7 +392,7 @@ get_mvgam_priors = function(formula,
     # Modify some of the term names and return
     if(any(grepl('fixed effect', trend_prior_df$param_info))){
       para_lines <- grep('fixed effect', trend_prior_df$param_info)
-      for(i in seq_along(para_lines)){
+      for(i in para_lines){
         trend_prior_df$param_name[i] <- paste0(trend_prior_df$param_name[i], '_trend')
         trend_prior_df$prior[i] <- paste0(trimws(strsplit(trend_prior_df$prior[i],
                                                          "[~]")[[1]][1]),
@@ -384,6 +402,21 @@ get_mvgam_priors = function(formula,
                                           '_trend ~ normal(0, 1);')
       }
     }
+
+    if(any(grepl('(Intercept)', trend_prior_df$param_info))){
+      para_lines <- grep('(Intercept)', trend_prior_df$param_info)
+      for(i in para_lines){
+        trend_prior_df$param_name[i] <- paste0(trend_prior_df$param_name[i], '_trend')
+        trend_prior_df$prior[i] <- paste0(trimws(strsplit(trend_prior_df$prior[i],
+                                                          "[~]")[[1]][1]),
+                                          '_trend ~ student_t(3, 0, 2);')
+        trend_prior_df$example_change[i] <- paste0(trimws(strsplit(trend_prior_df$example_change[i],
+                                                                   "[~]")[[1]][1]),
+                                                   '_trend ~ normal(0, 1);')
+        trend_prior_df$param_info[i] <- '(Intercept) for the trend'
+      }
+    }
+
     trend_prior_df[] <- lapply(trend_prior_df, function(x)
       gsub("lambda", "lambda_trend", x))
     trend_prior_df[] <- lapply(trend_prior_df, function(x)
@@ -421,8 +454,18 @@ get_mvgam_priors = function(formula,
     # observation model
     if(drop_obs_intercept){
       if(any(grepl('Intercept', out$param_name))){
-        out <- out[-grep('Intercept', out$param_name),]
+        which_obs_int <- grep('Intercept', out$param_name) &
+          !grep('(Intercept)_trend', out$param_name)
+        if(length(which_obs_int) > 0L)
+          out <- out[-which_obs_int,]
       }
+    }
+
+    # Remove sigma prior if this is an N-mixture with no dynamics
+    if(add_nmix){
+      out <- out[-grep('vector<lower=0>[n_lv] sigma;',
+                       out$param_name,
+                       fixed = TRUE),]
     }
 
   } else {
@@ -1273,7 +1316,11 @@ make_default_int = function(response, family){
   if(all(is.na(response))){
     out <- prior_string("student_t(3, 0, 3.5)",
                         class = '(Intercept)')
-  } else {
+  } else if(family$family == 'nmix'){
+    # Intercept prior in N-Mixtures applies to avg detection probability
+    out <- prior_string("normal(0, 1.5)",
+                        class = '(Intercept)')
+    } else {
     resp_dat <- data.frame(y = response[!is.na(response)])
     int_prior <- get_prior(y ~ 1,
                            data = resp_dat,

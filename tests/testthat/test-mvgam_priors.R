@@ -74,7 +74,7 @@ test_that("response variable must follow family-specific restrictions", {
                                 trend_model = 'AR1',
                                 data = gaus_data$data_train,
                                 family = poisson()),
-               'Values < 0 not allowed for poisson responses')
+               'Values < 0 not allowed for count family responses')
 })
 
 test_that("default intercept prior should match brms implementation", {

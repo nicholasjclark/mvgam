@@ -11,7 +11,9 @@
 #'but ignore uncertainty in the observation process. When \code{response} is used,
 #'the predictions take uncertainty in the observation process into account to return
 #'predictions on the outcome scale. When \code{variance} is used, the variance of the response
-#'with respect to the mean (mean-variance relationship) is returned
+#'with respect to the mean (mean-variance relationship) is returned. Two special cases are also allowed:
+#' type `latent_N` will return the estimated latent abundances from an N-mixture distribution,
+#' while type `detection` will return the estimated detection probability from an N-mixture distribution
 #'@param process_error Logical. If \code{TRUE} and a dynamic trend model was fit,
 #'expected uncertainty in the process model is accounted for by using draws
 #'from the latent trend SD parameters. If \code{FALSE}, uncertainty in the latent trend
@@ -56,7 +58,19 @@ predict.mvgam = function(object, newdata,
   type <- match.arg(arg = type, choices = c("link",
                                             "expected",
                                             "response",
-                                            "variance"))
+                                            "variance",
+                                            "latent_N",
+                                            "detection"))
+
+  if(type == 'latent_N' & object$family != 'nmix'){
+    stop('"latent_N" type only available for N-mixture models',
+         call. = FALSE)
+  }
+
+  if(type == 'detection' & object$family != 'nmix'){
+    stop('"detection" type only available for N-mixture models',
+         call. = FALSE)
+  }
 
   # If a linear predictor was supplied for the latent process models, calculate
   # predictions by assuming the trend is stationary (this is basically what brms)
@@ -71,8 +85,12 @@ predict.mvgam = function(object, newdata,
 
     # Extract process error estimates
     if(attr(object$model_data, 'trend_model') %in% c('RW','AR1','AR2','AR3')){
-      family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
-                                                  'sigma'))
+      if(object$family == 'nmix'){
+        family_pars <- list(sigma_obs = .Machine$double.eps)
+      } else {
+        family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
+                                                    'sigma'))
+      }
     }
 
     if(attr(object$model_data, 'trend_model') %in% c('VAR1')){
@@ -255,15 +273,41 @@ predict.mvgam = function(object, newdata,
 
   # Pre-multiply the linear predictors, including any offset and trend
   # predictions if applicable
-  all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
-                                              function(row) Xp %*% row +
-                                                attr(Xp, 'model.offset')))) +
-                              trend_predictions)
+  if(family == 'nmix'){
+    all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
+                                                function(row) Xp %*% row +
+                                                  attr(Xp, 'model.offset')))))
+    latent_lambdas <- exp(trend_predictions)
+
+    if(!(exists('cap', where = newdata))) {
+      stop('Max abundances must be supplied as a variable named "cap" for N-mixture models',
+           call. = FALSE)
+    }
+
+    validate_pos_integers(newdata$cap)
+
+    if(any(is.na(newdata$cap)) | any(is.infinite(newdata$cap))){
+      stop(paste0('Missing or infinite values found for some "cap" terms'),
+           call. = FALSE)
+    }
+    cap <- as.vector(t(replicate(NROW(betas), newdata$cap)))
+
+  } else {
+    all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
+                                                function(row) Xp %*% row +
+                                                  attr(Xp, 'model.offset')))) +
+                                trend_predictions)
+    latent_lambdas <- NULL
+    cap <- NULL
+  }
+
   attr(all_linpreds, 'model.offset') <- 0
 
   # Calculate vectorized predictions
   predictions_vec <- mvgam_predict(family = family,
                                    Xp = all_linpreds,
+                                   latent_lambdas = latent_lambdas,
+                                   cap = cap,
                                    type = type,
                                    betas = 1,
                                    family_pars = family_extracts)

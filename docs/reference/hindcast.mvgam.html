@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.8</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.91</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -88,7 +88,9 @@ If <code>expected</code> is used, predictions reflect the expectation of the res
 but ignore uncertainty in the observation process. When <code>response</code> is used,
 the predictions take uncertainty in the observation process into account to return
 predictions on the outcome scale. When <code>variance</code> is used, the variance of the response
-with respect to the mean (mean-variance relationship) is returned</p></dd>
+with respect to the mean (mean-variance relationship) is returned. Two special cases are also allowed:
+type <code>latent_N</code> will return the estimated latent abundances from an N-mixture distribution,
+while type <code>detection</code> will return the estimated detection probability from an N-mixture distribution</p></dd>
 
 </dl></div>
     <div class="section level2">
