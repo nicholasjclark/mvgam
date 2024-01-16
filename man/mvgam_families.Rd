@@ -42,7 +42,7 @@ Finally, \code{mvgam} supports the three extended families described here:
 \item \code{nmix} for count data with imperfect detection modeled via a
 State-Space N-Mixture model. The latent states are Poisson (with log link), capturing the 'true' latent
 abundance, while the observation process is Binomial to account for imperfect detection. The
-observation formula in these models is used to set up a linear predictor for the detection
+observation \code{formula} in these models is used to set up a linear predictor for the detection
 probability (with logit link). See the example below for a more detailed worked explanation
 of the \code{nmix()} family
 }
@@ -166,7 +166,7 @@ abund_plots[[2]] +
 det_plot <- plot(conditional_effects(mod,
                                      type = 'detection',
                                      effects = 'rainfall'),
-                 plot = FALSE
+                 plot = FALSE)
 det_plot[[1]] +
   ylab('Pr(detection)')
 

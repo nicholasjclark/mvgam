@@ -104,7 +104,7 @@ latent abundance</p></dd>
 
 <dt>data</dt>
 <dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable and covariates
-required by the GAM <code>formula</code>. Should include columns:
+required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Should include columns:
 <code>series</code> (a <code>factor</code> index of the series IDs;the number of levels should be identical
 to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))
 <code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).

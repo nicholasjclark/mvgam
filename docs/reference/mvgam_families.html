@@ -86,7 +86,7 @@ be changed</p></dd>
 <li><p><code>nmix</code> for count data with imperfect detection modeled via a
 State-Space N-Mixture model. The latent states are Poisson (with log link), capturing the 'true' latent
 abundance, while the observation process is Binomial to account for imperfect detection. The
-observation formula in these models is used to set up a linear predictor for the detection
+observation <code>formula</code> in these models is used to set up a linear predictor for the detection
 probability (with logit link). See the example below for a more detailed worked explanation
 of the <code>nmix()</code> family</p></li>
 </ul><p>Only <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code>nb()</code>, and <code>tweedie()</code> are available if
@@ -102,7 +102,135 @@ functions in <code>mvgam</code>, so any call to change these will be silently ig
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
+<span class="r-in"><span><span class="co"># An N-mixture example using family nmix()</span></span></span>
+<span class="r-in"><span><span class="co"># Simulate data from a Poisson-Binomial N-Mixture model</span></span></span>
+<span class="r-in"><span><span class="co"># True abundance is predicted by a single nonlinear function of temperature</span></span></span>
+<span class="r-in"><span><span class="co"># as well as a nonlinear long-term trend (as a Gaussian Process function)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">gamdat</span> <span class="op">&lt;-</span> <span class="fu">gamSim</span><span class="op">(</span>n <span class="op">=</span> <span class="fl">80</span><span class="op">)</span>; <span class="va">N</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NROW</a></span><span class="op">(</span><span class="va">gamdat</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">abund_linpred</span> <span class="op">&lt;-</span> <span class="va">gamdat</span><span class="op">$</span><span class="va">y</span>; <span class="va">temperature</span> <span class="op">&lt;-</span> <span class="va">gamdat</span><span class="op">$</span><span class="va">x2</span></span></span>
+<span class="r-in"><span><span class="va">trend</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="fu">:::</span><span class="fu">sim_gp</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">0</span>, <span class="fl">0.1</span><span class="op">)</span>, alpha_gp <span class="op">=</span> <span class="fl">3</span>,</span></span>
+<span class="r-in"><span>                        rho_gp <span class="op">=</span> <span class="fl">16</span>, h <span class="op">=</span> <span class="va">N</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">true_abund</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">floor</a></span><span class="op">(</span><span class="fl">10</span> <span class="op">+</span> <span class="va">abund_linpred</span> <span class="op">+</span> <span class="va">trend</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Detection probability increases linearly with decreasing rainfall</span></span></span>
+<span class="r-in"><span><span class="va">rainfall</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">N</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">detect_linpred</span> <span class="op">&lt;-</span> <span class="fl">0.4</span> <span class="op">+</span> <span class="op">-</span><span class="fl">0.55</span> <span class="op">*</span> <span class="va">rainfall</span></span></span>
+<span class="r-in"><span><span class="va">detect_prob</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="va">detect_linpred</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Simulate observed counts</span></span></span>
+<span class="r-in"><span><span class="va">obs_abund</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="va">N</span>, size <span class="op">=</span> <span class="va">true_abund</span>, prob <span class="op">=</span> <span class="va">detect_prob</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Plot true and observed time series</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">true_abund</span>,</span></span>
+<span class="r-in"><span>     type <span class="op">=</span> <span class="st">'l'</span>,</span></span>
+<span class="r-in"><span>     ylab <span class="op">=</span> <span class="st">'Abundance'</span>,</span></span>
+<span class="r-in"><span>     xlab <span class="op">=</span> <span class="st">'Time'</span>,</span></span>
+<span class="r-in"><span>     ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">true_abund</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>     bty <span class="op">=</span> <span class="st">'l'</span>,</span></span>
+<span class="r-in"><span>     lwd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/lines.html" class="external-link">lines</a></span><span class="op">(</span><span class="va">obs_abund</span>, col <span class="op">=</span> <span class="st">'darkred'</span>, lwd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/title.html" class="external-link">title</a></span><span class="op">(</span>main <span class="op">=</span> <span class="st">'True = black; observed = red'</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Gather data into a dataframe suitable for mvgam modelling;</span></span></span>
+<span class="r-in"><span><span class="co"># This will require a 'cap' variable specifying the maximum K to marginalise</span></span></span>
+<span class="r-in"><span><span class="co"># over when estimating latent abundance (it does NOT have to be a fixed value)</span></span></span>
+<span class="r-in"><span><span class="va">model_dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span><span class="va">obs_abund</span>,</span></span>
+<span class="r-in"><span>                        <span class="va">temperature</span>,</span></span>
+<span class="r-in"><span>                        <span class="va">rainfall</span>,</span></span>
+<span class="r-in"><span>                        cap <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">obs_abund</span><span class="op">)</span> <span class="op">+</span> <span class="fl">20</span>,</span></span>
+<span class="r-in"><span>                        time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="va">N</span>,</span></span>
+<span class="r-in"><span>                        series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="st">'series1'</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Training and testing folds</span></span></span>
+<span class="r-in"><span><span class="va">data_train</span> <span class="op">&lt;-</span> <span class="va">model_dat</span> <span class="op"><a href="pipe.html">%&gt;%</a></span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">time</span> <span class="op">&lt;=</span> <span class="fl">74</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">data_test</span> <span class="op">&lt;-</span> <span class="va">model_dat</span> <span class="op"><a href="pipe.html">%&gt;%</a></span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">time</span> <span class="op">&gt;</span> <span class="fl">74</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Fit a model with informative priors on the two intercept parameters</span></span></span>
+<span class="r-in"><span><span class="co"># and on the length scale of the GP temporal trend parameter</span></span></span>
+<span class="r-in"><span><span class="co"># Note that the 'trend_formula' applies to the latent count process</span></span></span>
+<span class="r-in"><span><span class="co"># (a Poisson process with log-link), while the 'formula' applies to the</span></span></span>
+<span class="r-in"><span><span class="co"># detection probability (logit link)</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span>formula <span class="op">=</span> <span class="va">obs_abund</span> <span class="op">~</span> <span class="va">rainfall</span>,</span></span>
+<span class="r-in"><span>             trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">temperature</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>               <span class="fu">gp</span><span class="op">(</span><span class="va">time</span>, k <span class="op">=</span> <span class="fl">10</span>, c <span class="op">=</span> <span class="fl">5</span><span class="op">/</span><span class="fl">4</span>, scale <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>             family <span class="op">=</span> <span class="fu">nmix</span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>             data <span class="op">=</span> <span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>             newdata <span class="op">=</span> <span class="va">data_test</span>,</span></span>
+<span class="r-in"><span>             priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu">prior</span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'(Intercept)'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                        <span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'(Intercept)_trend'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                        <span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">15</span>, <span class="fl">5</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'rho_gp_trend(time)'</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Model summary and diagnostics</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'residuals'</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Intercept parameters</span></span></span>
+<span class="r-in"><span><span class="fu">mcmc_plot</span><span class="op">(</span><span class="va">mod</span>,</span></span>
+<span class="r-in"><span>          variable <span class="op">=</span> <span class="st">"Intercept"</span>,</span></span>
+<span class="r-in"><span>          regex <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span>          type <span class="op">=</span> <span class="st">'hist'</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Hindcasts and forecasts of latent abundance (with truth overlain)</span></span></span>
+<span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'latent_N'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/graphics/points.html" class="external-link">points</a></span><span class="op">(</span><span class="va">true_abund</span>, pch <span class="op">=</span> <span class="fl">16</span>, cex <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Latent abundance predictions are restricted based on 'cap'</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">model_dat</span><span class="op">$</span><span class="va">cap</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">fc</span><span class="op">$</span><span class="va">forecasts</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Hindcasts and forecasts of detection probability (with truth overlain)</span></span></span>
+<span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/graphics/points.html" class="external-link">points</a></span><span class="op">(</span><span class="va">detect_prob</span>, pch <span class="op">=</span> <span class="fl">16</span>, cex <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Hindcasts and forecasts of observations</span></span></span>
+<span class="r-in"><span><span class="co"># (after accounting for detection error)</span></span></span>
+<span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'response'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Hindcasts and forecasts of response expectations</span></span></span>
+<span class="r-in"><span><span class="co"># (with truth overlain)</span></span></span>
+<span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span>object <span class="op">=</span> <span class="va">mod</span>, type <span class="op">=</span> <span class="st">'expected'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/graphics/points.html" class="external-link">points</a></span><span class="op">(</span><span class="va">detect_prob</span> <span class="op">*</span> <span class="va">true_abund</span>, pch <span class="op">=</span> <span class="fl">16</span>, cex <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Plot conditional effects</span></span></span>
+<span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Effects on true abundance can be visualised using type = 'link'</span></span></span>
+<span class="r-in"><span><span class="va">abund_plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>,</span></span>
+<span class="r-in"><span>                                        type <span class="op">=</span> <span class="st">'link'</span>,</span></span>
+<span class="r-in"><span>                                        effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'temperature'</span>, <span class="st">'time'</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                    plot <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Effect of temperature on abundance</span></span></span>
+<span class="r-in"><span><span class="va">abund_plots</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Latent abundance'</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Long-term trend in abundance</span></span></span>
+<span class="r-in"><span><span class="va">abund_plots</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Latent abundance'</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Effect of rainfall on detection probability</span></span></span>
+<span class="r-in"><span><span class="va">det_plot</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>,</span></span>
+<span class="r-in"><span>                                     type <span class="op">=</span> <span class="st">'detection'</span>,</span></span>
+<span class="r-in"><span>                                     effects <span class="op">=</span> <span class="st">'rainfall'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                 plot <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">det_plot</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># More targeted plots can use marginaleffects capabilities;</span></span></span>
+<span class="r-in"><span><span class="co"># Here visualise how response predictions might change</span></span></span>
+<span class="r-in"><span><span class="co"># if we considered different possible 'cap' limits on latent</span></span></span>
+<span class="r-in"><span><span class="co"># abundance and different rainfall measurements</span></span></span>
+<span class="r-in"><span><span class="fu">plot_predictions</span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">'temperature'</span>,</span></span>
+<span class="r-in"><span>                                       cap <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">15</span>, <span class="fl">20</span>, <span class="fl">40</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                       rainfall <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                type <span class="op">=</span> <span class="st">'response'</span>,</span></span>
+<span class="r-in"><span>                conf_level <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Observed abundance'</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">}</span></span></span>
+</code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside></div>

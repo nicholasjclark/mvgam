@@ -43,6 +43,14 @@ and uses less memory than `Rstan`. See [this documentation from the
 `Cmdstan` team for more
 information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan).
 
+## Introductory seminar
+
+<div class="vembedr">
+<div>
+<iframe src="https://www.youtube.com/embed/0zZopLlomsQ" width="533" height="300" frameborder="0" allowfullscreen="" data-external="1"></iframe>
+</div>
+</div>
+
 ## Cheatsheet
 
 [![`mvgam` usage

@@ -39,7 +39,7 @@ In \code{nmix()} family models, the \code{trend_formula} is used to set up a lin
 latent abundance}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
-required by the GAM \code{formula}. Should include columns:
+required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:
 \code{series} (a \code{factor} index of the series IDs;the number of levels should be identical
 to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
 \code{time} (\code{numeric} or \code{integer} index of the time point for each observation).

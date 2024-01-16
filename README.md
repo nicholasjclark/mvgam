@@ -38,7 +38,7 @@ been compiled:
 
 Install from `GitHub` using:
 `devtools::install_github("nicholasjclark/mvgam")`. Note that to
-condition models with MCMC sampling, either `JAGS` (along with packages
+condition models on observed data, either `JAGS` (along with packages
 `rjags` and `runjags`) or `Stan` must be installed (along with either
 `rstan` and/or `cmdstanr`). Please refer to installation links for
 `JAGS` <a href="https://sourceforge.net/projects/mcmc-jags/files/"
@@ -317,29 +317,29 @@ summary(lynx_mvgam)
 #> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>               2.5%    50% 97.5% Rhat n_eff
-#> (Intercept)   6.10  6.600 7.000 1.00   355
-#> s(season).1  -0.59  0.046 0.710 1.00  1022
-#> s(season).2  -0.26  0.770 1.800 1.00   443
-#> s(season).3  -0.12  1.100 2.400 1.00   399
-#> s(season).4  -0.51  0.410 1.300 1.00   890
-#> s(season).5  -1.20 -0.130 0.950 1.01   503
-#> s(season).6  -1.00 -0.011 1.100 1.01   699
-#> s(season).7  -0.71  0.340 1.400 1.00   711
-#> s(season).8  -0.92  0.180 1.800 1.00   371
-#> s(season).9  -1.10 -0.290 0.710 1.00   476
-#> s(season).10 -1.30 -0.660 0.027 1.00   595
+#>                2.5%     50%  97.5% Rhat n_eff
+#> (Intercept)   6.200  6.6000  7.000    1  1020
+#> s(season).1  -0.590  0.0500  0.700    1  1094
+#> s(season).2  -0.240  0.8100  1.800    1   417
+#> s(season).3  -0.057  1.2000  2.500    1   365
+#> s(season).4  -0.510  0.4200  1.400    1   951
+#> s(season).5  -1.200 -0.1400  1.000    1   538
+#> s(season).6  -1.100  0.0074  1.100    1   632
+#> s(season).7  -0.790  0.3800  1.400    1   847
+#> s(season).8  -1.000  0.2900  1.800    1   413
+#> s(season).9  -1.100 -0.2700  0.670    1   574
+#> s(season).10 -1.400 -0.6900 -0.025    1   641
 #> 
 #> Approximate significance of GAM observation smooths:
-#>            edf Chi.sq p-value
-#> s(season) 5.08  17751    0.25
+#>           edf Chi.sq p-value
+#> s(season)   5  17851    0.28
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n_eff
-#> ar1[1]    0.74  1.10 1.400    1   635
-#> ar2[1]   -0.84 -0.40 0.062    1  1514
-#> ar3[1]   -0.47 -0.13 0.290    1   540
-#> sigma[1]  0.40  0.50 0.640    1  1154
+#> ar1[1]    0.74  1.10 1.400    1   695
+#> ar2[1]   -0.82 -0.41 0.045    1  1630
+#> ar3[1]   -0.47 -0.12 0.280    1   453
+#> sigma[1]  0.40  0.50 0.630    1  1101
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -348,7 +348,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Mon Jan 15 8:57:57 AM 2024.
+#> Samples were drawn using NUTS(diag_e) at Tue Jan 16 8:42:08 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -470,7 +470,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-21-1.png" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample CRPS:
-    #> [1] 2892.767
+    #> [1] 2856.97
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -626,7 +626,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Mon Jan 15 8:59:01 AM 2024.
+#> Samples were drawn using NUTS(diag_e) at Tue Jan 16 8:44:20 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
