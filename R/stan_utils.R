@@ -2393,11 +2393,18 @@ if(trend_model != 'VAR1'){
            "matrix[n_series, n_lv] Z; // matrix mapping series to latent trends")
   model_file <- readLines(textConnection(model_file), n = -1)
 
+  # Z <- matrix(0, NCOL(ytimes), n_lv)
+  # for(i in 1:NROW(trend_map)){
+  #   Z[as.numeric(data_train$series)[trend_map$series[i]],
+  #            trend_map$trend[i]] <- 1
+  # }
+
   Z <- matrix(0, NCOL(ytimes), n_lv)
   for(i in 1:NROW(trend_map)){
-    Z[as.numeric(data_train$series)[trend_map$series[i]],
-             trend_map$trend[i]] <- 1
+    rowid <- which(levels(data_train$series) == trend_map$series[i])
+    Z[rowid, trend_map$trend[i]] <- 1
   }
+
 
   model_data$Z <- Z
   return(list(model_file = model_file,

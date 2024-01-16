@@ -396,13 +396,20 @@ plot_mvgam_series = function(object,
            xaxt = 'n',
            ylim = range(c(truth), na.rm = TRUE),
            xlim = c(0, length(c(truth))))
-      axis(side = 1,
-           at = floor(seq(0, max(data_train$time) -
-                            (min(data_train$time)-1),
-                          length.out = 6)),
-           labels = floor(seq(min(data_train$time),
-                              max(data_train$time),
-                              length.out = 6)))
+      if(max(data_train$time < 6)){
+        axis(side = 1,
+             at = 0:(max(data_train$time) - 1),
+             labels = 1:max(data_train$time))
+      } else {
+        axis(side = 1,
+             at = floor(seq(0, max(data_train$time) -
+                              (min(data_train$time)-1),
+                            length.out = 6)),
+             labels = floor(seq(min(data_train$time),
+                                max(data_train$time),
+                                length.out = 6)))
+      }
+
       title('Time series', line = 0)
       title(ylab = ylab, line = 1.5)
       title(xlab = "Time", line = 1.5)

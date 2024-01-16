@@ -884,7 +884,7 @@ mvgam = function(formula,
     # If no smooth terms are included, jagam will fail; so add a fake one and remove
     # it from the model and data structures later
     data_train$fakery <- rnorm(length(data_train$y))
-    form_fake <- update.formula(formula, ~ . + s(fakery))
+    form_fake <- update.formula(formula, ~ . + s(fakery, k = 3))
     fakery_names <- names(suppressWarnings(mgcv::gam(form_fake,
                                                      data = data_train,
                                                      family = family_to_mgcvfam(family),
