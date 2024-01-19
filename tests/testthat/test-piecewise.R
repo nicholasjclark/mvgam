@@ -65,3 +65,37 @@ test_that("logistic should error if cap has NAs after link transformation", {
                paste0('Missing or infinite values found for some "cap" terms\n',
                'after transforming to the log link scale'))
 })
+
+# Make sure cap is in the right order
+y <- rpois(100, ts + 5)
+df <- rbind(data.frame(y = y,
+                 time = 1:100,
+                 series = as.factor('series1'),
+                 cap = y + 20,
+                 fake = rnorm(100)),
+            data.frame(y = y + 2,
+                       time = 1:100,
+                       series = as.factor('series2'),
+                       cap = y + 22,
+                       fake = rnorm(100)))
+
+test_that("logistic caps should be included in the correct order", {
+  mod <- mvgam(formula = y ~ 0,
+                     data = df,
+                     trend_model = PW(growth = 'logistic',
+                                      n_changepoints = 10),
+                     family = poisson(),
+                     run_model = FALSE,
+                     return_model_data = TRUE)
+
+  # caps should now be logged and in a matrix [1:n_timepoints, 1:n_series]
+  expect_true(all(mod$model_data$cap ==
+        log(cbind(df %>%
+                    dplyr::filter(series == 'series1') %>%
+                    dplyr::arrange(time) %>%
+                    dplyr::pull(cap),
+                  df %>%
+                    dplyr::filter(series == 'series2') %>%
+                    dplyr::arrange(time) %>%
+                    dplyr::pull(cap)))))
+})

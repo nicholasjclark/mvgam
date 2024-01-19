@@ -462,7 +462,7 @@ get_mvgam_priors = function(formula,
     }
 
     # Remove sigma prior if this is an N-mixture with no dynamics
-    if(add_nmix){
+    if(add_nmix & trend_model == 'None'){
       out <- out[-grep('vector<lower=0>[n_lv] sigma;',
                        out$param_name,
                        fixed = TRUE),]

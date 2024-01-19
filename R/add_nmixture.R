@@ -15,13 +15,36 @@ add_nmixture = function(model_file,
     stop('Max abundances must be supplied as a variable named "cap" for N-mixture models',
          call. = FALSE)
   }
-  cap <- data_train$cap
+
+  if(inherits(data_train, 'data.frame')){
+    cap = data_train %>%
+      dplyr::arrange(series, time) %>%
+      dplyr::pull(cap)
+  } else {
+    cap = data.frame(series = data_train$series,
+                     cap = data_train$cap,
+                     time = data_train$time)%>%
+      dplyr::arrange(series, time) %>%
+      dplyr::pull(cap)
+  }
+
   if(!is.null(data_test)){
     if(!(exists('cap', where = data_test))) {
       stop('Max abundances must be supplied in test data as a variable named "cap" for N-mixture models',
            call. = FALSE)
     }
-    cap <- c(cap, data_test$cap)
+    if(inherits(data_test, 'data.frame')){
+      captest = data_test %>%
+        dplyr::arrange(series, time) %>%
+        dplyr::pull(cap)
+    } else {
+      captest = data.frame(series = data_test$series,
+                           cap = data_test$cap,
+                           time = data_test$time)%>%
+        dplyr::arrange(series, time) %>%
+        dplyr::pull(cap)
+    }
+    cap <- c(cap, captest)
   }
 
   validate_pos_integers(cap)
@@ -33,7 +56,7 @@ add_nmixture = function(model_file,
 
   model_data$cap <- as.vector(cap)
 
-  if(any(model_data$cap < model_data$y)){
+  if(any(model_data$cap[model_data$obs_ind] < model_data$flat_ys)){
     stop(paste0('Some "cap" terms are < the observed counts. This is not allowed'),
          call. = FALSE)
   }
@@ -243,7 +266,7 @@ add_nmixture = function(model_file,
                                                        'array[n, n_series] int latent_ypred;\n',
                                                        'array[total_obs] int latent_truncpred;\n',
                                                        'vector[n_nonmissing] flat_ps;\n',
-                                                       'int flat_caps[n_nonmissing];',
+                                                       'int flat_caps[n_nonmissing];\n',
                                                        'vector[total_obs] flat_trends;\n',
                                                        'vector[n_nonmissing] flat_trends_nonmis;\n',
                                                        'vector[total_obs] detprob;\n',

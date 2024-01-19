@@ -1718,8 +1718,7 @@ mvgam = function(formula,
       # Auto-format the model file
       if(autoformat){
         if(requireNamespace('cmdstanr') & cmdstanr::cmdstan_version() >= "2.29.0") {
-          tmp_file <- cmdstanr::write_stan_file(vectorised$model_file)
-          vectorised$model_file <- .autoformat(tmp_file,
+          vectorised$model_file <- .autoformat(vectorised$model_file,
                                                overwrite_file = FALSE)
         }
         vectorised$model_file <- readLines(textConnection(vectorised$model_file),
@@ -1908,7 +1907,7 @@ mvgam = function(formula,
                                                cpp_options = list(stan_threads = TRUE))
           } else {
             cmd_mod <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(vectorised$model_file),
-                                               stanc_options = list('O1'))
+                                               stanc_options = list('O1'),)
           }
 
         } else {

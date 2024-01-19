@@ -77,7 +77,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2024-01-12</h4>
+            <h4 data-toc-skip class="date">2024-01-19</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/forecast_evaluation.Rmd" class="external-link"><code>vignettes/forecast_evaluation.Rmd</code></a></small>
       <div class="d-none name"><code>forecast_evaluation.Rmd</code></div>
@@ -211,15 +211,15 @@ possible:</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM coefficient (beta) estimates:</span></span>
-<span><span class="co">##              2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## (Intercept) -0.42 -0.22 -0.03 1.01   847</span></span>
+<span><span class="co">##              2.5%   50%  97.5% Rhat n_eff</span></span>
+<span><span class="co">## (Intercept) -0.41 -0.21 -0.039    1   813</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">##                          edf Chi.sq p-value   </span></span>
-<span><span class="co">## s(season)               3.71   9.25  0.0191 * </span></span>
-<span><span class="co">## s(time):seriesseries_1  7.55  13.18  0.0919 . </span></span>
-<span><span class="co">## s(time):seriesseries_2 11.05 346.28  0.0023 **</span></span>
-<span><span class="co">## s(time):seriesseries_3  6.24  16.78  0.0384 * </span></span>
+<span><span class="co">##                         edf Chi.sq p-value    </span></span>
+<span><span class="co">## s(season)              3.77   9.48 0.01603 *  </span></span>
+<span><span class="co">## s(time):seriesseries_1 6.50  13.64 0.09218 .  </span></span>
+<span><span class="co">## s(time):seriesseries_2 9.49 256.09 0.00021 ***</span></span>
+<span><span class="co">## s(time):seriesseries_3 5.93  16.79 0.04680 *  </span></span>
 <span><span class="co">## ---</span></span>
 <span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">## </span></span>
@@ -230,7 +230,7 @@ possible:</p>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Fri Jan 12 3:49:18 PM 2024.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Fri Jan 19 11:52:33 AM 2024.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
@@ -287,32 +287,32 @@ parameters for each time series:</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM coefficient (beta) estimates:</span></span>
 <span><span class="co">##             2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## (Intercept) -1.1 -0.53  0.19    1   700</span></span>
+<span><span class="co">## (Intercept) -1.1 -0.52  0.31    1   768</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM gp term marginal deviation (alpha) and length scale (rho) estimates:</span></span>
-<span><span class="co">##                               2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## alpha_gp(time):seriesseries_1 0.24  0.77   2.1 1.00  1090</span></span>
-<span><span class="co">## alpha_gp(time):seriesseries_2 0.75  1.40   3.0 1.01   900</span></span>
-<span><span class="co">## alpha_gp(time):seriesseries_3 0.48  1.10   2.5 1.00   900</span></span>
-<span><span class="co">## rho_gp(time):seriesseries_1   1.20  4.90  20.0 1.00   750</span></span>
-<span><span class="co">## rho_gp(time):seriesseries_2   2.20 11.00  17.0 1.00   512</span></span>
-<span><span class="co">## rho_gp(time):seriesseries_3   1.40  8.20  23.0 1.00   825</span></span>
+<span><span class="co">##                               2.5%  50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">## alpha_gp(time):seriesseries_1 0.21  0.8   2.1 1.01   763</span></span>
+<span><span class="co">## alpha_gp(time):seriesseries_2 0.74  1.4   2.9 1.00  1028</span></span>
+<span><span class="co">## alpha_gp(time):seriesseries_3 0.50  1.1   2.8 1.00  1026</span></span>
+<span><span class="co">## rho_gp(time):seriesseries_1   1.20  5.1  23.0 1.00   681</span></span>
+<span><span class="co">## rho_gp(time):seriesseries_2   2.20 10.0  17.0 1.00   644</span></span>
+<span><span class="co">## rho_gp(time):seriesseries_3   1.50  8.8  23.0 1.00   819</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
 <span><span class="co">##           edf Chi.sq p-value    </span></span>
-<span><span class="co">## s(season)   6   24.8 0.00028 ***</span></span>
+<span><span class="co">## s(season)   6     25 0.00016 ***</span></span>
 <span><span class="co">## ---</span></span>
 <span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
 <span><span class="co">## Rhat looks reasonable for all parameters</span></span>
-<span><span class="co">## 5 of 2000 iterations ended with a divergence (0.25%)</span></span>
+<span><span class="co">## 4 of 2000 iterations ended with a divergence (0.2%)</span></span>
 <span><span class="co">##  *Try running with larger adapt_delta to remove the divergences</span></span>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Fri Jan 12 3:50:20 PM 2024.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Fri Jan 19 11:53:19 AM 2024.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
@@ -395,22 +395,22 @@ distributions and true observations for each series in the data:</p>
 <span><span class="co">##   ..$ series_3: int [1:25] 1 0 0 1 0 0 1 0 1 0 ...</span></span>
 <span><span class="co">##  $ test_times        : int [1:25] 76 77 78 79 80 81 82 83 84 85 ...</span></span>
 <span><span class="co">##  $ hindcasts         :List of 3</span></span>
-<span><span class="co">##   ..$ series_1: num [1:2000, 1:75] 1 2 1 1 2 0 0 1 0 0 ...</span></span>
+<span><span class="co">##   ..$ series_1: num [1:2000, 1:75] 1 1 0 0 0 1 1 1 0 0 ...</span></span>
 <span><span class="co">##   .. ..- attr(*, "dimnames")=List of 2</span></span>
 <span><span class="co">##   .. .. ..$ : NULL</span></span>
 <span><span class="co">##   .. .. ..$ : chr [1:75] "ypred[1,1]" "ypred[2,1]" "ypred[3,1]" "ypred[4,1]" ...</span></span>
-<span><span class="co">##   ..$ series_2: num [1:2000, 1:75] 0 0 0 0 0 0 0 0 0 0 ...</span></span>
+<span><span class="co">##   ..$ series_2: num [1:2000, 1:75] 0 0 0 0 0 0 0 1 0 0 ...</span></span>
 <span><span class="co">##   .. ..- attr(*, "dimnames")=List of 2</span></span>
 <span><span class="co">##   .. .. ..$ : NULL</span></span>
 <span><span class="co">##   .. .. ..$ : chr [1:75] "ypred[1,2]" "ypred[2,2]" "ypred[3,2]" "ypred[4,2]" ...</span></span>
-<span><span class="co">##   ..$ series_3: num [1:2000, 1:75] 0 1 3 1 0 0 0 0 3 5 ...</span></span>
+<span><span class="co">##   ..$ series_3: num [1:2000, 1:75] 3 0 2 1 0 1 2 1 5 1 ...</span></span>
 <span><span class="co">##   .. ..- attr(*, "dimnames")=List of 2</span></span>
 <span><span class="co">##   .. .. ..$ : NULL</span></span>
 <span><span class="co">##   .. .. ..$ : chr [1:75] "ypred[1,3]" "ypred[2,3]" "ypred[3,3]" "ypred[4,3]" ...</span></span>
 <span><span class="co">##  $ forecasts         :List of 3</span></span>
-<span><span class="co">##   ..$ series_1: num [1:2000, 1:25] 1 0 0 0 0 1 1 0 1 0 ...</span></span>
-<span><span class="co">##   ..$ series_2: num [1:2000, 1:25] 3 1 1 1 1 0 1 0 5 0 ...</span></span>
-<span><span class="co">##   ..$ series_3: num [1:2000, 1:25] 0 3 2 1 0 0 2 2 1 0 ...</span></span>
+<span><span class="co">##   ..$ series_1: num [1:2000, 1:25] 1 3 2 1 0 0 1 1 0 0 ...</span></span>
+<span><span class="co">##   ..$ series_2: num [1:2000, 1:25] 6 0 0 0 0 2 0 0 0 0 ...</span></span>
+<span><span class="co">##   ..$ series_3: num [1:2000, 1:25] 0 1 1 3 3 1 3 2 4 2 ...</span></span>
 <span><span class="co">##  - attr(*, "class")= chr "mvgam_forecast"</span></span></code></pre>
 <p>We can plot the forecasts for each series from each model using the
 <code>S3 plot</code> method for objects of this class:</p>
@@ -418,32 +418,32 @@ distributions and true observations for each series in the data:</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_mod1</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
 <p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-19-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 13.96002</span></span></code></pre>
+<span><span class="co">## [1] 14.62964</span></span></code></pre>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_mod2</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
 <p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-19-2.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample DRPS:</span></span>
-<span><span class="co">## [1] 10.79944</span></span></code></pre>
+<span><span class="co">## [1] 10.92516</span></span></code></pre>
 <div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_mod1</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
 <p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-19-3.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 4.209141e+12</span></span></code></pre>
+<span><span class="co">## [1] 84201962708</span></span></code></pre>
 <div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_mod2</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
 <p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-19-4.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample DRPS:</span></span>
-<span><span class="co">## [1] 14.30626</span></span></code></pre>
+<span><span class="co">## [1] 14.31168</span></span></code></pre>
 <div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_mod1</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
 <p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-19-5.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample CRPS:</span></span>
-<span><span class="co">## [1] 41.10631</span></span></code></pre>
+<span><span class="co">## [1] 32.44136</span></span></code></pre>
 <div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_mod2</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
 <p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-19-6.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample DRPS:</span></span>
-<span><span class="co">## [1] 15.62831</span></span></code></pre>
+<span><span class="co">## [1] 15.44332</span></span></code></pre>
 <p>Clearly the two models do not produce equivalent forecasts. We will
 come back to scoring these forecasts in a moment.</p>
 </div>
@@ -477,7 +477,7 @@ previously:</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_mod2</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
 <p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-23-1.png" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample DRPS:</span></span>
-<span><span class="co">## [1] 10.75464</span></span></code></pre>
+<span><span class="co">## [1] 10.85762</span></span></code></pre>
 </div>
 <div class="section level2">
 <h2 id="scoring-forecast-distributions">Scoring forecast distributions<a class="anchor" aria-label="anchor" href="#scoring-forecast-distributions"></a>
@@ -494,55 +494,55 @@ absolute error using the full forecast distribution.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">crps_mod1</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## List of 4</span></span>
 <span><span class="co">##  $ series_1  :'data.frame':  25 obs. of  5 variables:</span></span>
-<span><span class="co">##   ..$ score         : num [1:25] 0.1975 0.1398 1.3519 NA 0.0359 ...</span></span>
+<span><span class="co">##   ..$ score         : num [1:25] 0.1938 0.1366 1.355 NA 0.0348 ...</span></span>
 <span><span class="co">##   ..$ in_interval   : num [1:25] 1 1 1 NA 1 1 1 1 1 1 ...</span></span>
 <span><span class="co">##   ..$ interval_width: num [1:25] 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 ...</span></span>
 <span><span class="co">##   ..$ eval_horizon  : int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span></span>
 <span><span class="co">##   ..$ score_type    : chr [1:25] "crps" "crps" "crps" "crps" ...</span></span>
 <span><span class="co">##  $ series_2  :'data.frame':  25 obs. of  5 variables:</span></span>
-<span><span class="co">##   ..$ score         : num [1:25] 0.362 0.349 0.941 0.492 0.558 ...</span></span>
+<span><span class="co">##   ..$ score         : num [1:25] 0.379 0.306 0.941 0.5 0.573 ...</span></span>
 <span><span class="co">##   ..$ in_interval   : num [1:25] 1 1 1 1 1 1 1 1 1 NA ...</span></span>
 <span><span class="co">##   ..$ interval_width: num [1:25] 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 ...</span></span>
 <span><span class="co">##   ..$ eval_horizon  : int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span></span>
 <span><span class="co">##   ..$ score_type    : chr [1:25] "crps" "crps" "crps" "crps" ...</span></span>
 <span><span class="co">##  $ series_3  :'data.frame':  25 obs. of  5 variables:</span></span>
-<span><span class="co">##   ..$ score         : num [1:25] 0.329 0.597 0.386 0.349 0.235 ...</span></span>
+<span><span class="co">##   ..$ score         : num [1:25] 0.32 0.556 0.379 0.362 0.219 ...</span></span>
 <span><span class="co">##   ..$ in_interval   : num [1:25] 1 1 1 1 1 1 1 1 1 1 ...</span></span>
 <span><span class="co">##   ..$ interval_width: num [1:25] 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 ...</span></span>
 <span><span class="co">##   ..$ eval_horizon  : int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span></span>
 <span><span class="co">##   ..$ score_type    : chr [1:25] "crps" "crps" "crps" "crps" ...</span></span>
 <span><span class="co">##  $ all_series:'data.frame':  25 obs. of  3 variables:</span></span>
-<span><span class="co">##   ..$ score       : num [1:25] 0.888 1.086 2.68 NA 0.829 ...</span></span>
+<span><span class="co">##   ..$ score       : num [1:25] 0.892 0.999 2.675 NA 0.827 ...</span></span>
 <span><span class="co">##   ..$ eval_horizon: int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span></span>
 <span><span class="co">##   ..$ score_type  : chr [1:25] "sum_crps" "sum_crps" "sum_crps" "sum_crps" ...</span></span></code></pre>
 <div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">crps_mod1</span><span class="op">$</span><span class="va">series_1</span></span></code></pre></div>
 <pre><code><span><span class="co">##         score in_interval interval_width eval_horizon score_type</span></span>
-<span><span class="co">## 1  0.19749300           1            0.9            1       crps</span></span>
-<span><span class="co">## 2  0.13975150           1            0.9            2       crps</span></span>
-<span><span class="co">## 3  1.35193650           1            0.9            3       crps</span></span>
+<span><span class="co">## 1  0.19375525           1            0.9            1       crps</span></span>
+<span><span class="co">## 2  0.13663925           1            0.9            2       crps</span></span>
+<span><span class="co">## 3  1.35502175           1            0.9            3       crps</span></span>
 <span><span class="co">## 4          NA          NA            0.9            4       crps</span></span>
-<span><span class="co">## 5  0.03594650           1            0.9            5       crps</span></span>
-<span><span class="co">## 6  1.55512000           1            0.9            6       crps</span></span>
-<span><span class="co">## 7  1.52746400           1            0.9            7       crps</span></span>
-<span><span class="co">## 8  0.62147725           1            0.9            8       crps</span></span>
-<span><span class="co">## 9  0.60050300           1            0.9            9       crps</span></span>
-<span><span class="co">## 10 0.58537625           1            0.9           10       crps</span></span>
-<span><span class="co">## 11 1.27717750           1            0.9           11       crps</span></span>
-<span><span class="co">## 12 2.06627175           1            0.9           12       crps</span></span>
-<span><span class="co">## 13 0.58131925           1            0.9           13       crps</span></span>
-<span><span class="co">## 14 0.13444200           1            0.9           14       crps</span></span>
-<span><span class="co">## 15 0.63533750           1            0.9           15       crps</span></span>
-<span><span class="co">## 16 0.06961475           1            0.9           16       crps</span></span>
-<span><span class="co">## 17 0.06879775           1            0.9           17       crps</span></span>
-<span><span class="co">## 18 0.07628275           1            0.9           18       crps</span></span>
-<span><span class="co">## 19 0.10143425           1            0.9           19       crps</span></span>
+<span><span class="co">## 5  0.03482775           1            0.9            5       crps</span></span>
+<span><span class="co">## 6  1.55416700           1            0.9            6       crps</span></span>
+<span><span class="co">## 7  1.51028900           1            0.9            7       crps</span></span>
+<span><span class="co">## 8  0.62121225           1            0.9            8       crps</span></span>
+<span><span class="co">## 9  0.62630125           1            0.9            9       crps</span></span>
+<span><span class="co">## 10 0.59853100           1            0.9           10       crps</span></span>
+<span><span class="co">## 11 1.30998625           1            0.9           11       crps</span></span>
+<span><span class="co">## 12 2.04829775           1            0.9           12       crps</span></span>
+<span><span class="co">## 13 0.61251800           1            0.9           13       crps</span></span>
+<span><span class="co">## 14 0.14052300           1            0.9           14       crps</span></span>
+<span><span class="co">## 15 0.65110800           1            0.9           15       crps</span></span>
+<span><span class="co">## 16 0.07973125           1            0.9           16       crps</span></span>
+<span><span class="co">## 17 0.07675600           1            0.9           17       crps</span></span>
+<span><span class="co">## 18 0.09382375           1            0.9           18       crps</span></span>
+<span><span class="co">## 19 0.12356725           1            0.9           19       crps</span></span>
 <span><span class="co">## 20         NA          NA            0.9           20       crps</span></span>
-<span><span class="co">## 21 0.16723125           1            0.9           21       crps</span></span>
-<span><span class="co">## 22 0.76396600           1            0.9           22       crps</span></span>
+<span><span class="co">## 21 0.20173600           1            0.9           21       crps</span></span>
+<span><span class="co">## 22 0.84066825           1            0.9           22       crps</span></span>
 <span><span class="co">## 23         NA          NA            0.9           23       crps</span></span>
-<span><span class="co">## 24 0.90052575           1            0.9           24       crps</span></span>
-<span><span class="co">## 25 0.50255325           1            0.9           25       crps</span></span></code></pre>
+<span><span class="co">## 24 1.06489225           1            0.9           24       crps</span></span>
+<span><span class="co">## 25 0.75528825           1            0.9           25       crps</span></span></code></pre>
 <p>The returned list contains a <code>data.frame</code> for each series
 in the data that shows the CRPS score for each evaluation in the testing
 data, along with some other useful information about the fit of the
@@ -557,31 +557,31 @@ say using a 60% interval:</p>
 <code class="sourceCode R"><span><span class="va">crps_mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">fc_mod1</span>, score <span class="op">=</span> <span class="st">'crps'</span>, interval_width <span class="op">=</span> <span class="fl">0.6</span><span class="op">)</span></span>
 <span><span class="va">crps_mod1</span><span class="op">$</span><span class="va">series_1</span></span></code></pre></div>
 <pre><code><span><span class="co">##         score in_interval interval_width eval_horizon score_type</span></span>
-<span><span class="co">## 1  0.19749300           1            0.6            1       crps</span></span>
-<span><span class="co">## 2  0.13975150           1            0.6            2       crps</span></span>
-<span><span class="co">## 3  1.35193650           0            0.6            3       crps</span></span>
+<span><span class="co">## 1  0.19375525           1            0.6            1       crps</span></span>
+<span><span class="co">## 2  0.13663925           1            0.6            2       crps</span></span>
+<span><span class="co">## 3  1.35502175           0            0.6            3       crps</span></span>
 <span><span class="co">## 4          NA          NA            0.6            4       crps</span></span>
-<span><span class="co">## 5  0.03594650           1            0.6            5       crps</span></span>
-<span><span class="co">## 6  1.55512000           0            0.6            6       crps</span></span>
-<span><span class="co">## 7  1.52746400           0            0.6            7       crps</span></span>
-<span><span class="co">## 8  0.62147725           1            0.6            8       crps</span></span>
-<span><span class="co">## 9  0.60050300           1            0.6            9       crps</span></span>
-<span><span class="co">## 10 0.58537625           1            0.6           10       crps</span></span>
-<span><span class="co">## 11 1.27717750           0            0.6           11       crps</span></span>
-<span><span class="co">## 12 2.06627175           0            0.6           12       crps</span></span>
-<span><span class="co">## 13 0.58131925           1            0.6           13       crps</span></span>
-<span><span class="co">## 14 0.13444200           1            0.6           14       crps</span></span>
-<span><span class="co">## 15 0.63533750           1            0.6           15       crps</span></span>
-<span><span class="co">## 16 0.06961475           1            0.6           16       crps</span></span>
-<span><span class="co">## 17 0.06879775           1            0.6           17       crps</span></span>
-<span><span class="co">## 18 0.07628275           1            0.6           18       crps</span></span>
-<span><span class="co">## 19 0.10143425           1            0.6           19       crps</span></span>
+<span><span class="co">## 5  0.03482775           1            0.6            5       crps</span></span>
+<span><span class="co">## 6  1.55416700           0            0.6            6       crps</span></span>
+<span><span class="co">## 7  1.51028900           0            0.6            7       crps</span></span>
+<span><span class="co">## 8  0.62121225           1            0.6            8       crps</span></span>
+<span><span class="co">## 9  0.62630125           1            0.6            9       crps</span></span>
+<span><span class="co">## 10 0.59853100           1            0.6           10       crps</span></span>
+<span><span class="co">## 11 1.30998625           0            0.6           11       crps</span></span>
+<span><span class="co">## 12 2.04829775           0            0.6           12       crps</span></span>
+<span><span class="co">## 13 0.61251800           1            0.6           13       crps</span></span>
+<span><span class="co">## 14 0.14052300           1            0.6           14       crps</span></span>
+<span><span class="co">## 15 0.65110800           1            0.6           15       crps</span></span>
+<span><span class="co">## 16 0.07973125           1            0.6           16       crps</span></span>
+<span><span class="co">## 17 0.07675600           1            0.6           17       crps</span></span>
+<span><span class="co">## 18 0.09382375           1            0.6           18       crps</span></span>
+<span><span class="co">## 19 0.12356725           1            0.6           19       crps</span></span>
 <span><span class="co">## 20         NA          NA            0.6           20       crps</span></span>
-<span><span class="co">## 21 0.16723125           1            0.6           21       crps</span></span>
-<span><span class="co">## 22 0.76396600           1            0.6           22       crps</span></span>
+<span><span class="co">## 21 0.20173600           1            0.6           21       crps</span></span>
+<span><span class="co">## 22 0.84066825           1            0.6           22       crps</span></span>
 <span><span class="co">## 23         NA          NA            0.6           23       crps</span></span>
-<span><span class="co">## 24 0.90052575           1            0.6           24       crps</span></span>
-<span><span class="co">## 25 0.50255325           1            0.6           25       crps</span></span></code></pre>
+<span><span class="co">## 24 1.06489225           1            0.6           24       crps</span></span>
+<span><span class="co">## 25 0.75528825           1            0.6           25       crps</span></span></code></pre>
 <p>We can also compare forecasts against out of sample observations
 using the <a href="https://link.springer.com/article/10.1007/s11222-016-9696-4" target="_blank" class="external-link">Expected Log Predictive Density (ELPD; also known as the
 log score)</a>. The ELPD is a strictly proper scoring rule that can be
@@ -593,31 +593,31 @@ using the <code><a href="../reference/forecast.mvgam.html">forecast()</a></code>
 <code class="sourceCode R"><span><span class="va">link_mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod1</span>, newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/score.mvgam_forecast.html">score</a></span><span class="op">(</span><span class="va">link_mod1</span>, score <span class="op">=</span> <span class="st">'elpd'</span><span class="op">)</span><span class="op">$</span><span class="va">series_1</span></span></code></pre></div>
 <pre><code><span><span class="co">##         score eval_horizon score_type</span></span>
-<span><span class="co">## 1  -0.5415389            1       elpd</span></span>
-<span><span class="co">## 2  -0.4394250            2       elpd</span></span>
-<span><span class="co">## 3  -2.9516572            3       elpd</span></span>
+<span><span class="co">## 1  -0.5304414            1       elpd</span></span>
+<span><span class="co">## 2  -0.4298955            2       elpd</span></span>
+<span><span class="co">## 3  -2.9617583            3       elpd</span></span>
 <span><span class="co">## 4          NA            4       elpd</span></span>
-<span><span class="co">## 5  -0.2039540            5       elpd</span></span>
-<span><span class="co">## 6  -3.3591450            6       elpd</span></span>
-<span><span class="co">## 7  -3.2434347            7       elpd</span></span>
-<span><span class="co">## 8  -1.9910208            8       elpd</span></span>
-<span><span class="co">## 9  -2.0099446            9       elpd</span></span>
-<span><span class="co">## 10 -2.0168619           10       elpd</span></span>
-<span><span class="co">## 11 -3.0178822           11       elpd</span></span>
-<span><span class="co">## 12 -3.6389118           12       elpd</span></span>
-<span><span class="co">## 13 -2.0934546           13       elpd</span></span>
-<span><span class="co">## 14 -0.3015793           14       elpd</span></span>
-<span><span class="co">## 15 -2.2982746           15       elpd</span></span>
-<span><span class="co">## 16 -0.2153677           16       elpd</span></span>
-<span><span class="co">## 17 -0.2021458           17       elpd</span></span>
-<span><span class="co">## 18 -0.2102088           18       elpd</span></span>
-<span><span class="co">## 19 -0.2230817           19       elpd</span></span>
+<span><span class="co">## 5  -0.2007644            5       elpd</span></span>
+<span><span class="co">## 6  -3.3781408            6       elpd</span></span>
+<span><span class="co">## 7  -3.2729088            7       elpd</span></span>
+<span><span class="co">## 8  -2.0363750            8       elpd</span></span>
+<span><span class="co">## 9  -2.0670612            9       elpd</span></span>
+<span><span class="co">## 10 -2.0844818           10       elpd</span></span>
+<span><span class="co">## 11 -3.0576463           11       elpd</span></span>
+<span><span class="co">## 12 -3.6291058           12       elpd</span></span>
+<span><span class="co">## 13 -2.1692669           13       elpd</span></span>
+<span><span class="co">## 14 -0.2960899           14       elpd</span></span>
+<span><span class="co">## 15 -2.3738851           15       elpd</span></span>
+<span><span class="co">## 16 -0.2160804           16       elpd</span></span>
+<span><span class="co">## 17 -0.2036782           17       elpd</span></span>
+<span><span class="co">## 18 -0.2115539           18       elpd</span></span>
+<span><span class="co">## 19 -0.2235072           19       elpd</span></span>
 <span><span class="co">## 20         NA           20       elpd</span></span>
-<span><span class="co">## 21 -0.2440297           21       elpd</span></span>
-<span><span class="co">## 22 -2.5577404           22       elpd</span></span>
+<span><span class="co">## 21 -0.2413680           21       elpd</span></span>
+<span><span class="co">## 22 -2.6791984           22       elpd</span></span>
 <span><span class="co">## 23         NA           23       elpd</span></span>
-<span><span class="co">## 24 -2.5796575           24       elpd</span></span>
-<span><span class="co">## 25 -0.2890367           25       elpd</span></span></code></pre>
+<span><span class="co">## 24 -2.6851981           24       elpd</span></span>
+<span><span class="co">## 25 -0.2836901           25       elpd</span></span></code></pre>
 <p>Finally, when we have multiple time series it may also make sense to
 use a multivariate proper scoring rule. <code>mvgam</code> offers two
 such options: the Energy score and the Variogram score. The first
@@ -642,7 +642,7 @@ goals, but both are very easy to compute:</p>
 <span><span class="co">##   ..$ interval_width: num [1:25] 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 ...</span></span>
 <span><span class="co">##   ..$ eval_horizon  : int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span></span>
 <span><span class="co">##  $ all_series:'data.frame':  25 obs. of  3 variables:</span></span>
-<span><span class="co">##   ..$ score       : num [1:25] 0.77 1.115 1.25 NA 0.453 ...</span></span>
+<span><span class="co">##   ..$ score       : num [1:25] 0.773 1.147 1.226 NA 0.458 ...</span></span>
 <span><span class="co">##   ..$ eval_horizon: int [1:25] 1 2 3 4 5 6 7 8 9 10 ...</span></span>
 <span><span class="co">##   ..$ score_type  : chr [1:25] "energy" "energy" "energy" "energy" ...</span></span></code></pre>
 <p>The returned object still provides information on interval coverage
@@ -651,31 +651,31 @@ now (which is provided in the <code>all_series</code> slot):</p>
 <div class="sourceCode" id="cb49"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">energy_mod2</span><span class="op">$</span><span class="va">all_series</span></span></code></pre></div>
 <pre><code><span><span class="co">##        score eval_horizon score_type</span></span>
-<span><span class="co">## 1  0.7702021            1     energy</span></span>
-<span><span class="co">## 2  1.1146337            2     energy</span></span>
-<span><span class="co">## 3  1.2502919            3     energy</span></span>
+<span><span class="co">## 1  0.7728517            1     energy</span></span>
+<span><span class="co">## 2  1.1469836            2     energy</span></span>
+<span><span class="co">## 3  1.2258781            3     energy</span></span>
 <span><span class="co">## 4         NA            4     energy</span></span>
-<span><span class="co">## 5  0.4534938            5     energy</span></span>
-<span><span class="co">## 6  1.7972077            6     energy</span></span>
-<span><span class="co">## 7  1.4989659            7     energy</span></span>
-<span><span class="co">## 8  0.7437805            8     energy</span></span>
-<span><span class="co">## 9  1.0982204            9     energy</span></span>
+<span><span class="co">## 5  0.4577536            5     energy</span></span>
+<span><span class="co">## 6  1.8094487            6     energy</span></span>
+<span><span class="co">## 7  1.4887317            7     energy</span></span>
+<span><span class="co">## 8  0.7651593            8     energy</span></span>
+<span><span class="co">## 9  1.1180634            9     energy</span></span>
 <span><span class="co">## 10        NA           10     energy</span></span>
-<span><span class="co">## 11 1.4463652           11     energy</span></span>
-<span><span class="co">## 12 3.3035827           12     energy</span></span>
-<span><span class="co">## 13 1.5265317           13     energy</span></span>
-<span><span class="co">## 14 1.1512861           14     energy</span></span>
-<span><span class="co">## 15 1.0331594           15     energy</span></span>
-<span><span class="co">## 16 1.8705236           16     energy</span></span>
+<span><span class="co">## 11 1.5008324           11     energy</span></span>
+<span><span class="co">## 12 3.2142460           12     energy</span></span>
+<span><span class="co">## 13 1.6129732           13     energy</span></span>
+<span><span class="co">## 14 1.2704438           14     energy</span></span>
+<span><span class="co">## 15 1.1335958           15     energy</span></span>
+<span><span class="co">## 16 1.8717420           16     energy</span></span>
 <span><span class="co">## 17        NA           17     energy</span></span>
-<span><span class="co">## 18 0.7118636           18     energy</span></span>
-<span><span class="co">## 19 0.8919367           19     energy</span></span>
+<span><span class="co">## 18 0.7953392           18     energy</span></span>
+<span><span class="co">## 19 0.9919119           19     energy</span></span>
 <span><span class="co">## 20        NA           20     energy</span></span>
-<span><span class="co">## 21 1.0178829           21     energy</span></span>
-<span><span class="co">## 22 1.3557390           22     energy</span></span>
+<span><span class="co">## 21 1.2461964           21     energy</span></span>
+<span><span class="co">## 22 1.5170615           22     energy</span></span>
 <span><span class="co">## 23        NA           23     energy</span></span>
-<span><span class="co">## 24 2.1700795           24     energy</span></span>
-<span><span class="co">## 25 1.2258707           25     energy</span></span></code></pre>
+<span><span class="co">## 24 2.3824552           24     energy</span></span>
+<span><span class="co">## 25 1.5314557           25     energy</span></span></code></pre>
 <p>You can use your score(s) of choice to compare different models. For
 example, we can compute and plot the difference in CRPS scores for each
 series in data. Here, a negative value means the Gaussian Process model

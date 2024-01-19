@@ -36,12 +36,313 @@ remove_likelihood = function(model_file){
 }
 
 #' @noRd
-.autoformat <- function(stan_file, overwrite_file = TRUE) {
+.autoformat <- function(stan_file, overwrite_file = TRUE){
+
+  # Old ways of specifying arrays have been converted to errors in
+  # the latest version of Cmdstan (2.34.0); this coincides with
+  # a decision to stop automatically replacing these depracations with
+  # the canonicalizer, so we have no choice but to replace the old
+  # syntax with this ugly bit of code:
+  if(requireNamespace('cmdstanr') & cmdstanr::cmdstan_version() >= "2.33.0"){
+
+    # Data modifications
+    stan_file[grep("int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)",
+                   stan_file, fixed = TRUE)] <-
+      'array[n, n_series] int<lower=0> ytimes;  // time-ordered matrix (which col in X belongs to each [time, series] observation?)'
+
+    stan_file[grep("int<lower=0> flat_ys[n_nonmissing]; // flattened nonmissing observations",
+                               stan_file, fixed = TRUE)] <-
+      'array[n_nonmissing] int<lower=0> flat_ys; // flattened nonmissing observations'
+
+    stan_file[grep("int<lower=0> obs_ind[n_nonmissing]; // indices of nonmissing observations",
+                   stan_file, fixed = TRUE)] <-
+      "array[n_nonmissing] int<lower=0> obs_ind; // indices of nonmissing observations"
+
+    if(any(grepl('int<lower=0> ytimes_trend[n, n_lv]; // time-ordered matrix for latent states',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("int<lower=0> ytimes_trend[n, n_lv]; // time-ordered matrix for latent states",
+                     stan_file, fixed = TRUE)] <-
+        "array[n, n_lv] int ytimes_trend;"
+    }
+
+    if(any(grepl('int idx', stan_file) &
+           grepl('// discontiguous index values',
+                 stan_file, fixed = TRUE))){
+      lines_replace <- which(grepl('int idx', stan_file) &
+                               grepl('// discontiguous index values',
+                                     stan_file, fixed = TRUE))
+      for(i in lines_replace){
+        split_line <- strsplit(stan_file[i], ' ')[[1]]
+
+        idxnum <- gsub(';', '',
+                             gsub("\\s*\\[[^\\]+\\]", "",
+                                  as.character(split_line[2])))
+        idx_length <- gsub("\\]", "", gsub("\\[", "",
+                                           regmatches(split_line[2],
+                                                      gregexpr("\\[.*?\\]", split_line[2]))[[1]]))
+
+        stan_file[i] <-
+          paste0('array[',
+                 idx_length,
+                 '] int ',
+                 idxnum,
+                 '; // discontiguous index values')
+      }
+    }
+
+    if(any(grepl('int<lower=0> cap[total_obs]; // upper limits of latent abundances',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep('int<lower=0> cap[total_obs]; // upper limits of latent abundances',
+                     stan_file, fixed = TRUE)] <-
+        'array[total_obs] int<lower=0> cap; // upper limits of latent abundances'
+
+      stan_file[grep('int flat_caps[n_nonmissing];',
+                     stan_file, fixed = TRUE)] <-
+        'array[n_nonmissing] int flat_caps;'
+       }
+
+    # Model modifications
+    if(any(grepl('real flat_phis[n_nonmissing];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("real flat_phis[n_nonmissing];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n_nonmissing] real flat_phis;"
+    }
+
+    # n-mixture modifications
+    if(any(grepl('real p_ub = poisson_cdf(max_k, lambda);',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep('real p_ub = poisson_cdf(max_k, lambda);',
+                     stan_file, fixed = TRUE)] <-
+        'real p_ub = poisson_cdf(max_k | lambda);'
+    }
+
+    # trend_formula modifications
+    if(any(grepl('int trend_idx', stan_file) &
+           grepl('// discontiguous index values',
+                 stan_file, fixed = TRUE))){
+      lines_replace <- which(grepl('int trend_idx', stan_file) &
+                               grepl('// discontiguous index values',
+                                     stan_file, fixed = TRUE))
+      for(i in lines_replace){
+        split_line <- strsplit(stan_file[i], ' ')[[1]]
+
+        trend_idxnum <- gsub(';', '',
+                             gsub("\\s*\\[[^\\]+\\]", "",
+                                  as.character(split_line[2])))
+        idx_length <- gsub("\\]", "", gsub("\\[", "",
+                                           regmatches(split_line[2],
+                                                      gregexpr("\\[.*?\\]", split_line[2]))[[1]]))
+
+        stan_file[i] <-
+          paste0('array[',
+                 idx_length,
+                 '] int ',
+                 trend_idxnum,
+                 '; // discontiguous index values')
+      }
+    }
+
+    if(any(grepl('vector[n_series] trend_raw[n];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("vector[n_series] trend_raw[n];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n] vector[n_series] trend_raw;"
+    }
+
+    if(any(grepl('vector[n_lv] error[n];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("vector[n_lv] error[n];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n] vector[n_lv] error;"
+    }
+
+    if(any(grepl('vector[n_series] error[n];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("vector[n_series] error[n];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n] vector[n_series] error;"
+    }
+
+    if(any(grepl('vector[n_lv] LV[n];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("vector[n_lv] LV[n];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n] vector[n_lv] LV;"
+    }
+
+    if(any(grepl('vector[n_series] mu[n - 1];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("vector[n_series] mu[n - 1];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n - 1] vector[n_series] mu;"
+    }
+
+    if(any(grepl('vector[n_lv] mu[n - 1];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("vector[n_lv] mu[n - 1];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n - 1] vector[n_lv] mu;"
+    }
+
+    if(any(grepl('vector[n_series] mu[n];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("vector[n_series] mu[n];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n] vector[n_series] mu;"
+    }
+
+    if(any(grepl('vector[n_lv] mu[n];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("vector[n_lv] mu[n];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n] vector[n_lv] mu;"
+    }
+    # Generated quantity modifications
+    if(any(grepl('real<lower=0,upper=1> ypred[n, n_series];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("real<lower=0,upper=1> ypred[n, n_series];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n, n_series] real<lower=0,upper=1> ypred;"
+    }
+
+    if(any(grepl('real<lower=0> ypred[n, n_series];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("real<lower=0> ypred[n, n_series];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n, n_series] real<lower=0> ypred;"
+    }
+
+    # ARMA model modifications
+    if(any(grepl('vector[n_series] epsilon[n];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("vector[n_series] epsilon[n];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n] vector[n_series] epsilon;"
+    }
+
+    if(any(grepl('vector[n_lv] epsilon[n];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("vector[n_lv] epsilon[n];",
+                     stan_file, fixed = TRUE)] <-
+        "array[n] vector[n_lv] epsilon;"
+    }
+
+    # VARMA model modifications
+    if(any(grepl('matrix[n_series, n_series] P[1];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("matrix[n_series, n_series] P[1];",
+                     stan_file, fixed = TRUE)] <-
+        "array[1] matrix[n_series, n_series] P;"
+
+      stan_file[grep("matrix[n_series, n_series] phiGamma[2, 1];",
+                     stan_file, fixed = TRUE)] <-
+        "array[2, 1] matrix[n_series, n_series] phiGamma;"
+    }
+
+    if(any(grepl('matrix initial_joint_var(matrix Sigma, matrix[] phi, matrix[] theta) {',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("matrix initial_joint_var(matrix Sigma, matrix[] phi, matrix[] theta) {",
+                     stan_file, fixed = TRUE)] <-
+        "matrix initial_joint_var(matrix Sigma, array[] matrix phi, array[] matrix theta) {"
+    }
+
+    if(any(grepl('matrix[n_lv, n_lv] P[1];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("matrix[n_lv, n_lv] P[1];",
+                     stan_file, fixed = TRUE)] <-
+        "array[1] matrix[n_lv, n_lv] P;"
+
+      stan_file[grep("matrix[n_lv, n_lv] R[1];",
+                     stan_file, fixed = TRUE)] <-
+        "array[1] matrix[n_lv, n_lv] R;"
+
+      stan_file[grep("matrix[n_lv, n_lv] A_init[1];",
+                     stan_file, fixed = TRUE)] <-
+        "array[1] matrix[n_lv, n_lv] A_init;"
+
+      stan_file[grep("matrix[n_lv, n_lv] theta_init[1];",
+                     stan_file, fixed = TRUE)] <-
+        "array[1] matrix[n_lv, n_lv] theta_init;"
+    }
+
+    if(any(grepl('matrix[n_series, n_series] R[1];',
+                 stan_file, fixed = TRUE))){
+
+      stan_file[grep("matrix[n_series, n_series] R[1];",
+                     stan_file, fixed = TRUE)] <-
+        "array[1] matrix[n_series, n_series] R;"
+
+      stan_file[grep("matrix[n_series, n_series] A_init[1];",
+                     stan_file, fixed = TRUE)] <-
+        "array[1] matrix[n_series, n_series] A_init;"
+
+      stan_file[grep("matrix[n_series, n_series] theta_init[1];",
+                     stan_file, fixed = TRUE)] <-
+        "array[1] matrix[n_series, n_series] theta_init;"
+    }
+
+    if(any(grepl('matrix[] rev_mapping(matrix[] P, matrix Sigma) {',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("matrix[] rev_mapping(matrix[] P, matrix Sigma) {",
+                     stan_file, fixed = TRUE)] <-
+        "array[] matrix rev_mapping(array[] matrix P, matrix Sigma) {"
+
+      stan_file[grep("matrix[m, m] phi_for[p, p];   matrix[m, m] phi_rev[p, p];",
+                     stan_file, fixed = TRUE)] <-
+        'array[p, p] matrix[m, m] phi_for;   array[p, p] matrix[m, m] phi_rev;'
+
+      stan_file[grep("matrix[m, m] Sigma_for[p+1];  matrix[m, m] Sigma_rev[p+1];",
+                     stan_file, fixed = TRUE)] <-
+        'array[p+1] matrix[m, m] Sigma_for;   array[p+1] matrix[m, m] Sigma_rev;'
+
+      stan_file[grep("matrix[m, m] S_for_list[p+1];",
+                     stan_file, fixed = TRUE)] <-
+        'array[p+1] matrix[m, m] S_for_list;'
+    }
+
+    # VAR model modifications
+    if(any(grepl('matrix[n_lv, n_lv] phiGamma[2, 1];',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep('matrix[n_lv, n_lv] phiGamma[2, 1];',
+                     stan_file, fixed = TRUE)] <-
+        'array[2, 1] matrix[n_lv, n_lv] phiGamma;'
+    }
+
+    if(any(grepl('matrix[,] rev_mapping(matrix[] P, matrix Sigma) {',
+                 stan_file, fixed = TRUE))){
+      stan_file[grep("matrix[,] rev_mapping(matrix[] P, matrix Sigma) {",
+                     stan_file, fixed = TRUE)] <-
+        "array[,] matrix rev_mapping(array[] matrix P, matrix Sigma) {"
+
+      stan_file[grep("matrix[m, m] phi_for[p, p];   matrix[m, m] phi_rev[p, p];",
+                     stan_file, fixed = TRUE)] <-
+        'array[p, p] matrix[m, m] phi_for;   array[p, p] matrix[m, m] phi_rev;'
+
+      stan_file[grep("matrix[m, m] Sigma_for[p+1];  matrix[m, m] Sigma_rev[p+1];",
+                     stan_file, fixed = TRUE)] <-
+        'array[p+1] matrix[m, m] Sigma_for;   array[p+1] matrix[m, m] Sigma_rev;'
+
+      stan_file[grep("matrix[m, m] S_for_list[p+1];",
+                     stan_file, fixed = TRUE)] <-
+        'array[p+1] matrix[m, m] S_for_list;'
+
+      stan_file[grep("matrix[m, m] Gamma_trans[p+1];",
+                     stan_file, fixed = TRUE)] <-
+        'array[p+1] matrix[m, m] Gamma_trans;'
+
+      stan_file[grep("matrix[m, m] phiGamma[2, p];",
+                     stan_file, fixed = TRUE)] <-
+        'array[2, p] matrix[m, m] phiGamma;'
+    }
+  }
+
+  stan_file <- cmdstanr::write_stan_file(stan_file)
   cmdstan_mod <- cmdstanr::cmdstan_model(stan_file, compile = FALSE)
   out <- utils::capture.output(
     cmdstan_mod$format(
       max_line_length = 80,
-      canonicalize = list("deprecations", "parentheses"),
+      canonicalize = TRUE,
       overwrite_file = overwrite_file, backup = FALSE))
   paste0(out, collapse = "\n")
 }

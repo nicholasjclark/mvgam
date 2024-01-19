@@ -75,7 +75,14 @@ test_that("latent process intercept is allowed in nmixtures", {
                         mod$model_file, fixed = TRUE)))
 
   # Can also test that 'cap' is properly included in model_data
+  # The caps should be arranged by series and then by time
+  train_cap = poisdat$data_train %>%
+    dplyr::arrange(series, time) %>%
+    dplyr::pull(cap)
+  test_cap = poisdat$data_test %>%
+    dplyr::arrange(series, time) %>%
+    dplyr::pull(cap)
   expect_true(all(mod$model_data$cap ==
-                    c(poisdat$data_train$cap,
-                      poisdat$data_test$cap)))
+                    c(train_cap,
+                      test_cap)))
 })

@@ -6,6 +6,8 @@ validate_series_time = function(data, name = 'data'){
   # Series label must be present as a factor and
   # must contain a time variable
   if(inherits(data, 'data.frame')){
+    data %>%
+      dplyr::ungroup() -> data
     if(!'series' %in% colnames(data)){
       data$series <- factor('series1')
     }
