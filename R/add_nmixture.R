@@ -10,6 +10,8 @@ add_nmixture = function(model_file,
     orig_trend_model <- orig_trend_model$trend_model
   }
 
+  model_data$ytimes_array <- as.vector(model_data$ytimes)
+
   #### Perform necessary checks on 'cap' (positive integers, no missing values) ####
   if(!(exists('cap', where = data_train))) {
     stop('Max abundances must be supplied as a variable named "cap" for N-mixture models',
@@ -224,7 +226,8 @@ add_nmixture = function(model_file,
   # Update the data block
   model_file[grep('int<lower=0> n_nonmissing; // number of nonmissing observations', model_file, fixed = TRUE)] <-
     paste0("int<lower=0> n_nonmissing; // number of nonmissing observations\n",
-           "int<lower=0> cap[total_obs]; // upper limits of latent abundances\n")
+           "int<lower=0> cap[total_obs]; // upper limits of latent abundances\n",
+           'array[total_obs] int ytimes_array; // sorted ytimes\n')
   model_file <- readLines(textConnection(model_file), n = -1)
 
   # Update the transformed parameters block
@@ -235,7 +238,7 @@ add_nmixture = function(model_file,
 
   model_file[grep('// latent process linear predictors',
                   model_file, fixed = TRUE)] <- paste0('// detection probability\n',
-                                                       'p = X * b;\n\n',
+                                                       'p = X[ytimes_array,] * b;\n\n',
                                                        '// latent process linear predictors')
   model_file <- readLines(textConnection(model_file), n = -1)
 
