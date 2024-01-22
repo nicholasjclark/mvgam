@@ -10,7 +10,7 @@ obs_Xp_matrix = function(newdata, mgcv_model){
     testdat <- data.frame(time = newdata$time)
 
     terms_include <- insight::find_predictors(mgcv_model)$conditional
-    if(any(terms_include %in% names(trend_test) == FALSE)){
+    if(any(terms_include %in% names(newdata) == FALSE)){
       stop('not all required variables have been supplied in newdata!',
            call. = FALSE)
     }
