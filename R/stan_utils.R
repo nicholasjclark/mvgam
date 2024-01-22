@@ -118,6 +118,31 @@ remove_likelihood = function(model_file){
     }
 
     # trend_formula modifications
+    if(any(grepl('int trend_rand_idx', stan_file) &
+           grepl('// trend random effect indices',
+                 stan_file, fixed = TRUE))){
+      lines_replace <- which(grepl('int trend_rand_idx', stan_file) &
+                               grepl('// trend random effect indices',
+                                     stan_file, fixed = TRUE))
+      for(i in lines_replace){
+        split_line <- strsplit(stan_file[i], ' ')[[1]]
+
+        trend_idxnum <- gsub(';', '',
+                             gsub("\\s*\\[[^\\]+\\]", "",
+                                  as.character(split_line[2])))
+        idx_length <- gsub("\\]", "", gsub("\\[", "",
+                                           regmatches(split_line[2],
+                                                      gregexpr("\\[.*?\\]", split_line[2]))[[1]]))
+
+        stan_file[i] <-
+          paste0('array[',
+                 idx_length,
+                 '] int ',
+                 trend_idxnum,
+                 '; // trend random effect indices')
+      }
+    }
+
     if(any(grepl('int trend_idx', stan_file) &
            grepl('// discontiguous index values',
                  stan_file, fixed = TRUE))){
