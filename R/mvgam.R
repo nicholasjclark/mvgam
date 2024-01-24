@@ -704,12 +704,15 @@ mvgam = function(formula,
   trend_model <- validate_trend_model(orig_trend_model, drift = drift)
 
   # Check for N-mixture modifications
-  add_nmix <- FALSE
+  add_nmix <- FALSE; nmix_trendmap <- FALSE
   if(family_char == 'nmix'){
     family <- poisson(); family_char <- 'poisson'; add_nmix <- TRUE
     if(missing(trend_formula)){
       stop('Argument "trend_formula" required for nmix models',
            call. = FALSE)
+    }
+    if(!missing(trend_map)){
+      nmix_trendmap <- TRUE
     }
     use_lv <- TRUE
     if(trend_model == 'None'){
@@ -1692,7 +1695,9 @@ mvgam = function(formula,
                                      vectorised$model_data,
                                      orig_trend_model = orig_trend_model,
                                      data_train = data_train,
-                                     data_test = data_test)
+                                     data_test = data_test,
+                                     trend_map = trend_map,
+                                     nmix_trendmap = nmix_trendmap)
       vectorised$model_file <- nmix_additions$model_file
       vectorised$model_data <- nmix_additions$model_data
       family <- nmix(); family_char <- 'nmix'
