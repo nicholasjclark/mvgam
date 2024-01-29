@@ -38,9 +38,49 @@ remove_likelihood = function(model_file){
 #' @noRd
 .autoformat <- function(stan_file, overwrite_file = TRUE){
 
+  # No need to fill lv_coefs in each iteration if this is a
+  # trend_formula model
+  if(any(grepl('lv_coefs = Z;',
+               stan_file, fixed = TRUE)) &
+     !any(grepl('// ma error parameters',
+                stan_file, fixed = TRUE))){
+    stan_file <- stan_file[-grep('lv_coefs = Z;',
+                                  stan_file, fixed = TRUE)]
+    stan_file <- stan_file[-grep('matrix[n_series, n_lv] lv_coefs;',
+                                 stan_file, fixed = TRUE)]
+
+    if(any(grepl('// derived latent states',
+                 stan_file, fixed = TRUE))){
+      starts <- grep('// derived latent states',
+                     stan_file, fixed = TRUE) + 1
+      ends <- starts + 4
+      stan_file <- stan_file[-c(starts:ends)]
+      stan_file[grep('// derived latent states',
+                     stan_file, fixed = TRUE)] <-
+        paste0('// derived latent states\n',
+               "trend = LV * Z';")
+    } else {
+      starts <- grep('// derived latent trends',
+                     stan_file, fixed = TRUE) + 1
+      ends <- starts + 4
+      stan_file <- stan_file[-c(starts:ends)]
+      stan_file[grep('// derived latent trends',
+                     stan_file, fixed = TRUE)] <-
+        paste0('// derived latent trends\n',
+               "trend = LV * Z';")
+    }
+
+    stan_file[grep('// posterior predictions',
+                   stan_file, fixed = TRUE)-1] <-
+      paste0(stan_file[grep('// posterior predictions',
+                  stan_file, fixed = TRUE)-1],
+             '\n',
+             'matrix[n_series, n_lv] lv_coefs = Z;')
+    stan_file <- readLines(textConnection(stan_file), n = -1)
+  }
   # Old ways of specifying arrays have been converted to errors in
   # the latest version of Cmdstan (2.34.0); this coincides with
-  # a decision to stop automatically replacing these depracations with
+  # a decision to stop automatically replacing these deprecations with
   # the canonicalizer, so we have no choice but to replace the old
   # syntax with this ugly bit of code:
   if(requireNamespace('cmdstanr') & cmdstanr::cmdstan_version() >= "2.33.0"){

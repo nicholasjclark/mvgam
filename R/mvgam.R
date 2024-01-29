@@ -1912,7 +1912,7 @@ mvgam = function(formula,
                                                cpp_options = list(stan_threads = TRUE))
           } else {
             cmd_mod <- cmdstanr::cmdstan_model(cmdstanr::write_stan_file(vectorised$model_file),
-                                               stanc_options = list('O1'),)
+                                               stanc_options = list('O1'))
           }
 
         } else {

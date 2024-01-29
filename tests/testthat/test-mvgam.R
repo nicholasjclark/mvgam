@@ -155,6 +155,7 @@ test_that("trend_map is behaving propoerly", {
                    trend_model = 'AR1',
                    data = mod_data,
                    run_model = FALSE)
+
   expect_true(identical(mod_map$model_data$Z,
                         matrix(c(1,0,1,0,0,1), ncol = 2, byrow = TRUE)))
   expect_true(mod_map$use_lv)
@@ -332,7 +333,8 @@ test_that("parametric effect priors correctly incorporated in models", {
                trend_model = 'VARMA',
                data = mod_data$data_train,
                family = gaussian(),
-               run_model = FALSE)
+               run_model = FALSE,
+               autoformat = F)
 
   expect_true(any(grepl('// prior for (Intercept)...',
                         mod$model_file, fixed = TRUE)))
