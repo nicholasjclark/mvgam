@@ -16,6 +16,9 @@
     <loc>https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html</loc>
   </url>
   <url>
+    <loc>https://nicholasjclark.github.io/mvgam/articles/nmixtures.html</loc>
+  </url>
+  <url>
     <loc>https://nicholasjclark.github.io/mvgam/articles/shared_states.html</loc>
   </url>
   <url>
@@ -46,6 +49,9 @@
     <loc>https://nicholasjclark.github.io/mvgam/reference/code.html</loc>
   </url>
   <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/conditional_effects.mvgam.html</loc>
+  </url>
+  <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/dynamic.html</loc>
   </url>
   <url>
@@ -65,6 +71,9 @@
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/get_mvgam_priors.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/GP.html</loc>
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/hindcast.mvgam.html</loc>
@@ -94,6 +103,9 @@
     <loc>https://nicholasjclark.github.io/mvgam/reference/model.frame.mvgam.html</loc>
   </url>
   <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/monotonic.html</loc>
+  </url>
+  <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam-class.html</loc>
   </url>
   <url>
@@ -110,6 +122,9 @@
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_forecast-class.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_formulae.html</loc>
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/mvgam_marginaleffects.html</loc>
@@ -131,6 +146,9 @@
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/pfilter_mvgam_smooth.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/piecewise_trends.html</loc>
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/pipe.html</loc>
@@ -194,6 +212,9 @@
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/residuals.mvgam.html</loc>
+  </url>
+  <url>
+    <loc>https://nicholasjclark.github.io/mvgam/reference/RW.html</loc>
   </url>
   <url>
     <loc>https://nicholasjclark.github.io/mvgam/reference/score.mvgam_forecast.html</loc>
