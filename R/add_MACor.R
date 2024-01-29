@@ -19,11 +19,11 @@ add_MaCor = function(model_file,
         if(any(grepl('transformed data {', model_file, fixed = TRUE))){
           model_file[grep('transformed data {', model_file, fixed = TRUE)] <-
             paste0('transformed data {\n',
-                   'vector[n_series] trend_zeros = rep_vector(0.0, n_lv);')
+                   'vector[n_lv] trend_zeros = rep_vector(0.0, n_lv);')
         } else {
           model_file[grep('parameters {', model_file, fixed = TRUE)[1]] <-
             paste0('transformed data {\n',
-                   'vector[n_series] trend_zeros = rep_vector(0.0, n_lv);\n',
+                   'vector[n_lv] trend_zeros = rep_vector(0.0, n_lv);\n',
                    '}\nparameters {')
         }
 

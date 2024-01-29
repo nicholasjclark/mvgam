@@ -71,7 +71,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
                                             "prop_zero"))
 
   if(type == 'rootogram'){
-    if(!object$family %in% c('poisson', 'negative binomial', 'tweedie')){
+    if(!object$family %in% c('poisson', 'negative binomial', 'tweedie', 'nmix')){
       stop('Rootograms not supported for checking non-count data',
            call. = FALSE)
     }
@@ -235,7 +235,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
       preds <- mcmc_chains(object$model_output, 'ypred')[,starts[series]:ends[series]]
     }
 
-    preds <- preds[,1:length(truths)]
+    preds <- preds[,1:length(truths), drop = FALSE]
 
     if(NROW(preds) > 4000){
       preds <- preds[sample(1:NROW(preds), 4000, F), ]
