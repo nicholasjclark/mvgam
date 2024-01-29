@@ -289,7 +289,7 @@ plot_latentN(hc, testdat, species = 'sp_2')
 
 We can see that estimates for both species have correctly captured the true temporal variation in abundance. However, it is also apparent that low detection probabilities (like for species 2) make it difficult to accurately estimate latent abundance. We could likely improve these estimates if we had some additional information that could inform our estimates of detection probability, such as covariates that reflect our ability to take accurate measurements
 
-## Example 2: a larger survey with nonlinear effects
+## Example 2: a larger survey with possible nonlinear effects
 
 Now for another example with a larger dataset. We will use data from [Jeff Doser's simulation example from the wonderful `spAbundance` package](https://www.jeffdoser.com/files/spabundance-web/articles/nmixturemodels){target="_blank"}. The simulated data include one continuous site-level covariate, one factor site-level covariate and two continuous sample-level covariates. This example will allow us to examine how we can include possibly nonlinear effects in the latent process and detection probability models.
   
@@ -389,12 +389,12 @@ mod <- mvgam(
 mod <- mvgam(
   # effects of covariates on detection probability;
   # here we use penalized splines for both continuous covariates
-  formula = y ~ s(det_cov, k = 3) + s(det_cov2, k = 3),
+  formula = y ~ s(det_cov, k = 4) + s(det_cov2, k = 4),
   
   # effects of the covariates on latent abundance;
   # here we use a penalized spline for the continuous covariate and
   # hierarchical intercepts for the factor covariate
-  trend_formula = ~ s(abund_cov, k = 3) +
+  trend_formula = ~ s(abund_cov, k = 4) +
     s(abund_fac, bs = 're'),
   
   # link multiple observations to each site
@@ -475,7 +475,7 @@ plot_predictions(mod,
   ylab('Pr(detection)')
 ```
 
-The model has found support for some important covariate effects, but of course we'd want to interrogate how well the model predicts and think about possible spatial effects to capture unmodelled variation in latent abundance.
+The model has found support for some important covariate effects, but of course we'd want to interrogate how well the model predicts and think about possible spatial effects to capture unmodelled variation in latent abundance (which can easily be incorporated into both linear predictors using spatial smooths).
 
 ## Further reading
 The following papers and resources offer useful material about N-mixture models for ecological population dynamics investigations:

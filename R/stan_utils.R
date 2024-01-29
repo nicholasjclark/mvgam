@@ -42,7 +42,7 @@ remove_likelihood = function(model_file){
   # trend_formula model
   if(any(grepl('lv_coefs = Z;',
                stan_file, fixed = TRUE)) &
-     !any(grepl('// ma error parameters',
+     !any(grepl('vector[n_lv] LV[n];',
                 stan_file, fixed = TRUE))){
     stan_file <- stan_file[-grep('lv_coefs = Z;',
                                   stan_file, fixed = TRUE)]

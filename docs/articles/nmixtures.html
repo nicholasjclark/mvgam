@@ -78,7 +78,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2024-01-29</h4>
+            <h4 data-toc-skip class="date">2024-01-30</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/nmixtures.Rmd" class="external-link"><code>vignettes/nmixtures.Rmd</code></a></small>
       <div class="d-none name"><code>nmixtures.Rmd</code></div>
@@ -600,7 +600,7 @@ sense of how the marginalization over latent N works</p>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Jan 29 9:53:45 PM 2024.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Tue Jan 30 5:09:35 AM 2024.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
@@ -725,7 +725,7 @@ ability to take accurate measurements</p>
 </div>
 </div>
 <div class="section level2">
-<h2 id="example-2-a-larger-survey-with-nonlinear-effects">Example 2: a larger survey with nonlinear effects<a class="anchor" aria-label="anchor" href="#example-2-a-larger-survey-with-nonlinear-effects"></a>
+<h2 id="example-2-a-larger-survey-with-possible-nonlinear-effects">Example 2: a larger survey with possible nonlinear effects<a class="anchor" aria-label="anchor" href="#example-2-a-larger-survey-with-possible-nonlinear-effects"></a>
 </h2>
 <p>Now for another example with a larger dataset. We will use data from
 <a href="https://www.jeffdoser.com/files/spabundance-web/articles/nmixturemodels" target="_blank" class="external-link">Jeff Doser’s simulation example from the wonderful
@@ -851,12 +851,12 @@ substantially)</p>
 <code class="sourceCode R"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span></span>
 <span>  <span class="co"># effects of covariates on detection probability;</span></span>
 <span>  <span class="co"># here we use penalized splines for both continuous covariates</span></span>
-<span>  formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">det_cov</span>, k <span class="op">=</span> <span class="fl">3</span><span class="op">)</span> <span class="op">+</span> <span class="fu">s</span><span class="op">(</span><span class="va">det_cov2</span>, k <span class="op">=</span> <span class="fl">3</span><span class="op">)</span>,</span>
+<span>  formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">det_cov</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span> <span class="op">+</span> <span class="fu">s</span><span class="op">(</span><span class="va">det_cov2</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span>
 <span>  </span>
 <span>  <span class="co"># effects of the covariates on latent abundance;</span></span>
 <span>  <span class="co"># here we use a penalized spline for the continuous covariate and</span></span>
 <span>  <span class="co"># hierarchical intercepts for the factor covariate</span></span>
-<span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">abund_cov</span>, k <span class="op">=</span> <span class="fl">3</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">abund_cov</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span> <span class="op">+</span></span>
 <span>    <span class="fu">s</span><span class="op">(</span><span class="va">abund_fac</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span>,</span>
 <span>  </span>
 <span>  <span class="co"># link multiple observations to each site</span></span>
@@ -1009,7 +1009,8 @@ covariates?</p>
 <p>The model has found support for some important covariate effects, but
 of course we’d want to interrogate how well the model predicts and think
 about possible spatial effects to capture unmodelled variation in latent
-abundance.</p>
+abundance (which can easily be incorporated into both linear predictors
+using spatial smooths).</p>
 </div>
 <div class="section level2">
 <h2 id="further-reading">Further reading<a class="anchor" aria-label="anchor" href="#further-reading"></a>
