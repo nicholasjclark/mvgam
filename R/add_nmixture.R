@@ -12,10 +12,6 @@ add_nmixture = function(model_file,
     orig_trend_model <- orig_trend_model$trend_model
   }
 
-  # if(model_data$n == 1L){
-  #   nmix_trendmap <- FALSE
-  # }
-
   # Update model data
   model_data <- add_nmix_data(model_data,
                               data_train,
@@ -91,7 +87,9 @@ add_nmixture = function(model_file,
              'int<lower=0> K_reps; // maximum number of replicate observations\n',
              'array[K_groups] int<lower=0> K_starts; // col of K_inds where each group starts\n',
              'array[K_groups] int<lower=0> K_stops; // col of K_inds where each group ends\n',
-             'array[K_groups, K_reps] int<lower=0> K_inds; // indices of replicated observations')
+             'array[K_groups, K_reps] int<lower=0> K_inds; // indices of replicated observations\n',
+             'int<lower=0> n_missing; // number of missing observations\n',
+             'array[n_missing] int<lower=0> miss_ind; // indices of missing observations')
     model_file <- readLines(textConnection(model_file), n = -1)
 
     model_file[grep('int<lower=0> flat_ys[n_nonmissing]; // flattened nonmissing observations',
@@ -136,6 +134,15 @@ add_nmix_data = function(model_data,
                          trend_map,
                          nmix_trendmap){
   model_data$ytimes_array <- as.vector(model_data$ytimes)
+
+  # Indices of missing observations
+  if(length(model_data$obs_ind) == length(model_data$ytimes)){
+    model_data$miss_ind <- 1
+    model_data$n_missing <- 1
+  } else {
+    model_data$miss_ind <- (1:length(model_data$ytimes))[-model_data$obs_ind]
+    model_data$n_missing <- length(model_data$miss_ind)
+  }
 
   #### Perform necessary checks on 'cap' (positive integers, no missing values) ####
   if(!(exists('cap', where = data_train))) {
@@ -288,8 +295,8 @@ add_nmix_genquant = function(model_file,
       paste0('eta = X * b;\n',
              '{\n',
              'flat_trends = (to_vector(trend));\n',
-             '// prediction for all timepoints that ignore detection prob\n',
-             'for(i in 1:total_obs){\n',
+             '// prediction for missing timepoints that ignore detection prob\n',
+             'for(i in miss_ind){\n',
              'latent_truncpred[i] = trunc_pois_rng(cap[i], exp(flat_trends[i]));\n',
              '}\n',
              '// prediction for the nonmissing timepoints using actual obs\n',

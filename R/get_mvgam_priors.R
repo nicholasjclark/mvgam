@@ -208,7 +208,13 @@ get_mvgam_priors = function(formula,
   if(length(attr(terms(formula), 'term.labels')) == 0 &
      !attr(terms(formula), 'intercept') == 1){
     formula_envir <- attr(formula, '.Environment')
-    formula <- formula(paste(rlang::f_lhs(formula), '~ 1'))
+    if(!is.null(attr(terms(formula(formula)), 'offset'))){
+      formula <- formula(paste0(rlang::f_lhs(formula),
+                                ' ~ ', paste(gsub(' - 1',' + 1',
+                                                  rlang::f_text(formula)))))
+    } else {
+      formula <- formula(paste(rlang::f_lhs(formula), '~ 1'))
+    }
     attr(formula, '.Environment') <- formula_envir
     drop_obs_intercept <- TRUE
   }

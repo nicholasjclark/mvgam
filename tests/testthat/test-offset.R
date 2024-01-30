@@ -78,3 +78,28 @@ test_that("offset not allowed in trend_formula", {
                      run_model = FALSE),
                'Offsets not allowed in argument "trend_formula"')
 })
+
+test_that("offset works when no intercept is provided", {
+  simdat <- sim_mvgam()
+  simdat$data_train$offset <- rep(log(100), NROW(simdat$data_train))
+  mod <- mvgam(formula = y ~ offset(offset) - 1,
+               trend_formula = ~ s(season),
+               trend_model = RW(),
+               data = simdat$data_train,
+               run_model = FALSE)
+  stancode <- mod$model_file
+
+  # Offset should be recorded in the mgcv model
+  expect_true(!is.null(attr(mod$mgcv_model$terms, 'offset')))
+
+  # Offset should be in the linpred calculation
+  expect_true(expect_match2(stancode,
+                            'eta = X * b + off_set;'))
+
+  # Offset should be provided in 'data'
+  expect_true(expect_match2(stancode,
+                            'vector[total_obs] off_set;'))
+
+  # Offset should be in model_data
+  expect_true(!is.null(mod$model_data$off_set))
+})
