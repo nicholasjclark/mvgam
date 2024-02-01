@@ -42,7 +42,7 @@
 #' @importFrom mgcv smooth.construct
 #' @export
 #' @author Nicholas J Clark
-#' @rdname monotonic
+#' @name monotonic
 #' @examples
 #' \dontrun{
 #' # Simulate data from a monotonically increasing function
