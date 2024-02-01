@@ -224,7 +224,6 @@ beta_shapes = function(mu, phi) {
 
 #' Generic prediction function
 #' @importFrom stats predict
-#' @importFrom wrswoR sample_int_ccrank
 #' @param Xp A `mgcv` linear predictor matrix
 #' @param family \code{character}. The `family` slot of the model's family argument
 #' @param betas Vector of regression coefficients of length `NCOL(Xp)`
