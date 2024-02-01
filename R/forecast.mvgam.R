@@ -811,7 +811,7 @@ forecast_draws = function(object,
       }
 
       # Bind the last 3 linpred rows with the forecast linpred rows
-      Xp_trend <- rbind(Xp_trend_last[linpred_order, ],
+      Xp_trend <- rbind(Xp_trend_last[linpred_order, , drop = FALSE],
                         Xp_trend)
       attr(Xp_trend, 'model.offset') <- full_offset
     }

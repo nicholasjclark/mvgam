@@ -664,10 +664,12 @@ drps_score <- function(truth, fc, interval_width = 0.9,
   if(log){
     truth <- log(truth + 0.001)
     fc <- log(fc + 0.001)
+    nsum <- max(c(truth, fc), na.rm = TRUE) + 5
+  } else {
+    nsum <- max(c(truth,
+                  quantile(fc, probs = 0.99)), na.rm = TRUE) + 1000
   }
 
-  #nsum <- 1000
-  nsum <- max(c(truth, fc), na.rm = TRUE) + 1000
   Fy = ecdf(fc)
   ysum <- 0:nsum
   indicator <- ifelse(ysum - truth >= 0, 1, 0)
