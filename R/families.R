@@ -293,8 +293,10 @@ mvgam_predict = function(Xp,
             out[i] <- NA
           } else {
             ks <- truth[i]:cap[i]
-            lik_binom <- dbinom(truth[i], size = ks, p = p[i], log = TRUE)
-            lik_poisson <- dpois(x = ks, lambda = lambdas[i], log = TRUE)
+            lik_binom <- dbinom(truth[i], size = ks,
+                                prob = p[i], log = TRUE)
+            lik_poisson <- dpois(x = ks,
+                                 lambda = lambdas[i], log = TRUE)
             loglik <- lik_binom + lik_poisson
             out[i] <- log_sum_exp(loglik)
           }
@@ -317,8 +319,10 @@ mvgam_predict = function(Xp,
             out <- NA
           } else {
             ks <- min_cap[[i]]:cap[[i]]
-            lik <- exp(dbinom(truth[[i]], size = ks, p = p[[i]], log = TRUE) +
-                         dpois(x = ks, lambda = lambdas[[i]], log = TRUE))
+            lik <- exp(dbinom(truth[[i]], size = ks,
+                              prob = p[[i]], log = TRUE) +
+                         dpois(x = ks,
+                               lambda = lambdas[[i]], log = TRUE))
             probs <- lik / sum(lik)
             probs[!is.finite(probs)] <- 0
             out <- ks[wrswoR::sample_int_ccrank(length(ks),

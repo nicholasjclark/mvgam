@@ -7,10 +7,12 @@
 \usage{
 add_residuals(object, ...)
 
-\method{add_residuals}{mvgam}(object)
+\method{add_residuals}{mvgam}(object, ...)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
+
+\item{...}{unused}
 }
 \value{
 A list object of class \code{mvgam} with residuals included in the \code{'resids'} slot
