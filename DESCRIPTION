@@ -51,6 +51,7 @@ Suggests:
     tweedie,
     splines2,
     extraDistr,
+    wrswoR,
     xts,
     lubridate,
     knitr, 

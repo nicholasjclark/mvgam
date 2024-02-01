@@ -14,7 +14,8 @@ get_monitor_pars = function(family, smooths_included = TRUE,
   family <- match.arg(arg = family, choices = c("negative binomial", "poisson",
                                                 "tweedie", "beta",
                                                 "gaussian", "lognormal",
-                                                "student", "Gamma"))
+                                                "student", "Gamma",
+                                                "nmix"))
 
   if(smooths_included){
     param <- c('rho', 'b', 'ypred', 'mus', 'lp__', 'lambda')

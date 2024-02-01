@@ -212,7 +212,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
       truths <- data.frame(y = data_train$y,
                            time = data_train$time,
                            series = data_train$series) %>%
-        dplyr::arrange(time, series) %>%
+        dplyr::arrange(series, time) %>%
         dplyr::filter(series == s_name) %>%
         dplyr::pull(y)
 

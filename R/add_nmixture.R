@@ -8,6 +8,11 @@ add_nmixture = function(model_file,
                         nmix_trendmap = FALSE,
                         orig_trend_model){
 
+  insight::check_if_installed("extraDistr",
+                              reason = 'to simulate from N-Mixture distributions')
+  insight::check_if_installed("wrswoR",
+                              reason = 'to simulate from N-Mixture distributions')
+
   if(inherits(orig_trend_model, 'mvgam_trend')){
     orig_trend_model <- orig_trend_model$trend_model
   }
@@ -101,6 +106,12 @@ add_nmixture = function(model_file,
                                    model_file, fixed = TRUE)]
   }
 
+  # Update transformed data block
+  model_file[grep("transformed data {", model_file, fixed = TRUE)] <-
+    paste0("transformed data {\n",
+           "matrix[total_obs, num_basis] X_ordered = X[ytimes_array,  : ];")
+  model_file <- readLines(textConnection(model_file), n = -1)
+
   # Update the transformed parameters block
   model_file[grep("transformed parameters {", model_file, fixed = TRUE)] <-
     paste0("transformed parameters {\n",
@@ -109,7 +120,7 @@ add_nmixture = function(model_file,
 
   model_file[grep('// latent process linear predictors',
                   model_file, fixed = TRUE)] <- paste0('// detection probability\n',
-                                                       'p = X[ytimes_array,] * b;\n\n',
+                                                       'p = X_ordered * b;\n\n',
                                                        '// latent process linear predictors')
   model_file <- readLines(textConnection(model_file), n = -1)
 
@@ -270,104 +281,44 @@ add_nmix_data = function(model_data,
   return(model_data)
 }
 
-
 add_nmix_genquant = function(model_file,
                              trend_map,
                              nmix_trendmap){
-  if(nmix_trendmap){
-    model_file[grep('array[n, n_series] int ypred;',
-                    model_file, fixed = TRUE)] <- paste0('array[n, n_series] int ypred;\n',
-                                                         'array[n, n_series] int latent_ypred;\n',
-                                                         'array[total_obs] int latent_truncpred;\n',
-                                                         'vector[total_obs] flat_trends;\n',
-                                                         'vector[total_obs] detprob;\n',
-                                                         'detprob = inv_logit(p);')
-    model_file <- readLines(textConnection(model_file), n = -1)
 
-    start_remove <- grep('mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];',
-                         model_file, fixed = TRUE) - 1
-    end_remove <- grep('ypred[1:n, s] = poisson_log_rng(mus[1:n, s]);',
-                       model_file, fixed = TRUE) + 1
-    model_file <- model_file[-c(start_remove:end_remove)]
-
-    model_file[grep('eta = X * b;',
-                    model_file, fixed = TRUE)] <-
-      paste0('eta = X * b;\n',
-             '{\n',
-             'flat_trends = (to_vector(trend));\n',
-             '// prediction for missing timepoints that ignore detection prob\n',
-             'for(i in miss_ind){\n',
-             'latent_truncpred[i] = trunc_pois_rng(cap[i], exp(flat_trends[i]));\n',
-             '}\n',
-             '// prediction for the nonmissing timepoints using actual obs\n',
-             'for (k in 1:K_groups) {\n',
-             'latent_truncpred[K_inds[k, K_starts[k]:K_stops[k]]] =\n',
-             'nmix_rng(flat_ys[K_inds[k, K_starts[k]:K_stops[k]]],\n',
-             'cap[K_inds[k, K_starts[k]:K_stops[k]]],\n',
-             'to_array_1d(flat_trends[K_inds[k, K_starts[k]:K_stops[k]]]),\n',
-             'to_array_1d(p[K_inds[k, K_starts[k]:K_stops[k]]]));\n',
-             '}\n',
-             'for (s in 1 : n_series) {\n',
-             'for (i in 1 : n) {\n',
-             '// true latent abundance\n',
-             'latent_ypred[i, s] = latent_truncpred[ytimes_pred[i, s]];\n',
-
-             '// observed abundance\n',
-             'ypred[i, s] = binomial_rng(latent_ypred[i, s],\n',
-             'detprob[ytimes_pred[i, s]]);\n',
-
-             '// expected values\n',
-             'mus[i, s] = detprob[ytimes[i, s]] * latent_ypred[i, s];\n',
-             '}\n',
-             '}\n',
-             '}')
-    model_file <- readLines(textConnection(model_file), n = -1)
+  rho_included <- any(grepl('rho = log(lambda);',
+                            model_file, fixed = TRUE))
+  rho_trend_included <- any(grepl('rho_trend = log(lambda_trend);',
+                            model_file, fixed = TRUE))
+  if(any(grepl("penalty = 1.0 / (sigma .* sigma);",
+               model_file, fixed = TRUE))){
+    penalty_line <- "vector[n_lv] penalty = 1.0 / (sigma .* sigma);"
   } else {
-    model_file[grep('array[n, n_series] int ypred;',
-                    model_file, fixed = TRUE)] <- paste0('array[n, n_series] int ypred;\n',
-                                                         'array[n, n_series] int latent_ypred;\n',
-                                                         'array[total_obs] int latent_truncpred;\n',
-                                                         'vector[n_nonmissing] flat_ps;\n',
-                                                         'int flat_caps[n_nonmissing];\n',
-                                                         'vector[total_obs] flat_trends;\n',
-                                                         'vector[n_nonmissing] flat_trends_nonmis;\n',
-                                                         'vector[total_obs] detprob;\n',
-                                                         'detprob = inv_logit(p);')
-    model_file <- readLines(textConnection(model_file), n = -1)
-
-    start_remove <- grep('mus[1:n, s] = eta[ytimes[1:n, s]] + trend[1:n, s];',
-                         model_file, fixed = TRUE) - 1
-    end_remove <- grep('ypred[1:n, s] = poisson_log_rng(mus[1:n, s]);',
-                       model_file, fixed = TRUE) + 1
-    model_file <- model_file[-c(start_remove:end_remove)]
-
-    model_file[grep('eta = X * b;',
-                    model_file, fixed = TRUE)] <-
-      paste0('eta = X * b;\n',
-             '{\n',
-             'flat_trends = (to_vector(trend));\n',
-             'flat_trends_nonmis = flat_trends[obs_ind];\n',
-             'flat_ps = p[obs_ind];\n',
-             'flat_caps = cap[obs_ind];\n',
-             '// prediction for all timepoints that ignore detection prob\n',
-             'for(i in 1:total_obs){\n',
-             'latent_truncpred[i] = trunc_pois_rng(cap[i], exp(flat_trends[i]));\n',
-             '}\n',
-             '// prediction for the nonmissing timepoints using actual obs\n',
-             'for(i in 1:n_nonmissing){\n',
-             'latent_truncpred[obs_ind[i]] = nmix_rng(flat_ys[i], flat_caps[i], flat_trends_nonmis[i], flat_ps[i]);\n',
-             '}\n',
-             'for(s in 1:n_series){\n',
-             '// true latent abundance\n',
-             'latent_ypred[1:n, s] = latent_truncpred[ytimes[1:n, s]];\n',
-             '// observed abundance\n',
-             'ypred[1:n, s] = binomial_rng(latent_ypred[1:n, s], detprob[ytimes[1:n, s]]);\n',
-             '// expected values\n',
-             'for(i in 1:n){\n',
-             'mus[i, s] = detprob[ytimes[i, s]] * latent_ypred[i, s];\n',
-             '}\n}\n}')
-    model_file <- readLines(textConnection(model_file), n = -1)
+    penalty_line <- "vector[n_lv] penalty = rep_vector(1e12, n_lv);"
   }
+
+  # Delete most generated quantities so that they can be produced after model
+  # fitting; this dramatically speeds up model time for nmixture models
+  starts <- grep('generated quantities {',
+                 model_file, fixed = TRUE)+1
+  ends <- max(grep('}',
+                   model_file, fixed = TRUE))
+  model_file <- model_file[-c(starts:ends)]
+  model_file[grep('generated quantities {',
+                  model_file, fixed = TRUE)] <-
+    paste0('generated quantities {\n',
+           penalty_line,
+           '\n',
+           if(rho_included){
+             'vector[n_sp] rho = log(lambda);\n'
+           } else {
+             NULL
+           },
+           if(rho_trend_included){
+             'vector[n_sp_trend] rho_trend = log(lambda_trend);\n'
+           } else {
+             NULL
+           },'}')
+  model_file <- readLines(textConnection(model_file), n = -1)
   return(model_file)
 }
 
@@ -378,19 +329,19 @@ add_nmix_model = function(model_file,
   if(nmix_trendmap){
     model_file[grep('vector[n_nonmissing] flat_trends;',
                     model_file, fixed = TRUE)] <-
-      'vector[total_obs] flat_trends;'
+      'array[total_obs] real flat_trends;\narray[total_obs] real flat_ps;'
 
     model_file[grep('flat_trends = (to_vector(trend))[obs_ind];',
                     model_file, fixed = TRUE)] <-
-      'flat_trends = (to_vector(trend));'
+      'flat_trends = (to_array_1d(trend));\nflat_ps = to_array_1d(p);'
     model_file <- readLines(textConnection(model_file), n = -1)
 
     model_file[grep('flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends),',
                     model_file, fixed = TRUE)] <- paste0('for (k in 1:K_groups){\n',
                                                          'target += pb_lpmf(flat_ys[K_inds[k, K_starts[k]:K_stops[k]]] |\n',
                                                          'cap[K_inds[k, K_starts[k]:K_stops[k]]],\n',
-                                                         'to_array_1d(flat_trends[K_inds[k, K_starts[k]:K_stops[k]]]),\n',
-                                                         'to_array_1d(p[K_inds[k, K_starts[k]:K_stops[k]]]));\n',
+                                                         'flat_trends[K_inds[k, K_starts[k]:K_stops[k]]],\n',
+                                                         'flat_ps[K_inds[k, K_starts[k]:K_stops[k]]]);\n',
                                                          '}')
     model_file <- model_file[-grep('0.0,append_row(b, 1.0));',
                                    model_file, fixed = TRUE)]
@@ -435,7 +386,7 @@ add_nmix_functions = function(model_file,
                'if (max(count) > k) {\n',
                'return negative_infinity();\n',
                '}\n',
-               'return poisson_log_lpmf(k | lambda) + binomial_logit_lpmf(count | k, p);\n',
+               'return poisson_log_lpmf(k | lambda) + binomial_logit_lupmf(count | k, p);\n',
                '}\n',
                'vector pb_logp(array[] int count, int max_k,\n',
                'array[] real lambda, array[] real p) {\n',
@@ -456,35 +407,7 @@ add_nmix_functions = function(model_file,
                'vector[max_k_max + 1] lp;\n',
                'lp = pb_logp(count, max_k_max, lambda, p);\n',
                'return log_sum_exp(lp);\n',
-               '}\n',
-               '/* Functions to generate truncated Poisson variates */\n',
-               'array[] int nmix_rng(array[] int count, array[] int max_k,\n',
-               'array[] real lambda, array[] real p) {\n',
-               '// Take maximum of all supplied caps, in case they vary for some reason\n',
-               'int max_k_max = max(max_k);\n',
-               'vector[max_k_max + 1] lp;\n',
-               'lp = pb_logp(count, max_k_max, lambda, p);\n',
-               'return  rep_array(categorical_rng(softmax(lp)) - 1, size(count));\n',
-               '}\n',
-               'int trunc_pois_rng(int max_k, real lambda){\n',
-               'real p_ub = poisson_cdf(max_k, lambda);\n',
-               'if(p_ub < 1e-9) return max_k;\n',
-               'real u = uniform_rng(0, p_ub);\n',
-               'int i = 0;\n',
-               'int X = 0;\n',
-               'real p = exp(-lambda);',
-               'real F = p;\n',
-               'while(1){\n',
-               'if(u < F){\n',
-               'X = i;\n',
-               'break;\n',
-               '}\n',
-               'i = i + 1;\n',
-               'p = lambda * p / i;\n',
-               'F = F + p;\n',
-               '}\n',
-               'return X;\n',
-               '}')
+               '}\n')
     } else {
       model_file[grep('Stan model code', model_file)] <-
         paste0('// Stan model code generated by package mvgam\n',
@@ -495,7 +418,7 @@ add_nmix_functions = function(model_file,
                'if (max(count) > k) {\n',
                'return negative_infinity();\n',
                '}\n',
-               'return poisson_log_lpmf(k | lambda) + binomial_logit_lpmf(count | k, p);\n',
+               'return poisson_log_lpmf(k | lambda) + binomial_logit_lupmf(count | k, p);\n',
                '}\n',
                'vector pb_logp(array[] int count, int max_k,\n',
                'array[] real lambda, array[] real p) {\n',
@@ -517,34 +440,7 @@ add_nmix_functions = function(model_file,
                'lp = pb_logp(count, max_k_max, lambda, p);\n',
                'return log_sum_exp(lp);\n',
                '}\n',
-               '/* Functions to generate truncated Poisson variates */\n',
-               'array[] int nmix_rng(array[] int count, array[] int max_k,\n',
-               'array[] real lambda, array[] real p) {\n',
-               '// Take maximum of all supplied caps, in case they vary for some reason\n',
-               'int max_k_max = max(max_k);\n',
-               'vector[max_k_max + 1] lp;\n',
-               'lp = pb_logp(count, max_k_max, lambda, p);\n',
-               'return  rep_array(categorical_rng(softmax(lp)) - 1, size(count));\n',
-               '}\n',
-               'int trunc_pois_rng(int max_k, real lambda){\n',
-               'real p_ub = poisson_cdf(max_k, lambda);\n',
-               'if(p_ub < 1e-9) return max_k;\n',
-               'real u = uniform_rng(0, p_ub);\n',
-               'int i = 0;\n',
-               'int X = 0;\n',
-               'real p = exp(-lambda);',
-               'real F = p;\n',
-               'while(1){\n',
-               'if(u < F){\n',
-               'X = i;\n',
-               'break;\n',
-               '}\n',
-               'i = i + 1;\n',
-               'p = lambda * p / i;\n',
-               'F = F + p;\n',
-               '}\n',
-               'return X;\n',
-               '}\n}\n')
+               '}\n')
     }
   } else {
     if(any(grepl('functions {', model_file, fixed = TRUE))){
@@ -556,7 +452,7 @@ add_nmix_functions = function(model_file,
                'if (count > k) {\n',
                'return negative_infinity();\n',
                '}\n',
-               'return poisson_log_lpmf(k | lambda) + binomial_logit_lpmf(count | k, p);\n',
+               'return poisson_log_lpmf(k | lambda) + binomial_logit_lupmf(count | k, p);\n',
                '}\n',
                'vector pb_logp(int count, int max_k,\n',
                'real lambda, real p) {\n',
@@ -574,32 +470,6 @@ add_nmix_functions = function(model_file,
                'vector[max_k + 1] lp;\n',
                'lp = pb_logp(count, max_k, lambda, p);\n',
                'return log_sum_exp(lp);\n',
-               '}\n',
-               '/* Functions to generate truncated Poisson variates */\n',
-               'int nmix_rng(int count, int max_k,\n',
-               'real lambda, real p) {\n',
-               'vector[max_k + 1] lp;\n',
-               'lp = pb_logp(count, max_k, lambda, p);\n',
-               'return categorical_rng(softmax(lp)) - 1;\n',
-               '}\n',
-               'int trunc_pois_rng(int max_k, real lambda){\n',
-               'real p_ub = poisson_cdf(max_k, lambda);\n',
-               'if(p_ub < 1e-9) return max_k;\n',
-               'real u = uniform_rng(0, p_ub);\n',
-               'int i = 0;\n',
-               'int X = 0;\n',
-               'real p = exp(-lambda);',
-               'real F = p;\n',
-               'while(1){\n',
-               'if(u < F){\n',
-               'X = i;\n',
-               'break;\n',
-               '}\n',
-               'i = i + 1;\n',
-               'p = lambda * p / i;\n',
-               'F = F + p;\n',
-               '}\n',
-               'return X;\n',
                '}')
     } else {
       model_file[grep('Stan model code', model_file)] <-
@@ -611,7 +481,7 @@ add_nmix_functions = function(model_file,
                'if (count > k) {\n',
                'return negative_infinity();\n',
                '}\n',
-               'return poisson_log_lpmf(k | lambda) + binomial_logit_lpmf(count | k, p);\n',
+               'return poisson_log_lpmf(k | lambda) + binomial_logit_lupmf(count | k, p);\n',
                '}\n',
                'vector pb_logp(int count, int max_k,\n',
                'real lambda, real p) {\n',
@@ -629,37 +499,187 @@ add_nmix_functions = function(model_file,
                'vector[max_k + 1] lp;\n',
                'lp = pb_logp(count, max_k, lambda, p);\n',
                'return log_sum_exp(lp);\n',
-               '}\n',
-               '/* Functions to generate truncated Poisson variates */\n',
-               'int nmix_rng(int count, int max_k,\n',
-               'real lambda, real p) {\n',
-               'vector[max_k + 1] lp;\n',
-               'lp = pb_logp(count, max_k, lambda, p);\n',
-               'return categorical_rng(softmax(lp)) - 1;\n',
-               '}\n',
-               'int trunc_pois_rng(int max_k, real lambda){\n',
-               'real p_ub = poisson_cdf(max_k, lambda);\n',
-               'if(p_ub < 1e-9) return max_k;\n',
-               'real u = uniform_rng(0, p_ub);\n',
-               'int i = 0;\n',
-               'int X = 0;\n',
-               'real p = exp(-lambda);',
-               'real F = p;\n',
-               'while(1){\n',
-               'if(u < F){\n',
-               'X = i;\n',
-               'break;\n',
-               '}\n',
-               'i = i + 1;\n',
-               'p = lambda * p / i;\n',
-               'F = F + p;\n',
-               '}\n',
-               'return X;\n',
                '}\n}\n')
     }
   }
 
   model_file <- readLines(textConnection(model_file), n = -1)
   return(model_file)
+}
+
+#' Function to add generated quantities for nmixture models, which
+#' saves huge computational time
+#' @noRd
+add_nmix_posterior = function(model_output, obs_data, mgcv_model,
+                              n_lv, Z, K_inds){
+
+  # Function to add samples to the 'sim' slot of a stanfit object
+  add_samples = function(model_output, names, samples, nsamples, nchains,
+                         parname){
+    samp_starts <- seq(1, NROW(samples), by = nsamples)
+    samp_ends <- seq(nsamples, NROW(samples), by = nsamples)
+    for(i in 1:nchains){
+      samps_df <- data.frame(samples[samp_starts[i]:samp_ends[i],])
+      colnames(samps_df) <- names
+      model_output@sim$samples[[i]] <-
+        dplyr::bind_cols(model_output@sim$samples[[i]],
+                         samps_df)
+    }
+    model_output@sim$fnames_oi <- c(model_output@sim$fnames_oi,
+                                           names)
+    model_output@model_pars <- c(model_output@model_pars,
+                                        parname)
+    model_output@sim$pars_oi <- c(model_output@sim$pars_oi,
+                                         parname)
+    return(model_output)
+  }
+
+  # Number of chains
+  nchains <- model_output@sim$chains
+
+  # Trend samples (for getting dimnames needed for ypred, latent_ypred)
+  trend <- mcmc_chains(model_output, 'trend')
+
+  # Construct latent_ypred samples
+  Xp <- obs_Xp_matrix(newdata = obs_data,
+                      mgcv_model = mgcv_model)
+  betas <- mcmc_chains(model_output, 'b')
+  all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
+                                              function(row) Xp %*% row +
+                                                attr(Xp, 'model.offset')))))
+  attr(all_linpreds, 'model.offset') <- 0
+  cap <- data.frame(time = obs_data$time,
+                    series = obs_data$series,
+                    cap = obs_data$cap) %>%
+    dplyr::arrange(series, time) %>%
+    dplyr::pull(cap)
+  cap <- as.vector(t(replicate(NROW(betas), cap)))
+
+  # Unconditional latent_N predictions
+  truth <- data.frame(time = obs_data$time,
+                      series = obs_data$series,
+                      y = obs_data$y) %>%
+    dplyr::arrange(series, time) %>%
+    dplyr::pull(y)
+
+  get_min_cap = function(truth, K_inds){
+    rowgroup = function(x){
+      which(K_inds == x, arr.ind = TRUE)[1]
+    }
+
+    data.frame(index = 1:length(truth),
+               truth = truth) %>%
+      dplyr::rowwise() %>%
+      dplyr::mutate(group = rowgroup(index)) %>%
+      dplyr::ungroup() %>%
+      dplyr::group_by(group) %>%
+      dplyr::mutate(min_cap = max(truth, na.rm = TRUE)) %>%
+      dplyr::pull(min_cap)
+  }
+  min_cap <- suppressWarnings(get_min_cap(truth, K_inds))
+  min_cap[!is.finite(min_cap)] <- 0
+  truth <- as.vector(t(replicate(NROW(betas), truth)))
+  min_cap <- as.vector(t(replicate(NROW(betas), min_cap)))
+  latentypreds_vec <- mvgam_predict(Xp = all_linpreds,
+                                    family = 'nmix',
+                                    betas = 1,
+                                    latent_lambdas = exp(as.vector(trend)),
+                                    cap = cap,
+                                    min_cap = min_cap,
+                                    type = 'latent_N')
+
+  # Conditional latent_N predictions (when observations were not NA)
+  whichobs <- which(!is.na(truth))
+  Xp <- all_linpreds[whichobs,,drop=FALSE]
+  attr(Xp, 'model.offset') <- 0
+  condpreds_vec <- mvgam_predict(Xp = Xp,
+                                 family = 'nmix',
+                                 betas = 1,
+                                 latent_lambdas = exp(as.vector(trend)[whichobs]),
+                                 cap = cap[whichobs],
+                                 min_cap = min_cap[whichobs],
+                                 truth = truth[whichobs],
+                                 type = 'latent_N')
+
+  # Fill in the unconditionals using the conditionals when there were actually
+  # observations
+  latentypreds_vec[whichobs] <- condpreds_vec
+  latentypreds <- matrix(latentypreds_vec, nrow = NROW(betas))
+
+  # Add latent_ypreds to the posterior samples
+  model_output <- add_samples(model_output = model_output,
+                        names = gsub('trend', 'latent_ypred',
+                                     dimnames(trend)[[2]]),
+                        samples = latentypreds,
+                        nsamples = NROW(latentypreds) / nchains,
+                        nchains = nchains,
+                        parname = 'latent_ypred')
+  model_output@sim$dims_oi$latent_ypred <-
+    model_output@sim$dims_oi$trend
+
+  # Now construct the detprob samples
+  ps <- mcmc_chains(model_output, 'p')
+  detprob <- plogis(ps)
+  model_output <- add_samples(model_output = model_output,
+                        names = gsub('p', 'detprob',
+                                     dimnames(ps)[[2]]),
+                        samples = detprob,
+                        nsamples = NROW(detprob) / nchains,
+                        nchains = nchains,
+                        parname = 'detprob')
+  model_output@sim$dims_oi$detprob <-
+    model_output@sim$dims_oi$p
+
+  # Now construct ypred samples
+  ypreds_vec <- rbinom(length(latentypreds_vec),
+                       size = latentypreds_vec,
+                       prob = as.vector(detprob))
+  ypreds <- matrix(ypreds_vec, nrow = NROW(betas))
+  model_output <- add_samples(model_output = model_output,
+                        names = gsub('trend', 'ypred',
+                                     dimnames(trend)[[2]]),
+                        samples = ypreds,
+                        nsamples = NROW(ypreds) / nchains,
+                        nchains = nchains,
+                        parname = 'ypred')
+  model_output@sim$dims_oi$ypred <-
+    model_output@sim$dims_oi$trend
+
+  # Now construct mus (expectations) samples
+  mus_vec <- as.vector(detprob) * latentypreds_vec
+  mus <- matrix(mus_vec, nrow = NROW(betas))
+  model_output <- add_samples(model_output = model_output,
+                        names = gsub('trend', 'mus',
+                                     dimnames(trend)[[2]]),
+                        samples = mus,
+                        nsamples = NROW(mus) / nchains,
+                        nchains = nchains,
+                        parname = 'mus')
+  model_output@sim$dims_oi$mus <-
+    model_output@sim$dims_oi$trend
+
+  # Now the lv_coefs samples
+  n_series <- length(unique(obs_data$series))
+  combinations <- expand.grid(1:n_series, 1:n_lv) %>%
+    dplyr::arrange(Var2)
+  lv_coef_names <- apply(combinations, 1,
+                         function(x) paste0('lv_coefs[',
+                                            x[1], ',',
+                                            x[2], ']'))
+  lv_coef_samps <- t(replicate(NROW(betas), as.vector(t(Z))))
+  model_output <- add_samples(model_output = model_output,
+                              names = lv_coef_names,
+                              samples = lv_coef_samps,
+                              nsamples = NROW(lv_coef_samps) / nchains,
+                              nchains = nchains,
+                              parname = 'lv_coefs')
+  model_output@sim$dims_oi$lv_coefs <- c(n_series, n_lv)
+
+  # Update number of total parameters
+  model_output@sim$n_flatnames <-
+    sum(unlist(lapply(model_output@sim$dims_oi, prod),
+               use.names = FALSE))
+
+  return(model_output)
 }
 

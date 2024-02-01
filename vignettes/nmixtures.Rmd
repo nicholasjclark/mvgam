@@ -171,7 +171,8 @@ mod <- mvgam(
   
   # priors can be set in the usual way
   priors = c(prior(std_normal(), class = b),
-             prior(normal(1, 1.5), class = Intercept_trend)))
+             prior(normal(1, 1.5), class = Intercept_trend)),
+  samples = 1000)
 ```
 
 ```{r eval = FALSE}
@@ -193,7 +194,8 @@ mod <- mvgam(
   
   # priors can be set in the usual way
   priors = c(prior(std_normal(), class = b),
-             prior(normal(1, 1.5), class = Intercept_trend)))
+             prior(normal(1, 1.5), class = Intercept_trend)),
+  samples = 1000)
 ```
 
 View the automatically-generated `Stan` code to get a sense of how the marginalization over latent N works
@@ -226,7 +228,7 @@ plot_predictions(mod, condition = 'species',
   theme(legend.position = 'none')
 ```
 
-A common goal in N-mixture modelling is to estimate the true latent abundance. The model has automatically generated predictions of the latent abundance that are conditional on the observations. We can extract these and produce decent plots using a small function
+A common goal in N-mixture modelling is to estimate the true latent abundance. The model has automatically generated predictions for the unknown latent abundance that are conditional on the observations. We can extract these and produce decent plots using a small function
 ```{r}
 hc <- hindcast(mod, type = 'latent_N')
 
@@ -355,7 +357,7 @@ trend_map %>%
   head(12)
 ```
 
-Now we are ready to fit a model using `mvgam()`. Here we will use penalized splines for each of the continuous covariate effects to detect possible nonlinear associations. We also showcase how `mvgam` can make use of the different approximation algorithms available in `Stan` by using the meanfield variational Bayes approximator (this reduces computation time substantially)
+Now we are ready to fit a model using `mvgam()`. Here we will use penalized splines for each of the continuous covariate effects to detect possible nonlinear associations. We also showcase how `mvgam` can make use of the different approximation algorithms available in `Stan` by using the meanfield variational Bayes approximator (this reduces computation time to around 50 seconds, for this example)
 ```{r include = FALSE, results='hide'}
 mod <- mvgam(
   # effects of covariates on detection probability;
@@ -378,7 +380,8 @@ mod <- mvgam(
   # standard normal priors on key regression parameters
   priors = c(prior(std_normal(), class = 'b'),
              prior(std_normal(), class = 'Intercept'),
-             prior(std_normal(), class = 'Intercept_trend')),
+             prior(std_normal(), class = 'Intercept_trend'),
+             prior(std_normal(), class = 'sigma_raw_trend')),
   
   # use Stan's variational inference for quicker results
   algorithm = 'meanfield',
@@ -407,7 +410,8 @@ mod <- mvgam(
   # standard normal priors on key regression parameters
   priors = c(prior(std_normal(), class = 'b'),
              prior(std_normal(), class = 'Intercept'),
-             prior(std_normal(), class = 'Intercept_trend')),
+             prior(std_normal(), class = 'Intercept_trend'),
+             prior(std_normal(), class = 'sigma_raw_trend')),
   
   # use Stan's variational inference for quicker results
   algorithm = 'meanfield',

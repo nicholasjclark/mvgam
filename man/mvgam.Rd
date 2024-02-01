@@ -31,6 +31,7 @@ mvgam(
   priors,
   refit = FALSE,
   lfo = FALSE,
+  residuals = TRUE,
   use_stan = TRUE,
   backend = getOption("brms.backend", "cmdstanr"),
   algorithm = getOption("brms.algorithm", "sampling"),
@@ -192,6 +193,11 @@ as \code{FALSE}}
 lighter version of the model with no residuals and fewer monitored parameters to speed up
 post-processing. But other downstream functions will not work properly, so users should always
 leave this set as \code{FALSE}}
+
+\item{residuals}{Logical indicating whether to compute series-level randomized quantile residuals and include
+them as part of the returned object. Defaults to \code{TRUE}, but you can set to \code{FALSE} to save
+computational time and reduce the size of the returned object (users can always add residuals to
+an object of class \code{mvgam} using \link{add_residuals})}
 
 \item{use_stan}{Logical. If \code{TRUE}, the model will be compiled and sampled using
 Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or

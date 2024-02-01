@@ -155,8 +155,10 @@ logLik.mvgam = function(object,
     Xp <- as.matrix(qlogis(as.vector(mcmc_chains(object$model_output, 'detprob'))))
     attr(Xp, 'model.offset') <- 0
     latent_lambdas <- exp(as.vector(mcmc_chains(object$model_output, 'trend')))
-    n_draws <- dim(mcmc_chains(object$model_output, 'ypred'))[1]
-    cap <- as.vector(t(replicate(n_draws, all_dat$cap)))
+    cap_mat <- matrix(rep(all_dat$cap, NROW(mus)),
+                        nrow = NROW(mus),
+                        byrow = TRUE)
+    cap <- as.vector(cap_mat)
   } else {
     latent_lambdas <- NULL
     cap <- NULL

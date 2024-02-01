@@ -224,6 +224,7 @@ beta_shapes = function(mu, phi) {
 
 #' Generic prediction function
 #' @importFrom stats predict
+#' @importFrom wrswoR sample_int_ccrank
 #' @param Xp A `mgcv` linear predictor matrix
 #' @param family \code{character}. The `family` slot of the model's family argument
 #' @param betas Vector of regression coefficients of length `NCOL(Xp)`
@@ -246,6 +247,7 @@ mvgam_predict = function(Xp,
                          betas,
                          latent_lambdas,
                          cap,
+                         min_cap,
                          type = 'link',
                          family_pars,
                          density = FALSE,
@@ -266,7 +268,8 @@ mvgam_predict = function(Xp,
   if(family == 'nmix'){
     insight::check_if_installed("extraDistr",
                                 reason = 'to simulate from N-Mixture distributions')
-
+    insight::check_if_installed("wrswoR",
+                                reason = 'to simulate from N-Mixture distributions')
     # Calculate detection probability and convert to probability scale
     p <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                             betas) + attr(Xp, 'model.offset'))
@@ -300,28 +303,31 @@ mvgam_predict = function(Xp,
       }
 
     } else if(type == 'latent_N'){
+      min_cap <- as.vector(min_cap)
       if(missing(truth)){
         out <- extraDistr::rtpois(n = length(lambdas),
                                   lambda = lambdas,
+                                  a = min_cap,
                                   b = cap)
       } else {
         # If true observed N is supplied, we can calculate the
         # most likely latent N given the covariates and the estimated
         # detection probability
-        out <- vector(length = length(truth))
-        for(i in seq_along(truth)){
+        out <- unlist(lapply(seq_along(truth), function(i){
           if(is.na(truth[i])){
-            out[i] <- NA
+            out <- NA
           } else {
-            ks <- truth[i]:cap[i]
-            lik_binom <- dbinom(truth[i], size = ks, p = p[i], log = TRUE)
-            lik_poisson <- dpois(x = ks, lambda = lambdas[i], log = TRUE)
-            loglik <- lik_binom + lik_poisson
-            lik <- exp(loglik)
+            ks <- min_cap[[i]]:cap[[i]]
+            lik <- exp(dbinom(truth[[i]], size = ks, p = p[[i]], log = TRUE) +
+                         dpois(x = ks, lambda = lambdas[[i]], log = TRUE))
             probs <- lik / sum(lik)
-            out[i] <- sample(x = ks, size = 1, prob = probs)
+            probs[!is.finite(probs)] <- 0
+            out <- ks[wrswoR::sample_int_ccrank(length(ks),
+                                                size = 1L,
+                                                prob = probs)]
           }
-        }
+          out
+        }), use.names = FALSE)
       }
     } else if(type == 'response'){
       xpred <- extraDistr::rtpois(n = length(lambdas),
@@ -683,7 +689,7 @@ family_par_names = function(family){
   }
 
   if(family == 'nmix'){
-    out <- c()
+    out <- c('p')
   }
 
   return(out)

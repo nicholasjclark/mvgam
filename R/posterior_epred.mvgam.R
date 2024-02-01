@@ -272,7 +272,7 @@ fitted.mvgam <- function(object, process_error = TRUE,
       all_dat <- data.frame(series = object$obs_data$series,
                             time = object$obs_data$time,
                             y = object$obs_data$y) %>%
-        dplyr::arrange(time, series)
+        dplyr::arrange(series, time)
     } else {
       all_dat <- data.frame(series = c(object$obs_data$series,
                                        object$test_data$series),
@@ -280,7 +280,7 @@ fitted.mvgam <- function(object, process_error = TRUE,
                                      object$test_data$time),
                             y = c(object$obs_data$y,
                                   object$test_data$y)) %>%
-        dplyr::arrange(time, series)
+        dplyr::arrange(series, time)
     }
 
     obs <- all_dat$y

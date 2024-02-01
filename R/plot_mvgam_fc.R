@@ -119,9 +119,10 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
     # For stan objects, ypred is stored as a vector in column-major order
     preds <- mcmc_chains(object$model_output, 'ypred')[,seq(series,
                                                                     dim(mcmc_chains(object$model_output, 'ypred'))[2],
-                                                                    by = NCOL(object$ytimes))]
+                                                                    by = NCOL(object$ytimes)),
+                                                       drop = FALSE]
   } else {
-    preds <- mcmc_chains(object$model_output, 'ypred')[,starts[series]:ends[series]]
+    preds <- mcmc_chains(object$model_output, 'ypred')[,starts[series]:ends[series],drop = FALSE]
   }
 
   # Add variables to data_test if missing

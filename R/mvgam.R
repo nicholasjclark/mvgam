@@ -135,6 +135,10 @@
 #'lighter version of the model with no residuals and fewer monitored parameters to speed up
 #'post-processing. But other downstream functions will not work properly, so users should always
 #'leave this set as `FALSE`
+#'@param residuals Logical indicating whether to compute series-level randomized quantile residuals and include
+#'them as part of the returned object. Defaults to `TRUE`, but you can set to `FALSE` to save
+#'computational time and reduce the size of the returned object (users can always add residuals to
+#'an object of class `mvgam` using [add_residuals])
 #'@param use_stan Logical. If \code{TRUE}, the model will be compiled and sampled using
 #'Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or
 #'a call to \code{\link[rstan]{stan}}. Note that
@@ -584,6 +588,7 @@ mvgam = function(formula,
                  priors,
                  refit = FALSE,
                  lfo = FALSE,
+                 residuals = TRUE,
                  use_stan = TRUE,
                  backend = getOption("brms.backend", "cmdstanr"),
                  algorithm = getOption("brms.algorithm", "sampling"),
@@ -1707,7 +1712,7 @@ mvgam = function(formula,
       vectorised$model_file <- nmix_additions$model_file
       vectorised$model_data <- nmix_additions$model_data
       family <- nmix(); family_char <- 'nmix'
-      param <- c(param, 'detprob', 'latent_ypred')
+      param <- c(param, 'detprob', 'latent_ypred', 'p')
     }
 
     # Tidy the representation
@@ -2219,9 +2224,19 @@ mvgam = function(formula,
   unlink('base_gam.txt')
   unlink(fil)
 
+  # Add generated quantities for N-mixture models
+  if(family_char == 'nmix'){
+    out_gam_mod <- add_nmix_posterior(model_output = out_gam_mod,
+                                      obs_data = data_train,
+                                      mgcv_model = ss_gam,
+                                      Z = model_data$Z,
+                                      n_lv = n_lv,
+                                      K_inds = model_data$K_inds)
+  }
+
   # Get Dunn-Smyth Residual distributions for each series if this
   # is not a prior simulation or an lfo fit
-  if(prior_simulation || lfo){
+  if(prior_simulation || lfo || !residuals){
     series_resids <- NULL
   } else {
     object = list(
