@@ -12,8 +12,12 @@ compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names){
     }))
 
     # Find the best overall posterior draw
-    liks <- logLik(object, include_forecast = FALSE)
-    best_draw <- which.max(rowMeans(liks, na.rm = TRUE))
+    if(object$family == 'nmix'){
+      best_draw <- 1
+    } else {
+      liks <- logLik(object, include_forecast = FALSE)
+      best_draw <- which.max(rowMeans(liks, na.rm = TRUE))
+    }
 
     # Extract smoothing parameters
     sp_names <- names(mgcv_model$sp)

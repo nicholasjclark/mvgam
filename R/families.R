@@ -287,10 +287,9 @@ mvgam_predict = function(Xp,
       out <- lambdas
 
       if(density){
-        out <- vector(length = length(truth))
-        for(i in seq_along(truth)){
+        out <- unlist(lapply(seq_along(truth), function(i){
           if(is.na(truth[i])){
-            out[i] <- NA
+            output <- NA
           } else {
             ks <- truth[i]:cap[i]
             lik_binom <- dbinom(truth[i], size = ks,
@@ -298,9 +297,10 @@ mvgam_predict = function(Xp,
             lik_poisson <- dpois(x = ks,
                                  lambda = lambdas[i], log = TRUE)
             loglik <- lik_binom + lik_poisson
-            out[i] <- log_sum_exp(loglik)
+            output <- log_sum_exp(loglik)
           }
-        }
+          output
+        }), use.names = FALSE)
       }
 
     } else if(type == 'latent_N'){
@@ -316,7 +316,7 @@ mvgam_predict = function(Xp,
         # detection probability
         out <- unlist(lapply(seq_along(truth), function(i){
           if(is.na(truth[i])){
-            out <- NA
+            output <- NA
           } else {
             ks <- min_cap[[i]]:cap[[i]]
             lik <- exp(dbinom(truth[[i]], size = ks,
@@ -325,11 +325,11 @@ mvgam_predict = function(Xp,
                                lambda = lambdas[[i]], log = TRUE))
             probs <- lik / sum(lik)
             probs[!is.finite(probs)] <- 0
-            out <- ks[wrswoR::sample_int_ccrank(length(ks),
+            output <- ks[wrswoR::sample_int_ccrank(length(ks),
                                                 size = 1L,
                                                 prob = probs)]
           }
-          out
+          output
         }), use.names = FALSE)
       }
     } else if(type == 'response'){

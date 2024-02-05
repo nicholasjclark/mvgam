@@ -203,7 +203,7 @@ View the automatically-generated `Stan` code to get a sense of how the marginali
 code(mod)
 ```
 
-The summary of this model shows that it has converged nicely
+The posterior summary of this model shows that it has converged nicely
 ```{r}
 summary(mod)
 ```
