@@ -78,7 +78,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2024-02-01</h4>
+            <h4 data-toc-skip class="date">2024-02-06</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/nmixtures.Rmd" class="external-link"><code>vignettes/nmixtures.Rmd</code></a></small>
       <div class="d-none name"><code>nmixtures.Rmd</code></div>
@@ -373,8 +373,6 @@ sense of how the marginalization over latent N works</p>
 <span><span class="co">##   array[K_groups] int&lt;lower=0&gt; K_starts; // col of K_inds where each group starts</span></span>
 <span><span class="co">##   array[K_groups] int&lt;lower=0&gt; K_stops; // col of K_inds where each group ends</span></span>
 <span><span class="co">##   array[K_groups, K_reps] int&lt;lower=0&gt; K_inds; // indices of replicated observations</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; n_missing; // number of missing observations</span></span>
-<span><span class="co">##   array[n_missing] int&lt;lower=0&gt; miss_ind; // indices of missing observations</span></span>
 <span><span class="co">##   matrix[3, 6] S_trend1; // mgcv smooth penalty matrix S_trend1</span></span>
 <span><span class="co">##   matrix[3, 6] S_trend2; // mgcv smooth penalty matrix S_trend2</span></span>
 <span><span class="co">##   array[total_obs] int&lt;lower=0&gt; flat_ys; // flattened observations</span></span>
@@ -467,7 +465,8 @@ sense of how the marginalization over latent N works</p>
 <span><span class="co">##   vector[n_lv] penalty = rep_vector(1e12, n_lv);</span></span>
 <span><span class="co">##   vector[n_sp_trend] rho_trend = log(lambda_trend);</span></span>
 <span><span class="co">## }</span></span></code></pre>
-<p>The summary of this model shows that it has converged nicely</p>
+<p>The posterior summary of this model shows that it has converged
+nicely</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## GAM observation formula:</span></span>
@@ -517,11 +516,9 @@ sense of how the marginalization over latent N works</p>
 <span><span class="co">## s(time):trendtrend2.3_trend  0.190  0.410  0.630    1  1778</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##                        edf    F p-value   </span></span>
-<span><span class="co">## s(time):seriestrend1 0.854 0.24  0.0659 . </span></span>
-<span><span class="co">## s(time):seriestrend2 1.035 0.48  0.0026 **</span></span>
-<span><span class="co">## ---</span></span>
-<span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
+<span><span class="co">##                        edf    F p-value</span></span>
+<span><span class="co">## s(time):seriestrend1 0.717 0.26    0.39</span></span>
+<span><span class="co">## s(time):seriestrend2 0.738 0.53    0.44</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
@@ -530,7 +527,7 @@ sense of how the marginalization over latent N works</p>
 <span><span class="co">## 0 of 4000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Thu Feb 01 11:21:01 AM 2024.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Tue Feb 06 6:55:09 AM 2024.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
@@ -839,8 +836,8 @@ model</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
 <span><span class="co">##             edf Chi.sq p-value    </span></span>
-<span><span class="co">## s(det_cov)  NaN   76.4 0.00022 ***</span></span>
-<span><span class="co">## s(det_cov2) NaN  290.6 &lt; 2e-16 ***</span></span>
+<span><span class="co">## s(det_cov)  NaN   76.2 0.00022 ***</span></span>
+<span><span class="co">## s(det_cov2) NaN  289.9 &lt; 2e-16 ***</span></span>
 <span><span class="co">## ---</span></span>
 <span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">## </span></span>
@@ -855,8 +852,8 @@ model</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM process smooths:</span></span>
 <span><span class="co">##               edf    F p-value</span></span>
-<span><span class="co">## s(abund_cov) 1.14 0.71    0.77</span></span>
-<span><span class="co">## s(abund_fac) 8.93 0.23    0.66</span></span>
+<span><span class="co">## s(abund_cov) 1.15 0.50    0.73</span></span>
+<span><span class="co">## s(abund_fac) 8.93 0.23    0.65</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Posterior approximation used: no diagnostics to compute</span></span></code></pre>
 <p>Again we can make use of <code>marginaleffects</code> support for
