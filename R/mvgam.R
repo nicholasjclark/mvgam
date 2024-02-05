@@ -1712,7 +1712,13 @@ mvgam = function(formula,
       vectorised$model_file <- nmix_additions$model_file
       vectorised$model_data <- nmix_additions$model_data
       family <- nmix(); family_char <- 'nmix'
-      param <- c(param, 'detprob', 'latent_ypred', 'p')
+
+      # Nmixtures don't use generated quantities because it is faster
+      # to produce these in R after sampling has finished
+      param <- c(param, 'p')
+      param <- param[!param %in% c('ypred', 'mus', 'theta',
+                                   'Sigma', 'detprob', 'latent_ypred',
+                                   'lv_coefs', 'sigma', 'error')]
     }
 
     # Tidy the representation
