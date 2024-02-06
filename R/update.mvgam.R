@@ -40,6 +40,10 @@ update.mvgam = function(object, formula,
 
   if(missing(formula)){
     formula <- object$call
+
+    if(attr(object$mgcv_model, 'drop_obs_intercept')){
+      formula <- update(formula, ~ . -1)
+    }
   }
 
   if(missing(trend_formula)){

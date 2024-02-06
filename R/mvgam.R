@@ -1630,6 +1630,9 @@ mvgam = function(formula,
       }
 
       vectorised$model_file <- readLines(textConnection(vectorised$model_file), n = -1)
+      attr(ss_gam, 'drop_obs_intercept') <- TRUE
+    } else {
+      attr(ss_gam, 'drop_obs_intercept') <- FALSE
     }
 
     # Remaining model file updates for any GP terms
