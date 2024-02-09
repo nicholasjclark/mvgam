@@ -289,7 +289,7 @@ plot_latentN(hc, testdat, species = 'sp_1')
 plot_latentN(hc, testdat, species = 'sp_2')
 ```
 
-We can see that estimates for both species have correctly captured the true temporal variation in abundance. However, it is also apparent that low detection probabilities (like for species 2) make it difficult to accurately estimate latent abundance. We could likely improve these estimates if we had some additional information that could inform our estimates of detection probability, such as covariates that reflect our ability to take accurate measurements
+We can see that estimates for both species have correctly captured the true temporal variation and magnitudes in abundance
 
 ## Example 2: a larger survey with possible nonlinear effects
 
@@ -357,7 +357,7 @@ trend_map %>%
   head(12)
 ```
 
-Now we are ready to fit a model using `mvgam()`. Here we will use penalized splines for each of the continuous covariate effects to detect possible nonlinear associations. We also showcase how `mvgam` can make use of the different approximation algorithms available in `Stan` by using the meanfield variational Bayes approximator (this reduces computation time to around 50 seconds, for this example)
+Now we are ready to fit a model using `mvgam()`. Here we will use penalized splines for each of the continuous covariate effects to detect possible nonlinear associations. We also showcase how `mvgam` can make use of the different approximation algorithms available in `Stan` by using the meanfield variational Bayes approximator (this reduces computation time to around 12 seconds for this example)
 ```{r include = FALSE, results='hide'}
 mod <- mvgam(
   # effects of covariates on detection probability;

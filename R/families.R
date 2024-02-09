@@ -222,6 +222,31 @@ beta_shapes = function(mu, phi) {
               shape2 = (1 - mu) * phi))
 }
 
+# Calculate all possible Poisson log-densities for N-mixture simulation
+#' @noRd
+pois_dens = function(min_cap, max_cap, lambdas){
+  # Identify which indices share the exact same lambda AND
+  # k value so that we only need to run dpois once for each group
+  data.frame(lambdas,
+             min_cap,
+             max_cap) %>%
+    dplyr::group_by(lambdas) %>%
+    dplyr::summarise(min_cap = min(min_cap, na.rm = TRUE),
+                     max_cap = max(max_cap, na.rm = TRUE)) -> group_inds
+
+  l <- mapply(`:`, group_inds$min_cap, group_inds$max_cap)
+
+  data.frame(k = unlist(l),
+             lambda = group_inds$lambdas[rep(1:nrow(group_inds),
+                                             lengths(l))]) %>%
+    dplyr::mutate(pois_dens = dpois(k,
+                                    lambda,
+                                    log = TRUE)) -> all_ks
+
+  return(all_ks)
+}
+
+
 #' Generic prediction function
 #' @importFrom stats predict
 #' @param Xp A `mgcv` linear predictor matrix
@@ -322,7 +347,7 @@ mvgam_predict = function(Xp,
             lik <- exp(dbinom(truth[[i]], size = ks,
                               prob = p[[i]], log = TRUE) +
                          dpois(x = ks,
-                               lambda = lambdas[[i]], log = TRUE))
+                               lambda = lambdas[i], log = TRUE))
             probs <- lik / sum(lik)
             probs[!is.finite(probs)] <- 0
             output <- ks[wrswoR::sample_int_ccrank(length(ks),

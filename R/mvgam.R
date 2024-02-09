@@ -1720,8 +1720,8 @@ mvgam = function(formula,
       # to produce these in R after sampling has finished
       param <- c(param, 'p')
       param <- param[!param %in% c('ypred', 'mus', 'theta',
-                                   'Sigma', 'detprob', 'latent_ypred',
-                                   'lv_coefs', 'sigma', 'error')]
+                                   'detprob', 'latent_ypred',
+                                   'lv_coefs', 'error')]
     }
 
     # Tidy the representation
@@ -2114,11 +2114,6 @@ mvgam = function(formula,
 
         stan_control <- list(max_treedepth = max_treedepth,
                              adapt_delta = adapt_delta)
-        if(save_all_pars){
-          pars <- NA
-        } else {
-          pars <- param
-        }
 
         if(algorithm == 'sampling'){
           if(parallel){
@@ -2132,7 +2127,7 @@ mvgam = function(formula,
                                     verbose = FALSE,
                                     thin = thin,
                                     control = stan_control,
-                                    pars = pars,
+                                    pars = NA,
                                     refresh = 100,
                                     ...)
           } else {
@@ -2146,7 +2141,7 @@ mvgam = function(formula,
                                     verbose = FALSE,
                                     thin = thin,
                                     control = stan_control,
-                                    pars = pars,
+                                    pars = NA,
                                     refresh = 100,
                                     ...)
           }
@@ -2158,7 +2153,7 @@ mvgam = function(formula,
                             output_samples = samples,
                             data = model_data,
                             algorithm = algorithm,
-                            pars = pars,
+                            pars = NA,
                             ...)
         }
 
@@ -2240,7 +2235,7 @@ mvgam = function(formula,
                                       mgcv_model = ss_gam,
                                       Z = model_data$Z,
                                       n_lv = n_lv,
-                                      K_inds = model_data$K_inds)
+                                      K_inds = model_data$K_inds_all)
   }
 
   # Get Dunn-Smyth Residual distributions for each series if this
