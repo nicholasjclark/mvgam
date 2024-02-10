@@ -2232,6 +2232,7 @@ mvgam = function(formula,
   if(family_char == 'nmix'){
     out_gam_mod <- add_nmix_posterior(model_output = out_gam_mod,
                                       obs_data = data_train,
+                                      test_data = data_test,
                                       mgcv_model = ss_gam,
                                       Z = model_data$Z,
                                       n_lv = n_lv,
