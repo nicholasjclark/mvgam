@@ -510,12 +510,12 @@ add_nmix_posterior = function(model_output,
   # Trend samples (for getting dimnames needed for ypred, latent_ypred)
   trend <- mcmc_chains(model_output, 'trend')
 
-  # Construct latent_ypred samples
-  Xp <- obs_Xp_matrix(newdata = obs_data,
+  # Construct latent_ypred samples (arranged by time, then series)
+  Xp <- obs_Xp_matrix(newdata = sort_data(obs_data),
                       mgcv_model = mgcv_model)
   if(!is.null(test_data)){
     offset_obs <- attr(Xp, 'model.offset')
-    Xp_test <- obs_Xp_matrix(newdata = test_data,
+    Xp_test <- obs_Xp_matrix(newdata = sort_data(test_data),
                              mgcv_model = mgcv_model)
     offset_test <- attr(Xp_test, 'model.offset')
     Xp <- rbind(Xp, Xp_test)
@@ -544,25 +544,20 @@ add_nmix_posterior = function(model_output,
       dplyr::arrange(series, time) %>%
       dplyr::pull(cap)
   }
-
   cap <- as.vector(t(replicate(NROW(betas), cap)))
 
   # Unconditional latent_N predictions
   if(!is.null(test_data)){
-    truth <- rbind(data.frame(time = obs_data$time,
+    truth_df <- rbind(data.frame(time = obs_data$time,
                         series = obs_data$series,
                         y = obs_data$y),
                    data.frame(time = test_data$time,
                               series = test_data$series,
-                              y = test_data$y)) %>%
-      dplyr::arrange(series, time) %>%
-      dplyr::pull(y)
+                              y = test_data$y))
   } else {
-    truth <- data.frame(time = obs_data$time,
+    truth_df <- data.frame(time = obs_data$time,
                         series = obs_data$series,
-                        y = obs_data$y) %>%
-      dplyr::arrange(series, time) %>%
-      dplyr::pull(y)
+                        y = obs_data$y)
   }
 
   get_min_cap = function(truth, K_inds){
@@ -582,9 +577,28 @@ add_nmix_posterior = function(model_output,
   if(is.null(K_inds)){
     K_inds <- matrix(1:length(truth), ncol = 1)
   }
-  min_cap <- suppressWarnings(get_min_cap(truth, K_inds))
+
+  # K_inds was originally supplied in series, time order
+  # so the corresponding truth must be supplied that way
+  truth_df %>%
+    dplyr::arrange(series, time) %>%
+    dplyr::pull(y) -> orig_y
+  min_cap <- suppressWarnings(get_min_cap(orig_y, K_inds))
   min_cap[!is.finite(min_cap)] <- 0
-  truth <- as.vector(t(replicate(NROW(betas), truth)))
+
+  # min_cap is now in the wrong order, so we need to change it
+  truth_df %>%
+    dplyr::arrange(series, time) %>%
+    dplyr::bind_cols(min_cap = min_cap) %>%
+    dplyr::arrange(series, time) %>%
+    dplyr::pull(min_cap) -> min_cap
+
+  # truth now also needs to be in the correct time, series
+  # order
+  truth_df %>%
+    dplyr::arrange(series, time) %>%
+    dplyr::pull(y) -> mod_y
+  truth <- as.vector(t(replicate(NROW(betas), mod_y)))
   min_cap <- as.vector(t(replicate(NROW(betas), min_cap)))
   latentypreds_vec <- mvgam_predict(Xp = all_linpreds,
                                     family = 'nmix',
@@ -596,9 +610,9 @@ add_nmix_posterior = function(model_output,
 
   # Conditional latent_N predictions (when observations were not NA)
   whichobs <- which(!is.na(truth))
-  Xp <- all_linpreds[whichobs,,drop=FALSE]
+  Xp <- all_linpreds[whichobs, , drop = FALSE]
   attr(Xp, 'model.offset') <- 0
-  condpreds_vec <- mvgam_predict(Xp = Xp,
+  condpreds_vec <- mvgam_predict(Xp = all_linpreds,
                                  family = 'nmix',
                                  betas = 1,
                                  latent_lambdas = exp(as.vector(trend)[whichobs]),
@@ -612,10 +626,24 @@ add_nmix_posterior = function(model_output,
   latentypreds_vec[whichobs] <- condpreds_vec
   latentypreds <- matrix(latentypreds_vec, nrow = NROW(betas))
 
+  # TEST ####
+  expand.grid(time = 1:model_output@sim$dims_oi$trend[1],
+              series = 1:model_output@sim$dims_oi$trend[2]) %>%
+    dplyr::arrange(series, time) %>%
+    dplyr::mutate(name = paste0('trend[',
+                                time,
+                                ',',
+                                series,
+                                ']')) %>%
+    dplyr::pull(name) -> parnames
+
+  # old_parnames <- dimnames(trend)[[2]]
+  # latentypreds <- latentypreds[, order(match(old_parnames,parnames))]
+  parnames <- gsub('trend', 'latent_ypred', parnames)
+
   # Add latent_ypreds to the posterior samples
   model_output <- add_samples(model_output = model_output,
-                        names = gsub('trend', 'latent_ypred',
-                                     dimnames(trend)[[2]]),
+                        names = parnames,
                         samples = latentypreds,
                         nsamples = NROW(latentypreds) / nchains,
                         nchains = nchains,
@@ -689,3 +717,26 @@ add_nmix_posterior = function(model_output,
   return(model_output)
 }
 
+# Get list object into correct order in case it is not already
+sort_data = function(obs_data){
+  if(inherits(obs_data, 'list')){
+    obs_data_arranged <- obs_data
+    temp_dat = data.frame(time = obs_data$time,
+                          series = obs_data$series) %>%
+      dplyr::mutate(index = dplyr::row_number()) %>%
+      dplyr::arrange(series, time)
+    obs_data_arranged <- lapply(obs_data, function(x){
+      if(is.matrix(x)){
+        matrix(x[temp_dat$index,], ncol = NCOL(x))
+      } else {
+        x[temp_dat$index]
+      }
+    })
+    names(obs_data_arranged) <- names(obs_data)
+  } else {
+    obs_data_arranged <- obs_data %>%
+      dplyr::arrange(series, time)
+  }
+
+  return(obs_data_arranged)
+}
