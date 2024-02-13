@@ -626,7 +626,7 @@ add_nmix_posterior = function(model_output,
   latentypreds_vec[whichobs] <- condpreds_vec
   latentypreds <- matrix(latentypreds_vec, nrow = NROW(betas))
 
-  # TEST ####
+  # Update parameter names to match expected order
   expand.grid(time = 1:model_output@sim$dims_oi$trend[1],
               series = 1:model_output@sim$dims_oi$trend[2]) %>%
     dplyr::arrange(series, time) %>%
@@ -637,13 +637,9 @@ add_nmix_posterior = function(model_output,
                                 ']')) %>%
     dplyr::pull(name) -> parnames
 
-  # old_parnames <- dimnames(trend)[[2]]
-  # latentypreds <- latentypreds[, order(match(old_parnames,parnames))]
-  parnames <- gsub('trend', 'latent_ypred', parnames)
-
   # Add latent_ypreds to the posterior samples
   model_output <- add_samples(model_output = model_output,
-                        names = parnames,
+                        names = gsub('trend', 'latent_ypred', parnames),
                         samples = latentypreds,
                         nsamples = NROW(latentypreds) / nchains,
                         nchains = nchains,
@@ -670,8 +666,7 @@ add_nmix_posterior = function(model_output,
                        prob = as.vector(detprob))
   ypreds <- matrix(ypreds_vec, nrow = NROW(betas))
   model_output <- add_samples(model_output = model_output,
-                        names = gsub('trend', 'ypred',
-                                     dimnames(trend)[[2]]),
+                        names = gsub('trend', 'ypred', parnames),
                         samples = ypreds,
                         nsamples = NROW(ypreds) / nchains,
                         nchains = nchains,
@@ -683,8 +678,7 @@ add_nmix_posterior = function(model_output,
   mus_vec <- as.vector(detprob) * latentypreds_vec
   mus <- matrix(mus_vec, nrow = NROW(betas))
   model_output <- add_samples(model_output = model_output,
-                        names = gsub('trend', 'mus',
-                                     dimnames(trend)[[2]]),
+                        names = gsub('trend', 'mus', parnames),
                         samples = mus,
                         nsamples = NROW(mus) / nchains,
                         nchains = nchains,

@@ -136,7 +136,7 @@ head(testdat, 12)
 
 ### Setting up the `trend_map`
 
-Finally, we need to set up the `trend_map` object. This is crucial for allowing multiple observations to be linked to the same latent process model (see more information about this argument in the [Shared latent states vignette](https://nicholasjclark.github.io/mvgam/articles/shared_states.html){target="_blank"}. In this case, the mapping operates by species and site to state that each set of replicate observations from the same time point should all share the exact same latent abundance model:
+Finally, we need to set up the `trend_map` object. This is crucial for allowing multiple observations to be linked to the same latent process model (see more information about this argument in the [Shared latent states vignette](https://nicholasjclark.github.io/mvgam/articles/shared_states.html){target="_blank"}). In this case, the mapping operates by species and site to state that each set of replicate observations from the same time point should all share the exact same latent abundance model:
 ```{r}
 testdat %>%
   # each unique combination of site*species is a separate process
@@ -208,7 +208,7 @@ The posterior summary of this model shows that it has converged nicely
 summary(mod)
 ```
 
-`loo()` functionality works just as it does for all `mvgam` models to aid in model comparison / selection
+`loo()` functionality works just as it does for all `mvgam` models to aid in model comparison / selection (though note that Pareto K values often give warnings for mixture models so these may not be too helpful)
 ```{r}
 loo(mod)
 ```
@@ -218,7 +218,7 @@ Plot the estimated smooths of time from each species' latent abundance process (
 plot(mod, type = 'smooths', trend_effects = TRUE)
 ```
 
-`marginaleffects` support allows for more useful prediction-based interrogations on different scales. Objects that use family `nmix()` have a few additional prediction scales that can be used (i.e. `link`, `response`, `detection` or `latent_N`). For example, here are the estimated detection probabilities per species, which shows that the model has over-estimated detection probability for species 2 (originally simulated to be 0.45):
+`marginaleffects` support allows for more useful prediction-based interrogations on different scales. Objects that use family `nmix()` have a few additional prediction scales that can be used (i.e. `link`, `response`, `detection` or `latent_N`). For example, here are the estimated detection probabilities per species, which show that the model has done a nice job of estimating these parameters:
 ```{r}
 plot_predictions(mod, condition = 'species',
                  type = 'detection') +

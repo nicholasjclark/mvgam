@@ -78,7 +78,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2024-02-09</h4>
+            <h4 data-toc-skip class="date">2024-02-13</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/nmixtures.Rmd" class="external-link"><code>vignettes/nmixtures.Rmd</code></a></small>
       <div class="d-none name"><code>nmixtures.Rmd</code></div>
@@ -255,7 +255,7 @@ we’d like to allow certain effects to vary by species</p>
 </h3>
 <p>Finally, we need to set up the <code>trend_map</code> object. This is
 crucial for allowing multiple observations to be linked to the same
-latent process model (see more information about this argument in the <a href="https://nicholasjclark.github.io/mvgam/articles/shared_states.html" target="_blank">Shared latent states vignette</a>. In this case, the
+latent process model (see more information about this argument in the <a href="https://nicholasjclark.github.io/mvgam/articles/shared_states.html" target="_blank">Shared latent states vignette</a>). In this case, the
 mapping operates by species and site to state that each set of replicate
 observations from the same time point should all share the exact same
 latent abundance model:</p>
@@ -517,12 +517,14 @@ nicely</p>
 <span><span class="co">## 0 of 4000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Fri Feb 09 10:26:52 PM 2024.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Tue Feb 13 10:37:12 AM 2024.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
 <p><code>loo()</code> functionality works just as it does for all
-<code>mvgam</code> models to aid in model comparison / selection</p>
+<code>mvgam</code> models to aid in model comparison / selection (though
+note that Pareto K values often give warnings for mixture models so
+these may not be too helpful)</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">loo</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span></span></code></pre>
@@ -553,9 +555,8 @@ prediction-based interrogations on different scales. Objects that use
 family <code><a href="../reference/mvgam_families.html">nmix()</a></code> have a few additional prediction scales that
 can be used (i.e. <code>link</code>, <code>response</code>,
 <code>detection</code> or <code>latent_N</code>). For example, here are
-the estimated detection probabilities per species, which shows that the
-model has over-estimated detection probability for species 2 (originally
-simulated to be 0.45):</p>
+the estimated detection probabilities per species, which show that the
+model has done a nice job of estimating these parameters:</p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">plot_predictions</span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span>
 <span>                 type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span> <span class="op">+</span></span>
@@ -826,9 +827,9 @@ model</p>
 <span><span class="co">## (Intercept) 0.098 0.38  0.65  NaN   NaN</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">##             edf Chi.sq p-value    </span></span>
-<span><span class="co">## s(det_cov)  NaN   71.6 0.00028 ***</span></span>
-<span><span class="co">## s(det_cov2) NaN  274.1 1.3e-06 ***</span></span>
+<span><span class="co">##              edf Chi.sq p-value    </span></span>
+<span><span class="co">## s(det_cov)  1.40   71.6 0.00028 ***</span></span>
+<span><span class="co">## s(det_cov2) 1.71  274.1 1.3e-06 ***</span></span>
 <span><span class="co">## ---</span></span>
 <span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">## </span></span>
@@ -842,9 +843,9 @@ model</p>
 <span><span class="co">## sd(s(abund_fac))_trend   0.096 0.19  0.37  NaN   NaN</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##               edf    F p-value</span></span>
-<span><span class="co">## s(abund_cov) 1.75 0.58    0.90</span></span>
-<span><span class="co">## s(abund_fac) 9.04 0.36    0.74</span></span>
+<span><span class="co">##                edf    F p-value</span></span>
+<span><span class="co">## s(abund_cov) 0.972 0.58    0.90</span></span>
+<span><span class="co">## s(abund_fac) 8.769 0.36    0.74</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Posterior approximation used: no diagnostics to compute</span></span></code></pre>
 <p>Again we can make use of <code>marginaleffects</code> support for
