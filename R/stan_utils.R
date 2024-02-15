@@ -48,27 +48,30 @@ remove_likelihood = function(model_file){
                                   stan_file, fixed = TRUE)]
     stan_file <- stan_file[-grep('matrix[n_series, n_lv] lv_coefs;',
                                  stan_file, fixed = TRUE)]
+    stan_file[grep('trend[i, s] = dot_product(lv_coefs[s,], LV[i,]);',
+                   stan_file, fixed = TRUE)] <-
+      'trend[i, s] = dot_product(Z[s,], LV[i,]);'
 
-    if(any(grepl('// derived latent states',
-                 stan_file, fixed = TRUE))){
-      starts <- grep('// derived latent states',
-                     stan_file, fixed = TRUE) + 1
-      ends <- starts + 4
-      stan_file <- stan_file[-c(starts:ends)]
-      stan_file[grep('// derived latent states',
-                     stan_file, fixed = TRUE)] <-
-        paste0('// derived latent states\n',
-               "trend = LV * Z';")
-    } else {
-      starts <- grep('// derived latent trends',
-                     stan_file, fixed = TRUE) + 1
-      ends <- starts + 4
-      stan_file <- stan_file[-c(starts:ends)]
-      stan_file[grep('// derived latent trends',
-                     stan_file, fixed = TRUE)] <-
-        paste0('// derived latent trends\n',
-               "trend = LV * Z';")
-    }
+    # if(any(grepl('// derived latent states',
+    #              stan_file, fixed = TRUE))){
+    #   starts <- grep('// derived latent states',
+    #                  stan_file, fixed = TRUE) + 1
+    #   ends <- starts + 4
+    #   stan_file <- stan_file[-c(starts:ends)]
+    #   stan_file[grep('// derived latent states',
+    #                  stan_file, fixed = TRUE)] <-
+    #     paste0('// derived latent states\n',
+    #            "trend = LV * Z';")
+    # } else {
+    #   starts <- grep('// derived latent trends',
+    #                  stan_file, fixed = TRUE) + 1
+    #   ends <- starts + 4
+    #   stan_file <- stan_file[-c(starts:ends)]
+    #   stan_file[grep('// derived latent trends',
+    #                  stan_file, fixed = TRUE)] <-
+    #     paste0('// derived latent trends\n',
+    #            "trend = LV * Z';")
+    # }
 
     stan_file[grep('// posterior predictions',
                    stan_file, fixed = TRUE)-1] <-
