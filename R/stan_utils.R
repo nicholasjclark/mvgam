@@ -2826,7 +2826,8 @@ add_trend_predictors = function(trend_formula,
     trend_indicators[i] <- trend_map$trend[which(trend_map$series ==
                                                    trend_train$series[i])]
   }
-  trend_indicators <- as.factor(paste0('trend', trend_indicators))
+  trend_indicators <- factor(paste0('trend', trend_indicators),
+                             levels = paste0('trend', 1:max(trend_map$trend)))
   trend_train$series <- trend_indicators
   trend_train$y <- NULL
 

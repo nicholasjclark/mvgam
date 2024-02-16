@@ -511,23 +511,11 @@ add_nmix_posterior = function(model_output,
   trend <- mcmc_chains(model_output, 'trend')
 
   # Construct latent_ypred samples (arranged by time, then series)
-  Xp <- obs_Xp_matrix(newdata = sort_data(obs_data),
-                      mgcv_model = mgcv_model)
-  if(!is.null(test_data)){
-    offset_obs <- attr(Xp, 'model.offset')
-    Xp_test <- obs_Xp_matrix(newdata = sort_data(test_data),
-                             mgcv_model = mgcv_model)
-    offset_test <- attr(Xp_test, 'model.offset')
-    Xp <- rbind(Xp, Xp_test)
-    attr(Xp, 'model.offset') <- c(offset_obs,
-                                  offset_test)
-  }
+  ps <- mcmc_chains(model_output, 'p')
+  detprob <- plogis(ps)
+  Xp <- matrix(as.vector(ps))
+  attr(Xp, 'model.offset') <- 0
 
-  betas <- mcmc_chains(model_output, 'b')
-  all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
-                                              function(row) Xp %*% row +
-                                                attr(Xp, 'model.offset')))))
-  attr(all_linpreds, 'model.offset') <- 0
   if(!is.null(test_data)){
     cap <- rbind(data.frame(time = obs_data$time,
                       series = obs_data$series,
@@ -544,7 +532,7 @@ add_nmix_posterior = function(model_output,
       dplyr::arrange(series, time) %>%
       dplyr::pull(cap)
   }
-  cap <- as.vector(t(replicate(NROW(betas), cap)))
+  cap <- as.vector(t(replicate(NROW(ps), cap)))
 
   # Unconditional latent_N predictions
   if(!is.null(test_data)){
@@ -590,17 +578,17 @@ add_nmix_posterior = function(model_output,
   truth_df %>%
     dplyr::arrange(series, time) %>%
     dplyr::bind_cols(min_cap = min_cap) %>%
-    dplyr::arrange(series, time) %>%
+    dplyr::arrange(time, series) %>%
     dplyr::pull(min_cap) -> min_cap
 
   # truth now also needs to be in the correct time, series
   # order
   truth_df %>%
-    dplyr::arrange(series, time) %>%
+    dplyr::arrange(time, series) %>%
     dplyr::pull(y) -> mod_y
-  truth <- as.vector(t(replicate(NROW(betas), mod_y)))
-  min_cap <- as.vector(t(replicate(NROW(betas), min_cap)))
-  latentypreds_vec <- mvgam_predict(Xp = all_linpreds,
+  truth <- as.vector(t(replicate(NROW(ps), mod_y)))
+  min_cap <- as.vector(t(replicate(NROW(ps), min_cap)))
+  latentypreds_vec <- mvgam_predict(Xp = Xp,
                                     family = 'nmix',
                                     betas = 1,
                                     latent_lambdas = exp(as.vector(trend)),
@@ -610,9 +598,9 @@ add_nmix_posterior = function(model_output,
 
   # Conditional latent_N predictions (when observations were not NA)
   whichobs <- which(!is.na(truth))
-  Xp <- all_linpreds[whichobs, , drop = FALSE]
+  Xp <- Xp[whichobs, , drop = FALSE]
   attr(Xp, 'model.offset') <- 0
-  condpreds_vec <- mvgam_predict(Xp = all_linpreds,
+  condpreds_vec <- mvgam_predict(Xp = Xp,
                                  family = 'nmix',
                                  betas = 1,
                                  latent_lambdas = exp(as.vector(trend)[whichobs]),
@@ -624,23 +612,34 @@ add_nmix_posterior = function(model_output,
   # Fill in the unconditionals using the conditionals when there were actually
   # observations
   latentypreds_vec[whichobs] <- condpreds_vec
-  latentypreds <- matrix(latentypreds_vec, nrow = NROW(betas))
+  latentypreds <- matrix(latentypreds_vec, nrow = NROW(ps))
 
-  # Update parameter names to match expected order
+  # Update parameter names and samples to match expected order
   expand.grid(time = 1:model_output@sim$dims_oi$trend[1],
               series = 1:model_output@sim$dims_oi$trend[2]) %>%
+    dplyr::arrange(time, series) %>%
+    dplyr::mutate(current = dplyr::row_number()) %>%
     dplyr::arrange(series, time) %>%
+    dplyr::mutate(needed = dplyr::row_number()) %>%
     dplyr::mutate(name = paste0('trend[',
                                 time,
                                 ',',
                                 series,
                                 ']')) %>%
-    dplyr::pull(name) -> parnames
+    dplyr::arrange(current) -> ordering_needed
+
+  parnames <- ordering_needed %>%
+    dplyr::arrange(needed) %>%
+    dplyr::pull(name)
+
+  indices <- ordering_needed %>%
+    dplyr::arrange(needed) %>%
+    dplyr::pull(current)
 
   # Add latent_ypreds to the posterior samples
   model_output <- add_samples(model_output = model_output,
                         names = gsub('trend', 'latent_ypred', parnames),
-                        samples = latentypreds,
+                        samples = latentypreds[, indices],
                         nsamples = NROW(latentypreds) / nchains,
                         nchains = nchains,
                         parname = 'latent_ypred')
@@ -648,8 +647,6 @@ add_nmix_posterior = function(model_output,
     model_output@sim$dims_oi$trend
 
   # Now construct the detprob samples
-  ps <- mcmc_chains(model_output, 'p')
-  detprob <- plogis(ps)
   model_output <- add_samples(model_output = model_output,
                         names = gsub('p', 'detprob',
                                      dimnames(ps)[[2]]),
@@ -664,10 +661,10 @@ add_nmix_posterior = function(model_output,
   ypreds_vec <- rbinom(length(latentypreds_vec),
                        size = latentypreds_vec,
                        prob = as.vector(detprob))
-  ypreds <- matrix(ypreds_vec, nrow = NROW(betas))
+  ypreds <- matrix(ypreds_vec, nrow = NROW(ps))
   model_output <- add_samples(model_output = model_output,
                         names = gsub('trend', 'ypred', parnames),
-                        samples = ypreds,
+                        samples = ypreds[, indices],
                         nsamples = NROW(ypreds) / nchains,
                         nchains = nchains,
                         parname = 'ypred')
@@ -676,10 +673,10 @@ add_nmix_posterior = function(model_output,
 
   # Now construct mus (expectations) samples
   mus_vec <- as.vector(detprob) * latentypreds_vec
-  mus <- matrix(mus_vec, nrow = NROW(betas))
+  mus <- matrix(mus_vec, nrow = NROW(ps))
   model_output <- add_samples(model_output = model_output,
                         names = gsub('trend', 'mus', parnames),
-                        samples = mus,
+                        samples = mus[, indices],
                         nsamples = NROW(mus) / nchains,
                         nchains = nchains,
                         parname = 'mus')
@@ -694,7 +691,7 @@ add_nmix_posterior = function(model_output,
                          function(x) paste0('lv_coefs[',
                                             x[1], ',',
                                             x[2], ']'))
-  lv_coef_samps <- t(replicate(NROW(betas), as.vector(t(Z))))
+  lv_coef_samps <- t(replicate(NROW(ps), as.vector(t(Z))))
   model_output <- add_samples(model_output = model_output,
                               names = lv_coef_names,
                               samples = lv_coef_samps,

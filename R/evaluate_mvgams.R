@@ -758,7 +758,7 @@ variogram_score = function(truth, fc, log = FALSE, weights){
   # Use weight of 1 for each pairwise combination if no weights
   # are supplied; else take the product of each pair of weights
   if(missing(weights)){
-    weights <- matrix(1, nrow = length(obs), ncol = length(obs))
+    weights <- matrix(1, nrow = length(truth), ncol = length(truth))
   } else {
     weights <- outer(weights, weights, FUN = function(X, Y){
       (X + Y) / 2
