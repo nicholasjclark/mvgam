@@ -2129,6 +2129,7 @@ mvgam = function(formula,
                                     control = stan_control,
                                     pars = NA,
                                     refresh = 100,
+                                    save_warmup = FALSE,
                                     ...)
           } else {
             fit1 <- rstan::sampling(stan_mod,
@@ -2143,6 +2144,7 @@ mvgam = function(formula,
                                     control = stan_control,
                                     pars = NA,
                                     refresh = 100,
+                                    save_warmup = FALSE,
                                     ...)
           }
         }

@@ -489,11 +489,23 @@ add_nmix_posterior = function(model_output,
     samp_starts <- seq(1, NROW(samples), by = nsamples)
     samp_ends <- seq(nsamples, NROW(samples), by = nsamples)
     for(i in 1:nchains){
+
       samps_df <- data.frame(samples[samp_starts[i]:samp_ends[i],])
       colnames(samps_df) <- names
-      model_output@sim$samples[[i]] <-
-        dplyr::bind_cols(model_output@sim$samples[[i]],
-                         samps_df)
+
+      if(is.list(model_output@sim$samples[[i]])){
+        old <- attributes(model_output@sim$samples[[i]])
+        oldnames <- attr(model_output@sim$samples[[i]], 'names')
+        model_output@sim$samples[[i]] <-
+          append(model_output@sim$samples[[i]], as.list(samps_df))
+        mostattributes(model_output@sim$samples[[i]]) <- old
+        attr(model_output@sim$samples[[i]], 'names') <-
+          c(oldnames, colnames(samps_df))
+      } else {
+        model_output@sim$samples[[i]] <-
+          dplyr::bind_cols(model_output@sim$samples[[i]],
+                           samps_df)
+      }
     }
     model_output@sim$fnames_oi <- c(model_output@sim$fnames_oi,
                                            names)
@@ -638,11 +650,11 @@ add_nmix_posterior = function(model_output,
 
   # Add latent_ypreds to the posterior samples
   model_output <- add_samples(model_output = model_output,
-                        names = gsub('trend', 'latent_ypred', parnames),
-                        samples = latentypreds[, indices],
-                        nsamples = NROW(latentypreds) / nchains,
-                        nchains = nchains,
-                        parname = 'latent_ypred')
+                              names = gsub('trend', 'latent_ypred', parnames),
+                              samples = latentypreds[, indices],
+                              nsamples = NROW(latentypreds) / nchains,
+                              nchains = nchains,
+                              parname = 'latent_ypred')
   model_output@sim$dims_oi$latent_ypred <-
     model_output@sim$dims_oi$trend
 
