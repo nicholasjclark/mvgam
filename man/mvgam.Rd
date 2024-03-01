@@ -17,6 +17,7 @@ mvgam(
   prior_simulation = FALSE,
   return_model_data = FALSE,
   family = "poisson",
+  share_obs_params = FALSE,
   use_lv = FALSE,
   n_lv,
   trend_map,
@@ -118,6 +119,13 @@ See \code{\link{mvgam_families}} for an example of how to use this family}
 Note that only \code{nb()} and \code{poisson()} are available if using \code{JAGS} as the backend.
 Default is \code{poisson()}.
 See \code{\link{mvgam_families}} for more details}
+
+\item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family}
+has additional family-specific observation parameters (e.g. variance components in
+\code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or \code{betar()}),
+these parameters will be shared across all series. This is handy if you have multiple
+time series that you believe share some properties, such as being from the same
+species over different spatial units. Default is \code{FALSE}.}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. Only available for
@@ -328,7 +336,8 @@ to ensure predictions can be made for all levels of the supplied factor variable
 \emph{Observation level parameters}: When more than one series is included in \code{data} and an
 observation family that contains more than one parameter is used, additional observation family parameters
 (i.e. \code{phi} for \code{nb()} or \code{sigma} for \code{gaussian()}) are
-estimated independently for each series.
+by default estimated independently for each series. But if you wish for the series to share
+the same observation parameters, set \code{share_obs_params = TRUE}
 \cr
 \cr
 \emph{Factor regularisation}: When using a dynamic factor model for the trends with \code{JAGS} factor precisions are given

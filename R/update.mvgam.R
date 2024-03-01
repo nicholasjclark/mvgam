@@ -28,13 +28,18 @@
 #' summary(updated_mod)
 #'}
 #'@export
-update.mvgam = function(object, formula,
+update.mvgam = function(object,
+                        formula,
                         trend_formula,
-                        data, newdata,
+                        data,
+                        newdata,
                         trend_model,
                         trend_map,
-                        use_lv, n_lv,
-                        family, priors,
+                        use_lv,
+                        n_lv,
+                        family,
+                        share_obs_params,
+                        priors,
                         lfo = FALSE,
                         ...){
 
@@ -44,6 +49,10 @@ update.mvgam = function(object, formula,
     if(attr(object$mgcv_model, 'drop_obs_intercept')){
       formula <- update(formula, ~ . -1)
     }
+  }
+
+  if(missing(share_obs_params)){
+    share_obs_params <- object$share_obs_params
   }
 
   if(missing(trend_formula)){
@@ -132,6 +141,7 @@ update.mvgam = function(object, formula,
                          use_lv = use_lv,
                          n_lv = n_lv,
                          family = family,
+                         share_obs_params = share_obs_params,
                          refit = TRUE,
                          lfo = lfo,
                          use_stan = ifelse(object$fit_engine == 'stan', TRUE,
@@ -147,6 +157,7 @@ update.mvgam = function(object, formula,
                          use_lv = use_lv,
                          n_lv = n_lv,
                          family = family,
+                         share_obs_params = share_obs_params,
                          refit = TRUE,
                          lfo = lfo,
                          use_stan = ifelse(object$fit_engine == 'stan', TRUE,

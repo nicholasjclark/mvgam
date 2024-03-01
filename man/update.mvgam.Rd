@@ -15,6 +15,7 @@
   use_lv,
   n_lv,
   family,
+  share_obs_params,
   priors,
   lfo = FALSE,
   ...
@@ -100,6 +101,13 @@ See \code{\link{mvgam_families}} for an example of how to use this family}
 Note that only \code{nb()} and \code{poisson()} are available if using \code{JAGS} as the backend.
 Default is \code{poisson()}.
 See \code{\link{mvgam_families}} for more details}
+
+\item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family}
+has additional family-specific observation parameters (e.g. variance components in
+\code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or \code{betar()}),
+these parameters will be shared across all series. This is handy if you have multiple
+time series that you believe share some properties, such as being from the same
+species over different spatial units. Default is \code{FALSE}.}
 
 \item{priors}{An optional \code{data.frame} with prior
 definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of

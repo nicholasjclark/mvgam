@@ -74,6 +74,12 @@
 #'Note that only `nb()` and `poisson()` are available if using `JAGS` as the backend.
 #'Default is `poisson()`.
 #'See \code{\link{mvgam_families}} for more details
+#'@param share_obs_params \code{logical}. If \code{TRUE} and the \code{family}
+#'has additional family-specific observation parameters (e.g. variance components in
+#'`student_t()` or `gaussian()`, or dispersion parameters in `nb()` or `betar()`),
+#'these parameters will be shared across all series. This is handy if you have multiple
+#'time series that you believe share some properties, such as being from the same
+#'species over different spatial units. Default is \code{FALSE}.
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. Only available for
 #'`RW()`, `AR()` and `GP()` trend models. Defaults to \code{FALSE}
@@ -124,7 +130,8 @@
 #'@param threads \code{integer} Experimental option to use multithreading for within-chain
 #'parallelisation in \code{Stan}. We recommend its use only if you are experienced with
 #'\code{Stan}'s `reduce_sum` function and have a slow running model that cannot be sped
-#'up by any other means. Only available when using \code{Cmdstan} as the backend
+#'up by any other means. Only available for some families(`poisson()`, `nb()`, `gaussian()`) and
+#'when using \code{Cmdstan} as the backend
 #'@param priors An optional \code{data.frame} with prior
 #'definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
 #'class `brmsprior` (see. \code{\link[brms]{prior}} for details). See [get_mvgam_priors] and
@@ -242,7 +249,8 @@
 #'*Observation level parameters*: When more than one series is included in \code{data} and an
 #'observation family that contains more than one parameter is used, additional observation family parameters
 #'(i.e. `phi` for `nb()` or `sigma` for `gaussian()`) are
-#'estimated independently for each series.
+#'by default estimated independently for each series. But if you wish for the series to share
+#'the same observation parameters, set `share_obs_params = TRUE`
 #'\cr
 #'\cr
 #'*Factor regularisation*: When using a dynamic factor model for the trends with `JAGS` factor precisions are given
@@ -574,6 +582,7 @@ mvgam = function(formula,
                  prior_simulation = FALSE,
                  return_model_data = FALSE,
                  family = 'poisson',
+                 share_obs_params = FALSE,
                  use_lv = FALSE,
                  n_lv,
                  trend_map,
@@ -709,6 +718,10 @@ mvgam = function(formula,
   # Validate the family argument
   family <- validate_family(family, use_stan = use_stan)
   family_char <- match.arg(arg = family$family, choices = family_char_choices())
+  if(threads > 1 & !family_char %in% c('poisson', 'negative binomial', 'gaussian')){
+    warning('multithreading not supported for this family; setting threads = 1')
+    threads <- 1
+  }
 
   # Validate the trend arguments
   orig_trend_model <- trend_model
@@ -1724,6 +1737,12 @@ mvgam = function(formula,
                                    'lv_coefs', 'error')]
     }
 
+    # Updates for sharing of observation params
+    if(share_obs_params){
+      vectorised$model_file <- shared_obs_params(vectorised$model_file,
+                                                 family_char)
+    }
+
     # Tidy the representation
     vectorised$model_file <- sanitise_modelfile(vectorised$model_file)
 
@@ -1816,6 +1835,7 @@ mvgam = function(formula,
                                  NULL
                                },
                                family = family_char,
+                               share_obs_params = share_obs_params,
                                trend_model = orig_trend_model,
                                trend_map = if(!missing(trend_map)){
                                  trend_map
@@ -2255,6 +2275,7 @@ mvgam = function(formula,
       },
       fit_engine = fit_engine,
       family = family_char,
+      share_obs_params = share_obs_params,
       obs_data = data_train,
       test_data = data_test,
       ytimes = ytimes)
@@ -2296,6 +2317,7 @@ mvgam = function(formula,
       },
       fit_engine = fit_engine,
       family = family_char,
+      share_obs_params = share_obs_params,
       obs_data = data_train,
       test_data = data_test,
       trend_model = trend_model,
@@ -2337,6 +2359,7 @@ mvgam = function(formula,
                              NULL
                            },
                            family = family_char,
+                           share_obs_params = share_obs_params,
                            trend_model = orig_trend_model,
                            trend_map = if(!missing(trend_map)){
                              trend_map
