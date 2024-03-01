@@ -300,3 +300,6 @@ Hyndman, Rob J., and George Athanasopoulos. [Forecasting: principles and practic
 Gneiting, Tilmann, and Adrian E. Raftery. [Strictly proper scoring rules, prediction, and estimation](https://www.tandfonline.com/doi/abs/10.1198/016214506000001437) *Journal of the American statistical Association* 102.477 (2007) 359-378.  
   
 Simonis, Juniper L., Ethan P. White, and SK Morgan Ernest. [Evaluating probabilistic ecological forecasts](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/ecy.3431) *Ecology* 102.8 (2021) e03431.
+
+## Interested in contributing?
+I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au)

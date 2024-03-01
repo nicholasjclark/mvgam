@@ -341,3 +341,5 @@ Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. "[MARSS: multivariate auto
   
 Scheuerell, Mark D., and John G. Williams. [Forecasting climate induced changes in the survival of Snake River Spring/Summer Chinook Salmon (*Oncorhynchus Tshawytscha*)](https://onlinelibrary.wiley.com/doi/10.1111/j.1365-2419.2005.00346.x) *Fisheries Oceanography*  14 (2005): 448–57.
 
+## Interested in contributing?
+I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au)

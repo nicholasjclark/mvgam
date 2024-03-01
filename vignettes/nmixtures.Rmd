@@ -489,3 +489,6 @@ Guélat, Jérôme, and Kéry, Marc. “[Effects of Spatial Autocorrelation and I
 Kéry, Marc, and Royle Andrew J. "[Applied hierarchical modeling in ecology: Analysis of distribution, abundance and species richness in R and BUGS: Volume 2: Dynamic and advanced models](https://www.sciencedirect.com/book/9780128237687/applied-hierarchical-modeling-in-ecology-analysis-of-distribution-abundance-and-species-richness-in-r-and-bugs)". London, UK: Academic Press (2020).
   
 Royle, Andrew J. "[N‐mixture models for estimating population size from spatially replicated counts.](https://onlinelibrary.wiley.com/doi/full/10.1111/j.0006-341X.2004.00142.x)" *Biometrics* 60.1 (2004): 108-115.
+
+## Interested in contributing?
+I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au)

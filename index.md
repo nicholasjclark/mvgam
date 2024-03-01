@@ -160,3 +160,10 @@ The following resources can be helpful to troubleshoot:
 
 - [Stan Discourse](https://discourse.mc-stan.org/)
 - [JAGS Discourse](https://sourceforge.net/projects/mcmc-jags/)
+
+## Interested in contributing?
+
+I’m actively seeking PhD students and other researchers to work in the
+areas of ecological forecasting, multivariate model evaluation and
+development of `mvgam`. Please reach out if you are interested
+(n.clark’at’uq.edu.au)
