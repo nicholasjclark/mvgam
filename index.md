@@ -1,6 +1,8 @@
 
 <br> <br>
 
+<img src="man/figures/mvgam_logo.png" width = 120 alt="brms Logo"/>[<img src="https://raw.githubusercontent.com/stan-dev/logos/master/logo_tm.png" align="right" width=120 alt="Stan Logo"/>](https://mc-stan.org/)
+
 ## mvgam
 
 **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels

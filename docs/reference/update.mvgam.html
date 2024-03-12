@@ -72,6 +72,7 @@
 <span>  <span class="va">use_lv</span>,</span>
 <span>  <span class="va">n_lv</span>,</span>
 <span>  <span class="va">family</span>,</span>
+<span>  <span class="va">share_obs_params</span>,</span>
 <span>  <span class="va">priors</span>,</span>
 <span>  lfo <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">...</span></span>
@@ -173,6 +174,15 @@ See <code><a href="mvgam_families.html">mvgam_families</a></code> for an example
 </ul><p>Note that only <code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> are available if using <code>JAGS</code> as the backend.
 Default is <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>.
 See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
+
+
+<dt>share_obs_params</dt>
+<dd><p><code>logical</code>. If <code>TRUE</code> and the <code>family</code>
+has additional family-specific observation parameters (e.g. variance components in
+<code><a href="mvgam_families.html">student_t()</a></code> or <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>, or dispersion parameters in <code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code> or <code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar()</a></code>),
+these parameters will be shared across all series. This is handy if you have multiple
+time series that you believe share some properties, such as being from the same
+species over different spatial units. Default is <code>FALSE</code>.</p></dd>
 
 
 <dt>priors</dt>
