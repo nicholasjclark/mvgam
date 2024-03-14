@@ -188,7 +188,8 @@ predict.mvgam = function(object, newdata,
 
     if(!object$use_lv){
 
-      if(attr(object$model_data, 'trend_model') %in% c('RW','AR1','AR2','AR3','VAR1')){
+      if(attr(object$model_data, 'trend_model') %in%
+         c('RW','AR1','AR2','AR3','VAR1')){
         family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
                                                     'sigma'))
       }
@@ -211,7 +212,7 @@ predict.mvgam = function(object, newdata,
       betas <- matrix(0,
                       ncol = 1,
                       nrow = dim(mcmc_chains(object$model_output, 'b'))[1])
-      Xp <- matrix(1, ncol = 1, nrow = NROW(newdata))
+      Xp <- matrix(1, ncol = 1, nrow = length(newdata$time))
       attr(Xp, 'model.offset') <- 0
 
       # Family parameters spread into a vector
