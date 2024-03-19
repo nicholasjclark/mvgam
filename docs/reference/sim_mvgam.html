@@ -134,7 +134,7 @@ and the observation process is the only source of error; similarly to what is es
 
 
 <dt>trend_rel</dt>
-<dd><p>Depracated. Use <code>prop_trend</code> instead</p></dd>
+<dd><p>Deprecated. Use <code>prop_trend</code> instead</p></dd>
 
 
 <dt>freq</dt>
@@ -143,30 +143,38 @@ and the observation process is the only source of error; similarly to what is es
 
 <dt>family</dt>
 <dd><p><code>family</code> specifying the exponential observation family for the series. Currently supported
-families are: <code><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb()</a></code>, <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code><a href="mvgam_families.html">tweedie()</a></code>, <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar()</a></code>, <code><a href="https://paul-buerkner.github.io/brms/reference/brmsfamily.html" class="external-link">lognormal()</a></code>, <code><a href="https://paul-buerkner.github.io/brms/reference/brmsfamily.html" class="external-link">student()</a></code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code></p></dd>
+families are: <code>nb()</code>, <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code><a href="mvgam_families.html">tweedie()</a></code>, <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>,
+<code>betar()</code>, <code>lognormal()</code>, <code>student()</code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code></p></dd>
 
 
 <dt>phi</dt>
-<dd><p><code>vector</code> of dispersion parameters for the series (i.e. <code>size</code> for Negative Binomial or
-<code>phi</code> for Tweedie or Beta). If <code>length(phi) &lt; n_series</code>, the first element of <code>phi</code> will
-be replicated <code>n_series</code> times. Defaults to <code>5</code> for Negative Binomial and Tweedie; <code>10</code> for
-Beta</p></dd>
+<dd><p><code>vector</code> of dispersion parameters for the series
+(i.e. <code>size</code> for <code>nb()</code> or
+<code>phi</code> for <code>betar()</code>). If <code>length(phi) &lt; n_series</code>,
+the first element of <code>phi</code> will
+be replicated <code>n_series</code> times.
+Defaults to <code>5</code> for <code>nb()</code> and <code><a href="mvgam_families.html">tweedie()</a></code>; <code>10</code> for
+<code>betar()</code></p></dd>
 
 
 <dt>shape</dt>
-<dd><p><code>vector</code> of shape parameters for the series (i.e. <code>shape</code> for Gamma)
+<dd><p><code>vector</code> of shape parameters for the series
+(i.e. <code>shape</code> for <code><a href="https://rdrr.io/r/base/Special.html" class="external-link">gamma()</a></code>)
 If <code>length(shape) &lt; n_series</code>, the first element of <code>shape</code> will
 be replicated <code>n_series</code> times. Defaults to <code>10</code></p></dd>
 
 
 <dt>sigma</dt>
-<dd><p><code>vector</code> of scale parameters for the series (i.e. <code>sd</code> for Normal or Student-T,
-<code>log(sd)</code> for LogNormal). If <code>length(sigma) &lt; n_series</code>, the first element of <code>sigma</code> will
-be replicated <code>n_series</code> times. Defaults to <code>0.5</code> for Normal and Student-T; <code>0.2</code> for Lognormal</p></dd>
+<dd><p><code>vector</code> of scale parameters for the series
+(i.e. <code>sd</code> for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> or <code>student()</code>,
+<code>log(sd)</code> for <code>lognormal()</code>). If <code>length(sigma) &lt; n_series</code>, the first element of <code>sigma</code> will
+be replicated <code>n_series</code> times. Defaults to <code>0.5</code> for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> and
+<code>student()</code>; <code>0.2</code> for <code>lognormal()</code></p></dd>
 
 
 <dt>nu</dt>
-<dd><p><code>vector</code> of degrees of freedom parameters for the series (i.e. <code>nu</code> for Student-T)
+<dd><p><code>vector</code> of degrees of freedom parameters for the
+series (i.e. <code>nu</code> for <code>student()</code>)
 If <code>length(nu) &lt; n_series</code>, the first element of <code>nu</code> will
 be replicated <code>n_series</code> times. Defaults to <code>3</code></p></dd>
 
@@ -196,12 +204,12 @@ as well as some additional information about the simulated seasonality and trend
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co">#Simulate series with observations bounded at 0 and 1 (Beta responses)</span></span></span>
-<span class="r-in"><span><span class="va">sim_data</span> <span class="op">&lt;-</span> <span class="fu">sim_mvgam</span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/Beta.html" class="external-link">betar</a></span><span class="op">(</span><span class="op">)</span>, trend_model <span class="op">=</span> <span class="st">'GP'</span>, prop_trend <span class="op">=</span> <span class="fl">0.6</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">sim_data</span> <span class="op">&lt;-</span> <span class="fu">sim_mvgam</span><span class="op">(</span>family <span class="op">=</span> <span class="fu">betar</span><span class="op">(</span><span class="op">)</span>, trend_model <span class="op">=</span> <span class="st">'GP'</span>, prop_trend <span class="op">=</span> <span class="fl">0.6</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">sim_data</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="sim_mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co">#Now simulate series with overdispersed discrete observations</span></span></span>
-<span class="r-in"><span><span class="va">sim_data</span> <span class="op">&lt;-</span> <span class="fu">sim_mvgam</span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/negbin.html" class="external-link">nb</a></span><span class="op">(</span><span class="op">)</span>, trend_model <span class="op">=</span> <span class="st">'GP'</span>, prop_trend <span class="op">=</span> <span class="fl">0.6</span>, phi <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">sim_data</span> <span class="op">&lt;-</span> <span class="fu">sim_mvgam</span><span class="op">(</span>family <span class="op">=</span> <span class="fu">nb</span><span class="op">(</span><span class="op">)</span>, trend_model <span class="op">=</span> <span class="st">'GP'</span>, prop_trend <span class="op">=</span> <span class="fl">0.6</span>, phi <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">sim_data</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="sim_mvgam-2.png" alt="" width="700" height="433"></span>
 </code></pre></div>

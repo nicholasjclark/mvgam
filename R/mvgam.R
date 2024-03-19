@@ -589,13 +589,13 @@
 #'                         time = 1:50,
 #'                         series = 'series2',
 #'                         x = x,
-#'                         ntrials = trials)) %>%
-#'  dplyr::mutate(series = as.factor(series)) %>%
-#'  dplyr::arrange(time, series)
+#'                         ntrials = trials))
+#' dat <- dplyr::mutate(dat, series = as.factor(series))
+#' dat <- dplyr::arrange(dat, time, series)
 #'
 #' # Fit a model using the binomial() family; must specify observations
 #' # and number of trials in the cbind() wrapper
-#' mod <- mvgam(cbind(y, ntrials) ~ series + s(x, by = series)
+#' mod <- mvgam(cbind(y, ntrials) ~ series + s(x, by = series),
 #'              family = binomial(),
 #'              data = dat)
 #' summary(mod)
