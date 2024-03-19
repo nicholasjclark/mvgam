@@ -72,9 +72,12 @@ package can handle data for the following families:
 - `lognormal()` for non-negative real-valued data
 - `Gamma()` for non-negative real-valued data
 - `betar()` for proportional data on `(0,1)`
+- `bernoulli()` for binary data
 - `poisson()` for count data
 - `nb()` for overdispersed count data
-- `nmix()` for count data with imperfect detection
+- `binomial()` for count data with known number of trials
+- `nmix()` for count data with imperfect detection (unknown number of
+  trials)
 - `tweedie()` for overdispersed count data
 
 Note that only `poisson()`, `nb()`, and `tweedie()` are available if

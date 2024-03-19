@@ -20,7 +20,7 @@ interpret_mvgam = function(formula, N, family){
     if(is.function(family))
       family <- family()
 
-    if(family$family == 'binomial'){
+    if(family$family %in% c('binomial', 'beta_binomial')){
       # Check that response terms use the cbind() syntax
       resp_terms <- as.character(terms(formula(formula))[[2]])
       if(length(resp_terms) == 1){
@@ -49,7 +49,8 @@ interpret_mvgam = function(formula, N, family){
 
     # Preserve offset if included
     if(!is.null(attr(terms(formula(formula)), 'offset'))){
-      newformula <- as.formula(paste(terms.formula(formula)[[2]], '~',
+      newformula <- as.formula(paste(dimnames(attr(terms(formula), 'factors'))[[1]][1],
+                                     '~',
                                      grep('offset', rownames(attr(terms.formula(formula), 'factors')),
                                           value = TRUE),
                                      '+',
@@ -60,7 +61,8 @@ interpret_mvgam = function(formula, N, family){
                                      ifelse(int == 0, ' - 1', '')))
 
     } else {
-      newformula <- as.formula(paste(terms.formula(formula)[[2]], '~',
+      newformula <- as.formula(paste(dimnames(attr(terms(formula), 'factors'))[[1]][1],
+                                     '~',
                                      paste(paste(newfacs, collapse = '+'),
                                            '+',
                                            paste(refacs, collapse = '+'),

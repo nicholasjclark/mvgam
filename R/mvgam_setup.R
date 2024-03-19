@@ -5,7 +5,7 @@
 mvgam_setup <- function(formula,
                         knots,
                         family = gaussian(),
-                        data = list(),
+                        dat = list(),
                         na.action,
                         drop.unused.levels = FALSE,
                         maxit = 5) {
@@ -13,7 +13,7 @@ mvgam_setup <- function(formula,
   if(missing(knots)){
     # Initialise the GAM for a few iterations to ensure it all works without error
     suppressWarnings(mgcv::gam(formula(formula),
-                               data = data,
+                               data = dat,
                                method = 'GCV.Cp',
                                family = family,
                                control = list(maxit = maxit),
@@ -22,7 +22,7 @@ mvgam_setup <- function(formula,
                                select = TRUE))
   } else {
     suppressWarnings(mgcv::gam(formula(formula),
-                               data = data,
+                               data = dat,
                                method = 'GCV.Cp',
                                family = family,
                                knots = knots,

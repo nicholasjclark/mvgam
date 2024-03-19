@@ -756,8 +756,18 @@ mvgam = function(formula,
     validate_family_resrictions(response = orig_y, family = family)
   }
 
-  # Replace any NAs in the response for initial setup
-  data_train$y <- replace_nas(data_train$y)
+  # Fill in missing observations in data_train so the size of the dataset is correct when
+  # building the initial JAGS model
+  resp_terms <- as.character(terms(formula(formula))[[2]])
+  if(length(resp_terms) == 1){
+    out_name <- as.character(terms(formula(formula))[[2]])
+  } else {
+    if(any(grepl('cbind', resp_terms))){
+      resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+      out_name <- resp_terms[1]
+    }
+  }
+  data_train[[out_name]] <- replace_nas(data_train[[out_name]])
 
   # Compute default priors
   def_priors <- adapt_brms_priors(c(make_default_scales(orig_y,
@@ -783,7 +793,7 @@ mvgam = function(formula,
   ss_gam <- try(mvgam_setup(formula = formula,
                             knots = knots,
                             family = family_to_mgcvfam(family),
-                            data = data_train),
+                            dat = data_train),
                 silent = TRUE)
   if(inherits(ss_gam, 'try-error')){
     if(grepl('missing values', ss_gam[1])){
@@ -827,7 +837,8 @@ mvgam = function(formula,
   }
   if(length(ss_gam$smooth) == 0) ss_jagam$jags.ini$lambda <- NULL
 
-  # Fill y with NAs if this is a simulation from the priors
+  # Fill y with NAs if this is a simulation from the priors;
+  # otherwise replace with the original supplied values
   data_train <- check_priorsim(prior_simulation,
                                data_train, orig_y,
                                formula)
@@ -1338,7 +1349,8 @@ mvgam = function(formula,
                                   n_lv = n_lv,
                                   jags_data = ss_jagam$jags.data,
                                   family = ifelse(family_char %in% c('binomial',
-                                                                     'bernoulli'),
+                                                                     'bernoulli',
+                                                                     'beta_binomial'),
                                                   'poisson',
                                                   family_char),
                                   upper_bounds = upper_bounds)
@@ -1585,7 +1597,7 @@ mvgam = function(formula,
     }
 
     # Updates for Binomial and Bernoulli families
-    if(family_char %in% c('binomial', 'bernoulli')){
+    if(family_char %in% c('binomial', 'bernoulli', 'beta_binomial')){
       bin_additions <- add_binomial(formula,
                                     vectorised$model_file,
                                     vectorised$model_data,

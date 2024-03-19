@@ -422,7 +422,7 @@ get_mvgam_priors = function(formula,
     # in the model
     ss_gam <- try(mvgam_setup(formula = formula,
                               family = family_to_mgcvfam(family),
-                              data = data_train,
+                              dat = data_train,
                               drop.unused.levels = FALSE,
                               maxit = 5),
                   silent = TRUE)

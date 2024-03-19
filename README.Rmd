@@ -29,9 +29,8 @@ The goal of `mvgam` is to fit Bayesian Dynamic Generalized Additive Models to ti
 A series of [vignettes cover data formatting, forecasting and several extended case studies of DGAMs](https://nicholasjclark.github.io/mvgam/){target="_blank"}. A number of other examples have also been compiled:
   
 * [Ecological Forecasting with Dynamic Generalized Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ){target="_blank"}
-* [mvgam case study 1: model comparison and data assimilation](https://rpubs.com/NickClark47/mvgam){target="_blank"}
-* [mvgam case study 2: multivariate models](https://rpubs.com/NickClark47/mvgam2){target="_blank"}
-* [mvgam case study 3: distributed lag models](https://rpubs.com/NickClark47/mvgam3){target="_blank"}
+* [Distributed lags (and hierarchical distributed lags) using `mgcv` and `mvgam`](https://ecogambler.netlify.app/blog/distributed-lags-mgcv/){target="_blank"}
+* [Ecological Forecasting with Dynamic GAMs; a tutorial and detailed case study](https://www.youtube.com/watch?v=RwllLjgPUmM){target="_blank"}
   
 ## Installation
 Install from `GitHub` using:

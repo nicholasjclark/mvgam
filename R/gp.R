@@ -80,8 +80,19 @@ make_gp_additions = function(gp_details, data,
     term_k <- mgcv_model$smooth[[min(which(smooth_bys %in% by[x] &
                                smooth_terms == gp_covariates[x]))]]$df
 
+    # Check that response terms use the cbind() syntax
+    resp_terms <- rlang::f_lhs(formula(mgcv_model))
+    if(length(resp_terms) == 1){
+      response <- resp_terms
+    } else {
+      if(any(grepl('cbind', resp_terms))){
+        resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+        response <- resp_terms[1]
+      }
+    }
+
     prep_gp_covariate(data = data,
-                      response = rlang::f_lhs(formula(mgcv_model)),
+                      response = response,
                       covariate = gp_covariates[x],
                       by = by[x],
                       level = level[x],
@@ -517,7 +528,8 @@ prep_gp_covariate = function(data,
                              k = 20){
 
   # Get default gp param priors from a call to brms::get_prior()
-  def_gp_prior <- suppressWarnings(brms::get_prior(formula(paste0(response, ' ~ gp(', covariate,
+  def_gp_prior <- suppressWarnings(brms::get_prior(formula(paste0(response,
+                                                                  ' ~ gp(', covariate,
                                                  ifelse(is.na(by), ', ',
                                                         paste0(', by = ', by, ', ')),
                                                  'k = ', k,

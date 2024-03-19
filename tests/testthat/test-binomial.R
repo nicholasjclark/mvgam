@@ -18,6 +18,9 @@ dat <- rbind(data.frame(y = rbinom(n = 50, size = trials, prob = detprob1),
   dplyr::mutate(series = as.factor(series)) %>%
   dplyr::arrange(time, series)
 
+# Throw in some NAs
+dat$y[c(1,5,9)] <- NA
+
 # Training and testing splits
 dat_train <- dat %>%
   dplyr::filter(time <= 40)
@@ -32,7 +35,8 @@ test_that("cbind() syntax required for binomial()", {
                'Binomial family requires cbind() syntax in the formula left-hand side',
                fixed = TRUE)
 
-  mod <- mvgam(cbind(y, ntrials) ~ series + s(x, by = series),
+  mod <- mvgam(cbind(y, ntrials) ~ s(series, bs = 're') +
+                 gp(x, by = series, c = 5/4, k = 5),
                family = binomial(),
                data = dat_train,
                run_model = FALSE)
@@ -78,6 +82,9 @@ dat <- rbind(data.frame(y = rbinom(n = 50, size = 1, prob = detprob1),
   dplyr::mutate(series = as.factor(series)) %>%
   dplyr::arrange(time, series)
 
+# Throw in some NAs
+dat$y[c(1,5,9)] <- NA
+
 # Training and testing splits
 dat_train <- dat %>%
   dplyr::filter(time <= 40)
@@ -92,7 +99,8 @@ test_that("bernoulli() behaves appropriately", {
                'y values must be 0 <= y <= 1',
                fixed = TRUE)
 
-  mod <- mvgam(y ~ series + s(x, by = series),
+  mod <- mvgam(y ~ s(series, bs = 're') +
+                 gp(x, by = series, c = 5/4, k = 5),
                family = bernoulli(),
                data = dat_train,
                run_model = FALSE)
@@ -102,7 +110,7 @@ test_that("bernoulli() behaves appropriately", {
 
   # Also with a trend_formula
   mod <- mvgam(y ~ series,
-               trend_formula = ~ s(x, by = trend),
+               trend_formula = ~ gp(x, by = trend, c = 5/4),
                trend_model = AR(),
                family = bernoulli(),
                data = dat_train,

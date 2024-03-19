@@ -133,7 +133,7 @@ validate_family_resrictions = function(response, family){
 
   # negatives not allowed for several families
   if(family$family %in%  c('poisson', 'negative binomial',
-                           'tweedie', 'binomial')){
+                           'tweedie', 'binomial', 'beta_binomial')){
     if(any(response < 0)){
       stop(paste0('Values < 0 not allowed for count family responses'),
            call. = FALSE)
