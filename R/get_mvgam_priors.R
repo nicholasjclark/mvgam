@@ -173,59 +173,21 @@ get_mvgam_priors = function(formula,
   data_train <- validate_series_time(data_train, name = 'data')
 
   # Validate the formula to convert any dynamic() terms
-  formula <- interpret_mvgam(formula, N = max(data_train$time))
+  formula <- interpret_mvgam(formula, N = max(data_train$time),
+                             family = family)
 
-  # Check for gp and mo terms in the validated formula
-  orig_formula <- gp_terms <- mo_terms <- NULL
-  if(any(grepl('gp(', attr(terms(formula), 'term.labels'), fixed = TRUE))){
-
-    # Check that there are no multidimensional gp terms
-    formula <- interpret_mvgam(formula, N = max(data_train$time))
-    orig_formula <- formula
-
-    # Keep intercept?
-    keep_intercept <- attr(terms(formula), 'intercept') == 1
-
-    # Indices of gp() terms in formula
-    gp_terms <- which_are_gp(formula)
-
-    # Extract GP attributes
-    gp_details <- get_gp_attributes(formula)
-
-    # Replace with s() terms so the correct terms are included
-    # in the model.frame
-    formula <- gp_to_s(formula)
-    if(!keep_intercept){
-      formula <- update(formula, . ~ . - 1)
-    }
-  }
+  # Check for gp terms in the validated formula
+  list2env(check_gp_terms(formula, data_train, family = family),
+           env = environment())
 
   # Check for missing rhs in formula
-  # If there are no terms in the observation formula (i.e. y ~ -1),
-  # we will use an intercept-only observation formula and fix
-  # the intercept coefficient at zero
-  drop_obs_intercept <- FALSE
-  if(length(attr(terms(formula), 'term.labels')) == 0 &
-     !attr(terms(formula), 'intercept') == 1){
-    formula_envir <- attr(formula, '.Environment')
-    if(!is.null(attr(terms(formula(formula)), 'offset'))){
-      formula <- formula(paste0(rlang::f_lhs(formula),
-                                ' ~ ', paste(gsub(' - 1',' + 1',
-                                                  rlang::f_text(formula)))))
-    } else {
-      formula <- formula(paste(rlang::f_lhs(formula), '~ 1'))
-    }
-    attr(formula, '.Environment') <- formula_envir
-    drop_obs_intercept <- TRUE
-  }
-
-  if(is.null(orig_formula)){
-    orig_formula <- formula
-  }
+  list2env(check_obs_intercept(formula, orig_formula),
+           env = environment())
 
   # Validate observation formula
   formula <- interpret_mvgam(formula, N = max(data_train$time))
-  data_train <- validate_obs_formula(formula, data = data_train, refit = FALSE)
+  data_train <- validate_obs_formula(formula, data = data_train,
+                                     refit = FALSE)
 
   # Validate the family argument
   family <- validate_family(family, use_stan = use_stan)
@@ -236,92 +198,27 @@ get_mvgam_priors = function(formula,
   orig_trend_model <- trend_model
   trend_model <- validate_trend_model(orig_trend_model, drift = drift)
 
-  # Check for N-mixture modifications
-  add_nmix <- FALSE
-  if(family_char == 'nmix'){
-    add_nmix <- TRUE
-    if(!(exists('cap', where = data_train))) {
-      stop('Max abundances must be supplied as a variable named "cap" for N-mixture models',
-           call. = FALSE)
-    }
-    use_lv <- TRUE
-    if(trend_model == 'None'){
-      trend_model <- 'RW'
-    }
-  }
+  # Nmixture additions?
+  list2env(check_nmix(family, family_char,
+                      trend_formula, trend_model,
+                      trend_map, data_train,
+                      priors = TRUE), env = environment())
 
-  # Assess whether any additional moving average or correlated errors are needed
-  ma_cor_adds <- ma_cor_additions(trend_model)
-  trend_model <- ma_cor_adds$trend_model
-  use_var1 <- ma_cor_adds$use_var1; use_var1cor <- ma_cor_adds$use_var1cor
-  add_ma <- ma_cor_adds$add_ma; add_cor <- ma_cor_adds$add_cor
-
-  if(length(unique(data_train$series)) == 1 & add_cor){
-    warning('Correlated process errors not possible with only 1 series')
-    add_cor <- FALSE
-  }
-
-  if(use_lv & trend_model %in% c('PWlinear', 'PWlogistic')){
-    stop('Cannot estimate piecewise trends using dynamic factors',
-         call. = FALSE)
-  }
-
-  if(use_lv & (add_ma | add_cor) & missing(trend_formula)){
-    stop('Cannot estimate moving averages or correlated errors for dynamic factors',
-         call. = FALSE)
-  }
-
-  if(drift && use_lv){
-    warning('Cannot identify drift terms in latent factor models; setting "drift = FALSE"')
-    drift <- FALSE
-  }
-
-  if(use_lv & trend_model == 'VAR1' & missing(trend_formula)){
-    stop('Cannot identify dynamic factor models that evolve as VAR processes',
-         call. = FALSE)
-  }
-
-  # JAGS cannot support latent GP, VAR or piecewise trends
-  if(!use_stan & trend_model %in% c('GP', 'VAR1', 'PWlinear', 'PWlogistic')){
-    stop('Gaussian Process, VAR and piecewise trends not supported for JAGS',
-         call. = FALSE)
-  }
-
-  # Stan cannot support Tweedie
-  if(use_stan & family_char == 'tweedie'){
-    stop('Tweedie family not supported for stan',
-         call. = FALSE)
-  }
-
-  # Check trend formula
-  if(!missing(trend_formula)){
-    if(missing(trend_map)){
-      trend_map <- data.frame(series = unique(data_train$series),
-                              trend = 1:length(unique(data_train$series)))
-    }
-
-    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'AR3',
-                           'VAR1', 'VAR1cor', 'VARMA1,1cor', 'None')){
-      stop('only RW, AR1, AR2, AR3 and VAR trends currently supported for trend predictor models',
-           call. = FALSE)
-    }
-  }
-
-  # Check trend_map is correctly specified
-  if(!missing(trend_map)){
-    validate_trendmap(trend_map = trend_map, data_train = data_train,
-                      trend_model = trend_model, use_stan = use_stan)
-
-    # If trend_map correctly specified, set use_lv to TRUE for
-    # most models (but not yet for VAR models, which require additional
-    # modifications)
-    if(trend_model %in% c('VAR1', 'VAR1cor', 'VARMA1,1cor')){
-      use_lv <- FALSE
-    } else {
-      use_lv <- TRUE
-    }
-    n_lv <- max(trend_map$trend)
-  }
+  # Validate remaining trend arguments
+  trend_val <- validate_trend_restrictions(trend_model = trend_model,
+                                           formula = formula,
+                                           trend_formula = trend_formula,
+                                           trend_map = trend_map,
+                                           drift = drift,
+                                           drop_obs_intercept = drop_obs_intercept,
+                                           use_lv = use_lv,
+                                           n_lv = n_lv,
+                                           data_train = data_train,
+                                           use_stan = use_stan,
+                                           priors = TRUE)
+  list2env(trend_val, env = environment())
+  if(is.null(trend_map)) trend_map <- rlang::missing_arg()
+  if(is.null(n_lv)) n_lv <- rlang::missing_arg()
 
   # If trend_formula supplied, first run get_mvgam_priors for the observation model
   # and then modify the resulting output
@@ -505,12 +402,20 @@ get_mvgam_priors = function(formula,
     }
 
     # Fill in missing observations in data_train so the size of the dataset is correct when
-    # building the initial JAGS model.
-    data_train[[terms(formula(formula))[[2]]]] <-
-      replace_nas(data_train[[terms(formula(formula))[[2]]]])
+    # building the initial JAGS model
+    resp_terms <- as.character(terms(formula(formula))[[2]])
+    if(length(resp_terms) == 1){
+      out_name <- as.character(terms(formula(formula))[[2]])
+    } else {
+      if(any(grepl('cbind', resp_terms))){
+        resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+        out_name <- resp_terms[1]
+      }
+    }
+    data_train[[out_name]] <- replace_nas(data_train[[out_name]])
 
     # Some general family-level restrictions can now be checked
-    validate_family_resrictions(response = data_train[[terms(formula(formula))[[2]]]],
+    validate_family_resrictions(response = data_train[[out_name]],
                                 family = family)
 
     # Use a small fit from mgcv to extract relevant information on smooths included
@@ -1289,7 +1194,7 @@ get_mvgam_priors = function(formula,
 
     # Final update to use more brms-like default priors on
     # scale parameters
-    def_scale_prior <- update_default_scales(response = replace_nas(data_train[[terms(formula(formula))[[2]]]]),
+    def_scale_prior <- update_default_scales(response = replace_nas(data_train[[out_name]]),
                                              family = family)
 
     # Update in priors df

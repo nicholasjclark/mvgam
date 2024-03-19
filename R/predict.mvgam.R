@@ -272,6 +272,32 @@ predict.mvgam = function(object, newdata,
   })
   names(family_extracts) <- names(family_pars)
 
+  # Add trial information if this is a Binomial model
+  if(object$family == 'binomial'){
+    resp_terms <- as.character(terms(formula(object))[[2]])
+    resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+    trial_name <- resp_terms[2]
+    if(!trial_name %in% names(newdata)){
+      stop(paste0('variable ', trial_name, ' not found in newdata'),
+           call. = FALSE)
+    }
+    trial_df <- data.frame(series = newdata$series,
+                           time = newdata$time,
+                           trial = newdata[[trial_name]])
+    trials <- do.call(cbind, lapply(length(levels(newdata$series)), function(i){
+      trial_df %>%
+        dplyr::filter(series == levels(newdata$series)[i]) %>%
+        dplyr::arrange(time) %>%
+        dplyr::pull(trial)
+    }))
+
+    trials <- as.vector(matrix(rep(as.vector(trials),
+                                   NROW(betas)),
+                               nrow = NROW(betas),
+                               byrow = TRUE))
+    family_extracts$trials <- trials
+  }
+
   # Pre-multiply the linear predictors, including any offset and trend
   # predictions if applicable
   if(family == 'nmix'){

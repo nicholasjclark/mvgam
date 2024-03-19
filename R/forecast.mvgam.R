@@ -14,10 +14,6 @@
 #'observation of series 1 in \code{data} and the first observation for series 1 in \code{newdata})
 #'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
 #'\code{newdata} instead for more seamless integration into `R` workflows
-#'@param series Either a \code{integer} specifying which series in the set is to be forecast,
-#'or the character string \code{'all'}, specifying that all series should be forecast. This is preferable
-#'if the fitted model contained multivariate trends (either as a dynamic factor or \code{VAR} process),
-#'as it saves recomputing the full set of trends for each series individually
 #'@param n_cores \code{integer} specifying number of cores for generating forecasts in parallel
 #'@param ... Ignored
 #'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to simulate a forecast distribution
@@ -60,12 +56,13 @@ forecast <- function(object, ...){
 #'
 #' }
 #'@export
-forecast.mvgam = function(object, newdata, data_test, series = 'all',
+forecast.mvgam = function(object, newdata, data_test,
                           n_cores = 1,
                           type = 'response',
                           ...){
   # Check arguments
   validate_pos_integer(n_cores)
+  series <- 'all'
 
   if(is.character(series)){
     if(series != 'all'){
@@ -121,10 +118,18 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
 
   # Only compute forecasts if they don't already exist!
   if(!forecasts_exist){
+    resp_terms <- as.character(terms(formula(object))[[2]])
+    if(length(resp_terms) == 1){
+      out_name <- as.character(terms(formula(object))[[2]])
+    } else {
+      if(any(grepl('cbind', resp_terms))){
+        resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+        out_name <- resp_terms[1]
+      }
+    }
 
-    # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
-    if(terms(formula(object$call))[[2]] != 'y'){
-      data_test$y <- data_test[[terms(formula(object$call))[[2]]]]
+    if(out_name != 'y'){
+      data_test$y <- data_test[[out_name]]
     }
 
     if(!missing(data_test)){
@@ -202,6 +207,15 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
             }
           })
           names(par_extracts) <- names(family_pars)
+
+          # Add trial information if this is a Binomial model
+          if(object$family == 'binomial'){
+            trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')[,series]),
+                                           NROW(mus)),
+                                       nrow = NROW(mus),
+                                       byrow = TRUE))
+            par_extracts$trials <- trials
+          }
 
           if(object$family == 'nmix'){
               preds <- mcmc_chains(object$model_output, 'detprob')[,object$ytimes[, series],
@@ -423,6 +437,15 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
           })
           names(par_extracts) <- names(family_pars)
 
+          # Add trial information if this is a Binomial model
+          if(object$family == 'binomial'){
+            trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')[,series]),
+                                           NROW(mus)),
+                                       nrow = NROW(mus),
+                                       byrow = TRUE))
+            par_extracts$trials <- trials
+          }
+
           if(object$family == 'nmix'){
             preds <- mcmc_chains(object$model_output, 'detprob')[,object$ytimes[, series],
                                                                  drop = FALSE]
@@ -509,6 +532,15 @@ forecast.mvgam = function(object, newdata, data_test, series = 'all',
             }
           })
           names(par_extracts) <- names(family_pars)
+
+          # Add trial information if this is a Binomial model
+          if(object$family == 'binomial'){
+            trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')[1:last_train, series]),
+                                           NROW(mus)),
+                                       nrow = NROW(mus),
+                                       byrow = TRUE))
+            par_extracts$trials <- trials
+          }
 
           if(object$family == 'nmix'){
             preds <- mcmc_chains(object$model_output, 'detprob')[,object$ytimes[1:last_train, series],
@@ -729,7 +761,6 @@ forecast_draws = function(object,
   if(series != 'all'){
     s_name <- levels(data_test$series)[series]
   }
-  n_series <- NCOL(object$ytimes)
 
   # Generate the observation model linear predictor matrix
   if(inherits(data_test, 'list')){
@@ -883,6 +914,25 @@ forecast_draws = function(object,
   # Family-specific parameters
   family_pars <- extract_family_pars(object = object, newdata = data_test)
 
+  # Add trial information if this is a Binomial model
+  if(object$family == 'binomial'){
+    resp_terms <- as.character(terms(formula(object$formula))[[2]])
+    resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+    trial_name <- resp_terms[2]
+    trial_df <- data.frame(series = data_test$series,
+                           time = data_test$time,
+                           trial = data_test[[trial_name]])
+    trials <- matrix(NA, nrow = fc_horizon, ncol = n_series)
+    for(i in 1:n_series){
+      trials[,i] <- trial_df %>%
+        dplyr::filter(series == levels(data_test$series)[i]) %>%
+        dplyr::arrange(time) %>%
+        dplyr::pull(trial)
+    }
+  } else {
+    trials <- NULL
+  }
+
   # Trend model
   trend_model <- attr(object$model_data, 'trend_model')
 
@@ -914,6 +964,7 @@ forecast_draws = function(object,
   parallel::setDefaultCluster(cl)
   parallel::clusterExport(NULL, c('family',
                                   'family_pars',
+                                  'trials',
                                   'trend_model',
                                   'trend_pars',
                                   'type',
@@ -1055,6 +1106,11 @@ forecast_draws = function(object,
             }
           })
           names(family_extracts) <- names(family_pars)
+
+          # Add trial information if this is a Binomial model
+          if(family == 'binomial'){
+            family_extracts$trials <- trials[,series]
+          }
 
           mvgam_predict(family = family,
                         Xp = Xpmat,

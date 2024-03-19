@@ -7,17 +7,12 @@
 \usage{
 hindcast(object, ...)
 
-\method{hindcast}{mvgam}(object, series = "all", type = "response", ...)
+\method{hindcast}{mvgam}(object, type = "response", ...)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{...}{Ignored}
-
-\item{series}{Either a \code{integer} specifying which series in the set is to be forecast,
-or the character string \code{'all'}, specifying that all series should be forecast. This is preferable
-if the fitted model contained multivariate trends (either as a dynamic factor or \code{VAR} process),
-as it saves recomputing the full set of trends for each series individually}
 
 \item{type}{When this has the value \code{link} (default) the linear predictor is calculated on the link scale.
 If \code{expected} is used, predictions reflect the expectation of the response (the mean)
@@ -27,6 +22,11 @@ predictions on the outcome scale. When \code{variance} is used, the variance of 
 with respect to the mean (mean-variance relationship) is returned. Two special cases are also allowed:
 type \code{latent_N} will return the estimated latent abundances from an N-mixture distribution,
 while type \code{detection} will return the estimated detection probability from an N-mixture distribution}
+
+\item{series}{Either a \code{integer} specifying which series in the set is to be forecast,
+or the character string \code{'all'}, specifying that all series should be forecast. This is preferable
+if the fitted model contained multivariate trends (either as a dynamic factor or \code{VAR} process),
+as it saves recomputing the full set of trends for each series individually}
 }
 \value{
 An object of class \code{mvgam_forecast} containing hindcast distributions.

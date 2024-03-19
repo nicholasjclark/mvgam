@@ -54,27 +54,35 @@ and the observation process is the only source of error; similarly to what is es
 
 \item{prop_trend}{\code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}}
 
-\item{trend_rel}{Depracated. Use \code{prop_trend} instead}
+\item{trend_rel}{Deprecated. Use \code{prop_trend} instead}
 
 \item{freq}{\code{integer}. The seasonal frequency of the series}
 
 \item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
-families are: \code{nb()}, \code{poisson()}, \code{tweedie()}, \code{gaussian()}, \code{betar()}, \code{lognormal()}, \code{student()} and \code{Gamma()}}
+families are: \code{nb()}, \code{poisson()}, \code{tweedie()}, \code{gaussian()},
+\code{betar()}, \code{lognormal()}, \code{student()} and \code{Gamma()}}
 
-\item{phi}{\code{vector} of dispersion parameters for the series (i.e. \code{size} for Negative Binomial or
-\code{phi} for Tweedie or Beta). If \code{length(phi) < n_series}, the first element of \code{phi} will
-be replicated \code{n_series} times. Defaults to \code{5} for Negative Binomial and Tweedie; \code{10} for
-Beta}
+\item{phi}{\code{vector} of dispersion parameters for the series
+(i.e. \code{size} for \code{nb()} or
+\code{phi} for \code{betar()}). If \code{length(phi) < n_series},
+the first element of \code{phi} will
+be replicated \code{n_series} times.
+Defaults to \code{5} for \code{nb()} and \code{tweedie()}; \code{10} for
+\code{betar()}}
 
-\item{shape}{\code{vector} of shape parameters for the series (i.e. \code{shape} for Gamma)
+\item{shape}{\code{vector} of shape parameters for the series
+(i.e. \code{shape} for \code{gamma()})
 If \code{length(shape) < n_series}, the first element of \code{shape} will
 be replicated \code{n_series} times. Defaults to \code{10}}
 
-\item{sigma}{\code{vector} of scale parameters for the series (i.e. \code{sd} for Normal or Student-T,
-\code{log(sd)} for LogNormal). If \code{length(sigma) < n_series}, the first element of \code{sigma} will
-be replicated \code{n_series} times. Defaults to \code{0.5} for Normal and Student-T; \code{0.2} for Lognormal}
+\item{sigma}{\code{vector} of scale parameters for the series
+(i.e. \code{sd} for \code{gaussian()} or \code{student()},
+\code{log(sd)} for \code{lognormal()}). If \code{length(sigma) < n_series}, the first element of \code{sigma} will
+be replicated \code{n_series} times. Defaults to \code{0.5} for \code{gaussian()} and
+\code{student()}; \code{0.2} for \code{lognormal()}}
 
-\item{nu}{\code{vector} of degrees of freedom parameters for the series (i.e. \code{nu} for Student-T)
+\item{nu}{\code{vector} of degrees of freedom parameters for the
+series (i.e. \code{nu} for \code{student()})
 If \code{length(nu) < n_series}, the first element of \code{nu} will
 be replicated \code{n_series} times. Defaults to \code{3}}
 

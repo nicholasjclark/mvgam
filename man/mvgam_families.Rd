@@ -26,6 +26,8 @@ Supported mvgam families
 \item \code{\link[stats]{gaussian}} with identity link, for real-valued data
 \item \code{\link[stats]{poisson}} with log-link, for count data
 \item \code{\link[stats]{Gamma}} with log-link, for non-negative real-valued data
+\item \code{\link[stats]{binomial}} with logit-link, for count data when the number
+of trials is known (and must be supplied)
 }
 
 In addition, the following extended families from the \code{mgcv} and \code{brms} packages are supported:
@@ -33,6 +35,7 @@ In addition, the following extended families from the \code{mgcv} and \code{brms
 \item \code{\link[mgcv]{betar}} with logit-link, for proportional data on \verb{(0,1)}
 \item \code{\link[mgcv]{nb}} with log-link, for count data
 \item \code{\link[brms]{lognormal}} with identity-link, for non-negative real-valued data
+\item \code{\link[brms]{bernoulli}} with logit-link, for binary data
 }
 
 Finally, \code{mvgam} supports the three extended families described here:

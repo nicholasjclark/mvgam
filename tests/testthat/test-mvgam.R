@@ -13,7 +13,7 @@ test_that("response variable must be specified", {
 expect_error(mod <- mvgam( ~ s(season),
                           trend_model = 'AR1',
                           data = beta_data$data_train,
-                          family = 'besta',
+                          family = betar(),
                           run_model = FALSE),
              'response variable is missing from formula')
 })
@@ -92,16 +92,16 @@ test_that("median coefs should be stored in the mgcv object", {
 })
 
 test_that("empty obs formula is allowed, even if no trend_formula", {
-  mod <- mvgam(y ~ -1,
-                     trend_model = 'AR1',
-                     data = gaus_data$data_train,
-                     family = gaussian(),
-                     run_model = FALSE)
+  mod <- mvgam(formula = y ~ -1,
+               trend_model = 'AR1',
+               data_train = gaus_data$data_train,
+               family = gaussian(),
+               run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
 })
 
 test_that("empty obs formula allowed if trend_formula supplied", {
-  mod <- mvgam(y ~ -1,
+  mod <- mvgam(formula = y ~ -1,
                trend_formula = ~ s(season),
                trend_model = 'AR1',
                data = gaus_data$data_train,

@@ -7,15 +7,7 @@
 \usage{
 forecast(object, ...)
 
-\method{forecast}{mvgam}(
-  object,
-  newdata,
-  data_test,
-  series = "all",
-  n_cores = 1,
-  type = "response",
-  ...
-)
+\method{forecast}{mvgam}(object, newdata, data_test, n_cores = 1, type = "response", ...)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
@@ -33,11 +25,6 @@ observation of series 1 in \code{data} and the first observation for series 1 in
 
 \item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
 \code{newdata} instead for more seamless integration into \code{R} workflows}
-
-\item{series}{Either a \code{integer} specifying which series in the set is to be forecast,
-or the character string \code{'all'}, specifying that all series should be forecast. This is preferable
-if the fitted model contained multivariate trends (either as a dynamic factor or \code{VAR} process),
-as it saves recomputing the full set of trends for each series individually}
 
 \item{n_cores}{\code{integer} specifying number of cores for generating forecasts in parallel}
 

@@ -1523,6 +1523,10 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
                               drift = FALSE,
                               threads = 1){
 
+  if(family %in% c('binomial', 'beta_binomial', 'bernoulli')){
+    family <- 'poisson'
+  }
+
   # Hack for adding VAR1 models
   if(trend_model %in% c('VAR1', 'VAR1cor')){
     VAR1 <- TRUE

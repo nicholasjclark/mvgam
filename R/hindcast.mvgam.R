@@ -48,11 +48,12 @@ hindcast <- function(object, ...){
 #' plot(hc, series = 3)
 #' }
 #'@export
-hindcast.mvgam = function(object, series = 'all',
+hindcast.mvgam = function(object,
                           type = 'response',
                           ...){
 
   # Check arguments
+  series <- 'all'
   if(!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
   }
@@ -139,6 +140,15 @@ if(series == 'all'){
         }
       })
       names(par_extracts) <- names(family_pars)
+
+      # Add trial information if this is a Binomial model
+      if(object$family == 'binomial'){
+        trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')[,series]),
+                                       NROW(preds)),
+                                   nrow = NROW(preds),
+                                   byrow = TRUE))
+        par_extracts$trials <- trials
+      }
 
       # Compute expectations as one long vector
       Xpmat <- matrix(as.vector(preds))

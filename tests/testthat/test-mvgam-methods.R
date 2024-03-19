@@ -1,4 +1,4 @@
-context("tests for mvgam and mvgam_forecast class methods")
+context("class methods")
 
 expect_ggplot <- function(object, ...) {
   testthat::expect_true(is(object, "ggplot"), ...)

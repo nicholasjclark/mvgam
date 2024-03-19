@@ -20,7 +20,7 @@ test_that("logistic should error if cap is missing", {
                      data = df,
                      trend_model = PW(growth = 'logistic',
                                       n_changepoints = 10),
-                     priors = prior(normal(2, 5), class = k_trend),
+                     # priors = prior(normal(2, 5), class = k_trend),
                      family = gaussian(),
                      run_model = TRUE,
                      return_model_data = TRUE),

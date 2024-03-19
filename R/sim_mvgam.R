@@ -26,21 +26,29 @@
 #'   \item `GP` (Gaussian Process with squared exponential kernel)} See [mvgam_trends] for more details
 #'@param drift \code{logical}, simulate a drift term for each trend
 #'@param prop_trend \code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}
-#'@param trend_rel Depracated. Use `prop_trend` instead
+#'@param trend_rel Deprecated. Use `prop_trend` instead
 #'@param freq \code{integer}. The seasonal frequency of the series
 #'@param family \code{family} specifying the exponential observation family for the series. Currently supported
-#'families are: `nb()`, `poisson()`, `tweedie()`, `gaussian()`, `betar()`, `lognormal()`, `student()` and `Gamma()`
-#'@param phi \code{vector} of dispersion parameters for the series (i.e. `size` for Negative Binomial or
-#'`phi` for Tweedie or Beta). If \code{length(phi) < n_series}, the first element of `phi` will
-#'be replicated `n_series` times. Defaults to \code{5} for Negative Binomial and Tweedie; \code{10} for
-#'Beta
-#'@param shape \code{vector} of shape parameters for the series (i.e. `shape` for Gamma)
+#'families are: `nb()`, `poisson()`, `tweedie()`, `gaussian()`,
+#'`betar()`, `lognormal()`, `student()` and `Gamma()`
+#'@param phi \code{vector} of dispersion parameters for the series
+#'(i.e. `size` for `nb()` or
+#'`phi` for `betar()`). If \code{length(phi) < n_series},
+#'the first element of `phi` will
+#'be replicated `n_series` times.
+#'Defaults to \code{5} for `nb()` and `tweedie()`; \code{10} for
+#'`betar()`
+#'@param shape \code{vector} of shape parameters for the series
+#'(i.e. `shape` for `gamma()`)
 #'If \code{length(shape) < n_series}, the first element of `shape` will
 #'be replicated `n_series` times. Defaults to \code{10}
-#'@param sigma \code{vector} of scale parameters for the series (i.e. `sd` for Normal or Student-T,
-#'`log(sd)` for LogNormal). If \code{length(sigma) < n_series}, the first element of `sigma` will
-#'be replicated `n_series` times. Defaults to \code{0.5} for Normal and Student-T; \code{0.2} for Lognormal
-#'@param nu \code{vector} of degrees of freedom parameters for the series (i.e. `nu` for Student-T)
+#'@param sigma \code{vector} of scale parameters for the series
+#'(i.e. `sd` for `gaussian()` or `student()`,
+#'`log(sd)` for `lognormal()`). If \code{length(sigma) < n_series}, the first element of `sigma` will
+#'be replicated `n_series` times. Defaults to \code{0.5} for `gaussian()` and
+#'`student()`; \code{0.2} for `lognormal()`
+#'@param nu \code{vector} of degrees of freedom parameters for the
+#'series (i.e. `nu` for `student()`)
 #'If \code{length(nu) < n_series}, the first element of `nu` will
 #'be replicated `n_series` times. Defaults to \code{3}
 #'@param mu \code{vector} of location parameters for the series. If \code{length(mu) < n_series}, the first element of `mu` will

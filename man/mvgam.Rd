@@ -105,16 +105,20 @@ the size of the returned object, unless \code{run_model == FALSE}}
 \item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
 families are:
 \itemize{
-\item\code{nb()} for count data
-\item\code{poisson()} for count data
 \item\code{gaussian()} for real-valued data
 \item\code{betar()} for proportional data on \verb{(0,1)}
 \item\code{lognormal()} for non-negative real-valued data
 \item\code{student_t()} for real-valued data
 \item\code{Gamma()} for non-negative real-valued data
-\item\code{nmix()} for count data with imperfect detection modeled via a
-State-Space N-Mixture model. The latent states are Poisson, capturing the 'true' latent
-abundance, while the observation process is Binomial to account for imperfect detection.
+\item\code{bernoulli()} for binary data
+\item\code{nb()} for count data
+\item\code{poisson()} for count data
+\item\code{binomial()} for count data with imperfect detection when the number of trials is known
+\item\code{nmix()} for count data with imperfect detection when the number of trials
+is unknown and should be modeled via a State-Space N-Mixture model.
+The latent states are Poisson, capturing the 'true' latent
+abundance, while the observation process is Binomial to account for
+imperfect detection.
 See \code{\link{mvgam_families}} for an example of how to use this family}
 Note that only \code{nb()} and \code{poisson()} are available if using \code{JAGS} as the backend.
 Default is \code{poisson()}.
@@ -187,7 +191,8 @@ generating MCMC simulations in parallel. If \code{TRUE}, the number of cores to 
 \item{threads}{\code{integer} Experimental option to use multithreading for within-chain
 parallelisation in \code{Stan}. We recommend its use only if you are experienced with
 \code{Stan}'s \code{reduce_sum} function and have a slow running model that cannot be sped
-up by any other means. Only available when using \code{Cmdstan} as the backend}
+up by any other means. Only available for some families(\code{poisson()}, \code{nb()}, \code{gaussian()}) and
+when using \code{Cmdstan} as the backend}
 
 \item{priors}{An optional \code{data.frame} with prior
 definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of

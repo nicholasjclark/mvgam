@@ -11,9 +11,7 @@ mvgam_setup <- function(formula,
                         maxit = 5) {
 
   if(missing(knots)){
-    # Initialise the GAM for a few iterations to get all necessary structures for
-    # generating predictions; also provides information to regularize parametric
-    # effect priors for better identifiability of latent trends
+    # Initialise the GAM for a few iterations to ensure it all works without error
     suppressWarnings(mgcv::gam(formula(formula),
                                data = data,
                                method = 'GCV.Cp',
@@ -23,9 +21,6 @@ mvgam_setup <- function(formula,
                                na.action = na.fail,
                                select = TRUE))
   } else {
-    # Initialise the GAM for a few iterations to get all necessary structures for
-    # generating predictions; also provides information to regularize parametric
-    # effect priors for better identifiability of latent trends
     suppressWarnings(mgcv::gam(formula(formula),
                                data = data,
                                method = 'GCV.Cp',
@@ -37,6 +32,99 @@ mvgam_setup <- function(formula,
                                select = TRUE))
   }
 
+}
+
+#' Generic JAGAM setup function
+#' @noRd
+#'
+jagam_setup <- function(ss_gam, formula, data_train, family,
+                        family_char, knots){
+
+  # Change the formula to a Poisson-like formula if this is a cbind Binomial,
+  # as jagam will fail if it sees that
+  if(family$family == 'binomial'){
+    resp_terms <- as.character(terms(formula(formula))[[2]])
+    if(any(grepl('cbind', resp_terms))){
+      resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+      out_name <- resp_terms[1]
+    } else {
+      stop('Binomial family requires the cbind() left-hand side formula syntax',
+           call. = FALSE)
+    }
+    formula <- update(formula, paste(out_name, '~ .'))
+    family <- poisson()
+  }
+
+  if(length(ss_gam$smooth) == 0){
+    smooths_included <- FALSE
+    # If no smooth terms are included, jagam will fail; so add a fake one and remove
+    # it from the model and data structures later
+    data_train$fakery <- rnorm(length(data_train$y))
+    form_fake <- update.formula(formula, ~ . + s(fakery, k = 3))
+    fakery_names <- names(suppressWarnings(mgcv::gam(form_fake,
+                                                     data = data_train,
+                                                     family = family_to_mgcvfam(family),
+                                                     drop.unused.levels = FALSE,
+                                                     control = list(maxit = 1)))$coefficients)
+    xcols_drop <- grep('s(fakery', fakery_names, fixed = TRUE)
+
+    if(!missing(knots)){
+      ss_jagam <- mgcv::jagam(form_fake,
+                              data = data_train,
+                              family = family_to_jagamfam(family_char),
+                              file = 'base_gam.txt',
+                              sp.prior = 'gamma',
+                              diagonalize = FALSE,
+                              knots = knots,
+                              drop.unused.levels = FALSE)
+    } else {
+      ss_jagam <- mgcv::jagam(form_fake,
+                              data = data_train,
+                              family = family_to_jagamfam(family_char),
+                              file = 'base_gam.txt',
+                              sp.prior = 'gamma',
+                              diagonalize = FALSE,
+                              drop.unused.levels = FALSE)
+    }
+    data_train$fakery <- NULL
+  } else {
+    smooths_included <- TRUE
+    xcols_drop <- NULL
+
+    # If smooth terms included, use the original formula
+    if(!missing(knots)){
+      ss_jagam <- mgcv::jagam(formula,
+                              data = data_train,
+                              family = family_to_jagamfam(family_char),
+                              file = 'base_gam.txt',
+                              sp.prior = 'gamma',
+                              diagonalize = FALSE,
+                              knots = knots,
+                              drop.unused.levels = FALSE)
+    } else {
+      ss_jagam <- mgcv::jagam(formula,
+                              data = data_train,
+                              family = family_to_jagamfam(family_char),
+                              file = 'base_gam.txt',
+                              sp.prior = 'gamma',
+                              diagonalize = FALSE,
+                              drop.unused.levels = FALSE)
+    }
+  }
+  return(list(ss_jagam = ss_jagam,
+              smooths_included = smooths_included,
+              xcols_drop = xcols_drop))
+}
+
+#' @noRd
+get_offset <- function(model) {
+  nm1 <- names(attributes(model$terms)$dataClasses)
+  if('(offset)' %in% nm1) {
+    deparse(as.list(model$call)$offset)
+  } else {
+
+    sub("offset\\((.*)\\)$", "\\1", grep('offset', nm1, value = TRUE))
+  }
 }
 
 #' @noRd

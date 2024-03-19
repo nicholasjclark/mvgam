@@ -87,16 +87,20 @@ Cannot be \code{> n_series}. Defaults arbitrarily to \code{min(2, floor(n_series
 \item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
 families are:
 \itemize{
-\item\code{nb()} for count data
-\item\code{poisson()} for count data
 \item\code{gaussian()} for real-valued data
 \item\code{betar()} for proportional data on \verb{(0,1)}
 \item\code{lognormal()} for non-negative real-valued data
 \item\code{student_t()} for real-valued data
 \item\code{Gamma()} for non-negative real-valued data
-\item\code{nmix()} for count data with imperfect detection modeled via a
-State-Space N-Mixture model. The latent states are Poisson, capturing the 'true' latent
-abundance, while the observation process is Binomial to account for imperfect detection.
+\item\code{bernoulli()} for binary data
+\item\code{nb()} for count data
+\item\code{poisson()} for count data
+\item\code{binomial()} for count data with imperfect detection when the number of trials is known
+\item\code{nmix()} for count data with imperfect detection when the number of trials
+is unknown and should be modeled via a State-Space N-Mixture model.
+The latent states are Poisson, capturing the 'true' latent
+abundance, while the observation process is Binomial to account for
+imperfect detection.
 See \code{\link{mvgam_families}} for an example of how to use this family}
 Note that only \code{nb()} and \code{poisson()} are available if using \code{JAGS} as the backend.
 Default is \code{poisson()}.

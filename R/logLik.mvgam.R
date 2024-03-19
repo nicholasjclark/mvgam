@@ -142,6 +142,15 @@ logLik.mvgam = function(object,
   })
   names(family_extracts) <- names(family_pars)
 
+  # Add trial information if this is a Binomial model
+  if(object$family == 'binomial'){
+    trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')),
+                                   NROW(mus)),
+                               nrow = NROW(mus),
+                               byrow = TRUE))
+    family_extracts$trials <- trials
+  }
+
   # Create a truth matrix that can also be spread to a vector
   truth_mat <- matrix(rep(obs, NROW(mus)),
                       nrow = NROW(mus),

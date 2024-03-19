@@ -3,6 +3,7 @@ context("n_mixture")
 poisdat <- sim_mvgam()
 
 test_that("only count data allowed for nmixtures", {
+  gaus_data$data_train$cap <- 100
   expect_error(mvgam(y ~ s(season),
                      trend_formula = ~ trend,
                      family = nmix(),

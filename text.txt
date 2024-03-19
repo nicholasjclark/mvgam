@@ -1,0 +1,4 @@
+model {
+  eta <- X %*% b ## linear predictor
+  for (i in 1:n) { mu[i] <-  ilogit(eta[i]) } ## expected response
+  for (i in 1:n) { y[i] ~ dbin(mu[i],w[i]) } ## response 

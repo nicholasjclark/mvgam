@@ -301,6 +301,15 @@ fitted.mvgam <- function(object, process_error = TRUE,
     })
     names(family_extracts) <- names(family_pars)
 
+    # Add trial information if this is a Binomial model
+    if(object$family == 'binomial'){
+      trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')),
+                                     NROW(mus)),
+                                 nrow = NROW(mus),
+                                 byrow = TRUE))
+      family_extracts$trials <- trials
+    }
+
     # Expectations as a vector
     Xp <- as.matrix(as.vector(mus))
     attr(Xp, 'model.offset') <- 0

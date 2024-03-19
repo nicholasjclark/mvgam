@@ -3,38 +3,44 @@ context("dynamic")
 test_that("dynamic to gp spline is working properly", {
   expect_match(attr(terms(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate, rho = 1,
                                                                         stationary = FALSE),
-                                                  N = 100)), 'term.labels'),
+                                                  N = 100,
+                                                  family = gaussian())), 'term.labels'),
                's(time, by = covariate, bs = "gp", m = c(2, 1, 2), k = 50)',
                fixed = TRUE)
 
   # k will decrease as rho increases
   expect_match(attr(terms(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate, rho = 11),
-                                                  N = 100)), 'term.labels'),
+                                                  N = 100,
+                                                  family = gaussian())), 'term.labels'),
                's(time, by = covariate, bs = "gp", m = c(-2, 11, 2), k = 11)',
                fixed = TRUE)
 
   # k will be fixed at N if N <= 8
   expect_match(attr(terms(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate, rho = 5),
-                                                  N = 7)), 'term.labels'),
+                                                  N = 7,
+                                                  family = gaussian())), 'term.labels'),
                's(time, by = covariate, bs = "gp", m = c(-2, 5, 2), k = 7)',
                fixed = TRUE)
 })
 
 test_that("dynamic to gp Hilbert is working properly", {
   expect_match(attr(terms(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate),
-                                                  N = 100)), 'term.labels'),
+                                                  N = 100,
+                                                  family = gaussian())), 'term.labels'),
                'gp(time, by = covariate, c = 5/4, k = 40, scale = TRUE)',
                fixed = TRUE)
 
   # k should come across just fine
   expect_match(attr(terms(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate, k = 17),
-                                                  N = 100)), 'term.labels'),
+                                                  N = 100,
+                                                  family = gaussian())), 'term.labels'),
                'gp(time, by = covariate, c = 5/4, k = 17, scale = TRUE)',
                fixed = TRUE)
 
   # k will be fixed at N-1 if N <= 8
   expect_match(attr(terms(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate),
-                                                  N = 7)), 'term.labels'),
+                                                  N = 7,
+                                                  family = gaussian())), 'term.labels'),
                'gp(time, by = covariate, c = 5/4, k = 6, scale = TRUE)',
                fixed = TRUE)
 })
@@ -63,7 +69,8 @@ test_that("rho argument cannot be larger than N - 1", {
                fixed = TRUE)
 
   expect_error(mvgam:::interpret_mvgam(formula = y ~ dynamic(covariate, rho = 120),
-                                       N = 100),
+                                       N = 100,
+                                       family = gaussian()),
                'Argument "rho" in dynamic() cannot be larger than (max(time) - 1)',
                fixed = TRUE)
 })
@@ -114,6 +121,5 @@ test_that("dynamic to Hilbert works for trend_formulas", {
   expect_true("l_gp_trend_time_byrandom" %in% names(mod$model_data))
   expect_true("b_trend_idx_gp_time_byrandom" %in% names(mod$model_data))
   expect_true("k_gp_trend_time_byrandom" %in% names(mod$model_data))
-
 })
 

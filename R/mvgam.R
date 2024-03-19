@@ -60,16 +60,20 @@
 #'@param family \code{family} specifying the exponential observation family for the series. Currently supported
 #'families are:
 #'\itemize{
-#'   \item`nb()` for count data
-#'   \item`poisson()` for count data
 #'   \item`gaussian()` for real-valued data
 #'   \item`betar()` for proportional data on `(0,1)`
 #'   \item`lognormal()` for non-negative real-valued data
 #'   \item`student_t()` for real-valued data
 #'   \item`Gamma()` for non-negative real-valued data
-#'   \item`nmix()` for count data with imperfect detection modeled via a
-#'   State-Space N-Mixture model. The latent states are Poisson, capturing the 'true' latent
-#'   abundance, while the observation process is Binomial to account for imperfect detection.
+#'   \item`bernoulli()` for binary data
+#'   \item`nb()` for count data
+#'   \item`poisson()` for count data
+#'   \item`binomial()` for count data with imperfect detection when the number of trials is known
+#'   \item`nmix()` for count data with imperfect detection when the number of trials
+#'   is unknown and should be modeled via a State-Space N-Mixture model.
+#'   The latent states are Poisson, capturing the 'true' latent
+#'   abundance, while the observation process is Binomial to account for
+#'   imperfect detection.
 #'   See \code{\link{mvgam_families}} for an example of how to use this family}
 #'Note that only `nb()` and `poisson()` are available if using `JAGS` as the backend.
 #'Default is `poisson()`.
@@ -620,7 +624,8 @@ mvgam = function(formula,
   data_train <- validate_series_time(data_train, name = 'data')
 
   # Validate the formula to convert any dynamic() terms
-  formula <- interpret_mvgam(formula, N = max(data_train$time))
+  formula <- interpret_mvgam(formula, N = max(data_train$time),
+                             family = family)
 
   # Check sampler arguments
   validate_pos_integer(chains)
@@ -629,49 +634,16 @@ mvgam = function(formula,
   validate_pos_integer(samples)
   validate_pos_integer(thin)
 
+  # Upper bounds no longer supported as they are fairly useless
+  upper_bounds <- rlang::missing_arg()
+
   # Check for gp terms in the validated formula
-  orig_formula <- gp_terms <- NULL
-  if(any(grepl('gp(', attr(terms(formula), 'term.labels'), fixed = TRUE))){
-
-    # Check that there are no multidimensional gp terms
-    formula <- interpret_mvgam(formula, N = max(data_train$time))
-    orig_formula <- formula
-
-    # Keep intercept?
-    keep_intercept <- attr(terms(formula), 'intercept') == 1
-
-    # Indices of gp() terms in formula
-    gp_terms <- which_are_gp(formula)
-
-    # Extract attributes
-    gp_details <- get_gp_attributes(formula)
-
-    # Replace with s() terms so the correct terms are included
-    # in the model.frame
-    formula <- gp_to_s(formula)
-    if(!keep_intercept) formula <- update(formula, . ~ . - 1)
-  }
+  list2env(check_gp_terms(formula, data_train, family = family),
+           env = environment())
 
   # Check for missing rhs in formula
-  # If there are no terms in the observation formula (i.e. y ~ -1),
-  # we will use an intercept-only observation formula and fix
-  # the intercept coefficient at zero
-  drop_obs_intercept <- FALSE
-  if(length(attr(terms(formula), 'term.labels')) == 0 &
-     !attr(terms(formula), 'intercept') == 1){
-    formula_envir <- attr(formula, '.Environment')
-    if(!is.null(attr(terms(formula(formula)), 'offset'))){
-      formula <- formula(paste0(rlang::f_lhs(formula),
-                                ' ~ ', paste(gsub(' - 1',' + 1',
-                                                  rlang::f_text(formula)))))
-    } else {
-      formula <- formula(paste(rlang::f_lhs(formula), '~ 1'))
-    }
-    attr(formula, '.Environment') <- formula_envir
-    drop_obs_intercept <- TRUE
-  }
-
-  if(is.null(orig_formula)) orig_formula <- formula
+  list2env(check_obs_intercept(formula, orig_formula),
+           env = environment())
 
   # Check for brmspriors
   if(!missing(priors)){
@@ -700,10 +672,14 @@ mvgam = function(formula,
 
   # Validate observation formula
   formula <- interpret_mvgam(formula, N = max(data_train$time))
-  data_train <- validate_obs_formula(formula, data = data_train, refit = refit)
+  data_train <- validate_obs_formula(formula,
+                                     data = data_train,
+                                     refit = refit)
 
   if(!missing(data_test)){
-    data_test <- validate_obs_formula(formula, data = data_test, refit = refit)
+    data_test <- validate_obs_formula(formula,
+                                      data = data_test,
+                                      refit = refit)
   }
   if(is.null(attr(terms(formula(formula)), 'offset'))){
     offset <- FALSE
@@ -715,145 +691,44 @@ mvgam = function(formula,
   if(!use_stan & run_model) find_jags(jags_path = jags_path)
   if(use_stan & run_model) find_stan()
 
-  # Validate the family argument
+  # Validate the family and threads arguments
   family <- validate_family(family, use_stan = use_stan)
-  family_char <- match.arg(arg = family$family, choices = family_char_choices())
-  if(threads > 1 & !family_char %in% c('poisson', 'negative binomial', 'gaussian')){
-    warning('multithreading not supported for this family; setting threads = 1')
-    threads <- 1
-  }
+  family_char <- match.arg(arg = family$family,
+                           choices = family_char_choices())
+  threads <- validate_threads(family_char, threads)
 
-  # Validate the trend arguments
+  # Validate trend_model
   orig_trend_model <- trend_model
   trend_model <- validate_trend_model(orig_trend_model, drift = drift)
 
-  # Check for N-mixture modifications
-  add_nmix <- FALSE; nmix_trendmap <- FALSE
-  if(family_char == 'nmix'){
-    family <- poisson(); family_char <- 'poisson'; add_nmix <- TRUE
-    if(missing(trend_formula)){
-      stop('Argument "trend_formula" required for nmix models',
-           call. = FALSE)
-    }
-    if(!missing(trend_map)){
-      nmix_trendmap <- TRUE
-    }
-    use_lv <- TRUE
-    if(trend_model == 'None'){
-      trend_model <- 'RW'
-    }
-  }
+  # Nmixture additions?
+  list2env(check_nmix(family, family_char,
+                      trend_formula, trend_model,
+                      trend_map, data_train), env = environment())
 
-  # Assess whether any additional moving average or correlated errors are needed
-  ma_cor_adds <- ma_cor_additions(trend_model)
-  trend_model <- ma_cor_adds$trend_model
-  use_var1 <- ma_cor_adds$use_var1; use_var1cor <- ma_cor_adds$use_var1cor
-  add_ma <- ma_cor_adds$add_ma; add_cor <- ma_cor_adds$add_cor
-
-  if(length(unique(data_train$series)) == 1 & add_cor){
-    warning('Correlated process errors not possible with only 1 series',
-            call. = FALSE)
-    add_cor <- FALSE
-  }
-
-  if(trend_model %in% c('PWlinear', 'PWlogistic')){
-    if(attr(terms(formula), 'intercept') == 1 & !drop_obs_intercept){
-      warning(paste0('It is difficult / impossible to estimate intercepts\n',
-                     'and piecewise trend offset parameters. You may want to\n',
-                     'consider dropping the intercept from the formula'),
-              call. = FALSE)
-    }
-
-    if(use_lv) stop('Cannot estimate piecewise trends using dynamic factors',
-                    call. = FALSE)
-  }
-
-  if(use_lv & (add_ma | add_cor) & missing(trend_formula)){
-    stop('Cannot estimate moving averages or correlated errors for dynamic factors',
-         call. = FALSE)
-  }
-
-  if(drift && use_lv){
-    warning('Cannot identify drift terms in latent factor models; setting "drift = FALSE"',
-            call. = FALSE)
-    drift <- FALSE
-  }
-
-  if(use_lv & trend_model == 'VAR1' & missing(trend_formula)){
-    stop('Cannot identify dynamic factor models that evolve as VAR processes',
-         call. = FALSE)
-  }
-
-  # JAGS cannot support latent GP, VAR or piecewise trends
-  if(!use_stan & trend_model %in% c('GP', 'VAR1', 'PWlinear', 'PWlogistic')){
-    stop('Gaussian Process, VAR and piecewise trends not supported for JAGS',
-         call. = FALSE)
-  }
-
-  # Stan cannot support Tweedie
-  if(use_stan & family_char == 'tweedie'){
-    stop('Tweedie family not supported for stan',
-         call. = FALSE)
-  }
-
-  # Check trend formula
-  if(!missing(trend_formula)){
-
-    validate_trend_formula(trend_formula)
-
-    if(missing(trend_map)){
-      trend_map <- data.frame(series = unique(data_train$series),
-                              trend = 1:length(unique(data_train$series)))
-    }
-
-    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'VAR1')){
-      stop('only RW, AR1, AR2, AR3 and VAR trends currently supported for trend predictor models',
-           call. = FALSE)
-    }
-  }
-
-  # Check trend_map is correctly specified
-  if(!missing(trend_map)){
-    validate_trendmap(trend_map = trend_map, data_train = data_train,
-                      trend_model = trend_model, use_stan = use_stan)
-
-    # If trend_map correctly specified, set use_lv to TRUE for
-    # most models (but not yet for VAR models, which require additional
-    # modifications)
-    if(trend_model == 'VAR1'){
-      use_lv <- FALSE
-    } else {
-      use_lv <- TRUE
-    }
-    n_lv <- max(trend_map$trend)
-  }
-
-  # Upper bounds no longer supported as they are fairly useless
-  upper_bounds <- rlang::missing_arg()
-
-  # Number of latent variables cannot be greater than number of series
-  if(use_lv){
-    if(missing(n_lv)){
-      n_lv <- min(2, floor(length(unique(data_train$series)) / 2))
-    }
-    if(n_lv > length(unique(data_train$series))){
-      stop('number of latent variables cannot be greater than number of series')
-    }
-  }
-
-  # No point in latent variables if trend model is None
-  if(trend_model == 'None' & use_lv){
-    use_lv <- FALSE
-    warning('No point in latent variables if trend model is None; changing use_lv to FALSE')
-  }
+  # Validate remaining trend arguments
+  trend_val <- validate_trend_restrictions(trend_model = trend_model,
+                                           formula = formula,
+                                           trend_formula = trend_formula,
+                                           trend_map = trend_map,
+                                           drift = drift,
+                                           drop_obs_intercept = drop_obs_intercept,
+                                           use_lv = use_lv,
+                                           n_lv = n_lv,
+                                           data_train = data_train,
+                                           use_stan = use_stan)
+  list2env(trend_val, env = environment())
+  if(is.null(trend_map)) trend_map <- rlang::missing_arg()
+  if(is.null(n_lv)) n_lv <- rlang::missing_arg()
 
   # Some general family-level restrictions can now be checked
   orig_y <- data_train$y
-  validate_family_resrictions(response = orig_y, family = family)
+  if(any(!is.na(orig_y))){
+    validate_family_resrictions(response = orig_y, family = family)
+  }
 
   # Replace any NAs in the response for initial setup
-  data_train[[terms(formula(formula))[[2]]]] <-
-    replace_nas(data_train[[terms(formula(formula))[[2]]]])
+  data_train$y <- replace_nas(data_train$y)
 
   # Compute default priors
   def_priors <- adapt_brms_priors(c(make_default_scales(orig_y,
@@ -906,60 +781,12 @@ mvgam = function(formula,
   }
 
   # Make JAGS file and appropriate data structures
-  if(length(ss_gam$smooth) == 0){
-    smooths_included <- FALSE
-    # If no smooth terms are included, jagam will fail; so add a fake one and remove
-    # it from the model and data structures later
-    data_train$fakery <- rnorm(length(data_train$y))
-    form_fake <- update.formula(formula, ~ . + s(fakery, k = 3))
-    fakery_names <- names(suppressWarnings(mgcv::gam(form_fake,
-                                                     data = data_train,
-                                                     family = family_to_mgcvfam(family),
-                                                     drop.unused.levels = FALSE,
-                                                     control = list(maxit = 1)))$coefficients)
-    xcols_drop <- grep('s(fakery', fakery_names, fixed = TRUE)
-    if(!missing(knots)){
-      ss_jagam <- mgcv::jagam(form_fake,
-                              data = data_train,
-                              family = family_to_jagamfam(family_char),
-                              file = 'base_gam.txt',
-                              sp.prior = 'gamma',
-                              diagonalize = F,
-                              knots = knots,
-                              drop.unused.levels = FALSE)
-    } else {
-      ss_jagam <- mgcv::jagam(form_fake,
-                              data = data_train,
-                              family = family_to_jagamfam(family_char),
-                              file = 'base_gam.txt',
-                              sp.prior = 'gamma',
-                              diagonalize = F,
-                              drop.unused.levels = FALSE)
-    }
-    data_train$fakery <- NULL
-  } else {
-    smooths_included <- TRUE
-
-  # If smooth terms included, use the original formula
-  if(!missing(knots)){
-    ss_jagam <- mgcv::jagam(formula,
-                            data = data_train,
-                            family = family_to_jagamfam(family_char),
-                            file = 'base_gam.txt',
-                            sp.prior = 'gamma',
-                            diagonalize = FALSE,
-                            knots = knots,
-                            drop.unused.levels = FALSE)
-  } else {
-    ss_jagam <- mgcv::jagam(formula,
-                            data = data_train,
-                            family = family_to_jagamfam(family_char),
-                            file = 'base_gam.txt',
-                            sp.prior = 'gamma',
-                            diagonalize = FALSE,
-                            drop.unused.levels = FALSE)
-  }
-  }
+  list2env(jagam_setup(ss_gam = ss_gam,
+                       formula = formula,
+                       data_train = data_train,
+                       family = family,
+                       family_char = family_char,
+                       knots = knots), env = environment())
 
   # Update initial values of lambdas using the full estimates from the
   # fitted gam model to speed convergence; remove initial betas so that the
@@ -972,12 +799,9 @@ mvgam = function(formula,
   if(length(ss_gam$smooth) == 0) ss_jagam$jags.ini$lambda <- NULL
 
   # Fill y with NAs if this is a simulation from the priors
-  if(prior_simulation){
-    data_train$y <- rep(NA, length(data_train$y))
-  } else {
-    data_train$y <- orig_y
-  }
-  data_train[[terms(formula(formula))[[2]]]] <- orig_y
+  data_train <- check_priorsim(prior_simulation,
+                               data_train, orig_y,
+                               formula)
 
   # Read in the base (unmodified) jags model file
   base_model <- suppressWarnings(readLines('base_gam.txt'))
@@ -987,7 +811,8 @@ mvgam = function(formula,
   base_model <- base_model[-lines_remove]
 
   if(any(grepl('scale <- 1/tau', base_model, fixed = TRUE))){
-    base_model <- base_model[-grep('scale <- 1/tau', base_model, fixed = TRUE)]
+    base_model <- base_model[-grep('scale <- 1/tau',
+                                   base_model, fixed = TRUE)]
   }
 
   if(any(grepl('tau ~ dgamma(.05,.005)', base_model, fixed = TRUE))){
@@ -1127,17 +952,6 @@ mvgam = function(formula,
     model_file[grep('eta <- X * b', model_file, fixed = TRUE)] <-
       "eta <- X * b + offset"
     if(!missing(data_test) & !prior_simulation){
-
-      get_offset <- function(model) {
-        nm1 <- names(attributes(model$terms)$dataClasses)
-        if('(offset)' %in% nm1) {
-          deparse(as.list(model$call)$offset)
-        } else {
-
-          sub("offset\\((.*)\\)$", "\\1", grep('offset', nm1, value = TRUE))
-        }
-      }
-
       ss_jagam$jags.data$offset <- c(ss_jagam$jags.data$offset,
                                      data_test[[get_offset(ss_gam)]])
     }
@@ -1275,7 +1089,7 @@ mvgam = function(formula,
   }
   ss_jagam$jags.data$y <- ys_mat
 
-  # Other necessary variables for JAGS
+  # Other necessary variables
   ss_jagam$jags.data$n <- NROW(ytimes)
   ss_jagam$jags.data$n_series <- NCOL(ytimes)
   ss_jagam$jags.data$X <- as.matrix(X %>%
@@ -1297,7 +1111,8 @@ mvgam = function(formula,
   }
 
   # Machine epsilon for minimum allowable non-zero rate
-  if(family_char == 'negative binomial') ss_jagam$jags.data$min_eps <- .Machine$double.eps
+  if(family_char == 'negative binomial')
+    ss_jagam$jags.data$min_eps <- .Machine$double.eps
 
   # Number of latent variables to use
   if(use_lv){
@@ -1493,7 +1308,10 @@ mvgam = function(formula,
                                   use_lv = use_lv,
                                   n_lv = n_lv,
                                   jags_data = ss_jagam$jags.data,
-                                  family = family_char,
+                                  family = ifelse(family_char %in% c('binomial',
+                                                                     'bernoulli'),
+                                                  'poisson',
+                                                  family_char),
                                   upper_bounds = upper_bounds)
 
     if(use_lv || !missing(trend_map)){
@@ -1735,6 +1553,19 @@ mvgam = function(formula,
       param <- param[!param %in% c('ypred', 'mus', 'theta',
                                    'detprob', 'latent_ypred',
                                    'lv_coefs', 'error')]
+    }
+
+    # Updates for Binomial and Bernoulli families
+    if(family_char %in% c('binomial', 'bernoulli')){
+      bin_additions <- add_binomial(formula,
+                                    vectorised$model_file,
+                                    vectorised$model_data,
+                                    data_train,
+                                    data_test,
+                                    family_char)
+      vectorised$model_file <- bin_additions$model_file
+      vectorised$model_data <- bin_additions$model_data
+      attr(ss_gam, 'trials') <- bin_additions$trials
     }
 
     # Updates for sharing of observation params
@@ -2268,6 +2099,8 @@ mvgam = function(formula,
   } else {
     object = list(
       model_output = out_gam_mod,
+      call = orig_formula,
+      mgcv_model = ss_gam,
       model_data = if(use_stan){
         vectorised$model_data
       } else {
@@ -2293,7 +2126,7 @@ mvgam = function(formula,
   # smooths that aren't yet supported by mvgam plotting functions
   # Extract median beta params for smooths and their covariances
   # so that uncertainty from mgcv plots is reasonably accurate
-  if(run_model & !lfo){
+  if(all(run_model, !lfo, residuals)){
     # Use the empirical covariance matrix from the fitted coefficients
     V <- cov(mcmc_chains(out_gam_mod, 'b'))
     ss_gam$Ve <- ss_gam$Vp <- ss_gam$Vc <- V
@@ -2310,6 +2143,7 @@ mvgam = function(formula,
     # Compute estimated degrees of freedom for smooths
     object = list(
       model_output = out_gam_mod,
+      call = orig_formula,
       model_data = if(use_stan){
         vectorised$model_data
       } else {

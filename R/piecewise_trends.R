@@ -102,6 +102,11 @@ add_piecewise = function(model_file,
            call. = FALSE)
     }
 
+    if(any(is.infinite(data_train$cap))){
+      stop('Infinite values found for some "cap" terms',
+           call. = FALSE)
+    }
+
     # Matrix of capacities per series (these must operate on the link scale)
     all_caps <- data.frame(series = as.numeric(data_train$series),
                            time = data_train$time,
