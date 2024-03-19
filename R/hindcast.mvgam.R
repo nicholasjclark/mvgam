@@ -2,10 +2,6 @@
 #'@name hindcast.mvgam
 #'@importFrom stats predict
 #'@inheritParams predict.mvgam
-#'@param series Either a \code{integer} specifying which series in the set is to be forecast,
-#'or the character string \code{'all'}, specifying that all series should be forecast. This is preferable
-#'if the fitted model contained multivariate trends (either as a dynamic factor or \code{VAR} process),
-#'as it saves recomputing the full set of trends for each series individually
 #'@param ... Ignored
 #'@details Posterior retrodictions are drawn from the fitted \code{mvgam} and
 #'organized into a convenient format

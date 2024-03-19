@@ -1,0 +1,9 @@
+knitr
+ggplot2
+nlme
+mgcv
+Rcpp
+brms
+marginaleffects
+insight
+mvgam

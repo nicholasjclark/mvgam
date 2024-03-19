@@ -68,7 +68,9 @@
 #'   \item`bernoulli()` for binary data
 #'   \item`nb()` for count data
 #'   \item`poisson()` for count data
-#'   \item`binomial()` for count data with imperfect detection when the number of trials is known
+#'   \item`binomial()` for count data with imperfect detection when the number of trials is known;
+#'   note that the `cbind()` function must be used to bind the discrete observations and the number
+#'   of trials
 #'   \item`nmix()` for count data with imperfect detection when the number of trials
 #'   is unknown and should be modeled via a State-Space N-Mixture model.
 #'   The latent states are Poisson, capturing the 'true' latent
@@ -571,6 +573,33 @@
 #' scale_y_discrete(labels = mod$trend_model$changepoints) +
 #' labs(y = 'Potential changepoint',
 #'      x = 'Rate change')
+#'
+#' # Example showcasing how cbind() is needed for Binomial observations
+#' # Simulate two time series of Binomial trials
+#' trials <- sample(c(20:25), 50, replace = TRUE)
+#' x <- rnorm(50)
+#' detprob1 <- plogis(-0.5 + 0.9*x)
+#' detprob2 <- plogis(-0.1 -0.7*x)
+#' dat <- rbind(data.frame(y = rbinom(n = 50, size = trials, prob = detprob1),
+#'                         time = 1:50,
+#'                         series = 'series1',
+#'                         x = x,
+#'                         ntrials = trials),
+#'              data.frame(y = rbinom(n = 50, size = trials, prob = detprob2),
+#'                         time = 1:50,
+#'                         series = 'series2',
+#'                         x = x,
+#'                         ntrials = trials)) %>%
+#'  dplyr::mutate(series = as.factor(series)) %>%
+#'  dplyr::arrange(time, series)
+#'
+#' # Fit a model using the binomial() family; must specify observations
+#' # and number of trials in the cbind() wrapper
+#' mod <- mvgam(cbind(y, ntrials) ~ series + s(x, by = series)
+#'              family = binomial(),
+#'              data = dat)
+#' summary(mod)
+#'
 #' }
 #'@export
 
@@ -639,11 +668,11 @@ mvgam = function(formula,
 
   # Check for gp terms in the validated formula
   list2env(check_gp_terms(formula, data_train, family = family),
-           env = environment())
+           envir = environment())
 
   # Check for missing rhs in formula
   list2env(check_obs_intercept(formula, orig_formula),
-           env = environment())
+           envir = environment())
 
   # Check for brmspriors
   if(!missing(priors)){
@@ -704,7 +733,7 @@ mvgam = function(formula,
   # Nmixture additions?
   list2env(check_nmix(family, family_char,
                       trend_formula, trend_model,
-                      trend_map, data_train), env = environment())
+                      trend_map, data_train), envir = environment())
 
   # Validate remaining trend arguments
   trend_val <- validate_trend_restrictions(trend_model = trend_model,
@@ -717,7 +746,7 @@ mvgam = function(formula,
                                            n_lv = n_lv,
                                            data_train = data_train,
                                            use_stan = use_stan)
-  list2env(trend_val, env = environment())
+  list2env(trend_val, envir = environment())
   if(is.null(trend_map)) trend_map <- rlang::missing_arg()
   if(is.null(n_lv)) n_lv <- rlang::missing_arg()
 
@@ -786,7 +815,7 @@ mvgam = function(formula,
                        data_train = data_train,
                        family = family,
                        family_char = family_char,
-                       knots = knots), env = environment())
+                       knots = knots), envir = environment())
 
   # Update initial values of lambdas using the full estimates from the
   # fitted gam model to speed convergence; remove initial betas so that the

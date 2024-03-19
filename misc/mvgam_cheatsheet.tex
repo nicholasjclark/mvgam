@@ -1,35 +1,67 @@
-\documentclass[final,9pt,fleqn]{beamer}
+\documentclass[final,9pt,fleqn]{beamer}\usepackage[]{graphicx}\usepackage[]{xcolor}
+% maxwidth is the original width if it is less than linewidth
+% otherwise use linewidth (to make sure the graphics do not exceed the margin)
+\makeatletter
+\def\maxwidth{ %
+  \ifdim\Gin@nat@width>\linewidth
+    \linewidth
+  \else
+    \Gin@nat@width
+  \fi
+}
+\makeatother
+
+\definecolor{fgcolor}{rgb}{0.345, 0.345, 0.345}
+\newcommand{\hlnum}[1]{\textcolor[rgb]{0.686,0.059,0.569}{#1}}%
+\newcommand{\hlstr}[1]{\textcolor[rgb]{0.192,0.494,0.8}{#1}}%
+\newcommand{\hlcom}[1]{\textcolor[rgb]{0.678,0.584,0.686}{\textit{#1}}}%
+\newcommand{\hlopt}[1]{\textcolor[rgb]{0,0,0}{#1}}%
+\newcommand{\hlstd}[1]{\textcolor[rgb]{0.345,0.345,0.345}{#1}}%
+\newcommand{\hlkwa}[1]{\textcolor[rgb]{0.161,0.373,0.58}{\textbf{#1}}}%
+\newcommand{\hlkwb}[1]{\textcolor[rgb]{0.69,0.353,0.396}{#1}}%
+\newcommand{\hlkwc}[1]{\textcolor[rgb]{0.333,0.667,0.333}{#1}}%
+\newcommand{\hlkwd}[1]{\textcolor[rgb]{0.737,0.353,0.396}{\textbf{#1}}}%
+\let\hlipl\hlkwb
+
+\usepackage{framed}
+\makeatletter
+\newenvironment{kframe}{%
+ \def\at@end@of@kframe{}%
+ \ifinner\ifhmode%
+  \def\at@end@of@kframe{\end{minipage}}%
+  \begin{minipage}{\columnwidth}%
+ \fi\fi%
+ \def\FrameCommand##1{\hskip\@totalleftmargin \hskip-\fboxsep
+ \colorbox{shadecolor}{##1}\hskip-\fboxsep
+     % There is no \\@totalrightmargin, so:
+     \hskip-\linewidth \hskip-\@totalleftmargin \hskip\columnwidth}%
+ \MakeFramed {\advance\hsize-\width
+   \@totalleftmargin\z@ \linewidth\hsize
+   \@setminipage}}%
+ {\par\unskip\endMakeFramed%
+ \at@end@of@kframe}
+\makeatother
+
+\definecolor{shadecolor}{rgb}{.97, .97, .97}
+\definecolor{messagecolor}{rgb}{0, 0, 0}
+\definecolor{warningcolor}{rgb}{1, 0, 1}
+\definecolor{errorcolor}{rgb}{1, 0, 0}
+\newenvironment{knitrout}{}{} % an empty environment to be redefined in TeX
+
+\usepackage{alltt}
 \input{BeamOptions.tex}
 
 \setbeamertemplate{footline}{\hfill {\footnotesize \href{https://creativecommons.org/licenses/by-sa/4.0/}{CC BY-SA 4.0} $\circ$ Nicholas J. Clark $\circ$ Learn more at \href{https://nicholasjclark.github.io/mvgam/index.html}{https://nicholasjclark.github.io/mvgam/index.html} $\circ$ package version $1.0.9$ $\circ$ updated: \today} \hspace {0.1in} \vspace{0.1in}}
-
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
 \begin{document}
 
-<<include=FALSE>>=
-library(knitr)
-opts_chunk$set(
-concordance=TRUE
-)
-@
 
 
 
-<<setup, include=FALSE>>=
-library(knitr)
-options(replace.assign=TRUE, width=50, digits=4)
-opts_knit[["set"]](progress=FALSE)
-library("ggplot2")
-library("mvgam")
-@
 
-<<include=FALSE, cache=TRUE>>=
-set.seed(1234)
-simdat <- sim_mvgam(n_series = 1)
-model <- mvgam(y ~ s(season, bs = 'cc'),
-               trend_model = RW(),
-               data = simdat$data_train)
-fc <- forecast(model, newdata = simdat$data_test)
-@
+
+
+
 
 \begin{frame}[fragile]
   \frametitle{{\fontsize{41}{43} \selectfont \textcolor{mygray}{mvgam ::}} {\fontsize{25}{25} \textbf{\textcolor{mygray}{CHEATSHEET}}}}
@@ -120,11 +152,15 @@ See \href{https://nicholasjclark.github.io/mvgam/articles/mvgam_overview.html}{t
 
 \medskip
 \texttt{\color{Orchid} sim\_mvgam()} is useful to generate simple example datasets
-<<eval=FALSE>>=
-simdat <- sim_mvgam(n_series = 1)
-model <- mvgam(formula = y ~ s(season, bs = 'cc'),
-               trend_model = RW(), data = simdat$data_train)
-@
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{kframe}
+\begin{alltt}
+\hlstd{simdat} \hlkwb{<-} \hlkwd{sim_mvgam}\hlstd{(}\hlkwc{n_series} \hlstd{=} \hlnum{1}\hlstd{)}
+\hlstd{model} \hlkwb{<-} \hlkwd{mvgam}\hlstd{(}\hlkwc{formula} \hlstd{= y} \hlopt{~} \hlkwd{s}\hlstd{(season,} \hlkwc{bs} \hlstd{=} \hlstr{'cc'}\hlstd{),}
+               \hlkwc{trend_model} \hlstd{=} \hlkwd{RW}\hlstd{(),} \hlkwc{data} \hlstd{= simdat}\hlopt{$}\hlstd{data_train)}
+\end{alltt}
+\end{kframe}
+\end{knitrout}
 
 Use \texttt{\color{Orchid} code(model)} to see the auto-generated \texttt{Stan} code
 
@@ -156,9 +192,15 @@ Use \texttt{\color{Orchid} code(model)} to see the auto-generated \texttt{Stan} 
 \medskip
 \texttt{\color{Orchid} mcmc\_plot(model)}: visualize posterior summaries, pairs plots and a wide range of MCMC diagnostics using functionality from the \texttt{Bayesplot} package
 
-<<fig.width=6, fig.height=2, fig.align='center', warning=FALSE, echo=FALSE>>=
-mcmc_plot(model, variable = '(Intercept)', type = 'combo')
-@
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}
+
+{\centering \includegraphics[width=\maxwidth]{figure/unnamed-chunk-4-1} 
+
+}
+
+
+\end{knitrout}
 
 \medskip
 Use \texttt{\color{Orchid} as.data.frame(model)}, \texttt{\color{Orchid} as.matrix(model)}, or \texttt{\color{Orchid} as.array(model)} for posterior extraction. Use \texttt{\color{Orchid} variables(model)} to determine what parameters are available for extraction
@@ -170,22 +212,26 @@ The \texttt{S3} \texttt{\color{Orchid} plot()} function applied to models can vi
 \texttt{\color{Orchid} conditional\_effects(model)} gives useful conditional effect plots on either the response or the link scale
 
 \smallskip
-<<fig.width=4, fig.height=1.75, fig.align='center', warning=FALSE, echo=FALSE>>=
-conditional_effects(model)[[1]] + xlim(c(1, 12.1))
-@
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}
+
+{\centering \includegraphics[width=\maxwidth]{figure/unnamed-chunk-5-1} 
+
+}
+
+
+\end{knitrout}
 
 For most \texttt{mvgam} models, functions from the \texttt{marginaleffects} package can be used for more targeted prediction-based inference. See \href{https://marginaleffects.com/}{The Marginal Effects Zoo} for guidance on computing and plotting predictions, slopes and comparisons
-<<fig.width=4, fig.height=1.75, fig.align='center', warning=FALSE, echo=FALSE>>=
-post_contrasts <- avg_comparisons(model,
-                                  variables = list(season = c(5, 11))) %>%
-  posteriordraws()
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}
 
-post_contrasts %>%
-  ggplot(aes(x = draw)) +
-  tidybayes::stat_halfeye(fill = "#C79999") +
-  labs(x = "(season = 11) − (season = 5) posterior contrast", y = "Density") +
-  theme_classic()
-@
+{\centering \includegraphics[width=\maxwidth]{figure/unnamed-chunk-6-1} 
+
+}
+
+
+\end{knitrout}
 
 \end{block}
 \end{column}
@@ -212,33 +258,41 @@ Use \texttt{\color{Orchid} ppc(model)} to plot various kinds of posterior predic
 \medskip
 Extract in-sample posterior predictions with \texttt{\color{Orchid} hindcast(model)}. If validation data exist, generate forecast predictions with \texttt{\color{Orchid} forecast(model, newdata = newdata)}. As above, change the \texttt{\color{Orchid} type} argument for predictions on different scales. Both functions generate an object of class \texttt{mvgam\_forecast}, that can be plotted with an \texttt{S3} \texttt{\color{Orchid} plot()} function. See \href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{the forecasting vignette} for more details about how to produce forecasts.
 
-<<fig.width=5.4, fig.height=2.5, fig.align='center', warning=FALSE, results='hide',echo=FALSE>>=
-  par(family = "serif",
-      las = 1,
-      mar=c(3,3,2,2),
-      mgp = c(2,0.5,0),
-      bty = "l",
-      cex.axis = 0.9,
-      cex.lab = 0.9,
-      cex.main = 0.9,
-      xaxs = 'r',
-      yaxs = 'r',
-      pch = 16)
-plot(fc)
-@
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}
+
+{\centering \includegraphics[width=\maxwidth]{figure/unnamed-chunk-7-1} 
+
+}
+
+
+\end{knitrout}
 
 \smallskip
 Compute probabilistic forecast scores using proper scoring rules with the \texttt{\color{Orchid} score()} function:
-<<eval=FALSE>>=
-fc <- forecast(model, newdata = simdat$data_test, type = 'response')
-crps <- score(fc, score = 'crps')
-dplyr::glimpse(crps$series_1)
-@
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{kframe}
+\begin{alltt}
+\hlstd{fc} \hlkwb{<-} \hlkwd{forecast}\hlstd{(model,} \hlkwc{newdata} \hlstd{= simdat}\hlopt{$}\hlstd{data_test,} \hlkwc{type} \hlstd{=} \hlstr{'response'}\hlstd{)}
+\hlstd{crps} \hlkwb{<-} \hlkwd{score}\hlstd{(fc,} \hlkwc{score} \hlstd{=} \hlstr{'crps'}\hlstd{)}
+\hlstd{dplyr}\hlopt{::}\hlkwd{glimpse}\hlstd{(crps}\hlopt{$}\hlstd{series_1)}
+\end{alltt}
+\end{kframe}
+\end{knitrout}
 
-<<echo=FALSE>>=
-crps <- score(fc, score = 'crps')
-dplyr::glimpse(crps$series_1)
-@
+\begin{knitrout}
+\definecolor{shadecolor}{rgb}{0.969, 0.969, 0.969}\color{fgcolor}\begin{kframe}
+\begin{verbatim}
+## Rows: 25
+## Columns: 5
+## $ score          <dbl> 0.2315, 0.3944, 0.7198, 0~
+## $ in_interval    <dbl> 1, 1, 1, 1, 1, 1, 1, 0, 1~
+## $ interval_width <dbl> 0.9, 0.9, 0.9, 0.9, 0.9, ~
+## $ eval_horizon   <int> 1, 2, 3, 4, 5, 6, 7, 8, 9~
+## $ score_type     <chr> "crps", "crps", "crps", "~
+\end{verbatim}
+\end{kframe}
+\end{knitrout}
 \smallskip
 Available proper scoring rules in the \texttt{\color{Orchid} score()} function include:
 \begin{itemize}

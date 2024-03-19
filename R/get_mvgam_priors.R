@@ -178,11 +178,11 @@ get_mvgam_priors = function(formula,
 
   # Check for gp terms in the validated formula
   list2env(check_gp_terms(formula, data_train, family = family),
-           env = environment())
+           envir = environment())
 
   # Check for missing rhs in formula
   list2env(check_obs_intercept(formula, orig_formula),
-           env = environment())
+           envir = environment())
 
   # Validate observation formula
   formula <- interpret_mvgam(formula, N = max(data_train$time))
@@ -202,7 +202,7 @@ get_mvgam_priors = function(formula,
   list2env(check_nmix(family, family_char,
                       trend_formula, trend_model,
                       trend_map, data_train,
-                      priors = TRUE), env = environment())
+                      priors = TRUE), envir = environment())
 
   # Validate remaining trend arguments
   trend_val <- validate_trend_restrictions(trend_model = trend_model,
@@ -216,7 +216,7 @@ get_mvgam_priors = function(formula,
                                            data_train = data_train,
                                            use_stan = use_stan,
                                            priors = TRUE)
-  list2env(trend_val, env = environment())
+  list2env(trend_val, envir = environment())
   if(is.null(trend_map)) trend_map <- rlang::missing_arg()
   if(is.null(n_lv)) n_lv <- rlang::missing_arg()
 

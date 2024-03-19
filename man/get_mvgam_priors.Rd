@@ -59,7 +59,9 @@ families are:
 \item\code{bernoulli()} for binary data
 \item\code{nb()} for count data
 \item\code{poisson()} for count data
-\item\code{binomial()} for count data with imperfect detection when the number of trials is known
+\item\code{binomial()} for count data with imperfect detection when the number of trials is known;
+note that the \code{cbind()} function must be used to bind the discrete observations and the number
+of trials
 \item\code{nmix()} for count data with imperfect detection when the number of trials
 is unknown and should be modeled via a State-Space N-Mixture model.
 The latent states are Poisson, capturing the 'true' latent

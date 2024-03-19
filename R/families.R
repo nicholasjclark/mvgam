@@ -1,7 +1,7 @@
 #' Supported mvgam families
 #' @importFrom stats make.link dgamma pgamma rgamma qnorm plnorm runif pbeta dlnorm dpois
 #' @importFrom stats pnorm ppois plogis gaussian poisson Gamma dnbinom rnbinom dnorm dbeta
-#' @importFrom stats rbinom pbinom dbinom qbinom qlogis
+#' @importFrom stats binomial rbinom pbinom dbinom qbinom qlogis
 #' @importFrom brms lognormal student bernoulli rstudent_t qstudent_t dstudent_t pstudent_t
 #' @param link a specification for the family link function. At present these cannot
 #' be changed

@@ -10,4 +10,9 @@ utils::globalVariables(c("y", "year", "smooth_vals", "smooth_num",
                          "term", "data_test", "object", "row_num", "trends_test",
                          "trend", "trend_series", "trend_y", ".", "gam",
                          "group", "mod", "row_id", "byvar", "direction",
-                         "index..time..index", "trend_test", "Var2"))
+                         "index..time..index", "trend_test", "Var2",
+                         "add_cor", "add_ma", "add_nmix", "binomial",
+                         "current", "drop_obs_intercept",
+                         "gp_details", "gp_terms", "k", "mus",
+                         "name", "needed", "nmix_trendmap", "orig_formula",
+                         "trial", "use_var1", "use_var1cor", "xcols_drop"))
