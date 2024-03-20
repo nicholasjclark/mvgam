@@ -95,7 +95,16 @@ get_predict.mvgam <- function(model, newdata,
 #' @export
 get_data.mvgam = function (x, source = "environment", verbose = TRUE, ...) {
 
-  resp <- as.character(rlang::f_lhs(x$call))
+  resp_terms <- as.character(rlang::f_lhs(x$call))
+  if(length(resp_terms) == 1L){
+    resp <- resp_terms
+  } else {
+    if(any(grepl('cbind', resp_terms))){
+      resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+      resp <- resp_terms[1]
+    }
+  }
+
   mf <- tryCatch({
     # Drop response observations if a trend call was used because often
     # there won't be an easy way to match them up (for example if multiple
@@ -165,14 +174,32 @@ get_data.mvgam = function (x, source = "environment", verbose = TRUE, ...) {
   })
 
   prep_data <- utils::getFromNamespace(".prepare_get_data", "insight")
-  prep_data(x, mf, effects = "all", verbose = verbose)
+  out <- prep_data(x, mf, effects = "all", verbose = verbose)
+
+  # Remove colnames with cbind in them as these can be artifacts in
+  # binomial model data preparations
+  if(any(grepl('cbind', colnames(out)))){
+    out %>%
+      dplyr::select(-matches('cbind')) -> out
+  }
+
+  return(out)
 }
 
 #' @rdname mvgam_marginaleffects
 #' @export
 get_data.mvgam_prefit = function (x, source = "environment", verbose = TRUE, ...) {
 
-  resp <- as.character(rlang::f_lhs(x$call))
+  resp_terms <- as.character(rlang::f_lhs(x$call))
+  if(length(resp_terms) == 1L){
+    resp <- resp_terms
+  } else {
+    if(any(grepl('cbind', resp_terms))){
+      resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+      resp <- resp_terms[1]
+    }
+  }
+
   mf <- tryCatch({
     # Drop response observations if a trend call was used because often
     # there won't be an easy way to match them up (for example if multiple
@@ -242,7 +269,16 @@ get_data.mvgam_prefit = function (x, source = "environment", verbose = TRUE, ...
   })
 
   prep_data <- utils::getFromNamespace(".prepare_get_data", "insight")
-  prep_data(x, mf, effects = "all", verbose = verbose)
+  out <- prep_data(x, mf, effects = "all", verbose = verbose)
+
+  # Remove colnames with cbind in them as these can be artifacts in
+  # binomial model data preparations
+  if(any(grepl('cbind', colnames(out)))){
+    out %>%
+      dplyr::select(-matches('cbind')) -> out
+  }
+
+  return(out)
 }
 
 #' @rdname mvgam_marginaleffects

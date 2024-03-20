@@ -29,7 +29,7 @@
 #'@param trend_rel Deprecated. Use `prop_trend` instead
 #'@param freq \code{integer}. The seasonal frequency of the series
 #'@param family \code{family} specifying the exponential observation family for the series. Currently supported
-#'families are: `nb()`, `poisson()`, `tweedie()`, `gaussian()`,
+#'families are: `nb()`, `poisson()`, `bernoulli()`, `tweedie()`, `gaussian()`,
 #'`betar()`, `lognormal()`, `student()` and `Gamma()`
 #'@param phi \code{vector} of dispersion parameters for the series
 #'(i.e. `size` for `nb()` or
@@ -92,6 +92,7 @@ sim_mvgam = function(T = 100,
   family_char <- match.arg(arg = family$family,
                            choices = c('negative binomial',
                                        "poisson",
+                                       "bernoulli",
                                        "tweedie",
                                        "beta",
                                        "gaussian",
@@ -185,7 +186,7 @@ sim_mvgam = function(T = 100,
   }
 
   if(missing(mu)){
-    mu <- sample(seq(-0.5, 0.5), n_series, T)
+    mu <- sample(seq(-0.5, 0.5), n_series, TRUE)
   }
 
   if(length(phi) < n_series){
@@ -364,13 +365,13 @@ sim_mvgam = function(T = 100,
   obs_ys <- c(unlist(lapply(seq_len(n_series), function(x){
     if(seasonality == 'shared'){
 
-      dynamics <- (glob_season * (1-trend_rel)) +
+      dynamics <- (glob_season * (1 - trend_rel)) +
         (obs_trends[,x] * trend_rel)
 
     } else {
       yseason <- as.vector(scale(stl(ts(rnorm(T, glob_season, sd = 2),
                                         frequency = freq), 'periodic')$time.series[,1]))
-      dynamics <- (yseason * (1-trend_rel)) +
+      dynamics <- (yseason * (1 - trend_rel)) +
         (obs_trends[,x] * trend_rel)
     }
 
@@ -382,6 +383,12 @@ sim_mvgam = function(T = 100,
     if(family_char == 'poisson'){
       out <- rpois(length(dynamics),
                    lambda = exp(mu[x] + dynamics))
+    }
+
+    if(family_char == 'bernoulli'){
+      out <- rbinom(length(dynamics),
+                    size = 1,
+                    prob = plogis(mu[x] + dynamics))
     }
 
     if(family_char == 'tweedie'){
@@ -472,18 +479,18 @@ sim_mvgam = function(T = 100,
                           rho = trend_rhos)
     }
 
-    out <-   list(data_train = data.frame(data_train),
-                  data_test = data.frame(data_test),
-                  true_corrs = cov2cor(cov(obs_trends)),
-                  true_trends = obs_trends,
-                  global_seasonality = glob_season,
-                  trend_params = trend_params)
+    out <- list(data_train = data.frame(data_train),
+                data_test = data.frame(data_test),
+                true_corrs = cov2cor(cov(obs_trends)),
+                true_trends = obs_trends,
+                global_seasonality = glob_season,
+                trend_params = trend_params)
   } else {
-    out <-   list(data_train = data.frame(data_train),
-                  data_test = data.frame(data_test),
-                  true_corrs = cov2cor(cov(obs_trends)),
-                  true_trends = obs_trends,
-                  global_seasonality = glob_season)
+    out <- list(data_train = data.frame(data_train),
+                data_test = data.frame(data_test),
+                true_corrs = cov2cor(cov(obs_trends)),
+                true_trends = obs_trends,
+                global_seasonality = glob_season)
   }
 
 return(out)

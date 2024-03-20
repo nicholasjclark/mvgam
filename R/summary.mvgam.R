@@ -101,6 +101,12 @@ if(object$family == 'negative binomial'){
                      variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder'))[,c(3:7)])
 }
 
+if(object$family == 'beta_binomial'){
+  cat("\nObservation dispersion parameter estimates:\n")
+  print(mcmc_summary(object$model_output, 'phi', digits = digits,
+                     variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder'))[,c(3:7)])
+}
+
 if(object$family == 'beta'){
   cat("\nObservation precision parameter estimates:\n")
   print(mcmc_summary(object$model_output, 'phi', digits = digits,

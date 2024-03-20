@@ -15,7 +15,8 @@ get_monitor_pars = function(family, smooths_included = TRUE,
                                                 "tweedie", "beta",
                                                 "gaussian", "lognormal",
                                                 "student", "Gamma",
-                                                "nmix", "binomial", "bernoulli"))
+                                                "nmix", "binomial", "bernoulli",
+                                                "beta_binomial"))
 
   if(smooths_included){
     param <- c('rho', 'b', 'ypred', 'mus', 'lp__', 'lambda')

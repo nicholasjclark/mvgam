@@ -71,7 +71,8 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
                                             "prop_zero"))
 
   if(type == 'rootogram'){
-    if(!object$family %in% c('poisson', 'negative binomial', 'tweedie', 'nmix')){
+    if(!object$family %in% c('poisson', 'negative binomial', 'tweedie', 'nmix',
+                             'binomial', 'beta_binomial')){
       stop('Rootograms not supported for checking non-count data',
            call. = FALSE)
     }

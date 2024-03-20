@@ -76,6 +76,8 @@ package can handle data for the following families:
 - `poisson()` for count data
 - `nb()` for overdispersed count data
 - `binomial()` for count data with known number of trials
+- `beta_binomial()` for overdispersed count data with known number of
+  trials
 - `nmix()` for count data with imperfect detection (unknown number of
   trials)
 - `tweedie()` for overdispersed count data

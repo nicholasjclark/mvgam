@@ -585,12 +585,18 @@ check_obs_intercept = function(formula, orig_formula){
   if(length(attr(terms(formula), 'term.labels')) == 0 &
      !attr(terms(formula), 'intercept') == 1){
     formula_envir <- attr(formula, '.Environment')
+
+    if(length(attr(terms(formula), 'factors')) == 0){
+      resp <- as.character(attr(terms(formula), 'variables'))[2]
+    } else {
+      resp <- dimnames(attr(terms(formula), 'factors'))[[1]][1]
+    }
+
     if(!is.null(attr(terms(formula(formula)), 'offset'))){
-      formula <- formula(paste0(rlang::f_lhs(formula),
-                                ' ~ ', paste(gsub(' - 1',' + 1',
+      formula <- formula(paste0(resp, ' ~ ', paste(gsub(' - 1',' + 1',
                                                   rlang::f_text(formula)))))
     } else {
-      formula <- formula(paste(rlang::f_lhs(formula), '~ 1'))
+      formula <- formula(paste(resp, '~ 1'))
     }
     attr(formula, '.Environment') <- formula_envir
     drop_obs_intercept <- TRUE

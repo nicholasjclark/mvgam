@@ -1558,6 +1558,19 @@ mvgam = function(formula,
       orig_trend_model$cap <- pw_additions$model_data$cap
     }
 
+    # Updates for Binomial and Bernoulli families
+    if(family_char %in% c('binomial', 'bernoulli', 'beta_binomial')){
+      bin_additions <- add_binomial(formula,
+                                    vectorised$model_file,
+                                    vectorised$model_data,
+                                    data_train,
+                                    data_test,
+                                    family_char)
+      vectorised$model_file <- bin_additions$model_file
+      vectorised$model_data <- bin_additions$model_data
+      attr(ss_gam, 'trials') <- bin_additions$trials
+    }
+
     # Add in any user-specified priors
     if(!missing(priors)){
       vectorised$model_file <- update_priors(vectorised$model_file, priors,
@@ -1594,19 +1607,6 @@ mvgam = function(formula,
       param <- param[!param %in% c('ypred', 'mus', 'theta',
                                    'detprob', 'latent_ypred',
                                    'lv_coefs', 'error')]
-    }
-
-    # Updates for Binomial and Bernoulli families
-    if(family_char %in% c('binomial', 'bernoulli', 'beta_binomial')){
-      bin_additions <- add_binomial(formula,
-                                    vectorised$model_file,
-                                    vectorised$model_data,
-                                    data_train,
-                                    data_test,
-                                    family_char)
-      vectorised$model_file <- bin_additions$model_file
-      vectorised$model_data <- bin_additions$model_data
-      attr(ss_gam, 'trials') <- bin_additions$trials
     }
 
     # Updates for sharing of observation params

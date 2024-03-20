@@ -35,6 +35,7 @@ test_that("cbind() syntax required for binomial()", {
                'Binomial family requires cbind() syntax in the formula left-hand side',
                fixed = TRUE)
 
+  # Should work if correctly specified
   mod <- mvgam(cbind(y, ntrials) ~ s(series, bs = 're') +
                  gp(x, by = series, c = 5/4, k = 5),
                family = binomial(),
@@ -54,6 +55,64 @@ test_that("cbind() syntax required for binomial()", {
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(any(grepl('flat_ys ~ binomial_logit_glm(',
                         mod$model_file, fixed = TRUE)))
+
+  # Also with no predictors
+  mod <- mvgam(cbind(y, ntrials) ~ 0,
+               family = binomial(),
+               trend_model = AR(),
+               data = dat_train,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('flat_ys ~ binomial_logit_glm(',
+                        mod$model_file, fixed = TRUE)))
+  expect_true(any(grepl("b[1] = 0;", mod$model_file,
+                        fixed = TRUE)))
+})
+
+# All tests should apply to beta_binomial as well
+test_that("cbind() syntax required for beta_binomial()", {
+  expect_error(mvgam(y ~ series + s(x, by = series),
+                     family = beta_binomial(),
+                     data = dat_train,
+                     run_model = FALSE),
+               'Binomial family requires cbind() syntax in the formula left-hand side',
+               fixed = TRUE)
+
+  # Should work if correctly specified
+  mod <- mvgam(cbind(y, ntrials) ~ s(series, bs = 're') +
+                 gp(x, by = series, c = 5/4, k = 5),
+               family = beta_binomial(),
+               data = dat_train,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('flat_ys ~ beta_binomial(',
+                        mod$model_file, fixed = TRUE)))
+
+  # Also with a trend_formula
+  mod <- mvgam(cbind(y, ntrials) ~ series,
+               trend_formula = ~ s(x, by = trend),
+               family = beta_binomial(),
+               trend_model = AR(),
+               data = dat_train,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('flat_ys ~ beta_binomial(',
+                        mod$model_file, fixed = TRUE)))
+
+  # Also with no predictors and with a prior on phi
+  mod <- mvgam(cbind(y, ntrials) ~ 0,
+               family = beta_binomial(),
+               priors = prior(normal(0, 3), class = phi),
+               trend_model = AR(),
+               data = dat_train,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('beta_binomial(',
+                        mod$model_file, fixed = TRUE)))
+  expect_true(any(grepl("b[1] = 0;", mod$model_file,
+                        fixed = TRUE)))
+  expect_true(any(grepl("phi ~ normal(0, 3);", mod$model_file,
+                        fixed = TRUE)))
 })
 
 test_that("trials variable must be in data for binomial()", {

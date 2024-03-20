@@ -138,7 +138,7 @@ if(series == 'all'){
       names(par_extracts) <- names(family_pars)
 
       # Add trial information if this is a Binomial model
-      if(object$family == 'binomial'){
+      if(object$family %in% c('binomial', 'beta_binomial')){
         trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')[,series]),
                                        NROW(preds)),
                                    nrow = NROW(preds),

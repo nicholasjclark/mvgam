@@ -86,6 +86,23 @@ conditional_effects.mvgam = function(x,
   type <- match.arg(type, c('response', 'link',
                             'detection', 'latent_N',
                             'expected'))
+
+  # Can't plot points or rugs with binomial models due to the
+  # cbind syntax
+  if(rug){
+    if(x$family %in% c('binomial', 'beta_binomial')){
+      rug <- FALSE
+      warning('Cannot show observation rug for binomial models')
+    }
+  }
+
+  if(points){
+    if(x$family %in% c('binomial', 'beta_binomial')){
+      points <- FALSE
+      warning('Cannot show observation points for binomial models')
+    }
+  }
+
   if(type == 'response'){
     if(points){
       points <- 0.5

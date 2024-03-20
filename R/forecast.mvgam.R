@@ -209,7 +209,7 @@ forecast.mvgam = function(object, newdata, data_test,
           names(par_extracts) <- names(family_pars)
 
           # Add trial information if this is a Binomial model
-          if(object$family == 'binomial'){
+          if(object$family %in% c('binomial', 'beta_binomial')){
             trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')[,series]),
                                            NROW(mus)),
                                        nrow = NROW(mus),
@@ -438,7 +438,7 @@ forecast.mvgam = function(object, newdata, data_test,
           names(par_extracts) <- names(family_pars)
 
           # Add trial information if this is a Binomial model
-          if(object$family == 'binomial'){
+          if(object$family %in% c('binomial', 'beta_binomial')){
             trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')[,series]),
                                            NROW(mus)),
                                        nrow = NROW(mus),
@@ -534,7 +534,7 @@ forecast.mvgam = function(object, newdata, data_test,
           names(par_extracts) <- names(family_pars)
 
           # Add trial information if this is a Binomial model
-          if(object$family == 'binomial'){
+          if(object$family %in% c('binomial', 'beta_binomial')){
             trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')[1:last_train, series]),
                                            NROW(mus)),
                                        nrow = NROW(mus),
@@ -915,7 +915,7 @@ forecast_draws = function(object,
   family_pars <- extract_family_pars(object = object, newdata = data_test)
 
   # Add trial information if this is a Binomial model
-  if(object$family == 'binomial'){
+  if(object$family %in% c('binomial', 'beta_binomial')){
     resp_terms <- as.character(terms(formula(object$formula))[[2]])
     resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
     trial_name <- resp_terms[2]
@@ -1108,7 +1108,7 @@ forecast_draws = function(object,
           names(family_extracts) <- names(family_pars)
 
           # Add trial information if this is a Binomial model
-          if(family == 'binomial'){
+          if(family %in% c('binomial', 'beta_binomial')){
             family_extracts$trials <- trials[,series]
           }
 

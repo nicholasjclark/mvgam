@@ -42,7 +42,7 @@ jagam_setup <- function(ss_gam, formula, data_train, family,
 
   # Change the formula to a Poisson-like formula if this is a cbind Binomial,
   # as jagam will fail if it sees that
-  if(family$family == 'binomial'){
+  if(family$family %in% c('binomial', 'beta_binomial')){
     resp_terms <- as.character(terms(formula(formula))[[2]])
     if(any(grepl('cbind', resp_terms))){
       resp_terms <- resp_terms[-grepl('cbind', resp_terms)]

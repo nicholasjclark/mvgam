@@ -2,7 +2,7 @@
 #' @importFrom stats make.link dgamma pgamma rgamma qnorm plnorm runif pbeta dlnorm dpois
 #' @importFrom stats pnorm ppois plogis gaussian poisson Gamma dnbinom rnbinom dnorm dbeta
 #' @importFrom stats binomial rbinom pbinom dbinom qbinom qlogis
-#' @importFrom brms lognormal student bernoulli rstudent_t qstudent_t dstudent_t pstudent_t
+#' @importFrom brms lognormal student bernoulli rstudent_t qstudent_t dstudent_t pstudent_t dbeta_binomial rbeta_binomial pbeta_binomial
 #' @param link a specification for the family link function. At present these cannot
 #' be changed
 #' @details \code{mvgam} currently supports the following standard observation families:
@@ -192,6 +192,33 @@ student_t = function(link = 'identity'){
 #'                 conf_level = 0.5) +
 #'  ylab('Observed abundance') +
 #'  theme_classic()
+#'
+#' # Example showcasing how cbind() is needed for Binomial observations
+#' # Simulate two time series of Binomial trials
+#' trials <- sample(c(20:25), 50, replace = TRUE)
+#' x <- rnorm(50)
+#' detprob1 <- plogis(-0.5 + 0.9*x)
+#' detprob2 <- plogis(-0.1 -0.7*x)
+#' dat <- rbind(data.frame(y = rbinom(n = 50, size = trials, prob = detprob1),
+#'                         time = 1:50,
+#'                         series = 'series1',
+#'                         x = x,
+#'                         ntrials = trials),
+#'              data.frame(y = rbinom(n = 50, size = trials, prob = detprob2),
+#'                         time = 1:50,
+#'                         series = 'series2',
+#'                         x = x,
+#'                         ntrials = trials))
+#' dat <- dplyr::mutate(dat, series = as.factor(series))
+#' dat <- dplyr::arrange(dat, time, series)
+#'
+#' # Fit a model using the binomial() family; must specify observations
+#' # and number of trials in the cbind() wrapper
+#' mod <- mvgam(cbind(y, ntrials) ~ series + s(x, by = series),
+#'              family = binomial(),
+#'              data = dat)
+#' summary(mod)
+#'
 #' }
 #' @export
 nmix = function(link = 'log'){
@@ -209,6 +236,7 @@ family_char_choices = function(){
   c('negative binomial',
     "poisson",
     "binomial",
+    'beta_binomial',
     "bernoulli",
     "nmix",
     "tweedie",
@@ -541,11 +569,50 @@ mvgam_predict = function(Xp,
     } else if(type == 'variance'){
       mu <- plogis(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                              betas) + attr(Xp, 'model.offset')))
-      out <- mu * (1 - mu)
+      out <- as.vector(family_pars$trials) * mu * (1 - mu)
     } else {
       out <- plogis(((matrix(Xp, ncol = NCOL(Xp)) %*%
                      betas)) +
                    attr(Xp, 'model.offset')) *
+        as.vector(family_pars$trials)
+    }
+  }
+
+  # Beta_Binomial observations (requires arguments 'trials' and 'phi')
+  if(family == 'beta_binomial'){
+    if(type ==  'link'){
+      out <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                          betas) + attr(Xp, 'model.offset'))
+
+      if(density){
+        out <- dbeta_binomial(truth,
+                              mu = plogis(out),
+                              phi = as.vector(family_pars$phi),
+                              size = as.vector(family_pars$trials),
+                              log = TRUE)
+      }
+
+    } else if(type == 'response'){
+      out <- rbeta_binomial(n = NROW(Xp),
+                            mu = plogis(((matrix(Xp, ncol = NCOL(Xp)) %*%
+                                            betas)) +
+                                          attr(Xp, 'model.offset')),
+                            phi = as.vector(family_pars$phi),
+                            size = as.vector(family_pars$trials))
+    } else if(type == 'variance'){
+      mu <- plogis(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                                betas) + attr(Xp, 'model.offset')))
+      # https://en.wikipedia.org/wiki/Beta-binomial_distribution
+      alpha <- mu * as.vector(family_pars$phi)
+      beta <- (1 - mu) * as.vector(family_pars$phi)
+      p <- 1 / (alpha + beta + 1)
+      n <- as.vector(family_pars$trials)
+      out <- ((n * p) * (1 - p)) * ((alpha + beta + n) / (alpha + beta + 1))
+
+    } else {
+      out <- plogis(((matrix(Xp, ncol = NCOL(Xp)) %*%
+                        betas)) +
+                      attr(Xp, 'model.offset')) *
         as.vector(family_pars$trials)
     }
   }
@@ -710,7 +777,7 @@ family_to_mgcvfam = function(family){
     mgcv::Tweedie(p = 1.5, link = 'log')
   } else if(family$family == 'nmix'){
     poisson()
-  } else if(family$family == 'bernoulli'){
+  } else if(family$family %in% c('bernoulli', 'beta_binomial')){
     binomial()
   } else {
     family
@@ -781,6 +848,7 @@ family_par_names = function(family){
   }
 
   if(family %in% c('beta',
+                   'beta_binomial',
                    'negative binomial',
                    'tweedie')){
     out <- c('phi')
@@ -921,6 +989,21 @@ family_prior_info = function(family, use_stan, data){
                              )))
   }
 
+  if(family == 'beta_binomial'){
+    prior_df <- data.frame(param_name = c('vector<lower=0>[n_series] phi;'),
+                           param_length = length(unique(data$series)),
+                           param_info = c('Beta Binomial precision parameter'),
+                           prior = c('phi ~ gamma(0.01, 0.01);'),
+                           example_change = c(
+                             paste0(
+                               'phi ~ normal(',
+                               round(runif(min = -1, max = 1, n = 1), 2),
+                               ', ',
+                               round(runif(min = 0.1, max = 1, n = 1), 2),
+                               ');'
+                             )))
+  }
+
   if(family == 'Gamma'){
     prior_df <- data.frame(param_name = c('vector<lower=0>[n_series] shape;'),
                            param_length = length(unique(data$series)),
@@ -1029,6 +1112,37 @@ ds_resids_binomial = function(truth, fitted, draw, N){
   b_obs <- pbinom(as.vector(truth[!na_obs]),
                   size = N[!na_obs],
                   prob = fitted[!na_obs])
+  u_obs <- runif(n = length(truth[!na_obs]),
+                 min = pmin(a_obs, b_obs),
+                 max = pmax(a_obs, b_obs))
+
+  if(any(is.na(truth))){
+    u <- vector(length = length(truth))
+    u[na_obs] <- NaN
+    u[!na_obs] <- u_obs
+  } else {
+    u <- u_obs
+  }
+  dsres_out <- qnorm(u)
+  dsres_out[is.infinite(dsres_out)] <- NaN
+  dsres_out
+}
+
+#' @noRd
+ds_resids_beta_binomial = function(truth, fitted, draw, N, phi){
+  na_obs <- is.na(truth)
+  a_obs <- pbeta_binomial(ifelse(as.vector(truth[!na_obs]) - 1.e-6 > 0,
+                                 as.vector(truth[!na_obs]) - 1.e-6,
+                                 0),
+                          size = N[!na_obs],
+                          mu = fitted[!na_obs],
+                          phi = phi[!na_obs])
+  b_obs <- pbeta_binomial(ifelse(as.vector(truth[!na_obs]),
+                                 as.vector(truth[!na_obs]),
+                                 0),
+                          size = N[!na_obs],
+                          mu = fitted[!na_obs],
+                          phi = phi[!na_obs])
   u_obs <- runif(n = length(truth[!na_obs]),
                  min = pmin(a_obs, b_obs),
                  max = pmax(a_obs, b_obs))
@@ -1529,7 +1643,7 @@ dsresids_vec = function(object){
     N <- mcmc_chains(object$model_output, 'latent_ypred')[,1:last_train, drop = FALSE]
   }
 
-  if(family == 'binomial'){
+  if(family %in% c('binomial', 'beta_binomial')){
     p <- plogis(mcmc_chains(object$model_output, 'mus')[,1:last_train,
                                                         drop = FALSE])
     N <- as.vector(attr(object$mgcv_model, 'trials'))[1:length(truth)]
@@ -1573,6 +1687,19 @@ dsresids_vec = function(object){
                                         N = as.vector(N_mat)),
                      nrow = NROW(preds))
   }
+
+  if(family == 'beta_binomial'){
+    N_mat <- matrix(rep(N, NROW(preds)),
+                    nrow = NROW(preds),
+                    byrow = TRUE)
+    resids <- matrix(ds_resids_beta_binomial(truth = as.vector(truth_mat),
+                                             fitted = as.vector(p),
+                                             draw = 1,
+                                             N = as.vector(N_mat),
+                                             phi = family_extracts$phi),
+                     nrow = NROW(preds))
+  }
+
   if(family == 'bernoulli'){
     resids <- matrix(ds_resids_binomial(truth = as.vector(truth_mat),
                                         fitted = as.vector(preds),

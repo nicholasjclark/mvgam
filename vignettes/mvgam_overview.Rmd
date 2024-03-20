@@ -48,6 +48,7 @@ Here $\alpha$ are the unknown intercepts, the $\boldsymbol{s}$'s are unknown smo
 |Poisson (log link)           | `poisson()`     | Non-negative integers in $(0,1,2,...)$            | -                    |
 |Negative Binomial2 (log link)| `nb()`          | Non-negative integers in $(0,1,2,...)$            | $\phi$               |
 |Binomial (logit link)           | `binomial()` | Non-negative integers in $(0,1,2,...)$            | -                    |
+|Beta-Binomial (logit link)      | `beta_binomial()` | Non-negative integers in $(0,1,2,...)$       | $\phi$                   |
 |Poisson Binomial N-mixture (log link)| `nmix()`  | Non-negative integers in $(0,1,2,...)$            | -               |
 
 For all supported observation families, any extra parameters that need to be estimated (i.e. the $\sigma$ in a Gaussian model or the $\phi$ in a Negative Binomial model) are by default estimated independently for each series. However, users can opt to force all series to share extra observation parameters using `share_obs_params = TRUE` in `mvgam()`. Note that default link functions cannot currently be changed.

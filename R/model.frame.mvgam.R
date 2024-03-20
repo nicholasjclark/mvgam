@@ -21,7 +21,15 @@ model.frame.mvgam = function(formula, trend_effects = FALSE, ...){
     out <- stats::model.frame(formula$mgcv_model)
 
     # Identify response variable
-    resp <- as.character(rlang::f_lhs(formula$call))
+    resp_terms <- as.character(rlang::f_lhs(formula$call))
+    if(length(resp_terms) == 1L){
+      resp <- resp_terms
+    } else {
+      if(any(grepl('cbind', resp_terms))){
+        resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+        resp <- resp_terms[1]
+      }
+    }
 
     # Now add the observed response, in case there are any
     # NAs there that need to be updated
@@ -48,7 +56,15 @@ model.frame.mvgam_prefit = function(formula, trend_effects = FALSE, ...){
     out <- stats::model.frame(formula$mgcv_model)
 
     # Identify response variable
-    resp <- as.character(rlang::f_lhs(formula$call))
+    resp_terms <- as.character(rlang::f_lhs(formula$call))
+    if(length(resp_terms) == 1L){
+      resp <- resp_terms
+    } else {
+      if(any(grepl('cbind', resp_terms))){
+        resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+        resp <- resp_terms[1]
+      }
+    }
 
     # Now add the observed response, in case there are any
     # NAs there that need to be updated

@@ -184,6 +184,33 @@ plot_predictions(mod, condition = list('temperature',
                 conf_level = 0.5) +
  ylab('Observed abundance') +
  theme_classic()
+
+# Example showcasing how cbind() is needed for Binomial observations
+# Simulate two time series of Binomial trials
+trials <- sample(c(20:25), 50, replace = TRUE)
+x <- rnorm(50)
+detprob1 <- plogis(-0.5 + 0.9*x)
+detprob2 <- plogis(-0.1 -0.7*x)
+dat <- rbind(data.frame(y = rbinom(n = 50, size = trials, prob = detprob1),
+                        time = 1:50,
+                        series = 'series1',
+                        x = x,
+                        ntrials = trials),
+             data.frame(y = rbinom(n = 50, size = trials, prob = detprob2),
+                        time = 1:50,
+                        series = 'series2',
+                        x = x,
+                        ntrials = trials))
+dat <- dplyr::mutate(dat, series = as.factor(series))
+dat <- dplyr::arrange(dat, time, series)
+
+# Fit a model using the binomial() family; must specify observations
+# and number of trials in the cbind() wrapper
+mod <- mvgam(cbind(y, ntrials) ~ series + s(x, by = series),
+             family = binomial(),
+             data = dat)
+summary(mod)
+
 }
 }
 \author{

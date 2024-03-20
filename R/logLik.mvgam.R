@@ -143,7 +143,7 @@ logLik.mvgam = function(object,
   names(family_extracts) <- names(family_pars)
 
   # Add trial information if this is a Binomial model
-  if(object$family == 'binomial'){
+  if(object$family %in% c('binomial', 'beta_binomial')){
     trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')),
                                    NROW(mus)),
                                nrow = NROW(mus),

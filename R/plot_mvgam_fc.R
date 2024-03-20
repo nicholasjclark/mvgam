@@ -249,7 +249,7 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
       dplyr::arrange(time) %>%
       dplyr::pull(y)
 
-    if(tolower(object$family) %in% c('beta')){
+    if(tolower(object$family) %in% c('beta', 'bernoulli')){
       ylim <- c(min(cred, min(ytrain, na.rm = TRUE)),
                 max(cred, max(ytrain, na.rm = TRUE)))
       ymin <- max(0, ylim[1])
@@ -571,7 +571,7 @@ plot.mvgam_forecast = function(x, series = 1,
       ylim <- c(min(cred, min(ytrain, na.rm = TRUE)),
                 max(cred, max(ytrain, na.rm = TRUE)) * 1.1)
 
-      if(object$family == 'beta'){
+      if(object$family %in% c('beta', 'bernoulli')){
         ymin <- max(0, ylim[1])
         ymax <- min(1, ylim[2])
         ylim <- c(ymin, ymax)
