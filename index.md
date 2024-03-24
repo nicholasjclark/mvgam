@@ -17,7 +17,7 @@ familiar GAM modelling interface. The motivation for the package and
 some of its primary objectives are described in detail by [Clark & Wells
 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974)
 (published in *Methods in Ecology and Evolution*). An introduction to
-the package and some worked examples are also shown in this seminar:
+the package and some worked examples are shown in this seminar:
 <a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
 target="_blank">Ecological Forecasting with Dynamic Generalized Additive
 Models</a>.
@@ -103,7 +103,12 @@ Plot the series to see how they evolve over time
 plot_mvgam_series(data = data$data_train, series = 'all')
 ```
 
-![](man/figures/README-beta_sim-1.png)
+<figure>
+<img src="man/figures/README-beta_sim-1.png"
+alt="Simulating and analysing multivariate time series with Dynamic Generalized Additive Models" />
+<figcaption aria-hidden="true">Simulating and analysing multivariate
+time series with Dynamic Generalized Additive Models</figcaption>
+</figure>
 
 Fit a DGAM to these series that uses a hierarchical cyclic seasonal
 smooth term to capture variation in seasonality among series. The model
@@ -129,7 +134,12 @@ for(i in 1:3){
 }
 ```
 
-![](man/figures/README-beta_fc-1.png)
+<figure>
+<img src="man/figures/README-beta_fc-1.png"
+alt="Forecasting multivariate time series with Dynamic Generalized Additive Models" />
+<figcaption aria-hidden="true">Forecasting multivariate time series with
+Dynamic Generalized Additive Models</figcaption>
+</figure>
 
 Various `S3` functions can be used to inspect parameter estimates, plot
 smooth functions and residuals, and evaluate models through posterior
@@ -146,18 +156,20 @@ always access the vignette htmls online at
 
 ## Other resources
 
-A number of case studies have been compiled to highlight how DGAMs can
-be estimated using MCMC sampling:
+A number of case studies have been compiled to highlight how GAMs and
+DGAMs can be useful for working with time series data:
 
 - <a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
   target="_blank">Ecological Forecasting with Dynamic Generalized Additive
   Models</a>
-- [mvgam case study 1: model comparison and data
-  assimilation](https://rpubs.com/NickClark47/mvgam)
-- [mvgam case study 2: multivariate
-  models](https://rpubs.com/NickClark47/mvgam2)
-- [mvgam case study 3: distributed lag
-  models](https://rpubs.com/NickClark47/mvgam3)
+- <a href="https://ecogambler.netlify.app/blog/interpreting-gams/"
+  target="_blank">How to interpret and report nonlinear effects from
+  Generalized Additive Models</a>
+- <a href="https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/"
+  target="_blank">Phylogenetic smoothing using mgcv</a>
+- <a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/"
+  target="_blank">Distributed lags (and hierarchical distributed lags)
+  using mgcv and mvgam</a>
 
 The package can also be used to generate all necessary data structures,
 initial value functions and modelling code necessary to fit DGAMs using

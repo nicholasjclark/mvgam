@@ -89,7 +89,7 @@
 <h2 id="mvgam">mvgam<a class="anchor" aria-label="anchor" href="#mvgam"></a>
 </h2>
 <p><strong>M</strong>ulti<strong>V</strong>ariate (Dynamic) <strong>G</strong>eneralized <strong>A</strong>ddivite <strong>M</strong>odels</p>
-<p>The goal of <code>mvgam</code> is to use a Bayesian framework to estimate parameters of Dynamic Generalized Additive Models (DGAMs) for time series with dynamic trend components. The package provides an interface to fit Bayesian DGAMs using either <code>JAGS</code> or <code>Stan</code> as the backend, but note that users are strongly encouraged to opt for <code>Stan</code> over <code>JAGS</code>. The formula syntax is based on that of the package <code>mgcv</code> to provide a familiar GAM modelling interface. The motivation for the package and some of its primary objectives are described in detail by <a href="https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974" class="external-link">Clark &amp; Wells 2022</a> (published in <em>Methods in Ecology and Evolution</em>). An introduction to the package and some worked examples are also shown in this seminar: <a href="https://www.youtube.com/watch?v=0zZopLlomsQ" target="_blank" class="external-link">Ecological Forecasting with Dynamic Generalized Additive Models</a>.</p>
+<p>The goal of <code>mvgam</code> is to use a Bayesian framework to estimate parameters of Dynamic Generalized Additive Models (DGAMs) for time series with dynamic trend components. The package provides an interface to fit Bayesian DGAMs using either <code>JAGS</code> or <code>Stan</code> as the backend, but note that users are strongly encouraged to opt for <code>Stan</code> over <code>JAGS</code>. The formula syntax is based on that of the package <code>mgcv</code> to provide a familiar GAM modelling interface. The motivation for the package and some of its primary objectives are described in detail by <a href="https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974" class="external-link">Clark &amp; Wells 2022</a> (published in <em>Methods in Ecology and Evolution</em>). An introduction to the package and some worked examples are shown in this seminar: <a href="https://www.youtube.com/watch?v=0zZopLlomsQ" target="_blank" class="external-link">Ecological Forecasting with Dynamic Generalized Additive Models</a>.</p>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
@@ -152,8 +152,9 @@
 <p>Plot the series to see how they evolve over time</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="reference/figures/README-beta_sim-1.png"></p>
-<p>Fit a DGAM to these series that uses a hierarchical cyclic seasonal smooth term to capture variation in seasonality among series. The model also includes series-specific latent Gaussian Processes with squared exponential covariance functions to capture temporal dynamics</p>
+<figure><img src="reference/figures/README-beta_sim-1.png" alt="Simulating and analysing multivariate time series with Dynamic Generalized Additive Models"><figcaption aria-hidden="true">
+Simulating and analysing multivariate time series with Dynamic Generalized Additive Models
+</figcaption></figure><p>Fit a DGAM to these series that uses a hierarchical cyclic seasonal smooth term to capture variation in seasonality among series. The model also includes series-specific latent Gaussian Processes with squared exponential covariance functions to capture temporal dynamics</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">7</span><span class="op">)</span> <span class="op">+</span></span>
 <span>               <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, m <span class="op">=</span> <span class="fl">1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span>
@@ -167,8 +168,9 @@
 <span><span class="kw">for</span><span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="fl">3</span><span class="op">)</span><span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="va">i</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<p><img src="reference/figures/README-beta_fc-1.png"></p>
-<p>Various <code>S3</code> functions can be used to inspect parameter estimates, plot smooth functions and residuals, and evaluate models through posterior predictive checks or forecast comparisons. Please see the package documentation for more detailed examples.</p>
+<figure><img src="reference/figures/README-beta_fc-1.png" alt="Forecasting multivariate time series with Dynamic Generalized Additive Models"><figcaption aria-hidden="true">
+Forecasting multivariate time series with Dynamic Generalized Additive Models
+</figcaption></figure><p>Various <code>S3</code> functions can be used to inspect parameter estimates, plot smooth functions and residuals, and evaluate models through posterior predictive checks or forecast comparisons. Please see the package documentation for more detailed examples.</p>
 </div>
 <div class="section level2">
 <h2 id="vignettes">Vignettes<a class="anchor" aria-label="anchor" href="#vignettes"></a>
@@ -178,12 +180,12 @@
 <div class="section level2">
 <h2 id="other-resources">Other resources<a class="anchor" aria-label="anchor" href="#other-resources"></a>
 </h2>
-<p>A number of case studies have been compiled to highlight how DGAMs can be estimated using MCMC sampling:</p>
+<p>A number of case studies have been compiled to highlight how GAMs and DGAMs can be useful for working with time series data:</p>
 <ul>
 <li><a href="https://www.youtube.com/watch?v=0zZopLlomsQ" target="_blank" class="external-link">Ecological Forecasting with Dynamic Generalized Additive Models</a></li>
-<li><a href="https://rpubs.com/NickClark47/mvgam" class="external-link">mvgam case study 1: model comparison and data assimilation</a></li>
-<li><a href="https://rpubs.com/NickClark47/mvgam2" class="external-link">mvgam case study 2: multivariate models</a></li>
-<li><a href="https://rpubs.com/NickClark47/mvgam3" class="external-link">mvgam case study 3: distributed lag models</a></li>
+<li><a href="https://ecogambler.netlify.app/blog/interpreting-gams/" target="_blank" class="external-link">How to interpret and report nonlinear effects from Generalized Additive Models</a></li>
+<li><a href="https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/" target="_blank" class="external-link">Phylogenetic smoothing using mgcv</a></li>
+<li><a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/" target="_blank" class="external-link">Distributed lags (and hierarchical distributed lags) using mgcv and mvgam</a></li>
 </ul>
 <p>The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using <code>Stan</code> or <code>JAGS</code>. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The following resources can be helpful to troubleshoot:</p>
 <ul>

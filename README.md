@@ -35,6 +35,14 @@ been compiled:
 - <a href="https://www.youtube.com/watch?v=RwllLjgPUmM"
   target="_blank">Ecological Forecasting with Dynamic GAMs; a tutorial and
   detailed case study</a>
+- <a href="https://ecogambler.netlify.app/blog/interpreting-gams/"
+  target="_blank">How to interpret and report nonlinear effects from
+  Generalized Additive Models</a>
+- <a href="https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/"
+  target="_blank">Phylogenetic smoothing using mgcv</a>
+- <a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/"
+  target="_blank">Distributed lags (and hierarchical distributed lags)
+  using mgcv and mvgam</a>
 
 ## Installation
 
@@ -100,7 +108,7 @@ packages.
 [![`mvgam` usage
 cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
 
-## A brief introduction to the package
+## Introducing mvgam for fitting Generalized Additive Models to time seriese
 
 We can explore the model’s primary functions using a dataset that is
 available with all `R` installations. Load the `lynx` data and plot the
@@ -115,7 +123,7 @@ plot(lynx_full$population, type = 'l', ylab = 'Lynx trappings',
 box(bty = 'l', lwd  = 2)
 ```
 
-<img src="man/figures/README-unnamed-chunk-4-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-4-1.png" alt="Visualizing the lynx time series in R" width="60%" style="display: block; margin: auto;" />
 
 ``` r
 acf(lynx_full$population, main = '', bty = 'l', lwd = 2,
@@ -123,7 +131,7 @@ acf(lynx_full$population, main = '', bty = 'l', lwd = 2,
 box(bty = 'l', lwd  = 2)
 ```
 
-<img src="man/figures/README-unnamed-chunk-4-2.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-4-2.png" alt="Visualizing the lynx time series in R" width="60%" style="display: block; margin: auto;" />
 
 Along with serial autocorrelation, there is a clear ~19-year cyclic
 pattern. Create a `season` term that can be used to model this effect
@@ -135,7 +143,7 @@ plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'),
      lwd = 2, col.range = 'darkred')
 ```
 
-<img src="man/figures/README-unnamed-chunk-5-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-5-1.png" alt="Visualizing and decomposing the lynx time series in R" width="60%" style="display: block; margin: auto;" />
 
 ``` r
 lynx_full$season <- (lynx_full$year%%19) + 1
@@ -165,7 +173,7 @@ Inspect the series in a bit more detail using `mvgam`’s plotting utility
 plot_mvgam_series(data = lynx_train, y = 'population')
 ```
 
-<img src="man/figures/README-unnamed-chunk-8-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-8-1.png" alt="Plotting time series features with the mvgam R package" width="60%" style="display: block; margin: auto;" />
 
 Now we will formulate an `mvgam` model; this model fits a GAM in which a
 cyclic smooth function for `season` is estimated jointly with a full
@@ -319,29 +327,29 @@ summary(lynx_mvgam)
 #> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                 2.5%    50%  97.5% Rhat n_eff
-#> (Intercept)   6.0000  6.600 7.0000 1.00   653
-#> s(season).1  -0.6200  0.034 0.7100 1.00   788
-#> s(season).2  -0.2300  0.840 1.8000 1.01   351
-#> s(season).3   0.0081  1.300 2.5000 1.01   289
-#> s(season).4  -0.4700  0.440 1.4000 1.00   739
-#> s(season).5  -1.2000 -0.150 0.9200 1.01   485
-#> s(season).6  -1.2000 -0.027 1.1000 1.00   612
-#> s(season).7  -0.8000  0.380 1.5000 1.01   545
-#> s(season).8  -1.0000  0.250 1.8000 1.01   282
-#> s(season).9  -1.1000 -0.260 0.7100 1.01   369
-#> s(season).10 -1.4000 -0.680 0.0082 1.01   459
+#>                2.5%    50%  97.5% Rhat n_eff
+#> (Intercept)   6.100  6.600  7.000 1.00   635
+#> s(season).1  -0.580  0.027  0.730 1.01   997
+#> s(season).2  -0.220  0.790  1.800 1.01   530
+#> s(season).3   0.029  1.200  2.500 1.02   433
+#> s(season).4  -0.560  0.420  1.400 1.01   985
+#> s(season).5  -1.200 -0.170  0.920 1.01   623
+#> s(season).6  -1.000 -0.011  1.000 1.01   629
+#> s(season).7  -0.730  0.370  1.400 1.01   835
+#> s(season).8  -0.970  0.270  1.800 1.02   440
+#> s(season).9  -1.100 -0.260  0.700 1.01   487
+#> s(season).10 -1.400 -0.670 -0.013 1.00   825
 #> 
 #> Approximate significance of GAM observation smooths:
 #>            edf Chi.sq p-value
-#> s(season) 4.11  20324    0.22
+#> s(season) 4.75  18258    0.24
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n_eff
-#> ar1[1]    0.72  1.10 1.400 1.01   668
-#> ar2[1]   -0.83 -0.41 0.059 1.00  1648
-#> ar3[1]   -0.47 -0.11 0.330 1.01   466
-#> sigma[1]  0.40  0.50 0.640 1.00  1103
+#> ar1[1]    0.73  1.10 1.400 1.01   732
+#> ar2[1]   -0.83 -0.40 0.057 1.00  1413
+#> ar3[1]   -0.47 -0.13 0.320 1.01   530
+#> sigma[1]  0.40  0.50 0.640 1.00  1043
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -350,7 +358,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Mar 19 3:04:49 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Sun Mar 24 8:59:46 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -365,7 +373,7 @@ mcmc_plot(lynx_mvgam, variable = 'rho', regex = TRUE, type = 'trace')
 #> No divergences to plot.
 ```
 
-<img src="man/figures/README-unnamed-chunk-13-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-13-1.png" alt="Smoothing parameter posterior distributions estimated with Stan in mvgam" width="60%" style="display: block; margin: auto;" />
 
 and for the latent trend parameters
 
@@ -374,7 +382,7 @@ mcmc_plot(lynx_mvgam, variable = 'trend_params', regex = TRUE, type = 'trace')
 #> No divergences to plot.
 ```
 
-<img src="man/figures/README-unnamed-chunk-14-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-14-1.png" alt="Dynamic temporal autocorrelation parameters estimated with Stan in mvgam" width="60%" style="display: block; margin: auto;" />
 
 Use posterior predictive checks to see if the model can simulate data
 that looks realistic and unbiased. First, examine histograms for
@@ -385,7 +393,7 @@ observations (`y`)
 ppc(lynx_mvgam, series = 1, type = 'hist')
 ```
 
-<img src="man/figures/README-unnamed-chunk-15-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-15-1.png" alt="Posterior predictive checks for discrete time series in R" width="60%" style="display: block; margin: auto;" />
 
 Next examine simulated empirical Cumulative Distribution Functions (CDF)
 for posterior predictions
@@ -394,7 +402,7 @@ for posterior predictions
 ppc(lynx_mvgam, series = 1, type = 'cdf')
 ```
 
-<img src="man/figures/README-unnamed-chunk-16-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-16-1.png" alt="Posterior predictive checks for discrete time series in R" width="60%" style="display: block; margin: auto;" />
 
 Rootograms are
 <a href="https://arxiv.org/pdf/1605.01311.pdf" target="_blank">popular
@@ -415,7 +423,7 @@ generally near zero
 ppc(lynx_mvgam, series = 1, type = 'rootogram', n_bins = 25)
 ```
 
-<img src="man/figures/README-unnamed-chunk-17-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-17-1.png" alt="Posterior predictive rootograms for discrete time series in R" width="60%" style="display: block; margin: auto;" />
 
 All plots indicate the model is well calibrated against the training
 data. Inspect the estimated cyclic smooth, which is shown as a ribbon
@@ -431,7 +439,7 @@ further confidence that this function is important in the model
 plot(lynx_mvgam, type = 'smooths', residuals = TRUE)
 ```
 
-<img src="man/figures/README-unnamed-chunk-18-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-18-1.png" alt="Plotting GAM smooth functions in mvgam and R" width="60%" style="display: block; margin: auto;" />
 
 First derivatives of smooths can be plotted to inspect how the slope of
 the function changes. To plot these we use the more flexible
@@ -443,7 +451,7 @@ plot_mvgam_smooth(lynx_mvgam, series = 1,
                   derivatives = TRUE)
 ```
 
-<img src="man/figures/README-unnamed-chunk-19-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-19-1.png" alt="Plotting GAM smooth functions in mvgam and R" width="60%" style="display: block; margin: auto;" />
 
 As for many types of regression models, it is often more useful to plot
 model effects on the outcome scale. `mvgam` has support for the
@@ -460,7 +468,7 @@ plot_predictions(lynx_mvgam, condition = 'season', points = 0.5) +
   theme_classic()
 ```
 
-<img src="man/figures/README-unnamed-chunk-20-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-20-1.png" alt="Using marginaleffects and mvgam to plot GAM smooth functions in R" width="60%" style="display: block; margin: auto;" />
 
 We can also view the `mvgam`’s posterior predictions for the entire
 series (testing and training)
@@ -469,10 +477,10 @@ series (testing and training)
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 ```
 
-<img src="man/figures/README-unnamed-chunk-21-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample CRPS:
-    #> [1] 2903.294
+    #> [1] 2784.628
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -482,7 +490,7 @@ trend
 plot_mvgam_trend(lynx_mvgam, newdata = lynx_test, derivatives = TRUE)
 ```
 
-<img src="man/figures/README-unnamed-chunk-22-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-22-1.png" alt="Plotting dynamic trend components using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
 A key aspect of ecological forecasting is to understand <a
 href="https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589"
@@ -499,7 +507,7 @@ text(1, 0.8, cex = 1.5, label="Trend component",
      pos = 4, col="#7C0000", family = 'serif')
 ```
 
-<img src="man/figures/README-unnamed-chunk-23-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-23-1.png" alt="Decomposing uncertainty contributions to forecasts in mvgam in R" width="60%" style="display: block; margin: auto;" />
 
 Both components contribute to forecast uncertainty. Diagnostics of the
 model can also be performed using `mvgam`. Have a look at the model’s
@@ -512,7 +520,7 @@ our AR3 model is appropriate for the latent trend
 plot(lynx_mvgam, type = 'residuals')
 ```
 
-<img src="man/figures/README-unnamed-chunk-24-1.png" width="60%" style="display: block; margin: auto;" />
+<img src="man/figures/README-unnamed-chunk-24-1.png" alt="Plotting Dunn-Smyth residuals for time series analysis in mvgam and R" width="60%" style="display: block; margin: auto;" />
 
 ## Extended observation families
 
@@ -526,11 +534,16 @@ families. Currently, the package can handle data for the following:
 - `student_t()` for heavy-tailed real-valued data
 - `lognormal()` for non-negative real-valued data
 - `Gamma()` for non-negative real-valued data
-- `betar()` for proportional data on `[0,1]`
+- `betar()` for proportional data on `(0,1)`
+- `bernoulli()` for binary data
 - `poisson()` for count data
 - `nb()` for overdispersed count data
+- `binomial()` for count data with known number of trials
+- `beta_binomial()` for overdispersed count data with known number of
+  trials
+- `nmix()` for count data with imperfect detection (unknown number of
+  trials)
 - `tweedie()` for overdispersed count data
-- `nmix()` for count data with imperfect detection
 
 Note that only `poisson()`, `nb()`, and `tweedie()` are available if
 using `JAGS`. All families, apart from `tweedie()`, are supported if
@@ -628,7 +641,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Mar 19 3:06:31 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Sun Mar 24 9:01:15 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
