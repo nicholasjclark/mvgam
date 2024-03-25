@@ -137,7 +137,10 @@ logLik.mvgam = function(object,
     if(is.matrix(family_pars[[j]])){
       as.vector(family_pars[[j]][, series_obs])
     } else {
-      family_pars[[j]][]
+      as.vector(matrix(rep(family_pars[[j]],
+                           NCOL(mus)),
+                       nrow = NROW(mus),
+                       byrow = FALSE))
     }
   })
   names(family_extracts) <- names(family_pars)

@@ -6,6 +6,9 @@
 #'@param include_betas Logical. Print a summary that includes posterior summaries
 #'of all linear predictor beta coefficients (including spline coefficients)?
 #'Defaults to \code{TRUE} but use \code{FALSE} for a more concise summary
+#'@param smooth_test Logical. Compute estimated degrees of freedom and approximate
+#'p-values for smooth terms? Defaults to \code{TRUE}, but users may wish to set
+#'to \code{FALSE} for complex models with many smooth terms
 #'@param digits The number of significant digits for printing out the summary;
 #'  defaults to \code{2}.
 #'@param ... Ignored
@@ -28,7 +31,25 @@
 #'For `coef.mvgam`, either a \code{matrix} of posterior coefficient distributions
 #'(if \code{summarise == FALSE} or \code{data.frame} of coefficient summaries)
 #'@export
-summary.mvgam = function(object, include_betas = TRUE, digits = 2, ...){
+summary.mvgam = function(object,
+                         include_betas = TRUE,
+                         smooth_test = TRUE,
+                         digits = 2, ...){
+
+#### Smooth tests ####
+  if(smooth_test){
+    object$mgcv_model <- compute_edf(object$mgcv_model,
+                                     object,
+                                     'rho',
+                                     'sigma_raw')
+
+    if(!is.null(object$trend_call)){
+      object$trend_mgcv_model <- compute_edf(object$trend_mgcv_model,
+                                             object,
+                                             'rho_trend',
+                                             'sigma_raw_trend')
+    }
+  }
 
 #### Standard summary of formula and model arguments ####
   if(!is.null(object$trend_call)){
@@ -252,8 +273,8 @@ if(!is.null(attr(object$mgcv_model, 'gp_att_table'))){
   print(rbind(alpha_summary, rho_summary))
 }
 
-if(any(!is.na(object$sp_names))){
-  gam_sig_table <- summary(object$mgcv_model)$s.table[, c(1,3,4), drop = FALSE]
+if(any(!is.na(object$sp_names)) & smooth_test){
+  gam_sig_table <- summary(object$mgcv_model)$s.table[, c(1,2,3,4), drop = FALSE]
   if(!is.null(attr(object$mgcv_model, 'gp_att_table'))){
     gp_names <- unlist(purrr::map(attr(object$mgcv_model,
                                        'gp_att_table'), 'name'))
@@ -676,8 +697,8 @@ if(!is.null(object$trend_call)){
     print(rbind(alpha_summary, rho_summary))
   }
 
-  if(any(!is.na(object$trend_sp_names))){
-    gam_sig_table <- summary(object$trend_mgcv_model)$s.table[, c(1,3,4), drop = FALSE]
+  if(any(!is.na(object$trend_sp_names)) & smooth_test){
+    gam_sig_table <- summary(object$trend_mgcv_model)$s.table[, c(1,2,3,4), drop = FALSE]
     if(!is.null(attr(object$trend_mgcv_model, 'gp_att_table'))){
       gp_names <- unlist(purrr::map(attr(object$trend_mgcv_model, 'gp_att_table'), 'name'))
       if(all(rownames(gam_sig_table) %in% gsub('gp(', 's(', gp_names, fixed = TRUE))){

@@ -327,29 +327,29 @@ summary(lynx_mvgam)
 #> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                2.5%    50%  97.5% Rhat n_eff
-#> (Intercept)   6.100  6.600  7.000 1.00   635
-#> s(season).1  -0.580  0.027  0.730 1.01   997
-#> s(season).2  -0.220  0.790  1.800 1.01   530
-#> s(season).3   0.029  1.200  2.500 1.02   433
-#> s(season).4  -0.560  0.420  1.400 1.01   985
-#> s(season).5  -1.200 -0.170  0.920 1.01   623
-#> s(season).6  -1.000 -0.011  1.000 1.01   629
-#> s(season).7  -0.730  0.370  1.400 1.01   835
-#> s(season).8  -0.970  0.270  1.800 1.02   440
-#> s(season).9  -1.100 -0.260  0.700 1.01   487
-#> s(season).10 -1.400 -0.670 -0.013 1.00   825
+#>                2.5%    50%   97.5% Rhat n_eff
+#> (Intercept)   6.000  6.600  7.0000 1.01   371
+#> s(season).1  -0.630  0.022  0.6700 1.00   861
+#> s(season).2  -0.230  0.820  1.8000 1.01   497
+#> s(season).3  -0.018  1.300  2.4000 1.01   466
+#> s(season).4  -0.460  0.460  1.5000 1.00  1029
+#> s(season).5  -1.200 -0.170  0.9300 1.01   467
+#> s(season).6  -1.100 -0.038  1.1000 1.01   555
+#> s(season).7  -0.800  0.340  1.4000 1.00   635
+#> s(season).8  -0.970  0.260  1.8000 1.01   380
+#> s(season).9  -1.100 -0.250  0.7400 1.01   457
+#> s(season).10 -1.300 -0.680 -0.0084 1.00   801
 #> 
 #> Approximate significance of GAM observation smooths:
-#>            edf Chi.sq p-value
-#> s(season) 4.75  18258    0.24
+#>            edf Ref.df Chi.sq p-value
+#> s(season) 9.95     10  20068    0.22
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n_eff
-#> ar1[1]    0.73  1.10 1.400 1.01   732
-#> ar2[1]   -0.83 -0.40 0.057 1.00  1413
-#> ar3[1]   -0.47 -0.13 0.320 1.01   530
-#> sigma[1]  0.40  0.50 0.640 1.00  1043
+#> ar1[1]    0.72  1.10 1.400 1.01   551
+#> ar2[1]   -0.84 -0.40 0.065 1.00  1148
+#> ar3[1]   -0.46 -0.11 0.310 1.01   536
+#> sigma[1]  0.40  0.50 0.630 1.00  1064
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -358,7 +358,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Sun Mar 24 8:59:46 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Mon Mar 25 1:03:44 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -480,7 +480,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample CRPS:
-    #> [1] 2784.628
+    #> [1] 2854.959
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -616,11 +616,11 @@ summary(mod, include_betas = FALSE)
 #> (Intercept) -0.19 0.19  0.44    1   822
 #> 
 #> Approximate significance of GAM observation smooths:
-#>                           edf Chi.sq p-value    
-#> s(season)                5.00  16.91 7.4e-06 ***
-#> s(season):seriesseries_1 3.90   0.14    0.97    
-#> s(season):seriesseries_2 3.90   0.10    0.98    
-#> s(season):seriesseries_3 3.96   0.82    0.58    
+#>                            edf Ref.df Chi.sq p-value    
+#> s(season)                4.639      5  35.50  <2e-16 ***
+#> s(season):seriesseries_1 0.887      4   0.53    0.98    
+#> s(season):seriesseries_2 0.940      4   0.44    0.99    
+#> s(season):seriesseries_3 1.391      4   1.40    0.78    
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
@@ -641,7 +641,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Sun Mar 24 9:01:15 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Mon Mar 25 1:04:58 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)

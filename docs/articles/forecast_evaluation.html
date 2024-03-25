@@ -78,7 +78,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2024-03-12</h4>
+            <h4 data-toc-skip class="date">2024-03-25</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/forecast_evaluation.Rmd" class="external-link"><code>vignettes/forecast_evaluation.Rmd</code></a></small>
       <div class="d-none name"><code>forecast_evaluation.Rmd</code></div>
@@ -145,30 +145,30 @@ visualise:</p>
 <span>     ylab <span class="op">=</span> <span class="st">'Relative effect'</span>,</span>
 <span>     xlab <span class="op">=</span> <span class="st">'Season'</span>,</span>
 <span>     bty <span class="op">=</span> <span class="st">'l'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-3-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-3-1.png" alt="Simulating data for dynamic GAM models in mvgam" width="60%" style="display: block; margin: auto;"></p>
 <p>The resulting time series are similar to what we might encounter when
 dealing with count-valued data that can take small counts:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, </span>
 <span>                  series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-4-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-4-1.png" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;"></p>
 <p>For each individual series, we can plot the training and testing
 data, as well as some more specific features of the observed data:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, </span>
 <span>                  newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>,</span>
 <span>                  series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-5-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-5-1.png" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, </span>
 <span>                  newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>,</span>
 <span>                  series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-5-2.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-5-2.png" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, </span>
 <span>                  newdata <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span>,</span>
 <span>                  series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-5-3.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-5-3.png" alt="Plotting time series features for GAM models in mvgam" width="60%" style="display: block; margin: auto;"></p>
 <div class="section level3">
 <h3 id="modelling-dynamics-with-splines">Modelling dynamics with splines<a class="anchor" aria-label="anchor" href="#modelling-dynamics-with-splines"></a>
 </h3>
@@ -178,8 +178,8 @@ capture the long-term dynamics. We allow the temporal splines to be
 fairly complex so they can capture as much of the temporal variation as
 possible:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span> <span class="op">+</span> </span>
-<span>                <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'cr'</span>, k <span class="op">=</span> <span class="fl">20</span><span class="op">)</span>,</span>
+<code class="sourceCode R"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span> <span class="op">+</span> </span>
+<span>                <span class="fu">s</span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'cr'</span>, k <span class="op">=</span> <span class="fl">20</span><span class="op">)</span>,</span>
 <span>              knots <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>season <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.5</span>, <span class="fl">12.5</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>              trend_model <span class="op">=</span> <span class="st">'None'</span>,</span>
 <span>              data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">)</span></span></code></pre></div>
@@ -216,11 +216,11 @@ possible:</p>
 <span><span class="co">## (Intercept) -0.41 -0.21 -0.039    1   813</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">##                         edf Chi.sq p-value    </span></span>
-<span><span class="co">## s(season)              3.77   9.48 0.01603 *  </span></span>
-<span><span class="co">## s(time):seriesseries_1 6.50  13.64 0.09218 .  </span></span>
-<span><span class="co">## s(time):seriesseries_2 9.49 256.09 0.00021 ***</span></span>
-<span><span class="co">## s(time):seriesseries_3 5.93  16.79 0.04680 *  </span></span>
+<span><span class="co">##                         edf Ref.df Chi.sq p-value    </span></span>
+<span><span class="co">## s(season)              3.92      6   21.8   0.004 ** </span></span>
+<span><span class="co">## s(time):seriesseries_1 6.12     19   15.3   0.848    </span></span>
+<span><span class="co">## s(time):seriesseries_2 9.06     19  226.0  &lt;2e-16 ***</span></span>
+<span><span class="co">## s(time):seriesseries_3 5.61     19   18.3   0.867    </span></span>
 <span><span class="co">## ---</span></span>
 <span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">## </span></span>
@@ -231,7 +231,7 @@ possible:</p>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Tue Mar 12 1:56:47 PM 2024.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Mar 25 1:16:21 PM 2024.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
@@ -239,7 +239,7 @@ possible:</p>
 are estimated to be highly nonlinear</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'smooths'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-9-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-9-1.png" alt="Plotting GAM smooth functions using mvgam" width="60%" style="display: block; margin: auto;"></p>
 </div>
 <div class="section level3">
 <h3 id="modelling-dynamics-with-gps">Modelling dynamics with GPs<a class="anchor" aria-label="anchor" href="#modelling-dynamics-with-gps"></a>
@@ -247,12 +247,12 @@ are estimated to be highly nonlinear</p>
 <p>Before showing how to produce and evaluate forecasts, we will fit a
 second model to these data so the two models can be compared. This model
 is equivalent to the above, except we now use Gaussian Processes to
-model series-specific dynamics. This makes use of the <code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp()</a></code>
+model series-specific dynamics. This makes use of the <code>gp()</code>
 function from <code>brms</code>, which can fit Hilbert space approximate
 GPs. See <code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">?brms::gp</a></code> for more details.</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span> <span class="op">+</span> </span>
-<span>                <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp</a></span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span>, c <span class="op">=</span> <span class="fl">5</span><span class="op">/</span><span class="fl">4</span>, k <span class="op">=</span> <span class="fl">20</span>,</span>
+<code class="sourceCode R"><span><span class="va">mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span> <span class="op">+</span> </span>
+<span>                <span class="fu">gp</span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span>, c <span class="op">=</span> <span class="fl">5</span><span class="op">/</span><span class="fl">4</span>, k <span class="op">=</span> <span class="fl">20</span>,</span>
 <span>                   scale <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>,</span>
 <span>              knots <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>season <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.5</span>, <span class="fl">12.5</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>              trend_model <span class="op">=</span> <span class="st">'None'</span>,</span>
@@ -300,8 +300,8 @@ parameters for each time series:</p>
 <span><span class="co">## rho_gp(time):seriesseries_3   1.50  8.8  23.0 1.00   819</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">##           edf Chi.sq p-value    </span></span>
-<span><span class="co">## s(season)   6     25 0.00016 ***</span></span>
+<span><span class="co">##           edf Ref.df Chi.sq p-value    </span></span>
+<span><span class="co">## s(season)   6      6   25.9 0.00053 ***</span></span>
 <span><span class="co">## ---</span></span>
 <span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">## </span></span>
@@ -313,7 +313,7 @@ parameters for each time series:</p>
 <span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Tue Mar 12 1:57:51 PM 2024.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Mar 25 1:17:27 PM 2024.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
@@ -322,26 +322,26 @@ parameter for that matter, using <code>bayesplot</code> routines. First
 the marginal deviation (<span class="math inline">\(\alpha\)</span>)
 parameters:</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span><span class="va">mod2</span>, variable <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'alpha_gp'</span><span class="op">)</span>, regex <span class="op">=</span> <span class="cn">TRUE</span>, type <span class="op">=</span> <span class="st">'areas'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-13-1.png" width="60%" style="display: block; margin: auto;"></p>
+<code class="sourceCode R"><span><span class="fu">mcmc_plot</span><span class="op">(</span><span class="va">mod2</span>, variable <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'alpha_gp'</span><span class="op">)</span>, regex <span class="op">=</span> <span class="cn">TRUE</span>, type <span class="op">=</span> <span class="st">'areas'</span><span class="op">)</span></span></code></pre></div>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-13-1.png" alt="Summarising latent Gaussian Process parameters in mvgam" width="60%" style="display: block; margin: auto;"></p>
 <p>And now the length scale (<span class="math inline">\(\rho\)</span>)
 parameters:</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/mcmc_plot.brmsfit.html" class="external-link">mcmc_plot</a></span><span class="op">(</span><span class="va">mod2</span>, variable <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'rho_gp'</span><span class="op">)</span>, regex <span class="op">=</span> <span class="cn">TRUE</span>, type <span class="op">=</span> <span class="st">'areas'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-14-1.png" width="60%" style="display: block; margin: auto;"></p>
+<code class="sourceCode R"><span><span class="fu">mcmc_plot</span><span class="op">(</span><span class="va">mod2</span>, variable <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'rho_gp'</span><span class="op">)</span>, regex <span class="op">=</span> <span class="cn">TRUE</span>, type <span class="op">=</span> <span class="st">'areas'</span><span class="op">)</span></span></code></pre></div>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-14-1.png" alt="Summarising latent Gaussian Process parameters in mvgam" width="60%" style="display: block; margin: auto;"></p>
 <p>We can also plot the nonlinear effects as before:</p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod2</span>, type <span class="op">=</span> <span class="st">'smooths'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-15-1.png" width="60%" style="display: block; margin: auto;">
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-15-1.png" alt="Plotting Gaussian Process effects in mvgam" width="60%" style="display: block; margin: auto;">
 These can also be plotted using <code>marginaleffects</code>
 utilities:</p>
 <div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="st"><a href="https://ggplot2.tidyverse.org" class="external-link">'ggplot2'</a></span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod2</span>, </span>
+<span><span class="fu">plot_predictions</span><span class="op">(</span><span class="va">mod2</span>, </span>
 <span>                 condition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'time'</span>, <span class="st">'series'</span>, <span class="st">'series'</span><span class="op">)</span>,</span>
 <span>                 type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-16-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-16-1.png" alt="Summarising latent Gaussian Process parameters in mvgam and marginaleffects" width="60%" style="display: block; margin: auto;"></p>
 <p>The estimates for the temporal trends are fairly similar for the two
 models, but below we will see if they produce similar forecasts</p>
 </div>
@@ -460,8 +460,8 @@ block in <code>Stan</code>. As an example, we can refit
 <code>mod2</code> but include the testing data for automatic
 forecasts:</p>
 <div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span> <span class="op">+</span> </span>
-<span>                <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp</a></span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span>, c <span class="op">=</span> <span class="fl">5</span><span class="op">/</span><span class="fl">4</span>, k <span class="op">=</span> <span class="fl">20</span>,</span>
+<code class="sourceCode R"><span><span class="va">mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span> <span class="op">+</span> </span>
+<span>                <span class="fu">gp</span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span>, c <span class="op">=</span> <span class="fl">5</span><span class="op">/</span><span class="fl">4</span>, k <span class="op">=</span> <span class="fl">20</span>,</span>
 <span>                   scale <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>,</span>
 <span>              knots <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>season <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.5</span>, <span class="fl">12.5</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>              trend_model <span class="op">=</span> <span class="st">'None'</span>,</span>
@@ -476,7 +476,7 @@ function:</p>
 previously:</p>
 <div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc_mod2</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-23-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="forecast_evaluation_files/figure-html/unnamed-chunk-23-1.png" alt="Plotting posterior forecast distributions using mvgam and R" width="60%" style="display: block; margin: auto;"></p>
 <pre><code><span><span class="co">## Out of sample DRPS:</span></span>
 <span><span class="co">## [1] 10.85762</span></span></code></pre>
 </div>

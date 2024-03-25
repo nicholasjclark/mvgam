@@ -130,9 +130,16 @@ if(series == 'all'){
       family_pars <- extract_family_pars(object = object)
       par_extracts <- lapply(seq_along(family_pars), function(j){
         if(is.matrix(family_pars[[j]])){
-          family_pars[[j]][, series]
+          as.vector(matrix(rep(as.vector(family_pars[[j]][, series]),
+                               NCOL(preds)),
+                           nrow = NROW(preds),
+                           byrow = FALSE))
+
         } else {
-          family_pars[[j]]
+          as.vector(matrix(rep(family_pars[[j]],
+                               NCOL(preds)),
+                           nrow = NROW(preds),
+                           byrow = FALSE))
         }
       })
       names(par_extracts) <- names(family_pars)

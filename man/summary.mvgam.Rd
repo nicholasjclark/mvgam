@@ -6,7 +6,7 @@
 \alias{coef.mvgam}
 \title{Summary for a fitted mvgam object}
 \usage{
-\method{summary}{mvgam}(object, include_betas = TRUE, digits = 2, ...)
+\method{summary}{mvgam}(object, include_betas = TRUE, smooth_test = TRUE, digits = 2, ...)
 
 \method{summary}{mvgam_prefit}(object, ...)
 
@@ -18,6 +18,10 @@
 \item{include_betas}{Logical. Print a summary that includes posterior summaries
 of all linear predictor beta coefficients (including spline coefficients)?
 Defaults to \code{TRUE} but use \code{FALSE} for a more concise summary}
+
+\item{smooth_test}{Logical. Compute estimated degrees of freedom and approximate
+p-values for smooth terms? Defaults to \code{TRUE}, but users may wish to set
+to \code{FALSE} for complex models with many smooth terms}
 
 \item{digits}{The number of significant digits for printing out the summary;
 defaults to \code{2}.}

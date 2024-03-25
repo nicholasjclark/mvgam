@@ -401,8 +401,11 @@ mvgam_predict = function(Xp,
       xpred <- extraDistr::rtpois(n = length(lambdas),
                                   lambda = lambdas,
                                   b = cap)
-      # Variance of a Binomial distribution
-      out <- xpred * p * (1 - p)
+
+      # Variance of a Binomial distribution using the
+      # weights convention from stats::glm()
+      mu <- p / xpred
+      out <- mu * (1 - mu)
     } else {
       # Expectations
       xpred <- extraDistr::rtpois(n = length(lambdas),
@@ -478,8 +481,9 @@ mvgam_predict = function(Xp,
       }
 
     } else if(type == 'variance') {
-      out <- as.vector(family_pars$nu) /
-        (pmax(2.01, as.vector(family_pars$nu)) - 2)
+      out <- as.vector(family_pars$sigma_obs)^2 *
+        as.vector(family_pars$nu) /
+        pmax(1.01, (as.vector(family_pars$nu) - 2))
 
     } else {
       out <- rstudent_t(n = NROW(Xp),
@@ -568,8 +572,9 @@ mvgam_predict = function(Xp,
                     size = as.vector(family_pars$trials))
     } else if(type == 'variance'){
       mu <- plogis(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
-                             betas) + attr(Xp, 'model.offset')))
-      out <- as.vector(family_pars$trials) * mu * (1 - mu)
+                                betas) + attr(Xp, 'model.offset'))) /
+        as.vector(family_pars$trials)
+      out <- mu * (1 - mu)
     } else {
       out <- plogis(((matrix(Xp, ncol = NCOL(Xp)) %*%
                      betas)) +
@@ -669,7 +674,7 @@ mvgam_predict = function(Xp,
     } else if(type == 'variance'){
       mu <- plogis(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                                betas) + attr(Xp, 'model.offset')))
-      out <- mu * (1 - mu) / (1 + exp(as.vector(family_pars$phi)))
+      out <- mu * (1 - mu) / (1 + as.vector(family_pars$phi))
       } else {
      out <- plogis(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                           betas) + attr(Xp, 'model.offset')))
@@ -1658,7 +1663,10 @@ dsresids_vec = function(object){
     if(is.matrix(family_pars[[j]])){
       as.vector(family_pars[[j]][, series_obs])
     } else {
-      family_pars[[j]][]
+      as.vector(matrix(rep(family_pars[[j]],
+                           NCOL(preds)),
+                       nrow = NROW(preds),
+                       byrow = FALSE))
     }
   })
   names(family_extracts) <- names(family_pars)

@@ -262,12 +262,15 @@ predict.mvgam = function(object, newdata,
   # Determine which series each observation belongs to
   series_ind <- as.numeric(newdata$series)
 
-  # Family parameters spread into a vector
+  # Family parameters spread into long vectors
   family_extracts <- lapply(seq_along(family_pars), function(j){
     if(is.matrix(family_pars[[j]])){
       as.vector(family_pars[[j]][, series_ind])
     } else {
-      family_pars[[j]]
+      as.vector(matrix(rep(family_pars[[j]],
+                           NROW(Xp)),
+                       nrow = NROW(betas),
+                       byrow = FALSE))
     }
   })
   names(family_extracts) <- names(family_pars)
@@ -283,16 +286,6 @@ predict.mvgam = function(object, newdata,
     }
 
     trials <- newdata[[trial_name]]
-    # trial_df <- data.frame(series = newdata$series,
-    #                        time = newdata$time,
-    #                        trial = newdata[[trial_name]])
-    # trials <- do.call(cbind, lapply(length(levels(newdata$series)), function(i){
-    #   trial_df %>%
-    #     dplyr::filter(series == levels(newdata$series)[i]) %>%
-    #     dplyr::arrange(time) %>%
-    #     dplyr::pull(trial)
-    # }))
-
     trials <- as.vector(matrix(rep(as.vector(trials),
                                    NROW(betas)),
                                nrow = NROW(betas),

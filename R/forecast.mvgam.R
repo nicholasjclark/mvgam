@@ -201,9 +201,16 @@ forecast.mvgam = function(object, newdata, data_test,
           family_pars <- extract_family_pars(object = object)
           par_extracts <- lapply(seq_along(family_pars), function(j){
             if(is.matrix(family_pars[[j]])){
-              family_pars[[j]][, series]
+              as.vector(matrix(rep(as.vector(family_pars[[j]][, series]),
+                                   NCOL(preds)),
+                               nrow = NROW(preds),
+                               byrow = FALSE))
+
             } else {
-              family_pars[[j]]
+              as.vector(matrix(rep(family_pars[[j]],
+                                   NCOL(preds)),
+                               nrow = NROW(preds),
+                               byrow = FALSE))
             }
           })
           names(par_extracts) <- names(family_pars)
@@ -211,8 +218,8 @@ forecast.mvgam = function(object, newdata, data_test,
           # Add trial information if this is a Binomial model
           if(object$family %in% c('binomial', 'beta_binomial')){
             trials <- as.vector(matrix(rep(as.vector(attr(object$mgcv_model, 'trials')[,series]),
-                                           NROW(mus)),
-                                       nrow = NROW(mus),
+                                           NROW(preds)),
+                                       nrow = NROW(preds),
                                        byrow = TRUE))
             par_extracts$trials <- trials
           }

@@ -385,6 +385,9 @@ mod <- mvgam(
   
   # use Stan's variational inference for quicker results
   algorithm = 'meanfield',
+  
+  # no need to compute "series-level" residuals
+  residuals = FALSE,
   samples = 1000)
 ```
 
@@ -415,6 +418,9 @@ mod <- mvgam(
   
   # use Stan's variational inference for quicker results
   algorithm = 'meanfield',
+  
+  # no need to compute "series-level" residuals
+  residuals = FALSE,
   samples = 1000)
 ```
 

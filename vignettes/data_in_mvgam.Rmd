@@ -32,12 +32,14 @@ Manipulating the data into a 'long' format is necessary for modelling in `mvgam`
 simdat <- sim_mvgam(n_series = 4, T = 24, prop_missing = 0.2)
 head(simdat$data_train, 16)
 ```
+
 ### `series` as a `factor` variable
 Notice how we have four different time series in these simulated data, and we have identified the series-level indicator as a `factor` variable.
 ```{r}
 class(simdat$data_train$series)
 levels(simdat$data_train$series)
 ```
+
 It is important that the number of levels matches the number of unique series in the data to ensure indexing across series works properly in the underlying modelling functions. Several of the main workhorse functions in the package (including `mvgam()` and `get_mvgam_priors()`) will give an error if this is not the case, but it may be worth checking anyway:
 ```{r}
 all(levels(simdat$data_train$series) %in% unique(simdat$data_train$series))
@@ -219,21 +221,21 @@ get_mvgam_priors(outcome ~ cov,
 
 ## Plotting with `plot_mvgam_series`
 Plotting the data is a useful way to ensure everything looks ok, once you've gone throug the above checks on factor levels and timepoint x series combinations. The `plot_mvgam_series` function will take supplied data and plot either a series of line plots (if you choose `series = 'all'`) or a set of plots to describe the distribution for a single time series. For example, to plot all of the time series in our data, and highlight a single series in each plot, we can use:
-```{r}
+```{r, fig.alt = "Plotting time series features for GAM models in mvgam"}
 plot_mvgam_series(data = simdat$data_train, 
                   y = 'y', 
                   series = 'all')
 ```
 
 Or we can look more closely at the distribution for the first time series:
-```{r}
+```{r, fig.alt = "Plotting time series features for GAM models in mvgam"}
 plot_mvgam_series(data = simdat$data_train, 
                   y = 'y', 
                   series = 1)
 ```
 
 If you have split your data into training and testing folds (i.e. for forecast evaluation), you can include the test data in your plots:
-```{r}
+```{r, fig.alt = "Plotting time series features for GAM models in mvgam"}
 plot_mvgam_series(data = simdat$data_train,
                   newdata = simdat$data_test,
                   y = 'y', 

@@ -41,7 +41,7 @@ beta_temp <- mvgam:::sim_gp(rnorm(1),
 ```
 
 A plot of the time-varying coefficient shows that it changes smoothly through time:
-```{r}
+```{r, fig.alt = "Simulating time-varying effects in mvgam and R"}
 plot(beta_temp, type = 'l', lwd = 3, 
      bty = 'l', xlab = 'Time', ylab = 'Coefficient',
      col = 'darkred')
@@ -54,7 +54,7 @@ temp <- rnorm(N, sd = 1)
 ```
 
 Finally, simulate the outcome variable, which is a Gaussian observation process (with observation error) over the time-varying effect of $temperature$
-```{r}
+```{r, fig.alt = "Simulating time-varying effects in mvgam and R"}
 out <- rnorm(N, mean = 4 + beta_temp * temp,
              sd = 0.25)
 time <- seq_along(temp)
@@ -193,6 +193,7 @@ Inspect the data
 ```{r}
 dplyr::glimpse(model_data)
 ```
+
 Plot features of the outcome variable, which shows that it is a proportional variable with particular restrictions that we want to model:
 ```{r}
 plot_mvgam_series(data = model_data, y = 'survival')
@@ -317,7 +318,7 @@ sum(lfo_mod1$elpds)
 ```
 
 We can also plot the ELPDs for each model as a contrast. Here, values less than zero suggest the time-varying predictor model (Mod1) gives better 1-step ahead forecasts:
-```{r}
+```{r, fig.alt = "Comparing forecast skill for dynamic beta regression models in mvgam and R"}
 plot(x = 1:length(lfo_mod0$elpds) + 30,
      y = lfo_mod0$elpds - lfo_mod1$elpds,
      ylab = 'ELPDmod0 - ELPDmod1',

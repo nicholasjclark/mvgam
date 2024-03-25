@@ -2164,11 +2164,9 @@ mvgam = function(formula,
   }
 
   # Add Bayesian coefficients to the mgcv model to help with plotting of
-  # smooths that aren't yet supported by mvgam plotting functions
-  # Extract median beta params for smooths and their covariances
-  # so that uncertainty from mgcv plots is reasonably accurate
-  if(all(run_model, !lfo, residuals)){
-    # Use the empirical covariance matrix from the fitted coefficients
+  # smooths that aren't yet supported by mvgam plotting functions; this is
+  # also necessary for computing EDFs and approximate p-values of smooths
+  if(!lfo){
     V <- cov(mcmc_chains(out_gam_mod, 'b'))
     ss_gam$Ve <- ss_gam$Vp <- ss_gam$Vc <- V
 
@@ -2181,31 +2179,10 @@ mvgam = function(formula,
     names(p) <- names(ss_gam$coefficients)
     ss_gam$coefficients <- p
 
-    # Compute estimated degrees of freedom for smooths
-    object = list(
-      model_output = out_gam_mod,
-      call = orig_formula,
-      model_data = if(use_stan){
-        vectorised$model_data
-      } else {
-        ss_jagam$jags.data
-      },
-      fit_engine = fit_engine,
-      family = family_char,
-      share_obs_params = share_obs_params,
-      obs_data = data_train,
-      test_data = data_test,
-      trend_model = trend_model,
-      mgcv_model = ss_gam,
-      ytimes = ytimes)
-    class(object) <- 'mvgam'
-    ss_gam <- compute_edf(ss_gam, object, 'rho', 'sigma_raw')
-
     # Repeat for any trend-specific mgcv model
     if(!missing(trend_formula)){
       V <- cov(mcmc_chains(out_gam_mod, 'b_trend'))
       trend_mgcv_model$Ve <- trend_mgcv_model$Vp <- trend_mgcv_model$Vc <- V
-
       p <- mcmc_summary(out_gam_mod, 'b_trend',
                         variational = algorithm %in% c('meanfield',
                                                        'fullrank',
@@ -2213,15 +2190,7 @@ mvgam = function(formula,
                                                        'laplace'))[,c(4)]
       names(p) <- names(trend_mgcv_model$coefficients)
       trend_mgcv_model$coefficients <- p
-
-      object$trend_mgcv_model <- trend_mgcv_model
-      trend_mgcv_model <- compute_edf(trend_mgcv_model,
-                                      object, 'rho_trend', 'sigma_raw_trend')
     }
-  }
-
-  if(lfo){
-    ss_gam <- NULL
   }
 
   #### Return the output as class mvgam ####

@@ -52,7 +52,7 @@ compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names){
       names(random_sp) <- gsub('\\))', ')', names(random_sp))
     }
 
-    mgcv_model$sp <- c(rho_sp, random_sp)
+    mgcv_model$sp <- exp(c(rho_sp, random_sp))
 
     # Compute estimated degrees of freedom based on edf.type = 1 from
     # https://github.com/cran/mgcv/blob/master/R/jagam.r
@@ -88,10 +88,9 @@ compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names){
         mu[which(mu_variance == 0)]
     }
 
-    w <- as.numeric(mgcv_model$family$mu.eta(eta) / mu_variance)
+    w <- as.numeric(mgcv_model$family$mu.eta(eta)^2 / mu_variance)
     XWX <- t(X) %*% (w * X)
-    rho <- mgcv_model$sp
-    lambda <- exp(rho)
+    lambda <- mgcv_model$sp
     XWXS <- XWX
 
     for(i in 1:length(lambda)){

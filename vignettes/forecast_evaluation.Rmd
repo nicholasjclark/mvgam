@@ -44,7 +44,7 @@ str(simdat)
 ```
 
 Each series in this case has a shared seasonal pattern, which we can visualise:
-```{r}
+```{r, fig.alt = "Simulating data for dynamic GAM models in mvgam"}
 plot(simdat$global_seasonality[1:12], 
      type = 'l', lwd = 2,
      ylab = 'Relative effect',
@@ -53,13 +53,13 @@ plot(simdat$global_seasonality[1:12],
 ```
 
 The resulting time series are similar to what we might encounter when dealing with count-valued data that can take small counts:
-```{r}
+```{r, fig.alt = "Plotting time series features for GAM models in mvgam"}
 plot_mvgam_series(data = simdat$data_train, 
                   series = 'all')
 ```
 
 For each individual series, we can plot the training and testing data, as well as some more specific features of the observed data:
-```{r}
+```{r, fig.alt = "Plotting time series features for GAM models in mvgam"}
 plot_mvgam_series(data = simdat$data_train, 
                   newdata = simdat$data_test,
                   series = 1)
@@ -95,7 +95,7 @@ summary(mod1, include_betas = FALSE)
 ```
 
 And we can plot the partial effects of the splines to see that they are estimated to be highly nonlinear
-```{r}
+```{r, fig.alt = "Plotting GAM smooth functions using mvgam"}
 plot(mod1, type = 'smooths')
 ```
 
@@ -126,21 +126,21 @@ summary(mod2, include_betas = FALSE)
 ```
 
 We can plot the posteriors for these parameters, and for any other parameter for that matter, using `bayesplot` routines. First the marginal deviation ($\alpha$) parameters:
-```{r}
+```{r, fig.alt = "Summarising latent Gaussian Process parameters in mvgam"}
 mcmc_plot(mod2, variable = c('alpha_gp'), regex = TRUE, type = 'areas')
 ```
 
 And now the length scale ($\rho$) parameters:
-```{r}
+```{r, fig.alt = "Summarising latent Gaussian Process parameters in mvgam"}
 mcmc_plot(mod2, variable = c('rho_gp'), regex = TRUE, type = 'areas')
 ```
 
 We can also plot the nonlinear effects as before:
-```{r}
+```{r, fig.alt = "Plotting Gaussian Process effects in mvgam"}
 plot(mod2, type = 'smooths')
 ```
 These can also be plotted using `marginaleffects` utilities:
-```{r}
+```{r, fig.alt = "Summarising latent Gaussian Process parameters in mvgam and marginaleffects"}
 require('ggplot2')
 plot_predictions(mod2, 
                  condition = c('time', 'series', 'series'),
@@ -205,7 +205,7 @@ fc_mod2 <- forecast(mod2)
 ```
 
 The forecasts will be nearly identical to those calculated previously:
-```{r warning=FALSE}
+```{r warning=FALSE, fig.alt = "Plotting posterior forecast distributions using mvgam and R"}
 plot(fc_mod2, series = 1)
 ```
 
