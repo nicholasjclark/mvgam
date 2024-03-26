@@ -87,6 +87,17 @@ conditional_effects.mvgam = function(x,
                             'detection', 'latent_N',
                             'expected'))
 
+  if(type == 'response'){
+    if(points){
+      points <- 0.5
+    } else {
+      points <- 0
+    }
+  } else {
+    points <- 0
+    rug <- FALSE
+  }
+
   # Can't plot points or rugs with binomial models due to the
   # cbind syntax
   if(rug){
@@ -101,17 +112,6 @@ conditional_effects.mvgam = function(x,
       points <- FALSE
       warning('Cannot show observation points for binomial models')
     }
-  }
-
-  if(type == 'response'){
-    if(points){
-      points <- 0.5
-    } else {
-      points <- 0
-    }
-  } else {
-    points <- 0
-    rug <- FALSE
   }
 
   if(use_def_effects){

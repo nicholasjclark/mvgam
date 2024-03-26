@@ -22,7 +22,9 @@ test_that("cap must be supplied in data", {
                'Max abundances must be supplied as a variable named "cap" for N-mixture models',
                fixed = TRUE)
 
-  poisdat$data_train$cap <- 100
+  poisdat$data_train$cap <- rpois(NROW(poisdat$data_train),
+                                  lambda = 5) +
+    max(poisdat$data_train$y, na.rm = TRUE)
   expect_error(mvgam(formula = y ~ s(season),
                      trend_formula = ~ s(season) +
                        trend,
@@ -45,10 +47,12 @@ test_that("cap must be supplied in data", {
                fixed = TRUE)
 })
 
-poisdat$data_train$cap <- 100
+poisdat$data_train$cap <- rpois(NROW(poisdat$data_train),
+                               lambda = 5) +
+  max(poisdat$data_train$y, na.rm = TRUE)
 poisdat$data_test$cap <- rpois(NROW(poisdat$data_test),
                                lambda = 5) +
-  max(poisdat$data_test$y)
+  max(poisdat$data_test$y, na.rm = TRUE)
 
 test_that("latent process intercept is allowed in nmixtures", {
   prior_df <- get_mvgam_priors(formula = y ~ s(season),

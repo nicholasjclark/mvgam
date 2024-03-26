@@ -161,18 +161,26 @@ This function allows a previously fitted \code{mvgam} model to be updated
 \examples{
 \dontrun{
 # Simulate some data and fit a Poisson AR1 model
-simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc'),
-            trend_model = 'AR1',
-            data = simdat$data_train)
+             trend_model = AR(),
+             data = simdat$data_train)
 summary(mod)
+conditional_effects(mod, type = 'link')
 
 # Update to an AR2 model
-updated_mod <- update(mod, trend_model = 'AR2')
+updated_mod <- update(mod, trend_model = AR(p = 2))
 summary(updated_mod)
+conditional_effects(updated_mod, type = 'link')
 
-# Now update to a Negative Binomial AR1
-updated_mod <- update(mod, family = nb())
+# Now update to a Binomial AR1 by adding information on trials
+# requires that we supply newdata that contains the 'trials' variable
+simdat$data_train$trials <- max(simdat$data_train$y) + 15
+updated_mod <- update(mod,
+                      formula = cbind(y, trials) ~ s(season, bs = 'cc'),
+                      data = simdat$data_train,
+                      family = binomial())
 summary(updated_mod)
+conditional_effects(updated_mod, type = 'link')
 }
 }
