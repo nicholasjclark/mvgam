@@ -40,8 +40,28 @@ update.mvgam = function(object,
                         family,
                         share_obs_params,
                         priors,
+                        chains,
+                        burnin,
+                        samples,
+                        algorithm,
                         lfo = FALSE,
                         ...){
+
+  if(missing(chains)){
+    chains <- object$model_output@sim$chains
+  }
+
+  if(missing(burnin)){
+    burnin <- object$model_output@sim$warmup
+  }
+
+  if(missing(samples)){
+    samples <- object$model_output@sim$iter - burnin
+  }
+
+  if(missing(algorithm)){
+    algorithm <- object$algorithm
+  }
 
   if(missing(formula)){
     formula <- object$call
@@ -147,6 +167,10 @@ update.mvgam = function(object,
                          use_stan = ifelse(object$fit_engine == 'stan', TRUE,
                                            FALSE),
                          priors = priors,
+                         chains = chains,
+                         burnin = burnin,
+                         samples = samples,
+                         algorithm = algorithm,
                          ...)
   } else {
     updated_mod <- mvgam(formula = formula,
@@ -163,6 +187,10 @@ update.mvgam = function(object,
                          use_stan = ifelse(object$fit_engine == 'stan', TRUE,
                                            FALSE),
                          priors = priors,
+                         chains = chains,
+                         burnin = burnin,
+                         samples = samples,
+                         algorithm = algorithm,
                          ...)
   }
 

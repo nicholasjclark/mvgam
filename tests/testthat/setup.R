@@ -36,7 +36,7 @@ gaus_ar1fc <- mvgam(y ~ s(series, bs = 're') +
                     samples = 300,
                     parallel = FALSE)
 
-# Simple Beta models, using variational bayes to ensure this works as well
+# Simple Beta models
 set.seed(100)
 beta_data <- sim_mvgam(family = betar(),
                        trend_model = 'GP',
@@ -47,8 +47,7 @@ beta_gp <- mvgam(y ~ s(season, bs = 'cc'),
                   data = beta_data$data_train,
                   family = betar(),
                  samples = 300,
-                 backend = 'cmdstanr',
-                 algorithm = 'fullrank')
+                 chains = 1)
 beta_gpfc <- mvgam(y ~ s(season, bs = 'cc'),
                     trend_model = 'GP',
                     data = beta_data$data_train,

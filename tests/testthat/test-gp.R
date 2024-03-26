@@ -2,25 +2,25 @@ context("gp")
 
 test_that("gp_to_s is working properly", {
   # All true gp() terms should be changed to s() with k = k+1
-formula <- y ~ s(series) + gp(banana) +
-  infect:you + gp(hardcourt)
+  formula <- y ~ s(series) + gp(banana) +
+    infect:you + gp(hardcourt)
 
-expect_equal(attr(terms(mvgam:::gp_to_s(formula), keep.order = TRUE),
-                  'term.labels'),
-             attr(terms(formula(y ~ s(series) +
-                       s(banana, k = 11) +
-                       infect:you +
-                       s(hardcourt, k = 11)),
-                   keep.order = TRUE),
-                  'term.labels'))
+  expect_equal(attr(terms(mvgam:::gp_to_s(formula), keep.order = TRUE),
+                    'term.labels'),
+               attr(terms(formula(y ~ s(series) +
+                                    s(banana, k = 11) +
+                                    infect:you +
+                                    s(hardcourt, k = 11)),
+                          keep.order = TRUE),
+                    'term.labels'))
 
-# Characters that match to 'gp' should not be changed
-formula <- y ~ gp(starwars) + s(gp)
-expect_equal(attr(terms(mvgam:::gp_to_s(formula), keep.order = TRUE),
-                  'term.labels'),
-             attr(terms(formula(y ~ s(starwars, k = 11) + s(gp)),
-                        keep.order = TRUE),
-                  'term.labels'))
+  # Characters that match to 'gp' should not be changed
+  formula <- y ~ gp(starwars) + s(gp)
+  expect_equal(attr(terms(mvgam:::gp_to_s(formula), keep.order = TRUE),
+                    'term.labels'),
+               attr(terms(formula(y ~ s(starwars, k = 11) + s(gp)),
+                          keep.order = TRUE),
+                    'term.labels'))
 })
 
 test_that("gp for observation models working properly", {

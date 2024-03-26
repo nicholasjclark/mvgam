@@ -17,6 +17,10 @@
   family,
   share_obs_params,
   priors,
+  chains,
+  burnin,
+  samples,
+  algorithm,
   lfo = FALSE,
   ...
 )
@@ -119,6 +123,30 @@ species over different spatial units. Default is \code{FALSE}.}
 definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
 class \code{brmsprior} (see. \code{\link[brms]{prior}} for details). See \link{get_mvgam_priors} and
 'Details' for more information on changing default prior distributions}
+
+\item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
+if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
+
+\item{burnin}{\code{integer} specifying the number of warmup iterations of the Markov chain to run
+to tune sampling algorithms. Ignored
+if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
+
+\item{samples}{\code{integer} specifying the number of post-warmup iterations of the Markov chain to run for
+sampling the posterior distribution}
+
+\item{algorithm}{Character string naming the estimation approach to use.
+Options are \code{"sampling"} for MCMC (the default), \code{"meanfield"} for
+variational inference with factorized normal distributions,
+\code{"fullrank"} for variational inference with a multivariate normal
+distribution, \code{"laplace"} for a Laplace approximation (only available
+when using cmdstanr as the backend) or \code{"pathfinder"} for the pathfinder
+algorithm (only currently available when using cmdstanr as the backend).
+Can be set globally for the current \R session via the
+\code{"brms.algorithm"} option (see \code{\link{options}}). Limited testing
+suggests that \code{"meanfield"} performs best out of the non-MCMC approximations for
+dynamic GAMs, possibly because of the difficulties estimating covariances among the
+many spline parameters and latent trend parameters. But rigorous testing has not
+been carried out}
 
 \item{lfo}{Logical indicating whether this is part of a call to \link{lfo_cv.mvgam}. Returns a
 lighter version of the model with no residuals and fewer monitored parameters to speed up
