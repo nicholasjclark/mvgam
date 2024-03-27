@@ -100,7 +100,7 @@ compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names){
     }
     suppressWarnings(edf <- try(diag(solve(XWXS, XWX)), silent = TRUE))
     if(inherits(edf, 'try-error')){
-      edf <- rep(1, length(coef(mgcv_model)))
+      edf <- mgcv_model$edf
       names(edf) <- names(coef(mgcv_model))
     }
     mgcv_model$edf <- edf
