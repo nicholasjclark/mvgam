@@ -2168,7 +2168,7 @@ mvgam = function(formula,
   # also necessary for computing EDFs and approximate p-values of smooths
   if(!lfo){
     V <- cov(mcmc_chains(out_gam_mod, 'b'))
-    ss_gam$Ve <- ss_gam$Vp <- ss_gam$Vc <- V
+    ss_gam$Vp <- ss_gam$Vc <- V
 
     # Add the posterior median coefficients
     p <- mcmc_summary(out_gam_mod, 'b',
@@ -2182,7 +2182,7 @@ mvgam = function(formula,
     # Repeat for any trend-specific mgcv model
     if(!missing(trend_formula)){
       V <- cov(mcmc_chains(out_gam_mod, 'b_trend'))
-      trend_mgcv_model$Ve <- trend_mgcv_model$Vp <- trend_mgcv_model$Vc <- V
+      trend_mgcv_model$Vp <- trend_mgcv_model$Vc <- V
       p <- mcmc_summary(out_gam_mod, 'b_trend',
                         variational = algorithm %in% c('meanfield',
                                                        'fullrank',

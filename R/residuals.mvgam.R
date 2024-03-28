@@ -55,15 +55,15 @@ residuals.mvgam <- function(object,
   }
 
   if(summary){
-    Qupper <- apply(resid_matrix, 2, quantile, probs = max(probs), na.rm = TRUE)
-    Qlower <- apply(resid_matrix, 2, quantile, probs = min(probs), na.rm = TRUE)
+    Qupper <- apply(resid_matrix, 1, quantile, probs = max(probs), na.rm = TRUE)
+    Qlower <- apply(resid_matrix, 1, quantile, probs = min(probs), na.rm = TRUE)
 
     if(robust){
-      estimates <- apply(resid_matrix, 2, median, na.rm = TRUE)
-      errors <- apply(abs(resid_matrix - estimates), 2, median, na.rm = TRUE)
+      estimates <- apply(resid_matrix, 1, median, na.rm = TRUE)
+      errors <- apply(abs(resid_matrix - estimates), 1, median, na.rm = TRUE)
     } else {
-      estimates <- apply(resid_matrix, 2, mean, na.rm = TRUE)
-      errors <- apply(resid_matrix, 2, sd, na.rm = TRUE)
+      estimates <- apply(resid_matrix, 1, mean, na.rm = TRUE)
+      errors <- apply(resid_matrix, 1, sd, na.rm = TRUE)
     }
 
     out <- cbind(estimates, errors, Qlower, Qupper)

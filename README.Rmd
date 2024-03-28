@@ -113,7 +113,7 @@ lynx_mvgam <- mvgam(data = lynx_train,
                newdata = lynx_test,
                formula = population ~ s(season, bs = 'cc', k = 12),
                knots = list(season = c(0.5, 19.5)),
-               family = 'poisson',
+               family = poisson(),
                trend_model = AR(p = 3),
                use_stan = TRUE)
 ```

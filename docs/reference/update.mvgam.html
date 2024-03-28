@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.91</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -74,6 +74,10 @@
 <span>  <span class="va">family</span>,</span>
 <span>  <span class="va">share_obs_params</span>,</span>
 <span>  <span class="va">priors</span>,</span>
+<span>  <span class="va">chains</span>,</span>
+<span>  <span class="va">burnin</span>,</span>
+<span>  <span class="va">samples</span>,</span>
+<span>  <span class="va">algorithm</span>,</span>
 <span>  lfo <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
@@ -198,6 +202,38 @@ class <code>brmsprior</code> (see. <code><a href="https://paul-buerkner.github.i
 'Details' for more information on changing default prior distributions</p></dd>
 
 
+<dt>chains</dt>
+<dd><p><code>integer</code> specifying the number of parallel chains for the model. Ignored
+if <code>algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')</code></p></dd>
+
+
+<dt>burnin</dt>
+<dd><p><code>integer</code> specifying the number of warmup iterations of the Markov chain to run
+to tune sampling algorithms. Ignored
+if <code>algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')</code></p></dd>
+
+
+<dt>samples</dt>
+<dd><p><code>integer</code> specifying the number of post-warmup iterations of the Markov chain to run for
+sampling the posterior distribution</p></dd>
+
+
+<dt>algorithm</dt>
+<dd><p>Character string naming the estimation approach to use.
+Options are <code>"sampling"</code> for MCMC (the default), <code>"meanfield"</code> for
+variational inference with factorized normal distributions,
+<code>"fullrank"</code> for variational inference with a multivariate normal
+distribution, <code>"laplace"</code> for a Laplace approximation (only available
+when using cmdstanr as the backend) or <code>"pathfinder"</code> for the pathfinder
+algorithm (only currently available when using cmdstanr as the backend).
+Can be set globally for the current <span style="R">R</span> session via the
+<code>"brms.algorithm"</code> option (see <code><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></code>). Limited testing
+suggests that <code>"meanfield"</code> performs best out of the non-MCMC approximations for
+dynamic GAMs, possibly because of the difficulties estimating covariances among the
+many spline parameters and latent trend parameters. But rigorous testing has not
+been carried out</p></dd>
+
+
 <dt>lfo</dt>
 <dd><p>Logical indicating whether this is part of a call to <a href="lfo_cv.mvgam.html">lfo_cv.mvgam</a>. Returns a
 lighter version of the model with no residuals and fewer monitored parameters to speed up
@@ -214,19 +250,27 @@ leave this set as <code>FALSE</code></p></dd>
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate some data and fit a Poisson AR1 model</span></span></span>
-<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">1</span>, trend_model <span class="op">=</span> <span class="st">'AR1'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">1</span>, trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span></span>
-<span class="r-in"><span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">)</span></span></span>
+<span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Update to an AR2 model</span></span></span>
-<span class="r-in"><span><span class="va">updated_mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">mod</span>, trend_model <span class="op">=</span> <span class="st">'AR2'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">updated_mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">mod</span>, trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">updated_mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">updated_mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Now update to a Negative Binomial AR1</span></span></span>
-<span class="r-in"><span><span class="va">updated_mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">mod</span>, family <span class="op">=</span> <span class="fu">nb</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Now update to a Binomial AR1 by adding information on trials</span></span></span>
+<span class="r-in"><span><span class="co"># requires that we supply newdata that contains the 'trials' variable</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">trials</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">y</span><span class="op">)</span> <span class="op">+</span> <span class="fl">15</span></span></span>
+<span class="r-in"><span><span class="va">updated_mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">mod</span>,</span></span>
+<span class="r-in"><span>                      formula <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="va">y</span>, <span class="va">trials</span><span class="op">)</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                      data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>                      family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">updated_mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">updated_mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 </code></pre></div>
     </div>

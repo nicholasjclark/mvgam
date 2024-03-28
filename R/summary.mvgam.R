@@ -8,7 +8,7 @@
 #'Defaults to \code{TRUE} but use \code{FALSE} for a more concise summary
 #'@param smooth_test Logical. Compute estimated degrees of freedom and approximate
 #'p-values for smooth terms? Defaults to \code{TRUE}, but users may wish to set
-#'to \code{FALSE} for complex models with many smooth terms
+#'to \code{FALSE} for complex models with many smooth or random effect terms
 #'@param digits The number of significant digits for printing out the summary;
 #'  defaults to \code{2}.
 #'@param ... Ignored
@@ -16,10 +16,12 @@
 #'@details `summary.mvgam` and `summary.mvgam_prefit` return brief summaries of the model's call, along with posterior intervals for
 #'some of the key parameters in the model. Note that some smooths have extra penalties on the null space,
 #'so summaries for the \code{rho} parameters may include more penalty terms than the number of smooths in
-#'the original model formula. Approximate p-values for smooth terms are also returned, with methods used for their
+#'the original model formula. Approximate p-values for smooth terms are also returned,
+#'with methods used for their
 #'calculation following those used for `mgcv` equivalents (see \code{\link[mgcv]{summary.gam}} for details).
 #'The Estimated Degrees of Freedom (edf) for smooth terms is computed using
-#'`edf.type = 1` as described in the documentation for \code{\link[mgcv]{jagam}}. Experiments suggest
+#'either `edf.type = 1` for models with no trend component, or `edf.type = 0` for models with
+#'trend components. These are described in the documentation for \code{\link[mgcv]{jagam}}. Experiments suggest
 #'these p-values tend to be more conservative than those that might be returned from an equivalent
 #'model fit with \code{\link[mgcv]{summary.gam}} using `method = 'REML'`
 #'
@@ -38,10 +40,16 @@ summary.mvgam = function(object,
 
 #### Smooth tests ####
   if(smooth_test){
+    if(inherits(object$trend_model, 'mvgam_trend')){
+      trend_model <- object$trend_model$label
+    } else {
+      trend_model <- object$trend_model
+    }
     object$mgcv_model <- compute_edf(object$mgcv_model,
                                      object,
                                      'rho',
-                                     'sigma_raw')
+                                     'sigma_raw',
+                                     conservative = trend_model == 'None')
 
     if(!is.null(object$trend_call)){
       object$trend_mgcv_model <- compute_edf(object$trend_mgcv_model,
@@ -287,7 +295,7 @@ if(any(!is.na(object$sp_names)) & smooth_test){
       if(!is.null(object$trend_call)){
         cat("\nApproximate significance of GAM observation smooths:\n")
       } else {
-        cat("\nApproximate significance of GAM observation smooths:\n")
+        cat("\nApproximate significance of GAM smooths:\n")
       }
       suppressWarnings(printCoefmat(gam_sig_table,
                                     digits = min(3, digits + 1),
@@ -299,7 +307,7 @@ if(any(!is.na(object$sp_names)) & smooth_test){
     if(!is.null(object$trend_call)){
       cat("\nApproximate significance of GAM observation smooths:\n")
     } else {
-      cat("\nApproximate significance of GAM observation smooths:\n")
+      cat("\nApproximate significance of GAM smooths:\n")
     }
     suppressWarnings(printCoefmat(gam_sig_table,
                                   digits = min(3, digits + 1),

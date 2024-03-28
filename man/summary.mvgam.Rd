@@ -21,7 +21,7 @@ Defaults to \code{TRUE} but use \code{FALSE} for a more concise summary}
 
 \item{smooth_test}{Logical. Compute estimated degrees of freedom and approximate
 p-values for smooth terms? Defaults to \code{TRUE}, but users may wish to set
-to \code{FALSE} for complex models with many smooth terms}
+to \code{FALSE} for complex models with many smooth or random effect terms}
 
 \item{digits}{The number of significant digits for printing out the summary;
 defaults to \code{2}.}
@@ -45,10 +45,12 @@ These functions take a fitted \code{mvgam} object and return various useful summ
 \code{summary.mvgam} and \code{summary.mvgam_prefit} return brief summaries of the model's call, along with posterior intervals for
 some of the key parameters in the model. Note that some smooths have extra penalties on the null space,
 so summaries for the \code{rho} parameters may include more penalty terms than the number of smooths in
-the original model formula. Approximate p-values for smooth terms are also returned, with methods used for their
+the original model formula. Approximate p-values for smooth terms are also returned,
+with methods used for their
 calculation following those used for \code{mgcv} equivalents (see \code{\link[mgcv]{summary.gam}} for details).
 The Estimated Degrees of Freedom (edf) for smooth terms is computed using
-\code{edf.type = 1} as described in the documentation for \code{\link[mgcv]{jagam}}. Experiments suggest
+either \code{edf.type = 1} for models with no trend component, or \code{edf.type = 0} for models with
+trend components. These are described in the documentation for \code{\link[mgcv]{jagam}}. Experiments suggest
 these p-values tend to be more conservative than those that might be returned from an equivalent
 model fit with \code{\link[mgcv]{summary.gam}} using \code{method = 'REML'}
 

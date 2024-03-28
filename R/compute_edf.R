@@ -1,7 +1,8 @@
 #' Compute approximate EDFs of smooths
 #' @importFrom stats fitted
 #'@noRd
-compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names){
+compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names,
+                       conservative = FALSE){
 
   if(length(mgcv_model$smooth) > 0){
 
@@ -88,8 +89,11 @@ compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names){
         mu[which(mu_variance == 0)]
     }
 
-    w <- as.numeric(mgcv_model$family$mu.eta(eta)^2 / mu_variance)
-    XWX <- t(X) %*% (w * X)
+    if(!conservative){
+      w <- as.numeric(mgcv_model$family$mu.eta(as.vector(eta))^2 / mu_variance)
+      XWX <- t(X) %*% (w * X)
+    } else XWX <- t(X) %*% X
+
     lambda <- mgcv_model$sp
     XWXS <- XWX
 
@@ -104,7 +108,18 @@ compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names){
       names(edf) <- names(coef(mgcv_model))
     }
     mgcv_model$edf <- edf
+    mgcv_model$edf1 <- edf
+    mgcv_model$edf2 <- edf
   }
 
+  # Add frequentist version of parameter covariance estimators
+  # for calculation of smooth term p-values;
+  # rV <- mroot(mgcv_model$Vp)
+  # V <- tcrossprod(rV)
+  # XWX <- crossprod(mgcv_model$R)
+  # Ve_hat <- V %*% XWX
+  # mgcv_model$Ve <- Ve_hat %*% V
+
+  mgcv_model$Ve <- mgcv_model$Vp
   return(mgcv_model)
 }
