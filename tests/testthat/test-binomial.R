@@ -28,6 +28,13 @@ dat_test <- dat %>%
   dplyr::filter(time > 40)
 
 test_that("cbind() syntax required for binomial()", {
+  # Initial warning should be issued when calling binomial or beta-binomial
+  expect_warning(mvgam(cbind(y, ntrials) ~ s(series, bs = 're') +
+                   gp(x, by = series, c = 5/4, k = 5),
+                 family = binomial(),
+                 data = dat_train,
+                 run_model = FALSE))
+
   expect_error(mvgam(y ~ series + s(x, by = series),
                      family = binomial(),
                      data = dat_train,

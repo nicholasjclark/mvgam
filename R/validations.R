@@ -64,6 +64,7 @@ validate_series_time = function(data, name = 'data'){
   return(data)
 }
 
+#'@importFrom rlang warn
 #'@noRd
 validate_family = function(family, use_stan = TRUE){
   if(is.character(family)){
@@ -103,6 +104,10 @@ validate_family = function(family, use_stan = TRUE){
   if(use_stan & family$family == 'tweedie')
     stop('Tweedie family not supported for stan',
          call. = FALSE)
+
+  if(family$family %in% c('binomial', 'beta_binomial'))
+    rlang::warn(paste0("Binomial and Beta-binomial families require cbind(n_successes, n_trials)\nin the formula left-hand side. Do not use cbind(n_successes, n_failures)!"),
+                       .frequency = "once", .frequency_id = '1')
   return(family)
 }
 

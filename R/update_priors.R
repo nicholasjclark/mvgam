@@ -280,7 +280,8 @@ adapt_brms_priors = function(priors,
                              trend_model = 'None',
                              trend_map,
                              drift = FALSE,
-                             warnings = FALSE){
+                             warnings = FALSE,
+                             knots){
 
   # Replace any call to 'Intercept' with '(Intercept)' to match mgcv style
   priors[] <- lapply(priors, function(x)
@@ -297,7 +298,8 @@ adapt_brms_priors = function(priors,
                                 use_stan = TRUE,
                                 trend_model = trend_model,
                                 trend_map = trend_map,
-                                drift = drift)
+                                drift = drift,
+                                knots = knots)
 
   # Update using priors from the brmsprior object
   for(i in 1:NROW(priors)){

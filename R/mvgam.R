@@ -687,7 +687,8 @@ mvgam = function(formula,
                                   trend_model = trend_model,
                                   trend_map = trend_map,
                                   drift = drift,
-                                  warnings = TRUE)
+                                  warnings = TRUE,
+                                  knots = knots)
     }
   }
 
@@ -786,7 +787,8 @@ mvgam = function(formula,
                                   n_lv = n_lv,
                                   trend_model = trend_model,
                                   trend_map = trend_map,
-                                  drift = drift)
+                                  drift = drift,
+                                  knots = knots)
 
   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the Bayesian model later on;

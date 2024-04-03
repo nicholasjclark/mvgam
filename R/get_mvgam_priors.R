@@ -3,7 +3,7 @@
 #'This function lists the parameters that can have their prior distributions
 #'changed for a given `mvgam` model, as well listing their default distributions
 #'
-#' @inheritParams mvgam
+#'@inheritParams mvgam
 #'@details Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and
 #'altered. To make alterations, change the contents of the `prior` column and supplying this
 #'\code{data.frame} to the `mvgam` function using the argument `priors`. If using `Stan` as the backend,
@@ -153,6 +153,7 @@ get_mvgam_priors = function(formula,
                             data,
                             data_train,
                             family = 'poisson',
+                            knots,
                             use_lv = FALSE,
                             n_lv,
                             use_stan = TRUE,
@@ -232,7 +233,8 @@ get_mvgam_priors = function(formula,
                                  use_stan = TRUE,
                                  trend_model = trend_model,
                                  trend_map = trend_map,
-                                 drift = drift)
+                                 drift = drift,
+                                 knots = knots)
 
     # Replace any terms labelled 'trend' with 'series' for creating the necessary
     # structures
@@ -290,7 +292,8 @@ get_mvgam_priors = function(formula,
     trend_prior_df <- get_mvgam_priors(trend_formula,
                                        data = trend_train,
                                        family = gaussian(),
-                                       trend_model = 'None')
+                                       trend_model = 'None',
+                                       knots = knots)
 
     # Modify some of the term names and return
     if(any(grepl('fixed effect', trend_prior_df$param_info))){
@@ -424,7 +427,8 @@ get_mvgam_priors = function(formula,
                               family = family_to_mgcvfam(family),
                               dat = data_train,
                               drop.unused.levels = FALSE,
-                              maxit = 5),
+                              maxit = 5,
+                              knots = knots),
                   silent = TRUE)
     if(inherits(ss_gam, 'try-error')){
       if(grepl('missing values', ss_gam[1])){
