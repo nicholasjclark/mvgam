@@ -719,27 +719,3 @@ add_nmix_posterior = function(model_output,
 
   return(model_output)
 }
-
-# Get list object into correct order in case it is not already
-sort_data = function(obs_data){
-  if(inherits(obs_data, 'list')){
-    obs_data_arranged <- obs_data
-    temp_dat = data.frame(time = obs_data$time,
-                          series = obs_data$series) %>%
-      dplyr::mutate(index = dplyr::row_number()) %>%
-      dplyr::arrange(series, time)
-    obs_data_arranged <- lapply(obs_data, function(x){
-      if(is.matrix(x)){
-        matrix(x[temp_dat$index,], ncol = NCOL(x))
-      } else {
-        x[temp_dat$index]
-      }
-    })
-    names(obs_data_arranged) <- names(obs_data)
-  } else {
-    obs_data_arranged <- obs_data %>%
-      dplyr::arrange(series, time)
-  }
-
-  return(obs_data_arranged)
-}

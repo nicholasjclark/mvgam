@@ -144,7 +144,8 @@ forecast.mvgam = function(object, newdata, data_test,
                                type = type,
                                series = series,
                                data_test = data_test,
-                               n_cores = n_cores)
+                               n_cores = n_cores,
+                               ...)
 
     # Extract hindcasts and forecasts into the correct format
     if(series == 'all'){
@@ -757,7 +758,10 @@ forecast_draws = function(object,
                           data_test,
                           n_cores = 1,
                           n_samples,
-                          ending_time){
+                          ending_time,
+                          b_uncertainty = TRUE,
+                          trend_uncertainty = TRUE,
+                          obs_uncertainty = TRUE){
 
   # Check arguments
   validate_pos_integer(n_cores)
@@ -769,9 +773,10 @@ forecast_draws = function(object,
     s_name <- levels(data_test$series)[series]
   }
 
-  # Generate the observation model linear predictor matrix
+  # Generate the observation model linear predictor matrix,
+  # ensuring the test data is sorted correctly (by time and then series)
   if(inherits(data_test, 'list')){
-    Xp <- obs_Xp_matrix(newdata = data_test,
+    Xp <- obs_Xp_matrix(newdata = sort_data(data_test),
                         mgcv_model = object$mgcv_model)
 
     if(series != 'all'){
@@ -800,15 +805,16 @@ forecast_draws = function(object,
       Xp <- obs_Xp_matrix(newdata = series_test,
                           mgcv_model = object$mgcv_model)
     } else {
-      Xp <- obs_Xp_matrix(newdata = data_test,
+      Xp <- obs_Xp_matrix(newdata = sort_data(data_test),
                           mgcv_model = object$mgcv_model)
       series_test <- NULL
     }
   }
 
-  # Generate linear predictor matrix from trend mgcv model
+  # Generate linear predictor matrix from trend mgcv model, ensuring
+  # the test data is sorted correctly (by time and then series)
   if(!is.null(object$trend_call)){
-    Xp_trend <- trend_Xp_matrix(newdata = data_test,
+    Xp_trend <- trend_Xp_matrix(newdata = sort_data(data_test),
                                 trend_map = object$trend_map,
                                 series = series,
                                 mgcv_model = object$trend_mgcv_model)
@@ -984,7 +990,10 @@ forecast_draws = function(object,
                                   'series_test',
                                   'Xp',
                                   'Xp_trend',
-                                  'fc_horizon'),
+                                  'fc_horizon',
+                                  'b_uncertainty',
+                                  'trend_uncertainty',
+                                  'obs_uncertainty'),
                           envir = environment())
   parallel::clusterExport(cl = cl,
                           unclass(lsf.str(envir = asNamespace("mvgam"),
@@ -998,18 +1007,31 @@ forecast_draws = function(object,
     samp_index <- i
 
     # Sample beta coefs
-    betas <- betas[samp_index, ]
+    if(b_uncertainty){
+      betas <- betas[samp_index, ]
+    } else {
+      betas <- betas[1, ]
+    }
 
     if(!is.null(betas_trend)){
-      betas_trend <- betas_trend[samp_index, ]
+      if(b_uncertainty){
+        betas_trend <- betas_trend[samp_index, ]
+      } else {
+        betas_trend <- betas_trend[1, ]
+      }
     }
 
     # Return predictions
     if(series == 'all'){
 
       # Sample general trend-specific parameters
-      general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
-                                                       samp_index = samp_index)
+      if(trend_uncertainty){
+        general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
+                                                         samp_index = samp_index)
+      } else {
+        general_trend_pars <- extract_general_trend_pars(trend_pars = trend_pars,
+                                                         samp_index = 1)
+      }
 
       if(use_lv || trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic')){
         if(trend_model == 'PWlogistic'){
@@ -1107,9 +1129,17 @@ forecast_draws = function(object,
           # Family-specific parameters
           family_extracts <- lapply(seq_along(family_pars), function(x){
             if(is.matrix(family_pars[[x]])){
-              family_pars[[x]][samp_index, series]
+              if(obs_uncertainty){
+                family_pars[[x]][samp_index, series]
+              } else {
+                family_pars[[x]][1, series]
+              }
             } else {
-              family_pars[[x]][samp_index]
+              if(obs_uncertainty){
+                family_pars[[x]][samp_index]
+              } else {
+                family_pars[[x]][1]
+              }
             }
           })
           names(family_extracts) <- names(family_pars)

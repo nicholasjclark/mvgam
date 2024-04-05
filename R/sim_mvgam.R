@@ -106,6 +106,11 @@ sim_mvgam = function(T = 100,
     use_lv <- FALSE
   }
 
+  if(trend_model %in% c('RWcor', 'AR1cor', 'AR2cor', 'AR3cor')){
+    warning(paste0('Simulation of correlated AR or RW trends not yet supported.\n',
+                   'Reverting to uncorrelated trends'))
+  }
+
   if(missing(trend_rel)){
     trend_rel <- prop_trend
   }
@@ -219,31 +224,32 @@ sim_mvgam = function(T = 100,
   }
 
   # Set trend parameters
-  if(trend_model == 'RW'){
+  if(trend_model %in% c('RW', 'RWcor')){
     ar1s <- rep(1, n_lv)
     ar2s <- rep(0, n_lv)
     ar3s <- rep(0, n_lv)
   }
 
-  if(trend_model == 'AR1'){
+  if(trend_model %in% c('AR1', 'AR1cor')){
     ar1s <- rnorm(n_lv, sd = 0.5)
     ar2s <- rep(0, n_lv)
     ar3s <- rep(0, n_lv)
   }
 
-  if(trend_model == 'AR2'){
+  if(trend_model %in% c('AR2', 'AR2cor')){
     ar1s <- rnorm(n_lv, sd = 0.5)
     ar2s <- rnorm(n_lv, sd = 0.5)
     ar3s <- rep(0, n_lv)
   }
 
-  if(trend_model == 'AR3'){
+  if(trend_model %in% c('AR3', 'AR3cor')){
     ar1s <- rnorm(n_lv, sd = 0.5)
     ar2s <- rnorm(n_lv, sd = 0.5)
     ar3s <- rnorm(n_lv, sd = 0.5)
   }
 
-  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'VAR1cor')){
+  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3',
+                        'VAR1', 'VAR1cor')){
     # Sample trend drift terms so they are (hopefully) not too correlated
     if(drift){
       trend_alphas <- rnorm(n_lv, sd = 0.15)
