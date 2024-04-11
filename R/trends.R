@@ -7,12 +7,16 @@
 #'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
 #'   \item `RW()`
 #'   \item `AR(p = 1, 2, or 3)`
+#'   \item `CAR(p = 1)`(continuous time autoregressive trends; only available in \code{Stan})
 #'   \item `VAR()`(only available in \code{Stan})
 #'   \item `PW()` (piecewise linear or logistic trends; only available in \code{Stan})
 #'   \item `GP()` (Gaussian Process with squared exponential kernel;
 #'only available in \code{Stan})}
 #'
-#'For all types apart from `GP()` and `PW()`, moving average and/or correlated
+#'For most dynamic trend types available in `mvgam` (see argument `trend_model`), time should be
+#'measured in discrete, regularly spaced intervals (i.e. `c(1, 2, 3, ...)`). However you can
+#'use irregularly spaced intervals if using `trend_model = CAR(1)`. For all trend types
+#'apart from `GP()`, `PW()`, and `CAR()`, moving average and/or correlated
 #'process error terms can also be estimated (for example, `RW(cor = TRUE)` will set up a
 #'multivariate Random Walk if `data` contains `>1` series). Character strings can also be supplied
 #'instead of the various trend functions. The full list of possible models that are
@@ -34,6 +38,7 @@
 #'\item 'AR3MA'
 #'\item 'AR3cor'
 #'\item 'AR3MAcor'
+#'\item 'CAR1'
 #'\item 'VAR'
 #'\item 'VARcor'
 #'\item 'VAR1' (same as 'VAR')
@@ -51,7 +56,7 @@
 #'Note that only `RW`, `AR1`, `AR2` and `AR3` are available if
 #'using `JAGS`. All trend models are supported if using `Stan`.
 #'Dynamic factor models can be used in which the latent factors evolve as either
-#'`RW`, `AR1-3` or `GP`. For `VAR` models
+#'`RW`, `AR1-3`, `VAR` or `GP`. For `VAR` models
 #'(i.e. `VAR` and `VARcor` models), users can either fix the trend error covariances to be `0`
 #'(using `VAR`) or estimate them and potentially allow for contemporaneously correlated errors using
 #'`VARcor`. For all `VAR` models, stationarity of
@@ -62,7 +67,8 @@
 #'[mvgam]. Piecewise trends follow the formulation in the popular `prophet` package produced
 #'by `Facebook`, where users can allow for changepoints to control the potential flexibility
 #'of the trend. See Taylor and Letham (2018) for details
-#'@seealso \code{\link{RW}}, \code{\link{AR}}, \code{\link{VAR}}, \code{\link{PW}}, \code{\link{GP}}
+#'@seealso \code{\link{RW}}, \code{\link{AR}}, \code{\link{CAR}},
+#'\code{\link{VAR}}, \code{\link{PW}}, \code{\link{GP}}
 #' @references Sarah E. Heaps (2022) Enforcing stationarity through the prior in Vector Autoregressions.
 #' Journal of Computational and Graphical Statistics. 32:1, 1-10.
 #'
@@ -92,6 +98,7 @@ trend_model_choices = function(){
     'AR3MA',
     'AR3cor',
     'AR3MAcor',
+    'CAR1',
     'VAR',
     'VARcor',
     'VAR1',
@@ -268,7 +275,8 @@ sim_ar3 = function(drift = 0,
 
   # Prepare linear predictors (if necessary)
   if(!is.null(Xp_trend)){
-    linpreds <- c(rep(0, 3), as.vector(((matrix(Xp_trend, ncol = NCOL(Xp_trend)) %*%
+    linpreds <- c(rep(0, 3), as.vector(((matrix(Xp_trend,
+                                                ncol = NCOL(Xp_trend)) %*%
                     betas_trend)) +
       attr(Xp_trend, 'model.offset')))
   } else {
@@ -519,7 +527,7 @@ prep_varma_params = function(ar1,
 stationary_VAR_phi <- function(p = 1, n_series = 3, ar_scale = 1) {
   stopifnot(ar_scale > 0)
   Id <- diag(nrow = n_series)
-  all_P <- array(dim=c(n_series, n_series, p))
+  all_P <- array(dim = c(n_series, n_series, p))
   for(i in 1:p) {
     A <- matrix(rnorm(n_series*n_series, sd = ar_scale),
                 nrow = n_series)
@@ -539,10 +547,10 @@ stationary_VAR_phi <- function(p = 1, n_series = 3, ar_scale = 1) {
 
   # Recursion algorithm (Ansley and Kohn 1986, lemma 2.1)
   for(s in 0:(p - 1)) {
-    all_phi[, , s+1, s+1] <- L %*%
-      all_P[, , s+1] %*%
+    all_phi[, , s + 1, s + 1] <- L %*%
+      all_P[, , s + 1] %*%
       solve(L_star)
-    all_phi_star[, , s+1, s+1] <- tcrossprod(L_star, all_P[, , s+1]) %*%
+    all_phi_star[, , s + 1, s + 1] <- tcrossprod(L_star, all_P[, , s+1]) %*%
       solve(L)
 
     if(s >= 1) {
@@ -566,12 +574,10 @@ stationary_VAR_phi <- function(p = 1, n_series = 3, ar_scale = 1) {
       L <- t(chol(Sigma))
     }
   }
-
   out <- vector(mode = 'list')
   for(i in 1:p){
     out[[i]] <- all_phi[,,i,i]
   }
-
   return(out)
 }
 
@@ -607,6 +613,11 @@ trend_par_names = function(trend_model,
                  'Sigma', 'error')
     }
 
+    if(trend_model == 'CAR1'){
+      param <- c('trend', 'ar1', 'LV', 'penalty',
+                 'lv_coefs', 'Sigma')
+    }
+
     if(trend_model == 'GP'){
       param <- c('trend', 'alpha_gp', 'rho_gp',
                  'LV', 'lv_coefs', 'b_gp')
@@ -638,6 +649,11 @@ trend_par_names = function(trend_model,
     if(trend_model == 'AR3'){
       param <- c('trend', 'tau', 'sigma', 'ar1', 'ar2',
                  'ar3', 'theta', 'Sigma', 'error')
+    }
+
+    if(trend_model == 'CAR1'){
+      param <- c('trend', 'tau', 'sigma', 'ar1',
+                 'Sigma')
     }
 
     if(trend_model == 'GP'){
@@ -674,7 +690,8 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
                               ending_time = NULL){
 
   # Get names of parameters to extract
-  pars_to_extract <- trend_par_names(trend_model = attr(object$model_data, 'trend_model'),
+  pars_to_extract <- trend_par_names(trend_model = attr(object$model_data,
+                                                        'trend_model'),
                                      trend_map = object$trend_map,
                                      use_lv = object$use_lv,
                                      drift = object$drift)
@@ -704,9 +721,18 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
     out <- list()
   }
 
+  # time distance calculations for CAR1 trends
+  if(attr(object$model_data, 'trend_model') == 'CAR1'){
+    out$time_dist <- lapply(seq_along(levels(object$obs_data$series)), function(series){
+      t(replicate(NROW(out$ar1[[1]]), object$trend_model$time_dist[,series]))
+    })
+  }
+
   # delta params for piecewise trends
-  if(attr(object$model_data, 'trend_model') %in% c('PWlinear', 'PWlogistic')){
-    out$delta_trend <- lapply(seq_along(levels(object$obs_data$series)), function(series){
+  if(attr(object$model_data, 'trend_model') %in%
+     c('PWlinear', 'PWlogistic')){
+    out$delta_trend <- lapply(seq_along(levels(object$obs_data$series)),
+                              function(series){
       if(object$fit_engine == 'stan'){
         delta_estimates <- mcmc_chains(object$model_output, 'delta_trend')[,seq(series,
                                                                           dim(mcmc_chains(object$model_output,
@@ -728,7 +754,8 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
 
   # Latent trend loadings for dynamic factor models
   if(object$use_lv){
-    if(attr(object$model_data, 'trend_model') %in% c('RW', 'AR1', 'AR2', 'AR3')){
+    if(attr(object$model_data, 'trend_model') %in% c('RW', 'AR1', 'AR2', 'AR3',
+                                                     'CAR1')){
       # Just due to legacy reasons from working in JAGS, the simulation
       # functions use precision (tau) rather than SD (sigma)
       out$tau <- mcmc_chains(object$model_output, 'penalty')
@@ -750,7 +777,8 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
     })
 
   } else {
-    if(attr(object$model_data, 'trend_model') %in% c('RW', 'AR1', 'AR2', 'AR3')){
+    if(attr(object$model_data, 'trend_model') %in% c('RW', 'AR1', 'AR2', 'AR3',
+                                                     'CAR1')){
       out$sigma <- NULL
     }
   }
@@ -889,7 +917,6 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
           out$last_lvs <- out$last_trends
           out$last_trends <- NULL
         }
-
       }
     }
   }
@@ -942,10 +969,10 @@ extract_general_trend_pars = function(samp_index, trend_pars){
 
     if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
                                    'A', 'Sigma', 'theta', 'b_gp', 'error',
-                                   'delta_trend', 'cap')){
+                                   'delta_trend', 'cap', 'time_dist')){
 
       if(names(trend_pars)[x] %in% c('last_lvs', 'lv_coefs', 'last_trends',
-                                     'b_gp', 'delta_trend', 'cap')){
+                                     'b_gp', 'delta_trend', 'cap', 'time_dist')){
         out <- unname(lapply(trend_pars[[x]], `[`, samp_index, ))
       }
 
@@ -969,8 +996,9 @@ extract_general_trend_pars = function(samp_index, trend_pars){
   return(general_trend_pars)
 }
 
-#' Function for extracting a single draw of trend parameters for a single series, for use
-#' in many of the forecasting / evaluation functions
+#' Function for extracting a single draw of trend parameters for a single series;
+#' deprecated as all forecasting / prediction functions now operate jointly on all
+#' series at once
 #' @noRd
 extract_series_trend_pars = function(series, samp_index, trend_pars,
                                      use_lv = FALSE){
@@ -1024,12 +1052,13 @@ extract_series_trend_pars = function(series, samp_index, trend_pars,
 #' @noRd
 forecast_trend = function(trend_model, use_lv, trend_pars,
                           Xp_trend = NULL, betas_trend = NULL,
-                          h = 1, time = NULL, cap = NULL){
+                          h = 1, time = NULL, cap = NULL,
+                          time_dist = NULL){
 
   # Propagate dynamic factors forward
   if(use_lv){
     n_lv <- length(trend_pars$last_lvs)
-    if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+    if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
       next_lvs <- do.call(cbind, lapply(seq_len(n_lv), function(lv){
 
         ar1 <- ifelse('ar1' %in% names(trend_pars),
@@ -1095,15 +1124,6 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                        rho_gp = trend_pars$rho_gp[lv],
                        last_trends = trend_pars$last_lvs[[lv]],
                        h = h)
-        # Before using the Hilbert version, we need to sign flip
-        # the b_gp coefficients in the actual model
-        # sim_hilbert_gp(alpha_gp = trend_pars$alpha_gp[lv],
-        #                rho_gp = trend_pars$rho_gp[lv],
-        #                b_gp = trend_pars$b_gp[[lv]],
-        #                last_trends = trend_pars$last_lvs[[lv]],
-        #                fc_times = time,
-        #                train_times = trend_pars$time_cent,
-        #                mean_train_times = trend_pars$mean_time)
       }))
     }
 
@@ -1195,13 +1215,6 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                             Xp_trend = varma_params$Xp_trend,
                             betas_trend = varma_params$betas_trend,
                             h = varma_params$h)
-
-      # next_lvs <- sim_var1(A = Amat,
-      #                      Sigma = Sigmamat,
-      #                      last_trends = last_trendvec,
-      #                      Xp_trend = Xp_trend,
-      #                      betas_trend = betas_trend,
-      #                      h = h)
     }
 
     trend_fc <- next_lvs
@@ -1210,11 +1223,10 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
   # Simpler if not using dynamic factors
   if(!use_lv){
 
-    if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+    if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
 
       ar1 <- ifelse('ar1' %in% names(trend_pars),
-                    trend_pars$ar1,
-                    0)
+                    trend_pars$ar1, 0)
       if(trend_model == 'RW'){
         ar1 <- 1
       }
@@ -1257,30 +1269,9 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                             Xp_trend = varma_params$Xp_trend,
                             betas_trend = varma_params$betas_trend,
                             h = varma_params$h)
-
-      # trend_fc <-  sim_ar3(drift = ifelse('drift' %in% names(trend_pars),
-      #                                     trend_pars$drift,
-      #                                     0),
-      #                      ar1 = ar1,
-      #                      ar2 = ifelse('ar2' %in% names(trend_pars),
-      #                                   trend_pars$ar2,
-      #                                   0),
-      #                      ar3 = ifelse('ar3' %in% names(trend_pars),
-      #                                   trend_pars$ar3,
-      #                                   0),
-      #                      tau = trend_pars$tau,
-      #                      Xp_trend = Xp_trend,
-      #                      betas_trend = betas_trend,
-      #                      last_trends = tail(trend_pars$last_trends, 3),
-      #                      h = h)
     }
 
     if(trend_model == 'GP'){
-      # trend_fc <- sim_gp(alpha_gp = trend_pars$alpha_gp,
-      #                            rho_gp = trend_pars$rho_gp,
-      #                            last_trends = trend_pars$last_trends,
-      #                            h = h)
-      #
       trend_fc <- sim_hilbert_gp(alpha_gp = trend_pars$alpha_gp,
                                  rho_gp = trend_pars$rho_gp,
                                  b_gp = trend_pars$b_gp,
@@ -1333,7 +1324,6 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
         diag(Sigmamat) <- 1 / trend_pars$tau
       }
 
-
       # Reconstruct the last trend matrix
       last_trendmat <- do.call(cbind,(lapply(trend_pars$last_lvs,
                                              function(x) tail(x, 3))))
@@ -1378,13 +1368,6 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                             Xp_trend = varma_params$Xp_trend,
                             betas_trend = varma_params$betas_trend,
                             h = varma_params$h)
-
-      # trend_fc <- sim_var1(A = Amat,
-      #                      Sigma = Sigmamat,
-      #                      last_trends = last_trendvec,
-      #                      Xp_trend = Xp_trend,
-      #                      betas_trend = betas_trend,
-      #                      h = h)
     }
 
     if(trend_model == 'PWlinear'){
@@ -1469,7 +1452,6 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
         tail(draw, max(time) - min(time))
       }))
     }
-
   }
   return(trend_fc)
 }

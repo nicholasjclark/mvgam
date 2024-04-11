@@ -136,7 +136,9 @@ forecast.mvgam = function(object, newdata, data_test,
       if(!'y' %in% names(data_test)){
         data_test$y <- rep(NA, NROW(data_test))
       }
-      data_test <- validate_series_time(data_test, name = 'newdata')
+      data_test <- validate_series_time(data_test, name = 'newdata',
+                                        trend_model = attr(object$model_data,
+                                                           'trend_model'))
     }
 
     # Generate draw-specific forecasts

@@ -3,12 +3,15 @@
 \name{RW}
 \alias{RW}
 \alias{AR}
+\alias{CAR}
 \alias{VAR}
 \title{Specify autoregressive dynamic processes}
 \usage{
 RW(ma = FALSE, cor = FALSE)
 
 AR(p = 1, ma = FALSE, cor = FALSE)
+
+CAR(p = 1)
 
 VAR(ma = FALSE, cor = FALSE)
 }
@@ -22,7 +25,8 @@ in the supplied data, a fully structured covariance matrix will be estimated
 for the process errors. Default is \code{FALSE}.}
 
 \item{p}{A non-negative integer specifying the autoregressive (AR) order.
-Default is \code{1}. Cannot currently be larger than \code{3}}
+Default is \code{1}. Cannot currently be larger than \code{3} for \code{AR} terms,
+and cannot be anything other than \code{1} for continuous time AR (\code{CAR}) terms}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of

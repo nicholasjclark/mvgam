@@ -84,8 +84,8 @@ hindcast.mvgam = function(object,
   }
   n_series <- NCOL(object$ytimes)
 
-last_train <- max(object$obs_data$time) -
-  (min(object$obs_data$time) - 1)
+last_train <- max(object$obs_data$index..time..index) -
+  (min(object$obs_data$index..time..index) - 1)
 
 if(series == 'all'){
   data_train <- object$obs_data

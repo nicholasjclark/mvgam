@@ -2293,6 +2293,57 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
 
   }
 
+  if(trend_model == 'CAR1'){
+    if(any(grepl('// dynamic factor estimates', model_file, fixed = TRUE))){
+      init_trend_line <- grep('LV_raw[1, j] ~ normal(0, 0.1)',
+                              model_file, fixed = TRUE) - 1
+      model_file <- model_file[-c(init_trend_line:(init_trend_line + 2))]
+      model_file[init_trend_line] <-
+        'LV_raw[1, 1:n_lv] ~ normal(0, 0.1);'
+
+      remainder_line <- grep('LV_raw[2:n, j] ~ normal(ar1[j] * LV_raw[1:(n - 1), j], 0.1)',
+                             model_file, fixed = TRUE) - 1
+      model_file <- model_file[-c(remainder_line:(remainder_line + 2))]
+      model_file[remainder_line] <-
+        paste0('for(j in 1:n_lv){\n',
+               'LV_raw[2:n, j] ~ normal(pow(ar1[j], to_vector(time_dis[2:n, j])) .* LV_raw[1:(n - 1), j], 0.1);\n',
+               '}')
+      model_file = readLines(textConnection(model_file), n = -1)
+    } else {
+      if(drift){
+        init_trend_line <- grep('trend[1, s] ~ normal(0, sigma[s])',
+                                model_file, fixed = TRUE) - 1
+        model_file <- model_file[-c(init_trend_line:(init_trend_line + 2))]
+        model_file[init_trend_line] <-
+          'trend[1, 1:n_series] ~ normal(0, sigma);'
+
+        remainder_line <- grep('trend[2:n, s] ~ normal(drift[s] + ar1[s] * trend[1:(n - 1), s], sigma[s])',
+                               model_file, fixed = TRUE) - 1
+        model_file <- model_file[-c(remainder_line:(remainder_line + 2))]
+        model_file[remainder_line] <-
+          paste0('for(s in 1:n_series){\n',
+                 'trend[2:n, s] ~ normal(drift[s] + pow(ar1[s], to_vector(time_dis[2:n, s])) .* trend[1:(n - 1), s], sigma[s]);\n',
+                 '}')
+        model_file = readLines(textConnection(model_file), n = -1)
+      } else {
+        init_trend_line <- grep('trend[1, s] ~ normal(0, sigma[s])',
+                                model_file, fixed = TRUE) - 1
+        model_file <- model_file[-c(init_trend_line:(init_trend_line + 2))]
+        model_file[init_trend_line] <-
+          'trend[1, 1:n_series] ~ normal(0, sigma);'
+
+        remainder_line <- grep('trend[2:n, s] ~ normal(ar1[s] * trend[1:(n - 1), s], sigma[s])',
+                               model_file, fixed = TRUE) - 1
+        model_file <- model_file[-c(remainder_line:(remainder_line + 2))]
+        model_file[remainder_line] <-
+          paste0('for(s in 1:n_series){\n',
+                 'trend[2:n, s] ~ normal(pow(ar1[s], to_vector(time_dis[2:n, s])) .* trend[1:(n - 1), s], sigma[s]);\n',
+                 '}')
+        model_file = readLines(textConnection(model_file), n = -1)
+      }
+    }
+  }
+
   if(trend_model == 'AR1'){
     if(any(grepl('// dynamic factor estimates', model_file, fixed = TRUE))){
       init_trend_line <- grep('LV_raw[1, j] ~ normal(0, 0.1)',
@@ -2341,9 +2392,7 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
                  '}')
         model_file = readLines(textConnection(model_file), n = -1)
       }
-
     }
-
   }
 
   if(trend_model == 'AR2'){
@@ -2568,6 +2617,16 @@ vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
       paste0('Sigma = diag_matrix(square(sigma));\n')
     model_file = readLines(textConnection(model_file), n = -1)
   }
+
+  # Add time_dis array for tracking length between observations for
+  # continuous time AR models
+  if(trend_model == 'CAR1'){
+    model_file[grep('int<lower=0> ytimes[n, n_series]; //',
+                    model_file, fixed = TRUE)] <-
+      paste0('int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)\n',
+             'array[n, n_series] real<lower=0> time_dis; // temporal distances between observations')
+    model_file = readLines(textConnection(model_file), n = -1)
+    }
 
   # Change variable 'offset' to 'off_set' to avoid any issues with later
   # versions of cmdstan
@@ -2965,7 +3024,7 @@ add_trend_predictors = function(trend_formula,
                   model_file, fixed = TRUE)] <-
     "// latent states and loading matrix"
 
-  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
     model_file[grep("// latent factor SD terms",
                     model_file, fixed = TRUE)] <-
       "// latent state SD terms"
@@ -3399,7 +3458,7 @@ add_trend_predictors = function(trend_formula,
              "// trend random effects\n",
              paste(random_param_lines, collapse = '\n'))
 
-    if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+    if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
       model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);", model_file,
                       fixed = TRUE)] <- paste0(
                         "sigma_raw_trend ~ exponential(0.5);\n",
@@ -3468,6 +3527,33 @@ add_trend_predictors = function(trend_formula,
                "LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
                "for(i in 2:n){\n",
                "LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]] + LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]], sigma[j]);\n",
+               "}\n}")
+    }
+
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
+
+  if(trend_model == 'CAR1'){
+    model_file[grep('// latent factor AR1 terms', model_file, fixed = TRUE)] <-
+      '// latent state AR1 terms'
+    model_file <- model_file[-c(grep("for(j in 1:n_lv){", model_file, fixed = TRUE):
+                                  (grep("for(j in 1:n_lv){", model_file, fixed = TRUE) + 2))]
+
+    if(drift){
+      model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);",
+                      model_file, fixed = TRUE)] <-
+        paste0("for(j in 1:n_lv){\n",
+               "LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
+               "for(i in 2:n){\n",
+               "LV[i, j] ~ normal(drift[j] + trend_mus[ytimes_trend[i, j]] + pow(ar1[j], time_dis[i, j]) * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]), sigma[j]);\n",
+               "}\n}")
+    } else {
+      model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);",
+                      model_file, fixed = TRUE)] <-
+        paste0("for(j in 1:n_lv){\n",
+               "LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);\n",
+               "for(i in 2:n){\n",
+               "LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]] + pow(ar1[j], time_dis[i, j]) * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]), sigma[j]);\n",
                "}\n}")
     }
 

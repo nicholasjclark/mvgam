@@ -1,19 +1,36 @@
 #'Argument validation functions
 #'@param data Data to be validated (list or dataframe)
 #'@noRd
-validate_series_time = function(data, name = 'data'){
+validate_series_time = function(data, name = 'data',
+                                trend_model){
 
   # Series label must be present as a factor and
   # must contain a time variable
   if(inherits(data, 'data.frame')){
     data %>%
       dplyr::ungroup() -> data
+
     if(!'series' %in% colnames(data)){
       data$series <- factor('series1')
     }
-    if(!'time' %in% colnames(data)){
-      stop(name, " does not contain a 'time' variable",
+
+    # Series factor must have all unique levels present
+    if(!is.factor(data$series)){
+      stop('Variable "series" must be a factor',
            call. = FALSE)
+    }
+
+    if(!'time' %in% colnames(data)){
+      if(trend_model == 'None'){
+        # Add a time indicator if missing
+        data %>%
+          dplyr::group_by(series) %>%
+          dplyr::mutate(time = dplyr::row_number()) %>%
+          dplyr::ungroup() -> data
+      } else {
+        stop(name, " does not contain a 'time' variable",
+             call. = FALSE)
+      }
     }
   }
 
@@ -21,18 +38,49 @@ validate_series_time = function(data, name = 'data'){
     if(!'series' %in% names(data)){
       data$series <- factor('series1')
     }
-    if(!'time' %in% names(data)){
-      stop(name, " does not contain a 'time' variable",
+
+    # Series factor must have all unique levels present
+    if(!is.factor(data$series)){
+      stop('Variable "series" must be a factor',
            call. = FALSE)
+    }
+
+    if(!'time' %in% names(data)){
+      if(trend_model == 'None'){
+        # Add a time indicator if missing
+        data.frame(series = data$series) %>%
+          dplyr::group_by(series) %>%
+          dplyr::mutate(time = dplyr::row_number()) %>%
+          dplyr::pull(time) -> times
+        data$time <- times
+      } else {
+        stop(name, " does not contain a 'time' variable",
+             call. = FALSE)
+      }
     }
   }
 
-  # Series factor must have all unique levels present
-  if(!is.factor(data$series)){
-    stop('Variable "series" must be a factor',
-         call. = FALSE)
+  # Add a new 'time' variable that will be useful for rearranging data for
+  # modeling, in case 'time' is also supplied as a covariate or if this is
+  # a continuous time model (CAR1)
+  data$index..time..index <- data$time
+
+  # Use the data ordering to set the index of time for CAR1
+  if(trend_model == 'CAR1'){
+    data.frame(series = data$series,
+               time = data$time) %>%
+      dplyr::mutate(orig_rows = dplyr::row_number()) %>%
+      dplyr::group_by(series) %>%
+      dplyr::mutate(idx = dplyr::row_number()) %>%
+      dplyr::arrange(time) %>%
+      dplyr::mutate(time. = dplyr::row_number()) %>%
+      dplyr::ungroup() %>%
+      dplyr::arrange(orig_rows) %>%
+      dplyr::pull(time.) -> times
+      data$index..time..index <- times
   }
 
+  # Series factor must have all unique levels present
   if(!all(levels(data$series) %in% unique(data$series))){
     stop(paste0('Mismatch between factor levels of "series" and unique values of "series"',
                 '\n',
@@ -43,15 +91,16 @@ validate_series_time = function(data, name = 'data'){
   }
 
   # Ensure each series has an observation, even if NA, for each
-  # unique timepoint
+  # unique timepoint (only for trend models that require discrete time with
+  # regularly spaced sampling intervals)
   all_times_avail = function(time, min_time, max_time){
     identical(as.numeric(sort(time)),
               as.numeric(seq.int(from = min_time, to = max_time)))
   }
-  min_time <- as.numeric(min(data$time))
-  max_time <- as.numeric(max(data$time))
+  min_time <- as.numeric(min(data$index..time..index))
+  max_time <- as.numeric(max(data$index..time..index))
   data.frame(series = data$series,
-             time = data$time) %>%
+             time = data$index..time..index) %>%
     dplyr::group_by(series) %>%
     dplyr::summarise(all_there = all_times_avail(time,
                                                  min_time,
@@ -64,8 +113,8 @@ validate_series_time = function(data, name = 'data'){
   return(data)
 }
 
-#'@noRd
 #' Get data objects into correct order in case it is not already
+#'@noRd
 sort_data = function(data, series_time = FALSE){
   if(inherits(data, 'list')){
     data_arranged <- data

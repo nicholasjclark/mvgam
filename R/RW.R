@@ -11,7 +11,8 @@
 #' in the supplied data, a fully structured covariance matrix will be estimated
 #' for the process errors. Default is \code{FALSE}.
 #' @param p A non-negative integer specifying the autoregressive (AR) order.
-#' Default is \code{1}. Cannot currently be larger than \code{3}
+#' Default is \code{1}. Cannot currently be larger than \code{3} for `AR` terms,
+#' and cannot be anything other than `1` for continuous time AR (`CAR`) terms
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \code{mvgam}
 #' @rdname RW
@@ -35,6 +36,21 @@ AR = function(p = 1, ma = FALSE, cor = FALSE){
   out <- structure(list(trend_model = paste0('AR', p),
                         ma = ma,
                         cor = cor,
+                        label = match.call()),
+                   class = 'mvgam_trend')
+}
+
+#' @rdname RW
+#' @export
+CAR = function(p = 1){
+  validate_pos_integer(p)
+  if(p > 1){
+    stop("Argument 'p' must be = 1",
+         call. = FALSE)
+  }
+  out <- structure(list(trend_model = paste0('CAR', p),
+                        ma = FALSE,
+                        cor = FALSE,
                         label = match.call()),
                    class = 'mvgam_trend')
 }

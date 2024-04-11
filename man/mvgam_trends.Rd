@@ -13,12 +13,13 @@ Supported mvgam trend models
 and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
 \item \code{RW()}
 \item \verb{AR(p = 1, 2, or 3)}
+\item \code{CAR(p = 1)}(continuous time autoregressive trends; only available in \code{Stan})
 \item \code{VAR()}(only available in \code{Stan})
 \item \code{PW()} (piecewise linear or logistic trends; only available in \code{Stan})
 \item \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all types apart from \code{GP()} and \code{PW()}, moving average and/or correlated
+For all types apart from \code{GP()}, \code{PW()}, and \code{CAR()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
 multivariate Random Walk if \code{data} contains \verb{>1} series). Character strings can also be supplied
 instead of the various trend functions. The full list of possible models that are
@@ -40,6 +41,7 @@ currently supported is:
 \item 'AR3MA'
 \item 'AR3cor'
 \item 'AR3MAcor'
+\item 'CAR1'
 \item 'VAR'
 \item 'VARcor'
 \item 'VAR1' (same as 'VAR')
@@ -56,7 +58,7 @@ currently supported is:
 Note that only \code{RW}, \code{AR1}, \code{AR2} and \code{AR3} are available if
 using \code{JAGS}. All trend models are supported if using \code{Stan}.
 Dynamic factor models can be used in which the latent factors evolve as either
-\code{RW}, \code{AR1-3} or \code{GP}. For \code{VAR} models
+\code{RW}, \code{AR1-3}, \code{VAR} or \code{GP}. For \code{VAR} models
 (i.e. \code{VAR} and \code{VARcor} models), users can either fix the trend error covariances to be \code{0}
 (using \code{VAR}) or estimate them and potentially allow for contemporaneously correlated errors using
 \code{VARcor}. For all \code{VAR} models, stationarity of
@@ -76,5 +78,6 @@ Sean J. Taylor and Benjamin Letham (2018) Forecasting at scale.
 The American Statistician 72.1, 37-45.
 }
 \seealso{
-\code{\link{RW}}, \code{\link{AR}}, \code{\link{VAR}}, \code{\link{PW}}, \code{\link{GP}}
+\code{\link{RW}}, \code{\link{AR}}, \code{\link{CAR}},
+\code{\link{VAR}}, \code{\link{PW}}, \code{\link{GP}}
 }

@@ -169,11 +169,6 @@ make_gp_additions = function(gp_details, data,
 
   # Add coefficient indices to attribute table and to Stan data
   for(covariate in seq_along(gp_att_table)){
-    # coef_indices <- which(grepl(gp_att_table[[covariate]]$name,
-    #                             names(coef(mgcv_model)), fixed = TRUE) &
-    #                         !grepl(paste0(gp_att_table[[covariate]]$name,':'),
-    #                                names(coef(mgcv_model)), fixed = TRUE) == TRUE)
-
     coef_indices <- which(grepl(paste0(gsub("([()])","\\\\\\1",
                                             gp_att_table[[covariate]]$name),
                                        '\\.+[0-9]'),

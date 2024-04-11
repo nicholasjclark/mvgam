@@ -356,7 +356,7 @@ if(object$use_lv){
                          variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder'))[,c(3:7)])
     }
 
-    if(attr(object$model_data, 'trend_model') == 'AR1'){
+    if(attr(object$model_data, 'trend_model') %in% c('AR1', 'CAR1')){
       if(object$drift){
         if(!is.null(object$trend_call)){
           cat("\nProcess model drift and AR parameter estimates:\n")
@@ -570,7 +570,7 @@ if(!object$use_lv){
       }
     }
 
-    if(attr(object$model_data, 'trend_model') == 'AR1'){
+    if(attr(object$model_data, 'trend_model') %in% c('AR1', 'CAR1')){
       if(object$drift){
         cat("\nLatent trend drift and AR parameter estimates:\n")
         print(suppressWarnings(mcmc_summary(object$model_output, c('drift', 'ar1', 'sigma', 'theta'),
