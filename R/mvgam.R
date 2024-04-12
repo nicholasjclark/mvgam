@@ -42,7 +42,9 @@
 #'   \item`time` (\code{numeric} or \code{integer} index of the time point for each observation).
 #'   For most dynamic trend types available in `mvgam` (see argument `trend_model`), time should be
 #'   measured in discrete, regularly spaced intervals (i.e. `c(1, 2, 3, ...)`). However you can
-#'   use irregularly spaced intervals if using `trend_model = CAR(1)`
+#'   use irregularly spaced intervals if using `trend_model = CAR(1)`, though note that any
+#'temporal intervals that are exactly `0` will be adjusted to a very small number
+#'(`1e-12`) to prevent sampling errors. See an example of `CAR()` trends in \code{\link{CAR}}
 #'   }
 #'Should also include any other variables to be included in the linear predictor of \code{formula}
 #'@param data_train Deprecated. Still works in place of \code{data} but users are recommended to use
@@ -334,7 +336,7 @@
 #' model_data <- mod1$model_data
 #' library(rstan)
 #' fit <- stan(model_code = mod1$model_file,
-#'            data = model_data)
+#'             data = model_data)
 #'
 #' # Now using cmdstanr
 #' library(cmdstanr)
@@ -384,8 +386,13 @@
 #' plot(mod1, type = 'smooths', realisations = TRUE)
 #'
 #' # Plot conditional response predictions using marginaleffects
-#' plot(conditional_effects(mod1), ask = FALSE)
+#' conditional_effects(mod1)
 #' plot_predictions(mod1, condition = 'season', points = 0.5)
+#'
+#' # Generate posterior predictive checks through bayesplot
+#' pp_check(mod1)
+#' pp_check(mod, type = "bars_grouped",
+#'          group = "series", ndraws = 50)
 #'
 #' # Extract observation model beta coefficient draws as a data.frame
 #' beta_draws_df <- as.data.frame(mod1, variable = 'betas')
@@ -1447,7 +1454,7 @@ mvgam = function(formula,
       vectorised$model_file <- trend_map_setup$model_file
       vectorised$model_data <- trend_map_setup$model_data
 
-      if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+      if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
         param <- c(param, 'sigma')
       }
 

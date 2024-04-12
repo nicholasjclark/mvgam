@@ -67,7 +67,7 @@ series_residuals <- object$resids[[series]]
 
 # Get indices of training horizon
 if(class(data_train)[1] == 'list'){
-  data_train_df <- data.frame(time = data_train$time,
+  data_train_df <- data.frame(time = data_train$index..time..index,
                               y = data_train$y,
                               series = data_train$series)
   obs_length <- length(data_train_df %>%
@@ -79,9 +79,9 @@ if(class(data_train)[1] == 'list'){
 } else {
   obs_length <- length(data_train %>%
                          dplyr::filter(series == !!(levels(data_train$series)[series])) %>%
-                         dplyr::select(time, y) %>%
+                         dplyr::select(index..time..index, y) %>%
                          dplyr::distinct() %>%
-                         dplyr::arrange(time) %>%
+                         dplyr::arrange(index..time..index) %>%
                          dplyr::pull(y))
 }
 
@@ -143,7 +143,7 @@ if(missing(data_test)){
     if(class(data_train)[1] == 'list'){
       all_obs <- c(data.frame(y = data_train$y,
                               series = data_train$series,
-                              time = data_train$time) %>%
+                              time = data_train$index..time..index) %>%
                      dplyr::filter(series == s_name) %>%
                      dplyr::select(time, y) %>%
                      dplyr::distinct() %>%
@@ -160,9 +160,9 @@ if(missing(data_test)){
     } else {
       all_obs <- c(data_train %>%
                      dplyr::filter(series == s_name) %>%
-                     dplyr::select(time, y) %>%
+                     dplyr::select(index..time..index, y) %>%
                      dplyr::distinct() %>%
-                     dplyr::arrange(time) %>%
+                     dplyr::arrange(index..time..index) %>%
                      dplyr::pull(y),
                    data_test %>%
                      dplyr::filter(series == s_name) %>%

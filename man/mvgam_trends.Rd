@@ -19,7 +19,12 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all types apart from \code{GP()}, \code{PW()}, and \code{CAR()}, moving average and/or correlated
+For most dynamic trend types available in \code{mvgam} (see argument \code{trend_model}), time should be
+measured in discrete, regularly spaced intervals (i.e. \code{c(1, 2, 3, ...)}). However you can
+use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though note that any
+temporal intervals that are exactly \code{0} will be adjusted to a very small number
+(\code{1e-12}) to prevent sampling errors. For all trend types
+apart from \code{GP()}, \code{PW()}, and \code{CAR()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
 multivariate Random Walk if \code{data} contains \verb{>1} series). Character strings can also be supplied
 instead of the various trend functions. The full list of possible models that are

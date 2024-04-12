@@ -80,7 +80,8 @@ compute_edf = function(mgcv_model, object, rho_names, sigma_raw_names,
     # Calculate variance using family's mean-variance relationship
     mu_variance <- predict(object,
                            process_error = FALSE,
-                           type = 'variance')[best_draw, ]
+                           type = 'variance',
+                           summary = FALSE)[best_draw, ]
     if(length(mu_variance) > 1){
       mu_variance <- mu_variance[1:length(eta)]
     }

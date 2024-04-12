@@ -743,3 +743,223 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
     box(bty = 'L', lwd = 2)
   }
 }
+
+#' Posterior Predictive Checks for \code{mvgam} Objects
+#'
+#' Perform posterior predictive checks with the help
+#' of the \pkg{bayesplot} package.
+#'
+#' @aliases pp_check
+#' @inheritParams brms::pp_check
+#' @param object An object of class \code{mvgam}.
+#' @param newdata Optional \code{dataframe} or \code{list} of test data containing the
+#' variables included in the linear predictor of \code{formula}. If not supplied,
+#' predictions are generated for the original observations used for the model fit.
+#' @param ... Further arguments passed to \code{\link{predict.mvgam}}
+#'   as well as to the PPC function specified in \code{type}.
+#' @inheritParams prepare_predictions.brmsfit
+#'
+#' @return A ggplot object that can be further
+#'  customized using the \pkg{ggplot2} package.
+#'
+#' @details For a detailed explanation of each of the ppc functions,
+#' see the \code{\link[bayesplot:PPC-overview]{PPC}}
+#' documentation of the \pkg{\link[bayesplot:bayesplot-package]{bayesplot}}
+#' package.
+#'
+#' @examples
+#' \dontrun{
+#'simdat <- sim_mvgam(seasonality = 'hierarchical')
+#'mod <- mvgam(y ~ series +
+#'               s(season, bs = 'cc', k = 6) +
+#'               s(season, series, bs = 'sz', k = 4),
+#'             data = simdat$data_train)
+#'
+#'# Get a list of available plot types
+#'pp_check(mod, type = "xyz")
+#'
+#'# Default is a density overlay for all observations
+#'pp_check(mod)
+#'
+#'# Rootograms particularly useful for count data
+#'pp_check(mod, type = "rootogram")
+#'
+#'# Grouping plots by series is useful
+#'pp_check(mod, type = "bars_grouped",
+#'         group = "series", ndraws = 50)
+#'pp_check(mod, type = "ecdf_overlay_grouped",
+#'         group = "series", ndraws = 50)
+#'pp_check(mod, type = "stat_freqpoly_grouped",
+#'         group = "series", ndraws = 50)
+#'
+#'# Custom functions accepted
+#'prop_zero <- function(x) mean(x == 0)
+#'pp_check(mod, type = "stat", stat = "prop_zero")
+#'pp_check(mod, type = "stat_grouped",
+#'         stat = "prop_zero",
+#'         group = "series")
+#'
+#'# Some functions accept covariates to set the x-axes
+#'pp_check(mod, x = "season",
+#'         type = "ribbon_grouped",
+#'         prob = 0.5,
+#'         prob_outer = 0.8,
+#'         group = "series")
+#'
+#'# Many plots can be made without the observed data
+#'pp_check(mod, prefix = "ppd")
+#' }
+#'
+#' @importFrom bayesplot pp_check
+#' @export pp_check
+#' @export
+pp_check.mvgam <- function(object, type, ndraws = NULL, prefix = c("ppc", "ppd"),
+                             group = NULL, x = NULL, newdata = NULL, ...) {
+
+  # Set red colour scheme
+  col_scheme <- attr(color_scheme_get(),
+                     'scheme_name')
+  color_scheme_set('red')
+
+  dots <- list(...)
+  if (missing(type)) {
+    type <- "dens_overlay"
+  }
+
+  prefix <- match.arg(prefix)
+  ndraws_given <- "ndraws" %in% names(match.call())
+
+  if(is.null(newdata)){
+    newdata <- object$obs_data
+  }
+
+  if (prefix == "ppc") {
+    # No type checking for prefix 'ppd' yet
+    valid_types <- as.character(bayesplot::available_ppc(""))
+    valid_types <- sub("^ppc_", "", valid_types)
+    if (!type %in% valid_types) {
+      stop("Type '", type, "' is not a valid ppc type. ",
+            "Valid types are:\n",
+           paste0("'", valid_types, "'", collapse = ", "),
+           call. = FALSE)
+    }
+  }
+  ppc_fun <- get(paste0(prefix, "_", type), asNamespace("bayesplot"))
+
+  family <- object$family
+  if (family == 'nmix') {
+    stop("'pp_check' is not implemented for this family.",
+         call. = FALSE)
+  }
+  valid_vars <- names(get_predictors(object))
+  if ("group" %in% names(formals(ppc_fun))) {
+    if (is.null(group)) {
+      stop("Argument 'group' is required for ppc type '", type, "'.",
+           call. = FALSE)
+    }
+    if (!group %in% valid_vars) {
+      stop("Variable '", group, "' could not be found in the data.",
+           call. = FALSE)
+    }
+  }
+  if ("x" %in% names(formals(ppc_fun))) {
+    if (!is.null(x) && !x %in% valid_vars) {
+      stop("Variable '", x, "' could not be found in the data.",
+           call. = FALSE)
+    }
+  }
+  if (type == "error_binned") {
+    method <- "posterior_epred"
+  } else {
+    method <- "posterior_predict"
+  }
+  if (!ndraws_given) {
+    aps_types <- c(
+      "error_scatter_avg", "error_scatter_avg_vs_x",
+      "intervals", "intervals_grouped",
+      "loo_intervals", "loo_pit", "loo_pit_overlay",
+      "loo_pit_qq", "loo_ribbon",
+      'pit_ecdf', 'pit_ecdf_grouped',
+      "ribbon", "ribbon_grouped",
+      "rootogram", "scatter_avg", "scatter_avg_grouped",
+      "stat", "stat_2d", "stat_freqpoly_grouped", "stat_grouped",
+      "violin_grouped"
+    )
+    if (type %in% aps_types) {
+      ndraws <- NULL
+      message("Using all posterior draws for ppc type '",
+              type, "' by default.")
+    } else {
+      ndraws <- 10
+      message("Using 10 posterior draws for ppc type '",
+              type, "' by default.")
+    }
+  }
+
+  y <- NULL
+  if (prefix == "ppc") {
+    # y is ignored in prefix 'ppd' plots
+    y <- newdata[[terms(formula(object$call))[[2]]]]
+  }
+
+  pred_args <- list(
+    object, newdata = newdata, ndraws = ndraws, ...)
+  yrep <- do_call(method, pred_args)
+
+  if (anyNA(y)) {
+    warning("NA responses are not shown in 'pp_check'.")
+    take <- !is.na(y)
+    y <- y[take]
+    yrep <- yrep[, take, drop = FALSE]
+  }
+
+  # Prepare plotting arguments
+  ppc_args <- list()
+  if (prefix == "ppc") {
+    ppc_args$y <- y
+    ppc_args$yrep <- yrep
+  } else if (prefix == "ppd") {
+    ppc_args$ypred <- yrep
+  }
+  if (!is.null(group)) {
+    if(!exists(group, newdata)) stop(paste0('Variable ', group, ' not in newdata'),
+                                     call. = FALSE)
+    ppc_args$group <- newdata[[group]]
+  }
+
+  is_like_factor = function(x){
+    is.factor(x) || is.character(x) || is.logical(x)
+  }
+
+  if (!is.null(x)) {
+    ppc_args$x <- newdata[[x]]
+    if (!is_like_factor(ppc_args$x)) {
+      ppc_args$x <- as.numeric(ppc_args$x)
+    }
+  }
+  if ("psis_object" %in% setdiff(names(formals(ppc_fun)), names(ppc_args))) {
+    # ppc_args$psis_object <- do_call(
+    #   compute_loo, c(pred_args, criterion = "psis")
+    # )
+    # compute_loo() not available yet for mvgam
+    ppc_args$psis_object <- NULL
+  }
+  if ("lw" %in% setdiff(names(formals(ppc_fun)), names(ppc_args))) {
+    # ppc_args$lw <- weights(
+    #   do_call(compute_loo, c(pred_args, criterion = "psis"))
+    # )
+    # compute_loo() not available yet for mvgam
+    ppc_args$lw <- NULL
+  }
+
+  # Most ... arguments are meant for the prediction function
+  for_pred <- names(dots) %in% names(formals(posterior_predict.mvgam))
+  ppc_args <- c(ppc_args, dots[!for_pred])
+
+  # Generate plot and reset colour scheme
+  out_plot <- do_call(ppc_fun, ppc_args)
+  color_scheme_set(col_scheme)
+
+  # Return the plot
+  return(out_plot)
+}

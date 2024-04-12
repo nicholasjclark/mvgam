@@ -4,7 +4,14 @@
 \alias{posterior_predict.mvgam}
 \title{Draws from the Posterior Predictive Distribution}
 \usage{
-\method{posterior_predict}{mvgam}(object, newdata, data_test, process_error = TRUE, ...)
+\method{posterior_predict}{mvgam}(
+  object,
+  newdata,
+  data_test,
+  ndraws = NULL,
+  process_error = TRUE,
+  ...
+)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
@@ -15,6 +22,9 @@ predictions are generated for the original observations used for the model fit.}
 
 \item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
 \code{newdata} instead for more seamless integration into \code{R} workflows}
+
+\item{ndraws}{Positive \code{integer} indicating how many posterior draws should be used.
+If \code{NULL} (the default) all draws are used.}
 
 \item{process_error}{Logical. If \code{TRUE} and \code{newdata} is supplied,
 expected uncertainty in the process model is accounted for by using draws

@@ -119,12 +119,12 @@ sort_data = function(data, series_time = FALSE){
   if(inherits(data, 'list')){
     data_arranged <- data
     if(series_time){
-      temp_dat = data.frame(time = data$time,
+      temp_dat = data.frame(time = data$index..time..index,
                             series = data$series) %>%
         dplyr::mutate(index = dplyr::row_number()) %>%
         dplyr::arrange(series, time)
     } else {
-      temp_dat = data.frame(time = data$time,
+      temp_dat = data.frame(time = data$index..time..index,
                             series = data$series) %>%
         dplyr::mutate(index = dplyr::row_number()) %>%
         dplyr::arrange(time, series)
@@ -141,10 +141,10 @@ sort_data = function(data, series_time = FALSE){
   } else {
     if(series_time){
       data_arranged <- data %>%
-        dplyr::arrange(series, time)
+        dplyr::arrange(series, index..time..index)
     } else {
       data_arranged <- data %>%
-        dplyr::arrange(time, series)
+        dplyr::arrange(index..time..index, series)
     }
   }
 
@@ -555,8 +555,8 @@ validate_trend_restrictions = function(trend_model,
                               trend = 1:length(unique(data_train$series)))
     }
 
-    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'VAR1')){
-      stop('only RW, AR1, AR2, AR3 and VAR trends currently supported for trend predictor models',
+    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'CAR1')){
+      stop('only RW, AR1, AR2, AR3, CAR1 and VAR trends currently supported for trend predictor models',
            call. = FALSE)
     }
   }

@@ -12,6 +12,8 @@
 #' averaged across draws should be very similar.
 #' @importFrom rstantools posterior_epred
 #' @inheritParams predict.mvgam
+#' @param ndraws Positive `integer` indicating how many posterior draws should be used.
+#' If `NULL` (the default) all draws are used.
 #' @param process_error Logical. If \code{TRUE} and \code{newdata} is supplied,
 #' expected uncertainty in the process model is accounted for by using draws
 #' from any latent trend SD parameters. If \code{FALSE}, uncertainty in the latent
@@ -49,19 +51,32 @@
 #'str(expectations)
 #'}
 #' @export
-posterior_epred.mvgam = function(object, newdata,
+posterior_epred.mvgam = function(object,
+                                 newdata,
                                  data_test,
+                                 ndraws = NULL,
                                  process_error = TRUE, ...){
 
   if(missing(newdata) & missing(data_test)){
-    .mvgam_fitted(object, type = 'expected')
+    out <- .mvgam_fitted(object, type = 'expected')
   } else {
-    predict(object,
-            newdata = newdata,
-            data_test = data_test,
-            process_error = process_error,
-            type = 'expected')
+    out <- predict(object,
+                   newdata = newdata,
+                   data_test = data_test,
+                   process_error = process_error,
+                   type = 'expected',
+                   summary = FALSE)
   }
+
+  if(!is.null(ndraws)){
+    validate_pos_integer(ndraws)
+    if(ndraws > NROW(out)){
+    } else {
+      idx <- sample(1:NROW(out), ndraws, replace = FALSE)
+      out <- out[idx, ]
+    }
+  }
+  return(out)
 }
 
 #' Posterior Draws of the Linear Predictor
@@ -110,6 +125,7 @@ posterior_epred.mvgam = function(object, newdata,
 posterior_linpred.mvgam = function(object,
                                    transform = FALSE,
                                    newdata,
+                                   ndraws = NULL,
                                    data_test,
                                    process_error = TRUE,
                                    ...){
@@ -120,11 +136,22 @@ posterior_linpred.mvgam = function(object,
     type <- 'link'
   }
 
-  predict(object,
-          newdata = newdata,
-          data_test = data_test,
-          process_error = process_error,
-          type = type)
+  out <- predict(object,
+                 newdata = newdata,
+                 data_test = data_test,
+                 process_error = process_error,
+                 type = type,
+                 summary = FALSE)
+
+  if(!is.null(ndraws)){
+    validate_pos_integer(ndraws)
+    if(ndraws > NROW(out)){
+    } else {
+      idx <- sample(1:NROW(out), ndraws, replace = FALSE)
+      out <- out[idx, ]
+    }
+  }
+  return(out)
 }
 
 #' Draws from the Posterior Predictive Distribution
@@ -138,6 +165,7 @@ posterior_linpred.mvgam = function(object,
 #' both methods averaged across draws should be very similar.
 #' @importFrom rstantools posterior_predict
 #' @inheritParams predict.mvgam
+#' @inheritParams posterior_epred.mvgam
 #' @param process_error Logical. If \code{TRUE} and \code{newdata} is supplied,
 #' expected uncertainty in the process model is accounted for by using draws
 #' from any latent trend SD parameters. If \code{FALSE}, uncertainty in the latent
@@ -174,15 +202,28 @@ posterior_linpred.mvgam = function(object,
 #'str(predictions)
 #'}
 #' @export
-posterior_predict.mvgam = function(object, newdata,
+posterior_predict.mvgam = function(object,
+                                   newdata,
                                    data_test,
+                                   ndraws = NULL,
                                    process_error = TRUE, ...){
 
-  predict(object,
-          newdata = newdata,
-          data_test = data_test,
-          process_error = process_error,
-          type = 'response')
+  out <- predict(object,
+                 newdata = newdata,
+                 data_test = data_test,
+                 process_error = process_error,
+                 type = 'response',
+                 summary = FALSE)
+
+  if(!is.null(ndraws)){
+    validate_pos_integer(ndraws)
+    if(ndraws > NROW(out)){
+    } else {
+      idx <- sample(1:NROW(out), ndraws, replace = FALSE)
+      out <- out[idx, ]
+    }
+  }
+  return(out)
 }
 
 #' Expected Values of the Posterior Predictive Distribution

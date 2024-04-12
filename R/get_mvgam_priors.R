@@ -256,6 +256,7 @@ get_mvgam_priors = function(formula,
     }
 
     trend_train <- data_train
+    trend_train$time <- trend_train$index..time..index
     trend_train$trend_y <- rnorm(length(trend_train$time))
 
     # Add indicators of trend names as factor levels using the trend_map

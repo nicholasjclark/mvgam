@@ -56,7 +56,9 @@ forecast <- function(object, ...){
 #'
 #' }
 #'@export
-forecast.mvgam = function(object, newdata, data_test,
+forecast.mvgam = function(object,
+                          newdata,
+                          data_test,
                           n_cores = 1,
                           type = 'response',
                           ...){
@@ -112,8 +114,34 @@ forecast.mvgam = function(object, newdata, data_test,
   }
 
   if(is.null(object$test_data)){
-    data_test %>%
-      dplyr::filter(time > max(object$obs_data$time)) -> data_test
+    data_test <- validate_series_time(data_test, name = 'newdata',
+                                      trend_model = attr(object$model_data, 'trend_model'))
+    data.frame(series = object$obs_data$series,
+               time = object$obs_data$time) %>%
+      dplyr::group_by(series) %>%
+      dplyr::summarise(maxt = max(time)) -> series_max_ts
+
+    data.frame(series = data_test$series,
+               time = data_test$time) %>%
+      dplyr::mutate(orig_rows = dplyr::row_number()) %>%
+      dplyr::left_join(series_max_ts, by = 'series') %>%
+      dplyr::filter(time > maxt) %>%
+      dplyr::pull(orig_rows) -> idx
+
+    if(inherits(data_test, 'list')){
+      data_arranged <- data_test
+      data_arranged <- lapply(data_test, function(x){
+        if(is.matrix(x)){
+          matrix(x[idx,], ncol = NCOL(x))
+        } else {
+          x[idx]
+        }
+      })
+      names(data_arranged) <- names(data_test)
+      data_test <- data_arranged
+    } else {
+      data_test <- data_test[idx, ]
+    }
   }
 
   # Only compute forecasts if they don't already exist!
@@ -269,7 +297,7 @@ forecast.mvgam = function(object, newdata, data_test,
       series_obs <- lapply(seq_len(n_series), function(series){
         s_name <- levels(object$obs_data$series)[series]
         data.frame(series = object$obs_data$series,
-                   time = object$obs_data$time,
+                   time = object$obs_data$index..time..index,
                    y = object$obs_data$y) %>%
           dplyr::filter(series == s_name) %>%
           dplyr::arrange(time) %>%
@@ -280,7 +308,7 @@ forecast.mvgam = function(object, newdata, data_test,
       series_test <- lapply(seq_len(n_series), function(series){
         s_name <- levels(object$obs_data$series)[series]
         data.frame(series = data_test$series,
-                   time = data_test$time,
+                   time = data_test$index..time..index,
                    y = data_test$y) %>%
           dplyr::filter(series == s_name) %>%
           dplyr::arrange(time) %>%
@@ -372,7 +400,7 @@ forecast.mvgam = function(object, newdata, data_test,
       names(series_hcs) <- s_name
 
       series_obs <- list(data.frame(series = object$obs_data$series,
-                                    time = object$obs_data$time,
+                                    time = object$obs_data$index..time..index,
                                     y = object$obs_data$y) %>%
                            dplyr::filter(series == s_name) %>%
                            dplyr::arrange(time) %>%
@@ -380,7 +408,7 @@ forecast.mvgam = function(object, newdata, data_test,
       names(series_obs) <- s_name
 
       series_test <- list(data.frame(series = data_test$series,
-                                     time = data_test$time,
+                                     time = data_test$index..time..index,
                                      y = data_test$y) %>%
                             dplyr::filter(series == s_name) %>%
                             dplyr::arrange(time) %>%
@@ -391,8 +419,8 @@ forecast.mvgam = function(object, newdata, data_test,
   } else {
     # If forecasts already exist, simply extract them
    data_test <- object$test_data
-    last_train <- max(object$obs_data$time) -
-      (min(object$obs_data$time) - 1)
+    last_train <- max(object$obs_data$index..time..index) -
+      (min(object$obs_data$index..time..index) - 1)
 
     if(series == 'all'){
       data_train <- object$obs_data
@@ -595,7 +623,7 @@ forecast.mvgam = function(object, newdata, data_test,
       series_obs <- lapply(seq_len(n_series), function(series){
         s_name <- levels(object$obs_data$series)[series]
         data.frame(series = object$obs_data$series,
-                   time = object$obs_data$time,
+                   time = object$obs_data$index..time..index,
                    y = object$obs_data$y) %>%
           dplyr::filter(series == s_name) %>%
           dplyr::arrange(time) %>%
@@ -606,7 +634,7 @@ forecast.mvgam = function(object, newdata, data_test,
       series_test <- lapply(seq_len(n_series), function(series){
         s_name <- levels(object$obs_data$series)[series]
         data.frame(series = object$test_data$series,
-                   time = object$test_data$time,
+                   time = object$test_data$index..time..index,
                    y = object$test_data$y) %>%
           dplyr::filter(series == s_name) %>%
           dplyr::arrange(time) %>%
@@ -709,7 +737,7 @@ forecast.mvgam = function(object, newdata, data_test,
 
       # Training observations
       series_obs <- list(data.frame(series = object$obs_data$series,
-                                    time = object$obs_data$time,
+                                    time = object$obs_data$index..time..index,
                                     y = object$obs_data$y) %>%
                            dplyr::filter(series == s_name) %>%
                            dplyr::arrange(time) %>%
@@ -718,7 +746,7 @@ forecast.mvgam = function(object, newdata, data_test,
 
       # Testing observations
       series_test <- list(data.frame(series = object$test_data$series,
-                                     time = object$test_data$time,
+                                     time = object$test_data$index..time..index,
                                      y = object$test_data$y) %>%
                             dplyr::filter(series == s_name) %>%
                             dplyr::arrange(time) %>%
@@ -743,9 +771,9 @@ forecast.mvgam = function(object, newdata, data_test,
                                series_names = factor(unique(data_train$series),
                                                      levels = levels(data_train$series)),
                                train_observations = series_obs,
-                               train_times = unique(data_train$time),
+                               train_times = unique(data_train$index..time..index),
                                test_observations = series_test,
-                               test_times = unique(data_test$time),
+                               test_times = unique(data_test$index..time..index),
                                hindcasts = series_hcs,
                                forecasts = series_fcs),
                           class = 'mvgam_forecast')
@@ -767,7 +795,8 @@ forecast_draws = function(object,
 
   # Check arguments
   validate_pos_integer(n_cores)
-  data_test <- validate_series_time(data_test, name = 'newdata')
+  data_test <- validate_series_time(data_test, name = 'newdata',
+                                    trend_model = attr(object$model_data, 'trend_model'))
   n_series <- NCOL(object$ytimes)
   use_lv <- object$use_lv
 
@@ -784,14 +813,14 @@ forecast_draws = function(object,
     if(series != 'all'){
       obs_keep <- data.frame(y = data_test$y,
                              series = data_test$series,
-                             time = data_test$time,
+                             time = data_test$index..time..index,
                              rowid = 1:length(data_test$y)) %>%
         dplyr::filter(series == s_name) %>%
         dplyr::arrange(time) %>%
         dplyr::pull(rowid)
       series_test <- data.frame(y = data_test$y,
                                 series = data_test$series,
-                                time = data_test$time,
+                                time = data_test$index..time..index,
                                 rowid = 1:length(data_test$y)) %>%
         dplyr::filter(series == s_name) %>%
         dplyr::arrange(time)
@@ -803,7 +832,7 @@ forecast_draws = function(object,
     if(series != 'all'){
       series_test <- data_test %>%
         dplyr::filter(series == s_name) %>%
-        dplyr::arrange(time)
+        dplyr::arrange(index..time..index)
       Xp <- obs_Xp_matrix(newdata = series_test,
                           mgcv_model = object$mgcv_model)
     } else {
@@ -834,9 +863,9 @@ forecast_draws = function(object,
 
       # Ensure the last three values are used, in case the obs_data
       # was not supplied in order
-      data.frame(time = object$obs_data$time,
+      data.frame(time = object$obs_data$index..time..index,
                  series = object$obs_data$series,
-                 row_id = 1:length(object$obs_data$time)) %>%
+                 row_id = 1:length(object$obs_data$index..time..index)) %>%
         dplyr::arrange(time, series) %>%
         dplyr::pull(row_id) -> sorted_inds
 
@@ -897,7 +926,7 @@ forecast_draws = function(object,
   if(series != 'all'){
     fc_horizon <- NROW(series_test)
   } else {
-    fc_horizon <- length(unique(data_test$time))
+    fc_horizon <- length(unique(data_test$index..time..index))
   }
 
   # Beta coefficients for GAM observation component
@@ -935,7 +964,7 @@ forecast_draws = function(object,
     resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
     trial_name <- resp_terms[2]
     trial_df <- data.frame(series = data_test$series,
-                           time = data_test$time,
+                           time = data_test$index..time..index,
                            trial = data_test[[trial_name]])
     trials <- matrix(NA, nrow = fc_horizon, ncol = n_series)
     for(i in 1:n_series){
@@ -951,6 +980,18 @@ forecast_draws = function(object,
   # Trend model
   trend_model <- attr(object$model_data, 'trend_model')
 
+  # Calculate time_dis if this is a CAR1 model
+  if(trend_model == 'CAR1'){
+    data_test$index..time..index <- data_test$index..time..index +
+      max(object$obs_data$index..time..index)
+    time_dis <- add_corcar(model_data = list(),
+                       data_train = object$obs_data,
+                       data_test = data_test)[[1]]
+    time_dis <- time_dis[-c(1:max(object$obs_data$index..time..index)),]
+  } else {
+    time_dis <- NULL
+  }
+
   # Trend-specific parameters
   if(missing(ending_time)){
     trend_pars <- extract_trend_pars(object = object,
@@ -964,12 +1005,18 @@ forecast_draws = function(object,
   # Any model in which an autoregressive process was included should be
   # considered as VAR1 for forecasting purposes as this will make use of the
   # faster c++ functions
-  if('Sigma' %in% names(trend_pars) |
-     'sigma' %in% names(trend_pars) |
-     'tau' %in% names(trend_pars)){
-    trend_model <- 'VAR1'
+  if(trend_model == 'CAR1'){
     if(!'last_lvs' %in% names(trend_pars)){
       trend_pars$last_lvs <- trend_pars$last_trends
+    }
+  } else {
+    if('Sigma' %in% names(trend_pars) |
+       'sigma' %in% names(trend_pars) |
+       'tau' %in% names(trend_pars)){
+      trend_model <- 'VAR1'
+      if(!'last_lvs' %in% names(trend_pars)){
+        trend_pars$last_lvs <- trend_pars$last_trends
+      }
     }
   }
 
@@ -995,7 +1042,8 @@ forecast_draws = function(object,
                                   'fc_horizon',
                                   'b_uncertainty',
                                   'trend_uncertainty',
-                                  'obs_uncertainty'),
+                                  'obs_uncertainty',
+                                  'time_dis'),
                           envir = environment())
   parallel::clusterExport(cl = cl,
                           unclass(lsf.str(envir = asNamespace("mvgam"),
@@ -1035,7 +1083,7 @@ forecast_draws = function(object,
                                                          samp_index = 1)
       }
 
-      if(use_lv || trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic')){
+      if(use_lv || trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic', 'CAR1')){
         if(trend_model == 'PWlogistic'){
           if(!(exists('cap', where = data_test))) {
             stop('Capacities must also be supplied in "newdata" for logistic growth predictions',
@@ -1046,7 +1094,7 @@ forecast_draws = function(object,
             family_links <- Gamma(link = 'log')
           }
           cap <- data.frame(series = data_test$series,
-                            time = data_test$time,
+                            time = data_test$index..time..index,
                             cap = suppressWarnings(linkfun(data_test$cap,
                                                            link = family_links$link)))
 
@@ -1068,8 +1116,10 @@ forecast_draws = function(object,
                                  h = fc_horizon,
                                  betas_trend = betas_trend,
                                  Xp_trend = Xp_trend,
-                                 time = unique(data_test$time - min(object$obs_data$time) + 1),
-                                 cap = cap)
+                                 time = unique(data_test$index..time..index -
+                                                 min(object$obs_data$index..time..index) + 1),
+                                 cap = cap,
+                                 time_dis = time_dis)
       }
 
       # Loop across series and produce the next trend estimate
@@ -1081,11 +1131,11 @@ forecast_draws = function(object,
                                                     trend_pars = trend_pars,
                                                     use_lv = use_lv)
 
-        if(use_lv || trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic')){
+        if(use_lv || trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic', 'CAR1')){
           if(use_lv){
             # Multiply lv states with loadings to generate the series' forecast trend state
             out <- as.numeric(trends %*% trend_extracts$lv_coefs)
-          } else if(trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic')){
+          } else if(trend_model %in% c('VAR1', 'PWlinear', 'PWlogistic', 'CAR1')){
             out <- trends[,series]
           }
 
@@ -1097,7 +1147,8 @@ forecast_draws = function(object,
                                 h = fc_horizon,
                                 betas_trend = betas_trend,
                                 Xp_trend = Xp_trend,
-                                time = sort(unique(data_test$time)))
+                                time = sort(unique(data_test$index..time..index)),
+                                time_dis = NULL)
         }
         out
       })
@@ -1176,7 +1227,7 @@ forecast_draws = function(object,
                                h = fc_horizon,
                                betas_trend = betas_trend,
                                Xp_trend = Xp_trend,
-                               time = sort(unique(series_test$time)))
+                               time = sort(unique(series_test$index..time..index)))
 
       if(use_lv){
         # Multiply lv states with loadings to generate the series' forecast trend state

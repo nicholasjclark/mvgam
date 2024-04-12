@@ -148,19 +148,19 @@ and for the latent trend parameters
 mcmc_plot(lynx_mvgam, variable = 'trend_params', regex = TRUE, type = 'trace')
 ```
 
-Use posterior predictive checks to see if the model can simulate data that looks realistic and unbiased. First, examine histograms for posterior retrodictions (`yhat`) and compare to the histogram of the observations (`y`)
+Use posterior predictive checks, which capitalize on the extensive functionality of the `bayesplot` package, to see if the model can simulate data that looks realistic and unbiased. First, examine histograms for posterior retrodictions (`yhat`) and compare to the histogram of the observations (`y`)
 ```{r, fig.alt = "Posterior predictive checks for discrete time series in R"}
-ppc(lynx_mvgam, series = 1, type = 'hist')
+pp_check(lynx_mvgam, type = "hist", ndraws = 5)
 ```
 
 Next examine simulated empirical Cumulative Distribution Functions (CDF) for posterior predictions
 ```{r, fig.alt = "Posterior predictive checks for discrete time series in R"}
-ppc(lynx_mvgam, series = 1, type = 'cdf')
+pp_check(lynx_mvgam, type = "ecdf_overlay", ndraws = 25)
 ```
 
-Rootograms are [popular graphical tools for checking a discrete model's ability to capture dispersion properties of the response variable](https://arxiv.org/pdf/1605.01311.pdf){target="_blank"}. Posterior predictive hanging rootograms can be displayed using the `ppc()` function. In the plot below, we bin the unique observed values into `25` bins to prevent overplotting and help with interpretation. This plot compares the frequencies of observed vs predicted values for each bin. For example, if the gray bars (representing observed frequencies) tend to stretch below zero, this suggests the model's simulations predict the values in that particular bin less frequently than they are observed in the data. A well-fitting model that can generate realistic simulated data will provide a rootogram in which the lower boundaries of the grey bars are generally near zero
+Rootograms are [popular graphical tools for checking a discrete model's ability to capture dispersion properties of the response variable](https://arxiv.org/pdf/1605.01311.pdf){target="_blank"}. Posterior predictive hanging rootograms can be displayed using the `ppc()` function. In the plot below, we bin the unique observed values into `25` bins to prevent overplotting and help with interpretation. This plot compares the frequencies of observed vs predicted values for each bin. For example, if the gray bars (representing observed frequencies) tend to stretch below zero, this suggests the model's simulations predict the values in that particular bin less frequently than they are observed in the data. A well-fitting model that can generate realistic simulated data will provide a rootogram in which the lower boundaries of the grey bars are generally near zero. For this plot we use the `S3` function `ppc.mvgam()`, which is not as versatile as `pp_check()` but allows us to bin rootograms to avoid overplotting
 ```{r, fig.alt = "Posterior predictive rootograms for discrete time series in R"}
-ppc(lynx_mvgam, series = 1, type = 'rootogram', n_bins = 25)
+ppc(lynx_mvgam, type = "rootogram", n_bins = 25)
 ```
 
 All plots indicate the model is well calibrated against the training data. Inspect the estimated cyclic smooth, which is shown as a ribbon plot of posterior empirical quantiles. We can also overlay posterior quantiles of partial residuals (shown in red), which represent the leftover variation that the model expects would remain if this smooth term was dropped but all other parameters remained unchanged. A strong pattern in the partial residuals suggests there would be strong patterns left unexplained in the model *if* we were to drop this term, giving us further confidence that this function is important in the model

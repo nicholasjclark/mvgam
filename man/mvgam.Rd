@@ -74,10 +74,17 @@ functions within the \code{trend_formula}}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:
-\code{series} (a \code{factor} index of the series IDs;the number of levels should be identical
+#'\itemize{
+\item\code{series} (a \code{factor} index of the series IDs; the number of levels should be identical
 to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
-\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
-Any other variables to be included in the linear predictor of \code{formula} must also be present}
+\item\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
+For most dynamic trend types available in \code{mvgam} (see argument \code{trend_model}), time should be
+measured in discrete, regularly spaced intervals (i.e. \code{c(1, 2, 3, ...)}). However you can
+use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though note that any
+temporal intervals that are exactly \code{0} will be adjusted to a very small number
+(\code{1e-12}) to prevent sampling errors. See an example of \code{CAR()} trends in \code{\link{CAR}}
+}
+Should also include any other variables to be included in the linear predictor of \code{formula}}
 
 \item{data_train}{Deprecated. Still works in place of \code{data} but users are recommended to use
 \code{data} instead for more seamless integration into \code{R} workflows}
@@ -99,7 +106,8 @@ simulations from prior distributions are returned}
 \item{return_model_data}{\code{logical}. If \code{TRUE}, the list of data that is needed to fit the
 model is returned, along with the initial values for smooth and AR parameters, once the model is fitted.
 This will be helpful if users wish to modify the model file to add
-other stochastic elements that are not currently avaiable in \code{mvgam}. Default is \code{FALSE} to reduce
+other stochastic elements that are not currently available in \code{mvgam}.
+Default is \code{FALSE} to reduce
 the size of the returned object, unless \code{run_model == FALSE}}
 
 \item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
@@ -157,12 +165,13 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{'AR1'} or \code{AR(p = 1)}
 \item \code{'AR2'} or \code{AR(p = 2)}
 \item \code{'AR3'} or \code{AR(p = 3)}
+\item \code{'CAR1'} or \code{CAR(p = 1)}
 \item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
 \item \verb{'PWlogistic}, \code{'PWlinear'} or \code{PW()} (only available in \code{Stan})
 \item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all trend types apart from \code{GP()} and \code{PW()}, moving average and/or correlated
+For all trend types apart from \code{GP()}, \code{CAR()} and \code{PW()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
 multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
 
@@ -309,7 +318,7 @@ are non-identifiable (as in piecewise trends, see examples below)
 \code{\link{mvgam_families}}.
 \cr
 \cr
-\emph{Trend models}: Details of latent trend models supported by \pkg{mvgam} can be found in
+\emph{Trend models}: Details of latent trend dynamic models supported by \pkg{mvgam} can be found in
 \code{\link{mvgam_trends}}.
 \cr
 \cr
@@ -405,7 +414,7 @@ str(mod1$model_data)
 model_data <- mod1$model_data
 library(rstan)
 fit <- stan(model_code = mod1$model_file,
-           data = model_data)
+            data = model_data)
 
 # Now using cmdstanr
 library(cmdstanr)
@@ -455,8 +464,13 @@ plot(mod1, type = 'smooths', residuals = TRUE)
 plot(mod1, type = 'smooths', realisations = TRUE)
 
 # Plot conditional response predictions using marginaleffects
-plot(conditional_effects(mod1), ask = FALSE)
+conditional_effects(mod1)
 plot_predictions(mod1, condition = 'season', points = 0.5)
+
+# Generate posterior predictive checks through bayesplot
+pp_check(mod1)
+pp_check(mod, type = "bars_grouped",
+         group = "series", ndraws = 50)
 
 # Extract observation model beta coefficient draws as a data.frame
 beta_draws_df <- as.data.frame(mod1, variable = 'betas')

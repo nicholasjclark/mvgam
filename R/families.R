@@ -1631,7 +1631,7 @@ dsresids_vec = function(object){
   # Need to know which series each observation belongs to so we can
   # pull out appropriate family-level parameters (overdispersions, shapes, etc...)
   all_dat <- data.frame(series = object$obs_data$series,
-                        time = object$obs_data$time,
+                        time = object$obs_data$index..time..index,
                         y = object$obs_data$y) %>%
     dplyr::arrange(time, series)
 

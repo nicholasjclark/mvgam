@@ -4,6 +4,9 @@ expect_ggplot <- function(object, ...) {
   testthat::expect_true(is(object, "ggplot"), ...)
 }
 
+SM <- suppressMessages
+SW <- suppressWarnings
+
 test_that("conditional_effects works properly", {
   effects <- conditional_effects(mvgam:::mvgam_example1)
   lapply(effects, expect_ggplot)
@@ -12,6 +15,36 @@ test_that("conditional_effects works properly", {
   lapply(effects, expect_ggplot)
 })
 
+test_that("mcmc_plot works properly", {
+  expect_ggplot(mcmc_plot(mvgam:::mvgam_example1, type = "dens"))
+  expect_ggplot(mcmc_plot(mvgam:::mvgam_example1,
+                          type = "scatter",
+                          variable = variables(mvgam:::mvgam_example1)$observation_betas[2:3, 1]))
+  expect_error(mcmc_plot(mvgam:::mvgam_example1, type = "density"), "Invalid plot type")
+  expect_ggplot(SW(mcmc_plot(mvgam:::mvgam_example2, type = "neff")))
+  expect_ggplot(mcmc_plot(mvgam:::mvgam_example3, type = "acf"))
+  expect_silent(p <- mcmc_plot(mvgam:::mvgam_example3, type = "areas"))
+  expect_error(mcmc_plot(mvgam:::mvgam_example3, type = "hex"),
+               "Exactly 2 parameters must be selected")
+  expect_ggplot(mcmc_plot(mvgam:::mvgam_example4))
+})
+
+test_that("pp_check works properly", {
+  expect_ggplot(SM(pp_check(mvgam:::mvgam_example1)))
+  expect_ggplot(SM(pp_check(mvgam:::mvgam_example1,
+                         newdata = mvgam:::mvgam_example1$obs_data[1:10, ])))
+  expect_ggplot(pp_check(mvgam:::mvgam_example2, "stat", ndraws = 5))
+  expect_ggplot(SM(pp_check(mvgam:::mvgam_example3, "error_binned")))
+  pp <- pp_check(mvgam:::mvgam_example4,
+                 type = "ribbon",
+                 x = "season")
+  expect_ggplot(pp)
+  pp <- pp_check(mvgam:::mvgam_example2, type = "violin_grouped",
+                 group = "season",
+                 newdata = mvgam:::mvgam_example2$obs_data[1:10, ])
+  expect_ggplot(pp)
+  expect_ggplot(pp_check(mvgam:::mvgam_example4, prefix = "ppd"))
+})
 
 test_that("model.frame gives expected output structure", {
   mod_data <- model.frame(gaus_ar1)
@@ -66,11 +99,11 @@ test_that("logLik has reasonable ouputs", {
 })
 
 test_that("predict has reasonable outputs", {
-  gaus_preds <- predict(gaus_ar1, type = 'link')
+  gaus_preds <- predict(gaus_ar1, type = 'link', summary = FALSE)
   expect_equal(dim(gaus_preds),
                c(1200, NROW(gaus_data$data_train)))
 
-  beta_preds <- predict(beta_gp, type = 'response')
+  beta_preds <- predict(beta_gp, type = 'response', summary = FALSE)
   expect_equal(dim(beta_preds),
                c(300, NROW(beta_data$data_train)))
   expect_lt(max(beta_preds), 1.00000001)
@@ -82,7 +115,8 @@ test_that("predict has reasonable outputs", {
 })
 
 test_that("get_predict has reasonable outputs", {
-gaus_preds <- predict(gaus_ar1, type = 'link', process_error = FALSE)
+gaus_preds <- predict(gaus_ar1, type = 'link', process_error = FALSE,
+                      summary = FALSE)
 meffects_preds <- get_predict(gaus_ar1, type = 'link')
 expect_true(NROW(meffects_preds) == NCOL(gaus_preds))
 expect_true(identical(meffects_preds$estimate,

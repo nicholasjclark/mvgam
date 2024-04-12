@@ -38,3 +38,64 @@ in \code{mvgam}. These functions do not evaluate their arguments –
 they exist purely to help set up a model with particular autoregressive
 trend models.
 }
+\examples{
+\dontrun{
+# A short example to illustrate CAR(1) models
+# Function to simulate CAR1 data with seasonality
+sim_corcar1 = function(n = 120,
+                      phi = 0.5,
+                      sigma = 1,
+                      sigma_obs = 0.75){
+# Sample irregularly spaced time intervals
+time_dis <- c(0, runif(n - 1, -0.1, 1))
+time_dis[time_dis < 0] <- 0; time_dis <- time_dis * 5
+
+# Set up the latent dynamic process
+x <- vector(length = n); x[1] <- -0.3
+for(i in 2:n){
+ # zero-distances will cause problems in sampling, so mvgam uses a
+ # minimum threshold; this simulation function emulates that process
+ if(time_dis[i] == 0){
+   x[i] <- rnorm(1, mean = (phi ^ 1e-12) * x[i - 1], sd = sigma)
+  } else {
+    x[i] <- rnorm(1, mean = (phi ^ time_dis[i]) * x[i - 1], sd = sigma)
+  }
+}
+
+# Add 12-month seasonality
+cov1 <- sin(2 * pi * (1 : n) / 12); cov2 <- cos(2 * pi * (1 : n) / 12)
+beta1 <- runif(1, 0.3, 0.7); beta2 <- runif(1, 0.2, 0.5)
+seasonality <- beta1 * cov1 + beta2 * cov2
+
+# Take Gaussian observations with error and return
+data.frame(y = rnorm(n, mean = x + seasonality, sd = sigma),
+           season = rep(1:12, 20)[1:n],
+           time = cumsum(time_dis))
+}
+
+# Sample two time series
+dat <- rbind(dplyr::bind_cols(sim_corcar1(phi = 0.65,
+                                         sigma_obs = 0.55),
+                             data.frame(series = 'series1')),
+            dplyr::bind_cols(sim_corcar1(phi = 0.8,
+                             sigma_obs = 0.35),
+                             data.frame(series = 'series2'))) \%>\%
+      dplyr::mutate(series = as.factor(series))
+
+# mvgam with CAR(1) trends and series-level seasonal smooths
+mod <- mvgam(formula = y ~ s(season, bs = 'cc',
+                            k = 5, by = series),
+            trend_model = CAR(),
+            data = dat,
+            family = gaussian(),
+            run_model = TRUE)
+
+# View usual summaries and plots
+summary(mod)
+conditional_effects(mod, type = 'expected')
+plot(mod, type = 'trend', series = 1)
+plot(mod, type = 'trend', series = 2)
+plot(mod, type = 'residuals', series = 1)
+plot(mod, type = 'residuals', series = 2)
+}
+}

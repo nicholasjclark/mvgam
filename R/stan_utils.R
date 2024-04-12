@@ -2701,7 +2701,7 @@ if(trend_model != 'VAR1'){
   model_file <- readLines(textConnection(model_file), n = -1)
 
   # We can estimate the variance parameters if a trend map is supplied
-  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
     model_file <- model_file[-grep('vector[num_basis] b_raw;',
                                    model_file, fixed = TRUE)]
     model_file[grep("// raw basis coefficients",
@@ -2902,6 +2902,7 @@ add_trend_predictors = function(trend_formula,
   }
 
   trend_train <- data_train
+  trend_train$time <- trend_train$index..time..index
   trend_train$trend_y <- rnorm(length(trend_train$time))
 
   # Add indicators of trend names as factor levels using the trend_map
@@ -2940,6 +2941,7 @@ add_trend_predictors = function(trend_formula,
     # If newdata supplied, also create a fake design matrix
     # for the test data
     trend_test <- data_test
+    trend_test$time <- trend_test$index..time..index
     trend_test$trend_y <- rnorm(length(trend_test$time))
     trend_indicators <- vector(length = length(trend_test$time))
     for(i in 1:length(trend_test$time)){
