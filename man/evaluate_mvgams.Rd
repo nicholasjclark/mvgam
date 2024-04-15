@@ -115,7 +115,7 @@ for whether or not the true value lies within the forecast's 90\% prediction int
 
 \code{roll_eval_mvgam} sets up a sequence of evaluation timepoints along a rolling window and iteratively
 calls \code{eval_mvgam} to evaluate 'out-of-sample' forecasts.
-Evaluation involves calculating the Discrete Rank Probability Score and a binary indicator
+Evaluation involves calculating the Rank Probability Scores and a binary indicator
 for whether or not the true value lies within the forecast's 90\% prediction interval
 
 \code{compare_mvgams} automates the evaluation to compare two fitted models using rolling window forecast evaluation and
@@ -129,8 +129,8 @@ set.seed(100)
 dat <- sim_mvgam(T = 75,
                 n_series = 1,
                 prop_trend = 0.75,
-                 trend_model = 'AR2',
-                 family = poisson())
+                trend_model = 'AR2',
+                family = poisson())
 
 # Plot the time series
 plot_mvgam_series(data = dat$data_train,
@@ -139,17 +139,17 @@ plot_mvgam_series(data = dat$data_train,
 
 # Fit an appropriate model
 mod_ar2 <- mvgam(y ~ s(season, bs = 'cc'),
-               trend_model = 'AR2',
-               family = poisson(),
-               data = dat$data_train,
-               newdata = dat$data_test)
+                trend_model = 'AR2',
+                family = poisson(),
+                data = dat$data_train,
+                newdata = dat$data_test)
 
 # Fit a less appropriate model
 mod_rw <- mvgam(y ~ s(season, bs = 'cc'),
-              trend_model = 'RW',
-              family = poisson(),
-              data = dat$data_train,
-              newdata = dat$data_test)
+               trend_model = 'RW',
+               family = poisson(),
+               data = dat$data_train,
+               newdata = dat$data_test)
 
 # Compare Discrete Ranked Probability Scores for the testing period
 fc_ar2 <- forecast(mod_ar2)

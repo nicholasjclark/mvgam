@@ -64,8 +64,8 @@ validate_series_time = function(data, name = 'data'){
   return(data)
 }
 
-#'@noRd
 #' Get data objects into correct order in case it is not already
+#'@noRd
 sort_data = function(data, series_time = FALSE){
   if(inherits(data, 'list')){
     data_arranged <- data

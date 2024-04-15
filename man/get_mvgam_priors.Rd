@@ -10,6 +10,7 @@ get_mvgam_priors(
   data,
   data_train,
   family = "poisson",
+  knots,
   use_lv = FALSE,
   n_lv,
   use_stan = TRUE,
@@ -71,6 +72,11 @@ See \code{\link{mvgam_families}} for an example of how to use this family}
 Note that only \code{nb()} and \code{poisson()} are available if using \code{JAGS} as the backend.
 Default is \code{poisson()}.
 See \code{\link{mvgam_families}} for more details}
+
+\item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
+For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
+(note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
+unless they share a covariate}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. Only available for
