@@ -47,10 +47,9 @@ test_that("cbind() syntax required for binomial()", {
                  gp(x, by = series, c = 5/4, k = 5),
                family = binomial(),
                data = dat_train,
-               run_model = FALSE,
-               autoformat = FALSE)
+               run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
-  expect_true(any(grepl('flat_ys ~ binomial_logit_glm(',
+  expect_true(any(grepl('flat_ys ~ binomial(',
                         mod$model_file, fixed = TRUE)))
 
   # Also with a trend_formula
@@ -61,7 +60,7 @@ test_that("cbind() syntax required for binomial()", {
                data = dat_train,
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
-  expect_true(any(grepl('flat_ys ~ binomial_logit_glm(',
+  expect_true(any(grepl('flat_ys ~ binomial(',
                         mod$model_file, fixed = TRUE)))
 
   # Also with no predictors
@@ -71,7 +70,7 @@ test_that("cbind() syntax required for binomial()", {
                data = dat_train,
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
-  expect_true(any(grepl('flat_ys ~ binomial_logit_glm(',
+  expect_true(any(grepl('flat_ys ~ binomial(',
                         mod$model_file, fixed = TRUE)))
   expect_true(any(grepl("b[1] = 0;", mod$model_file,
                         fixed = TRUE)))

@@ -109,7 +109,7 @@ conditional_effects.mvgam = function(x,
 
   if(points){
     if(x$family %in% c('binomial', 'beta_binomial')){
-      points <- FALSE
+      points <- 0
       warning('Cannot show observation points for binomial models')
     }
   }

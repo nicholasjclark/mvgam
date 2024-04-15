@@ -218,7 +218,7 @@ Plot the estimated smooths of time from each species' latent abundance process (
 plot(mod, type = 'smooths', trend_effects = TRUE)
 ```
 
-`marginaleffects` support allows for more useful prediction-based interrogations on different scales. Objects that use family `nmix()` have a few additional prediction scales that can be used (i.e. `link`, `response`, `detection` or `latent_N`). For example, here are the estimated detection probabilities per species, which show that the model has done a nice job of estimating these parameters:
+`marginaleffects` support allows for more useful prediction-based interrogations on different scales (though note that at the time of writing this Vignette, you must have the development version of `marginaleffects` installed for `nmix()` models to be supported; use `remotes::install_github('vincentarelbundock/marginaleffects')` to install). Objects that use family `nmix()` have a few additional prediction scales that can be used (i.e. `link`, `response`, `detection` or `latent_N`). For example, here are the estimated detection probabilities per species, which show that the model has done a nice job of estimating these parameters:
 ```{r}
 plot_predictions(mod, condition = 'species',
                  type = 'detection') +

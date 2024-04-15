@@ -26,7 +26,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.91</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -49,6 +49,9 @@
     <a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in mvgam</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in mvgam</a>
   </div>
+</li>
+<li class="nav-item">
+  <a class="nav-link" href="../news/index.html">Changelog</a>
 </li>
       </ul>
 <form class="form-inline my-2 my-lg-0" role="search">
@@ -78,7 +81,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2024-02-13</h4>
+            <h4 data-toc-skip class="date">2024-04-15</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/nmixtures.Rmd" class="external-link"><code>vignettes/nmixtures.Rmd</code></a></small>
       <div class="d-none name"><code>nmixtures.Rmd</code></div>
@@ -191,7 +194,7 @@ without adding too much computational cost:</p>
 <span><span class="co"># Now add another species that has a different temporal trend and a smaller </span></span>
 <span><span class="co"># detection probability (0.45 for this species)</span></span>
 <span><span class="va">testdat</span> <span class="op">=</span> <span class="va">testdat</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>site <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>site <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>                              replicate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span>,</span>
 <span>                              time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>                              species <span class="op">=</span> <span class="st">'sp_2'</span>,</span>
@@ -390,7 +393,11 @@ sense of how the marginalization over latent N works</p>
 <span><span class="co">##   }</span></span>
 <span><span class="co">##   </span></span>
 <span><span class="co">##   // derived latent states</span></span>
-<span><span class="co">##   trend = LV * Z';</span></span>
+<span><span class="co">##   for (i in 1 : n) {</span></span>
+<span><span class="co">##     for (s in 1 : n_series) {</span></span>
+<span><span class="co">##       trend[i, s] = dot_product(Z[s,  : ], LV[i,  : ]);</span></span>
+<span><span class="co">##     }</span></span>
+<span><span class="co">##   }</span></span>
 <span><span class="co">## }</span></span>
 <span><span class="co">## model {</span></span>
 <span><span class="co">##   // prior for speciessp_1...</span></span>
@@ -491,24 +498,24 @@ nicely</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">##              2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## speciessp_1 -0.29 0.700   1.4    1  1637</span></span>
-<span><span class="co">## speciessp_2 -1.20 0.019   0.9    1  1895</span></span>
+<span><span class="co">## speciessp_1 -0.22 0.710  1.40    1  1989</span></span>
+<span><span class="co">## speciessp_2 -1.20 0.011  0.88    1  1974</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM process model coefficient (beta) estimates:</span></span>
 <span><span class="co">##                               2.5%     50%  97.5% Rhat n_eff</span></span>
-<span><span class="co">## (Intercept)_trend            2.700  3.0000  3.500    1  1646</span></span>
-<span><span class="co">## speciessp_2_trend           -1.200 -0.6300  0.110    1  1538</span></span>
-<span><span class="co">## s(time):trendtrend1.1_trend -0.073  0.0160  0.210    1   827</span></span>
-<span><span class="co">## s(time):trendtrend1.2_trend -0.220  0.0084  0.250    1  1832</span></span>
-<span><span class="co">## s(time):trendtrend1.3_trend -0.460 -0.2500 -0.041    1  1517</span></span>
-<span><span class="co">## s(time):trendtrend2.1_trend -0.200 -0.0130  0.090    1  1097</span></span>
-<span><span class="co">## s(time):trendtrend2.2_trend -0.200  0.0270  0.390    1  1038</span></span>
-<span><span class="co">## s(time):trendtrend2.3_trend  0.054  0.3300  0.630    1  2973</span></span>
+<span><span class="co">## (Intercept)_trend            2.700  3.0000  3.400 1.00  1795</span></span>
+<span><span class="co">## speciessp_2_trend           -1.200 -0.6300  0.130 1.00  1767</span></span>
+<span><span class="co">## s(time):trendtrend1.1_trend -0.078  0.0160  0.240 1.00  1047</span></span>
+<span><span class="co">## s(time):trendtrend1.2_trend -0.250  0.0062  0.280 1.00  2061</span></span>
+<span><span class="co">## s(time):trendtrend1.3_trend -0.460 -0.2500 -0.027 1.00  2329</span></span>
+<span><span class="co">## s(time):trendtrend2.1_trend -0.260 -0.0130  0.095 1.01   661</span></span>
+<span><span class="co">## s(time):trendtrend2.2_trend -0.190  0.0320  0.490 1.01   765</span></span>
+<span><span class="co">## s(time):trendtrend2.3_trend  0.055  0.3300  0.640 1.00  2182</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##                        edf    F p-value</span></span>
-<span><span class="co">## s(time):seriestrend1 0.439 0.18    0.41</span></span>
-<span><span class="co">## s(time):seriestrend2 0.690 0.27    0.40</span></span>
+<span><span class="co">##                        edf Ref.df   F p-value</span></span>
+<span><span class="co">## s(time):seriestrend1 0.984      3 0.6    0.90</span></span>
+<span><span class="co">## s(time):seriestrend2 0.860      3 2.5    0.53</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Stan MCMC diagnostics:</span></span>
 <span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
@@ -517,7 +524,7 @@ nicely</p>
 <span><span class="co">## 0 of 4000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">## E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Tue Feb 13 10:37:12 AM 2024.</span></span>
+<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Apr 15 6:51:13 PM 2024.</span></span>
 <span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
@@ -532,18 +539,18 @@ these may not be too helpful)</p>
 <span><span class="co">## Computed from 4000 by 60 log-likelihood matrix</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">##          Estimate   SE</span></span>
-<span><span class="co">## elpd_loo   -222.5 12.6</span></span>
-<span><span class="co">## p_loo        76.1 11.5</span></span>
-<span><span class="co">## looic       445.0 25.3</span></span>
+<span><span class="co">## elpd_loo   -219.4 12.8</span></span>
+<span><span class="co">## p_loo        73.0 11.8</span></span>
+<span><span class="co">## looic       438.8 25.7</span></span>
 <span><span class="co">## ------</span></span>
 <span><span class="co">## Monte Carlo SE of elpd_loo is NA.</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Pareto k diagnostic values:</span></span>
 <span><span class="co">##                          Count Pct.    Min. n_eff</span></span>
-<span><span class="co">## (-Inf, 0.5]   (good)     21    35.0%   1921      </span></span>
-<span><span class="co">##  (0.5, 0.7]   (ok)        8    13.3%   999       </span></span>
-<span><span class="co">##    (0.7, 1]   (bad)       5     8.3%   32        </span></span>
-<span><span class="co">##    (1, Inf)   (very bad) 26    43.3%   2         </span></span>
+<span><span class="co">## (-Inf, 0.5]   (good)     27    45.0%   541       </span></span>
+<span><span class="co">##  (0.5, 0.7]   (ok)        3     5.0%   695       </span></span>
+<span><span class="co">##    (0.7, 1]   (bad)      11    18.3%   18        </span></span>
+<span><span class="co">##    (1, Inf)   (very bad) 19    31.7%   2         </span></span>
 <span><span class="co">## See help('pareto-k-diagnostic') for details.</span></span></code></pre>
 <p>Plot the estimated smooths of time from each species’ latent
 abundance process (on the log scale)</p>
@@ -551,12 +558,17 @@ abundance process (on the log scale)</p>
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, trend_effects <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-10-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p><code>marginaleffects</code> support allows for more useful
-prediction-based interrogations on different scales. Objects that use
-family <code><a href="../reference/mvgam_families.html">nmix()</a></code> have a few additional prediction scales that
-can be used (i.e. <code>link</code>, <code>response</code>,
-<code>detection</code> or <code>latent_N</code>). For example, here are
-the estimated detection probabilities per species, which show that the
-model has done a nice job of estimating these parameters:</p>
+prediction-based interrogations on different scales (though note that at
+the time of writing this Vignette, you must have the development version
+of <code>marginaleffects</code> installed for <code><a href="../reference/mvgam_families.html">nmix()</a></code> models
+to be supported; use
+<code>remotes::install_github('vincentarelbundock/marginaleffects')</code>
+to install). Objects that use family <code><a href="../reference/mvgam_families.html">nmix()</a></code> have a few
+additional prediction scales that can be used (i.e. <code>link</code>,
+<code>response</code>, <code>detection</code> or <code>latent_N</code>).
+For example, here are the estimated detection probabilities per species,
+which show that the model has done a nice job of estimating these
+parameters:</p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">plot_predictions</span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span>
 <span>                 type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span> <span class="op">+</span></span>
@@ -700,8 +712,8 @@ site, though some observations are missing</p>
 <span><span class="co">## $ y         <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1, NA, NA, NA, 2, 2, NA, 1, NA, NA, 0, 1, 0, 0, 0, 0, NA, NA…</span></span>
 <span><span class="co">## $ abund_cov <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -0.3734384, -0.3734384, -0.3734384, 0.7064305, 0.7064305, 0.…</span></span>
 <span><span class="co">## $ abund_fac <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> 3, 3, 3, 4, 4, 4, 9, 9, 9, 2, 2, 2, 3, 3, 3, 2, 2, 2, 1, 1, …</span></span>
-<span><span class="co">## $ det_cov   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -1.2827999, -0.3171904, -1.1369443, -0.2357530, 0.1954809, 0…</span></span>
-<span><span class="co">## $ det_cov2  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.0304731, 1.1052208, -0.7969389, 0.4753085, 1.0455536, 1.91…</span></span>
+<span><span class="co">## $ det_cov   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -1.2827999, -1.6141176, 0.5560101, -0.6389295, 0.1954809, 0.…</span></span>
+<span><span class="co">## $ det_cov2  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.03047314, -0.04295646, 1.04763941, 0.91753754, 1.04555361,…</span></span>
 <span><span class="co">## $ replicate <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, …</span></span>
 <span><span class="co">## $ site      <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> site1, site1, site1, site2, site2, site2, site3, site3, site…</span></span>
 <span><span class="co">## $ species   <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, …</span></span>
@@ -710,13 +722,13 @@ site, though some observations are missing</p>
 <span><span class="co">## $ cap       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, …</span></span></code></pre>
 <div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">mod_data</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">##    y  abund_cov abund_fac    det_cov   det_cov2 replicate  site species</span></span>
-<span><span class="co">## 1  1 -0.3734384         3 -1.2827999  2.0304731         1 site1    sp_1</span></span>
-<span><span class="co">## 2 NA -0.3734384         3 -0.3171904  1.1052208         2 site1    sp_1</span></span>
-<span><span class="co">## 3 NA -0.3734384         3 -1.1369443 -0.7969389         3 site1    sp_1</span></span>
-<span><span class="co">## 4 NA  0.7064305         4 -0.2357530  0.4753085         1 site2    sp_1</span></span>
-<span><span class="co">## 5  2  0.7064305         4  0.1954809  1.0455536         2 site2    sp_1</span></span>
-<span><span class="co">## 6  2  0.7064305         4  0.9673034  1.9197118         3 site2    sp_1</span></span>
+<pre><code><span><span class="co">##    y  abund_cov abund_fac    det_cov    det_cov2 replicate  site species</span></span>
+<span><span class="co">## 1  1 -0.3734384         3 -1.2827999  2.03047314         1 site1    sp_1</span></span>
+<span><span class="co">## 2 NA -0.3734384         3 -1.6141176 -0.04295646         2 site1    sp_1</span></span>
+<span><span class="co">## 3 NA -0.3734384         3  0.5560101  1.04763941         3 site1    sp_1</span></span>
+<span><span class="co">## 4 NA  0.7064305         4 -0.6389295  0.91753754         1 site2    sp_1</span></span>
+<span><span class="co">## 5  2  0.7064305         4  0.1954809  1.04555361         2 site2    sp_1</span></span>
+<span><span class="co">## 6  2  0.7064305         4  0.9673034  1.91971178         3 site2    sp_1</span></span>
 <span><span class="co">##         series time cap</span></span>
 <span><span class="co">## 1 site1_sp_1_1    1  33</span></span>
 <span><span class="co">## 2 site1_sp_1_2    1  33</span></span>
@@ -785,6 +797,9 @@ variational Bayes approximator (this reduces computation time to around
 <span>  </span>
 <span>  <span class="co"># use Stan's variational inference for quicker results</span></span>
 <span>  algorithm <span class="op">=</span> <span class="st">'meanfield'</span>,</span>
+<span>  </span>
+<span>  <span class="co"># no need to compute "series-level" residuals</span></span>
+<span>  residuals <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  samples <span class="op">=</span> <span class="fl">1000</span><span class="op">)</span></span></code></pre></div>
 <p>Inspect the model summary but don’t bother looking at estimates for
 all individual spline coefficients. Notice how we no longer receive
@@ -823,29 +838,31 @@ model</p>
 <span><span class="co">## </span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM observation model coefficient (beta) estimates:</span></span>
-<span><span class="co">##              2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## (Intercept) 0.098 0.38  0.65  NaN   NaN</span></span>
+<span><span class="co">##             2.5%  50% 97.5% Rhat n.eff</span></span>
+<span><span class="co">## (Intercept) 0.19 0.47  0.77  NaN   NaN</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">##              edf Chi.sq p-value    </span></span>
-<span><span class="co">## s(det_cov)  1.40   71.6 0.00028 ***</span></span>
-<span><span class="co">## s(det_cov2) 1.71  274.1 1.3e-06 ***</span></span>
+<span><span class="co">##              edf Ref.df Chi.sq p-value    </span></span>
+<span><span class="co">## s(det_cov)  1.09      2   91.1 4.9e-05 ***</span></span>
+<span><span class="co">## s(det_cov2) 1.50      2  274.7 &lt; 2e-16 ***</span></span>
 <span><span class="co">## ---</span></span>
 <span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM process model coefficient (beta) estimates:</span></span>
-<span><span class="co">##                    2.5%   50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## (Intercept)_trend -0.62 -0.47 -0.32  NaN   NaN</span></span>
+<span><span class="co">##                     2.5%   50% 97.5% Rhat n.eff</span></span>
+<span><span class="co">## (Intercept)_trend -0.087 0.064   0.2  NaN   NaN</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## GAM process model group-level estimates:</span></span>
-<span><span class="co">##                           2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## mean(s(abund_fac))_trend 0.180 0.36  0.54  NaN   NaN</span></span>
-<span><span class="co">## sd(s(abund_fac))_trend   0.096 0.19  0.37  NaN   NaN</span></span>
+<span><span class="co">##                           2.5%   50%  97.5% Rhat n.eff</span></span>
+<span><span class="co">## mean(s(abund_fac))_trend -0.31 -0.19 -0.064  NaN   NaN</span></span>
+<span><span class="co">## sd(s(abund_fac))_trend    0.26  0.40  0.650  NaN   NaN</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##                edf    F p-value</span></span>
-<span><span class="co">## s(abund_cov) 0.972 0.58    0.90</span></span>
-<span><span class="co">## s(abund_fac) 8.769 0.36    0.74</span></span>
+<span><span class="co">##                edf Ref.df    F p-value  </span></span>
+<span><span class="co">## s(abund_cov) 0.913      2 5.63   0.234  </span></span>
+<span><span class="co">## s(abund_fac) 8.795     10 2.95   0.035 *</span></span>
+<span><span class="co">## ---</span></span>
+<span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Posterior approximation used: no diagnostics to compute</span></span></code></pre>
 <p>Again we can make use of <code>marginaleffects</code> support for
@@ -855,7 +872,7 @@ inspect the estimated average detection probability</p>
 <code class="sourceCode R"><span><span class="fu">avg_predictions</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span></span></code></pre></div>
 <pre><code><span><span class="co">## </span></span>
 <span><span class="co">##  Estimate 2.5 % 97.5 %</span></span>
-<span><span class="co">##     0.577  0.52  0.632</span></span>
+<span><span class="co">##     0.594 0.538  0.655</span></span>
 <span><span class="co">## </span></span>
 <span><span class="co">## Columns: estimate, conf.low, conf.high </span></span>
 <span><span class="co">## Type:  detection</span></span></code></pre>
@@ -938,6 +955,14 @@ models</a>”. London, UK: Academic Press (2020).</p>
 <p>Royle, Andrew J. “<a href="https://onlinelibrary.wiley.com/doi/full/10.1111/j.0006-341X.2004.00142.x" class="external-link">N‐mixture
 models for estimating population size from spatially replicated
 counts.</a>” <em>Biometrics</em> 60.1 (2004): 108-115.</p>
+</div>
+<div class="section level2">
+<h2 id="interested-in-contributing">Interested in contributing?<a class="anchor" aria-label="anchor" href="#interested-in-contributing"></a>
+</h2>
+<p>I’m actively seeking PhD students and other researchers to work in
+the areas of ecological forecasting, multivariate model evaluation and
+development of <code>mvgam</code>. Please reach out if you are
+interested (n.clark’at’uq.edu.au)</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside>

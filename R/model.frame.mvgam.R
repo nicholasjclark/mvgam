@@ -36,7 +36,7 @@ model.frame.mvgam = function(formula, trend_effects = FALSE, ...){
     out[,resp] <- formula$obs_data$y
 
     # Ensure 'cap' is included if this is an N-mixture model
-    if(attr(formula$model_data, 'trend_model') == 'nmix'){
+    if(formula$family == 'nmix'){
       out$cap <- formula$obs_data$cap
     }
   }
@@ -74,7 +74,7 @@ model.frame.mvgam_prefit = function(formula, trend_effects = FALSE, ...){
   }
 
   # Ensure 'cap' is included if this is an N-mixture model
-  if(attr(formula$model_data, 'trend_model') == 'nmix'){
+  if(formula$family == 'nmix'){
     out$cap <- formula$obs_data$cap
   }
 
