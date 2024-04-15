@@ -33,6 +33,9 @@
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in mvgam</a>
   </div>
 </li>
+<li class="nav-item">
+  <a class="nav-link" href="../news/index.html">Changelog</a>
+</li>
       </ul><form class="form-inline my-2 my-lg-0" role="search">
         <input type="search" class="form-control me-sm-2" aria-label="Toggle navigation" name="search-input" data-search-index="../search.json" id="search-input" placeholder="Search for" autocomplete="off"></form>
 
@@ -111,10 +114,15 @@ latent abundance</p></dd>
 <dt>data</dt>
 <dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable and covariates
 required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Should include columns:
-<code>series</code> (a <code>factor</code> index of the series IDs;the number of levels should be identical
-to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))
-<code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).
-Any other variables to be included in the linear predictor of <code>formula</code> must also be present</p></dd>
+#'</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of levels should be identical
+to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))</p></li>
+<li><p><code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).
+For most dynamic trend types available in <code>mvgam</code> (see argument <code>trend_model</code>), time should be
+measured in discrete, regularly spaced intervals (i.e. <code>c(1, 2, 3, ...)</code>). However you can
+use irregularly spaced intervals if using <code>trend_model = CAR(1)</code>, though note that any
+temporal intervals that are exactly <code>0</code> will be adjusted to a very small number
+(<code>1e-12</code>) to prevent sampling errors. See an example of <code><a href="RW.html">CAR()</a></code> trends in <code><a href="RW.html">CAR</a></code></p></li>
+</ul><p>Should also include any other variables to be included in the linear predictor of <code>formula</code></p></dd>
 
 
 <dt>newdata</dt>
@@ -131,11 +139,12 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>'AR1'</code> or <code>AR(p = 1)</code></p></li>
 <li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
 <li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
+<li><p><code>'CAR1'</code> or <code>CAR(p = 1)</code></p></li>
 <li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
 <li><p><code>'PWlogistic</code>, <code>'PWlinear'</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>For all trend types apart from <code><a href="GP.html">GP()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
+</ul><p>For all trend types apart from <code><a href="GP.html">GP()</a></code>, <code><a href="RW.html">CAR()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
 process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
 multivariate Random Walk if <code>n_series &gt; 1</code>). See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
 

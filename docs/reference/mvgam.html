@@ -22,7 +22,7 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.91</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -44,6 +44,9 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
     <a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in mvgam</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in mvgam</a>
   </div>
+</li>
+<li class="nav-item">
+  <a class="nav-link" href="../news/index.html">Changelog</a>
 </li>
       </ul><form class="form-inline my-2 my-lg-0" role="search">
         <input type="search" class="form-control me-sm-2" aria-label="Toggle navigation" name="search-input" data-search-index="../search.json" id="search-input" placeholder="Search for" autocomplete="off"></form>
@@ -159,10 +162,15 @@ functions within the <code>trend_formula</code></p></dd>
 <dt>data</dt>
 <dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable and covariates
 required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Should include columns:
-<code>series</code> (a <code>factor</code> index of the series IDs;the number of levels should be identical
-to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))
-<code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).
-Any other variables to be included in the linear predictor of <code>formula</code> must also be present</p></dd>
+#'</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of levels should be identical
+to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))</p></li>
+<li><p><code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).
+For most dynamic trend types available in <code>mvgam</code> (see argument <code>trend_model</code>), time should be
+measured in discrete, regularly spaced intervals (i.e. <code>c(1, 2, 3, ...)</code>). However you can
+use irregularly spaced intervals if using <code>trend_model = CAR(1)</code>, though note that any
+temporal intervals that are exactly <code>0</code> will be adjusted to a very small number
+(<code>1e-12</code>) to prevent sampling errors. See an example of <code><a href="RW.html">CAR()</a></code> trends in <code><a href="RW.html">CAR</a></code></p></li>
+</ul><p>Should also include any other variables to be included in the linear predictor of <code>formula</code></p></dd>
 
 
 <dt>data_train</dt>
@@ -196,7 +204,8 @@ simulations from prior distributions are returned</p></dd>
 <dd><p><code>logical</code>. If <code>TRUE</code>, the list of data that is needed to fit the
 model is returned, along with the initial values for smooth and AR parameters, once the model is fitted.
 This will be helpful if users wish to modify the model file to add
-other stochastic elements that are not currently avaiable in <code>mvgam</code>. Default is <code>FALSE</code> to reduce
+other stochastic elements that are not currently available in <code>mvgam</code>.
+Default is <code>FALSE</code> to reduce
 the size of the returned object, unless <code>run_model == FALSE</code></p></dd>
 
 
@@ -262,11 +271,12 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>'AR1'</code> or <code>AR(p = 1)</code></p></li>
 <li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
 <li><p><code>'AR3'</code> or <code>AR(p = 3)</code></p></li>
+<li><p><code>'CAR1'</code> or <code>CAR(p = 1)</code></p></li>
 <li><p><code>'VAR1'</code>  or <code><a href="RW.html">VAR()</a></code>(only available in <code>Stan</code>)</p></li>
 <li><p><code>'PWlogistic</code>, <code>'PWlinear'</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>For all trend types apart from <code><a href="GP.html">GP()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
+</ul><p>For all trend types apart from <code><a href="GP.html">GP()</a></code>, <code><a href="RW.html">CAR()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
 process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
 multivariate Random Walk if <code>n_series &gt; 1</code>). See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
 
@@ -443,7 +453,7 @@ the variation in the dynamic trend controls the average expectation, and/or wher
 are non-identifiable (as in piecewise trends, see examples below)
 <br><br><em>Families and link functions</em>: Details of families supported by <span class="pkg">mvgam</span> can be found in
 <code><a href="mvgam_families.html">mvgam_families</a></code>.
-<br><br><em>Trend models</em>: Details of latent trend models supported by <span class="pkg">mvgam</span> can be found in
+<br><br><em>Trend models</em>: Details of latent trend dynamic models supported by <span class="pkg">mvgam</span> can be found in
 <code><a href="mvgam_trends.html">mvgam_trends</a></code>.
 <br><br><em>Priors</em>: A <code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code> model file is generated from <code>formula</code> and
 modified to include any latent
@@ -542,7 +552,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="va">model_data</span> <span class="op">&lt;-</span> <span class="va">mod1</span><span class="op">$</span><span class="va">model_data</span></span></span>
 <span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mc-stan.org/rstan/" class="external-link">rstan</a></span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></span><span class="op">(</span>model_code <span class="op">=</span> <span class="va">mod1</span><span class="op">$</span><span class="va">model_file</span>,</span></span>
-<span class="r-in"><span>           data <span class="op">=</span> <span class="va">model_data</span><span class="op">)</span></span></span>
+<span class="r-in"><span>            data <span class="op">=</span> <span class="va">model_data</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now using cmdstanr</span></span></span>
 <span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mc-stan.org/cmdstanr/" class="external-link">cmdstanr</a></span><span class="op">)</span></span></span>
@@ -592,8 +602,13 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, realisations <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot conditional response predictions using marginaleffects</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span>, ask <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">plot_predictions</span><span class="op">(</span><span class="va">mod1</span>, condition <span class="op">=</span> <span class="st">'season'</span>, points <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Generate posterior predictive checks through bayesplot</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"bars_grouped"</span>,</span></span>
+<span class="r-in"><span>         group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Extract observation model beta coefficient draws as a data.frame</span></span></span>
 <span class="r-in"><span><span class="va">beta_draws_df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">mod1</span>, variable <span class="op">=</span> <span class="st">'betas'</span><span class="op">)</span></span></span>

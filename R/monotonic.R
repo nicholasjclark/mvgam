@@ -114,7 +114,7 @@
 #' # First derivatives (on the link scale) should never be
 #' # negative for either factor level
 #' (derivs <- slopes(mod, variables = 'x',
-#'                  by = c('x', 'fac'),\
+#'                  by = c('x', 'fac'),
 #'                  type = 'link'))
 #' all(derivs$estimate > 0)
 #' }

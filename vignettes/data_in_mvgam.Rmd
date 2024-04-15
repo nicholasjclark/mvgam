@@ -87,7 +87,7 @@ mvgam(outcome ~ time,
 Please see `?mvgam_families` for more information on the types of responses that the package can handle and their restrictions
 
 ### A `time` variable
-The other requirement for modelling in `mvgam` is a `numeric / integer`-classed variable labelled `time` to ensure the modelling software knows how to arrange the time series when building models. This setup still allows us to formulate multivariate time series models. If you plan to use any of the autoregressive dynamic trend functions available in `mvgam` (see `?mvgam_trends` for details of available dynamic processes), you will need to ensure your time series are entered with a fixed sampling interval (i.e. the time between timesteps 1 and 2 should be the same as the time between timesteps 2 and 3, etc...). But note that you can have missing observations for some (or all) series. `mvgam` will check this for you, but again it is useful to ensure you have no missing timepoint x series combinations in your data. You can generally do this with a simple `dplyr` call:
+The other requirement for most models that can be fit in `mvgam` is a `numeric / integer`-classed variable labelled `time`. This ensures the modelling software knows how to arrange the time series when building models. This setup still allows us to formulate multivariate time series models. If you plan to use any of the autoregressive dynamic trend functions available in `mvgam` (see `?mvgam_trends` for details of available dynamic processes), you will need to ensure your time series are entered with a fixed sampling interval (i.e. the time between timesteps 1 and 2 should be the same as the time between timesteps 2 and 3, etc...). But note that you can have missing observations for some (or all) series. `mvgam` will check this for you, but again it is useful to ensure you have no missing timepoint x series combinations in your data. You can generally do this with a simple `dplyr` call:
 ```{r}
 # A function to ensure all timepoints within a sequence are identical
 all_times_avail = function(time, min_time, max_time){
@@ -114,6 +114,9 @@ if(any(checked_times$all_there == FALSE)){
 ```
 
 Note that models which use dynamic components will assume that smaller values of `time` are *older* (i.e. `time = 1` came *before* `time = 2`, etc...)
+
+### Irregular sampling intervals?
+Most `mvgam` trend models expect `time` to be measured in discrete, evenly-spaced intervals (i.e. one measurement per week, or one per year, for example; though missing values are allowed). But please note that irregularly sampled time intervals are allowed, in which case the `CAR()` trend model (continuous time autoregressive) is appropriate. You can see an example of this kind of model in the **Examples** section in `?CAR`. You can also use `trend_model = 'None'` (the default in `mvgam()`) and instead use a Gaussian Process to model temporal variation for irregularly-sampled time series. See the `?brms::gp` for details
 
 ## Checking data with `get_mvgam_priors`
 The `get_mvgam_priors` function is designed to return information about the parameters in a model whose prior distributions can be modified by the user. But in doing so, it will perform a series of checks to ensure the data are formatted properly. It can therefore be very useful to new users for ensuring there isn't anything strange going on in the data setup. For example, we can replicate the steps taken above (to check factor levels and timepoint x series combinations) with a single call to `get_mvgam_priors`. Here we first simulate some data in which some of the timepoints in the `time` variable are not included in the data:
