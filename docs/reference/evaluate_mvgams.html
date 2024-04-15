@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.91</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -32,6 +32,9 @@
     <a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in mvgam</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in mvgam</a>
   </div>
+</li>
+<li class="nav-item">
+  <a class="nav-link" href="../news/index.html">Changelog</a>
 </li>
       </ul><form class="form-inline my-2 my-lg-0" role="search">
         <input type="search" class="form-control me-sm-2" aria-label="Toggle navigation" name="search-input" data-search-index="../search.json" id="search-input" placeholder="Search for" autocomplete="off"></form>
@@ -196,7 +199,7 @@ appropriate Rank Probability Score and a binary indicator
 for whether or not the true value lies within the forecast's 90% prediction interval</p>
 <p><code>roll_eval_mvgam</code> sets up a sequence of evaluation timepoints along a rolling window and iteratively
 calls <code>eval_mvgam</code> to evaluate 'out-of-sample' forecasts.
-Evaluation involves calculating the Discrete Rank Probability Score and a binary indicator
+Evaluation involves calculating the Rank Probability Scores and a binary indicator
 for whether or not the true value lies within the forecast's 90% prediction interval</p>
 <p><code>compare_mvgams</code> automates the evaluation to compare two fitted models using rolling window forecast evaluation and
 provides a series of summary plots to facilitate model selection. It is essentially a wrapper for
@@ -211,8 +214,8 @@ provides a series of summary plots to facilitate model selection. It is essentia
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>T <span class="op">=</span> <span class="fl">75</span>,</span></span>
 <span class="r-in"><span>                n_series <span class="op">=</span> <span class="fl">1</span>,</span></span>
 <span class="r-in"><span>                prop_trend <span class="op">=</span> <span class="fl">0.75</span>,</span></span>
-<span class="r-in"><span>                 trend_model <span class="op">=</span> <span class="st">'AR2'</span>,</span></span>
-<span class="r-in"><span>                 family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                trend_model <span class="op">=</span> <span class="st">'AR2'</span>,</span></span>
+<span class="r-in"><span>                family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot the time series</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
@@ -221,17 +224,17 @@ provides a series of summary plots to facilitate model selection. It is essentia
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit an appropriate model</span></span></span>
 <span class="r-in"><span><span class="va">mod_ar2</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>               trend_model <span class="op">=</span> <span class="st">'AR2'</span>,</span></span>
-<span class="r-in"><span>               family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>               data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>               newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                trend_model <span class="op">=</span> <span class="st">'AR2'</span>,</span></span>
+<span class="r-in"><span>                family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>                newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a less appropriate model</span></span></span>
 <span class="r-in"><span><span class="va">mod_rw</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              trend_model <span class="op">=</span> <span class="st">'RW'</span>,</span></span>
-<span class="r-in"><span>              family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>              newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
+<span class="r-in"><span>               trend_model <span class="op">=</span> <span class="st">'RW'</span>,</span></span>
+<span class="r-in"><span>               family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>               data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>               newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compare Discrete Ranked Probability Scores for the testing period</span></span></span>
 <span class="r-in"><span><span class="va">fc_ar2</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod_ar2</span><span class="op">)</span></span></span>

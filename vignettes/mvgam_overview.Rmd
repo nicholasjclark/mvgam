@@ -128,6 +128,14 @@ In both trend models, $m$ is an offset parameter that controls the trend interce
 
 Sean J. Taylor and Benjamin Letham. "[Forecasting at scale.](https://www.tandfonline.com/doi/full/10.1080/00031305.2017.1380080)" *The American Statistician* 72.1 (2018): 37-45.
 
+### Continuous time AR(1) processes
+Most trend models in the `mvgam()` function expect time to be measured in regularly-spaced, discrete intervals (i.e. one measurement per week, or one per year for example). But some time series are taken at irregular intervals and we'd like to model autoregressive properties of these. The `trend_model = CAR()` can be useful to set up these models, which currently only support autoregressive processes of order `1`. The evolution of the latent dynamic process follows the form:
+
+\begin{align*}
+z_{i,t} & \sim \text{Normal}(ar1_i^{distance} * z_{i,t-1}, \sigma_i) \end{align*}
+
+Where $distance$ is a vector of non-negative measurements of the time differences between successive observations. See the **Examples** section in `?CAR` for an illustration of how to set these models up. 
+
 ## Regression formulae
 `mvgam` supports an observation model regression formula, built off the `mvgcv` package, as well as an optional process model regression formula. The formulae supplied to \code{\link{mvgam}} are exactly like those supplied to `glm()` except that smooth terms, `s()`,
 `te()`, `ti()` and `t2()`, time-varying effects using `dynamic()`, monotonically increasing (using `s(x, bs = 'moi')`) or decreasing splines (using `s(x, bs = 'mod')`; see `?smooth.construct.moi.smooth.spec` for details), as well as Gaussian Process functions using `gp()`, can be added to the right hand side (and `.` is not supported in `mvgam` formulae). See `?mvgam_formulae` for more guidance.
@@ -292,6 +300,12 @@ We can also capitalize on most of the useful MCMC plotting functions from the `b
 mcmc_plot(object = model1,
           variable = 'betas',
           type = 'areas')
+```
+
+We can also use the wide range of posterior checking functions available in `bayesplot` (see `?mvgam::ppc_check.mvgam` for details):
+```{r}
+pp_check(object = model1)
+pp_check(model1, type = "rootogram")
 ```
 
 There is clearly some variation in these yearly intercept estimates. But how do these translate into time-varying predictions? To understand this, we can plot posterior hindcasts from this model for the training period using `plot.mvgam` with `type = 'forecast'`
@@ -499,8 +513,7 @@ plot(model3, type = 'smooths', derivatives = TRUE)
 ```
 
 Here, values above `>0` indicate the function was increasing at that time point, while values `<0` indicate the function was declining. The most rapid declines appear to have been happening around timepoints 50 and again toward the end of the training period, for example.
-
-### Conditional effects
+  
 Use `conditional_effects` again for useful plots on the outcome scale:
 ```{r warning=FALSE}
 plot(conditional_effects(model3), ask = FALSE)
