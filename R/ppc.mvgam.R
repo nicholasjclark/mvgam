@@ -911,6 +911,8 @@ pp_check.mvgam <- function(object, type, ndraws = NULL, prefix = c("ppc", "ppd")
     take <- !is.na(y)
     y <- y[take]
     yrep <- yrep[, take, drop = FALSE]
+  } else {
+    take <- NULL
   }
 
   # Prepare plotting arguments
@@ -922,9 +924,15 @@ pp_check.mvgam <- function(object, type, ndraws = NULL, prefix = c("ppc", "ppd")
     ppc_args$ypred <- yrep
   }
   if (!is.null(group)) {
-    if(!exists(group, newdata)) stop(paste0('Variable ', group, ' not in newdata'),
+    if(!exists(group, newdata)) stop(paste0('Variable ',
+                                            group,
+                                            ' not in newdata'),
                                      call. = FALSE)
     ppc_args$group <- newdata[[group]]
+
+    if(!is.null(take)){
+      ppc_args$group <- ppc_args$group[take]
+    }
   }
 
   is_like_factor = function(x){
@@ -936,7 +944,12 @@ pp_check.mvgam <- function(object, type, ndraws = NULL, prefix = c("ppc", "ppd")
     if (!is_like_factor(ppc_args$x)) {
       ppc_args$x <- as.numeric(ppc_args$x)
     }
+
+    if(!is.null(take)){
+      ppc_args$x <- ppc_args$x[take]
+    }
   }
+
   if ("psis_object" %in% setdiff(names(formals(ppc_fun)), names(ppc_args))) {
     # ppc_args$psis_object <- do_call(
     #   compute_loo, c(pred_args, criterion = "psis")
