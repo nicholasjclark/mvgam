@@ -10,6 +10,7 @@ get_mvgam_priors(
   data,
   data_train,
   family = "poisson",
+  knots,
   use_lv = FALSE,
   n_lv,
   use_stan = TRUE,
@@ -40,10 +41,17 @@ latent abundance}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:
-\code{series} (a \code{factor} index of the series IDs;the number of levels should be identical
+#'\itemize{
+\item\code{series} (a \code{factor} index of the series IDs; the number of levels should be identical
 to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
-\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
-Any other variables to be included in the linear predictor of \code{formula} must also be present}
+\item\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
+For most dynamic trend types available in \code{mvgam} (see argument \code{trend_model}), time should be
+measured in discrete, regularly spaced intervals (i.e. \code{c(1, 2, 3, ...)}). However you can
+use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though note that any
+temporal intervals that are exactly \code{0} will be adjusted to a very small number
+(\code{1e-12}) to prevent sampling errors. See an example of \code{CAR()} trends in \code{\link{CAR}}
+}
+Should also include any other variables to be included in the linear predictor of \code{formula}}
 
 \item{data_train}{Deprecated. Still works in place of \code{data} but users are recommended to use
 \code{data} instead for more seamless integration into \code{R} workflows}
@@ -72,6 +80,11 @@ Note that only \code{nb()} and \code{poisson()} are available if using \code{JAG
 Default is \code{poisson()}.
 See \code{\link{mvgam_families}} for more details}
 
+\item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
+For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
+(note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
+unless they share a covariate}
+
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. Only available for
 \code{RW()}, \code{AR()} and \code{GP()} trend models. Defaults to \code{FALSE}}
@@ -92,12 +105,13 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{'AR1'} or \code{AR(p = 1)}
 \item \code{'AR2'} or \code{AR(p = 2)}
 \item \code{'AR3'} or \code{AR(p = 3)}
+\item \code{'CAR1'} or \code{CAR(p = 1)}
 \item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
 \item \verb{'PWlogistic}, \code{'PWlinear'} or \code{PW()} (only available in \code{Stan})
 \item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all trend types apart from \code{GP()} and \code{PW()}, moving average and/or correlated
+For all trend types apart from \code{GP()}, \code{CAR()} and \code{PW()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
 multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
 

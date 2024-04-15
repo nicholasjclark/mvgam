@@ -157,6 +157,15 @@ dat_train <- dat %>%
 dat_test <- dat %>%
   dplyr::filter(time > 40)
 
+set.seed(100)
+gaus_data <- sim_mvgam(family = gaussian(),
+                       T = 60,
+                       trend_model = 'AR1',
+                       seasonality = 'shared',
+                       mu = c(-1, 0, 1),
+                       trend_rel = 0.5,
+                       prop_missing = 0.2)
+
 test_that("bernoulli() behaves appropriately", {
   expect_error(mvgam(y ~ series + s(x, by = series),
                      family = bernoulli(),

@@ -23,6 +23,15 @@ test_that("gp_to_s is working properly", {
                     'term.labels'))
 })
 
+set.seed(100)
+gaus_data <- sim_mvgam(family = gaussian(),
+                       T = 60,
+                       trend_model = 'AR1',
+                       seasonality = 'shared',
+                       mu = c(-1, 0, 1),
+                       trend_rel = 0.5,
+                       prop_missing = 0.2)
+
 test_that("gp for observation models working properly", {
   mod <- mvgam(y ~ s(series, bs = 're') +
                  gp(time, by = series) +
@@ -70,7 +79,11 @@ test_that("gp for observation models working properly", {
                     'term.labels'))
 })
 
-
+set.seed(100)
+beta_data <- sim_mvgam(family = betar(),
+                       trend_model = 'GP',
+                       trend_rel = 0.5,
+                       T = 60)
 test_that("gp for process models working properly", {
   mod <- mvgam(y ~ s(series, bs = 're'),
                trend_formula = ~

@@ -8,6 +8,7 @@
   object,
   transform = FALSE,
   newdata,
+  ndraws = NULL,
   data_test,
   process_error = TRUE,
   ...
@@ -24,6 +25,9 @@ i.e. the conditional expectation, are returned.}
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the
 variables included in the linear predictor of \code{formula}. If not supplied,
 predictions are generated for the original observations used for the model fit.}
+
+\item{ndraws}{Positive \code{integer} indicating how many posterior draws should be used.
+If \code{NULL} (the default) all draws are used.}
 
 \item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
 \code{newdata} instead for more seamless integration into \code{R} workflows}

@@ -53,6 +53,16 @@ test_that("outcome variable must be present in data", {
                'variable y not found in data')
 })
 
+test_that("time not requried in data if this is a no trend model", {
+  data = data.frame(out = rnorm(100),
+                    temp = rnorm(100))
+  mod <- mvgam(formula = out ~ dynamic(temp, rho = 20),
+                            data = data,
+                            family = gaussian(),
+                            run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+})
+
 test_that("rho argument must be positive numeric", {
   data = data.frame(out = rnorm(100),
                     temp = rnorm(100),
@@ -87,8 +97,8 @@ test_that("all series must have observations for all unique timepoints", {
 })
 
 test_that("median coefs should be stored in the mgcv object", {
-  expect_true(identical(unname(coef(gaus_ar1$mgcv_model)),
-            coef(gaus_ar1)[,2]))
+  expect_true(identical(unname(coef(mvgam:::mvgam_example2$mgcv_model)),
+            coef(mvgam:::mvgam_example2)[,2]))
 })
 
 test_that("empty obs formula is allowed, even if no trend_formula", {
@@ -199,7 +209,8 @@ test_that("trend_formula setup is working properly", {
                    data = mod_data,
                    run_model = FALSE)
   expect_true(identical(mod_map$model_data$Z,
-                        matrix(c(1,0,0,0,1,0,0,0,1), nrow = 3, byrow = TRUE)))
+                        matrix(c(1,0,0,0,1,0,0,0,1),
+                               nrow = 3, byrow = TRUE)))
   expect_true(mod_map$use_lv)
   expect_true(!is.null(mod_map$trend_mgcv_model))
   expect_equal(colnames(model.frame(mod_map, trend_effects = TRUE)),
@@ -209,7 +220,8 @@ test_that("trend_formula setup is working properly", {
                c('y', 'series', 'time', 'season'))
 
   expect_error(mvgam(y ~ 1,
-                     trend_formula = 1 ~ s(series, bs = 're') + s(season, bs = 'cc'),
+                     trend_formula = 1 ~ s(series, bs = 're') +
+                       s(season, bs = 'cc'),
                      trend_model = 'AR1',
                      data = mod_data,
                      run_model = FALSE),

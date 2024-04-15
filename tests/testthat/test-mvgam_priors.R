@@ -34,6 +34,11 @@ test_that("get_mvgam_priors works for a variety of ma and cor trends", {
 
 })
 
+set.seed(100)
+beta_data <- sim_mvgam(family = betar(),
+                       trend_model = 'GP',
+                       trend_rel = 0.5,
+                       T = 60)
 test_that("get_mvgam_priors finds all classes for which priors can be specified", {
   beta_data$data_train$cov <- rnorm(NROW(beta_data$data_train))
   beta_data$data_train$cov2 <- rnorm(NROW(beta_data$data_train))
@@ -88,7 +93,7 @@ test_that("default intercept prior should match brms implementation", {
                paste0(brms::get_prior(y ~ 1, data = data.frame(y = simdat$data_train$y),
                                       family = gaussian())$prior[1], ';'))
 
-  # Now try student
+  # Now try Student
   def_prior <- get_mvgam_priors(y ~ s(season),
                                 trend_model = 'AR1',
                                 data = simdat$data_train,

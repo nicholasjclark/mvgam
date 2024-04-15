@@ -327,29 +327,29 @@ summary(lynx_mvgam)
 #> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                 2.5%      50%  97.5% Rhat n_eff
-#> (Intercept)   6.1000  6.60000  7.000 1.01   758
-#> s(season).1  -0.6400  0.02600  0.690 1.00   810
-#> s(season).2  -0.2400  0.81000  1.800 1.02   227
-#> s(season).3  -0.0084  1.20000  2.400 1.02   219
-#> s(season).4  -0.5000  0.44000  1.300 1.00   680
-#> s(season).5  -1.2000 -0.10000  0.950 1.02   444
-#> s(season).6  -1.1000  0.00088  1.100 1.01   564
-#> s(season).7  -0.7300  0.36000  1.500 1.00   673
-#> s(season).8  -0.9800  0.24000  1.800 1.02   337
-#> s(season).9  -1.2000 -0.29000  0.680 1.02   450
-#> s(season).10 -1.4000 -0.66000 -0.025 1.01   451
+#>                2.5%    50% 97.5% Rhat n_eff
+#> (Intercept)   6.100  6.600 7.000 1.01   657
+#> s(season).1  -0.610  0.029 0.690 1.01   859
+#> s(season).2  -0.250  0.830 1.800 1.00   609
+#> s(season).3  -0.088  1.200 2.500 1.01   436
+#> s(season).4  -0.560  0.440 1.400 1.01   753
+#> s(season).5  -1.100 -0.180 0.850 1.01   573
+#> s(season).6  -1.100 -0.012 1.100 1.00   682
+#> s(season).7  -0.670  0.390 1.500 1.00   677
+#> s(season).8  -0.920  0.330 1.800 1.01   352
+#> s(season).9  -1.100 -0.260 0.700 1.01   476
+#> s(season).10 -1.400 -0.690 0.011 1.00   797
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value
-#> s(season) 9.97     10  19379    0.24
+#> s(season) 9.91     10  19445    0.23
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n_eff
-#> ar1[1]    0.75  1.10  1.40 1.01   703
-#> ar2[1]   -0.85 -0.40  0.04 1.00  1839
-#> ar3[1]   -0.47 -0.13  0.31 1.01   393
-#> sigma[1]  0.41  0.51  0.64 1.00  1027
+#> ar1[1]    0.73  1.10 1.400 1.00   637
+#> ar2[1]   -0.82 -0.39 0.036 1.00  1604
+#> ar3[1]   -0.47 -0.11 0.290 1.01   619
+#> sigma[1]  0.40  0.50 0.630 1.00  1115
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -358,7 +358,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Thu Mar 28 8:44:38 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Fri Apr 12 8:58:47 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -384,13 +384,15 @@ mcmc_plot(lynx_mvgam, variable = 'trend_params', regex = TRUE, type = 'trace')
 
 <img src="man/figures/README-unnamed-chunk-14-1.png" alt="Dynamic temporal autocorrelation parameters estimated with Stan in mvgam" width="60%" style="display: block; margin: auto;" />
 
-Use posterior predictive checks to see if the model can simulate data
-that looks realistic and unbiased. First, examine histograms for
-posterior retrodictions (`yhat`) and compare to the histogram of the
-observations (`y`)
+Use posterior predictive checks, which capitalize on the extensive
+functionality of the `bayesplot` package, to see if the model can
+simulate data that looks realistic and unbiased. First, examine
+histograms for posterior retrodictions (`yhat`) and compare to the
+histogram of the observations (`y`)
 
 ``` r
-ppc(lynx_mvgam, series = 1, type = 'hist')
+pp_check(lynx_mvgam, type = "hist", ndraws = 5)
+#> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 ```
 
 <img src="man/figures/README-unnamed-chunk-15-1.png" alt="Posterior predictive checks for discrete time series in R" width="60%" style="display: block; margin: auto;" />
@@ -399,7 +401,7 @@ Next examine simulated empirical Cumulative Distribution Functions (CDF)
 for posterior predictions
 
 ``` r
-ppc(lynx_mvgam, series = 1, type = 'cdf')
+pp_check(lynx_mvgam, type = "ecdf_overlay", ndraws = 25)
 ```
 
 <img src="man/figures/README-unnamed-chunk-16-1.png" alt="Posterior predictive checks for discrete time series in R" width="60%" style="display: block; margin: auto;" />
@@ -417,10 +419,12 @@ below zero, this suggests the model’s simulations predict the values in
 that particular bin less frequently than they are observed in the data.
 A well-fitting model that can generate realistic simulated data will
 provide a rootogram in which the lower boundaries of the grey bars are
-generally near zero
+generally near zero. For this plot we use the `S3` function
+`ppc.mvgam()`, which is not as versatile as `pp_check()` but allows us
+to bin rootograms to avoid overplotting
 
 ``` r
-ppc(lynx_mvgam, series = 1, type = 'rootogram', n_bins = 25)
+ppc(lynx_mvgam, type = "rootogram", n_bins = 25)
 ```
 
 <img src="man/figures/README-unnamed-chunk-17-1.png" alt="Posterior predictive rootograms for discrete time series in R" width="60%" style="display: block; margin: auto;" />
@@ -480,7 +484,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample CRPS:
-    #> [1] 2942.292
+    #> [1] 2776.972
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -641,7 +645,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Thu Mar 28 8:46:19 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Fri Apr 12 9:00:27 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
