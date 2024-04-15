@@ -133,7 +133,7 @@ add_binomial = function(formula,
                  model_file, fixed = TRUE))){
       model_file[grep("flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends),",
                       model_file, fixed = TRUE)] <-
-        "flat_ys ~ binomial_logit_glm(flat_trials_train, append_col(flat_xs, flat_trends),"
+        "flat_ys ~ binomial(flat_trials_train, inv_logit(flat_xs * b)),"
     }
   }
 

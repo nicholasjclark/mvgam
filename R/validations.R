@@ -503,7 +503,7 @@ validate_trend_restrictions = function(trend_model,
 
   # Assess whether additional moving average or correlated errors are needed
   ma_cor_adds <- ma_cor_additions(trend_model)
-  list2env(ma_cor_adds, env = environment())
+  list2env(ma_cor_adds, envir = environment())
 
   if(length(unique(data_train$series)) == 1 & add_cor){
     warning('Correlated process errors not possible with only 1 series',

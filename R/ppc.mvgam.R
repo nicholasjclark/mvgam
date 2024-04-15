@@ -751,6 +751,8 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
 #'
 #' @aliases pp_check
 #' @inheritParams brms::pp_check
+#' @importFrom insight get_predictors
+#' @importFrom brms do_call
 #' @param object An object of class \code{mvgam}.
 #' @param newdata Optional \code{dataframe} or \code{list} of test data containing the
 #' variables included in the linear predictor of \code{formula}. If not supplied,
