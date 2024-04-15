@@ -47,7 +47,8 @@ test_that("cbind() syntax required for binomial()", {
                  gp(x, by = series, c = 5/4, k = 5),
                family = binomial(),
                data = dat_train,
-               run_model = FALSE)
+               run_model = FALSE,
+               autoformat = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(any(grepl('flat_ys ~ binomial_logit_glm(',
                         mod$model_file, fixed = TRUE)))

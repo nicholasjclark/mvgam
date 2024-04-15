@@ -20,8 +20,8 @@ covariate information in \code{newdata} will be used to generate forecasts from 
 this same \code{newdata} was originally included in the call to \code{mvgam}, then forecasts have already been
 produced by the generative model and these will simply be extracted and plotted. However if no \code{newdata} was
 supplied to the original model call, an assumption is made that the \code{newdata} supplied here comes sequentially
-after the data supplied as \code{data} in the original model (i.e. we assume there is no time gap between the last
-observation of series 1 in \code{data} and the first observation for series 1 in \code{newdata})}
+after the data supplied in the original model (i.e. we assume there is no time gap between the last
+observation of series 1 in the original data and the first observation for series 1 in \code{newdata})}
 
 \item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
 \code{newdata} instead for more seamless integration into \code{R} workflows}
