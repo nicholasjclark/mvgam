@@ -80,6 +80,7 @@ get_predict.mvgam <- function(model, newdata,
                    newdata = newdata,
                    type = type,
                    process_error = process_error,
+                   summary = FALSE,
                    ...)
   out <- data.frame(
     rowid = seq_len(NCOL(preds)),
@@ -113,7 +114,7 @@ get_data.mvgam = function (x, source = "environment", verbose = TRUE, ...) {
 
       # Original series, time and outcomes
       orig_dat <- data.frame(series = x$obs_data$series,
-                             time = x$obs_data$time,
+                             time = x$obs_data$index..time..index,
                              y = x$obs_data$y)
 
       # Add indicators of trend names as factor levels using the trend_map
@@ -129,7 +130,7 @@ get_data.mvgam = function (x, source = "environment", verbose = TRUE, ...) {
                                      series = orig_dat$series,
                                      time = orig_dat$time,
                                      y = orig_dat$y,
-                                     row_num = 1:length(x$obs_data$time))
+                                     row_num = 1:length(x$obs_data$index..time..index))
 
       # # We only kept one time observation per trend
       trend_level_data %>%
@@ -208,7 +209,7 @@ get_data.mvgam_prefit = function (x, source = "environment", verbose = TRUE, ...
 
       # Original series, time and outcomes
       orig_dat <- data.frame(series = x$obs_data$series,
-                             time = x$obs_data$time,
+                             time = x$obs_data$index..time..index,
                              y = x$obs_data$y)
 
       # Add indicators of trend names as factor levels using the trend_map
@@ -224,7 +225,7 @@ get_data.mvgam_prefit = function (x, source = "environment", verbose = TRUE, ...
                                      series = orig_dat$series,
                                      time = orig_dat$time,
                                      y = orig_dat$y,
-                                     row_num = 1:length(x$obs_data$time))
+                                     row_num = 1:length(x$obs_data$index..time..index))
 
       # # We only kept one time observation per trend
       trend_level_data %>%

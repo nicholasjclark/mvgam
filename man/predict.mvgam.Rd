@@ -4,7 +4,17 @@
 \alias{predict.mvgam}
 \title{Predict from the GAM component of an mvgam model}
 \usage{
-\method{predict}{mvgam}(object, newdata, data_test, type = "link", process_error = TRUE, ...)
+\method{predict}{mvgam}(
+  object,
+  newdata,
+  data_test,
+  type = "link",
+  process_error = TRUE,
+  summary = TRUE,
+  robust = FALSE,
+  probs = c(0.025, 0.975),
+  ...
+)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
@@ -30,11 +40,33 @@ expected uncertainty in the process model is accounted for by using draws
 from the latent trend SD parameters. If \code{FALSE}, uncertainty in the latent trend
 component is ignored when calculating predictions}
 
+\item{summary}{Should summary statistics be returned
+instead of the raw values? Default is \code{TRUE}..}
+
+\item{robust}{If \code{FALSE} (the default) the mean is used as
+the measure of central tendency and the standard deviation as
+the measure of variability. If \code{TRUE}, the median and the
+median absolute deviation (MAD) are applied instead.
+Only used if \code{summary} is \code{TRUE}.}
+
+\item{probs}{The percentiles to be computed by the \code{quantile}
+function. Only used if \code{summary} is \code{TRUE}.}
+
 \item{...}{Ignored}
 }
 \value{
-A \code{matrix} of dimension \code{n_samples x new_obs}, where \code{n_samples} is the number of
-posterior samples from the fitted object and \code{n_obs} is the number of test observations in \code{newdata}
+Predicted values on the appropriate scale.
+If \code{summary = FALSE} the output is a matrix of dimension \verb{n_draw x n_observations}
+containing predicted values for each posterior draw in \code{object}.
+
+If \code{summary = TRUE} the output is an \code{n_observations} x \code{E}
+matrix. The number of summary statistics \code{E} is equal to \code{2 +
+  length(probs)}: The \code{Estimate} column contains point estimates (either
+mean or median depending on argument \code{robust}), while the
+\code{Est.Error} column contains uncertainty estimates (either standard
+deviation or median absolute deviation depending on argument
+\code{robust}). The remaining columns starting with \code{Q} contain
+quantile estimates as specified via argument \code{probs}.
 }
 \description{
 Predict from the GAM component of an mvgam model

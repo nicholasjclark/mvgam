@@ -1,5 +1,6 @@
 #'Predict from the GAM component of an mvgam model
 #'@importFrom stats predict
+#'@inheritParams brms::fitted.brmsfit
 #'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing the
 #'variables included in the linear predictor of \code{formula}. If not supplied,
@@ -31,13 +32,28 @@
 #'of a \code{mvgam} model, while the forecasting functions
 #'\code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better suited to generate h-step ahead forecasts
 #'that respect the temporal dynamics of estimated latent trends.
-#'@return A \code{matrix} of dimension \code{n_samples x new_obs}, where \code{n_samples} is the number of
-#'posterior samples from the fitted object and \code{n_obs} is the number of test observations in \code{newdata}
+#' @return Predicted values on the appropriate scale.
+#'   If \code{summary = FALSE} the output is a matrix of dimension `n_draw x n_observations`
+#'   containing predicted values for each posterior draw in `object`.
+#'
+#'   If \code{summary = TRUE} the output is an \code{n_observations} x \code{E}
+#'   matrix. The number of summary statistics \code{E} is equal to \code{2 +
+#'   length(probs)}: The \code{Estimate} column contains point estimates (either
+#'   mean or median depending on argument \code{robust}), while the
+#'   \code{Est.Error} column contains uncertainty estimates (either standard
+#'   deviation or median absolute deviation depending on argument
+#'   \code{robust}). The remaining columns starting with \code{Q} contain
+#'   quantile estimates as specified via argument \code{probs}.
 #'@export
-predict.mvgam = function(object, newdata,
+predict.mvgam = function(object,
+                         newdata,
                          data_test,
                          type = 'link',
-                         process_error = TRUE, ...){
+                         process_error = TRUE,
+                         summary = TRUE,
+                         robust = FALSE,
+                         probs = c(0.025, 0.975),
+                         ...){
 
   # Argument checks
   if(!missing("data_test")){
@@ -84,7 +100,7 @@ predict.mvgam = function(object, newdata,
                           mgcv_model = object$trend_mgcv_model)
 
     # Extract process error estimates
-    if(attr(object$model_data, 'trend_model') %in% c('RW','AR1','AR2','AR3')){
+    if(attr(object$model_data, 'trend_model') %in% c('RW','AR1','AR2','AR3','CAR1')){
       if(object$family == 'nmix'){
         family_pars <- list(sigma_obs = .Machine$double.eps)
       } else {
@@ -189,7 +205,7 @@ predict.mvgam = function(object, newdata,
     if(!object$use_lv){
 
       if(attr(object$model_data, 'trend_model') %in%
-         c('RW','AR1','AR2','AR3','VAR1')){
+         c('RW','AR1','AR2','AR3','VAR1','CAR1')){
         family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
                                                     'sigma'))
       }
@@ -335,7 +351,26 @@ predict.mvgam = function(object, newdata,
                                    family_pars = family_extracts)
 
   # Convert back to matrix
-  predictions <- matrix(predictions_vec, nrow = NROW(betas))
-  return(predictions)
+  preds <- matrix(predictions_vec, nrow = NROW(betas))
+
+  if(summary){
+    Qupper <- apply(preds, 2, quantile, probs = max(probs), na.rm = TRUE)
+    Qlower <- apply(preds, 2, quantile, probs = min(probs), na.rm = TRUE)
+
+    if(robust){
+      estimates <- apply(preds, 2, median, na.rm = TRUE)
+      errors <- apply(abs(preds - estimates), 2, median, na.rm = TRUE)
+    } else {
+      estimates <- apply(preds, 2, mean, na.rm = TRUE)
+      errors <- apply(preds, 2, sd, na.rm = TRUE)
+    }
+
+    out <- cbind(estimates, errors, Qlower, Qupper)
+    colnames(out) <- c('Estimate', 'Est.Error', paste0('Q', 100*min(probs)),
+                       paste0('Q', 100*max(probs)))
+  } else {
+    out <- preds
+  }
+  return(out)
 }
 

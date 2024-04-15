@@ -110,6 +110,13 @@
 #' plot_predictions(mod, condition = c('x', 'fac', 'fac'),
 #'                  points = 0.5)
 #' plot(mod, type = 'smooth', realisations = TRUE)
+#'
+#' # First derivatives (on the link scale) should never be
+#' # negative for either factor level
+#' (derivs <- slopes(mod, variables = 'x',
+#'                  by = c('x', 'fac'),\
+#'                  type = 'link'))
+#' all(derivs$estimate > 0)
 #' }
 smooth.construct.moi.smooth.spec <- function(object, data, knots){
 

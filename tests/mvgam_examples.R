@@ -3,7 +3,8 @@
 library(mvgam)
 set.seed(1234)
 mvgam_examp_dat <- sim_mvgam(family = gaussian(),
-                             T = 40)
+                             T = 40,
+                             prop_missing = 0.1)
 
 # Univariate process without trend_formula
 mvgam_example1 <- mvgam(y ~ s(season, k = 5),
@@ -34,7 +35,7 @@ mvgam_example3 <- mvgam(y ~ s(season, k = 5),
                         chains = 1)
 
 # Multivariate process with trend_formula and moving averages
-mvgam_example4 <- mvgam(y ~ 1,
+mvgam_example4 <- mvgam(y ~ series,
                         trend_formula = ~ s(season, k = 5),
                         trend_model = VAR(ma = TRUE, cor = TRUE),
                         family = gaussian(),

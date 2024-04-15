@@ -45,10 +45,17 @@ latent abundance}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:
-\code{series} (a \code{factor} index of the series IDs;the number of levels should be identical
+#'\itemize{
+\item\code{series} (a \code{factor} index of the series IDs; the number of levels should be identical
 to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
-\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
-Any other variables to be included in the linear predictor of \code{formula} must also be present}
+\item\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
+For most dynamic trend types available in \code{mvgam} (see argument \code{trend_model}), time should be
+measured in discrete, regularly spaced intervals (i.e. \code{c(1, 2, 3, ...)}). However you can
+use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though note that any
+temporal intervals that are exactly \code{0} will be adjusted to a very small number
+(\code{1e-12}) to prevent sampling errors. See an example of \code{CAR()} trends in \code{\link{CAR}}
+}
+Should also include any other variables to be included in the linear predictor of \code{formula}}
 
 \item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least \code{series} and \code{time}
 in addition to any other variables included in the linear predictor of \code{formula}. If included, the
@@ -63,12 +70,13 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{'AR1'} or \code{AR(p = 1)}
 \item \code{'AR2'} or \code{AR(p = 2)}
 \item \code{'AR3'} or \code{AR(p = 3)}
+\item \code{'CAR1'} or \code{CAR(p = 1)}
 \item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
 \item \verb{'PWlogistic}, \code{'PWlinear'} or \code{PW()} (only available in \code{Stan})
 \item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all trend types apart from \code{GP()} and \code{PW()}, moving average and/or correlated
+For all trend types apart from \code{GP()}, \code{CAR()} and \code{PW()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
 multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
 

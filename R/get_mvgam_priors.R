@@ -170,8 +170,13 @@ get_mvgam_priors = function(formula,
   }
   orig_data <- data_train
 
+  # Validate the trend arguments
+  orig_trend_model <- trend_model
+  trend_model <- validate_trend_model(orig_trend_model, drift = drift)
+
   # Ensure series and time variables are present
-  data_train <- validate_series_time(data_train, name = 'data')
+  data_train <- validate_series_time(data_train, name = 'data',
+                                     trend_model = trend_model)
 
   # Validate the formula to convert any dynamic() terms
   formula <- interpret_mvgam(formula, N = max(data_train$time),
@@ -194,10 +199,6 @@ get_mvgam_priors = function(formula,
   family <- validate_family(family, use_stan = use_stan)
   family_char <- match.arg(arg = family$family,
                            choices = family_char_choices())
-
-  # Validate the trend arguments
-  orig_trend_model <- trend_model
-  trend_model <- validate_trend_model(orig_trend_model, drift = drift)
 
   # Nmixture additions?
   list2env(check_nmix(family, family_char,
@@ -255,6 +256,7 @@ get_mvgam_priors = function(formula,
     }
 
     trend_train <- data_train
+    trend_train$time <- trend_train$index..time..index
     trend_train$trend_y <- rnorm(length(trend_train$time))
 
     # Add indicators of trend names as factor levels using the trend_map
@@ -876,6 +878,33 @@ get_mvgam_priors = function(formula,
                                                       "hs[1] = 0.08;" ,
                                                       "hs[2] = 0.1;",
                                                       "L_Omega ~ lkj_corr_cholesky(4);")))
+    }
+
+    if(trend_model == 'CAR1'){
+      trend_df <- data.frame(param_name = c(paste0('vector<lower=0,upper=1.5>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] ar1;'),
+                                            paste0('vector<lower=0>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] sigma;')),
+                             param_length = ifelse(use_lv,
+                                                   n_lv,
+                                                   length(unique(data_train$series))),
+                             param_info = c('trend AR1 coefficient',
+                                            'trend sd'),
+                             prior = c('ar1 ~ std_normal();',
+                                       'sigma ~ exponential(2);'),
+                             example_change = c(paste0(
+                               'ar1 ~ normal(',
+                               round(runif(min = 0.1, max = 1, n = 1), 2),
+                               ', ',
+                               round(runif(min = 0.1, max = 1, n = 1), 2),
+                               ');'
+                             ),
+                             paste0('sigma ~ exponential(',
+                                    round(runif(min = 0.01, max = 1, n = 1), 2),
+                                    ');'
+                             )))
     }
 
     if(trend_model == 'AR1'){

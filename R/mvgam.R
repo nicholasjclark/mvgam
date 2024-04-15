@@ -36,10 +36,17 @@
 #'functions within the `trend_formula`
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:
-#'`series` (a \code{factor} index of the series IDs;the number of levels should be identical
-#'to the number of unique series labels (i.e. `n_series = length(levels(data$series))`))
-#'`time` (\code{numeric} or \code{integer} index of the time point for each observation).
-#'Any other variables to be included in the linear predictor of \code{formula} must also be present
+#'#'\itemize{
+#'   \item`series` (a \code{factor} index of the series IDs; the number of levels should be identical
+#'   to the number of unique series labels (i.e. `n_series = length(levels(data$series))`))
+#'   \item`time` (\code{numeric} or \code{integer} index of the time point for each observation).
+#'   For most dynamic trend types available in `mvgam` (see argument `trend_model`), time should be
+#'   measured in discrete, regularly spaced intervals (i.e. `c(1, 2, 3, ...)`). However you can
+#'   use irregularly spaced intervals if using `trend_model = CAR(1)`, though note that any
+#'temporal intervals that are exactly `0` will be adjusted to a very small number
+#'(`1e-12`) to prevent sampling errors. See an example of `CAR()` trends in \code{\link{CAR}}
+#'   }
+#'Should also include any other variables to be included in the linear predictor of \code{formula}
 #'@param data_train Deprecated. Still works in place of \code{data} but users are recommended to use
 #'\code{data} instead for more seamless integration into `R` workflows
 #'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least `series` and `time`
@@ -55,7 +62,8 @@
 #'@param return_model_data \code{logical}. If \code{TRUE}, the list of data that is needed to fit the
 #'model is returned, along with the initial values for smooth and AR parameters, once the model is fitted.
 #'This will be helpful if users wish to modify the model file to add
-#'other stochastic elements that are not currently avaiable in \code{mvgam}. Default is \code{FALSE} to reduce
+#'other stochastic elements that are not currently available in \code{mvgam}.
+#'Default is \code{FALSE} to reduce
 #'the size of the returned object, unless \code{run_model == FALSE}
 #'@param family \code{family} specifying the exponential observation family for the series. Currently supported
 #'families are:
@@ -99,12 +107,13 @@
 #'   \item `'AR1'` or `AR(p = 1)`
 #'   \item `'AR2'` or `AR(p = 2)`
 #'   \item `'AR3'` or `AR(p = 3)`
+#'   \item `'CAR1'` or `CAR(p = 1)`
 #'   \item `'VAR1'`  or `VAR()`(only available in \code{Stan})
 #'   \item `'PWlogistic`, `'PWlinear'` or `PW()` (only available in \code{Stan})
 #'   \item `'GP'` or `GP()` (Gaussian Process with squared exponential kernel;
 #'only available in \code{Stan})}
 #'
-#'For all trend types apart from `GP()` and `PW()`, moving average and/or correlated
+#'For all trend types apart from `GP()`, `CAR()` and `PW()`, moving average and/or correlated
 #'process error terms can also be estimated (for example, `RW(cor = TRUE)` will set up a
 #'multivariate Random Walk if `n_series > 1`). See [mvgam_trends] for more details
 #'@param trend_map Optional `data.frame` specifying which series should depend on which latent
@@ -221,7 +230,7 @@
 #'\code{\link{mvgam_families}}.
 #'\cr
 #'\cr
-#'*Trend models*: Details of latent trend models supported by \pkg{mvgam} can be found in
+#'*Trend models*: Details of latent trend dynamic models supported by \pkg{mvgam} can be found in
 #'\code{\link{mvgam_trends}}.
 #'\cr
 #'\cr
@@ -327,7 +336,7 @@
 #' model_data <- mod1$model_data
 #' library(rstan)
 #' fit <- stan(model_code = mod1$model_file,
-#'            data = model_data)
+#'             data = model_data)
 #'
 #' # Now using cmdstanr
 #' library(cmdstanr)
@@ -377,8 +386,13 @@
 #' plot(mod1, type = 'smooths', realisations = TRUE)
 #'
 #' # Plot conditional response predictions using marginaleffects
-#' plot(conditional_effects(mod1), ask = FALSE)
+#' conditional_effects(mod1)
 #' plot_predictions(mod1, condition = 'season', points = 0.5)
+#'
+#' # Generate posterior predictive checks through bayesplot
+#' pp_check(mod1)
+#' pp_check(mod, type = "bars_grouped",
+#'          group = "series", ndraws = 50)
 #'
 #' # Extract observation model beta coefficient draws as a data.frame
 #' beta_draws_df <- as.data.frame(mod1, variable = 'betas')
@@ -649,11 +663,17 @@ mvgam = function(formula,
   if(!missing("newdata")) data_test <- newdata
   orig_data <- data_train
 
+  # Validate trend_model
+  orig_trend_model <- trend_model
+  trend_model <- validate_trend_model(orig_trend_model, drift = drift)
+
   # Ensure series and time variables are present
-  data_train <- validate_series_time(data_train, name = 'data')
+  data_train <- validate_series_time(data_train, name = 'data',
+                                     trend_model = trend_model)
 
   # Validate the formula to convert any dynamic() terms
-  formula <- interpret_mvgam(formula, N = max(data_train$time),
+  formula <- interpret_mvgam(formula,
+                             N = max(data_train$index..time..index),
                              family = family)
 
   # Check sampler arguments
@@ -693,15 +713,24 @@ mvgam = function(formula,
   }
 
   # Ensure series and time variables are present
-  data_train <- validate_series_time(data_train, name = 'data')
-  if(!missing(data_test)) data_test <- validate_series_time(data_test,
-                                                            name = 'newdata')
+  data_train <- validate_series_time(data_train, name = 'data',
+                                     trend_model = trend_model)
+  if(!missing(data_test)){
+    data_test <- validate_series_time(data_test,
+                                      name = 'newdata',
+                                      trend_model = trend_model)
+    if(trend_model == 'CAR1'){
+      data_test$index..time..index <- data_test$index..time..index +
+        max(data_train$index..time..index)
+    }
+  }
+
 
   # Lighten the final object if this is an lfo run
   if(lfo) return_model_data <- FALSE
 
   # Validate observation formula
-  formula <- interpret_mvgam(formula, N = max(data_train$time))
+  formula <- interpret_mvgam(formula, N = max(data_train$index..time..index))
   data_train <- validate_obs_formula(formula,
                                      data = data_train,
                                      refit = refit)
@@ -726,10 +755,6 @@ mvgam = function(formula,
   family_char <- match.arg(arg = family$family,
                            choices = family_char_choices())
   threads <- validate_threads(family_char, threads)
-
-  # Validate trend_model
-  orig_trend_model <- trend_model
-  trend_model <- validate_trend_model(orig_trend_model, drift = drift)
 
   # Nmixture additions?
   list2env(check_nmix(family, family_char,
@@ -1009,7 +1034,7 @@ mvgam = function(formula,
                                      silent = TRUE))
 
     if(inherits(lp_test, 'try-error')){
-      testdat <- data.frame(time = data_test$time)
+      testdat <- data.frame(time = data_test$index..time..index)
 
       terms_include <- names(ss_gam$coefficients)[which(!names(ss_gam$coefficients)
                                                         %in% '(Intercept)')]
@@ -1037,19 +1062,19 @@ mvgam = function(formula,
 
     # Add a time variable
     if(inherits(data_train, 'list')){
-      temp_dat_train <- data.frame(time = data_train$time,
+      temp_dat_train <- data.frame(time = data_train$index..time..index,
                                    series = data_train$series)
-      temp_dat_test <- data.frame(time = data_test$time,
+      temp_dat_test <- data.frame(time = data_test$index..time..index,
                                   series = data_test$series)
 
       X$index..time..index <- rbind(temp_dat_train, temp_dat_test) %>%
         dplyr::left_join(rbind(temp_dat_train, temp_dat_test) %>%
-                           dplyr::select(time) %>%
+                           dplyr::select(index..time..index) %>%
                            dplyr::distinct() %>%
-                           dplyr::arrange(time) %>%
-                           dplyr::mutate(time = dplyr::row_number()),
-                         by = c('time')) %>%
-        dplyr::pull(time)
+                           dplyr::arrange(index..time..index) %>%
+                           dplyr::mutate(index..time..index = dplyr::row_number()),
+                         by = c('index..time..index')) %>%
+        dplyr::pull(index..time..index)
 
       # Add a series identifier variable
       X$series <- as.numeric(rbind(temp_dat_train, temp_dat_test)$series)
@@ -1066,12 +1091,12 @@ mvgam = function(formula,
 
       X$index..time..index <- dplyr::bind_rows(data_train, data_test) %>%
         dplyr::left_join(dplyr::bind_rows(data_train, data_test) %>%
-                           dplyr::select(time) %>%
+                           dplyr::select(index..time..index) %>%
                            dplyr::distinct() %>%
-                           dplyr::arrange(time) %>%
-                           dplyr::mutate(time = dplyr::row_number()),
-                         by = c('time')) %>%
-        dplyr::pull(time)
+                           dplyr::arrange(index..time..index) %>%
+                           dplyr::mutate(index..time..index = dplyr::row_number()),
+                         by = c('index..time..index')) %>%
+        dplyr::pull(index..time..index)
 
     # Add a series identifier variable
     X$series <- as.numeric(dplyr::bind_rows(data_train, data_test)$series)
@@ -1088,25 +1113,25 @@ mvgam = function(formula,
       X[,xcols_drop] <- NULL
     }
 
-    if(class(data_train)[1] == 'list'){
-      temp_dat <- data.frame(time = data_train$time)
+    if(inherits(data_train, 'list')){
+      temp_dat <- data.frame(time = data_train$index..time..index)
       X$index..time..index <- temp_dat %>%
         dplyr::left_join(temp_dat %>%
-                           dplyr::select(time) %>%
+                           dplyr::select(index..time..index) %>%
                            dplyr::distinct() %>%
-                           dplyr::arrange(time) %>%
-                           dplyr::mutate(time = dplyr::row_number()),
-                         by = c('time')) %>%
-        dplyr::pull(time)
+                           dplyr::arrange(index..time..index) %>%
+                           dplyr::mutate(index..time..index = dplyr::row_number()),
+                         by = c('index..time..index')) %>%
+        dplyr::pull(index..time..index)
     } else {
       X$index..time..index <- data_train %>%
         dplyr::left_join(data_train %>%
-                           dplyr::select(time) %>%
+                           dplyr::select(index..time..index) %>%
                            dplyr::distinct() %>%
-                           dplyr::arrange(time) %>%
-                           dplyr::mutate(time = dplyr::row_number()),
-                         by = c('time')) %>%
-        dplyr::pull(time)
+                           dplyr::arrange(index..time..index) %>%
+                           dplyr::mutate(index..time..index = dplyr::row_number()),
+                         by = c('index..time..index')) %>%
+        dplyr::pull(index..time..index)
     }
 
     X$outcome <- c(data_train$y)
@@ -1429,7 +1454,7 @@ mvgam = function(formula,
       vectorised$model_file <- trend_map_setup$model_file
       vectorised$model_data <- trend_map_setup$model_data
 
-      if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+      if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
         param <- c(param, 'sigma')
       }
 
@@ -1558,6 +1583,12 @@ mvgam = function(formula,
       orig_trend_model$changepoints <- pw_additions$model_data$t_change
       orig_trend_model$change_freq <- pw_additions$model_data$change_freq
       orig_trend_model$cap <- pw_additions$model_data$cap
+    }
+
+    # Update for CAR1 trends
+    if(trend_model == 'CAR1'){
+      vectorised$model_data <- add_corcar(vectorised$model_data,
+                                          data_train, data_test)
     }
 
     # Updates for Binomial and Bernoulli families

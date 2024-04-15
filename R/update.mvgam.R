@@ -61,6 +61,7 @@ update.mvgam = function(object,
 
   if(missing(burnin)){
     burnin <- object$model_output@sim$warmup
+    if(is.null(burnin)) burnin <- 0
   }
 
   if(missing(samples)){
@@ -69,6 +70,10 @@ update.mvgam = function(object,
 
   if(missing(algorithm)){
     algorithm <- object$algorithm
+  }
+
+  if(!algorithm %in% 'sampling'){
+    burnin <- 1
   }
 
   if(missing(formula)){

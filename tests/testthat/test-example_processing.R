@@ -50,85 +50,6 @@ test_that("hindcast() works correctly", {
 
 })
 
-test_that("forecast() works correctly", {
-
-  fc <- forecast(mvgam:::mvgam_example1,
-                 newdata = mvgam:::mvgam_examp_dat$data_test)
-  expect_true(inherits(fc$hindcasts, 'list'))
-  expect_true(inherits(fc$forecasts, 'list'))
-  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
-                 NCOL(mvgam:::mvgam_example1$ytimes),
-               NCOL(fc$forecasts$series_1),
-               length(fc$test_observations$series_1))
-
-  fc <- forecast(mvgam:::mvgam_example1,
-                 newdata = mvgam:::mvgam_examp_dat$data_test,
-                 type = 'expected')
-  expect_true(inherits(fc$hindcasts, 'list'))
-  expect_true(inherits(fc$forecasts, 'list'))
-  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
-                 NCOL(mvgam:::mvgam_example1$ytimes),
-               NCOL(fc$forecasts$series_1),
-               length(fc$test_observations$series_1))
-
-  fc <- forecast(mvgam:::mvgam_example2,
-                 newdata = mvgam:::mvgam_examp_dat$data_test)
-  expect_true(inherits(fc$hindcasts, 'list'))
-  expect_true(inherits(fc$forecasts, 'list'))
-  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
-                 NCOL(mvgam:::mvgam_example2$ytimes),
-               NCOL(fc$forecasts$series_1),
-               length(fc$test_observations$series_1))
-
-  fc <- forecast(mvgam:::mvgam_example2,
-                 newdata = mvgam:::mvgam_examp_dat$data_test,
-                 type = 'expected')
-  expect_true(inherits(fc$hindcasts, 'list'))
-  expect_true(inherits(fc$forecasts, 'list'))
-  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
-                 NCOL(mvgam:::mvgam_example2$ytimes),
-               NCOL(fc$forecasts$series_1),
-               length(fc$test_observations$series_1))
-
-  fc <- forecast(mvgam:::mvgam_example3,
-                 newdata = mvgam:::mvgam_examp_dat$data_test)
-  expect_true(inherits(fc$hindcasts, 'list'))
-  expect_true(inherits(fc$forecasts, 'list'))
-  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
-                 NCOL(mvgam:::mvgam_example3$ytimes),
-               NCOL(fc$forecasts$series_1),
-               length(fc$test_observations$series_1))
-
-  fc <- forecast(mvgam:::mvgam_example3,
-                 newdata = mvgam:::mvgam_examp_dat$data_test,
-                 type = 'expected')
-  expect_true(inherits(fc$hindcasts, 'list'))
-  expect_true(inherits(fc$forecasts, 'list'))
-  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
-                 NCOL(mvgam:::mvgam_example3$ytimes),
-               NCOL(fc$forecasts$series_1),
-               length(fc$test_observations$series_1))
-
-  fc <- forecast(mvgam:::mvgam_example4,
-                 newdata = mvgam:::mvgam_examp_dat$data_test)
-  expect_true(inherits(fc$hindcasts, 'list'))
-  expect_true(inherits(fc$forecasts, 'list'))
-  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
-                 NCOL(mvgam:::mvgam_example4$ytimes),
-               NCOL(fc$forecasts$series_1),
-               length(fc$test_observations$series_1))
-
-  fc <- forecast(mvgam:::mvgam_example4,
-                 newdata = mvgam:::mvgam_examp_dat$data_test,
-                 type = 'expected')
-  expect_true(inherits(fc$hindcasts, 'list'))
-  expect_true(inherits(fc$forecasts, 'list'))
-  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
-                 NCOL(mvgam:::mvgam_example4$ytimes),
-               NCOL(fc$forecasts$series_1),
-               length(fc$test_observations$series_1))
-})
-
 test_that("predict() works correctly", {
   expect_equal(dim(predict(mvgam:::mvgam_example1, type = 'expected',
                            process_error = FALSE)),
@@ -167,13 +88,6 @@ test_that("mcmc_plot() works correctly", {
   expect_ggplot(mcmc_plot(mvgam:::mvgam_example4, variable = 'trend_params'))
 })
 
-test_that("loo() works correctly", {
-  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example1)))
-  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example2)))
-  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example3)))
-  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example4)))
-})
-
 test_that("marginaleffects works correctly", {
   expect_ggplot(plot_slopes(mvgam:::mvgam_example1,
                             variables = 'season',
@@ -206,3 +120,90 @@ test_that("marginaleffects works correctly", {
                                  type = 'link'))
 })
 
+# Skip forecast and loo testing as they are a bit time-consuming
+test_that("forecast() works correctly", {
+  skip_on_cran()
+  fc <- forecast(mvgam:::mvgam_example1,
+                 newdata = mvgam:::mvgam_examp_dat$data_test)
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example1$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
+
+  fc <- forecast(mvgam:::mvgam_example1,
+                 newdata = mvgam:::mvgam_examp_dat$data_test,
+                 type = 'expected')
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example1$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
+
+  fc <- forecast(mvgam:::mvgam_example2,
+                 newdata = mvgam:::mvgam_examp_dat$data_test)
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example2$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
+
+  fc <- forecast(mvgam:::mvgam_example2,
+                 newdata = mvgam:::mvgam_examp_dat$data_test,
+                 type = 'expected')
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example2$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
+
+  fc <- forecast(mvgam:::mvgam_example3,
+                 newdata = mvgam:::mvgam_examp_dat$data_test)
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example3$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
+
+  fc <- forecast(mvgam:::mvgam_example3,
+                 newdata = mvgam:::mvgam_examp_dat$data_test,
+                 type = 'expected')
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example3$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
+
+  fc <- forecast(mvgam:::mvgam_example4,
+                 newdata = mvgam:::mvgam_examp_dat$data_test)
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example4$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
+
+  fc <- forecast(mvgam:::mvgam_example4,
+                 newdata = mvgam:::mvgam_examp_dat$data_test,
+                 type = 'expected')
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example4$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
+})
+
+test_that("loo() works correctly", {
+  skip_on_cran()
+  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example1)))
+  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example2)))
+  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example3)))
+  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example4)))
+})
