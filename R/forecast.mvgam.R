@@ -705,7 +705,8 @@ forecast_draws = function(object,
            call. = FALSE)
     }
 
-    all_preds <- predict(object, type = type, newdata = data_test)
+    all_preds <- predict(object, type = type, newdata = data_test,
+                         summary = FALSE)
     fc_preds <- lapply(seq_len(NROW(all_preds)), function(draw){
       lapply(seq_len(n_series), function(series){
         all_preds[draw, which(data_test$series == levels(data_test$series)[series])]

@@ -123,7 +123,8 @@ plot_predictions(mod,
 
 This results in sensible forecasts of the observations as well
 ```{r}
-plot(mod, type = 'forecast', newdata = data_test)
+fc <- forecast(mod, newdata = data_test)
+plot(fc)
 ```
 
 The syntax is very similar if we wish to estimate the parameters of the underlying Gaussian Process, this time using a Hilbert space approximation. We simply omit the `rho` argument in `dynamic` to make this happen. This will set up a call similar to `gp(time, by = 'temp', c = 5/4, k = 40)`.

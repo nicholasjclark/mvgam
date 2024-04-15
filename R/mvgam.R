@@ -1651,9 +1651,10 @@ mvgam = function(formula,
     # Tidy the representation
     vectorised$model_file <- sanitise_modelfile(vectorised$model_file)
 
-    if(requireNamespace('cmdstanr', quietly = TRUE)){
+    if(requireNamespace('cmdstanr', quietly = TRUE) & backend == 'cmdstanr'){
       # Replace new syntax if this is an older version of Stan
       if(cmdstanr::cmdstan_version() < "2.26"){
+        warning('Your version of CmdStan is out of date. Some features of mvgam may not work')
         vectorised$model_file <-
           gsub('array[n, n_series] int ypred;',
                'int ypred[n, n_series];',
@@ -1678,6 +1679,7 @@ mvgam = function(formula,
 
       # Replace new syntax if this is an older version of Stan
       if(rstan::stan_version() < "2.26"){
+        warning('Your version of rstan is out of date. Some features of mvgam may not work')
         vectorised$model_file <-
           gsub('array[n, n_series] int ypred;',
                'int ypred[n, n_series];',
