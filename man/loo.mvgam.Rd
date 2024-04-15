@@ -46,7 +46,7 @@ mod2 <- update(mod1,
 plot(mod2, type = 'smooths')
 loo(mod2)
 
-# Now add a AR1 dynamic errors to mod2
+# Now add AR1 dynamic errors to mod2
 mod3 <- update(mod2, trend_model = 'AR1')
 plot(mod3, type = 'smooths')
 plot(mod3, type = 'trend')

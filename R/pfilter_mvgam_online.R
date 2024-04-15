@@ -25,7 +25,7 @@
 #'@return A \code{list} object of \code{length = n_particles} containing information on parameters and
 #'current state estimates for each particle is generated and saved, along with other important information
 #'from the original model, to an \code{.rda} object in \code{file_path}
-#'@export
+#' @noRd
 pfilter_mvgam_online = function(newdata,
                                 data_assim,
                                 file_path = 'pfilter',

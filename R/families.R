@@ -514,9 +514,9 @@ mvgam_predict = function(Xp,
       out <- exp(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
                           betas) + attr(Xp, 'model.offset')))
       } else {
-      out <- exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
+      out <- exp(as.vector(((matrix(Xp, ncol = NCOL(Xp)) %*%
                      betas)) +
-                   attr(Xp, 'model.offset'))
+                   attr(Xp, 'model.offset')))
     }
   }
 

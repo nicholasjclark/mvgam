@@ -124,21 +124,23 @@ add_binomial = function(formula,
   if(family_char == 'binomial'){
     if(any(grepl("flat_ys ~ poisson_log_glm(flat_xs,",
                 model_file, fixed = TRUE))){
-      model_file[grep("flat_ys ~ poisson_log_glm(flat_xs,",
-                      model_file, fixed = TRUE)] <-
-        "flat_ys ~ binomial(flat_trials_train, inv_logit(flat_xs * b));"
+      linenum <- grep("flat_ys ~ poisson_log_glm(flat_xs,",
+                      model_file, fixed = TRUE)
+      model_file[linenum] <-
+        paste0("flat_ys ~ binomial(flat_trials_train, inv_logit(flat_xs * b));")
 
-      model_file <- model_file[-grep("0.0,b);", model_file, fixed = TRUE)]
+      model_file <- model_file[-(linenum + 1)]
       model_file <- readLines(textConnection(model_file), n = -1)
     }
 
     if(any(grepl("flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends),",
                  model_file, fixed = TRUE))){
-      model_file[grep("flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends),",
-                      model_file, fixed = TRUE)] <-
-        "flat_ys ~ binomial(flat_trials_train, inv_logit(append_col(flat_xs, flat_trends) * b));"
+      linenum <- grep("flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends),",
+                      model_file, fixed = TRUE)
+      model_file[linenum] <-
+        paste0("flat_ys ~ binomial(flat_trials_train, inv_logit(append_col(flat_xs, flat_trends) * b));")
 
-      model_file <- model_file[-grep("0.0,b);", model_file, fixed = TRUE)]
+      model_file <- model_file[-(linenum + 1)]
       model_file <- readLines(textConnection(model_file), n = -1)
     }
   }

@@ -67,10 +67,6 @@
 #'                 trend_model = 'AR2',
 #'                 family = poisson())
 #'
-#'# Plot the time series
-#'plot_mvgam_series(data = dat$data_train,
-#'                  newdata = dat$data_test,
-#'                  series = 1)
 #'
 #'# Fit an appropriate model
 #'mod_ar2 <- mvgam(y ~ s(season, bs = 'cc'),

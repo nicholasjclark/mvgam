@@ -14,7 +14,7 @@ Functions needed for getting data / objects with insight"><!-- mathjax --><scrip
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.91</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -36,6 +36,9 @@ Functions needed for getting data / objects with insight"><!-- mathjax --><scrip
     <a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in mvgam</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in mvgam</a>
   </div>
+</li>
+<li class="nav-item">
+  <a class="nav-link" href="../news/index.html">Changelog</a>
 </li>
       </ul><form class="form-inline my-2 my-lg-0" role="search">
         <input type="search" class="form-control me-sm-2" aria-label="Toggle navigation" name="search-input" data-search-index="../search.json" id="search-input" placeholder="Search for" autocomplete="off"></form>
@@ -67,25 +70,25 @@ Functions needed for getting data / objects with insight"><!-- mathjax --><scrip
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/get_coef.html" class="external-link">get_coef</a></span><span class="op">(</span><span class="va">model</span>, trend_effects <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">...</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://marginaleffects.com/man/get_coef.html" class="external-link">get_coef</a></span><span class="op">(</span><span class="va">model</span>, trend_effects <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/set_coef.html" class="external-link">set_coef</a></span><span class="op">(</span><span class="va">model</span>, <span class="va">coefs</span>, trend_effects <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">...</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://marginaleffects.com/man/set_coef.html" class="external-link">set_coef</a></span><span class="op">(</span><span class="va">model</span>, <span class="va">coefs</span>, trend_effects <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/get_vcov.html" class="external-link">get_vcov</a></span><span class="op">(</span><span class="va">model</span>, vcov <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">...</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://marginaleffects.com/man/get_vcov.html" class="external-link">get_vcov</a></span><span class="op">(</span><span class="va">model</span>, vcov <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/get_predict.html" class="external-link">get_predict</a></span><span class="op">(</span><span class="va">model</span>, <span class="va">newdata</span>, type <span class="op">=</span> <span class="st">"response"</span>, process_error <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">...</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://marginaleffects.com/man/get_predict.html" class="external-link">get_predict</a></span><span class="op">(</span><span class="va">model</span>, <span class="va">newdata</span>, type <span class="op">=</span> <span class="st">"response"</span>, process_error <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://easystats.github.io/insight/reference/get_data.html" class="external-link">get_data</a></span><span class="op">(</span><span class="va">x</span>, source <span class="op">=</span> <span class="st">"environment"</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span>, <span class="va">...</span><span class="op">)</span></span>
+<span><span class="fu">get_data</span><span class="op">(</span><span class="va">x</span>, source <span class="op">=</span> <span class="st">"environment"</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam_prefit</span></span>
-<span><span class="fu"><a href="https://easystats.github.io/insight/reference/get_data.html" class="external-link">get_data</a></span><span class="op">(</span><span class="va">x</span>, source <span class="op">=</span> <span class="st">"environment"</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span>, <span class="va">...</span><span class="op">)</span></span>
+<span><span class="fu">get_data</span><span class="op">(</span><span class="va">x</span>, source <span class="op">=</span> <span class="st">"environment"</span>, verbose <span class="op">=</span> <span class="cn">TRUE</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://easystats.github.io/insight/reference/find_predictors.html" class="external-link">find_predictors</a></span><span class="op">(</span></span>
+<span><span class="fu">find_predictors</span><span class="op">(</span></span>
 <span>  <span class="va">x</span>,</span>
 <span>  effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"fixed"</span>, <span class="st">"random"</span>, <span class="st">"all"</span><span class="op">)</span>,</span>
 <span>  component <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"all"</span>, <span class="st">"conditional"</span>, <span class="st">"zi"</span>, <span class="st">"zero_inflated"</span>, <span class="st">"dispersion"</span>, <span class="st">"instruments"</span>,</span>
@@ -96,7 +99,7 @@ Functions needed for getting data / objects with insight"><!-- mathjax --><scrip
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam_prefit</span></span>
-<span><span class="fu"><a href="https://easystats.github.io/insight/reference/find_predictors.html" class="external-link">find_predictors</a></span><span class="op">(</span></span>
+<span><span class="fu">find_predictors</span><span class="op">(</span></span>
 <span>  <span class="va">x</span>,</span>
 <span>  effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"fixed"</span>, <span class="st">"random"</span>, <span class="st">"all"</span><span class="op">)</span>,</span>
 <span>  component <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"all"</span>, <span class="st">"conditional"</span>, <span class="st">"zi"</span>, <span class="st">"zero_inflated"</span>, <span class="st">"dispersion"</span>, <span class="st">"instruments"</span>,</span>
@@ -125,7 +128,7 @@ for mixed-effects or bayesian models (see the online vignettes on the
 <code>marginaleffects</code> website). Available arguments can vary from model to
 model, depending on the range of supported arguments by each modeling
 package. See the "Model-Specific Arguments" section of the
-<code><a href="https://rdrr.io/pkg/marginaleffects/man/slopes.html" class="external-link">?slopes</a></code> documentation for a non-exhaustive list of available
+<code><a href="https://marginaleffects.com/man/slopes.html" class="external-link">?slopes</a></code> documentation for a non-exhaustive list of available
 arguments.</p></dd>
 
 
@@ -150,8 +153,8 @@ arguments.</p></dd>
 <dt>newdata</dt>
 <dd><p>Grid of predictor values at which we evaluate the slopes.</p><ul><li><p>Warning: Please avoid modifying your dataset between fitting the model and calling a <code>marginaleffects</code> function. This can sometimes lead to unexpected results.</p></li>
 <li><p><code>NULL</code> (default): Unit-level slopes for each observed value in the dataset (empirical distribution). The dataset is retrieved using <code><a href="https://easystats.github.io/insight/reference/get_data.html" class="external-link">insight::get_data()</a></code>, which tries to extract data from the environment. This may produce unexpected results if the original data frame has been altered since fitting the model.</p></li>
-<li><p><code><a href="https://rdrr.io/pkg/marginaleffects/man/datagrid.html" class="external-link">datagrid()</a></code> call to specify a custom grid of regressors. For example:</p><ul><li><p><code>newdata = datagrid(cyl = c(4, 6))</code>: <code>cyl</code> variable equal to 4 and 6 and other regressors fixed at their means or modes.</p></li>
-<li><p>See the Examples section and the <code><a href="https://rdrr.io/pkg/marginaleffects/man/datagrid.html" class="external-link">datagrid()</a></code> documentation.</p></li>
+<li><p><code><a href="https://marginaleffects.com/man/datagrid.html" class="external-link">datagrid()</a></code> call to specify a custom grid of regressors. For example:</p><ul><li><p><code>newdata = datagrid(cyl = c(4, 6))</code>: <code>cyl</code> variable equal to 4 and 6 and other regressors fixed at their means or modes.</p></li>
+<li><p>See the Examples section and the <code><a href="https://marginaleffects.com/man/datagrid.html" class="external-link">datagrid()</a></code> documentation.</p></li>
 </ul></li>
 <li><p>string:</p><ul><li><p>"mean": Marginal Effects at the Mean. Slopes when each predictor is held at its mean or mode.</p></li>
 <li><p>"median": Marginal Effects at the Median. Slopes when each predictor is held at its median or mode.</p></li>

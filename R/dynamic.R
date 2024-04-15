@@ -39,7 +39,7 @@
 #' @rdname dynamic
 #'@examples
 #'\dontrun{
-#'# Simulate a time-varying coefficient \
+#'# Simulate a time-varying coefficient
 #'#(as a Gaussian Process with length scale = 10)
 #'set.seed(1111)
 #'N <- 200
@@ -63,7 +63,7 @@
 #'     bty = 'l', xlab = 'Time', ylab = 'Outcome',
 #'     col = 'darkred')
 #'
-#'# Gather into a data.frame and fit a dynamic coefficient mmodel
+#'# Gather into a data.frame and fit a dynamic coefficient model
 #'data <- data.frame(out, predictor, time)
 #'
 #'# Split into training and testing

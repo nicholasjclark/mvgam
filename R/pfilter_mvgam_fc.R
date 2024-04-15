@@ -25,7 +25,7 @@
 #'as well as the forecast objects (each as a \code{matrix} of dimension \code{n_particles} x \code{horizon})
 #'@return A named \code{list} containing functions that call base \code{R} plots of each series' forecast. Optionally
 #'the actual forecasts are returned within the \code{list} as a separate \code{list} of \code{matrices}
-#'@export
+#' @noRd
 pfilter_mvgam_fc = function(file_path = 'pfilter',
                             n_cores = 2,
                             newdata,

@@ -32,7 +32,7 @@
 #'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
 #'@return A \code{list} object of \code{length = n_particles} containing information on parameters and
 #'current state estimates for each particle
-#'@export
+#' @noRd
 pfilter_mvgam_smooth = function(particles,
                                 mgcv_model,
                                 next_assim,
