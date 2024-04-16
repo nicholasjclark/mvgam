@@ -321,12 +321,12 @@
 #'# Set run_model = FALSE to inspect the returned objects
 #'mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
 #'              data = dat$data_train,
-#'              trend_model = 'RW',
+#'              trend_model = RW(),
 #'              family = 'poisson',
 #'              use_stan = TRUE,
 #'              run_model = FALSE)
 #'
-#'# View the model code in Stan language
+#' # View the model code in Stan language
 #' code(mod1)
 #'
 #' # Inspect the data objects needed to condition the model
@@ -352,9 +352,8 @@
 #' # Now fit the model using mvgam with the Stan backend
 #' mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
 #'               data = dat$data_train,
-#'               trend_model = 'RW',
-#'               family = poisson(),
-#'               use_stan = TRUE)
+#'               trend_model = RW(),
+#'               family = poisson())
 #'
 #' # Extract the model summary
 #' summary(mod1)
@@ -389,10 +388,8 @@
 #' conditional_effects(mod1)
 #' plot_predictions(mod1, condition = 'season', points = 0.5)
 #'
-#' # Generate posterior predictive checks through bayesplot
+#' # Generate posterior predictive checks using bayesplot
 #' pp_check(mod1)
-#' pp_check(mod, type = "bars_grouped",
-#'          group = "series", ndraws = 50)
 #'
 #' # Extract observation model beta coefficient draws as a data.frame
 #' beta_draws_df <- as.data.frame(mod1, variable = 'betas')
@@ -416,7 +413,7 @@
 #' # Fit the model using AR1 trends
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
 #'               trend_map = trend_map,
-#'               trend_model = 'AR1',
+#'               trend_model = AR(),
 #'               data = mod_data,
 #'               return_model_data = TRUE)
 #'
@@ -431,13 +428,14 @@
 #'
 #' # Example of how to use dynamic coefficients
 #' # Simulate a time-varying coefficient for the effect of temperature
-#' set.seed(3)
-#' N = 200
+#' set.seed(123)
+#' N <- 200
 #' beta_temp <- vector(length = N)
 #' beta_temp[1] <- 0.4
 #' for(i in 2:N){
-#'   beta_temp[i] <- rnorm(1, mean = beta_temp[i - 1], sd = 0.025)
+#'  beta_temp[i] <- rnorm(1, mean = beta_temp[i - 1] - 0.0025, sd = 0.05)
 #' }
+#' plot(beta_temp)
 #'
 #' # Simulate a covariate called 'temp'
 #' temp <- rnorm(N, sd = 1)
@@ -452,7 +450,10 @@
 #' data_test <- data[181:200,]
 #'
 #' # Fit the model using the dynamic() formula helper
-#' mod <- mvgam(formula = out ~ dynamic(temp, rho = 8),
+#' mod <- mvgam(out ~
+#'               dynamic(temp,
+#'                       scale = FALSE,
+#'                       k = 40),
 #'              family = gaussian(),
 #'              data = data_train,
 #'              newdata = data_test)
@@ -460,11 +461,13 @@
 #' # Inspect the model summary, forecast and time-varying coefficient distribution
 #' summary(mod)
 #' plot(mod, type = 'smooths')
-#' plot(mod, type = 'forecast', newdata = data_test)
+#' fc <- forecast(mod, newdata = data_test)
+#' plot(fc)
 #'
 #' # Propagating the smooth term shows how the coefficient is expected to evolve
 #' plot_mvgam_smooth(mod, smooth = 1, newdata = data)
 #' abline(v = 180, lty = 'dashed', lwd = 2)
+#' points(beta_temp, pch = 16)
 #'
 #'
 #' # Example showing how to incorporate an offset; simulate some count data
@@ -483,30 +486,30 @@
 #'               s(season, bs = 'cc') +
 #'               s(season, by = series, m = 1, k = 5),
 #'              data = dat$data_train,
-#'              trend_model = 'None',
-#'              use_stan = TRUE)
+#'              trend_model = 'None')
 #'
 #' # Inspect the model file to see the modification to the linear predictor
 #' # (eta)
-#' mod$model_file
+#' code(mod)
 #'
 #' # Forecasts for the first two series will differ in magnitude
+#' fc <- forecast(mod, newdata = dat$data_test)
 #' layout(matrix(1:2, ncol = 2))
-#' plot(mod, type = 'forecast', series = 1, newdata = dat$data_test,
-#'      ylim = c(0, 75))
-#' plot(mod, type = 'forecast', series = 2, newdata = dat$data_test,
-#'      ylim = c(0, 75))
+#' plot(fc, series = 1, ylim = c(0, 75))
+#' plot(fc, series = 2, ylim = c(0, 75))
 #' layout(1)
 #'
 #' # Changing the offset for the testing data should lead to changes in
 #' # the forecast
 #' dat$data_test$offset <- dat$data_test$offset - 2
-#' plot(mod, 'forecast', newdata = dat$data_test)
+#' fc <- forecast(mod, newdata = dat$data_test)
+#' plot(fc)
 #'
 #' # Relative Risks can be computed by fixing the offset to the same value
 #' # for each series
 #' dat$data_test$offset <- rep(1, NROW(dat$data_test))
-#' preds_rr <- predict(mod, type = 'link', newdata = dat$data_test)
+#' preds_rr <- predict(mod, type = 'link', newdata = dat$data_test,
+#'                     summary = FALSE)
 #' series1_inds <- which(dat$data_test$series == 'series_1')
 #' series2_inds <- which(dat$data_test$series == 'series_2')
 #'
@@ -606,6 +609,7 @@
 #'                         ntrials = trials))
 #' dat <- dplyr::mutate(dat, series = as.factor(series))
 #' dat <- dplyr::arrange(dat, time, series)
+#' plot_mvgam_series(data = dat, series = 'all')
 #'
 #' # Fit a model using the binomial() family; must specify observations
 #' # and number of trials in the cbind() wrapper
@@ -613,7 +617,11 @@
 #'              family = binomial(),
 #'              data = dat)
 #' summary(mod)
-#'
+#' pp_check(mod, type = "bars_grouped",
+#'          group = "series", ndraws = 50)
+#' pp_check(mod, type = "ecdf_overlay_grouped",
+#'          group = "series", ndraws = 50)
+#' conditional_effects(mod, type = 'link')
 #' }
 #'@export
 

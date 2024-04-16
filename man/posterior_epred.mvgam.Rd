@@ -72,7 +72,7 @@ that respect the temporal dynamics of estimated latent trends.
 # Simulate some data and fit a model
 simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 mod <- mvgam(y ~ s(season, bs = 'cc'),
-            trend_model = 'AR1',
+            trend_model = AR(),
             data = simdat$data_train)
 
 # Compute posterior expectations

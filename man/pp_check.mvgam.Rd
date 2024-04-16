@@ -109,3 +109,9 @@ pp_check(mod, prefix = "ppd")
 }
 
 }
+\seealso{
+\code{\link{ppc}} \code{\link{predict.mvgam}}
+}
+\author{
+Nicholas J Clark
+}

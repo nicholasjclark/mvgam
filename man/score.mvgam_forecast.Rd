@@ -63,7 +63,7 @@ Compute probabilistic forecast scores for mvgam objects
 data <- sim_mvgam()
 # Fit a dynamic model using 'newdata' to automatically produce forecasts
 mod <- mvgam(y ~ 1,
-            trend_model = 'RW',
+            trend_model = RW(),
             data = data$data_train,
             newdata = data$data_test)
 

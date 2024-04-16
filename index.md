@@ -35,14 +35,12 @@ using `mvgam`, please refer to installation links for `JAGS`
 [here](https://sourceforge.net/projects/mcmc-jags/files/), for `Stan`
 with `rstan` [here](https://mc-stan.org/users/interfaces/rstan), or for
 `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/). You will
-need a fairly recent version of `Stan` to ensure all the model syntax is
-recognized. If you see warnings such as
-`variable "array" does not exist`, this is usually a sign that you need
-to update your version of `Stan`. We highly recommend you use `Cmdstan`
-through the `cmdstanr` interface as the backend. This is because
-`Cmdstan` is easier to install, is more up to date with new features,
-and uses less memory than `Rstan`. See [this documentation from the
-`Cmdstan` team for more
+need a fairly recent version of `Stan` (preferably 2.29 or above) to
+ensure all the model syntax is recognized. We highly recommend you use
+`Cmdstan` through the `cmdstanr` interface as the backend. This is
+because `Cmdstan` is easier to install, is more up to date with new
+features, and uses less memory than `Rstan`. See [this documentation
+from the `Cmdstan` team for more
 information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan).
 
 ## Introductory seminar

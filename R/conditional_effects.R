@@ -103,14 +103,14 @@ conditional_effects.mvgam = function(x,
   if(rug){
     if(x$family %in% c('binomial', 'beta_binomial')){
       rug <- FALSE
-      warning('Cannot show observation rug for binomial models')
+      message('Cannot show observation rug for binomial models')
     }
   }
 
   if(points){
     if(x$family %in% c('binomial', 'beta_binomial')){
       points <- 0
-      warning('Cannot show observation points for binomial models')
+      message('Cannot show observation points for binomial models')
     }
   }
 

@@ -69,10 +69,15 @@ Plot mvgam posterior predictive checks for a specified series
 \details{
 Posterior predictions are drawn from the fitted \code{mvgam} and compared against
 the empirical distribution of the observed data for a specified series to help evaluate the model's
-ability to generate unbiased predictions. For all plots apart from the 'rootogram', posterior predictions
+ability to generate unbiased predictions. For all plots apart from \code{type = 'rootogram'}, posterior predictions
 can also be compared to out of sample observations as long as these observations were included as
 'data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
-'hanging' style
+'hanging' style.
+\cr
+Note that the predictions used for these plots are those that have been generated directly within
+the \code{mvgam()} model, so they can be misleading if the model included flexible dynamic trend components. For
+a broader range of posterior checks that are created using "new data" predictions, see
+\code{\link{pp_check.mvgam}}
 }
 \examples{
 \dontrun{
@@ -89,4 +94,10 @@ ppc(mod, type = 'hist')
 ppc(mod, type = 'density')
 ppc(mod, type = 'cdf')
 }
+}
+\seealso{
+\code{\link{pp_check.mvgam}}, \code{\link{predict.mvgam}}
+}
+\author{
+Nicholas J Clark
 }

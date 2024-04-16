@@ -28,10 +28,15 @@
 #'@param ... further \code{\link[graphics]{par}} graphical parameters.
 #'@details Posterior predictions are drawn from the fitted \code{mvgam} and compared against
 #'the empirical distribution of the observed data for a specified series to help evaluate the model's
-#'ability to generate unbiased predictions. For all plots apart from the 'rootogram', posterior predictions
+#'ability to generate unbiased predictions. For all plots apart from `type = 'rootogram'`, posterior predictions
 #'can also be compared to out of sample observations as long as these observations were included as
 #''data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
-#''hanging' style
+#''hanging' style.
+#'\cr
+#'Note that the predictions used for these plots are those that have been generated directly within
+#'the `mvgam()` model, so they can be misleading if the model included flexible dynamic trend components. For
+#'a broader range of posterior checks that are created using "new data" predictions, see
+#'\code{\link{pp_check.mvgam}}
 #'@return A base \code{R} graphics plot showing either a posterior rootogram (for \code{type == 'rootogram'}),
 #'the predicted vs observed mean for the
 #'series (for \code{type == 'mean'}), predicted vs observed proportion of zeroes for the
@@ -39,6 +44,8 @@
 #'series (for \code{type == 'hist'}), kernel density or empirical CDF estimates for
 #'posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or a Probability
 #'Integral Transform histogram (for \code{type == 'pit'}).
+#'@author Nicholas J Clark
+#'@seealso \code{\link{pp_check.mvgam}}, \code{\link{predict.mvgam}}
 #' @examples
 #' \dontrun{
 #' # Simulate some smooth effects and fit a model
@@ -768,7 +775,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
 #' see the \code{\link[bayesplot:PPC-overview]{PPC}}
 #' documentation of the \pkg{\link[bayesplot:bayesplot-package]{bayesplot}}
 #' package.
-#'
+#' @seealso \code{\link{ppc}} \code{\link{predict.mvgam}}
 #' @examples
 #' \dontrun{
 #'simdat <- sim_mvgam(seasonality = 'hierarchical')
@@ -814,6 +821,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
 #'
 #' @importFrom bayesplot pp_check
 #' @export pp_check
+#' @author Nicholas J Clark
 #' @export
 pp_check.mvgam <- function(object, type, ndraws = NULL, prefix = c("ppc", "ppd"),
                              group = NULL, x = NULL, newdata = NULL, ...) {
@@ -900,8 +908,18 @@ pp_check.mvgam <- function(object, type, ndraws = NULL, prefix = c("ppc", "ppd")
 
   y <- NULL
   if (prefix == "ppc") {
-    # y is ignored in prefix 'ppd' plots
-    y <- newdata[[terms(formula(object$call))[[2]]]]
+    # y is ignored in prefix 'ppd' plots; get the response variable,
+    # but take care that binomial models use the cbind() lhs
+    resp_terms <- as.character(terms(formula(object$call))[[2]])
+    if(length(resp_terms) == 1){
+      out_name <- as.character(terms(object$call)[[2]])
+    } else {
+      if(any(grepl('cbind', resp_terms))){
+        resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+        out_name <- resp_terms[1]
+      }
+    }
+    y <- newdata[[out_name]]
   }
 
   pred_args <- list(
