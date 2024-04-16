@@ -43,7 +43,6 @@ jobs:
               ggplot2
               rjags
               coda
-              runjags
               stan-dev/cmdstanr
               testthat
               usethis
