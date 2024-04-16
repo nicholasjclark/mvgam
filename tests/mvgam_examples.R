@@ -1,6 +1,7 @@
 # Small mvgam examples for testing post-fitting functions such as
 # predict, forecast, hindcast etc...
 set.seed(1234)
+library(mvgam)
 mvgam_examp_dat <- list(data_train = structure(list(y = c(-0.317295790188251, 0.220334092025582,
                                                           -0.23429845120413, -0.190120275631535, -0.721932341073365, -0.536319229285967,
                                                           1.07847872341093, 0.528603309959222, -1.01029789615038, 0.238298670523412,
