@@ -1217,8 +1217,10 @@ mvgam = function(formula,
 
   # Remove Smooth penalty matrix if no smooths were used in the formula
   if(!smooths_included){
-    ss_jagam$jags.data[[grep('S.*', names(ss_jagam$jags.data))]] <- NULL
-    ss_jagam$jags.data$sp <- NULL
+    if(any(grepl('S.*', names(ss_jagam$jags.data)))){
+      ss_jagam$jags.data[[grep('S.*', names(ss_jagam$jags.data))]] <- NULL
+      ss_jagam$jags.data$sp <- NULL
+    }
     ss_jagam$jags.data$zero <- NULL
   }
 
