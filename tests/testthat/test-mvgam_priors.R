@@ -150,8 +150,8 @@ test_that("specified priors appear in the Stan code", {
                     family = betar(),
                     priors = priors,
                     run_model = FALSE)$model_file
-  expect_true(expect_match2(stancode,
-                            'alpha_gp ~ normal(-1, 0.75);'))
+  expect_true(expect_match2(gsub(' ', '', stancode),
+                            'alpha_gp~normal(-1,0.75);'))
 
   # Now the same using brms functionality; this time use a bound as well
   priors <- prior(normal(-1, 0.75), class = alpha_gp, ub = 1)
@@ -163,8 +163,8 @@ test_that("specified priors appear in the Stan code", {
                     run_model = FALSE)$model_file
   expect_true(expect_match2(stancode,
                             'alpha_gp ~ normal(-1, 0.75);'))
-  expect_true(expect_match2(stancode,
-                            'vector<lower=0, upper=1>[n_series] alpha_gp;'))
+  expect_true(expect_match2(gsub(' ', '', stancode),
+                            'vector<lower=0,upper=1>[n_series]alpha_gp;'))
 })
 
 test_that("specified trend_formula priors appear in the Stan code", {
@@ -185,8 +185,8 @@ test_that("specified trend_formula priors appear in the Stan code", {
                     family = betar(),
                     priors = priors,
                     run_model = FALSE)$model_file
-  expect_true(expect_match2(stancode,
-                            'b_raw_trend[1] ~ uniform(-2, 1);'))
+  expect_true(expect_match2(gsub(' ', '', stancode),
+                            'b_raw_trend[1]~uniform(-2,1);'))
 })
 
 
@@ -203,8 +203,8 @@ test_that("priors on parametric effects behave correctly", {
                     family = betar(),
                     priors = priors,
                     run_model = FALSE)$model_file
-  expect_true(expect_match2(stancode,
-                            'b_raw[1] ~ normal(-1, 0.75);'))
+  expect_true(expect_match2(gsub(' ', '', stancode),
+                            'b_raw[1]~normal(-1,0.75);'))
 
   # Now the same using brms functionality
   priors <- prior(normal(-1, 0.75), class = Intercept)
@@ -214,8 +214,8 @@ test_that("priors on parametric effects behave correctly", {
                     family = betar(),
                     priors = priors,
                     run_model = FALSE)$model_file
-  expect_true(expect_match2(stancode,
-                            'b_raw[1] ~ normal(-1, 0.75);'))
+  expect_true(expect_match2(gsub(' ', '', stancode),
+                            'b_raw[1]~normal(-1,0.75);'))
 
   # Bounds not allowed on parametric effect priors yet
   priors <- prior(normal(-1, 0.75), class = `Intercept`, lb = 0)
@@ -246,14 +246,14 @@ test_that("priors on gp() effects work properly", {
                priors = priors)
 
   # Observation model priors working
-  expect_true(any(grepl('alpha_gp_time_byseriesseries_1 ~ normal(0, 0.5);',
-            mod$model_file, fixed = TRUE)))
-  expect_true(any(grepl('real<lower=0, upper=1> alpha_gp_time_byseriesseries_1;',
-            mod$model_file, fixed = TRUE)))
+  expect_true(any(grepl('alpha_gp_time_byseriesseries_1~normal(0,0.5);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('real<lower=0,upper=1>alpha_gp_time_byseriesseries_1;',
+            gsub(' ', '', mod$model_file), fixed = TRUE)))
 
   # Process model priors working
-  expect_true(any(grepl('rho_gp_trend_season_ ~ normal(5, 1.3);',
-                        mod$model_file, fixed = TRUE)))
-  expect_true(any(grepl('real<lower=0, upper=50> rho_gp_trend_season_;',
-            mod$model_file, fixed = TRUE)))
+  expect_true(any(grepl('rho_gp_trend_season_~normal(5,1.3);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('real<lower=0,upper=50>rho_gp_trend_season_;',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
 })

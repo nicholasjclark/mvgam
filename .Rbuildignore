@@ -12,3 +12,6 @@
 ^tests/testthat/Rplots\.pdf$
 ^base_gam.txt
 ^Meta$
+^CRAN-SUBMISSION$
+^cran-comments\.md$
+^tests/mvgam_examples\.R$
