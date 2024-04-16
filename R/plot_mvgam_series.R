@@ -72,7 +72,25 @@ plot_mvgam_series = function(object,
   # Check variables in data / data_train
   if(!missing("data")){
     data_train <- data
+  }
 
+# Choose models over data if both supplied
+  if(!missing(object)){
+    if(!missing(data_train)){
+      warning('both "object" and "data" were supplied; only using "object"')
+    }
+    data_train <- object$obs_data
+
+    resp_terms <- as.character(terms(formula(object$call))[[2]])
+    if(length(resp_terms) == 1){
+      out_name <- as.character(terms(object$call)[[2]])
+    } else {
+      if(any(grepl('cbind', resp_terms))){
+        resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+        out_name <- resp_terms[1]
+      }
+    }
+    y <- out_name
   }
 
   if(!missing(data_train)){
@@ -100,7 +118,7 @@ plot_mvgam_series = function(object,
     }
   }
 
-  if(!y %in% names(data_train)){
+  if(!as.character(y) %in% names(data_train)){
     stop(paste0('variable "', y, '" not found in data'),
          call. = FALSE)
   } else {
@@ -148,15 +166,6 @@ plot_mvgam_series = function(object,
 
     # Drop unused levels in data_train
     data_test$series <- droplevels(data_test$series)
-  }
-
-# Choose models over data if both supplied
-  if(!missing(object)){
-    if(!missing(data_train)){
-      warning('both "object" and "data" were supplied; only using "object"')
-    }
-    data_train <- object$obs_data
-    y <- terms(formula(object$call))[[2]]
   }
 
   if(series == 'all'){

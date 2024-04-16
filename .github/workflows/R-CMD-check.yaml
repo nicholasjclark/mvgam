@@ -18,12 +18,14 @@ jobs:
       fail-fast: false
       matrix:
         config:
+          # check latest release and up to date rtools
+          - {os: windows-latest, r: 'release'}
           # use 4.1 to check with rtools40's older compiler
           - {os: windows-latest, r: '4.1'}
           - {os: windows-latest, r: 'oldrel', rtools: '42'}
-          - {os: ubuntu-latest, r: 'devel', http-user-agent: 'release', rtools: ''}
-          - {os: ubuntu-latest, r: 'release', rtools: ''}
-          - {os: ubuntu-latest, r: 'oldrel-1', rtools: ''}
+          - {os: ubuntu-latest, r: 'devel', http-user-agent: 'release'}
+          - {os: ubuntu-latest, r: 'release'}
+          - {os: ubuntu-latest, r: 'oldrel-1'}
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}

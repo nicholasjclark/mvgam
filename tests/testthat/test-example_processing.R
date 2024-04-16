@@ -120,6 +120,40 @@ test_that("marginaleffects works correctly", {
                                  type = 'link'))
 })
 
+test_that("plot_mvgam... functions work properly", {
+  expect_no_error(plot_mvgam_fc(mvgam:::mvgam_example1))
+  expect_no_error(plot_mvgam_fc(mvgam:::mvgam_example2))
+  expect_no_error(plot(mvgam:::mvgam_example4, type = 'forecast'))
+  expect_no_error(plot(mvgam:::mvgam_example3, type = 'smooths'))
+  expect_no_error(plot(mvgam:::mvgam_example3, type = 'smooths',
+                       realisations = TRUE))
+  expect_no_error(plot_mvgam_smooth(mvgam:::mvgam_example1,
+                                    smooth = 1,
+                                    derivatives = TRUE))
+  expect_no_error(plot_mvgam_smooth(mvgam:::mvgam_example1,
+                                    smooth = 1,
+                                    residuals = TRUE))
+  expect_no_error(plot_mvgam_smooth(mvgam:::mvgam_example1,
+                                    smooth = 1,
+                                    realisations = TRUE))
+  expect_error(plot_mvgam_smooth(mvgam:::mvgam_example4,
+                                    smooth = 1))
+  expect_no_error(plot_mvgam_smooth(mvgam:::mvgam_example4,
+                                         smooth = 1,
+                                         trend_effects = TRUE))
+  expect_no_error(plot_mvgam_smooth(mvgam:::mvgam_example4,
+                                    smooth = 1,
+                                    derivatives = TRUE,
+                                    trend_effects = TRUE))
+  expect_message(plot(mvgam:::mvgam_example3, type = 'pterms'),
+                 'No parametric terms in model formula')
+  expect_message(plot(mvgam:::mvgam_example1, type = 're'))
+  expect_error(plot(mvgam:::mvgam_example1, type = 'factors'))
+  expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example1))
+  expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example4))
+  expect_no_error(plot_mvgam_series(object = mvgam:::mvgam_example4))
+})
+
 # Skip forecast and loo testing as they are a bit time-consuming
 test_that("forecast() works correctly", {
   skip_on_cran()
