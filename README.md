@@ -5,6 +5,9 @@
 
 # *mvgam*
 
+[![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
+[![codecov](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://codecov.io/gh/nicholasjclark/mvgam)
+
 The goal of `mvgam` is to fit Bayesian Dynamic Generalized Additive
 Models to time series data. The motivation for the package is described
 in <a
@@ -324,29 +327,29 @@ summary(lynx_mvgam)
 #> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                2.5%    50%  97.5% Rhat n_eff
-#> (Intercept)   6.200  6.600  7.000 1.00   859
-#> s(season).1  -0.580  0.034  0.690 1.00  1018
-#> s(season).2  -0.180  0.770  1.800 1.01   445
-#> s(season).3  -0.057  1.200  2.500 1.01   411
-#> s(season).4  -0.480  0.440  1.300 1.00   812
-#> s(season).5  -1.200 -0.130  0.950 1.00   511
-#> s(season).6  -1.100 -0.015  1.100 1.00   726
-#> s(season).7  -0.770  0.330  1.500 1.00   688
-#> s(season).8  -0.990  0.220  1.800 1.01   383
-#> s(season).9  -1.100 -0.290  0.610 1.00   564
-#> s(season).10 -1.400 -0.680 -0.014 1.00   645
+#>                2.5%    50% 97.5% Rhat n_eff
+#> (Intercept)   6.100  6.600 7.000 1.00   690
+#> s(season).1  -0.590  0.019 0.700 1.01   827
+#> s(season).2  -0.270  0.740 1.800 1.01   432
+#> s(season).3  -0.056  1.100 2.500 1.01   436
+#> s(season).4  -0.460  0.440 1.300 1.00  1009
+#> s(season).5  -1.200 -0.097 0.890 1.00   483
+#> s(season).6  -1.100  0.028 0.990 1.00   601
+#> s(season).7  -0.770  0.310 1.400 1.01   670
+#> s(season).8  -0.960  0.180 1.700 1.02   381
+#> s(season).9  -1.100 -0.300 0.650 1.02   523
+#> s(season).10 -1.300 -0.640 0.014 1.00   649
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value
-#> s(season) 9.97     10  18736    0.23
+#> s(season) 9.71     10  17767    0.26
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n_eff
-#> ar1[1]    0.72  1.10 1.400 1.01   642
-#> ar2[1]   -0.82 -0.40 0.045 1.00  1515
-#> ar3[1]   -0.47 -0.13 0.300 1.01   487
-#> sigma[1]  0.40  0.50 0.650 1.00   936
+#> ar1[1]    0.76  1.10  1.40 1.00   728
+#> ar2[1]   -0.81 -0.41  0.04 1.00  1576
+#> ar3[1]   -0.48 -0.14  0.27 1.01   610
+#> sigma[1]  0.40  0.50  0.63 1.00  1216
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -355,7 +358,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Mon Apr 15 2:56:34 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Tue Apr 16 9:20:34 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -481,7 +484,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample CRPS:
-    #> [1] 2827.704
+    #> [1] 2821.722
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -642,7 +645,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Mon Apr 15 2:58:02 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Tue Apr 16 9:22:25 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
