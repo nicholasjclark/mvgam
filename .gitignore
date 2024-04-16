@@ -9,3 +9,4 @@ Meta
 /doc/
 /Meta/
 desktop.ini
+^cran-comments\.md$

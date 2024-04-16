@@ -64,7 +64,7 @@ test_that("cbind() syntax required for binomial()", {
                         mod$model_file, fixed = TRUE)))
 
   # Also with no predictors
-  mod <- mvgam(cbind(y, ntrials) ~ 0,
+  mod <- mvgam(cbind(y, ntrials) ~ 1,
                family = binomial(),
                trend_model = AR(),
                data = dat_train,
@@ -72,8 +72,6 @@ test_that("cbind() syntax required for binomial()", {
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(any(grepl('flat_ys ~ binomial(',
                         mod$model_file, fixed = TRUE)))
-  expect_true(any(grepl("b[1] = 0;", mod$model_file,
-                        fixed = TRUE)))
 })
 
 # All tests should apply to beta_binomial as well

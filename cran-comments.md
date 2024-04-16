@@ -6,6 +6,7 @@
 * win-builder: R-release
 * ubuntu-latest: R-release
 * ubuntu-latest: R-devel
+* macOS-latest: R-release
 
 ## R CMD check results
 There were no ERRORs or WARNINGs
