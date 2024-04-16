@@ -10,6 +10,15 @@ vignette: >
   %\VignetteEngine{knitr::rmarkdown}
   \usepackage[utf8]{inputenc}
 ---
+```{r, echo = FALSE} 
+NOT_CRAN <- identical(tolower(Sys.getenv("NOT_CRAN")), "true")
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  purl = NOT_CRAN,
+  eval = NOT_CRAN
+)
+```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
@@ -164,7 +173,8 @@ plot_predictions(mod,
 
 Forecasts are also similar:
 ```{r}
-plot(mod, type = 'forecast', newdata = data_test)
+fc <- forecast(mod, newdata = data_test)
+plot(fc)
 ```
 
 ## Salmon survival example
