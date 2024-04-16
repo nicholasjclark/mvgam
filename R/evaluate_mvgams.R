@@ -21,7 +21,9 @@
 #'for weighting pairwise correlations when evaluating the variogram score for multivariate
 #'forecasts. Useful for down-weighting series that have larger magnitude observations or that
 #'are of less interest when forecasting. Ignored if \code{score != 'variogram'}
-#'@details `eval_mvgam` generates a set of samples representing fixed parameters estimated from the full
+#'@details `eval_mvgam` may be useful when both repeated fitting of a model using \code{\link{update.mvgam}}
+#'for exact leave-future-out cross-validation and approximate
+#'leave-future-out cross-validation using \code{\link{lfo_cv}} are impractical. The function generates a set of samples representing fixed parameters estimated from the full
 #'\code{mvgam} model and latent trend states at a given point in time. The trends are rolled forward
 #'a total of \code{fc_horizon} timesteps according to their estimated state space dynamics to
 #'generate an 'out-of-sample' forecast that is evaluated against the true observations in the horizon window.
@@ -57,6 +59,7 @@
 #'extrapolation of smooths and let the latent trends in the \code{mvgam} model capture any
 #'temporal dependencies in the data. These trends are time series models and so will provide much more
 #'stable forecasts
+#'@seealso \code{\link{forecast}}, \code{\link{score}}, \code{\link{lfo_cv}}
 #'@examples
 #'\dontrun{
 #'# Simulate from a Poisson-AR2 model with a seasonal smooth
@@ -70,14 +73,14 @@
 #'
 #'# Fit an appropriate model
 #'mod_ar2 <- mvgam(y ~ s(season, bs = 'cc'),
-#'                 trend_model = 'AR2',
+#'                 trend_model = AR(p = 2),
 #'                 family = poisson(),
 #'                 data = dat$data_train,
 #'                 newdata = dat$data_test)
 #'
 #'# Fit a less appropriate model
 #'mod_rw <- mvgam(y ~ s(season, bs = 'cc'),
-#'                trend_model = 'RW',
+#'                trend_model = RW(),
 #'                family = poisson(),
 #'                data = dat$data_train,
 #'                newdata = dat$data_test)

@@ -103,7 +103,9 @@ stable forecasts
 Evaluate forecasts from fitted mvgam objects
 }
 \details{
-\code{eval_mvgam} generates a set of samples representing fixed parameters estimated from the full
+\code{eval_mvgam} may be useful when both repeated fitting of a model using \code{\link{update.mvgam}}
+for exact leave-future-out cross-validation and approximate
+leave-future-out cross-validation using \code{\link{lfo_cv}} are impractical. The function generates a set of samples representing fixed parameters estimated from the full
 \code{mvgam} model and latent trend states at a given point in time. The trends are rolled forward
 a total of \code{fc_horizon} timesteps according to their estimated state space dynamics to
 generate an 'out-of-sample' forecast that is evaluated against the true observations in the horizon window.
@@ -135,14 +137,14 @@ dat <- sim_mvgam(T = 75,
 
 # Fit an appropriate model
 mod_ar2 <- mvgam(y ~ s(season, bs = 'cc'),
-                trend_model = 'AR2',
+                trend_model = AR(p = 2),
                 family = poisson(),
                 data = dat$data_train,
                 newdata = dat$data_test)
 
 # Fit a less appropriate model
 mod_rw <- mvgam(y ~ s(season, bs = 'cc'),
-               trend_model = 'RW',
+               trend_model = RW(),
                family = poisson(),
                data = dat$data_train,
                newdata = dat$data_test)
@@ -187,4 +189,7 @@ length(which((lfo_ar2$elpds - lfo_rw$elpds) > 0)) /
 lfo_ar2$sum_ELPD
 lfo_rw$sum_ELPD
 }
+}
+\seealso{
+\code{\link{forecast}}, \code{\link{score}}, \code{\link{lfo_cv}}
 }

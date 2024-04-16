@@ -73,9 +73,10 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
                      n_bins, legend_position, xlab, ylab, ...){
 
   # Check arguments
-  type <- match.arg(arg = type, choices = c("rootogram", "mean", "hist",
+  type <- match.arg(arg = type, choices = c("rootogram", "mean", "histogram",
                                             "density", "pit", "cdf",
                                             "prop_zero"))
+  if(type == 'histogram') type = 'hist'
 
   if(type == 'rootogram'){
     if(!object$family %in% c('poisson', 'negative binomial', 'tweedie', 'nmix',

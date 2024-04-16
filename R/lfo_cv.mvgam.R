@@ -35,6 +35,7 @@
 #' until the next refit is triggered (Bürkner et al. 2020).
 #'@return A `list` of class `mvgam_lfo` containing the approximate ELPD scores,
 #'the Pareto-k shape values and 'the specified `pareto_k_threshold`
+#'@seealso \code{\link{forecast}}, \code{\link{score}}, \code{\link{compare_mvgams}}
 #'@references Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-future-out cross-validation for Bayesian time series models
 #'Journal of Statistical Computation and Simulation. 90:14, 2499-2523.
 #'@examples

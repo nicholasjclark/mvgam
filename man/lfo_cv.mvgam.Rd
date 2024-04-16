@@ -123,6 +123,9 @@ lfo_rw$sum_ELPD
 Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-future-out cross-validation for Bayesian time series models
 Journal of Statistical Computation and Simulation. 90:14, 2499-2523.
 }
+\seealso{
+\code{\link{forecast}}, \code{\link{score}}, \code{\link{compare_mvgams}}
+}
 \author{
 Nicholas J Clark
 }

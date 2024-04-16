@@ -1,5 +1,31 @@
 context("class methods")
 
+test_that("add_residuals working properly", {
+  mod <- mvgam:::mvgam_example1
+  oldresids <- mod$resids
+  mod <- add_residuals(mod)
+
+  expect_true(all(unlist(lapply(seq_along(oldresids), function(x){
+    all.equal(dim(oldresids[[x]]), dim(mod$resids[[x]]))
+  }))))
+})
+
+test_that("compute_edf working properly", {
+  mod <- mvgam:::mvgam_example1
+  expect_no_error(mvgam:::compute_edf(mod$mgcv_model,
+                                   mod,
+                                   'rho',
+                                   'sigma_raw',
+                                   conservative = FALSE))
+
+  mod <- mvgam:::mvgam_example4
+  expect_no_error(mvgam:::compute_edf(mod$trend_mgcv_model,
+                                      mod,
+                                      'rho_trend',
+                                      'sigma_raw_trend',
+                                      conservative = TRUE))
+})
+
 test_that("conditional_effects works properly", {
   effects <- conditional_effects(mvgam:::mvgam_example1)
   lapply(effects, expect_ggplot)
@@ -26,9 +52,12 @@ test_that("mcmc_plot works properly", {
   expect_error(mcmc_plot(mvgam:::mvgam_example3, type = "hex"),
                "Exactly 2 parameters must be selected")
   expect_ggplot(mcmc_plot(mvgam:::mvgam_example4))
+  expect_no_error(SW(pairs(mvgam:::mvgam_example1)))
+  expect_no_error(SW(pairs(mvgam:::mvgam_example4,
+        variable = c('sigma'), regex = TRUE)))
 })
 
-test_that("pp_check works properly", {
+test_that("pp_check and ppc work properly", {
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example1))))
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example1,
                          newdata = mvgam:::mvgam_example1$obs_data[1:10, ]))))
@@ -44,6 +73,12 @@ test_that("pp_check works properly", {
                  newdata = mvgam:::mvgam_example2$obs_data[1:10, ])))
   expect_ggplot(pp)
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example4, prefix = "ppd"))))
+
+  expect_no_error(ppc(mvgam:::mvgam_example4))
+  expect_error(ppc(mvgam:::mvgam_example1, type = 'banana'))
+  expect_no_error(ppc(mvgam:::mvgam_example1, type = 'hist'))
+  expect_error(ppc(mvgam:::mvgam_example3, type = 'rootogram'),
+               'Rootograms not supported for checking non-count data')
 })
 
 test_that("model.frame gives expected output structure", {

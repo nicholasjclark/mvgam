@@ -35,7 +35,7 @@ For a detailed description see
 \dontrun{
 simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 mod <- mvgam(y ~ s(season, bs = 'cc'),
-            trend_model = 'AR1',
+            trend_model = AR(),
             data = simdat$data_train)
 pairs(mod)
 pairs(mod, variable = c('ar1', 'sigma'), regex = TRUE)

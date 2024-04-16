@@ -124,9 +124,9 @@ test_that("plot_mvgam... functions work properly", {
   expect_no_error(plot_mvgam_fc(mvgam:::mvgam_example1))
   expect_no_error(plot_mvgam_fc(mvgam:::mvgam_example2))
   expect_no_error(plot(mvgam:::mvgam_example4, type = 'forecast'))
-  expect_no_error(plot(mvgam:::mvgam_example3, type = 'smooths'))
-  expect_no_error(plot(mvgam:::mvgam_example3, type = 'smooths',
-                       realisations = TRUE))
+  expect_no_error(SW(plot(mvgam:::mvgam_example3, type = 'smooths')))
+  expect_no_error(SW(plot(mvgam:::mvgam_example3, type = 'smooths',
+                       realisations = TRUE)))
   expect_no_error(plot_mvgam_smooth(mvgam:::mvgam_example1,
                                     smooth = 1,
                                     derivatives = TRUE))
@@ -155,6 +155,35 @@ test_that("plot_mvgam... functions work properly", {
 })
 
 # Skip forecast and loo testing as they are a bit time-consuming
+test_that("evaluate() functions working", {
+  skip_on_cran()
+  mod <- mvgam:::mvgam_example1
+  out <- eval_mvgam(mod,
+                    fc_horizon = 6,
+                    n_samples = 100,
+                    n_cores = 1)
+  expect_true(inherits(out, 'list'))
+  expect_true(all(names(out) ==
+                    levels(mod$obs_data$series)))
+  expect_true(NROW(out[[1]]) == 6)
+
+  mod <- mvgam:::mvgam_example4
+  out <- eval_mvgam(mod,
+                    fc_horizon = 2,
+                    n_samples = 100,
+                    n_cores = 1)
+  expect_true(inherits(out, 'list'))
+  expect_true(all(names(out) ==
+                    levels(mod$obs_data$series)))
+  expect_true(NROW(out[[1]]) == 2)
+
+  expect_no_error(compare_mvgams(mvgam:::mvgam_example2,
+                                 mvgam:::mvgam_example4,
+                                 n_samples = 100,
+                                 n_evaluations = 2,
+                                 n_cores = 1))
+})
+
 test_that("forecast() works correctly", {
   skip_on_cran()
   fc <- forecast(mvgam:::mvgam_example1,
@@ -165,6 +194,13 @@ test_that("forecast() works correctly", {
                  NCOL(mvgam:::mvgam_example1$ytimes),
                NCOL(fc$forecasts$series_1),
                length(fc$test_observations$series_1))
+
+  sc <- score(fc)
+  expect_true(inherits(sc, 'list'))
+  expect_true(all.equal(names(sc),
+                        c(levels(mvgam:::mvgam_examp_dat$data_test$series),
+                          'all_series')))
+  expect_error(score(fc, score = 'elpd'))
 
   fc <- forecast(mvgam:::mvgam_example1,
                  newdata = mvgam:::mvgam_examp_dat$data_test,
@@ -177,13 +213,19 @@ test_that("forecast() works correctly", {
                length(fc$test_observations$series_1))
 
   fc <- forecast(mvgam:::mvgam_example2,
-                 newdata = mvgam:::mvgam_examp_dat$data_test)
+                 newdata = mvgam:::mvgam_examp_dat$data_test,
+                 type = 'link')
   expect_true(inherits(fc$hindcasts, 'list'))
   expect_true(inherits(fc$forecasts, 'list'))
   expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
                  NCOL(mvgam:::mvgam_example2$ytimes),
                NCOL(fc$forecasts$series_1),
                length(fc$test_observations$series_1))
+  sc <- score(fc, score = 'elpd')
+  expect_true(inherits(sc, 'list'))
+  expect_true(all.equal(names(sc),
+                        c(levels(mvgam:::mvgam_examp_dat$data_test$series),
+                          'all_series')))
 
   fc <- forecast(mvgam:::mvgam_example2,
                  newdata = mvgam:::mvgam_examp_dat$data_test,
@@ -240,4 +282,16 @@ test_that("loo() works correctly", {
   expect_loo(suppressWarnings(loo(mvgam:::mvgam_example2)))
   expect_loo(suppressWarnings(loo(mvgam:::mvgam_example3)))
   expect_loo(suppressWarnings(loo(mvgam:::mvgam_example4)))
+
+  p <- SW(loo_compare(mvgam:::mvgam_example1,
+                      mvgam:::mvgam_example2,
+                      model_names = c('banana')))
+  expect_true(inherits(p, 'compare.loo'))
+  expect_true(all(is.na(dimnames(p)[[1]]) == c(FALSE, TRUE)))
+
+  p <- SW(loo_compare(mvgam:::mvgam_example1,
+                      mvgam:::mvgam_example2,
+                      mvgam:::mvgam_example3,
+                      mvgam:::mvgam_example4))
+  expect_true(inherits(p, 'compare.loo'))
 })

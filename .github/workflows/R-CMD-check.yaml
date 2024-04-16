@@ -18,8 +18,8 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          # check latest release and up to date rtools
-          - {os: windows-latest, r: 'release'}
+          # Cmdstan isntall not working on win-latest release; check back later
+          # - {os: windows-latest, r: 'release'}
           # use 4.1 to check with rtools40's older compiler
           - {os: windows-latest, r: '4.1'}
           - {os: windows-latest, r: 'oldrel', rtools: '42'}

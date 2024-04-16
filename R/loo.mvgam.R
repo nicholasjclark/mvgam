@@ -76,6 +76,11 @@ split_mod_dots = function (x, ..., model_names = NULL, other = TRUE) {
   dots <- list(x, ...)
   names <- substitute(list(x, ...), env = parent.frame())[-1]
   names <- ulapply(names, deparse)
+
+  if(!is.null(model_names)){
+    names <- model_names
+  }
+
   if (length(names)) {
     if (!length(names(dots))) {
       names(dots) <- names
