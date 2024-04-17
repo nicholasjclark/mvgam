@@ -188,7 +188,9 @@ stable forecasts</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p><code>eval_mvgam</code> generates a set of samples representing fixed parameters estimated from the full
+    <p><code>eval_mvgam</code> may be useful when both repeated fitting of a model using <code><a href="update.mvgam.html">update.mvgam</a></code>
+for exact leave-future-out cross-validation and approximate
+leave-future-out cross-validation using <code><a href="lfo_cv.mvgam.html">lfo_cv</a></code> are impractical. The function generates a set of samples representing fixed parameters estimated from the full
 <code>mvgam</code> model and latent trend states at a given point in time. The trends are rolled forward
 a total of <code>fc_horizon</code> timesteps according to their estimated state space dynamics to
 generate an 'out-of-sample' forecast that is evaluated against the true observations in the horizon window.
@@ -205,6 +207,10 @@ for whether or not the true value lies within the forecast's 90% prediction inte
 provides a series of summary plots to facilitate model selection. It is essentially a wrapper for
 <code>roll_eval_mvgam</code></p>
     </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><code><a href="forecast.mvgam.html">forecast</a></code>, <code><a href="score.mvgam_forecast.html">score</a></code>, <code><a href="lfo_cv.mvgam.html">lfo_cv</a></code></p></div>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
@@ -220,14 +226,14 @@ provides a series of summary plots to facilitate model selection. It is essentia
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit an appropriate model</span></span></span>
 <span class="r-in"><span><span class="va">mod_ar2</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                trend_model <span class="op">=</span> <span class="st">'AR2'</span>,</span></span>
+<span class="r-in"><span>                trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>                newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a less appropriate model</span></span></span>
 <span class="r-in"><span><span class="va">mod_rw</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>               trend_model <span class="op">=</span> <span class="st">'RW'</span>,</span></span>
+<span class="r-in"><span>               trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">RW</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>               family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>               data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>               newdata <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span></span></span>

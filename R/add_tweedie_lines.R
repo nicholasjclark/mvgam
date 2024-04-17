@@ -1,10 +1,10 @@
 #' Tweedie JAGS modifications
 #'
 #'
-#' @export
 #' @param model_file A template `JAGS` model file to be modified
 #' @param upper_bounds Optional upper bounds for the truncated observation likelihood
 #' @return A modified `JAGS` model file
+#' @noRd
 add_tweedie_lines = function(model_file, upper_bounds){
   rate_begin <- grep('rate\\[i, s\\] <- ', model_file)
   rate_end <- rate_begin + 1
