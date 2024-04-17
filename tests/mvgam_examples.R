@@ -180,6 +180,17 @@ mvgam_example4 <- mvgam(y ~ series,
                         samples = 30,
                         chains = 1)
 
+# GP dynamic factors
+mvgam_example5 <- mvgam(y ~ series + s(season, k = 5),
+                        trend_model = GP(),
+                        family = gaussian(),
+                        use_lv = TRUE,
+                        n_lv = 2,
+                        data = mvgam_examp_dat$data_train,
+                        burnin = 300,
+                        samples = 30,
+                        chains = 1)
+
 # Save examples as internal data
 usethis::use_data(
   mvgam_examp_dat,
@@ -187,6 +198,7 @@ usethis::use_data(
   mvgam_example2,
   mvgam_example3,
   mvgam_example4,
+  mvgam_example5,
   internal = TRUE,
   overwrite = TRUE
 )

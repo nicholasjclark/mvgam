@@ -22,8 +22,19 @@ test_that("fitted() gives correct dimensions", {
                NROW(fitted(mvgam:::mvgam_example4)))
 })
 
-test_that("hindcast() works correctly", {
+test_that("variable extraction works correctly", {
+  expect_true(inherits(as.matrix(mvgam:::mvgam_example4,
+                                 'A', regex = TRUE),
+                       'matrix'))
+  expect_true(inherits(as.matrix(mvgam:::mvgam_example4,
+                                 'Sigma', regex = TRUE),
+                       'matrix'))
+  expect_true(inherits(as.matrix(mvgam:::mvgam_example5,
+                                 'rho_gp', regex = TRUE),
+                       'matrix'))
+})
 
+test_that("hindcast() works correctly", {
   hc <- hindcast(mvgam:::mvgam_example1)
   expect_true(inherits(hc$hindcasts, 'list'))
   expect_equal(NROW(mvgam:::mvgam_examp_dat$data_train) /
@@ -48,6 +59,11 @@ test_that("hindcast() works correctly", {
                  NCOL(mvgam:::mvgam_example4$ytimes),
                NCOL(hc$hindcasts$series_1))
 
+  hc <- hindcast(mvgam:::mvgam_example5, type = 'trend')
+  expect_true(inherits(hc$hindcasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_train) /
+                 NCOL(mvgam:::mvgam_example5$ytimes),
+               NCOL(hc$hindcasts$series_1))
 })
 
 test_that("predict() works correctly", {
@@ -60,6 +76,15 @@ test_that("predict() works correctly", {
                            process_error = FALSE)),
                dim(predict(mvgam:::mvgam_example4, type = 'expected',
                            process_error = FALSE)))
+
+  expect_equal(NROW(predict(mvgam:::mvgam_example1,
+                           newdata = mvgam:::mvgam_examp_dat$data_test,
+                           process_error = FALSE)),
+               NROW(mvgam:::mvgam_examp_dat$data_test))
+  expect_equal(NROW(predict(mvgam:::mvgam_example5,
+                            newdata = mvgam:::mvgam_examp_dat$data_test,
+                            process_error = FALSE)),
+               NROW(mvgam:::mvgam_examp_dat$data_test))
 
   expect_equal(dim(predict(mvgam:::mvgam_example1,
                            newdata = mvgam:::mvgam_examp_dat$data_test,
@@ -86,6 +111,7 @@ test_that("mcmc_plot() works correctly", {
   expect_ggplot(mcmc_plot(mvgam:::mvgam_example2, variable = 'trend_params'))
   expect_ggplot(mcmc_plot(mvgam:::mvgam_example3, variable = 'trend_params'))
   expect_ggplot(mcmc_plot(mvgam:::mvgam_example4, variable = 'trend_params'))
+  expect_ggplot(mcmc_plot(mvgam:::mvgam_example5, variable = 'trend_params'))
 })
 
 test_that("marginaleffects works correctly", {
@@ -105,6 +131,10 @@ test_that("marginaleffects works correctly", {
                             variables = 'season',
                             condition = 'season',
                             type = 'link'))
+  expect_ggplot(plot_slopes(mvgam:::mvgam_example5,
+                            variables = 'season',
+                            condition = 'season',
+                            type = 'link'))
 
   expect_ggplot(plot_predictions(mvgam:::mvgam_example1,
                                  condition = 'season',
@@ -116,6 +146,9 @@ test_that("marginaleffects works correctly", {
                                  condition = 'season',
                                  type = 'link'))
   expect_ggplot(plot_predictions(mvgam:::mvgam_example4,
+                                 condition = 'season',
+                                 type = 'link'))
+  expect_ggplot(plot_predictions(mvgam:::mvgam_example5,
                                  condition = 'season',
                                  type = 'link'))
 })
@@ -149,9 +182,19 @@ test_that("plot_mvgam... functions work properly", {
                  'No parametric terms in model formula')
   expect_message(plot(mvgam:::mvgam_example1, type = 're'))
   expect_error(plot(mvgam:::mvgam_example1, type = 'factors'))
+  expect_no_error(plot(mvgam:::mvgam_example5, type = 'factors'))
   expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example1))
   expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example4))
   expect_no_error(plot_mvgam_series(object = mvgam:::mvgam_example4))
+})
+
+test_that("dynamic factor investigations work", {
+  lvcors <- lv_correlations(mvgam:::mvgam_example5)
+  expect_true(inherits(lvcors, 'list'))
+  expect_true(all.equal(dim(lvcors$mean_correlations),
+                        c(nlevels(mvgam:::mvgam_example5$obs_data$series),
+                          nlevels(mvgam:::mvgam_example5$obs_data$series))))
+  expect_true(mvgam:::mvgam_example5$use_lv)
 })
 
 # Skip forecast and loo testing as they are a bit time-consuming
@@ -168,6 +211,16 @@ test_that("evaluate() functions working", {
   expect_true(NROW(out[[1]]) == 6)
 
   mod <- mvgam:::mvgam_example4
+  out <- eval_mvgam(mod,
+                    fc_horizon = 2,
+                    n_samples = 100,
+                    n_cores = 1)
+  expect_true(inherits(out, 'list'))
+  expect_true(all(names(out) ==
+                    levels(mod$obs_data$series)))
+  expect_true(NROW(out[[1]]) == 2)
+
+  mod <- mvgam:::mvgam_example5
   out <- eval_mvgam(mod,
                     fc_horizon = 2,
                     n_samples = 100,
@@ -274,6 +327,16 @@ test_that("forecast() works correctly", {
                  NCOL(mvgam:::mvgam_example4$ytimes),
                NCOL(fc$forecasts$series_1),
                length(fc$test_observations$series_1))
+
+  fc <- forecast(mvgam:::mvgam_example5,
+                 newdata = mvgam:::mvgam_examp_dat$data_test,
+                 type = 'expected')
+  expect_true(inherits(fc$hindcasts, 'list'))
+  expect_true(inherits(fc$forecasts, 'list'))
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
+                 NCOL(mvgam:::mvgam_example5$ytimes),
+               NCOL(fc$forecasts$series_1),
+               length(fc$test_observations$series_1))
 })
 
 test_that("loo() works correctly", {
@@ -282,6 +345,7 @@ test_that("loo() works correctly", {
   expect_loo(suppressWarnings(loo(mvgam:::mvgam_example2)))
   expect_loo(suppressWarnings(loo(mvgam:::mvgam_example3)))
   expect_loo(suppressWarnings(loo(mvgam:::mvgam_example4)))
+  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example5)))
 
   p <- SW(loo_compare(mvgam:::mvgam_example1,
                       mvgam:::mvgam_example2,
@@ -292,6 +356,7 @@ test_that("loo() works correctly", {
   p <- SW(loo_compare(mvgam:::mvgam_example1,
                       mvgam:::mvgam_example2,
                       mvgam:::mvgam_example3,
-                      mvgam:::mvgam_example4))
+                      mvgam:::mvgam_example4,
+                      mvgam:::mvgam_example5))
   expect_true(inherits(p, 'compare.loo'))
 })
