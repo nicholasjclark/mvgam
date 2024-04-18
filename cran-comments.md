@@ -9,7 +9,6 @@
 * macOS-latest: R-release
 
 ## R CMD check results
-* There were no ERRORs
-* win-builder and macOS issued WARNINGs that vignettes are not in 'inst/doc', but this is not a true warning because the package uses `VignetteBuilder: knitr` and all vignette files are appropriately located in `doc`
+* There were no ERRORs or WARNINGs
 
 Maintainer: 'Nicholas J Clark <nicholas.j.clark1214@gmail.com>'

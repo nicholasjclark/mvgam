@@ -13,6 +13,7 @@
 ^\README_cache$
 ^index\.Rmd
 ^index\.md
+^Meta
 ^base_gam.txt
 ^CRAN-SUBMISSION$
 ^cran-comments\.md$
