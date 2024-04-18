@@ -25,7 +25,7 @@ knitr::opts_chunk$set(
 ================
 [![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
 [![test-coverage](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml)
-[![codecov](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://codecov.io/gh/nicholasjclark/mvgam)
+[![codecov](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
 
 The goal of `mvgam` is to fit Bayesian Dynamic Generalized Additive Models to time series data. The motivation for the package is described in [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974){target="_blank"} (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling coming from [Michael Betancourt](https://betanalpha.github.io/writing/){target="_blank"}, [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/){target="_blank"} and [Emily Fox](https://emilybfox.su.domains/){target="_blank"}, among many others. 
 

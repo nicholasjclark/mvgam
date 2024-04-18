@@ -219,7 +219,7 @@ plot(fc_mod2, series = 1)
 ```
 
 ## Scoring forecast distributions
-A primary purpose of the `mvgam_forecast` class is to readily allow forecast evaluations for each series in the data, using a variety of possible scoring functions. See `?mvgam::score.mvgam_forecast` to view the types of scores that are available. A useful scoring metric is the [Continuous Rank Probability Score (CRPS)](https://www.annualreviews.org/doi/10.1146/annurev-statistics-062713-085831){target="_blank"}. A CRPS value is similar to what we might get if we calculated a weighted absolute error using the full forecast distribution.
+A primary purpose of the `mvgam_forecast` class is to readily allow forecast evaluations for each series in the data, using a variety of possible scoring functions. See `?mvgam::score.mvgam_forecast` to view the types of scores that are available. A useful scoring metric is the [Continuous Rank Probability Score (CRPS)](https://www.annualreviews.org/content/journals/10.1146/annurev-statistics-062713-085831){target="_blank"}. A CRPS value is similar to what we might get if we calculated a weighted absolute error using the full forecast distribution.
 ```{r warning=FALSE}
 crps_mod1 <- score(fc_mod1, score = 'crps')
 str(crps_mod1)

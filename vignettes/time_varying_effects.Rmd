@@ -178,7 +178,7 @@ plot(fc)
 ```
 
 ## Salmon survival example
-Here we will use openly available data on marine survival of Chinook salmon to illustrate how time-varying effects can be used to improve ecological time series models. [Scheuerell and Williams (2005)]() used a dynamic linear model to examine the relationship between marine survival of Chinook salmon and an index of ocean upwelling strength along the west coast of the USA. The authors hypothesized that stronger upwelling in April should create better growing conditions for phytoplankton, which would then translate into more zooplankton and provide better foraging opportunities for juvenile salmon entering the ocean. The data on survival is measured as a proportional variable over 42 years (1964–2005) and is available in the `MARSS` package:
+Here we will use openly available data on marine survival of Chinook salmon to illustrate how time-varying effects can be used to improve ecological time series models. [Scheuerell and Williams (2005)](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1365-2419.2005.00346.x) used a dynamic linear model to examine the relationship between marine survival of Chinook salmon and an index of ocean upwelling strength along the west coast of the USA. The authors hypothesized that stronger upwelling in April should create better growing conditions for phytoplankton, which would then translate into more zooplankton and provide better foraging opportunities for juvenile salmon entering the ocean. The data on survival is measured as a proportional variable over 42 years (1964–2005) and is available in the `MARSS` package:
 ```{r}
 load(url('https://github.com/atsa-es/MARSS/raw/master/data/SalmonSurvCUI.rda'))
 dplyr::glimpse(SalmonSurvCUI)
@@ -349,7 +349,7 @@ Bürkner, PC, Gabry, J and Vehtari, A [Approximate leave-future-out cross-valida
   
 Herrero, Asier, et al. [From the individual to the landscape and back: time‐varying effects of climate and herbivory on tree sapling growth at distribution limits](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/1365-2745.12527). *Journal of Ecology* 104.2 (2016): 430-442.
     
-Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. "[MARSS: multivariate autoregressive state-space models for analyzing time-series data.](https://d1wqtxts1xzle7.cloudfront.net/30588864/rjournal_2012-1_holmes_et_al-libre.pdf?1391843792=&response-content-disposition=inline%3B+filename%3DMARSS_Multivariate_Autoregressive_State.pdf&Expires=1695861526&Signature=TCRXULs0mUKRM4m1pmvZxwE10bUqS6vzLcuKeUBCj57YIjx23iTxS1fEgBpV0fs2wb5XAw7ZkG84XyMaoS~vjiqZ-DpheQDHwAHpIWG-TcckHQjEjPWTNajFvAemToUdCiHnDa~yrhW9HRgXjgncdalkjzjvjT3HLSW8mcjBDhQN-WJ3MKQFSXtxoBpWfcuPYbf-HC1E1oSl7957y~w0I1gcIVdu6LHjP~CEKXa0BQzS4xuarL2nz~tHD2MverbNJYMrDGrAxIi-MX6i~lfHWuwV6UKRdoOZ0pXIcMYWBTv9V5xYey76aMKTICiJ~0NqXLZdXO5qlS4~~2nFEO7b7w__&Key-Pair-Id=APKAJLOHF5GGSLRBV4ZA)" *R Journal*. 4.1 (2012): 11.
+Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. "[MARSS: multivariate autoregressive state-space models for analyzing time-series data.](https://journal.r-project.org/archive/2012/RJ-2012-002/index.html)" *R Journal*. 4.1 (2012): 11.
   
 Scheuerell, Mark D., and John G. Williams. [Forecasting climate induced changes in the survival of Snake River Spring/Summer Chinook Salmon (*Oncorhynchus Tshawytscha*)](https://onlinelibrary.wiley.com/doi/10.1111/j.1365-2419.2005.00346.x) *Fisheries Oceanography*  14 (2005): 448–57.
 
