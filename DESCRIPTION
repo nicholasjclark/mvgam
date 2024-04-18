@@ -12,7 +12,7 @@ Description: Fit Bayesian Dynamic Generalised Additive Models to sets of time se
              with Hamiltonian Monte Carlo in the software Stan. The package also includes 
              utilities for online updating of forecast distributions with a recursive particle filter that 
              uses sequential importance sampling to assimilate new observations as they become available. 
-             References: Clark & Wells (2022) <doi.org/10.1111/2041-210X.13974>.
+             References: Clark & Wells (2022) <doi:10.1111/2041-210X.13974>.
 URL: https://github.com/nicholasjclark/mvgam, https://nicholasjclark.github.io/mvgam/
 BugReports: https://github.com/nicholasjclark/mvgam/issues
 License: MIT + file LICENSE
