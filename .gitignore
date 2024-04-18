@@ -3,11 +3,8 @@
 .RData
 .Ruserdata
 .Rprofile
-doc
 Meta
 .Rproj.user
-/doc/
 /Meta/
 desktop.ini
 ^cran-comments\.md$
-^CRAN-SUBMISSION$

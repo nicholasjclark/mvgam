@@ -1,0 +1,630 @@
+---
+title: "Overview of the mvgam package"
+author: "Nicholas J Clark"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_vignette:
+    toc: yes
+vignette: >
+  %\VignetteIndexEntry{Overview of the mvgam package}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+```{r, echo = FALSE} 
+NOT_CRAN <- identical(tolower(Sys.getenv("NOT_CRAN")), "true")
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  purl = NOT_CRAN,
+  eval = NOT_CRAN
+)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,   
+  dpi = 150,
+  fig.asp = 0.8,
+  fig.width = 6,
+  out.width = "60%",
+  fig.align = "center")
+library(mvgam)
+library(ggplot2)
+theme_set(theme_bw(base_size = 12, base_family = 'serif'))
+```
+
+The purpose of this vignette is to give a general overview of the `mvgam` package and its primary functions.
+
+## Dynamic GAMs
+`mvgam` is designed to propagate unobserved temporal processes to capture latent dynamics in the observed time series. This works in a state-space format, with the temporal *trend* evolving independently of the observation process. An introduction to the package and some worked examples are also shown in this seminar: [Ecological Forecasting with Dynamic Generalized Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ){target="_blank"}. Briefly, assume $\tilde{\boldsymbol{y}}_{i,t}$ is the conditional expectation of response variable $\boldsymbol{i}$ at time $\boldsymbol{t}$. Assuming $\boldsymbol{y_i}$ is drawn from an exponential distribution with an invertible link function, the linear predictor for a multivariate Dynamic GAM can be written as:
+
+$$for~i~in~1:N_{series}~...$$
+$$for~t~in~1:N_{timepoints}~...$$
+
+$$g^{-1}(\tilde{\boldsymbol{y}}_{i,t})=\alpha_{i}+\sum\limits_{j=1}^J\boldsymbol{s}_{i,j,t}\boldsymbol{x}_{j,t}+\boldsymbol{z}_{i,t}\,,$$
+Here $\alpha$ are the unknown intercepts, the $\boldsymbol{s}$'s are unknown smooth functions of covariates ($\boldsymbol{x}$'s), which can potentially vary among the response series, and $\boldsymbol{z}$ are dynamic latent processes. Each smooth function $\boldsymbol{s_j}$ is composed of basis expansions whose coefficients, which must be estimated, control the functional relationship between $\boldsymbol{x}_{j}$ and $g^{-1}(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity. A larger set of basis functions allows greater flexibility. For more information on GAMs and how they can smooth through data, see [this blogpost on how to interpret nonlinear effects from Generalized Additive Models](https://ecogambler.netlify.app/blog/interpreting-gams/){target="_blank"}.
+  
+Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson, Negative Binomial, Gamma) that accommodate common ecological features such as zero-inflation or overdispersion, and that they can be formulated to include hierarchical smoothing for multivariate responses. `mvgam` supports a number of different observation families, which are summarized below:
+
+## Supported observation families
+
+|Distribution      | Function        | Support                                           | Extra parameter(s)   |
+|:----------------:|:---------------:| :------------------------------------------------:|:--------------------:|
+|Gaussian (identity link)         | `gaussian()`    | Real values in $(-\infty, \infty)$                | $\sigma$             |
+|Student's T (identity link)      | `student-t()`   | Heavy-tailed real values in $(-\infty, \infty)$   | $\sigma$, $\nu$      |
+|LogNormal (identity link)        | `lognormal()`   | Positive real values in $[0, \infty)$             | $\sigma$             |
+|Gamma (log link)             | `Gamma()`       | Positive real values in $[0, \infty)$             | $\alpha$             |
+|Beta (logit link)              | `betar()`       | Real values (proportional) in $[0,1]$             | $\phi$               |
+|Bernoulli (logit link)         | `bernoulli()`   | Binary data in ${0,1}$                          | -                    |
+|Poisson (log link)           | `poisson()`     | Non-negative integers in $(0,1,2,...)$            | -                    |
+|Negative Binomial2 (log link)| `nb()`          | Non-negative integers in $(0,1,2,...)$            | $\phi$               |
+|Binomial (logit link)           | `binomial()` | Non-negative integers in $(0,1,2,...)$            | -                    |
+|Beta-Binomial (logit link)      | `beta_binomial()` | Non-negative integers in $(0,1,2,...)$       | $\phi$                   |
+|Poisson Binomial N-mixture (log link)| `nmix()`  | Non-negative integers in $(0,1,2,...)$            | -               |
+
+For all supported observation families, any extra parameters that need to be estimated (i.e. the $\sigma$ in a Gaussian model or the $\phi$ in a Negative Binomial model) are by default estimated independently for each series. However, users can opt to force all series to share extra observation parameters using `share_obs_params = TRUE` in `mvgam()`. Note that default link functions cannot currently be changed.
+
+## Supported temporal dynamic processes
+The dynamic processes can take a wide variety of forms, some of which can be multivariate to allow the different time series to interact or be correlated. When using the `mvgam()` function, the user chooses between different process models with the `trend_model` argument. Available process models are described in detail below.
+
+### Independent Random Walks
+Use `trend_model = 'RW'` or `trend_model = RW()` to set up a model where each series in `data` has independent latent temporal dynamics of the form:
+
+
+\begin{align*}
+z_{i,t} & \sim \text{Normal}(z_{i,t-1}, \sigma_i) \end{align*}
+
+Process error parameters $\sigma$ are modeled independently for each series. If a moving average process is required, use `trend_model = RW(ma = TRUE)` to set up the following:
+
+\begin{align*}
+z_{i,t} & = z_{i,t-1} + \theta_i * error_{i,t-1} + error_{i,t} \\
+error_{i,t} & \sim \text{Normal}(0, \sigma_i) \end{align*}
+
+Moving average coefficients $\theta$ are independently estimated for each series and will be forced to be stationary by default $(abs(\theta)<1)$. Only moving averages of order $q=1$ are currently allowed. 
+
+### Multivariate Random Walks
+If more than one series is included in `data` $(N_{series} > 1)$, a multivariate Random Walk can be set up using `trend_model = RW(cor = TRUE)`, resulting in the following:
+
+\begin{align*}
+z_{t} & \sim \text{MVNormal}(z_{t-1}, \Sigma) \end{align*}
+
+Where the latent process estimate $z_t$ now takes the form of a vector. The covariance matrix $\Sigma$ will capture contemporaneously correlated process errors. It is parameterised using a Cholesky factorization, which requires priors on the series-level variances $\sigma$ and on the strength of correlations using `Stan`'s `lkj_corr_cholesky` distribution.
+
+Moving average terms can also be included for multivariate random walks, in which case the moving average coefficients $\theta$ will be parameterised as an $N_{series} * N_{series}$ matrix
+
+### Autoregressive processes
+Autoregressive models up to $p=3$, in which the autoregressive coefficients are estimated independently for each series, can be used by specifying `trend_model = 'AR1'`, `trend_model = 'AR2'`, `trend_model = 'AR3'`, or `trend_model = AR(p = 1, 2, or 3)`. For example, a univariate AR(1) model takes the form:
+
+\begin{align*}
+z_{i,t} & \sim \text{Normal}(ar1_i * z_{i,t-1}, \sigma_i) \end{align*}
+
+
+All options are the same as for Random Walks, but additional options will be available for placing priors on the autoregressive coefficients. By default, these coefficients will not be forced into stationarity, but users can impose this restriction by changing the upper and lower bounds on their priors. See `?get_mvgam_priors` for more details.
+
+### Vector Autoregressive processes
+A Vector Autoregression of order $p=1$ can be specified if $N_{series} > 1$ using `trend_model = 'VAR1'` or `trend_model = VAR()`. A VAR(1) model takes the form:
+
+\begin{align*}
+z_{t} & \sim \text{Normal}(A * z_{t-1}, \Sigma) \end{align*}
+
+Where $A$ is an $N_{series} * N_{series}$ matrix of autoregressive coefficients in which the diagonals capture lagged self-dependence (i.e. the effect of a process at time $t$ on its own estimate at time $t+1$), while off-diagonals capture lagged cross-dependence (i.e. the effect of a process at time $t$ on the process for another series at time $t+1$). By default, the covariance matrix $\Sigma$ will assume no process error covariance by fixing the off-diagonals to $0$. To allow for correlated errors, use `trend_model = 'VAR1cor'` or `trend_model = VAR(cor = TRUE)`. A moving average of order $q=1$ can also be included using `trend_model = VAR(ma = TRUE, cor = TRUE)`.
+
+Note that for all VAR models, stationarity of the process is enforced with a structured prior distribution that is described in detail in [Heaps 2022](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648)
+  
+Heaps, Sarah E. "[Enforcing stationarity through the prior in vector autoregressions.](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648)" *Journal of Computational and Graphical Statistics* 32.1 (2023): 74-83.
+
+### Gaussian Processes
+The final option for modelling temporal dynamics is to use a Gaussian Process with squared exponential kernel. These are set up independently for each series (there is currently no multivariate GP option), using `trend_model = 'GP'`. The dynamics for each latent process are modelled as:
+
+\begin{align*}
+z & \sim \text{MVNormal}(0, \Sigma_{error}) \\
+\Sigma_{error}[t_i, t_j] & = \alpha^2 * exp(-0.5 * ((|t_i - t_j| / \rho))^2) \end{align*}
+
+The latent dynamic process evolves from a complex, high-dimensional Multivariate Normal distribution which depends on $\rho$ (often called the length scale parameter) to control how quickly the correlations between the model's errors decay as a function of time. For these models, covariance decays exponentially fast with the squared distance (in time) between the observations. The functions also depend on a parameter $\alpha$, which controls the marginal variability of the temporal function at all points; in other words it controls how much the GP term contributes to the linear predictor. `mvgam` capitalizes on some advances that allow GPs to be approximated using Hilbert space basis functions, which [considerably speed up computation at little cost to accuracy or prediction performance](https://link.springer.com/article/10.1007/s11222-022-10167-2){target="_blank"}.
+
+### Piecewise logistic and linear trends
+Modeling growth for many types of time series is often similar to modeling population growth in natural ecosystems, where there series exhibits nonlinear growth that saturates at some particular carrying capacity. The logistic trend model available in {`mvgam`} allows for a time-varying capacity $C(t)$ as well as a non-constant growth rate. Changes in the base growth rate $k$ are incorporated by explicitly defining changepoints throughout the training period where the growth rate is allowed to vary. The changepoint vector $a$ is represented as a vector of `1`s and `0`s, and the rate of growth at time $t$ is represented as $k+a(t)^T\delta$. Potential changepoints are selected uniformly across the training period, and the number of changepoints, as well as the flexibility of the potential rate changes at these changepoints, can be controlled using `trend_model = PW()`. The full piecewise logistic growth model is then:
+
+\begin{align*}
+z_t & = \frac{C_t}{1 + \exp(-(k+a(t)^T\delta)(t-(m+a(t)^T\gamma)))}  \end{align*}
+
+For time series that do not appear to exhibit saturating growth, a piece-wise constant rate of growth can often provide a useful trend model. The piecewise linear trend is defined as:
+
+\begin{align*}
+z_t & = (k+a(t)^T\delta)t + (m+a(t)^T\gamma)  \end{align*}
+
+In both trend models, $m$ is an offset parameter that controls the trend intercept. Because of this parameter, it is not recommended that you include an intercept in your observation formula because this will not be identifiable. You can read about the full description of piecewise linear and logistic trends [in this paper by Taylor and Letham](https://www.tandfonline.com/doi/abs/10.1080/00031305.2017.1380080){target="_blank"}. 
+
+Sean J. Taylor and Benjamin Letham. "[Forecasting at scale.](https://www.tandfonline.com/doi/full/10.1080/00031305.2017.1380080)" *The American Statistician* 72.1 (2018): 37-45.
+
+### Continuous time AR(1) processes
+Most trend models in the `mvgam()` function expect time to be measured in regularly-spaced, discrete intervals (i.e. one measurement per week, or one per year for example). But some time series are taken at irregular intervals and we'd like to model autoregressive properties of these. The `trend_model = CAR()` can be useful to set up these models, which currently only support autoregressive processes of order `1`. The evolution of the latent dynamic process follows the form:
+
+\begin{align*}
+z_{i,t} & \sim \text{Normal}(ar1_i^{distance} * z_{i,t-1}, \sigma_i) \end{align*}
+
+Where $distance$ is a vector of non-negative measurements of the time differences between successive observations. See the **Examples** section in `?CAR` for an illustration of how to set these models up. 
+
+## Regression formulae
+`mvgam` supports an observation model regression formula, built off the `mvgcv` package, as well as an optional process model regression formula. The formulae supplied to \code{\link{mvgam}} are exactly like those supplied to `glm()` except that smooth terms, `s()`,
+`te()`, `ti()` and `t2()`, time-varying effects using `dynamic()`, monotonically increasing (using `s(x, bs = 'moi')`) or decreasing splines (using `s(x, bs = 'mod')`; see `?smooth.construct.moi.smooth.spec` for details), as well as Gaussian Process functions using `gp()`, can be added to the right hand side (and `.` is not supported in `mvgam` formulae). See `?mvgam_formulae` for more guidance.
+  
+For setting up State-Space models, the optional process model formula can be used (see [the State-Space model vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html) and [the shared latent states vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html) for guidance on using trend formulae).
+
+## Example time series data
+The 'portal_data' object contains time series of rodent captures from the Portal Project, [a long-term monitoring study based near the town of Portal, Arizona](https://portal.weecology.org/){target="_blank"}. Researchers have been operating a standardized set of baited traps within 24 experimental plots at this site since the 1970's. Sampling follows the lunar monthly cycle, with observations occurring on average about 28 days apart. However, missing observations do occur due to difficulties accessing the site (weather events, COVID disruptions etc...). You can read about the full sampling protocol [in this preprint by Ernest et al on the Biorxiv](https://www.biorxiv.org/content/10.1101/332783v3.full){target="_blank"}. 
+```{r Access time series data}
+data("portal_data")
+```
+
+As the data come pre-loaded with the `mvgam` package, you can read a little about it in the help page using `?portal_data`. Before working with data, it is important to inspect how the data are structured, first using `head`:
+```{r Inspect data format and structure}
+head(portal_data)
+```
+
+But the `glimpse` function in `dplyr` is also useful for understanding how variables are structured
+```{r}
+dplyr::glimpse(portal_data)
+```
+
+We will focus analyses on the time series of captures for one specific rodent species, the Desert Pocket Mouse *Chaetodipus penicillatus*. This species is interesting in that it goes into a kind of "hibernation" during the colder months, leading to very low captures during the winter period
+
+## Manipulating data for modelling
+
+Manipulating the data into a 'long' format is necessary for modelling in `mvgam`. By 'long' format, we mean that each `series x time` observation needs to have its own entry in the `dataframe` or `list` object that we wish to use as data for modelling. A simple example can be viewed by simulating data using the `sim_mvgam` function. See `?sim_mvgam` for more details
+```{r}
+data <- sim_mvgam(n_series = 4, T = 24)
+head(data$data_train, 12)
+```
+
+Notice how we have four different time series in these simulated data, but we do not spread the outcome values into different columns. Rather, there is only a single column for the outcome variable, labelled `y` in these simulated data. We also must supply a variable labelled `time` to ensure the modelling software knows how to arrange the time series when building models. This setup still allows us to formulate multivariate time series models, as you can see in the [State-Space vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html). Below are the steps needed to shape our `portal_data` object into the correct form. First, we create a `time` variable, select the column representing counts of our target species (`PP`), and select appropriate variables that we can use as predictors
+```{r Wrangle data for modelling}
+portal_data %>%
+  
+  # mvgam requires a 'time' variable be present in the data to index
+  # the temporal observations. This is especially important when tracking 
+  # multiple time series. In the Portal data, the 'moon' variable indexes the
+  # lunar monthly timestep of the trapping sessions
+  dplyr::mutate(time = moon - (min(moon)) + 1) %>%
+  
+  # We can also provide a more informative name for the outcome variable, which 
+  # is counts of the 'PP' species (Chaetodipus penicillatus) across all control
+  # plots
+  dplyr::mutate(count = PP) %>%
+  
+  # The other requirement for mvgam is a 'series' variable, which needs to be a
+  # factor variable to index which time series each row in the data belongs to.
+  # Again, this is more useful when you have multiple time series in the data
+  dplyr::mutate(series = as.factor('PP')) %>%
+  
+  # Select the variables of interest to keep in the model_data
+  dplyr::select(series, year, time, count, mintemp, ndvi) -> model_data
+```
+
+The data now contain six variables:  
+  `series`, a factor indexing which time series each observation belongs to  
+  `year`, the year of sampling  
+  `time`, the indicator of which time step each observation belongs to  
+  `count`, the response variable representing the number of captures of the species `PP` in each sampling observation  
+  `mintemp`, the monthly average minimum temperature at each time step  
+  `ndvi`, the monthly average Normalized Difference Vegetation Index at each time step  
+
+Now check the data structure again
+```{r}
+head(model_data)
+```
+
+```{r}
+dplyr::glimpse(model_data)
+```
+
+You can also summarize multiple variables, which is helpful to search for data ranges and identify missing values
+```{r Summarise variables}
+summary(model_data)
+```
+
+We have some `NA`s in our response variable `count`. Let's visualize the data as a heatmap to get a sense of where these are distributed (`NA`s are shown as red bars in the below plot)
+```{r}
+image(is.na(t(model_data %>%
+                dplyr::arrange(dplyr::desc(time)))), axes = F,
+      col = c('grey80', 'darkred'))
+axis(3, at = seq(0,1, len = NCOL(model_data)), labels = colnames(model_data))
+```
+
+These observations will generally be thrown out by most modelling packages in \R. But as you will see when we work through the tutorials, `mvgam` keeps these in the data so that predictions can be automatically returned for the full dataset. The time series and some of its descriptive features can be plotted using `plot_mvgam_series()`:
+```{r}
+plot_mvgam_series(data = model_data, series = 1, y = 'count')
+```
+
+## GLMs with temporal random effects
+Our first task will be to fit a Generalized Linear Model (GLM) that can adequately capture the features of our `count` observations (integer data, lower bound at zero, missing values) while also attempting to model temporal variation. We are almost ready to fit our first model, which will be a GLM with Poisson observations, a log link function and random (hierarchical) intercepts for `year`. This will allow us to capture our prior belief that, although each year is unique, having been sampled from the same population of effects, all years are connected and thus might contain valuable information about one another. This will be done by capitalizing on the partial pooling properties of hierarchical models. Hierarchical (also known as random) effects offer many advantages when modelling data with grouping structures (i.e. multiple species, locations, years etc...). The ability to incorporate these in time series models is a huge advantage over traditional models such as ARIMA or Exponential Smoothing. But before we fit the model, we will need to convert `year` to a factor so that we can use a random effect basis in `mvgam`. See `?smooth.terms` and
+`?smooth.construct.re.smooth.spec` for details about the `re` basis construction that is used by both `mvgam` and `mgcv`
+```{r}
+model_data %>%
+  
+  # Create a 'year_fac' factor version of 'year'
+  dplyr::mutate(year_fac = factor(year)) -> model_data
+```
+
+Preview the dataset to ensure year is now a factor with a unique factor level for each year in the data
+```{r}
+dplyr::glimpse(model_data)
+levels(model_data$year_fac)
+```
+
+We are now ready for our first `mvgam` model. The syntax will be familiar to users who have previously built models with `mgcv`. But for a refresher, see `?formula.gam` and the examples in `?gam`. Random effects can be specified using the `s` wrapper with the `re` basis. Note that we can also suppress the primary intercept using the usual `R` formula syntax `- 1`. `mvgam` has a number of possible observation families that can be used, see `?mvgam_families` for more information. We will use `Stan` as the fitting engine, which deploys Hamiltonian Monte Carlo (HMC) for full Bayesian inference. By default, 4 HMC chains will be run using a warmup of 500 iterations and collecting 500 posterior samples from each chain. The package will also aim to use the `Cmdstan` backend when possible, so it is recommended that users have an up-to-date installation of `Cmdstan` and the associated `cmdstanr` interface on their machines (note that you can set the backend yourself using the `backend` argument: see `?mvgam` for details). Interested users should consult the [`Stan` user's guide](https://mc-stan.org/docs/stan-users-guide/index.html){target="_blank"} for more information about the software and the enormous variety of models that can be tackled with HMC.
+```{r model1, include=FALSE, results='hide'}
+model1 <- mvgam(count ~ s(year_fac, bs = 're') - 1,
+                family = poisson(),
+                data = model_data,
+                parallel = FALSE)
+```
+
+```{r eval=FALSE}
+model1 <- mvgam(count ~ s(year_fac, bs = 're') - 1,
+                family = poisson(),
+                data = model_data)
+```
+
+The model can be described mathematically for each timepoint $t$ as follows:
+\begin{align*}
+\boldsymbol{count}_t & \sim \text{Poisson}(\lambda_t) \\
+log(\lambda_t) & = \beta_{year[year_t]} \\
+\beta_{year} & \sim \text{Normal}(\mu_{year}, \sigma_{year}) \end{align*}
+
+Where the $\beta_{year}$ effects are drawn from a *population* distribution that is parameterized by a common mean $(\mu_{year})$ and variance $(\sigma_{year})$. Priors on most of the model parameters can be interrogated and changed using similar functionality to the options available in `brms`. For example, the default priors on $(\mu_{year})$ and $(\sigma_{year})$ can be viewed using the following code:
+```{r}
+get_mvgam_priors(count ~ s(year_fac, bs = 're') - 1,
+                 family = poisson(),
+                 data = model_data)
+```
+
+See examples in `?get_mvgam_priors` to find out different ways that priors can be altered.
+Once the model has finished, the first step is to inspect the `summary` to ensure no major diagnostic warnings have been produced and to quickly summarise posterior distributions for key parameters
+```{r}
+summary(model1)
+```
+
+The diagnostic messages at the bottom of the summary show that the HMC sampler did not encounter any problems or difficult posterior spaces. This is a good sign. Posterior distributions for model parameters can be extracted in any way that an object of class `brmsfit` can (see `?mvgam::mvgam_draws` for details). For example, we can extract the coefficients related to the GAM linear predictor (i.e. the $\beta$'s) into a `data.frame` using:
+```{r Extract coefficient posteriors}
+beta_post <- as.data.frame(model1, variable = 'betas')
+dplyr::glimpse(beta_post)
+```
+
+With any model fitted in `mvgam`, the underlying `Stan` code can be viewed using the `code` function:
+```{r}
+code(model1)
+```
+
+### Plotting effects and residuals
+
+Now for interrogating the model. We can get some sense of the variation in yearly intercepts from the summary above, but it is easier to understand them using targeted plots. Plot posterior distributions of the temporal random effects using `plot.mvgam` with `type = 're'`. See `?plot.mvgam` for more details about the types of plots that can be produced from fitted `mvgam` objects
+```{r Plot random effect estimates}
+plot(model1, type = 're')
+```
+
+### `bayesplot` support
+We can also capitalize on most of the useful MCMC plotting functions from the `bayesplot` package to visualize posterior distributions and diagnostics (see `?mvgam::mcmc_plot.mvgam` for details):
+```{r}
+mcmc_plot(object = model1,
+          variable = 'betas',
+          type = 'areas')
+```
+
+We can also use the wide range of posterior checking functions available in `bayesplot` (see `?mvgam::ppc_check.mvgam` for details):
+```{r}
+pp_check(object = model1)
+pp_check(model1, type = "rootogram")
+```
+
+There is clearly some variation in these yearly intercept estimates. But how do these translate into time-varying predictions? To understand this, we can plot posterior hindcasts from this model for the training period using `plot.mvgam` with `type = 'forecast'`
+```{r Plot posterior hindcasts}
+plot(model1, type = 'forecast')
+```
+
+If you wish to extract these hindcasts for other downstream analyses, the `hindcast` function can be used. This will return a list object of class `mvgam_forecast`. In the `hindcasts` slot, a matrix of posterior retrodictions will be returned for each series in the data (only one series in our example): 
+```{r Extract posterior hindcast}
+hc <- hindcast(model1)
+str(hc)
+```
+
+You can also extract these hindcasts on the linear predictor scale, which in this case is the log scale (our Poisson GLM used a log link function). Sometimes this can be useful for asking more targeted questions about drivers of variation:
+```{r Extract hindcasts on the linear predictor scale}
+hc <- hindcast(model1, type = 'link')
+range(hc$hindcasts$PP)
+```
+
+Objects of class `mvgam_forecast` have an associated plot function as well:
+```{r Plot hindcasts on the linear predictor scale}
+plot(hc)
+```
+
+This plot can look a bit confusing as it seems like there is linear interpolation from the end of one year to the start of the next. But this is just due to the way the lines are automatically connected in base \R plots  
+  
+In any regression analysis, a key question is whether the residuals show any patterns that can be indicative of un-modelled sources of variation. For GLMs, we can use a modified residual called the [Dunn-Smyth, or randomized quantile, residual](https://www.jstor.org/stable/1390802){target="_blank"}. Inspect Dunn-Smyth residuals from the model using `plot.mvgam` with `type = 'residuals'`
+```{r Plot posterior residuals}
+plot(model1, type = 'residuals')
+```
+
+## Automatic forecasting for new data
+These temporal random effects do not have a sense of "time". Because of this, each yearly random intercept is not restricted in some way to be similar to the previous yearly intercept. This drawback becomes evident when we predict for a new year. To do this, we can repeat the exercise above but this time will split the data into training and testing sets before re-running the model. We can then supply the test set as `newdata`. For splitting, we will make use of the `filter` function from `dplyr`
+```{r}
+model_data %>% 
+  dplyr::filter(time <= 160) -> data_train 
+model_data %>% 
+  dplyr::filter(time > 160) -> data_test
+```
+
+```{r include=FALSE, message=FALSE, warning=FALSE}
+model1b <- mvgam(count ~ s(year_fac, bs = 're') - 1,
+                family = poisson(),
+                data = data_train,
+                newdata = data_test,
+                parallel = FALSE)
+```
+
+```{r eval=FALSE}
+model1b <- mvgam(count ~ s(year_fac, bs = 're') - 1,
+                family = poisson(),
+                data = data_train,
+                newdata = data_test)
+```
+
+Repeating the plots above gives insight into how the model's hierarchical prior formulation provides all the structure needed to sample values for un-modelled years
+```{r}
+plot(model1b, type = 're')
+```
+
+
+```{r}
+plot(model1b, type = 'forecast')
+```
+
+We can also view the test data in the forecast plot to see that the predictions do not capture the temporal variation in the test set
+```{r Plotting predictions against test data}
+plot(model1b, type = 'forecast', newdata = data_test)
+```
+
+As with the `hindcast` function, we can use the `forecast` function to automatically extract the posterior distributions for these predictions. This also returns an object of class `mvgam_forecast`, but now it will contain both the hindcasts and forecasts for each series in the data:
+```{r Extract posterior forecasts}
+fc <- forecast(model1b)
+str(fc)
+```
+
+## Adding predictors as "fixed" effects
+Any users familiar with GLMs will know that we nearly always wish to include predictor variables that may explain some of the variation in our observations. Predictors are easily incorporated into GLMs / GAMs. Here, we will update the model from above by including a parametric (fixed) effect of `ndvi` as a linear predictor:
+```{r model2, include=FALSE, message=FALSE, warning=FALSE}
+model2 <- mvgam(count ~ s(year_fac, bs = 're') + 
+                  ndvi - 1,
+                family = poisson(),
+                data = data_train,
+                newdata = data_test,
+                parallel = FALSE)
+```
+
+```{r eval=FALSE}
+model2 <- mvgam(count ~ s(year_fac, bs = 're') + 
+                  ndvi - 1,
+                family = poisson(),
+                data = data_train,
+                newdata = data_test)
+```
+
+The model can be described mathematically as follows:
+\begin{align*}
+\boldsymbol{count}_t & \sim \text{Poisson}(\lambda_t) \\
+log(\lambda_t) & = \beta_{year[year_t]} + \beta_{ndvi} * \boldsymbol{ndvi}_t \\
+\beta_{year} & \sim \text{Normal}(\mu_{year}, \sigma_{year}) \\
+\beta_{ndvi} & \sim \text{Normal}(0, 1) \end{align*}
+
+Where the $\beta_{year}$ effects are the same as before but we now have another predictor $(\beta_{ndvi})$ that applies to the `ndvi` value at each timepoint $t$. Inspect the summary of this model
+
+```{r, class.output="scroll-300"}
+summary(model2)
+```
+
+Rather than printing the summary each time, we can also quickly look at the posterior empirical quantiles for the fixed effect of `ndvi` (and other linear predictor coefficients) using `coef`: 
+```{r Posterior quantiles of model coefficients}
+coef(model2)
+```
+
+Look at the estimated effect of `ndvi` using `plot.mvgam` with `type = 'pterms'`
+```{r Plot NDVI effect}
+plot(model2, type = 'pterms')
+```
+
+This plot indicates a positive linear effect of `ndvi` on `log(counts)`. But it may be easier to visualise using a histogram, especially for parametric (linear) effects. This can be done by first extracting the posterior coefficients as we did in the first example:
+```{r}
+beta_post <- as.data.frame(model2, variable = 'betas')
+dplyr::glimpse(beta_post)
+```
+
+The posterior distribution for the effect of `ndvi` is stored in the `ndvi` column. A quick histogram confirms our inference that `log(counts)` respond positively to increases in `ndvi`:
+```{r Histogram of NDVI effects}
+hist(beta_post$ndvi,
+     xlim = c(-1 * max(abs(beta_post$ndvi)),
+              max(abs(beta_post$ndvi))),
+     col = 'darkred',
+     border = 'white',
+     xlab = expression(beta[NDVI]),
+     ylab = '',
+     yaxt = 'n',
+     main = '',
+     lwd = 2)
+abline(v = 0, lwd = 2.5)
+```
+
+### `marginaleffects` support
+Given our model used a nonlinear link function (log link in this example), it can still be difficult to fully understand what relationship our model is estimating between a predictor and the response. Fortunately, the `marginaleffects` package makes this relatively straightforward. Objects of class `mvgam` can be used with `marginaleffects` to inspect contrasts, scenario-based predictions, conditional and marginal effects, all on the outcome scale. Here we will use the `plot_predictions` function from `marginaleffects` to inspect the conditional effect of `ndvi` (use `?plot_predictions` for guidance on how to modify these plots):
+```{r warning=FALSE}
+plot_predictions(model2, 
+                 condition = "ndvi",
+                 # include the observed count values
+                 # as points, and show rugs for the observed
+                 # ndvi and count values on the axes
+                 points = 0.5, rug = TRUE)
+```
+
+Now it is easier to get a sense of the nonlinear but positive relationship estimated between `ndvi` and `count`. Like `brms`, `mvgam` has the simple `conditional_effects` function to make quick and informative plots for main effects. This will likely be your go-to function for quickly understanding patterns from fitted `mvgam` models
+```{r warning=FALSE}
+plot(conditional_effects(model2), ask = FALSE)
+```
+
+## Adding predictors as smooths
+
+Smooth functions, using penalized splines, are a major feature of `mvgam`. Nonlinear splines are commonly viewed as variations of random effects in which the coefficients that control the shape of the spline are drawn from a joint, penalized distribution. This strategy is very often used in ecological time series analysis to capture smooth temporal variation in the processes we seek to study. When we construct smoothing splines, the workhorse package `mgcv` will calculate a set of basis functions that will collectively control the shape and complexity of the resulting spline. It is often helpful to visualize these basis functions to get a better sense of how splines work. We'll create a set of 6 basis functions to represent possible variation in the effect of `time` on our outcome.In addition to constructing the basis functions, `mgcv` also creates a penalty matrix $S$, which contains **known** coefficients that work to constrain the wiggliness of the resulting smooth function. When fitting a GAM to data, we must estimate the smoothing parameters ($\lambda$) that will penalize these matrices, resulting in constrained basis coefficients and smoother functions that are less likely to overfit the data. This is the key to fitting GAMs in a Bayesian framework, as we can jointly estimate the $\lambda$'s using informative priors to prevent overfitting and expand the complexity of models we can tackle. To see this in practice, we can now fit a model that replaces the yearly random effects with a smooth function of `time`. We will need a reasonably complex function (large `k`) to try and accommodate the temporal variation in our observations. Following some [useful advice by Gavin Simpson](https://fromthebottomoftheheap.net/2020/06/03/extrapolating-with-gams/){target="_blank"}, we will use a b-spline basis for the temporal smooth. Because we no longer have intercepts for each year, we also retain the primary intercept term in this model (there is no `-1` in the formula now):
+```{r model3, include=FALSE, message=FALSE, warning=FALSE}
+model3 <- mvgam(count ~ s(time, bs = 'bs', k = 15) + 
+                  ndvi,
+                family = poisson(),
+                data = data_train,
+                newdata = data_test,
+                parallel = FALSE)
+```
+
+```{r eval=FALSE}
+model3 <- mvgam(count ~ s(time, bs = 'bs', k = 15) + 
+                  ndvi,
+                family = poisson(),
+                data = data_train,
+                newdata = data_test)
+```
+
+The model can be described mathematically as follows:
+\begin{align*}
+\boldsymbol{count}_t & \sim \text{Poisson}(\lambda_t) \\
+log(\lambda_t) & = f(\boldsymbol{time})_t + \beta_{ndvi} * \boldsymbol{ndvi}_t  \\
+f(\boldsymbol{time}) & = \sum_{k=1}^{K}b * \beta_{smooth} \\
+\beta_{smooth} & \sim \text{MVNormal}(0, (\Omega * \lambda)^{-1}) \\
+\beta_{ndvi} & \sim \text{Normal}(0, 1) \end{align*}
+
+
+Where the smooth function $f_{time}$ is built by summing across a set of weighted basis functions. The basis functions $(b)$ are constructed using a thin plate regression basis in `mgcv`. The weights $(\beta_{smooth})$ are drawn from a penalized multivariate normal distribution where the precision matrix $(\Omega$) is multiplied by a smoothing penalty $(\lambda)$. If $\lambda$ becomes large, this acts to *squeeze* the covariances among the weights $(\beta_{smooth})$, leading to a less wiggly spline. Note that sometimes there are multiple smoothing penalties that contribute to the covariance matrix, but I am only showing one here for simplicity. View the summary as before
+```{r}
+summary(model3)
+```
+
+The summary above now contains posterior estimates for the smoothing parameters as well as the basis coefficients for the nonlinear effect of `time`. We can visualize the conditional `time` effect using the `plot` function with `type = 'smooths'`:
+```{r}
+plot(model3, type = 'smooths')
+```
+
+By default this plots shows posterior empirical quantiles, but it can also be helpful to view some realizations of the underlying function (here, each line is a different potential curve drawn from the posterior of all possible curves):
+```{r}
+plot(model3, type = 'smooths', realisations = TRUE,
+     n_realisations = 30)
+```
+
+### Derivatives of smooths
+A useful question when modelling using GAMs is to identify where the function is changing most rapidly. To address this, we can plot estimated 1st derivatives of the spline:
+```{r Plot smooth term derivatives, warning = FALSE, fig.asp = 1}
+plot(model3, type = 'smooths', derivatives = TRUE)
+```
+
+Here, values above `>0` indicate the function was increasing at that time point, while values `<0` indicate the function was declining. The most rapid declines appear to have been happening around timepoints 50 and again toward the end of the training period, for example.
+  
+Use `conditional_effects` again for useful plots on the outcome scale:
+```{r warning=FALSE}
+plot(conditional_effects(model3), ask = FALSE)
+```
+
+Or on the link scale:
+```{r warning=FALSE}
+plot(conditional_effects(model3, type = 'link'), ask = FALSE)
+```
+
+Inspect the underlying `Stan` code to gain some idea of how the spline is being penalized:
+```{r, class.output="scroll-300"}
+code(model3)
+```
+
+The line below `// prior for s(time)...` shows how the spline basis coefficients are drawn from a zero-centred multivariate normal distribution. The precision matrix $S$ is penalized by two different smoothing parameters (the $\lambda$'s) to enforce smoothness and reduce overfitting
+
+## Latent dynamics in `mvgam`
+
+Forecasts from the above model are not ideal:
+```{r}
+plot(model3, type = 'forecast', newdata = data_test)
+```
+
+Why is this happening? The forecasts are driven almost entirely by variation in the temporal spline, which is extrapolating linearly *forever* beyond the edge of the training data. Any slight wiggles near the end of the training set will result in wildly different forecasts. To visualize this, we can plot the extrapolated temporal functions into the out-of-sample test set for the two models. Here are the extrapolated functions for the first model, with 15 basis functions:
+```{r Plot extrapolated temporal functions using newdata}
+plot_mvgam_smooth(model3, smooth = 's(time)',
+                  # feed newdata to the plot function to generate
+                  # predictions of the temporal smooth to the end of the 
+                  # testing period
+                  newdata = data.frame(time = 1:max(data_test$time),
+                                       ndvi = 0))
+abline(v = max(data_train$time), lty = 'dashed', lwd = 2)
+```
+
+This model is not doing well. Clearly we need to somehow account for the strong temporal autocorrelation when modelling these data without using a smooth function of `time`. Now onto another prominent feature of `mvgam`: the ability to include (possibly latent) autocorrelated residuals in regression models. To do so, we use the `trend_model` argument (see `?mvgam_trends` for details of different dynamic trend models that are supported). This model will use a separate sub-model for latent residuals that evolve as an AR1 process (i.e. the error in the current time point is a function of the error in the previous time point, plus some stochastic noise). We also include a smooth function of `ndvi` in this model, rather than the parametric term that was used above, to showcase that `mvgam` can include combinations of smooths and dynamic components:
+```{r model4, include=FALSE}
+model4 <- mvgam(count ~ s(ndvi, k = 6),
+                family = poisson(),
+                data = data_train,
+                newdata = data_test,
+                trend_model = 'AR1',
+                parallel = FALSE)
+```
+
+```{r eval=FALSE}
+model4 <- mvgam(count ~ s(ndvi, k = 6),
+                family = poisson(),
+                data = data_train,
+                newdata = data_test,
+                trend_model = 'AR1')
+```
+
+The model can be described mathematically as follows:
+\begin{align*}
+\boldsymbol{count}_t & \sim \text{Poisson}(\lambda_t) \\
+log(\lambda_t) & = f(\boldsymbol{ndvi})_t + z_t \\
+z_t & \sim \text{Normal}(ar1 * z_{t-1}, \sigma_{error}) \\
+ar1 & \sim \text{Normal}(0, 1)[-1, 1] \\
+\sigma_{error} & \sim \text{Exponential}(2) \\
+f(\boldsymbol{ndvi}) & = \sum_{k=1}^{K}b * \beta_{smooth} \\
+\beta_{smooth} & \sim \text{MVNormal}(0, (\Omega * \lambda)^{-1}) \end{align*}
+
+Here the term $z_t$ captures autocorrelated latent residuals, which are modelled using an AR1 process. You can also notice that this model is estimating autocorrelated errors for the full time period, even though some of these time points have missing observations. This is useful for getting more realistic estimates of the residual autocorrelation parameters. Summarise the model to see how it now returns posterior summaries for the latent AR1 process:
+```{r Summarise the mvgam autocorrelated error model, class.output="scroll-300"}
+summary(model4)
+```
+
+View conditional smooths for the `ndvi` effect:
+```{r warning=FALSE, message=FALSE}
+plot_predictions(model4, 
+                 condition = "ndvi",
+                 points = 0.5, rug = TRUE)
+```
+
+View posterior hindcasts / forecasts and compare against the out of sample test data
+```{r}
+plot(model4, type = 'forecast', newdata = data_test)
+```
+
+The trend is evolving as an AR1 process, which we can also view:
+```{r}
+plot(model4, type = 'trend', newdata = data_test)
+```
+
+In-sample model performance can be interrogated using leave-one-out cross-validation utilities from the `loo` package (a higher value is preferred for this metric):
+```{r}
+loo_compare(model3, model4)
+```
+
+The higher estimated log predictive density (ELPD) value for the dynamic model suggests it provides a better fit to the in-sample data. 
+
+Though it should be obvious that this model provides better forecasts, we can quantify forecast performance for models 3 and 4 using the `forecast` and `score` functions. Here we will compare models based on their Discrete Ranked Probability Scores (a lower value is preferred for this metric)
+```{r}
+fc_mod3 <- forecast(model3)
+fc_mod4 <- forecast(model4)
+score_mod3 <- score(fc_mod3, score = 'drps')
+score_mod4 <- score(fc_mod4, score = 'drps')
+sum(score_mod4$PP$score, na.rm = TRUE) - sum(score_mod3$PP$score, na.rm = TRUE)
+```
+
+A strongly negative value here suggests the score for the dynamic model (model 4) is much smaller than the score for the model with a smooth function of time (model 3)
+
+## Interested in contributing?
+I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au)
