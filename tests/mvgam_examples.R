@@ -1,6 +1,5 @@
 # Small mvgam examples for testing post-fitting functions such as
 # predict, forecast, hindcast etc...
-skip_on_cran()
 set.seed(1234)
 library(mvgam)
 mvgam_examp_dat <- list(data_train =
