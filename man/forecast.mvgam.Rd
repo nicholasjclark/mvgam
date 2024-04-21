@@ -48,7 +48,7 @@ Extract or compute hindcasts and forecasts for a fitted \code{mvgam} object
 Posterior predictions are drawn from the fitted \code{mvgam} and used to simulate a forecast distribution
 }
 \examples{
-\dontrun{
+\donttest{
 simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
 mod <- mvgam(y ~ s(season, bs = 'cc'),
             trend_model = 'AR1',

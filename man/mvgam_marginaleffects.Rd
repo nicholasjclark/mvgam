@@ -142,6 +142,12 @@ component, depending on the model.}
 \item{flatten}{Logical, if \code{TRUE}, the values are returned
 as character vector, not as list. Duplicated values are removed.}
 }
+\value{
+Objects suitable for internal 'marginaleffects' functions to proceed.
+See \code{\link[marginaleffects:get_coef]{marginaleffects::get_coef()}}, \code{\link[marginaleffects:set_coef]{marginaleffects::set_coef()}},
+\code{\link[marginaleffects:get_vcov]{marginaleffects::get_vcov()}}, \code{\link[marginaleffects:get_predict]{marginaleffects::get_predict()}},
+\code{\link[insight:get_data]{insight::get_data()}} and \code{\link[insight:find_predictors]{insight::find_predictors()}} for details
+}
 \description{
 Helper functions for mvgam marginaleffects calculations
 

@@ -52,7 +52,7 @@ if(any(smooth_labs$class == 'random.effect')){
   }
 
   .pardefault <- par(no.readonly=T)
-  par(.pardefault)
+  on.exit(par(.pardefault))
 
   if(length(re_smooths) == 1){
     par(mfrow = c(1,1),
@@ -155,9 +155,6 @@ if(any(smooth_labs$class == 'random.effect')){
     }
 
   }
-
-  invisible()
-  par(.pardefault)
   layout(1)
 
 } else {

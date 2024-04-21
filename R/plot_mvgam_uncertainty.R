@@ -12,6 +12,7 @@
 #'This places the legend on the inside of the plot frame at the given location (if it is not "none").
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
+#'@return A base \code{R} graphics plot
 #'@export
 plot_mvgam_uncertainty = function(object, series = 1, newdata,
                                   data_test, legend_position = 'topleft',

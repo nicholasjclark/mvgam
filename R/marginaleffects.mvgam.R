@@ -13,6 +13,10 @@
 #' (only applicable if a `trend_formula` was specified in the model)
 #' @param process_error `logical`. If `TRUE`, uncertainty in the latent
 #' process (or trend) model is incorporated in predictions
+#' @return Objects suitable for internal 'marginaleffects' functions to proceed.
+#' See [marginaleffects::get_coef()], [marginaleffects::set_coef()],
+#' [marginaleffects::get_vcov()], [marginaleffects::get_predict()],
+#' [insight::get_data()] and [insight::find_predictors()] for details
 #' @name mvgam_marginaleffects
 #' @author Nicholas J Clark
 NULL

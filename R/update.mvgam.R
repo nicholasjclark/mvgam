@@ -10,8 +10,13 @@
 #'updates such as removal of specific terms with `- term`. When updating, the entire formula needs
 #'to be supplied
 #'@param ... Other arguments to be passed to \code{\link{mvgam}}
+#'@return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
+#' the mgcv model output (for easily generating simulations at
+#' unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
+#' for other functions in the package. See \code{\link{mvgam-class}} for details.
+#' Use `methods(class = "mvgam")` for an overview on available methods.
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Simulate some data and fit a Poisson AR1 model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),

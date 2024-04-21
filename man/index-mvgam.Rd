@@ -19,6 +19,19 @@
 
 \item{...}{Arguments passed to individual methods (if applicable).}
 }
+\value{
+a \code{list} object of the variables that can be extracted, along
+with their aliases
+}
 \description{
 Index \code{mvgam} objects
+}
+\examples{
+\donttest{
+simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+mod <- mvgam(y ~ s(season, bs = 'cc'),
+             trend_model = AR(),
+             data = simdat$data_train)
+variables(mod)
+}
 }

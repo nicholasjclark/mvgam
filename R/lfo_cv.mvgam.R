@@ -39,7 +39,7 @@
 #'@references Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-future-out cross-validation for Bayesian time series models
 #'Journal of Statistical Computation and Simulation. 90:14, 2499-2523.
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate from a Poisson-AR2 model with a seasonal smooth
 #'set.seed(100)
 #'dat <- sim_mvgam(T = 75,
@@ -55,14 +55,14 @@
 #'
 #'# Fit an appropriate model
 #'mod_ar2 <- mvgam(y ~ s(season, bs = 'cc'),
-#'                trend_model = 'AR2',
+#'                trend_model = AR(p = 2),
 #'                family = poisson(),
 #'                data = dat$data_train,
 #'                newdata = dat$data_test)
 #'
 #'# Fit a less appropriate model
 #'mod_rw <- mvgam(y ~ s(season, bs = 'cc'),
-#'               trend_model = 'RW',
+#'               trend_model = RW(),
 #'               family = poisson(),
 #'               data = dat$data_train,
 #'               newdata = dat$data_test)

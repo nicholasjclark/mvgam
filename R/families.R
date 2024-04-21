@@ -37,6 +37,7 @@
 #' using `JAGS`. All families, apart from `tweedie()`, are supported if
 #' using `Stan`.
 #' @name mvgam_families
+#' @return NULL
 #' @details Note that currently it is not possible to change the default link
 #' functions in `mvgam`, so any call to change these will be silently ignored
 #' @author Nicholas J Clark

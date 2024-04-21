@@ -4,7 +4,10 @@
 \alias{GP}
 \title{Specify dynamic Gaussian processes}
 \usage{
-GP()
+GP(...)
+}
+\arguments{
+\item{...}{unused}
 }
 \value{
 An object of class \code{mvgam_trend}, which contains a list of

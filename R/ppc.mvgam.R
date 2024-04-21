@@ -47,7 +47,7 @@
 #'@author Nicholas J Clark
 #'@seealso \code{\link{pp_check.mvgam}}, \code{\link{predict.mvgam}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Simulate some smooth effects and fit a model
 #' set.seed(0)
 #' dat <- mgcv::gamSim(1, n = 200, scale = 2)
@@ -778,7 +778,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
 #' package.
 #' @seealso \code{\link{ppc}} \code{\link{predict.mvgam}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #'simdat <- sim_mvgam(seasonality = 'hierarchical')
 #'mod <- mvgam(y ~ series +
 #'               s(season, bs = 'cc', k = 6) +

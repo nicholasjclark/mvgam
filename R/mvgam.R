@@ -304,7 +304,7 @@
 #'Use `methods(class = "mvgam")` for an overview on available methods.
 #'
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate a collection of three time series that have shared seasonal dynamics
 # # and independent random walk trends, with a Poisson observation process
 #'dat <- sim_mvgam(T = 80, n_series = 3, prop_missing = 0.1,

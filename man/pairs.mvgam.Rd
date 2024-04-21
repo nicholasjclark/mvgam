@@ -23,6 +23,10 @@ names with the more informative alias. Defaults to \code{TRUE}}
 \item{...}{Further arguments to be passed to
 \code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.}
 }
+\value{
+Plottable objects whose classes depend on the arguments supplied.
+See \code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}} for details.
+}
 \description{
 A \code{\link[graphics:pairs]{pairs}}
 method that is customized for MCMC output.
@@ -32,7 +36,7 @@ For a detailed description see
 \code{\link[bayesplot:MCMC-scatterplots]{mcmc_pairs}}.
 }
 \examples{
-\dontrun{
+\donttest{
 simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 mod <- mvgam(y ~ s(season, bs = 'cc'),
             trend_model = AR(),

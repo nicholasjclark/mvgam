@@ -167,9 +167,9 @@ dat <- sim_mvgam(trend_rel = 0.5)
 # but this can be useful for testing whether your updated priors are written correctly)
 mod_default <- mvgam(y ~ s(series, bs = 're') +
               s(season, bs = 'cc') - 1,
-              family = 'nb',
+              family = nb(),
               data = dat$data_train,
-              trend_model = 'AR2',
+              trend_model = AR(p = 2),
               run_model = FALSE)
 
 # Inspect the model file with default mvgam priors
@@ -178,9 +178,9 @@ code(mod_default)
 # Look at which priors can be updated in mvgam
 test_priors <- get_mvgam_priors(y ~ s(series, bs = 're') +
                               s(season, bs = 'cc') - 1,
-                              family = 'nb',
+                              family = nb(),
                               data = dat$data_train,
-                              trend_model = 'AR2')
+                              trend_model = AR(p = 2))
 test_priors
 
 # Make a few changes; first, change the population mean for the series-level
@@ -194,17 +194,17 @@ test_priors$prior[5] <- 'ar2 ~ normal(0, 0.25);'
 # setting 'run_model = FALSE'
 mod <- mvgam(y ~ s(series, bs = 're') +
             s(season, bs = 'cc') - 1,
-            family = 'nb',
+            family = nb(),
             data = dat$data_train,
-            trend_model = 'AR2',
+            trend_model = AR(p = 2),
             priors = test_priors,
             run_model = FALSE)
-            code(mod)
+code(mod)
 
 # No warnings, the model is ready for fitting now in the usual way with the addition
 # of the 'priors' argument
 
-# The same can be done using brms functions; here we will also change the ar1 prior
+# The same can be done using 'brms' functions; here we will also change the ar1 prior
 # and put some bounds on the ar coefficients to enforce stationarity; we set the
 # prior using the 'class' argument in all brms prior functions
 brmsprior <- c(prior(normal(0.2, 0.5), class = mu_raw),
@@ -214,9 +214,9 @@ brmsprior
 
 mod <- mvgam(y ~ s(series, bs = 're') +
             s(season, bs = 'cc') - 1,
-          family = 'nb',
+          family = nb(),
           data = dat$data_train,
-          trend_model = 'AR2',
+          trend_model = AR(p = 2),
           priors = brmsprior,
           run_model = FALSE)
 code(mod)
@@ -225,9 +225,9 @@ code(mod)
 test_priors$prior[5] <- 'ar2_bananas ~ normal(0, 0.25);'
 mod <- mvgam(y ~ s(series, bs = 're') +
             s(season, bs = 'cc') - 1,
-            family = 'nb',
+            family = nb(),
             data = dat$data_train,
-            trend_model = 'AR2',
+            trend_model = AR(p = 2),
             priors = test_priors,
             run_model = FALSE)
 code(mod)
@@ -241,7 +241,7 @@ simdat$data_train$cov <- rnorm(NROW(simdat$data_train))
 priors <- get_mvgam_priors(y ~ cov + s(season),
                           data = simdat$data_train,
                           family = poisson(),
-                          trend_model = 'AR1')
+                          trend_model = AR())
 
 # Change priors for the intercept and fake covariate effects
 priors$prior[1] <- '(Intercept) ~ normal(0, 1);'
@@ -249,13 +249,13 @@ priors$prior[2] <- 'cov ~ normal(0, 0.1);'
 
 mod2 <- mvgam(y ~ cov + s(season),
              data = simdat$data_train,
-             trend_model = 'AR1',
+             trend_model = AR(),
              family = poisson(),
              priors = priors,
              run_model = FALSE)
 code(mod2)
 
-# Likewise using brms utilities (note that you can use
+# Likewise using 'brms' utilities (note that you can use
 # Intercept rather than `(Intercept)`) to change priors on the intercept
 brmsprior <- c(prior(normal(0.2, 0.5), class = cov),
               prior(normal(0, 0.25), class = Intercept))
@@ -263,7 +263,7 @@ brmsprior
 
 mod2 <- mvgam(y ~ cov + s(season),
              data = simdat$data_train,
-             trend_model = 'AR1',
+             trend_model = AR(),
              family = poisson(),
              priors = brmsprior,
              run_model = FALSE)

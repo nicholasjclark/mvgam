@@ -31,7 +31,7 @@
 #'posterior empirical quantiles. Intervals are not calculated when using `elpd` because forecasts
 #'will only contain the linear predictors
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate observations for three count-valued time series
 #'data <- sim_mvgam()
 #'# Fit a dynamic model using 'newdata' to automatically produce forecasts

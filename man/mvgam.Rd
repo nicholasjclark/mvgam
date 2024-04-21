@@ -383,7 +383,7 @@ of more response distributions, plans to handle zero-inflation, and plans to inc
 variety of trend models. Users are strongly encouraged to opt for \code{Stan} over \code{JAGS} in any proceeding workflows
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate a collection of three time series that have shared seasonal dynamics
 dat <- sim_mvgam(T = 80, n_series = 3, prop_missing = 0.1,
                 prop_trend = 0.6)

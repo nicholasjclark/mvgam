@@ -37,6 +37,7 @@
 #' set automatically to ensure enough basis functions are used to approximate the expected
 #' wiggliness of the underlying dynamic function (\code{k} will increase as \code{rho} decreases)
 #' @rdname dynamic
+#' @return a `list` object for internal usage in 'mvgam'
 #'@examples
 #'\donttest{
 #'# Simulate a time-varying coefficient

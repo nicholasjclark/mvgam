@@ -22,11 +22,11 @@
 #' @seealso \code{\link{mvgam_draws}} for an overview of some of the shortcut strings
 #' that can be used for argument `variable`
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'             trend_model = 'AR1',
-#'             data = simdat$data_train)
+#'              trend_model = AR(),
+#'              data = simdat$data_train)
 #' mcmc_plot(mod)
 #' mcmc_plot(mod, type = 'neff_hist')
 #' mcmc_plot(mod, variable = 'betas', type = 'areas')

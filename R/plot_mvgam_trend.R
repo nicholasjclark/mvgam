@@ -20,6 +20,7 @@
 #'@param xlab label for x axis.
 #'@param ylab label for y axis.
 #'@param ... further \code{\link[graphics]{par}} graphical parameters.
+#'@return A base \code{R} graphics plot
 #'@export
 plot_mvgam_trend = function(object, series = 1, newdata, data_test,
                             realisations = FALSE, n_realisations = 15,
@@ -160,7 +161,7 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
 
   if(derivatives){
     .pardefault <- par(no.readonly=T)
-    par(.pardefault)
+    on.exit(par(.pardefault))
     par(mfrow = c(2, 1),
         mar=c(2.5, 2.3, 2, 2),
         oma = c(1, 1, 0, 0),
@@ -256,7 +257,6 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
     abline(h = 0, lty = 'dashed', lwd = 2)
 
     invisible()
-    par(.pardefault)
 
   } else {
     if(hide_xlabels){

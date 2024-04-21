@@ -6,8 +6,11 @@
 #' @param x Object of class `mvgam`
 #' @param ... Additional arguments for [loo::loo()]
 #' @rdname loo.mvgam
+#' @return  for `loo.mvgam`, an object of class `psis_loo` (see [loo::loo()]
+#' for details). For `loo_compare.mvgam`, an object of class `compare.loo` (
+#' [loo::loo_compare()] for details)
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate 4 time series with hierarchical seasonality
 #'# and independent AR1 dynamic processes
 #'set.seed(111)

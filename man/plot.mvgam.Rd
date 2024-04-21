@@ -70,7 +70,7 @@ but the individual plotting functions and the functions from the marginaleffects
 offer far more more customisation.
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate some time series
 dat <- sim_mvgam(T = 80, n_series = 3)
 
@@ -91,7 +91,7 @@ plot(mod, type = 'residuals', series = 3)
 plot(mod, type = 'smooths')
 plot(mod, type = 're')
 
-# More flexible plots with marginaleffects utilities
+# More flexible plots with 'marginaleffects' utilities
 plot_predictions(mod, condition = 'season', type = 'link')
 plot_predictions(mod,
                 condition = c('season', 'series', 'series'),

@@ -51,6 +51,9 @@ estimated 1st derivative for the estimated trend}
 
 \item{...}{further \code{\link[graphics]{par}} graphical parameters.}
 }
+\value{
+A base \code{R} graphics plot
+}
 \description{
 Plot mvgam latent trend for a specified series
 }

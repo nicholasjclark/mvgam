@@ -437,7 +437,7 @@ plot_mvgam_smooth = function(object,
 
   if(derivatives){
     .pardefault <- par(no.readonly=T)
-    par(.pardefault)
+    on.exit(par(.pardefault))
     par(mfrow = c(2, 1),
         mar=c(2.5, 2.3, 2, 2),
         oma = c(1, 1, 0, 0),
@@ -672,7 +672,6 @@ plot_mvgam_smooth = function(object,
     abline(h = 0, lty = 'dashed', lwd = 2)
 
     invisible()
-    par(.pardefault)
 
   } else {
     if(residuals){

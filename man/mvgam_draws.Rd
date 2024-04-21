@@ -119,7 +119,7 @@ A \code{data.frame}, \code{matrix}, or \code{array} containing the posterior dra
 Extract posterior draws in conventional formats as data.frames, matrices, or arrays.
 }
 \examples{
-\dontrun{
+\donttest{
 sim <- sim_mvgam(family = Gamma())
 mod1 <- mvgam(y ~ s(season, bs = 'cc'),
              trend_model = 'AR1',

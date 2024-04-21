@@ -4,6 +4,7 @@
 #' basis expansions in \code{mvgam}. This function does not evaluate its arguments –
 #' it exists purely to help set up a model with particular GP
 #' trend models.
+#' @param ... unused
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \code{mvgam}
 #' @details A GP trend is estimated for each series using
@@ -15,7 +16,7 @@
 #' @rdname GP
 #' @seealso \code{\link[brms]{gp}}
 #' @export
-GP = function(){
+GP = function(...){
   out <- structure(list(trend_model = 'GP',
                         ma = FALSE,
                         cor = FALSE,

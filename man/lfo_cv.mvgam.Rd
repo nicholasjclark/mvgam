@@ -58,7 +58,7 @@ all of the observations up to the time of the failure. We then restart the proce
 until the next refit is triggered (Bürkner et al. 2020).
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate from a Poisson-AR2 model with a seasonal smooth
 set.seed(100)
 dat <- sim_mvgam(T = 75,
@@ -74,14 +74,14 @@ plot_mvgam_series(data = dat$data_train,
 
 # Fit an appropriate model
 mod_ar2 <- mvgam(y ~ s(season, bs = 'cc'),
-               trend_model = 'AR2',
+               trend_model = AR(p = 2),
                family = poisson(),
                data = dat$data_train,
                newdata = dat$data_test)
 
 # Fit a less appropriate model
 mod_rw <- mvgam(y ~ s(season, bs = 'cc'),
-              trend_model = 'RW',
+              trend_model = RW(),
               family = poisson(),
               data = dat$data_train,
               newdata = dat$data_test)

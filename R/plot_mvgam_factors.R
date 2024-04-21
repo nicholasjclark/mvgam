@@ -44,7 +44,8 @@ plot_mvgam_factors = function(object, plot = TRUE){
     c_dark <- c("#8F2727")
     c_dark_highlight <- c("#7C0000")
     .pardefault <- par(no.readonly=T)
-    par(.pardefault)
+    on.exit(par(.pardefault))
+
     if(object$n_lv <= 2){
       par(mfrow = c(1, 2),
           mar=c(2.5, 2.3, 2, 2),
@@ -117,8 +118,6 @@ plot_mvgam_factors = function(object, plot = TRUE){
   rownames(lv_estimates) <- paste0('Factor', 1:object$n_lv)
 
   if(plot){
-    invisible()
-    par(.pardefault)
     layout(1)
   }
 

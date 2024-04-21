@@ -36,10 +36,10 @@ Posterior retrodictions are drawn from the fitted \code{mvgam} and
 organized into a convenient format
 }
 \examples{
-\dontrun{
+\donttest{
 simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
 mod <- mvgam(y ~ s(season, bs = 'cc'),
-            trend_model = 'AR1',
+            trend_model = AR(),
             data = simdat$data_train)
 
 # Hindcasts on response scale

@@ -44,7 +44,7 @@
 #'@author Nicholas J Clark
 #'@return A base R plot or set of plots
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate some time series
 #'dat <- sim_mvgam(T = 80, n_series = 3)
 #'
@@ -65,7 +65,7 @@
 #'plot(mod, type = 'smooths')
 #'plot(mod, type = 're')
 #'
-#'# More flexible plots with marginaleffects utilities
+#'# More flexible plots with 'marginaleffects' utilities
 #'plot_predictions(mod, condition = 'season', type = 'link')
 #'plot_predictions(mod,
 #'                 condition = c('season', 'series', 'series'),
@@ -222,7 +222,7 @@ plot.mvgam = function(x, type = 'residuals',
     if (c*r < ppp) r <- r + 1
 
     .pardefault <- par(no.readonly=T)
-    par(.pardefault)
+    on.exit(par(.pardefault))
     oldpar<-par(mfrow=c(r,c),
                 mar=c(2.5, 2.3, 2, 2),
                 oma = c(1, 1, 0, 0),
@@ -236,9 +236,6 @@ plot.mvgam = function(x, type = 'residuals',
                         residuals = residuals, trend_effects = trend_effects,
                         ...)
     }
-
-    invisible()
-    par(.pardefault)
     layout(1)
   }
 

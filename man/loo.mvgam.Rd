@@ -17,12 +17,17 @@
 \item{model_names}{If \code{NULL} (the default) will use model names derived
 from deparsing the call. Otherwise will use the passed values as model names.}
 }
+\value{
+for \code{loo.mvgam}, an object of class \code{psis_loo} (see \code{\link[loo:loo]{loo::loo()}}
+for details). For \code{loo_compare.mvgam}, an object of class \code{compare.loo} (
+\code{\link[loo:loo_compare]{loo::loo_compare()}} for details)
+}
 \description{
 Extract the LOOIC (leave-one-out information criterion) using
 \code{\link[loo:loo]{loo::loo()}}
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate 4 time series with hierarchical seasonality
 # and independent AR1 dynamic processes
 set.seed(111)

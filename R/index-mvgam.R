@@ -14,6 +14,16 @@ NULL
 #' @importFrom posterior variables
 #' @param x \code{list} object returned from \code{mvgam}. See [mvgam()]
 #' @method variables mvgam
+#' @return a `list` object of the variables that can be extracted, along
+#' with their aliases
+#' @examples
+#' \donttest{
+#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' mod <- mvgam(y ~ s(season, bs = 'cc'),
+#'              trend_model = AR(),
+#'              data = simdat$data_train)
+#' variables(mod)
+#' }
 #' @export
 #' @export variables
 variables.mvgam = function(x, ...){

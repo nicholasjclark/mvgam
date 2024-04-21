@@ -190,7 +190,7 @@ plot_mvgam_series = function(object,
       if (c*r < ppp) r <- r + 1
 
       .pardefault <- par(no.readonly=T)
-      par(.pardefault)
+      on.exit(par(.pardefault))
       oldpar<-par(mfrow=c(r,c),
                   mar=c(2.5, 2.3, 2, 2),
                   oma = c(1, 1, 0, 0),
@@ -491,7 +491,6 @@ plot_mvgam_series = function(object,
     }
 
   }
-  invisible()
-  par(.pardefault)
+
   layout(1)
 }

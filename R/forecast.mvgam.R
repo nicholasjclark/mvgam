@@ -28,7 +28,7 @@ forecast <- function(object, ...){
 #'@rdname forecast.mvgam
 #'@method forecast mvgam
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
 #'             trend_model = 'AR1',

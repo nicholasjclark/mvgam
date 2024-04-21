@@ -31,6 +31,9 @@ This places the legend on the inside of the plot frame at the given location (if
 \item{hide_xlabels}{\code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 \code{axis} from base \code{R}}
 }
+\value{
+A base \code{R} graphics plot
+}
 \description{
 Plot mvgam forecast uncertainty contributions for a specified series
 }

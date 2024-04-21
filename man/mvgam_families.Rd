@@ -57,7 +57,7 @@ Note that currently it is not possible to change the default link
 functions in \code{mvgam}, so any call to change these will be silently ignored
 }
 \examples{
-\dontrun{
+\donttest{
 # An N-mixture example using family nmix()
 # Simulate data from a Poisson-Binomial N-Mixture model
 # True abundance is predicted by a single nonlinear function of temperature
@@ -65,8 +65,20 @@ functions in \code{mvgam}, so any call to change these will be silently ignored
 set.seed(123)
 gamdat <- gamSim(n = 80); N <- NROW(gamdat)
 abund_linpred <- gamdat$y; temperature <- gamdat$x2
-trend <- mvgam:::sim_gp(rnorm(3, 0, 0.1), alpha_gp = 3,
-                        rho_gp = 16, h = N)
+
+# A function to simulate from a squared exponential Gaussian Process
+sim_gp = function(N, c, alpha, rho){
+  Sigma <- alpha ^ 2 *
+           exp(-0.5 * ((outer(1:N, 1:N, "-") / rho) ^ 2)) +
+           diag(1e-9, N)
+ c + mgcv::rmvn(1,
+                mu = rep(0, N),
+                V = Sigma)
+}
+trend <- sim_gp(alpha = 3,
+                rho = 16,
+                c = 0,
+                N = N)
 true_abund <- floor(10 + abund_linpred + trend)
 
 # Detection probability increases linearly with decreasing rainfall

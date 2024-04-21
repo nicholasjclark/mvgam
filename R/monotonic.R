@@ -44,7 +44,7 @@
 #' @author Nicholas J Clark
 #' @name monotonic
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Simulate data from a monotonically increasing function
 #' set.seed(123123)
 #' x <- runif(80) * 4 - 1

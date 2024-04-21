@@ -203,7 +203,7 @@ if(missing(data_test)){
 
 # Graphical parameters
 .pardefault <- par(no.readonly=T)
-par(.pardefault)
+on.exit(par(.pardefault))
 layout(matrix(1:4, ncol = 2, nrow = 2, byrow = TRUE))
 oldpar <- par(mar=c(2.5, 2.3, 2, 2),
               oma = c(1, 1, 0, 0),
@@ -455,8 +455,6 @@ abline(h = clim, col = 'black', lwd = 2.5, lty = 'dashed')
 abline(h = -clim, col = '#FFFFFF60', lwd = 2.85)
 abline(h = -clim, col = 'black', lwd = 2.5, lty = 'dashed')
 
-invisible()
-par(.pardefault)
 layout(1)
 
 }

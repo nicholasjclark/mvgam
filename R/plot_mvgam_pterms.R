@@ -46,7 +46,7 @@ pterms <- attr(object2$mgcv_model$pterms, 'term.labels')
 if(length(pterms) > 0){
   # Graphical parameters
   .pardefault <- par(no.readonly=T)
-  par(.pardefault)
+  on.exit(par(.pardefault))
 
   if(length(pterms) == 1){
     par(mfrow = c(1,1),
@@ -174,9 +174,6 @@ if(length(pterms) > 0){
 
   }
 }
-
-  invisible()
-  par(.pardefault)
   layout(1)
 } else {
   message('No parametric terms in model formula')
