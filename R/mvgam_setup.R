@@ -55,6 +55,8 @@ jagam_setup <- function(ss_gam, formula, data_train, family,
     family <- poisson()
   }
 
+  # Set file save location in tempdir
+  file_name <- tempfile(pattern = 'base_gam', fileext = '.txt')
   if(length(ss_gam$smooth) == 0){
     smooths_included <- FALSE
     # If no smooth terms are included, jagam will fail; so add a fake one and remove
@@ -72,7 +74,7 @@ jagam_setup <- function(ss_gam, formula, data_train, family,
       ss_jagam <- mgcv::jagam(form_fake,
                               data = data_train,
                               family = family_to_jagamfam(family_char),
-                              file = 'base_gam.txt',
+                              file = file_name,
                               sp.prior = 'gamma',
                               diagonalize = FALSE,
                               knots = knots,
@@ -81,7 +83,7 @@ jagam_setup <- function(ss_gam, formula, data_train, family,
       ss_jagam <- mgcv::jagam(form_fake,
                               data = data_train,
                               family = family_to_jagamfam(family_char),
-                              file = 'base_gam.txt',
+                              file = file_name,
                               sp.prior = 'gamma',
                               diagonalize = FALSE,
                               drop.unused.levels = FALSE)
@@ -96,7 +98,7 @@ jagam_setup <- function(ss_gam, formula, data_train, family,
       ss_jagam <- mgcv::jagam(formula,
                               data = data_train,
                               family = family_to_jagamfam(family_char),
-                              file = 'base_gam.txt',
+                              file = file_name,
                               sp.prior = 'gamma',
                               diagonalize = FALSE,
                               knots = knots,
@@ -105,13 +107,14 @@ jagam_setup <- function(ss_gam, formula, data_train, family,
       ss_jagam <- mgcv::jagam(formula,
                               data = data_train,
                               family = family_to_jagamfam(family_char),
-                              file = 'base_gam.txt',
+                              file = file_name,
                               sp.prior = 'gamma',
                               diagonalize = FALSE,
                               drop.unused.levels = FALSE)
     }
   }
-  return(list(ss_jagam = ss_jagam,
+  return(list(file_name = file_name,
+              ss_jagam = ss_jagam,
               smooths_included = smooths_included,
               xcols_drop = xcols_drop))
 }

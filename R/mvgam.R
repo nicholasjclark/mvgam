@@ -879,7 +879,7 @@ mvgam = function(formula,
                                formula)
 
   # Read in the base (unmodified) jags model file
-  base_model <- suppressWarnings(readLines('base_gam.txt'))
+  base_model <- suppressWarnings(readLines(file_name))
 
   # Remove lines from the linear predictor section
   lines_remove <- c(1:grep('## response', base_model))
@@ -1364,9 +1364,11 @@ mvgam = function(formula,
     # Import the base Stan model file
     modification <- add_base_dgam_lines(stan = TRUE, use_lv = use_lv)
     unlink('base_gam_stan.txt')
-    cat(modification, file = 'base_gam_stan.txt', sep = '\n', append = T)
-    base_stan_model <- trimws(suppressWarnings(readLines('base_gam_stan.txt')))
-    unlink('base_gam_stan.txt')
+
+    stanfile_name <- tempfile(pattern = 'base_gam_stan', fileext = '.txt')
+    cat(modification, file = stanfile_name, sep = '\n', append = T)
+    base_stan_model <- trimws(suppressWarnings(readLines(stanfile_name)))
+    unlink(stanfile_name)
 
     # Add necessary trend structure
     base_stan_model <- add_trend_lines(model_file = base_stan_model,
@@ -2164,7 +2166,7 @@ mvgam = function(formula,
       out_gam_mod <- coda::as.mcmc.list(gam_mod)
     }
 
-  unlink('base_gam.txt')
+  unlink(file_name)
   unlink(fil)
 
   # Add generated quantities for N-mixture models

@@ -38,15 +38,26 @@
 #' wiggliness of the underlying dynamic function (\code{k} will increase as \code{rho} decreases)
 #' @rdname dynamic
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate a time-varying coefficient
 #'#(as a Gaussian Process with length scale = 10)
 #'set.seed(1111)
 #'N <- 200
-#'beta <- mvgam:::sim_gp(rnorm(1),
-#'                       alpha_gp = 0.75,
-#'                       rho_gp = 10,
-#'                       h = N) + 0.5
+#'
+#'# A function to simulate from a squared exponential Gaussian Process
+#'sim_gp = function(N, c, alpha, rho){
+#'  Sigma <- alpha ^ 2 *
+#'           exp(-0.5 * ((outer(1:N, 1:N, "-") / rho) ^ 2)) +
+#'           diag(1e-9, N)
+#' c + mgcv::rmvn(1,
+#'                mu = rep(0, N),
+#'                V = Sigma)
+#'}
+#'
+#'beta <- sim_gp(alpha_gp = 0.75,
+#'               rho_gp = 10,
+#'               c = 0.5,
+#'               N = N)
 #'plot(beta, type = 'l', lwd = 3,
 #'     bty = 'l', xlab = 'Time',
 #'     ylab = 'Coefficient',
