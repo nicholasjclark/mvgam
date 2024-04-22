@@ -5,7 +5,7 @@ add_nmixture = function(model_file,
                         data_train,
                         data_test = NULL,
                         trend_map = NULL,
-                        nmix_trendmap = FALSE,
+                        nmix_trendmap = TRUE,
                         orig_trend_model){
 
   insight::check_if_installed("extraDistr",
@@ -152,7 +152,7 @@ add_nmix_data = function(model_data,
                          data_train,
                          data_test,
                          trend_map,
-                         nmix_trendmap){
+                         nmix_trendmap = TRUE){
   model_data$ytimes_array <- as.vector(model_data$ytimes)
 
   #### Perform necessary checks on 'cap' (positive integers, no missing values) ####
@@ -481,7 +481,9 @@ add_nmix_posterior = function(model_output,
                               obs_data,
                               test_data,
                               mgcv_model,
-                              n_lv, Z, K_inds){
+                              n_lv,
+                              Z,
+                              K_inds){
 
   # Function to add samples to the 'sim' slot of a stanfit object
   add_samples = function(model_output, names, samples, nsamples, nchains,
@@ -574,15 +576,15 @@ add_nmix_posterior = function(model_output,
       dplyr::mutate(min_cap = max(truth, na.rm = TRUE)) %>%
       dplyr::pull(min_cap)
   }
-  if(is.null(K_inds)){
-    K_inds <- matrix(1:length(truth), ncol = 1)
-  }
 
   # K_inds was originally supplied in series, time order
   # so the corresponding truth must be supplied that way
   truth_df %>%
     dplyr::arrange(series, time) %>%
     dplyr::pull(y) -> orig_y
+  if(is.null(K_inds)){
+    K_inds <- matrix(1:length(orig_y), ncol = 1)
+  }
   min_cap <- suppressWarnings(get_min_cap(orig_y, K_inds))
   min_cap[!is.finite(min_cap)] <- 0
 
@@ -703,7 +705,7 @@ add_nmix_posterior = function(model_output,
                          function(x) paste0('lv_coefs[',
                                             x[1], ',',
                                             x[2], ']'))
-  lv_coef_samps <- t(replicate(NROW(ps), as.vector(t(Z))))
+  lv_coef_samps <- as.matrix(replicate(NROW(ps), as.vector(t(Z))))
   model_output <- add_samples(model_output = model_output,
                               names = lv_coef_names,
                               samples = lv_coef_samps,

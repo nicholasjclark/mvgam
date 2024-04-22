@@ -67,144 +67,115 @@ student_t = function(link = 'identity'){
 #' @rdname mvgam_families
 #' @examples
 #' \donttest{
-#' # An N-mixture example using family nmix()
-#' # Simulate data from a Poisson-Binomial N-Mixture model
-#' # True abundance is predicted by a single nonlinear function of temperature
-#' # as well as a nonlinear long-term trend (as a Gaussian Process function)
-#' set.seed(123)
-#' gamdat <- gamSim(n = 80); N <- NROW(gamdat)
-#' abund_linpred <- gamdat$y; temperature <- gamdat$x2
+#' # Example showing how to set up N-mixture models
+#' set.seed(999)
+#'# Simulate observations for species 1, which shows a declining trend and 0.7 detection probability
+#'data.frame(site = 1,
+#'           # five replicates per year; six years
+#'           replicate = rep(1:5, 6),
+#'           time = sort(rep(1:6, 5)),
+#'           species = 'sp_1',
+#'           # true abundance declines nonlinearly
+#'           truth = c(rep(28, 5),
+#'                     rep(26, 5),
+#'                     rep(23, 5),
+#'                     rep(16, 5),
+#'                     rep(14, 5),
+#'                     rep(14, 5)),
+#'           # observations are taken with detection prob = 0.7
+#'           obs = c(rbinom(5, 28, 0.7),
+#'                   rbinom(5, 26, 0.7),
+#'                   rbinom(5, 23, 0.7),
+#'                   rbinom(5, 15, 0.7),
+#'                   rbinom(5, 14, 0.7),
+#'                   rbinom(5, 14, 0.7))) %>%
+#'  # add 'series' information, which is an identifier of site, replicate and species
+#'  dplyr::mutate(series = paste0('site_', site,
+#'                                '_', species,
+#'                                '_rep_', replicate),
+#'                time = as.numeric(time),
+#'                # add a 'cap' variable that defines the maximum latent N to
+#'                # marginalize over when estimating latent abundance; in other words
+#'                # how large do we realistically think the true abundance could be?
+#'                cap = 100) %>%
+#'  dplyr::select(- replicate) -> testdat
 #'
-#' # A function to simulate from a squared exponential Gaussian Process
-#' sim_gp = function(N, c, alpha, rho){
-#'   Sigma <- alpha ^ 2 *
-#'            exp(-0.5 * ((outer(1:N, 1:N, "-") / rho) ^ 2)) +
-#'            diag(1e-9, N)
-#'  c + mgcv::rmvn(1,
-#'                 mu = rep(0, N),
-#'                 V = Sigma)
-#' }
-#' trend <- sim_gp(alpha = 3,
-#'                 rho = 16,
-#'                 c = 0,
-#'                 N = N)
-#' true_abund <- floor(10 + abund_linpred + trend)
 #'
-#' # Detection probability increases linearly with decreasing rainfall
-#' rainfall <- rnorm(N)
-#' detect_linpred <- 0.4 + -0.55 * rainfall
-#' detect_prob <- plogis(detect_linpred)
+#'# Now add another species that has a different temporal trend and a smaller
+#'# detection probability (0.45 for this species)
+#'testdat = testdat %>%
+#'  dplyr::bind_rows(data.frame(site = 1,
+#'                              replicate = rep(1:5, 6),
+#'                              time = sort(rep(1:6, 5)),
+#'                              species = 'sp_2',
+#'                              truth = c(rep(4, 5),
+#'                                        rep(7, 5),
+#'                                        rep(15, 5),
+#'                                        rep(16, 5),
+#'                                        rep(19, 5),
+#'                                        rep(18, 5)),
+#'                              obs = c(rbinom(5, 4, 0.45),
+#'                                      rbinom(5, 7, 0.45),
+#'                                      rbinom(5, 15, 0.45),
+#'                                      rbinom(5, 16, 0.45),
+#'                                      rbinom(5, 19, 0.45),
+#'                                      rbinom(5, 18, 0.45))) %>%
+#'                     dplyr::mutate(series = paste0('site_', site,
+#'                                                   '_', species,
+#'                                                   '_rep_', replicate),
+#'                                   time = as.numeric(time),
+#'                                   cap = 50) %>%
+#'                     dplyr::select(-replicate))
 #'
-#' # Simulate observed counts
-#' obs_abund <- rbinom(N, size = true_abund, prob = detect_prob)
+#' # series identifiers
+#' testdat$species <- factor(testdat$species,
+#'                           levels = unique(testdat$species))
+#' testdat$series <- factor(testdat$series,
+#'                          levels = unique(testdat$series))
 #'
-#' # Plot true and observed time series
-#' plot(true_abund,
-#'      type = 'l',
-#'      ylab = 'Abundance',
-#'      xlab = 'Time',
-#'      ylim = c(0, max(true_abund)),
-#'      bty = 'l',
-#'      lwd = 2)
-#' lines(obs_abund, col = 'darkred', lwd = 2)
-#' title(main = 'True = black; observed = red')
+#' # The trend_map to state how replicates are structured
+#' testdat %>%
+#' # each unique combination of site*species is a separate process
+#'dplyr::mutate(trend = as.numeric(factor(paste0(site, species)))) %>%
+#'  dplyr::select(trend, series) %>%
+#'  dplyr::distinct() -> trend_map
+#'trend_map
 #'
-#' # Gather data into a dataframe suitable for mvgam modelling;
-#' # This will require a 'cap' variable specifying the maximum K to marginalise
-#' # over when estimating latent abundance (it does NOT have to be a fixed value)
-#' model_dat <- data.frame(obs_abund,
-#'                         temperature,
-#'                         rainfall,
-#'                         cap = max(obs_abund) + 20,
-#'                         time = 1:N,
-#'                         series = as.factor('series1'))
+#' # Fit a model
+#' mod <- mvgam(
+#'             # the observation formula sets up linear predictors for
+#'             # detection probability on the logit scale
+#'             formula = obs ~ species - 1,
 #'
-#' # Training and testing folds
-#' data_train <- model_dat %>% dplyr::filter(time <= 74)
-#' data_test <- model_dat %>% dplyr::filter(time > 74)
+#'             # the trend_formula sets up the linear predictors for
+#'             # the latent abundance processes on the log scale
+#'             trend_formula = ~ s(time, by = trend, k = 4) + species,
 #'
-#' # Fit a model with informative priors on the two intercept parameters
-#' # and on the length scale of the GP temporal trend parameter
-#' # Note that the 'trend_formula' applies to the latent count process
-#' # (a Poisson process with log-link), while the 'formula' applies to the
-#' # detection probability (logit link)
-#' mod <- mvgam(formula = obs_abund ~ rainfall,
-#'              trend_formula = ~ s(temperature, k = 5) +
-#'                gp(time, k = 10, c = 5/4, scale = FALSE),
-#'              family = nmix(),
-#'              data = data_train,
-#'              newdata = data_test,
-#'              priors = c(prior(std_normal(), class = '(Intercept)'),
-#'                         prior(normal(2, 2), class = '(Intercept)_trend'),
-#'                         prior(normal(15, 5), class = 'rho_gp_trend(time)')))
+#'             # the trend_map takes care of the mapping
+#'             trend_map = trend_map,
 #'
-#' # Model summary and diagnostics
+#'             # nmix() family and data
+#'             family = nmix(),
+#'             data = testdat,
+#'
+#'             # priors can be set in the usual way
+#'             priors = c(prior(std_normal(), class = b),
+#'                        prior(normal(1, 1.5), class = Intercept_trend)),
+#'             samples = 1000)
+#'
+#' # The usual diagnostics
 #' summary(mod)
-#' plot(mod, type = 'residuals')
+#' code(mod)
+#' loo(mod)
 #'
-#' # Intercept parameters
-#' mcmc_plot(mod,
-#'           variable = "Intercept",
-#'           regex = TRUE,
-#'           type = 'hist')
-#'
-#' # Hindcasts and forecasts of latent abundance (with truth overlain)
-#' fc <- forecast(mod, type = 'latent_N')
-#' plot(fc); points(true_abund, pch = 16, cex = 0.8)
-#'
-#' # Latent abundance predictions are restricted based on 'cap'
-#' max(model_dat$cap); range(fc$forecasts[[1]])
-#'
-#' # Hindcasts and forecasts of detection probability (with truth overlain)
-#' fc <- forecast(mod, type = 'detection')
-#' plot(fc); points(detect_prob, pch = 16, cex = 0.8)
-#'
-#' # Hindcasts and forecasts of observations
-#' # (after accounting for detection error)
-#' fc <- forecast(mod, type = 'response')
-#' plot(fc)
-#'
-#' # Hindcasts and forecasts of response expectations
-#' # (with truth overlain)
-#' fc <- forecast(object = mod, type = 'expected')
-#' plot(fc); points(detect_prob * true_abund, pch = 16, cex = 0.8)
-#'
-#' # Plot conditional effects
+#' # Plotting conditional effects
 #' library(ggplot2)
-#'
-#' # Effects on true abundance can be visualised using type = 'link'
-#' abund_plots <- plot(conditional_effects(mod,
-#'                                         type = 'link',
-#'                                         effects = c('temperature', 'time')),
-#'                     plot = FALSE)
-#'
-#' # Effect of temperature on abundance
-#' abund_plots[[1]] +
-#'   ylab('Latent abundance')
-#'
-#' # Long-term trend in abundance
-#' abund_plots[[2]] +
-#'   ylab('Latent abundance')
-#'
-#' # Effect of rainfall on detection probability
-#' det_plot <- plot(conditional_effects(mod,
-#'                                      type = 'detection',
-#'                                      effects = 'rainfall'),
-#'                  plot = FALSE)
-#' det_plot[[1]] +
-#'   ylab('Pr(detection)')
-#'
-#' # More targeted plots can use marginaleffects capabilities;
-#' # Here visualise how response predictions might change
-#' # if we considered different possible 'cap' limits on latent
-#' # abundance and different rainfall measurements
-#' plot_predictions(mod, condition = list('temperature',
-#'                                        cap = c(15, 20, 40),
-#'                                        rainfall = c(-1, 1)),
-#'                 type = 'response',
-#'                 conf_level = 0.5) +
-#'  ylab('Observed abundance') +
-#'  theme_classic()
+#' plot_predictions(mod, condition = 'species',
+#'                  type = 'detection') +
+#'      ylab('Pr(detection)') +
+#'      ylim(c(0, 1)) +
+#'      theme_classic() +
+#'      theme(legend.position = 'none')
 #'
 #' # Example showcasing how cbind() is needed for Binomial observations
 #' # Simulate two time series of Binomial trials

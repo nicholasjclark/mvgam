@@ -709,7 +709,7 @@ check_nmix = function(family, family_char,
                       priors = FALSE){
 
   # Check for N-mixture modifications
-  add_nmix <- FALSE; nmix_trendmap <- FALSE
+  add_nmix <- FALSE; nmix_trendmap <- TRUE
   if(family_char == 'nmix'){
     if(!(exists('cap', where = data_train))) {
       stop('Max abundances must be supplied as a variable named "cap" for N-mixture models',

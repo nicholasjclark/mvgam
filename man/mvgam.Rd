@@ -407,26 +407,6 @@ mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
 # View the model code in Stan language
 code(mod1)
 
-# Inspect the data objects needed to condition the model
-str(mod1$model_data)
-
-# The following code can be used to run the model outside of mvgam; first using rstan
-model_data <- mod1$model_data
-library(rstan)
-fit <- stan(model_code = mod1$model_file,
-            data = model_data)
-
-# Now using cmdstanr
-library(cmdstanr)
-model_data <- mod1$model_data
-cmd_mod <- cmdstan_model(write_stan_file(mod1$model_file),
-                        stanc_options = list('canonicalize=deprecations,braces,parentheses'))
-cmd_mod$print()
-fit <- cmd_mod$sample(data = model_data,
-                     chains = 4,
-                     parallel_chains = 4,
-                     refresh = 100)
-
 # Now fit the model using mvgam with the Stan backend
 mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
               data = dat$data_train,
