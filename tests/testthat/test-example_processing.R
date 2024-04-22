@@ -1,13 +1,5 @@
 context("example post-processing")
 
-expect_ggplot <- function(object, ...) {
-  testthat::expect_true(is(object, "ggplot"), ...)
-}
-
-expect_loo <- function(object, ...) {
-  testthat::expect_true(is(object, "psis_loo"), ...)
-}
-
 test_that("fitted() gives correct dimensions", {
   expect_equal(NROW(mvgam:::mvgam_examp_dat$data_train),
                NROW(fitted(mvgam:::mvgam_example1)))
@@ -390,11 +382,11 @@ test_that("forecast() works correctly", {
 
 test_that("loo() works correctly", {
   skip_on_cran()
-  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example1)))
-  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example2)))
-  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example3)))
-  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example4)))
-  expect_loo(suppressWarnings(loo(mvgam:::mvgam_example5)))
+  expect_loo(SW(loo(mvgam:::mvgam_example1)))
+  expect_loo(SW(loo(mvgam:::mvgam_example2)))
+  expect_loo(SW(loo(mvgam:::mvgam_example3)))
+  expect_loo(SW(loo(mvgam:::mvgam_example4)))
+  expect_loo(SW(loo(mvgam:::mvgam_example5)))
 
   p <- SW(loo_compare(mvgam:::mvgam_example1,
                       mvgam:::mvgam_example2,

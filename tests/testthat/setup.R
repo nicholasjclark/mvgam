@@ -10,6 +10,10 @@ expect_ggplot <- function(object, ...) {
   testthat::expect_true(is(object, "ggplot"), ...)
 }
 
+expect_loo <- function(object, ...) {
+  testthat::expect_true(is(object, "psis_loo"), ...)
+}
+
 SM <- suppressMessages
 SW <- suppressWarnings
 

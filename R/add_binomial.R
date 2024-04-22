@@ -138,7 +138,7 @@ add_binomial = function(formula,
       linenum <- grep("flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends),",
                       model_file, fixed = TRUE)
       model_file[linenum] <-
-        paste0("flat_ys ~ binomial(flat_trials_train, inv_logit(append_col(flat_xs, flat_trends) * b));")
+        paste0("flat_ys ~ binomial(flat_trials_train, inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0)));")
 
       model_file <- model_file[-(linenum + 1)]
       model_file <- readLines(textConnection(model_file), n = -1)
@@ -170,7 +170,7 @@ add_binomial = function(formula,
       model_file[linenum] <-
         paste0("vector[n_nonmissing] flat_phis;\n",
                "flat_phis = rep_each(phi, n)[obs_ind];\n",
-               "flat_ys ~ beta_binomial(flat_trials_train, inv_logit(append_col(flat_xs, flat_trends) * b) .* flat_phis, (1 - inv_logit(append_col(flat_xs, flat_trends) * b)) .* flat_phis);")
+               "flat_ys ~ beta_binomial(flat_trials_train, inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0)) .* flat_phis, (1 - inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0))) .* flat_phis);")
 
       model_file <- model_file[-(linenum + 1)]
       model_file <- readLines(textConnection(model_file), n = -1)

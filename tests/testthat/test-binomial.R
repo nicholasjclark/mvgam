@@ -5,12 +5,14 @@ trials <- sample(c(20:25), 50, replace = TRUE)
 x <- rnorm(50)
 detprob1 <- plogis(-0.5 + 0.9*x)
 detprob2 <- plogis(-0.1 -0.7*x)
-dat <- rbind(data.frame(y = rbinom(n = 50, size = trials, prob = detprob1),
+dat <- rbind(data.frame(y = rbinom(n = 50, size = trials,
+                                   prob = detprob1),
                         time = 1:50,
                         series = 'series1',
                         x = x,
                         ntrials = trials),
-             data.frame(y = rbinom(n = 50, size = trials, prob = detprob2),
+             data.frame(y = rbinom(n = 50, size = trials,
+                                   prob = detprob2),
                         time = 1:50,
                         series = 'series2',
                         x = x,
@@ -72,6 +74,39 @@ test_that("cbind() syntax required for binomial()", {
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(any(grepl('flat_ys ~ binomial(',
                         mod$model_file, fixed = TRUE)))
+})
+
+test_that("binomial() post-processing works", {
+  skip_on_cran()
+  mod <- mvgam(cbind(y, ntrials) ~ series,
+               trend_formula = ~ s(x, by = trend),
+               family = binomial(),
+               trend_model = AR(),
+               data = dat_train,
+               burnin = 200,
+               samples = 200)
+  expect_no_error(summary(mod))
+  expect_no_error(print(mod))
+
+  preds <- predict(mod, summary = FALSE, type = 'response')
+  expect_true(NCOL(preds) == NROW(dat_train))
+  expect_true(all(preds >= 0L))
+
+  preds <- predict(mod, newdata = dat_test, summary = FALSE)
+  expect_true(NCOL(preds) == NROW(dat_test))
+
+  expect_no_error(plot(mod, type = 'smooths', trend_effects = TRUE))
+  expect_no_error(plot(mod, type = 'smooths',
+                       realisations = TRUE, trend_effects = TRUE))
+  expect_no_error(plot(mod, type = 'smooths',
+                       residuals = TRUE, trend_effects = TRUE))
+  expect_true(inherits(SM(conditional_effects(mod)),
+                       'mvgam_conditional_effects'))
+  expect_true(inherits(SM(conditional_effects(mod,
+                                              type = 'link')),
+                       'mvgam_conditional_effects'))
+  expect_loo(SW(loo(mod)))
+  expect_true(inherits(hindcast(mod), 'mvgam_forecast'))
 })
 
 # All tests should apply to beta_binomial as well
@@ -136,13 +171,11 @@ detprob2 <- plogis(-0.1 -0.7*x)
 dat <- rbind(data.frame(y = rbinom(n = 50, size = 1, prob = detprob1),
                         time = 1:50,
                         series = 'series1',
-                        x = x,
-                        ntrials = trials),
+                        x = x),
              data.frame(y = rbinom(n = 50, size = 1, prob = detprob2),
                         time = 1:50,
                         series = 'series2',
-                        x = x,
-                        ntrials = trials)) %>%
+                        x = x)) %>%
   dplyr::mutate(series = as.factor(series)) %>%
   dplyr::arrange(time, series)
 
@@ -191,4 +224,37 @@ test_that("bernoulli() behaves appropriately", {
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(any(grepl('flat_ys ~ bernoulli_logit_glm(',
                         mod$model_file, fixed = TRUE)))
+})
+
+test_that("bernoulli() post-processing works", {
+  skip_on_cran()
+  mod <- mvgam(y ~ s(series, bs = 're') +
+                 gp(x, by = series, c = 5/4, k = 5),
+               trend_model = AR(),
+               priors = prior(normal(0, 0.1), class = ar1),
+               family = bernoulli(),
+               data = dat_train,
+               newdata = dat_test,
+               burnin = 200,
+               samples = 200)
+
+  expect_no_error(summary(mod))
+  expect_no_error(print(mod))
+
+  preds <- predict(mod, summary = FALSE, type = 'response')
+  expect_true(NCOL(preds) == NROW(dat_train))
+  expect_true(all(preds %in% c(0L, 1L)))
+
+  preds <- predict(mod, newdata = dat_test, summary = FALSE)
+  expect_true(NCOL(preds) == NROW(dat_test))
+
+  expect_no_error(plot(mod, type = 'smooths'))
+  expect_no_error(plot(mod, type = 'smooths',
+                       realisations = TRUE))
+  expect_no_error(plot(mod, type = 'smooths',
+                       residuals = TRUE))
+  expect_no_error(plot(mod, newdata = dat_test,
+                       type = 'uncertainty'))
+  expect_loo(SW(loo(mod)))
+  expect_true(inherits(hindcast(mod), 'mvgam_forecast'))
 })

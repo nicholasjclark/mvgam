@@ -1427,182 +1427,182 @@ get_forecast_resids = function(object, series, truth, preds, family,
 }
 
 
-#'Residual calculations for a fitted mvgam object
-#' @importFrom parallel clusterExport stopCluster setDefaultCluster clusterEvalQ
-#' @param object \code{list} object returned from \code{mvgam}
-#' @param n_cores \code{integer} specifying number of cores for generating residual distributions in parallel
-#' @author Nicholas J Clark
-#' @details Dunn-Smyth residual distributions are calculated for each series in the fitted object
-#' @return A \code{list} of residual distributions
-#' @noRd
-get_mvgam_resids = function(object, n_cores = 1){
-
-  # Check arguments
-  validate_pos_integer(n_cores)
-
-  # Extract necessary model elements; for Stan models, expectations are
-  # stored on the link scale
-  preds <- hindcast(object, type = 'expected')
-  if(object$family == 'nmix'){
-    p <- mcmc_chains(object$model_output, 'detprob')
-    N <- mcmc_chains(object$model_output, 'latent_ypred')
-  }
-  n_series <- NCOL(object$ytimes)
-  obs_series <- object$obs_data$series
-  series_levels <- levels(obs_series)
-  family <- object$family
-  obs_data <- object$obs_data
-  fit_engine <- object$fit_engine
-
-  # Create sequences of posterior draws for calculating residual distributions
-  sample_seq <- 1:NROW(preds$hindcast[[1]])
-  draw_seq <- sample(sample_seq, length(sample_seq), replace = FALSE)
-
-  # Family-specific parameters
-  family_pars <- extract_family_pars(object = object)
-
-  # Calculate DS residual distributions in sequence (parallel is no faster)
-  series_resids <- lapply(seq_len(n_series), function(series){
-    if(class(obs_data)[1] == 'list'){
-      n_obs <- data.frame(series = obs_series) %>%
-        dplyr::filter(series == !!(series_levels[series])) %>%
-        nrow()
-    } else {
-      n_obs <- obs_data %>%
-        dplyr::filter(series == !!(series_levels[series])) %>%
-        nrow()
-    }
-
-    preds <- preds$hindcasts[[series]]
-    s_name <- levels(obs_data$series)[series]
-    truth <- data.frame(time = obs_data$time,
-                        series = obs_data$series,
-                        y = obs_data$y) %>%
-      dplyr::filter(series == s_name) %>%
-      dplyr::select(time, y) %>%
-      dplyr::distinct() %>%
-      dplyr::arrange(time) %>%
-      dplyr::pull(y)
-
-    # Keep only the predictions that match the observation period
-    # (not the out of sample predictions, if any were computed in the model)
-    preds <- preds[,1:length(truth)]
-
-    if(family == 'nmix'){
-      N <- N[,1:length(truth)]
-      p <- p[,1:length(truth)]
-    }
-
-    # Create a truth matrix for vectorised residual computation
-    truth_mat <- matrix(rep(truth, NROW(preds)),
-                        nrow = NROW(preds),
-                        byrow = TRUE)
-
-    if(family == 'gaussian'){
-      sigma_obs <- family_pars$sigma_obs[,series]
-      sigma_mat <- matrix(rep(sigma_obs,
-                              NCOL(preds)),
-                          ncol = NCOL(preds))
-      resids <- matrix(ds_resids_gaus(truth = as.vector(truth_mat),
-                                      fitted = as.vector(preds),
-                                      draw = as.vector(preds[draw_seq,]),
-                                      sigma = as.vector(sigma_mat)),
-                       nrow = NROW(preds))
-    }
-
-    if(family == 'nmix'){
-      resids <- matrix(ds_resids_nmix(truth = as.vector(truth_mat),
-                                      fitted = 1,
-                                      draw = 1,
-                                      N = as.vector(N),
-                                      p = as.vector(p)),
-                       nrow = NROW(preds))
-    }
-
-    if(family == 'student'){
-      sigma_obs <- family_pars$sigma_obs[,series]
-      sigma_mat <- matrix(rep(sigma_obs,
-                              NCOL(preds)),
-                          ncol = NCOL(preds))
-
-      nu <- family_pars$nu[,series]
-      nu_mat <- matrix(rep(nu,
-                           NCOL(preds)),
-                       ncol = NCOL(preds))
-
-      resids <- matrix(ds_resids_student(truth = as.vector(truth_mat),
-                                         fitted = as.vector(preds),
-                                         draw = as.vector(preds[draw_seq,]),
-                                         sigma = as.vector(sigma_mat),
-                                         nu = nu_mat),
-                       nrow = NROW(preds))
-    }
-
-    if(family == 'lognormal'){
-      sigma_obs <- family_pars$sigma_obs[,series]
-      sigma_mat <- matrix(rep(sigma_obs,
-                              NCOL(preds)),
-                          ncol = NCOL(preds))
-      resids <- matrix(ds_resids_lnorm(truth = as.vector(truth_mat),
-                                      fitted = as.vector(preds),
-                                      draw = as.vector(preds[draw_seq,]),
-                                      sigma= as.vector(sigma_mat)),
-                       nrow = NROW(preds))
-    }
-
-    if(family == 'poisson'){
-      resids <- matrix(ds_resids_pois(truth = as.vector(truth_mat),
-                                      fitted = as.vector(preds),
-                                      draw = as.vector(preds[draw_seq,])),
-                       nrow = NROW(preds))
-    }
-
-    if(family == 'beta'){
-      precision <- family_pars$phi[,series]
-      precision_mat <- matrix(rep(precision, NCOL(preds)),
-                              ncol = NCOL(preds))
-      resids <- matrix(ds_resids_beta(truth = as.vector(truth_mat),
-                                    fitted = as.vector(preds),
-                                    draw = as.vector(preds[draw_seq,]),
-                                    precision = as.vector(precision_mat)),
-                       nrow = NROW(preds))
-    }
-
-    if(family == 'Gamma'){
-      shape <- family_pars$shape[,series]
-      shape_mat <- matrix(rep(shape, NCOL(preds)),
-                              ncol = NCOL(preds))
-      resids <- matrix(ds_resids_gamma(truth = as.vector(truth_mat),
-                                      fitted = as.vector(preds),
-                                      draw = as.vector(preds[draw_seq,]),
-                                      shape = as.vector(shape_mat)),
-                       nrow = NROW(preds))
-    }
-
-    if(family == 'negative binomial'){
-      size <- family_pars$phi[,series]
-      size_mat <- matrix(rep(size, NCOL(preds)),
-                         ncol = NCOL(preds))
-      resids <- matrix(ds_resids_nb(truth = as.vector(truth_mat),
-                                    fitted = as.vector(preds),
-                                    draw = as.vector(preds[draw_seq,]),
-                                    size = as.vector(size_mat)),
-                       nrow = NROW(preds))
-    }
-
-    if(family == 'tweedie'){
-      resids <- matrix(ds_resids_tw(truth = as.vector(truth_mat),
-                                    fitted = as.vector(preds),
-                                    draw = as.vector(preds[draw_seq,])),
-                       nrow = NROW(preds))
-    }
-
-    resids
-
-  })
-  names(series_resids) <- series_levels
-  return(series_resids)
-}
+#' #'Residual calculations for a fitted mvgam object
+#' #' @importFrom parallel clusterExport stopCluster setDefaultCluster clusterEvalQ
+#' #' @param object \code{list} object returned from \code{mvgam}
+#' #' @param n_cores \code{integer} specifying number of cores for generating residual distributions in parallel
+#' #' @author Nicholas J Clark
+#' #' @details Dunn-Smyth residual distributions are calculated for each series in the fitted object
+#' #' @return A \code{list} of residual distributions
+#' #' @noRd
+#' get_mvgam_resids = function(object, n_cores = 1){
+#'
+#'   # Check arguments
+#'   validate_pos_integer(n_cores)
+#'
+#'   # Extract necessary model elements; for Stan models, expectations are
+#'   # stored on the link scale
+#'   preds <- hindcast(object, type = 'expected')
+#'   if(object$family == 'nmix'){
+#'     p <- mcmc_chains(object$model_output, 'detprob')
+#'     N <- mcmc_chains(object$model_output, 'latent_ypred')
+#'   }
+#'   n_series <- NCOL(object$ytimes)
+#'   obs_series <- object$obs_data$series
+#'   series_levels <- levels(obs_series)
+#'   family <- object$family
+#'   obs_data <- object$obs_data
+#'   fit_engine <- object$fit_engine
+#'
+#'   # Create sequences of posterior draws for calculating residual distributions
+#'   sample_seq <- 1:NROW(preds$hindcast[[1]])
+#'   draw_seq <- sample(sample_seq, length(sample_seq), replace = FALSE)
+#'
+#'   # Family-specific parameters
+#'   family_pars <- extract_family_pars(object = object)
+#'
+#'   # Calculate DS residual distributions in sequence (parallel is no faster)
+#'   series_resids <- lapply(seq_len(n_series), function(series){
+#'     if(class(obs_data)[1] == 'list'){
+#'       n_obs <- data.frame(series = obs_series) %>%
+#'         dplyr::filter(series == !!(series_levels[series])) %>%
+#'         nrow()
+#'     } else {
+#'       n_obs <- obs_data %>%
+#'         dplyr::filter(series == !!(series_levels[series])) %>%
+#'         nrow()
+#'     }
+#'
+#'     preds <- preds$hindcasts[[series]]
+#'     s_name <- levels(obs_data$series)[series]
+#'     truth <- data.frame(time = obs_data$time,
+#'                         series = obs_data$series,
+#'                         y = obs_data$y) %>%
+#'       dplyr::filter(series == s_name) %>%
+#'       dplyr::select(time, y) %>%
+#'       dplyr::distinct() %>%
+#'       dplyr::arrange(time) %>%
+#'       dplyr::pull(y)
+#'
+#'     # Keep only the predictions that match the observation period
+#'     # (not the out of sample predictions, if any were computed in the model)
+#'     preds <- preds[,1:length(truth)]
+#'
+#'     if(family == 'nmix'){
+#'       N <- N[,1:length(truth)]
+#'       p <- p[,1:length(truth)]
+#'     }
+#'
+#'     # Create a truth matrix for vectorised residual computation
+#'     truth_mat <- matrix(rep(truth, NROW(preds)),
+#'                         nrow = NROW(preds),
+#'                         byrow = TRUE)
+#'
+#'     if(family == 'gaussian'){
+#'       sigma_obs <- family_pars$sigma_obs[,series]
+#'       sigma_mat <- matrix(rep(sigma_obs,
+#'                               NCOL(preds)),
+#'                           ncol = NCOL(preds))
+#'       resids <- matrix(ds_resids_gaus(truth = as.vector(truth_mat),
+#'                                       fitted = as.vector(preds),
+#'                                       draw = as.vector(preds[draw_seq,]),
+#'                                       sigma = as.vector(sigma_mat)),
+#'                        nrow = NROW(preds))
+#'     }
+#'
+#'     if(family == 'nmix'){
+#'       resids <- matrix(ds_resids_nmix(truth = as.vector(truth_mat),
+#'                                       fitted = 1,
+#'                                       draw = 1,
+#'                                       N = as.vector(N),
+#'                                       p = as.vector(p)),
+#'                        nrow = NROW(preds))
+#'     }
+#'
+#'     if(family == 'student'){
+#'       sigma_obs <- family_pars$sigma_obs[,series]
+#'       sigma_mat <- matrix(rep(sigma_obs,
+#'                               NCOL(preds)),
+#'                           ncol = NCOL(preds))
+#'
+#'       nu <- family_pars$nu[,series]
+#'       nu_mat <- matrix(rep(nu,
+#'                            NCOL(preds)),
+#'                        ncol = NCOL(preds))
+#'
+#'       resids <- matrix(ds_resids_student(truth = as.vector(truth_mat),
+#'                                          fitted = as.vector(preds),
+#'                                          draw = as.vector(preds[draw_seq,]),
+#'                                          sigma = as.vector(sigma_mat),
+#'                                          nu = nu_mat),
+#'                        nrow = NROW(preds))
+#'     }
+#'
+#'     if(family == 'lognormal'){
+#'       sigma_obs <- family_pars$sigma_obs[,series]
+#'       sigma_mat <- matrix(rep(sigma_obs,
+#'                               NCOL(preds)),
+#'                           ncol = NCOL(preds))
+#'       resids <- matrix(ds_resids_lnorm(truth = as.vector(truth_mat),
+#'                                       fitted = as.vector(preds),
+#'                                       draw = as.vector(preds[draw_seq,]),
+#'                                       sigma= as.vector(sigma_mat)),
+#'                        nrow = NROW(preds))
+#'     }
+#'
+#'     if(family == 'poisson'){
+#'       resids <- matrix(ds_resids_pois(truth = as.vector(truth_mat),
+#'                                       fitted = as.vector(preds),
+#'                                       draw = as.vector(preds[draw_seq,])),
+#'                        nrow = NROW(preds))
+#'     }
+#'
+#'     if(family == 'beta'){
+#'       precision <- family_pars$phi[,series]
+#'       precision_mat <- matrix(rep(precision, NCOL(preds)),
+#'                               ncol = NCOL(preds))
+#'       resids <- matrix(ds_resids_beta(truth = as.vector(truth_mat),
+#'                                     fitted = as.vector(preds),
+#'                                     draw = as.vector(preds[draw_seq,]),
+#'                                     precision = as.vector(precision_mat)),
+#'                        nrow = NROW(preds))
+#'     }
+#'
+#'     if(family == 'Gamma'){
+#'       shape <- family_pars$shape[,series]
+#'       shape_mat <- matrix(rep(shape, NCOL(preds)),
+#'                               ncol = NCOL(preds))
+#'       resids <- matrix(ds_resids_gamma(truth = as.vector(truth_mat),
+#'                                       fitted = as.vector(preds),
+#'                                       draw = as.vector(preds[draw_seq,]),
+#'                                       shape = as.vector(shape_mat)),
+#'                        nrow = NROW(preds))
+#'     }
+#'
+#'     if(family == 'negative binomial'){
+#'       size <- family_pars$phi[,series]
+#'       size_mat <- matrix(rep(size, NCOL(preds)),
+#'                          ncol = NCOL(preds))
+#'       resids <- matrix(ds_resids_nb(truth = as.vector(truth_mat),
+#'                                     fitted = as.vector(preds),
+#'                                     draw = as.vector(preds[draw_seq,]),
+#'                                     size = as.vector(size_mat)),
+#'                        nrow = NROW(preds))
+#'     }
+#'
+#'     if(family == 'tweedie'){
+#'       resids <- matrix(ds_resids_tw(truth = as.vector(truth_mat),
+#'                                     fitted = as.vector(preds),
+#'                                     draw = as.vector(preds[draw_seq,])),
+#'                        nrow = NROW(preds))
+#'     }
+#'
+#'     resids
+#'
+#'   })
+#'   names(series_resids) <- series_levels
+#'   return(series_resids)
+#' }
 
 #' @noRd
 dsresids_vec = function(object){
