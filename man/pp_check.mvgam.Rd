@@ -73,8 +73,7 @@ mod <- mvgam(y ~ series +
               s(season, series, bs = 'sz', k = 4),
             data = simdat$data_train)
 
-# Get a list of available plot types
-pp_check(mod, type = "xyz")
+# Use pp_check(mod, type = "xyz") for a list of available plot types
 
 # Default is a density overlay for all observations
 pp_check(mod)

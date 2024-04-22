@@ -95,6 +95,10 @@ test_that("binomial() post-processing works", {
   preds <- predict(mod, newdata = dat_test, summary = FALSE)
   expect_true(NCOL(preds) == NROW(dat_test))
 
+  expect_no_error(plot(mod, type = 'residuals'))
+  expect_no_error(plot(mod, type = 'forecast'))
+  expect_no_error(plot(mod, type = 'forecast',
+                       newdata = dat_test))
   expect_no_error(plot(mod, type = 'smooths', trend_effects = TRUE))
   expect_no_error(plot(mod, type = 'smooths',
                        realisations = TRUE, trend_effects = TRUE))
@@ -248,6 +252,7 @@ test_that("bernoulli() post-processing works", {
   preds <- predict(mod, newdata = dat_test, summary = FALSE)
   expect_true(NCOL(preds) == NROW(dat_test))
 
+  expect_no_error(plot(mod, type = 'residuals'))
   expect_no_error(plot(mod, type = 'smooths'))
   expect_no_error(plot(mod, type = 'smooths',
                        realisations = TRUE))
