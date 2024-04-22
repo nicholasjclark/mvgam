@@ -34,6 +34,7 @@ simdat <- sim_mvgam()
 mod <- mvgam(y ~ s(season, bs = 'cc',
                   k = 6),
             trend_model = AR(),
+            use_lv = TRUE,
             n_lv = 2,
             data = simdat$data_train)
 plot_mvgam_factors(mod)
