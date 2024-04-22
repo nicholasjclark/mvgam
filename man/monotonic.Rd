@@ -88,7 +88,9 @@ plot_predictions(mod,
 mod_data$time <- 1:NROW(mod_data)
 mod2 <- mvgam(y ~ s(x, bs = 'moi', k = 18),
              data = mod_data,
-             family = gaussian())
+             family = gaussian(),
+             burnin = 300,
+             samples = 300)
 
 plot_predictions(mod2,
                  by = 'x',
@@ -121,7 +123,9 @@ mod_data$time <- 1:NROW(mod_data)
 # Fit a model with different smooths per factor level
 mod <- mvgam(y ~ s(x, bs = 'moi', by = fac, k = 8),
              data = mod_data,
-             family = gaussian())
+             family = gaussian(),
+             burnin = 300,
+             samples = 300)
 
 # Visualise the different monotonic functions
 plot_predictions(mod, condition = c('x', 'fac', 'fac'),

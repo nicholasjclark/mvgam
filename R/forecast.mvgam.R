@@ -30,9 +30,11 @@ forecast <- function(object, ...){
 #' @examples
 #' \donttest{
 #' simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
-#' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'             trend_model = 'AR1',
-#'             data = simdat$data_train)
+#' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
+#'             trend_model = AR(),
+#'             data = simdat$data_train,
+#'             burnin = 300,
+#'             samples = 300)
 #'
 #' # Hindcasts on response scale
 #' hc <- hindcast(mod)
@@ -54,6 +56,11 @@ forecast <- function(object, ...){
 #' plot(fc, series = 2)
 #' plot(fc, series = 3)
 #'
+#' # Dynamic trend extrapolations
+#' fc <- forecast(mod, newdata = simdat$data_test, type = 'trend')
+#' plot(fc, series = 1)
+#' plot(fc, series = 2)
+#' plot(fc, series = 3)
 #' }
 #'@export
 forecast.mvgam = function(object,
@@ -754,7 +761,7 @@ forecast_draws = function(object,
 
     # Add trial information if this is a Binomial model
     if(object$family %in% c('binomial', 'beta_binomial')){
-      resp_terms <- as.character(terms(formula(object$formula))[[2]])
+      resp_terms <- as.character(terms(formula(object$call))[[2]])
       resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
       trial_name <- resp_terms[2]
       trial_df <- data.frame(series = data_test$series,

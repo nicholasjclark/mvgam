@@ -57,3 +57,27 @@ A base \code{R} graphics plot
 \description{
 Plot mvgam latent trend for a specified series
 }
+\examples{
+\donttest{
+simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
+mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
+            trend_model = AR(),
+            data = simdat$data_train,
+            burnin = 300,
+            samples = 300)
+
+# Plot estimated trends for some series
+plot_mvgam_trend(mod)
+plot_mvgam_trend(mod, series = 2)
+
+# Extrapolate trends forward in time and plot on response scale
+plot_mvgam_trend(mod, newdata = simdat$data_test)
+plot_mvgam_trend(mod, newdata = simdat$data_test, series = 2)
+
+# But it is recommended to compute extrapolations for all series
+# first and then plot
+trend_fc <- forecast(mod, newdata = simdat$data_test)
+plot(trend_fc, series = 1)
+plot(trend_fc, series = 2)
+}
+}

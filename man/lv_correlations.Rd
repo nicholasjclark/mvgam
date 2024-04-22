@@ -23,7 +23,11 @@ simdat <- sim_mvgam()
 mod <- mvgam(y ~ s(season, bs = 'cc',
                   k = 6),
             trend_model = AR(),
-            data = simdat$data_train)
+            use_lv = TRUE,
+            n_lv = 2,
+            data = simdat$data_train,
+            burnin = 300,
+            samples = 300)
 lvcors <- lv_correlations(mod)
 names(lvcors)
 lapply(lvcors, class)

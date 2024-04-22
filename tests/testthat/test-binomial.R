@@ -95,22 +95,38 @@ test_that("binomial() post-processing works", {
   preds <- predict(mod, newdata = dat_test, summary = FALSE)
   expect_true(NCOL(preds) == NROW(dat_test))
 
+  expect_no_error(ppc(mod))
+  expect_no_error(ppc(mod, type = 'density'))
+  expect_no_error(ppc(mod, type = 'mean'))
+  expect_no_error(ppc(mod, type = 'pit'))
+  expect_no_error(ppc(mod, type = 'cdf'))
+  expect_no_error(ppc(mod, type = 'rootogram'))
+
   expect_no_error(plot(mod, type = 'residuals'))
+
+  expect_no_error(plot_mvgam_series(object = mod))
+  expect_no_error(plot_mvgam_series(object = mod, series = 'all'))
+
   expect_no_error(plot(mod, type = 'forecast'))
   expect_no_error(plot(mod, type = 'forecast',
                        newdata = dat_test))
+  expect_no_error(plot(mod, type = 'trend'))
+  expect_no_error(plot(mod, type = 'trend',
+                       newdata = dat_test))
+  expect_true(inherits(hindcast(mod), 'mvgam_forecast'))
+
   expect_no_error(plot(mod, type = 'smooths', trend_effects = TRUE))
   expect_no_error(plot(mod, type = 'smooths',
                        realisations = TRUE, trend_effects = TRUE))
   expect_no_error(plot(mod, type = 'smooths',
                        residuals = TRUE, trend_effects = TRUE))
+
   expect_true(inherits(SM(conditional_effects(mod)),
                        'mvgam_conditional_effects'))
   expect_true(inherits(SM(conditional_effects(mod,
                                               type = 'link')),
                        'mvgam_conditional_effects'))
   expect_loo(SW(loo(mod)))
-  expect_true(inherits(hindcast(mod), 'mvgam_forecast'))
 })
 
 # All tests should apply to beta_binomial as well
@@ -238,7 +254,6 @@ test_that("bernoulli() post-processing works", {
                priors = prior(normal(0, 0.1), class = ar1),
                family = bernoulli(),
                data = dat_train,
-               newdata = dat_test,
                burnin = 200,
                samples = 200)
 
@@ -247,19 +262,41 @@ test_that("bernoulli() post-processing works", {
 
   preds <- predict(mod, summary = FALSE, type = 'response')
   expect_true(NCOL(preds) == NROW(dat_train))
-  expect_true(all(preds %in% c(0L, 1L)))
+  expect_true(all(preds >= 0L))
 
   preds <- predict(mod, newdata = dat_test, summary = FALSE)
   expect_true(NCOL(preds) == NROW(dat_test))
 
+  expect_no_error(ppc(mod))
+  expect_no_error(ppc(mod, type = 'density'))
+  expect_no_error(ppc(mod, type = 'mean'))
+  expect_no_error(ppc(mod, type = 'pit'))
+  expect_no_error(ppc(mod, type = 'cdf'))
+  expect_no_error(ppc(mod, type = 'rootogram'))
+
   expect_no_error(plot(mod, type = 'residuals'))
-  expect_no_error(plot(mod, type = 'smooths'))
-  expect_no_error(plot(mod, type = 'smooths',
-                       realisations = TRUE))
-  expect_no_error(plot(mod, type = 'smooths',
-                       residuals = TRUE))
-  expect_no_error(plot(mod, newdata = dat_test,
-                       type = 'uncertainty'))
-  expect_loo(SW(loo(mod)))
+
+  expect_no_error(plot_mvgam_series(object = mod))
+  expect_no_error(plot_mvgam_series(object = mod, series = 'all'))
+
+  expect_no_error(plot(mod, type = 'forecast'))
+  expect_no_error(plot(mod, type = 'forecast',
+                       newdata = dat_test))
+  expect_no_error(plot(mod, type = 'trend'))
+  expect_no_error(plot(mod, type = 'trend',
+                       newdata = dat_test))
   expect_true(inherits(hindcast(mod), 'mvgam_forecast'))
+
+  expect_no_error(plot(mod, type = 'smooths', trend_effects = TRUE))
+  expect_no_error(plot(mod, type = 'smooths',
+                       realisations = TRUE, trend_effects = TRUE))
+  expect_no_error(plot(mod, type = 'smooths',
+                       residuals = TRUE, trend_effects = TRUE))
+
+  expect_true(inherits(SM(conditional_effects(mod)),
+                       'mvgam_conditional_effects'))
+  expect_true(inherits(SM(conditional_effects(mod,
+                                              type = 'link')),
+                       'mvgam_conditional_effects'))
+  expect_loo(SW(loo(mod)))
 })

@@ -319,21 +319,23 @@
 #'# Formulate a model using Stan where series share a cyclic smooth for
 #'# seasonality and each series has an independent random walk temporal process;
 #'# Set run_model = FALSE to inspect the returned objects
-#'mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
+#'mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
 #'              data = dat$data_train,
 #'              trend_model = RW(),
-#'              family = 'poisson',
+#'              family = poison(),
 #'              use_stan = TRUE,
 #'              run_model = FALSE)
 #'
 #' # View the model code in Stan language
 #' code(mod1)
 #'
-#' # Now fit the model using mvgam with the Stan backend
-#' mod1 <- mvgam(formula = y ~ s(season, bs = 'cc'),
+#' # Now fit the model
+#' mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
 #'               data = dat$data_train,
 #'               trend_model = RW(),
-#'               family = poisson())
+#'               family = poisson(),
+#'               burnin = 300,
+#'               samples = 300)
 #'
 #' # Extract the model summary
 #' summary(mod1)
@@ -388,14 +390,16 @@
 #' # Here, we specify only two latent trends; series 1 and 2 share a trend,
 #' # while series 3 has it's own unique latent trend
 #' trend_map <- data.frame(series = unique(mod_data$series),
-#'                        trend = c(1,1,2))
+#'                        trend = c(1, 1, 2))
 #'
 #' # Fit the model using AR1 trends
-#' mod <- mvgam(y ~ s(season, bs = 'cc'),
+#' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
 #'               trend_map = trend_map,
 #'               trend_model = AR(),
 #'               data = mod_data,
-#'               return_model_data = TRUE)
+#'               return_model_data = TRUE,
+#'               burnin = 300,
+#'               samples = 300)
 #'
 #' # The mapping matrix is now supplied as data to the model in the 'Z' element
 #' mod1$model_data$Z
@@ -405,6 +409,7 @@
 #' plot(mod, type = 'trend', series = 1)
 #' plot(mod, type = 'trend', series = 2)
 #' plot(mod, type = 'trend', series = 3)
+#'
 #'
 #' # Example of how to use dynamic coefficients
 #' # Simulate a time-varying coefficient for the effect of temperature
@@ -436,7 +441,9 @@
 #'                       k = 40),
 #'              family = gaussian(),
 #'              data = data_train,
-#'              newdata = data_test)
+#'              newdata = data_test,
+#'              burnin = 300,
+#'              samples = 300)
 #'
 #' # Inspect the model summary, forecast and time-varying coefficient distribution
 #' summary(mod)
@@ -466,7 +473,9 @@
 #'               s(season, bs = 'cc') +
 #'               s(season, by = series, m = 1, k = 5),
 #'              data = dat$data_train,
-#'              trend_model = 'None')
+#'              trend_model = 'None',
+#'              burnin = 300,
+#'              samples = 300)
 #'
 #' # Inspect the model file to see the modification to the linear predictor
 #' # (eta)
@@ -509,6 +518,7 @@
 #'  lines(preds_rr[i, series2_inds], col = 'darkred')
 #'  }
 #' layout(1)
+#'
 #'
 #' # Example of logistic growth with possible changepoints
 #' # Simple logistic growth model
@@ -557,7 +567,9 @@
 #' mod <- mvgam(y ~ 0,
 #'              trend_model = PW(growth = 'logistic'),
 #'              family = poisson(),
-#'              data = mod_data)
+#'              data = mod_data,
+#'              burnin = 300,
+#'              samples = 300)
 #' summary(mod)
 #'
 #' # Plot the posterior hindcast
@@ -570,6 +582,7 @@
 #' scale_y_discrete(labels = mod$trend_model$changepoints) +
 #' labs(y = 'Potential changepoint',
 #'      x = 'Rate change')
+#'
 #'
 #' # Example showcasing how cbind() is needed for Binomial observations
 #' # Simulate two time series of Binomial trials
@@ -595,7 +608,9 @@
 #' # and number of trials in the cbind() wrapper
 #' mod <- mvgam(cbind(y, ntrials) ~ series + s(x, by = series),
 #'              family = binomial(),
-#'              data = dat)
+#'              data = dat,
+#'              burnin = 300,
+#'              samples = 300)
 #' summary(mod)
 #' pp_check(mod, type = "bars_grouped",
 #'          group = "series", ndraws = 50)

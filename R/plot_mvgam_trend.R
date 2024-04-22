@@ -21,6 +21,29 @@
 #'@param ylab label for y axis.
 #'@param ... further \code{\link[graphics]{par}} graphical parameters.
 #'@return A base \code{R} graphics plot
+#' @examples
+#' \donttest{
+#' simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
+#' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
+#'             trend_model = AR(),
+#'             data = simdat$data_train,
+#'             burnin = 300,
+#'             samples = 300)
+#'
+#' # Plot estimated trends for some series
+#' plot_mvgam_trend(mod)
+#' plot_mvgam_trend(mod, series = 2)
+#'
+#' # Extrapolate trends forward in time and plot on response scale
+#' plot_mvgam_trend(mod, newdata = simdat$data_test)
+#' plot_mvgam_trend(mod, newdata = simdat$data_test, series = 2)
+#'
+#' # But it is recommended to compute extrapolations for all series
+#' # first and then plot
+#' trend_fc <- forecast(mod, newdata = simdat$data_test)
+#' plot(trend_fc, series = 1)
+#' plot(trend_fc, series = 2)
+#' }
 #'@export
 plot_mvgam_trend = function(object, series = 1, newdata, data_test,
                             realisations = FALSE, n_realisations = 15,
@@ -95,7 +118,7 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
       stop('data_test does not contain a "time" column')
     }
 
-    if(class(data_test)[1] == 'list'){
+    if(inherits(data_test, 'list')){
       all_obs <- c(data.frame(y = data_train$y,
                               series = data_train$series,
                               time = data_train$time) %>%
@@ -128,9 +151,9 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
     }
 
     if(dim(preds)[2] != length(all_obs)){
-      fc_preds <- forecast(object, series = series, data_test = data_test,
-                                 type = 'trend',
-                           n_cores = n_cores)$forecasts[[1]]
+      fc_preds <- forecast(object, data_test = data_test,
+                           type = 'trend',
+                           n_cores = n_cores)$forecasts[[series]]
       preds <- cbind(preds, fc_preds)
     }
   }
@@ -163,7 +186,7 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
     .pardefault <- par(no.readonly=T)
     on.exit(par(.pardefault))
     par(mfrow = c(2, 1),
-        mar=c(2.5, 2.3, 2, 2),
+        mar = c(2.5, 2.3, 2, 2),
         oma = c(1, 1, 0, 0),
         mgp = c(1.5, 0.5, 0))
 

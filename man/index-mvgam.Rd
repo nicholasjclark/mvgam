@@ -29,9 +29,11 @@ Index \code{mvgam} objects
 \examples{
 \donttest{
 simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
-mod <- mvgam(y ~ s(season, bs = 'cc'),
+mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
              trend_model = AR(),
-             data = simdat$data_train)
+             data = simdat$data_train,
+            burnin = 300,
+            samples = 300)
 variables(mod)
 }
 }

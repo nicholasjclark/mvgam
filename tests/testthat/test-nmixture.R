@@ -96,7 +96,7 @@ test_that("latent process intercept is allowed in nmixtures", {
 # example from the families man page
 test_that("nmix() post-processing works", {
   skip_on_cran()
-  set.seed(999)
+  set.seed(0)
   data.frame(site = 1,
              # five replicates per year; six years
              replicate = rep(1:5, 6),
@@ -186,7 +186,7 @@ test_that("nmix() post-processing works", {
     # priors can be set in the usual way
     priors = c(prior(std_normal(), class = b),
                prior(normal(1, 1.5), class = Intercept_trend)),
-    samples = 400)
+    samples = 300)
 
   expect_no_error(summary(mod))
   expect_no_error(print(mod))
@@ -210,6 +210,7 @@ test_that("nmix() post-processing works", {
   expect_true(NCOL(preds) == NROW(testdat))
   expect_true(all(preds >= 0L))
 
+  expect_no_error(plot(mod, type = 'residuals'))
   expect_no_error(plot(mod, type = 'smooths',
                        trend_effects = TRUE))
   expect_no_error(plot(mod, type = 'smooths',

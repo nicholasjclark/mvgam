@@ -73,18 +73,22 @@ plot_mvgam_series(data = dat$data_train,
                  series = 1)
 
 # Fit an appropriate model
-mod_ar2 <- mvgam(y ~ s(season, bs = 'cc'),
+mod_ar2 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
                trend_model = AR(p = 2),
                family = poisson(),
                data = dat$data_train,
-               newdata = dat$data_test)
+               newdata = dat$data_test,
+               burnin = 300,
+               samples = 300)
 
 # Fit a less appropriate model
-mod_rw <- mvgam(y ~ s(season, bs = 'cc'),
+mod_rw <- mvgam(y ~ s(season, bs = 'cc', k = 6),
               trend_model = RW(),
               family = poisson(),
               data = dat$data_train,
-              newdata = dat$data_test)
+              newdata = dat$data_test,
+              burnin = 300,
+              samples = 300)
 
 # Compare Discrete Ranked Probability Scores for the testing period
 fc_ar2 <- forecast(mod_ar2)

@@ -71,7 +71,9 @@ simdat <- sim_mvgam(seasonality = 'hierarchical')
 mod <- mvgam(y ~ series +
               s(season, bs = 'cc', k = 6) +
               s(season, series, bs = 'sz', k = 4),
-            data = simdat$data_train)
+            data = simdat$data_train,
+            burnin = 300,
+            samples = 300)
 
 # Use pp_check(mod, type = "xyz") for a list of available plot types
 

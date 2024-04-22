@@ -83,27 +83,30 @@ simdat <- sim_mvgam(family = poisson(),
                     seasonality = 'hierarchical')
 
 # Fit a model
-mod <- mvgam(y ~ s(season, by = series) + year:series,
+mod <- mvgam(y ~ s(season, by = series, k = 5) + year:series,
              family = poisson(),
-             data = simdat$data_train)
+             data = simdat$data_train,
+             burnin = 300,
+             samples = 300)
 
 # Plot all main effects on the response scale
-plot(conditional_effects(mod), ask = FALSE)
+conditional_effects(mod)
 
 # Change the prediction interval to 70\% using plot_predictions() argument
 # 'conf_level'
-plot(conditional_effects(mod, conf_level = 0.7), ask = FALSE)
+conditional_effects(mod, conf_level = 0.7)
 
 # Plot all main effects on the link scale
-plot(conditional_effects(mod, type = 'link'), ask = FALSE)
+conditional_effects(mod, type = 'link')
 
-# Works the same for smooth terms
+# Works the same for smooth terms, including smooth interactions
 set.seed(0)
 dat <- mgcv::gamSim(1, n = 200, scale = 2)
-dat$time <- 1:NROW(dat)
-mod <- mvgam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
+mod <- mvgam(y ~ te(x0, x1, k = 5) + s(x2, k = 6) + s(x3, k = 6),
             data = dat,
-            family = gaussian())
+            family = gaussian(),
+            burnin = 300,
+            samples = 300)
 conditional_effects(mod)
 conditional_effects(mod, conf_level = 0.5, type = 'link')
 }

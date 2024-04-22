@@ -40,7 +40,9 @@ organized into a convenient format
 simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
 mod <- mvgam(y ~ s(season, bs = 'cc'),
             trend_model = AR(),
-            data = simdat$data_train)
+            data = simdat$data_train,
+            burnin = 300,
+            samples = 300)
 
 # Hindcasts on response scale
 hc <- hindcast(mod)

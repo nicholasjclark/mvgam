@@ -84,15 +84,21 @@ a broader range of posterior checks that are created using "new data" prediction
 # Simulate some smooth effects and fit a model
 set.seed(0)
 dat <- mgcv::gamSim(1, n = 200, scale = 2)
-dat$time <- 1:NROW(dat)
 mod <- mvgam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
             data = dat,
-            family = gaussian())
+            family = gaussian(),
+            burnin = 300,
+            samples = 300)
 
 # Posterior checks
 ppc(mod, type = 'hist')
 ppc(mod, type = 'density')
 ppc(mod, type = 'cdf')
+
+# Many more options are available with pp_check()
+pp_check(mod)
+pp_check(mod, type = "ecdf_overlay")
+pp_check(mod, type = 'freqpoly')
 }
 }
 \seealso{
