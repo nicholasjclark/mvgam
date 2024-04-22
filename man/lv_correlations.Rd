@@ -10,9 +10,22 @@ lv_correlations(object)
 \item{object}{\code{list} object returned from \code{mvgam}}
 }
 \value{
-A \code{list} object containing the mean posterior correlations and the full array of posterior correlations
+A \code{list} object containing the mean posterior correlations
+and the full array of posterior correlations
 }
 \description{
 This function uses samples of latent trends for each series from a fitted
 mvgam model to calculates correlations among series' trends
+}
+\examples{
+\donttest{
+simdat <- sim_mvgam()
+mod <- mvgam(y ~ s(season, bs = 'cc',
+                  k = 6),
+            trend_model = AR(),
+            data = simdat$data_train)
+lvcors <- lv_correlations(mod)
+names(lvcors)
+lapply(lvcors, class)
+}
 }

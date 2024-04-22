@@ -12,7 +12,8 @@ plot_mvgam_factors(object, plot = TRUE)
 \item{plot}{\code{logical} specifying whether factors should be plotted}
 }
 \value{
-A \code{dataframe} of factor contributions and, optionally, a series of base \code{R} plots
+A \code{dataframe} of factor contributions and,
+optionally, a series of base \code{R} plots
 }
 \description{
 This function takes a fitted \code{mvgam} object and returns plots and summary statistics for
@@ -26,6 +27,16 @@ that factor from the model). In this function, each factor is tested against a n
 calculating the sum of the factor's 2nd derivatives. A factor that has a larger contribution will have a larger
 sum due to the weaker penalty on the factor's precision. If
 \code{plot == TRUE}, the factors are also plotted.
+}
+\examples{
+\donttest{
+simdat <- sim_mvgam()
+mod <- mvgam(y ~ s(season, bs = 'cc',
+                  k = 6),
+            trend_model = AR(),
+            data = simdat$data_train)
+plot_mvgam_factors(mod)
+}
 }
 \author{
 Nicholas J Clark

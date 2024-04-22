@@ -180,13 +180,18 @@ mvgam_example4 <- mvgam(y ~ series,
                         samples = 30,
                         chains = 1)
 
-# GP dynamic factors
+# GP dynamic factors (use list format to ensure it works in tests)
+list_data <- list()
+for(i in 1:NCOL(mvgam_examp_dat$data_train)){
+  list_data[[i]] <- mvgam_examp_dat$data_train[ , i]
+}
+names(list_data) <- colnames(mvgam_examp_dat$data_train)
 mvgam_example5 <- mvgam(y ~ series + s(season, k = 5),
                         trend_model = GP(),
                         family = gaussian(),
                         use_lv = TRUE,
                         n_lv = 2,
-                        data = mvgam_examp_dat$data_train,
+                        data = list_data,
                         burnin = 300,
                         samples = 30,
                         chains = 1)

@@ -1,6 +1,6 @@
 context("Tests for family functions")
 
-test_that("student distribution works correctly", {
+test_that("distributions work correctly", {
   fam <- tweedie()
   expect_true(inherits(fam, 'family'))
   expect_true(inherits(fam, 'extended.family'))

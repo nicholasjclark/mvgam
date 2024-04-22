@@ -211,8 +211,61 @@ test_that("share_obs_params working", {
                         gsub(' ', '', mod$model_file), fixed = TRUE)))
 
 
-  # Standard Gamma
+  # Standard student
+  mod <- mvgam(y ~ s(season, by = series),
+               trend_model = RW(cor = TRUE),
+               family = student_t(),
+               data = gaus_data$data_train,
+               share_obs_params = TRUE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('real<lower=0>sigma_obs;',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('sigma_obs_vec[1:n,s]=rep_vector(sigma_obs,n);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+
+  # State-space student
+  mod <- mvgam(y ~ -1,
+               trend_formula = ~ s(season, by = trend),
+               trend_model = RW(cor = TRUE),
+               family = student_t(),
+               data = gaus_data$data_train,
+               share_obs_params = TRUE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('real<lower=0>sigma_obs;',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('sigma_obs_vec[1:n,s]=rep_vector(sigma_obs,n);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+
+  # Standard lognormal
   simdat <- sim_mvgam(family = Gamma())
+  mod <- mvgam(y ~ s(season, by = series),
+               trend_model = RW(cor = TRUE),
+               family = lognormal(),
+               data = simdat$data_train,
+               share_obs_params = TRUE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('real<lower=0>sigma_obs;',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('sigma_obs_vec[1:n,s]=rep_vector(sigma_obs,n);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+
+  # State-space lognormal
+  mod <- mvgam(y ~ -1,
+               trend_formula = ~ s(season, by = trend),
+               trend_model = RW(cor = TRUE),
+               family = lognormal(),
+               data = simdat$data_train,
+               share_obs_params = TRUE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('real<lower=0>sigma_obs;',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('sigma_obs_vec[1:n,s]=rep_vector(sigma_obs,n);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  # Standard Gamma
   mod <- mvgam(y ~ s(season, by = series),
                trend_model = RW(cor = TRUE),
                family = Gamma(),

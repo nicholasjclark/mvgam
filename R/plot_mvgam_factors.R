@@ -43,10 +43,10 @@ plot_mvgam_factors = function(object, plot = TRUE){
   starts <- ends + 1
   starts <- c(1, starts[-c(1, object$n_lv + 1)])
   ends <- ends[-1]
+  probs <- c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
 
   # Set up plot environment
   if(plot){
-    probs = c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
     c_light <- c("#DCBCBC")
     c_light_highlight <- c("#C79999")
     c_mid <- c("#B97C7C")

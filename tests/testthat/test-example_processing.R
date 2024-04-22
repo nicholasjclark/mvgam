@@ -178,6 +178,15 @@ test_that("plot_mvgam... functions work properly", {
                                     smooth = 1,
                                     derivatives = TRUE,
                                     trend_effects = TRUE))
+  expect_no_error(plot_mvgam_smooth(mvgam:::mvgam_example4,
+                                    derivatives = TRUE,
+                                    residuals = TRUE,
+                                    trend_effects = TRUE))
+  expect_no_error(plot_mvgam_smooth(mvgam:::mvgam_example5,
+                                    realisations = TRUE))
+  expect_no_error(plot_mvgam_smooth(mvgam:::mvgam_example5,
+                                    realisations = TRUE,
+                                    newdata = mvgam:::mvgam_examp_dat$data_test))
   expect_message(plot(mvgam:::mvgam_example3, type = 'pterms'),
                  'No parametric terms in model formula')
   expect_message(plot(mvgam:::mvgam_example1, type = 're'))
@@ -188,6 +197,26 @@ test_that("plot_mvgam... functions work properly", {
   expect_no_error(plot_mvgam_series(object = mvgam:::mvgam_example4))
 })
 
+test_that("summaries all work", {
+  expect_no_error(summary(mvgam:::mvgam_example1))
+  expect_no_error(summary(mvgam:::mvgam_example2))
+  expect_no_error(summary(mvgam:::mvgam_example3))
+  expect_no_error(summary(mvgam:::mvgam_example4))
+  expect_no_error(summary(mvgam:::mvgam_example5))
+
+  expect_no_error(variables(mvgam:::mvgam_example1))
+  expect_no_error(variables(mvgam:::mvgam_example2))
+  expect_no_error(variables(mvgam:::mvgam_example3))
+  expect_no_error(variables(mvgam:::mvgam_example4))
+  expect_no_error(variables(mvgam:::mvgam_example5))
+
+  expect_no_error(mvgam:::mvgam_example1)
+  expect_no_error(mvgam:::mvgam_example2)
+  expect_no_error(mvgam:::mvgam_example3)
+  expect_no_error(mvgam:::mvgam_example4)
+  expect_no_error(mvgam:::mvgam_example5)
+})
+
 test_that("dynamic factor investigations work", {
   lvcors <- lv_correlations(mvgam:::mvgam_example5)
   expect_true(inherits(lvcors, 'list'))
@@ -195,6 +224,11 @@ test_that("dynamic factor investigations work", {
                         c(nlevels(mvgam:::mvgam_example5$obs_data$series),
                           nlevels(mvgam:::mvgam_example5$obs_data$series))))
   expect_true(mvgam:::mvgam_example5$use_lv)
+  expect_no_error(plot_mvgam_factors(mvgam:::mvgam_example4))
+  expect_no_error(plot_mvgam_factors(mvgam:::mvgam_example5))
+  facconts <- plot_mvgam_factors(mvgam:::mvgam_example4,
+                                 plot = FALSE)
+  expect_true(inherits(facconts, 'data.frame'))
 })
 
 # Skip forecast and loo testing as they are a bit time-consuming
@@ -235,6 +269,21 @@ test_that("evaluate() functions working", {
                                  n_samples = 100,
                                  n_evaluations = 2,
                                  n_cores = 1))
+})
+
+test_that("lfo_cv() working", {
+  skip_on_cran()
+  lfs <- lfo_cv(mvgam:::mvgam_example1,
+                min_t = 27,
+                fc_horizon = 1)
+  expect_true(inherits(lfs, 'mvgam_lfo'))
+  expect_no_error(plot(lfs))
+
+  lfs <- lfo_cv(mvgam:::mvgam_example5,
+                min_t = 27,
+                fc_horizon = 1)
+  expect_true(inherits(lfs, 'mvgam_lfo'))
+  expect_no_error(plot(lfs))
 })
 
 test_that("forecast() works correctly", {

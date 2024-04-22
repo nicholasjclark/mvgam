@@ -10,6 +10,23 @@ test_that("add_residuals working properly", {
   }))))
 })
 
+test_that("mcmc diagnostics working properly", {
+  expect_true(inherits(nuts_params(mvgam:::mvgam_example1),
+                       'data.frame'))
+  expect_true(inherits(nuts_params(mvgam:::mvgam_example5),
+                       'data.frame'))
+
+  expect_true(inherits(rhat(mvgam:::mvgam_example1),
+                       'numeric'))
+  expect_true(inherits(rhat(mvgam:::mvgam_example4),
+                       'numeric'))
+
+  expect_true(inherits(SW(neff_ratio(mvgam:::mvgam_example1)),
+                       'numeric'))
+  expect_true(inherits(SW(neff_ratio(mvgam:::mvgam_example4)),
+                       'numeric'))
+})
+
 test_that("compute_edf working properly", {
   mod <- mvgam:::mvgam_example1
   expect_no_error(mvgam:::compute_edf(mod$mgcv_model,

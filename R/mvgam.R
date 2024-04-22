@@ -1070,9 +1070,9 @@ mvgam = function(formula,
 
     # Add a time variable
     if(inherits(data_train, 'list')){
-      temp_dat_train <- data.frame(time = data_train$index..time..index,
+      temp_dat_train <- data.frame(index..time..index = data_train$index..time..index,
                                    series = data_train$series)
-      temp_dat_test <- data.frame(time = data_test$index..time..index,
+      temp_dat_test <- data.frame(index..time..index = data_test$index..time..index,
                                   series = data_test$series)
 
       X$index..time..index <- rbind(temp_dat_train, temp_dat_test) %>%
@@ -1122,7 +1122,7 @@ mvgam = function(formula,
     }
 
     if(inherits(data_train, 'list')){
-      temp_dat <- data.frame(time = data_train$index..time..index)
+      temp_dat <- data.frame(index..time..index = data_train$index..time..index)
       X$index..time..index <- temp_dat %>%
         dplyr::left_join(temp_dat %>%
                            dplyr::select(index..time..index) %>%
