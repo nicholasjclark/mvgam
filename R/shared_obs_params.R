@@ -92,6 +92,13 @@ shared_obs_params = function(model_file, family){
                     fixed = TRUE)] <-
       "(1 - inv_logit(flat_xs * b)) .* phi);"
 
+    model_file[grep("inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0)) .* flat_phis," , model_file,
+                    fixed = TRUE)] <-
+      "inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0)) .* phi,"
+    model_file[grep("(1 - inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0))) .* flat_phis);" , model_file,
+                    fixed = TRUE)] <-
+      "(1 - inv_logit(append_col(flat_xs, flat_trends) * append_row(b, 1.0))) .* phi);"
+
     model_file[grep("phi_vec[1:n,s] = rep_vector(phi[s], n);"  , model_file,
                     fixed = TRUE)] <-
       "phi_vec[1:n,s] = rep_vector(phi, n);"
@@ -110,6 +117,10 @@ shared_obs_params = function(model_file, family){
     model_file[grep("flat_shapes, flat_shapes ./ exp(flat_xs * b));" , model_file,
                     fixed = TRUE)] <-
       "shape, shape ./ exp(flat_xs * b));"
+
+    model_file[grep("flat_shapes, flat_shapes ./ exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)));" , model_file,
+                    fixed = TRUE)] <-
+      "shape, shape ./ exp(append_col(flat_xs, flat_trends) * append_row(b, 1.0)));"
 
     model_file[grep("shape_vec[1:n,s] = rep_vector(shape[s], n);", model_file,
                     fixed = TRUE)] <-

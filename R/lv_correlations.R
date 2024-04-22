@@ -5,7 +5,19 @@
 #'
 #'@importFrom stats cov2cor cov
 #'@param object \code{list} object returned from \code{mvgam}
-#'@return A \code{list} object containing the mean posterior correlations and the full array of posterior correlations
+#'@return A \code{list} object containing the mean posterior correlations
+#'and the full array of posterior correlations
+#'@examples
+#'\donttest{
+#'simdat <- sim_mvgam()
+#'mod <- mvgam(y ~ s(season, bs = 'cc',
+#'                   k = 6),
+#'             trend_model = AR(),
+#'             data = simdat$data_train)
+#'lvcors <- lv_correlations(mod)
+#'names(lvcors)
+#'lapply(lvcors, class)
+#'}
 #'@export
 lv_correlations = function(object){
 

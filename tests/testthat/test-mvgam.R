@@ -155,6 +155,91 @@ test_that("series levels must match unique entries in series", {
                      run_model = FALSE))
 })
 
+test_that("share_obs_params working", {
+  # Standard beta
+  mod <- mvgam(y ~ s(season, by = series),
+               trend_model = RW(cor = TRUE),
+               family = betar(),
+               data = beta_data$data_train,
+               share_obs_params = TRUE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('real<lower=0>phi;',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('phi_vec[1:n,s]=rep_vector(phi,n);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+
+  # State-space beta
+  mod <- mvgam(y ~ -1,
+               trend_formula = ~ s(season, by = trend),
+               trend_model = RW(cor = TRUE),
+               family = betar(),
+               data = beta_data$data_train,
+               share_obs_params = TRUE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('real<lower=0>phi;',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('phi_vec[1:n,s]=rep_vector(phi,n);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+
+  # Standard gaussian
+  mod <- mvgam(y ~ s(season, by = series),
+               trend_model = RW(cor = TRUE),
+               family = gaussian(),
+               data = gaus_data$data_train,
+               share_obs_params = TRUE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('real<lower=0>sigma_obs;',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('sigma_obs_vec[1:n,s]=rep_vector(sigma_obs,n);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+
+  # State-space gaussian
+  mod <- mvgam(y ~ -1,
+               trend_formula = ~ s(season, by = trend),
+               trend_model = RW(cor = TRUE),
+               family = gaussian(),
+               data = gaus_data$data_train,
+               share_obs_params = TRUE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('real<lower=0>sigma_obs;',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('sigma_obs_vec[1:n,s]=rep_vector(sigma_obs,n);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+
+
+  # Standard Gamma
+  simdat <- sim_mvgam(family = Gamma())
+  mod <- mvgam(y ~ s(season, by = series),
+               trend_model = RW(cor = TRUE),
+               family = Gamma(),
+               data = simdat$data_train,
+               share_obs_params = TRUE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('real<lower=0>shape;',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('shape_vec[1:n,s]=rep_vector(shape,n);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+
+  # State-space Gamma
+  mod <- mvgam(y ~ -1,
+               trend_formula = ~ s(season, by = trend),
+               trend_model = RW(cor = TRUE),
+               family = Gamma(),
+               data = simdat$data_train,
+               share_obs_params = TRUE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('real<lower=0>shape;',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('shape_vec[1:n,s]=rep_vector(shape,n);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+})
+
 test_that("trend_map is behaving propoerly", {
   sim <- sim_mvgam(n_series = 3)
   mod_data <- sim$data_train

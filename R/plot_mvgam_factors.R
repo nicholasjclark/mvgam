@@ -13,7 +13,17 @@
 #'calculating the sum of the factor's 2nd derivatives. A factor that has a larger contribution will have a larger
 #'sum due to the weaker penalty on the factor's precision. If
 #'\code{plot == TRUE}, the factors are also plotted.
-#'@return A \code{dataframe} of factor contributions and, optionally, a series of base \code{R} plots
+#'@return A \code{dataframe} of factor contributions and,
+#'optionally, a series of base \code{R} plots
+#'@examples
+#'\donttest{
+#'simdat <- sim_mvgam()
+#'mod <- mvgam(y ~ s(season, bs = 'cc',
+#'                   k = 6),
+#'             trend_model = AR(),
+#'             data = simdat$data_train)
+#'plot_mvgam_factors(mod)
+#'}
 #'@export
 plot_mvgam_factors = function(object, plot = TRUE){
 

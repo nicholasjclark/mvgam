@@ -55,8 +55,8 @@
 #'                V = Sigma)
 #'}
 #'
-#'beta <- sim_gp(alpha_gp = 0.75,
-#'               rho_gp = 10,
+#'beta <- sim_gp(alpha = 0.75,
+#'               rho = 10,
 #'               c = 0.5,
 #'               N = N)
 #'plot(beta, type = 'l', lwd = 3,
