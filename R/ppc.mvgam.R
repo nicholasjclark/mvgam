@@ -788,7 +788,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
 #'simdat <- sim_mvgam(seasonality = 'hierarchical')
 #'mod <- mvgam(y ~ series +
 #'               s(season, bs = 'cc', k = 6) +
-#'               s(season, series, bs = 'sz', k = 4),
+#'               s(season, series, bs = 'fs', k = 4),
 #'             data = simdat$data_train,
 #'             burnin = 300,
 #'             samples = 300)
