@@ -322,7 +322,7 @@
 #'mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
 #'              data = dat$data_train,
 #'              trend_model = RW(),
-#'              family = poison(),
+#'              family = poisson(),
 #'              use_stan = TRUE,
 #'              run_model = FALSE)
 #'

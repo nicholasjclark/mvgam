@@ -172,10 +172,10 @@ hindcast.mvgam = function(object,
   names(series_hcs) <- levels(data_train$series)
 
   series_obs <- lapply(seq_len(n_series), function(series){
-    s_name <- levels(object$obs_data$series)[series]
-    data.frame(series = object$obs_data$series,
-               time = object$obs_data$index..time..index,
-               y = object$obs_data$y) %>%
+    s_name <- levels(data_train$series)[series]
+    data.frame(series = data_train$series,
+               time = data_train$index..time..index,
+               y = data_train$y) %>%
       dplyr::filter(series == s_name) %>%
       dplyr::arrange(time) %>%
       dplyr::pull(y)

@@ -202,7 +202,9 @@ forecast.mvgam = function(object,
     names(series_fcs) <- levels(data_test$series)
 
     # Extract hindcasts
-    data_train <- object$obs_data
+    data_train <- validate_series_time(object$obs_data,
+                                       trend_model = attr(object$model_data,
+                                                          'trend_model'))
     ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
                 length.out = NCOL(object$ytimes) + 1)
     starts <- ends + 1
