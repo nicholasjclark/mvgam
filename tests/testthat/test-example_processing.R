@@ -85,6 +85,18 @@ test_that("predict() works correctly", {
                dim(predict(mvgam:::mvgam_example2, type = 'expected',
                            process_error = FALSE)))
 
+  expect_equal(dim(posterior_linpred(mvgam:::mvgam_example1, type = 'expected',
+                           process_error = FALSE)),
+               dim(posterior_linpred(mvgam:::mvgam_example2, type = 'expected',
+                           process_error = FALSE)))
+
+  expect_equal(dim(posterior_linpred(mvgam:::mvgam_example1, type = 'expected',
+                                     process_error = FALSE,
+                                     ndraws = 33)),
+               dim(posterior_linpred(mvgam:::mvgam_example2, type = 'expected',
+                                     process_error = FALSE,
+                                     ndraws = 33)))
+
   expect_equal(dim(predict(mvgam:::mvgam_example3, type = 'expected',
                            process_error = FALSE)),
                dim(predict(mvgam:::mvgam_example4, type = 'expected',
@@ -207,6 +219,14 @@ test_that("plot_mvgam... functions work properly", {
   expect_no_error(plot(mvgam:::mvgam_example5, type = 'factors'))
   expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example1))
   expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example4))
+  expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example4,
+                                   derivatives = TRUE))
+  expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example1,
+                                   realisations = TRUE))
+  expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example5,
+                                   derivatives = TRUE))
+  expect_no_error(plot_mvgam_trend(mvgam:::mvgam_example5,
+                                   realisations = TRUE))
   expect_no_error(plot_mvgam_series(object = mvgam:::mvgam_example4))
 })
 
@@ -316,6 +336,9 @@ test_that("forecast() works correctly", {
                         c(levels(mvgam:::mvgam_examp_dat$data_test$series),
                           'all_series')))
   expect_error(score(fc, score = 'elpd'))
+  expect_no_error(score(fc, score = 'energy'))
+  expect_no_error(score(fc, score = 'variogram'))
+  expect_no_error(score(fc, score = 'sis'))
 
   fc <- forecast(mvgam:::mvgam_example1,
                  newdata = mvgam:::mvgam_examp_dat$data_test,
