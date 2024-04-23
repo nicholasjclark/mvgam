@@ -24,6 +24,27 @@ test_that("variable extraction works correctly", {
   expect_true(inherits(as.matrix(mvgam:::mvgam_example5,
                                  'rho_gp', regex = TRUE),
                        'matrix'))
+  expect_true(inherits(as_draws(mvgam:::mvgam_example5,
+                                 'rho_gp', regex = TRUE),
+                       'draws'))
+  expect_true(inherits(as_draws(mvgam:::mvgam_example1,
+                                'obs_params', regex = TRUE),
+                       'draws'))
+  expect_true(inherits(as_draws_df(mvgam:::mvgam_example1,
+                                'obs_params', regex = TRUE),
+                       'draws'))
+  expect_true(inherits(as_draws_matrix(mvgam:::mvgam_example4,
+                                   'obs_params'),
+                       'draws'))
+  expect_true(inherits(as_draws_matrix(mvgam:::mvgam_example4,
+                                       'trend_params'),
+                       'draws'))
+  expect_true(inherits(as_draws_list(mvgam:::mvgam_example4,
+                                       'betas'),
+                       'draws'))
+  expect_true(inherits(as_draws_rvars(mvgam:::mvgam_example4,
+                                     'trend_betas'),
+                       'draws'))
 })
 
 test_that("hindcast() works correctly", {
@@ -354,6 +375,10 @@ test_that("forecast() works correctly", {
                  newdata = mvgam:::mvgam_examp_dat$data_test)
   expect_true(inherits(fc$hindcasts, 'list'))
   expect_true(inherits(fc$forecasts, 'list'))
+  expect_no_error(plot(fc))
+  expect_no_error(plot(fc, hide_xlabels = TRUE))
+  expect_no_error(plot(fc, ylab = 'banana'))
+  expect_no_error(plot(fc, realisations = TRUE))
   expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
                  NCOL(mvgam:::mvgam_example4$ytimes),
                NCOL(fc$forecasts$series_1),
@@ -364,6 +389,9 @@ test_that("forecast() works correctly", {
                  type = 'expected')
   expect_true(inherits(fc$hindcasts, 'list'))
   expect_true(inherits(fc$forecasts, 'list'))
+  expect_no_error(plot(fc, hide_xlabels = TRUE))
+  expect_no_error(plot(fc, ylab = 'banana'))
+  expect_no_error(plot(fc, realisations = TRUE))
   expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
                  NCOL(mvgam:::mvgam_example4$ytimes),
                NCOL(fc$forecasts$series_1),
@@ -374,6 +402,9 @@ test_that("forecast() works correctly", {
                  type = 'expected')
   expect_true(inherits(fc$hindcasts, 'list'))
   expect_true(inherits(fc$forecasts, 'list'))
+  expect_no_error(plot(fc, hide_xlabels = TRUE))
+  expect_no_error(plot(fc, ylab = 'banana'))
+  expect_no_error(plot(fc, realisations = TRUE))
   expect_equal(NROW(mvgam:::mvgam_examp_dat$data_test) /
                  NCOL(mvgam:::mvgam_example5$ytimes),
                NCOL(fc$forecasts$series_1),

@@ -112,8 +112,14 @@ test_that("binomial() post-processing works", {
                        newdata = dat_test))
   expect_no_error(plot(mod, type = 'trend'))
   expect_no_error(plot(mod, type = 'trend',
+                       realisations = TRUE))
+  expect_no_error(plot(mod, type = 'trend',
                        newdata = dat_test))
   expect_true(inherits(hindcast(mod), 'mvgam_forecast'))
+  fc <- forecast(mod, newdata = dat_test)
+  expect_true(inherits(fc, 'mvgam_forecast'))
+  expect_no_error(plot(fc))
+  expect_no_error(plot(fc, realisations = TRUE))
 
   expect_no_error(SW(plot(mod, type = 'smooths', trend_effects = TRUE)))
   expect_no_error(plot(mod, type = 'smooths',
