@@ -764,6 +764,12 @@ forecast_draws = function(object,
       resp_terms <- as.character(terms(formula(object$call))[[2]])
       resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
       trial_name <- resp_terms[2]
+
+      if(!exists(trial_name, data_test)){
+        stop(paste0('Variable ', trial_name, ' not found in newdata'),
+             call. = FALSE)
+      }
+
       trial_df <- data.frame(series = data_test$series,
                              time = data_test$index..time..index,
                              trial = data_test[[trial_name]])

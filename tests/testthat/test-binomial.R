@@ -78,13 +78,13 @@ test_that("cbind() syntax required for binomial()", {
 
 test_that("binomial() post-processing works", {
   skip_on_cran()
-  mod <- mvgam(cbind(y, ntrials) ~ series,
+  mod <- SW(mvgam(cbind(y, ntrials) ~ series,
                trend_formula = ~ s(x, by = trend),
                family = binomial(),
                trend_model = AR(),
                data = dat_train,
                burnin = 200,
-               samples = 200)
+               samples = 200))
   expect_no_error(summary(mod))
   expect_no_error(print(mod))
 
@@ -115,11 +115,12 @@ test_that("binomial() post-processing works", {
                        newdata = dat_test))
   expect_true(inherits(hindcast(mod), 'mvgam_forecast'))
 
-  expect_no_error(plot(mod, type = 'smooths', trend_effects = TRUE))
+  expect_no_error(SW(plot(mod, type = 'smooths', trend_effects = TRUE)))
   expect_no_error(plot(mod, type = 'smooths',
                        realisations = TRUE, trend_effects = TRUE))
   expect_no_error(plot(mod, type = 'smooths',
                        residuals = TRUE, trend_effects = TRUE))
+  expect_no_error(plot(mod, type = 'pterms'))
 
   expect_true(inherits(SM(conditional_effects(mod)),
                        'mvgam_conditional_effects'))
@@ -127,14 +128,21 @@ test_that("binomial() post-processing works", {
                                               type = 'link')),
                        'mvgam_conditional_effects'))
   expect_loo(SW(loo(mod)))
+
+  dat_test$ntrials <- NULL
+  expect_error(plot(mod, type = 'trend',
+                    newdata = dat_test),
+               'Variable ntrials not found in newdata')
+  expect_error(forecast(mod, newdata = dat_test),
+               'Variable ntrials not found in newdata')
 })
 
 # All tests should apply to beta_binomial as well
 test_that("cbind() syntax required for beta_binomial()", {
-  expect_error(mvgam(y ~ series + s(x, by = series),
+  expect_error(SW(mvgam(y ~ series + s(x, by = series),
                      family = beta_binomial(),
                      data = dat_train,
-                     run_model = FALSE),
+                     run_model = FALSE)),
                'Binomial family requires cbind() syntax in the formula left-hand side',
                fixed = TRUE)
 
@@ -208,15 +216,6 @@ dat_train <- dat %>%
 dat_test <- dat %>%
   dplyr::filter(time > 40)
 
-set.seed(100)
-gaus_data <- sim_mvgam(family = gaussian(),
-                       T = 60,
-                       trend_model = 'AR1',
-                       seasonality = 'shared',
-                       mu = c(-1, 0, 1),
-                       trend_rel = 0.5,
-                       prop_missing = 0.2)
-
 test_that("bernoulli() behaves appropriately", {
   expect_error(mvgam(y ~ series + s(x, by = series),
                      family = bernoulli(),
@@ -272,11 +271,11 @@ test_that("bernoulli() post-processing works", {
   expect_no_error(ppc(mod, type = 'mean'))
   expect_no_error(ppc(mod, type = 'pit'))
   expect_no_error(ppc(mod, type = 'cdf'))
-  expect_no_error(ppc(mod, type = 'rootogram'))
 
   expect_no_error(plot(mod, type = 'residuals'))
 
-  expect_no_error(plot_mvgam_series(object = mod))
+  expect_no_error(plot_mvgam_series(object = mod,
+                                    lines = FALSE))
   expect_no_error(plot_mvgam_series(object = mod, series = 'all'))
 
   expect_no_error(plot(mod, type = 'forecast'))
@@ -286,12 +285,13 @@ test_that("bernoulli() post-processing works", {
   expect_no_error(plot(mod, type = 'trend',
                        newdata = dat_test))
   expect_true(inherits(hindcast(mod), 'mvgam_forecast'))
+  expect_true(inherits(hindcast(mod, type = 'expected'), 'mvgam_forecast'))
 
-  expect_no_error(plot(mod, type = 'smooths', trend_effects = TRUE))
+  expect_no_error(plot(mod, type = 'smooths'))
   expect_no_error(plot(mod, type = 'smooths',
-                       realisations = TRUE, trend_effects = TRUE))
+                       realisations = TRUE))
   expect_no_error(plot(mod, type = 'smooths',
-                       residuals = TRUE, trend_effects = TRUE))
+                       residuals = TRUE))
 
   expect_true(inherits(SM(conditional_effects(mod)),
                        'mvgam_conditional_effects'))

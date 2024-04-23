@@ -131,14 +131,27 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
 
     # Ensure outcome is labelled 'y' when feeding data to the model for simplicity
     if(terms(formula(object$call))[[2]] != 'y'){
-      data_test$y <- data_test[[terms(formula(object$call))[[2]]]]
+      if(object$family %in% c('binomial', 'beta_binomial')){
+        resp_terms <- as.character(terms(formula(object$call))[[2]])
+        resp_terms <- resp_terms[-grepl('cbind', resp_terms)]
+        trial_name <- resp_terms[2]
+        data_test$y <- data_test[[resp_terms[1]]]
+
+        if(!exists(trial_name, data_test)){
+          stop(paste0('Variable ', trial_name, ' not found in newdata'),
+               call. = FALSE)
+        }
+      } else {
+        data_test$y <- data_test[[terms(formula(object$call))[[2]]]]
+      }
+
     }
 
     if(!'y' %in% names(data_test)){
       data_test$y <- rep(NA, NROW(data_test))
     }
 
-    if(class(data_test)[1] == 'list'){
+    if(inherits(data_test, 'list')){
       if(!'time' %in% names(data_test)){
         stop('data_test does not contain a "time" column')
       }
@@ -160,7 +173,7 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
   # If the posterior predictions do not already cover the data_test period, the forecast needs to be
   # generated using the latent trend dynamics; note, this assumes that there is no gap between the training and
   # testing datasets
-    if(class(data_train)[1] == 'list'){
+    if(inherits(data_test, 'list')){
       all_obs <- c(data.frame(y = data_train$y,
                               series = data_train$series,
                               time = data_train$time) %>%
