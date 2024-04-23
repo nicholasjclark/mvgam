@@ -36,7 +36,8 @@ remove_likelihood = function(model_file){
 }
 
 #' @noRd
-.autoformat <- function(stan_file, overwrite_file = TRUE){
+.autoformat <- function(stan_file, overwrite_file = TRUE,
+                        backend = 'cmdstanr'){
 
   # No need to fill lv_coefs in each iteration if this is a
   # trend_formula model
@@ -52,27 +53,6 @@ remove_likelihood = function(model_file){
                    stan_file, fixed = TRUE)] <-
       'trend[i, s] = dot_product(Z[s,], LV[i,]);'
 
-    # if(any(grepl('// derived latent states',
-    #              stan_file, fixed = TRUE))){
-    #   starts <- grep('// derived latent states',
-    #                  stan_file, fixed = TRUE) + 1
-    #   ends <- starts + 4
-    #   stan_file <- stan_file[-c(starts:ends)]
-    #   stan_file[grep('// derived latent states',
-    #                  stan_file, fixed = TRUE)] <-
-    #     paste0('// derived latent states\n',
-    #            "trend = LV * Z';")
-    # } else {
-    #   starts <- grep('// derived latent trends',
-    #                  stan_file, fixed = TRUE) + 1
-    #   ends <- starts + 4
-    #   stan_file <- stan_file[-c(starts:ends)]
-    #   stan_file[grep('// derived latent trends',
-    #                  stan_file, fixed = TRUE)] <-
-    #     paste0('// derived latent trends\n',
-    #            "trend = LV * Z';")
-    # }
-
     stan_file[grep('// posterior predictions',
                    stan_file, fixed = TRUE)-1] <-
       paste0(stan_file[grep('// posterior predictions',
@@ -81,13 +61,43 @@ remove_likelihood = function(model_file){
              'matrix[n_series, n_lv] lv_coefs = Z;')
     stan_file <- readLines(textConnection(stan_file), n = -1)
   }
+
+  if(backend == 'rstan' & rstan::stan_version() < '2.29.0'){
+    # normal_id_glm became available in 2.29.0; this needs to be replaced
+    # with the older non-glm version
+    if(any(grepl('normal_id_glm',
+                 stan_file, fixed = TRUE))){
+      if(any(grepl("flat_ys ~ normal_id_glm(flat_xs,",
+                   stan_file, fixed = TRUE))){
+        start <- grep("flat_ys ~ normal_id_glm(flat_xs,",
+                                stan_file, fixed = TRUE)
+        end <- start + 2
+        stan_file <- stan_file[-c((start + 1):(start + 2))]
+        stan_file[start] <- 'flat_ys ~ normal(flat_xs * b, flat_sigma_obs);'
+      }
+    }
+  }
+
   # Old ways of specifying arrays have been converted to errors in
-  # the latest version of Cmdstan (2.34.0); this coincides with
+  # the latest version of Cmdstan (2.32.0); this coincides with
   # a decision to stop automatically replacing these deprecations with
   # the canonicalizer, so we have no choice but to replace the old
-  # syntax with this ugly bit of code:
-  if(requireNamespace('cmdstanr') & cmdstanr::cmdstan_version() >= "2.33.0"){
+  # syntax with this ugly bit of code
 
+  # rstan dependency in Description should mean that updates should
+  # always happen (mvgam depends on rstan >= 2.29.0)
+  update_code <- TRUE
+
+  # Tougher if using cmdstanr
+  if(backend == 'cmdstanr'){
+    if(cmdstanr::cmdstan_version() < "2.32.0"){
+      # If the autoformat options from cmdstanr are available,
+      # make use of them to update any deprecated array syntax
+      update_code <- FALSE
+    }
+  }
+
+  if(update_code){
     # Data modifications
     stan_file[grep("int<lower=0> ytimes[n, n_series]; // time-ordered matrix (which col in X belongs to each [time, series] observation?)",
                    stan_file, fixed = TRUE)] <-
@@ -426,14 +436,21 @@ remove_likelihood = function(model_file){
     }
   }
 
-  stan_file <- cmdstanr::write_stan_file(stan_file)
-  cmdstan_mod <- cmdstanr::cmdstan_model(stan_file, compile = FALSE)
-  out <- utils::capture.output(
-    cmdstan_mod$format(
-      max_line_length = 80,
-      canonicalize = TRUE,
-      overwrite_file = overwrite_file, backup = FALSE))
-  paste0(out, collapse = "\n")
+  if(backend == 'rstan'){
+    options(stanc.allow_optimizations = TRUE,
+            stanc.auto_format = TRUE)
+    out <- rstan::stanc(model_code = stan_file)$model_code
+  } else {
+    stan_file <- cmdstanr::write_stan_file(stan_file)
+    cmdstan_mod <- cmdstanr::cmdstan_model(stan_file, compile = FALSE)
+    out <- utils::capture.output(
+      cmdstan_mod$format(
+        max_line_length = 80,
+        canonicalize = TRUE,
+        overwrite_file = overwrite_file, backup = FALSE))
+    out <- paste0(out, collapse = "\n")
+  }
+  return(out)
 }
 
 #### Replacement for MCMCvis functions to remove dependence on rstan for working

@@ -23,7 +23,7 @@ Depends:
     insight (>= 0.19.1),
     methods
 Imports: 
-    rstan (>= 2.19.2),
+    rstan (>= 2.29.0),
     posterior (>= 1.0.0),
     loo (>= 2.3.1),
     rstantools (>= 2.1.1),
@@ -46,7 +46,7 @@ LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
 Suggests: 
-    cmdstanr (>= 0.4.0),
+    cmdstanr (>= 0.5.0),
     tweedie,
     splines2,
     extraDistr,

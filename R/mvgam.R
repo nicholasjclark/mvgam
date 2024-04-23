@@ -1674,16 +1674,24 @@ mvgam = function(formula,
 
       # Auto-format the model file
       if(autoformat){
-        if(requireNamespace('cmdstanr') & cmdstanr::cmdstan_version() >= "2.29.0") {
+        if(requireNamespace('cmdstanr') &
+           cmdstanr::cmdstan_version() >= "2.29.0") {
           vectorised$model_file <- .autoformat(vectorised$model_file,
-                                               overwrite_file = FALSE)
+                                               overwrite_file = FALSE,
+                                               backend = 'cmdstanr')
         }
         vectorised$model_file <- readLines(textConnection(vectorised$model_file),
                                            n = -1)
       }
 
       } else {
-
+        if(autoformat){
+          vectorised$model_file <- .autoformat(vectorised$model_file,
+                                               overwrite_file = FALSE,
+                                               backend = 'rstan')
+          vectorised$model_file <- readLines(textConnection(vectorised$model_file),
+                                             n = -1)
+        }
       # Replace new syntax if this is an older version of Stan
       if(rstan::stan_version() < "2.26"){
         warning('Your version of rstan is out of date. Some features of mvgam may not work')
@@ -1842,8 +1850,8 @@ mvgam = function(formula,
       if(use_cmdstan){
         message('Using cmdstanr as the backend')
         message()
-        if(cmdstanr::cmdstan_version() < "2.24.0"){
-          warning('Your version of Cmdstan is < 2.24.0; some mvgam models may not work properly!')
+        if(cmdstanr::cmdstan_version() < "2.26.0"){
+          warning('Your version of Cmdstan is < 2.26.0; some mvgam models may not work properly!')
         }
 
         if(algorithm == 'pathfinder'){
@@ -1995,8 +2003,8 @@ mvgam = function(formula,
         message('Using rstan as the backend')
         message()
 
-        if(rstan::stan_version() < "2.24.0"){
-          warning('Your version of Stan is < 2.24.0; some mvgam models may not work properly!')
+        if(rstan::stan_version() < "2.26.0"){
+          warning('Your version of Stan is < 2.26.0; some mvgam models may not work properly!')
         }
 
         if(algorithm == 'pathfinder'){
