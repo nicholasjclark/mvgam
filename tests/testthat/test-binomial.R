@@ -135,12 +135,25 @@ test_that("binomial() post-processing works", {
                        'mvgam_conditional_effects'))
   expect_loo(SW(loo(mod)))
 
-  dat_test$ntrials <- NULL
+  dat_test2 <- dat_test
+  dat_test2$ntrials <- NULL
   expect_error(plot(mod, type = 'trend',
-                    newdata = dat_test),
+                    newdata = dat_test2),
                'Variable ntrials not found in newdata')
-  expect_error(forecast(mod, newdata = dat_test),
+  expect_error(forecast(mod, newdata = dat_test2),
                'Variable ntrials not found in newdata')
+
+  mod <- SW(mvgam(cbind(y, ntrials) ~ series,
+                  trend_formula = ~ s(x, by = trend),
+                  family = binomial(),
+                  trend_model = AR(),
+                  data = dat_train,
+                  newdata = dat_test,
+                  burnin = 200,
+                  samples = 200))
+  fc <- forecast(mod)
+  expect_true(inherits(fc, 'mvgam_forecast'))
+  expect_no_error(plot_mvgam_uncertainty(mod))
 })
 
 # All tests should apply to beta_binomial as well
