@@ -142,7 +142,6 @@ test_that("prior_only works", {
   mod <- mvgam(y ~ 1,
                trend_formula = ~ s(season) + s(trend, bs = 're'),
                trend_model = AR(cor = TRUE, ma = TRUE),
-               drift = TRUE,
                data = beta_data$data_train,
                prior_simulation = TRUE,
                family = betar(),
