@@ -88,9 +88,8 @@ data.frame(site = 1,
                # add a 'cap' variable that defines the maximum latent N to
                # marginalize over when estimating latent abundance; in other words
                # how large do we realistically think the true abundance could be?
-               cap = 100) \%>\%
+               cap = 80) \%>\%
  dplyr::select(- replicate) -> testdat
-
 
 # Now add another species that has a different temporal trend and a smaller
 # detection probability (0.45 for this species)
@@ -152,12 +151,11 @@ mod <- mvgam(
             # priors can be set in the usual way
             priors = c(prior(std_normal(), class = b),
                        prior(normal(1, 1.5), class = Intercept_trend)),
-            samples = 1000)
+            burnin = 300,
+            samples = 300)
 
 # The usual diagnostics
 summary(mod)
-code(mod)
-loo(mod)
 
 # Plotting conditional effects
 library(ggplot2)

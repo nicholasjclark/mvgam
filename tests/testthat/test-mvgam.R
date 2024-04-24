@@ -4,6 +4,14 @@ context("mvgam")
 test_that("JAGS setups work", {
   simdat <- sim_mvgam()
   mod <- mvgam(y ~ s(season),
+               trend_model = 'RW',
+               data = simdat$data_train,
+               family = poisson(),
+               use_stan = FALSE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+
+  mod <- mvgam(y ~ s(season),
                trend_model = 'AR1',
                data = simdat$data_train,
                family = poisson(),
