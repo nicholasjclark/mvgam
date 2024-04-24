@@ -53,7 +53,7 @@
 #' @export
 loo.mvgam <- function(x, ...) {
   logliks <- logLik(x, include_forecast = FALSE)
-  logliks <- logliks[,!apply(logliks, 2, function(x) all(is.na(x)))]
+  logliks <- logliks[,!apply(logliks, 2, function(x) all(!is.finite(x)))]
 
   releffs <- loo::relative_eff(exp(logliks),
                                chain_id = sort(rep(1:x$model_output@sim$chains,

@@ -83,7 +83,7 @@ test_that("binomial() post-processing works", {
                family = binomial(),
                trend_model = AR(),
                data = dat_train,
-               burnin = 200,
+               burnin = 500,
                samples = 200))
   expect_no_error(summary(mod))
   expect_no_error(code(mod))
