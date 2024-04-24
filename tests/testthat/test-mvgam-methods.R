@@ -6,6 +6,28 @@ test_that("inverse links working", {
   expect_true(is(mvgam:::family_invlinks('beta_binomial'), 'function'))
 })
 
+test_that("series_to_mvgam working", {
+  skip_on_cran()
+  data("sunspots")
+  series <- cbind(sunspots, sunspots)
+  colnames(series) <- c('blood', 'bone')
+  expect_true(inherits(series_to_mvgam(series,
+                                       frequency(series),
+                                       0.85),
+           'list'))
+
+  # An xts object example
+  dates <- seq(as.Date("2001-05-01"), length=30, by="quarter")
+  data  <- cbind(c(gas = rpois(30, cumprod(1+rnorm(30, mean = 0.01, sd = 0.001)))),
+  c(oil = rpois(30, cumprod(1+rnorm(30, mean = 0.01, sd = 0.001)))))
+  series <- xts::xts(x = data, order.by = dates)
+  colnames(series) <- c('gas', 'oil')
+  expect_true(inherits(series_to_mvgam(series,
+                                       freq = 4,
+                                       train_prop = 0.85),
+                       'list'))
+})
+
 test_that("add_residuals working properly", {
   mod <- mvgam:::mvgam_example1
   oldresids <- mod$resids

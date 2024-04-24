@@ -65,6 +65,22 @@ test_that("ma and cor options should work for trends other than VAR", {
 })
 
 test_that("VARMAs are set up correctly", {
+  var <- mvgam(y ~ s(series, bs = 're') +
+                   s(season, bs = 'cc') - 1,
+                 trend_model = VAR(),
+                 data = gaus_data$data_train,
+                 family = gaussian(),
+                 run_model = FALSE)
+  expect_true(inherits(var, 'mvgam_prefit'))
+
+  var <- mvgam(y ~ s(series, bs = 're') +
+                 gp(time, c = 5/4, k = 20) - 1,
+               trend_model = VAR(),
+               data = gaus_data$data_train,
+               family = gaussian(),
+               run_model = FALSE)
+  expect_true(inherits(var, 'mvgam_prefit'))
+
   varma <- mvgam(y ~ s(series, bs = 're') +
                    s(season, bs = 'cc') - 1,
                  trend_model = 'VARMA',
@@ -76,7 +92,7 @@ test_that("VARMAs are set up correctly", {
                         varma$model_file, fixed = TRUE)))
 
   varma <- mvgam(y ~ s(series, bs = 're'),
-                 trend_formula = ~ s(season, bs = 'cc'),
+                 trend_formula = ~ gp(time, by = trend, c = 5/4),
                  trend_model = VAR(ma = TRUE),
                  data = gaus_data$data_train,
                  family = gaussian(),

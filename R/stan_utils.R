@@ -1133,21 +1133,6 @@ mcmc_chains = function(object,
   #for rstanarm/brms objects - set to NULL by default
   sp_names <- NULL
 
-  #if from R2jags::jags.parallel
-  if (methods::is(object, 'rjags.parallel'))
-  {
-    x <- object$BUGSoutput
-    mclist <- vector('list', x$n.chains)
-    mclis <- vector('list', x$n.chains)
-    ord <- dimnames(x$sims.array)[[3]]
-    for (i in 1:x$n.chains)
-    {
-      tmp1 <- x$sims.array[, i, ord]
-      mclis[[i]] <- coda::mcmc(tmp1, thin = x$n.thin)
-    }
-    object <- coda::as.mcmc.list(mclis)
-  }
-
   #if mcmc object (from nimble) - convert to mcmc.list
   if (methods::is(object, 'mcmc'))
   {
@@ -1158,13 +1143,6 @@ mcmc_chains = function(object,
   if (methods::is(object, 'list'))
   {
     object <- coda::mcmc.list(lapply(object, function(x) coda::mcmc(x)))
-  }
-
-  #if from rstanarm::stan_glm
-  if (methods::is(object, 'stanreg'))
-  {
-    object <- object$stanfit
-    sp_names <- object@sim$fnames_oi
   }
 
   if (coda::is.mcmc.list(object) != TRUE &
@@ -1178,25 +1156,6 @@ mcmc_chains = function(object,
       !methods::is(object, 'CmdStanMCMC'))
   {
     stop('Invalid object type. Input must be stanfit object (rstan), CmdStanMCMC object (cmdstanr), stanreg object (rstanarm), brmsfit object (brms), mcmc.list object (coda/rjags), mcmc object (coda/nimble), list object (nimble), rjags object (R2jags), jagsUI object (jagsUI), or matrix with MCMC chains.')
-  }
-
-  #if from brms::brm
-  if (methods::is(object, 'brmsfit'))
-  {
-    #extract stanfit portion of object
-    object <- object$fit
-    #Stan names
-    sp_names_p <- names(object@sim$samples[[1]])
-    #remove b_ and r_
-    st_nm <- substr(sp_names_p, start = 1, stop = 2)
-    sp_names <- rep(NA, length(sp_names_p))
-    b_idx <- which(st_nm == 'b_')
-    r_idx <- which(st_nm == 'r_')
-    ot_idx <- which(st_nm != 'b_' & st_nm != 'r_')
-    #fill names vec with b_ and r_ removed
-    sp_names[b_idx] <- gsub('b_', '', sp_names_p[b_idx])
-    sp_names[r_idx] <- gsub('r_', '', sp_names_p[r_idx])
-    sp_names[ot_idx] <- sp_names_p[ot_idx]
   }
 
   #NAME SORTING BLOCK
@@ -4271,66 +4230,13 @@ check_rhat <- function(fit, quiet=FALSE, fit_summary) {
 #' @param quiet Logical (verbose or not?)
 #' @details Utility function written by Michael Betancourt (https://betanalpha.github.io/)
 #' @noRd
-check_all_diagnostics <- function(fit, quiet=FALSE, max_treedepth = 10) {
+check_all_diagnostics <- function(fit, max_treedepth = 10) {
   sampler_params <- rstan::get_sampler_params(fit, inc_warmup=FALSE)
   fit_summary <- rstan::summary(fit, probs = c(0.5))$summary
-  if (!quiet) {
-    check_n_eff(fit, fit_summary = fit_summary)
-    check_rhat(fit, fit_summary = fit_summary)
-    check_div(fit, sampler_params = sampler_params)
-    check_treedepth(fit, max_depth = max_treedepth,
-                    sampler_params = sampler_params)
-    check_energy(fit, sampler_params = sampler_params)
-  } else {
-    warning_code <- 0
-
-    if (!check_n_eff(fit, quiet=TRUE, fit_summary = fit_summary))
-      warning_code <- bitwOr(warning_code, bitwShiftL(1, 0))
-    if (!check_rhat(fit, quiet=TRUE, fit_summary = fit_summary))
-      warning_code <- bitwOr(warning_code, bitwShiftL(1, 1))
-    if (!check_div(fit, quiet=TRUE, sampler_params = sampler_params))
-      warning_code <- bitwOr(warning_code, bitwShiftL(1, 2))
-    if (!check_treedepth(fit, quiet=TRUE, sampler_params = sampler_params))
-      warning_code <- bitwOr(warning_code, bitwShiftL(1, 3))
-    if (!check_energy(fit, quiet=TRUE, sampler_params = sampler_params))
-      warning_code <- bitwOr(warning_code, bitwShiftL(1, 4))
-
-    return(warning_code)
-  }
-}
-
-#' Parse warnings
-#' @param warning_code Type of warning code to generate
-#' @details Utility function written by Michael Betancourt (https://betanalpha.github.io/)
-#' @noRd
-parse_warning_code <- function(warning_code) {
-  if (bitwAnd(warning_code, bitwShiftL(1, 0)))
-    cat("n_eff / iteration warning")
-  if (bitwAnd(warning_code, bitwShiftL(1, 1)))
-    cat("rhat warning")
-  if (bitwAnd(warning_code, bitwShiftL(1, 2)))
-    cat("divergence warning")
-  if (bitwAnd(warning_code, bitwShiftL(1, 3)))
-    cat("treedepth warning")
-  if (bitwAnd(warning_code, bitwShiftL(1, 4)))
-    cat("energy warning")
-}
-
-#' Return parameter arrays separated into divergent and non-divergent transitions
-#' @param fit A stanfit object
-#' @details Utility function written by Michael Betancourt (https://betanalpha.github.io/)
-#' @noRd
-partition_div <- function(fit) {
-  nom_params <- rstan::extract(fit, permuted=FALSE)
-  n_chains <- dim(nom_params)[2]
-  params <- as.data.frame(do.call(rbind, lapply(1:n_chains, function(n) nom_params[,n,])))
-
-  sampler_params <- rstan::get_sampler_params(fit, inc_warmup=FALSE)
-  divergent <- do.call(rbind, sampler_params)[,'divergent__']
-  params$divergent <- divergent
-
-  div_params <- params[params$divergent == 1,]
-  nondiv_params <- params[params$divergent == 0,]
-
-  return(list(div_params, nondiv_params))
+  check_n_eff(fit, fit_summary = fit_summary)
+  check_rhat(fit, fit_summary = fit_summary)
+  check_div(fit, sampler_params = sampler_params)
+  check_treedepth(fit, max_depth = max_treedepth,
+                  sampler_params = sampler_params)
+  check_energy(fit, sampler_params = sampler_params)
 }

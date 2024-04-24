@@ -14,6 +14,25 @@ test_that("fitted() gives correct dimensions", {
                NROW(fitted(mvgam:::mvgam_example4)))
 })
 
+test_that("residuals() gives correct dimensions", {
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_train),
+               NROW(residuals(mvgam:::mvgam_example1)))
+
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_train),
+               NROW(residuals(mvgam:::mvgam_example2)))
+
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_train),
+               NROW(residuals(mvgam:::mvgam_example3)))
+
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_train),
+               NROW(residuals(mvgam:::mvgam_example4,
+                              robust = TRUE)))
+
+  expect_equal(NROW(mvgam:::mvgam_examp_dat$data_train),
+               NROW(residuals(mvgam:::mvgam_example5,
+                              summary = FALSE)))
+})
+
 test_that("variable extraction works correctly", {
   expect_true(inherits(as.matrix(mvgam:::mvgam_example4,
                                  'A', regex = TRUE),
