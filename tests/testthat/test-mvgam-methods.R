@@ -1,5 +1,11 @@
 context("class methods")
 
+test_that("inverse links working", {
+  expect_true(is(mvgam:::family_invlinks('gaussian'), 'function'))
+  expect_true(is(mvgam:::family_invlinks('Gamma'), 'function'))
+  expect_true(is(mvgam:::family_invlinks('beta_binomial'), 'function'))
+})
+
 test_that("add_residuals working properly", {
   mod <- mvgam:::mvgam_example1
   oldresids <- mod$resids

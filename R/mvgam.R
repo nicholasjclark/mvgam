@@ -699,7 +699,7 @@ mvgam = function(formula,
 
   # Check for brmspriors
   if(!missing(priors)){
-    if(inherits(priors, 'brmsprior') & !lfo){
+    if(inherits(priors, 'brmsprior') & !lfo & use_stan){
       priors <- adapt_brms_priors(priors = priors,
                                   formula = orig_formula,
                                   trend_formula = trend_formula,
@@ -799,24 +799,26 @@ mvgam = function(formula,
   data_train[[out_name]] <- replace_nas(data_train[[out_name]])
 
   # Compute default priors
-  def_priors <- adapt_brms_priors(c(make_default_scales(orig_y,
-                                                        family),
-                                    make_default_int(orig_y,
-                                                     family = if(add_nmix){
-                                                       nmix()
-                                                     } else {
-                                                       family
-                                                     })),
-                                  formula = orig_formula,
-                                  trend_formula = trend_formula,
-                                  data = orig_data,
-                                  family = family,
-                                  use_lv = use_lv,
-                                  n_lv = n_lv,
-                                  trend_model = trend_model,
-                                  trend_map = trend_map,
-                                  drift = drift,
-                                  knots = knots)
+  if(use_stan){
+    def_priors <- adapt_brms_priors(c(make_default_scales(orig_y,
+                                                          family),
+                                      make_default_int(orig_y,
+                                                       family = if(add_nmix){
+                                                         nmix()
+                                                       } else {
+                                                         family
+                                                       })),
+                                    formula = orig_formula,
+                                    trend_formula = trend_formula,
+                                    data = orig_data,
+                                    family = family,
+                                    use_lv = use_lv,
+                                    n_lv = n_lv,
+                                    trend_model = trend_model,
+                                    trend_map = trend_map,
+                                    drift = drift,
+                                    knots = knots)
+  }
 
   # Initiate the GAM model using mgcv so that the linear predictor matrix can be easily calculated
   # when simulating from the Bayesian model later on;
@@ -1703,6 +1705,11 @@ mvgam = function(formula,
       }
     attr(vectorised$model_data, 'trend_model') <- trend_model
 
+    # Remove data likelihood if this is a prior sampling run
+    if(prior_simulation){
+      vectorised$model_file <- remove_likelihood(vectorised$model_file)
+    }
+
   } else {
     # Set up data and model file for JAGS
     attr(ss_jagam$jags.data, 'trend_model') <- trend_model
@@ -1825,11 +1832,6 @@ mvgam = function(formula,
     }
 
     if(use_stan){
-
-      # Remove data likelihood if this is a prior sampling run
-      if(prior_simulation){
-        vectorised$model_file <- remove_likelihood(vectorised$model_file)
-      }
 
       model_data <- vectorised$model_data
 

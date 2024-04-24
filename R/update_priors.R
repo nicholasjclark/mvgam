@@ -301,11 +301,6 @@ adapt_brms_priors = function(priors,
                                 drift = drift,
                                 knots = knots)
 
-  # if(trend_model == 'CAR1'){
-  #   which_ar <- grep('ar1 ~ ', priors_df$prior, fixed = TRUE)
-  #   priors_df$new_lowerbound[which_ar] <- 0
-  # }
-
   # Update using priors from the brmsprior object
   for(i in 1:NROW(priors)){
 

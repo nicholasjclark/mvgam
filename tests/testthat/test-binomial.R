@@ -86,6 +86,7 @@ test_that("binomial() post-processing works", {
                burnin = 200,
                samples = 200))
   expect_no_error(summary(mod))
+  expect_no_error(code(mod))
   expect_no_error(print(mod))
 
   preds <- predict(mod, summary = FALSE, type = 'response')

@@ -742,7 +742,7 @@ family_to_brmsfam = function(family){
     brms::Beta()
   } else if(family$family == 'student'){
     brms::student()
-  } else if(family$family == 'negative binomial'){
+  } else if(family$family %in% c('tweedie','negative binomial')){
     brms::negbinomial()
   } else if(family$family == 'Gamma'){
     Gamma(link = 'log')

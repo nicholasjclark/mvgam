@@ -105,6 +105,7 @@ test_that("dynamic to Hilbert works for trend_formulas", {
                family = betar(),
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_no_error(code(mod))
 
   # Model file should have prior lines for observationgp terms
   expect_true(any(grepl('// prior for gp(time):random...',

@@ -1,5 +1,70 @@
 context("mvgam")
 
+# JAGS setup should work, whether installed or not
+test_that("JAGS setups work", {
+  simdat <- sim_mvgam()
+  mod <- mvgam(y ~ s(season),
+               trend_model = 'AR1',
+               data = simdat$data_train,
+               family = poisson(),
+               use_stan = FALSE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+
+  mod <- mvgam(y ~ s(season),
+               trend_model = 'AR2',
+               drift = TRUE,
+               data = simdat$data_train,
+               family = poisson(),
+               use_stan = FALSE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+
+  mod <- mvgam(y ~ s(season),
+               trend_model = 'AR1',
+               drift = TRUE,
+               data = simdat$data_train,
+               family = nb(),
+               use_stan = FALSE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+
+  mod <- mvgam(y ~ s(season),
+               trend_model = 'AR3',
+               drift = TRUE,
+               data = simdat$data_train,
+               family = nb(),
+               use_stan = FALSE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+
+  mod <- mvgam(y ~ s(season),
+               trend_model = 'AR1',
+               data = simdat$data_train,
+               family = tweedie(),
+               use_stan = FALSE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+
+  mod <- mvgam(y ~ s(season),
+               trend_model = 'AR3',
+               drift = TRUE,
+               data = simdat$data_train,
+               family = tweedie(),
+               use_stan = FALSE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+
+  mod <- mvgam(y ~ s(season),
+               trend_model = 'RW',
+               drift = TRUE,
+               data = simdat$data_train,
+               family = tweedie(),
+               use_stan = FALSE,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+})
+
 test_that("family must be correctly specified", {
   expect_error(mod <- mvgam(y ~ s(season),
                             trend_model = 'AR1',
@@ -16,6 +81,77 @@ expect_error(mod <- mvgam( ~ s(season),
                           family = betar(),
                           run_model = FALSE),
              'response variable is missing from formula')
+})
+
+test_that("prior_only works", {
+  mod <- mvgam(y ~ s(season),
+               trend_model = AR(p = 2),
+               drift = TRUE,
+               data = gaus_data$data_train,
+               prior_simulation = TRUE,
+               family = gaussian(),
+               threads = 2,
+               run_model = FALSE)
+  expect_no_error(code(mod))
+  expect_true(!any(grepl('likelihood functions',
+                         mod$model_file, fixed = TRUE)))
+  expect_true(!any(grepl('flat_ys ~ ',
+                         mod$model_file, fixed = TRUE)))
+
+  mod <- mvgam(y ~ 1,
+               trend_formula = ~ s(season) + s(trend, bs = 're'),
+               trend_model = VAR(ma = TRUE),
+               data = gaus_data$data_train,
+               prior_simulation = TRUE,
+               family = gaussian(),
+               threads = 2,
+               run_model = FALSE)
+  expect_no_error(code(mod))
+  expect_true(!any(grepl('likelihood functions',
+                         mod$model_file, fixed = TRUE)))
+  expect_true(!any(grepl('flat_ys ~ ',
+                         mod$model_file, fixed = TRUE)))
+
+  mod <- mvgam(y ~ 1,
+               trend_formula = ~ s(season) + s(trend, bs = 're'),
+               trend_model = CAR(),
+               data = gaus_data$data_train,
+               prior_simulation = TRUE,
+               family = gaussian(),
+               threads = 2,
+               run_model = FALSE)
+  expect_no_error(code(mod))
+  expect_true(!any(grepl('likelihood functions',
+                         mod$model_file, fixed = TRUE)))
+  expect_true(!any(grepl('flat_ys ~ ',
+                         mod$model_file, fixed = TRUE)))
+
+  mod <- mvgam(y ~ s(season),
+               trend_model = AR(p = 3),
+               drift = TRUE,
+               data = beta_data$data_train,
+               prior_simulation = TRUE,
+               family = betar(),
+               run_model = FALSE)
+  expect_no_error(code(mod))
+  expect_true(!any(grepl('likelihood functions',
+                         mod$model_file, fixed = TRUE)))
+  expect_true(!any(grepl('flat_ys ~ ',
+                         mod$model_file, fixed = TRUE)))
+
+  mod <- mvgam(y ~ 1,
+               trend_formula = ~ s(season) + s(trend, bs = 're'),
+               trend_model = AR(cor = TRUE, ma = TRUE),
+               drift = TRUE,
+               data = beta_data$data_train,
+               prior_simulation = TRUE,
+               family = betar(),
+               run_model = FALSE)
+  expect_no_error(code(mod))
+  expect_true(!any(grepl('likelihood functions',
+                         mod$model_file, fixed = TRUE)))
+  expect_true(!any(grepl('flat_ys ~ ',
+                         mod$model_file, fixed = TRUE)))
 })
 
 test_that("response variable must follow family-specific restrictions", {
@@ -198,7 +334,7 @@ test_that("share_obs_params working", {
 
   # State-space gaussian
   mod <- mvgam(y ~ -1,
-               trend_formula = ~ s(season, by = trend),
+               trend_formula = ~ s(season, by = trend) + s(trend, bs = 're'),
                trend_model = RW(cor = TRUE),
                family = gaussian(),
                data = gaus_data$data_train,
