@@ -127,6 +127,8 @@ test_that("binomial() post-processing works", {
                        realisations = TRUE, trend_effects = TRUE))
   expect_no_error(plot(mod, type = 'smooths',
                        residuals = TRUE, trend_effects = TRUE))
+  expect_no_error(plot(mod, type = 're',
+                       trend_effects = TRUE))
   expect_no_error(plot(mod, type = 'pterms'))
 
   expect_true(inherits(SM(conditional_effects(mod)),
@@ -307,6 +309,7 @@ test_that("bernoulli() post-processing works", {
   expect_true(inherits(hindcast(mod), 'mvgam_forecast'))
   expect_true(inherits(hindcast(mod, type = 'expected'), 'mvgam_forecast'))
 
+  expect_no_error(plot(mod, type = 're'))
   expect_no_error(plot(mod, type = 'smooths'))
   expect_no_error(plot(mod, type = 'smooths',
                        realisations = TRUE))

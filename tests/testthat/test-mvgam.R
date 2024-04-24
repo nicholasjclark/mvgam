@@ -188,7 +188,7 @@ test_that("outcome variable must be present in data", {
                'variable y not found in data')
 })
 
-test_that("time not requried in data if this is a no trend model", {
+test_that("time not required in data if this is a no trend model", {
   data = data.frame(out = rnorm(100),
                     temp = rnorm(100))
   mod <- mvgam(formula = out ~ dynamic(temp, rho = 20),

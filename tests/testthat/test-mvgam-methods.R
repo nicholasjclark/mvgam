@@ -197,6 +197,49 @@ test_that("hindcast has reasonable outputs", {
                  which(mvgam:::mvgam_example2$obs_data$series == 'series_1')])
 })
 
+test_that("plot_mvgam_series reasonable outputs", {
+  simdat <- sim_mvgam()
+  expect_no_error(plot_mvgam_series(data = simdat$data_train,
+                                    newdata = simdat$data_test))
+  expect_no_error(plot_mvgam_series(data = simdat$data_train,
+                                    newdata = simdat$data_test,
+                                    series = 'all'))
+  expect_no_error(plot_mvgam_series(data = simdat$data_train,
+                                    newdata = simdat$data_test,
+                                    lines = FALSE))
+  expect_no_error(plot_mvgam_series(data = simdat$data_train,
+                                    newdata = simdat$data_test,
+                                    lines = FALSE,
+                                    series = 'all'))
+
+  # Should also work for list data
+  dat_train <- list()
+  for(i in 1:NCOL(simdat$data_train)){
+    dat_train[[i]] <- simdat$data_train[,i]
+  }
+  names(dat_train) <- colnames(simdat$data_train)
+
+  dat_test <- list()
+  for(i in 1:NCOL(simdat$data_test)){
+    dat_test[[i]] <- simdat$data_test[,i]
+  }
+  names(dat_test) <- colnames(simdat$data_test)
+
+  expect_no_error(plot_mvgam_series(data = dat_train))
+  expect_no_error(plot_mvgam_series(data = dat_train,
+                                    newdata = dat_test))
+  expect_no_error(plot_mvgam_series(data = dat_train,
+                                    newdata = dat_test,
+                                    series = 'all'))
+  expect_no_error(plot_mvgam_series(data = dat_train,
+                                    newdata = dat_test,
+                                    lines = FALSE))
+  expect_no_error(plot_mvgam_series(data = dat_train,
+                                    newdata = dat_test,
+                                    lines = FALSE,
+                                    series = 'all'))
+})
+
 test_that("forecast has reasonable outputs", {
   skip_on_cran()
   set.seed(1234)
