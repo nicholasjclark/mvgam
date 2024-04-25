@@ -130,8 +130,8 @@ conditional_effects.mvgam = function(x,
     }
 
     # Find all possible (up to 2-way) plot conditions
-    cond_labs <- purrr::flatten(lapply(termlabs, function(x){
-      all.vars(parse(text = split_termlabs(x)))
+    cond_labs <- purrr::flatten(lapply(termlabs, function(i){
+      mvgam:::split_termlabs(i)
     }))
   } else {
     cond_labs <- strsplit(as.character(effects), split = ":")
@@ -273,26 +273,34 @@ split_termlabs = function(lab){
       term_struc$by
     }
     if(length(term_struc$term) <= 2){
-      out[[1]] <- c(term_struc$term, term_struc$by)
+      out[[1]] <- c(all.vars(parse(text = term_struc$term)),
+                    term_struc$by)
     }
-
     if(length(term_struc$term) == 3){
-      out[[1]] <- c(term_struc$term[1:2], term_struc$by)
-      out[[2]] <- c(term_struc$term[c(1, 3)], term_struc$by)
-      out[[3]] <- c(term_struc$term[c(2, 3)], term_struc$by)
+      out[[1]] <- c(all.vars(parse(text = term_struc$term[1:2])),
+                    term_struc$by)
+      out[[2]] <- c(all.vars(parse(text = term_struc$term[1, 3])),
+                    term_struc$by)
+      out[[3]] <- c(all.vars(parse(text = term_struc$term[2, 3])),
+                    term_struc$by)
     }
 
     if(length(term_struc$term) == 4){
-      out[[1]] <- c(term_struc$term[1:2], term_struc$by)
-      out[[2]] <- c(term_struc$term[c(1, 3)], term_struc$by)
-      out[[3]] <- c(term_struc$term[c(1, 4)], term_struc$by)
-      out[[4]] <- c(term_struc$term[c(2, 3)], term_struc$by)
-      out[[5]] <- c(term_struc$term[c(2, 5)], term_struc$by)
+      out[[1]] <- c(all.vars(parse(text = term_struc$term[1:2])),
+                    term_struc$by)
+      out[[2]] <- c(all.vars(parse(text = term_struc$term[1, 3])),
+                    term_struc$by)
+      out[[3]] <- c(all.vars(parse(text = term_struc$term[1, 4])),
+                    term_struc$by)
+      out[[4]] <- c(all.vars(parse(text = term_struc$term[2, 3])),
+                    term_struc$by)
+      out[[5]] <- c(all.vars(parse(text = term_struc$term[2, 4])),
+                    term_struc$by)
     }
 
   } else if(grepl('dynamic(', lab, fixed = TRUE)){
     term_struc <- eval(rlang::parse_expr(lab))
-    out[[1]] <- c('time', term_struc$term)
+    out[[1]] <- c('time', all.vars(parse(text = term_struc$term[2, 4])))
   } else {
     out[[1]] <- lab
   }
