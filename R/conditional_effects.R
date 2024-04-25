@@ -131,7 +131,7 @@ conditional_effects.mvgam = function(x,
 
     # Find all possible (up to 2-way) plot conditions
     cond_labs <- purrr::flatten(lapply(termlabs, function(i){
-      mvgam:::split_termlabs(i)
+      split_termlabs(i)
     }))
   } else {
     cond_labs <- strsplit(as.character(effects), split = ":")
