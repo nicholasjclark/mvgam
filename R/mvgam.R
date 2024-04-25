@@ -1355,6 +1355,16 @@ mvgam = function(formula,
                                         'laplace'))
     backend <- match.arg(backend, c('rstan',
                                     'cmdstanr'))
+
+    cmdstan_avail <- insight::check_if_installed('cmdstanr',
+                                                 stop = FALSE,
+                                                 quietly = TRUE)
+
+    if(isTRUE(cmdstan_avail)){
+      if(is.null(cmdstanr::cmdstan_version(error_on_NA = FALSE))){
+        backend <- 'rstan'
+      }
+    }
     fit_engine <- 'stan'
     use_cmdstan <- ifelse(backend == 'cmdstanr', TRUE, FALSE)
 
