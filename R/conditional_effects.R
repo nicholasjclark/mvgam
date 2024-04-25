@@ -121,6 +121,7 @@ conditional_effects.mvgam = function(x,
     # Get all term labels in the model
     termlabs <- attr(terms(formula(x),
                            keep.order = TRUE), 'term.labels')
+    #termlabs <- unlist(find_predictors(x), use.names = FALSE)
     if(!is.null(x$trend_call)){
       termlabs <- c(termlabs,
                     gsub('trend', 'series',
@@ -130,7 +131,7 @@ conditional_effects.mvgam = function(x,
 
     # Find all possible (up to 2-way) plot conditions
     cond_labs <- purrr::flatten(lapply(termlabs, function(x){
-      split_termlabs(x)
+      all.vars(parse(text = split_termlabs(x)))
     }))
   } else {
     cond_labs <- strsplit(as.character(effects), split = ":")

@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main, master]
 
-name: R-CMD-check-cmdstan
+name: R-CMD-check-rstan
 
 jobs:
   R-CMD-check:
@@ -18,10 +18,10 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          # Cmdstan isntall not working on win-latest release; check back later
+          - {os: macOS-latest,   r: 'release'}
+          - {os: windows-latest, r: 'release'}
           - {os: ubuntu-latest, r: 'devel', http-user-agent: 'release'}
           - {os: ubuntu-latest, r: 'release'}
-          - {os: ubuntu-latest, r: 'oldrel-1'}
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
@@ -41,9 +41,7 @@ jobs:
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
 
-      # As cmdstanr is not yet on CRAN, configure the action to only install the
-      # 'Depends' packages by default and then manually specify the 'Suggests'
-      # packages that are needed for R CMD CHECK
+      # Install some suggests packages
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           dependencies: NA
@@ -60,16 +58,9 @@ jobs:
               ggplot2
               rjags
               coda
-              stan-dev/cmdstanr
               testthat
               usethis
               rcmdcheck
-
-      - name: Build Cmdstan
-        run: |
-          cmdstanr::check_cmdstan_toolchain(fix = TRUE)
-          cmdstanr::install_cmdstan()
-        shell: Rscript {0}
 
       - uses: r-lib/actions/check-r-package@v2
         with:

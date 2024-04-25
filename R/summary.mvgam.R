@@ -104,7 +104,7 @@ if(!is.null(object$upper_bounds)){
 }
 
 cat('\nN timepoints:\n')
-cat(max(object$obs_data$time), '\n')
+cat(NROW(object$ytimes), '\n')
 
 if(object$fit_engine == 'jags'){
   cat('\nStatus:\n')
@@ -818,7 +818,7 @@ summary.mvgam_prefit = function(object, ...){
 
 
   cat('\n\nN timepoints:')
-  cat(max(object$obs_data$time), '\n')
+  cat(NROW(object$ytimes), '\n')
 
 
   cat('\nStatus:')

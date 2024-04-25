@@ -1530,44 +1530,19 @@ dsresids_vec = function(object){
   }
 
   if(family == 'student'){
-    if(NCOL(mcmc_chains(object$model_output, 'sigma_obs')) == 1){
-      sigma_obs <- family_extracts$sigma_obs
-      sigma_mat <- matrix(rep(sigma_obs,
-                              NCOL(truth_mat)),
-                          ncol = NCOL(truth_mat))
-      sigma_obs <- as.vector(sigma_mat)
-
-      nu <- family_extracts$nu
-      nu_mat <- matrix(rep(nu,
-                              NCOL(truth_mat)),
-                          ncol = NCOL(truth_mat))
-      nu <- as.vector(nu_mat)
-    } else {
-      sigma_obs <- family_extracts$sigma_obs
-      nu <- family_extracts$nu
-    }
     resids <- matrix(ds_resids_student(truth = as.vector(truth_mat),
                                        fitted = as.vector(preds),
                                        draw = 1,
-                                       sigma = sigma_obs,
-                                       nu = nu),
+                                       sigma = family_extracts$sigma_obs,
+                                       nu = family_extracts$nu),
                      nrow = NROW(preds))
   }
 
   if(family == 'lognormal'){
-    if(NCOL(mcmc_chains(object$model_output, 'sigma_obs')) == 1){
-      sigma_obs <- family_extracts$sigma_obs
-      sigma_mat <- matrix(rep(sigma_obs,
-                              NCOL(truth_mat)),
-                          ncol = NCOL(truth_mat))
-      sigma_obs <- as.vector(sigma_mat)
-    } else {
-      sigma_obs <- family_extracts$sigma_obs
-    }
     resids <- matrix(ds_resids_lnorm(truth = as.vector(truth_mat),
                                      fitted = as.vector(preds),
                                      draw = 1,
-                                     sigma = sigma_obs),
+                                     sigma = family_extracts$sigma_obs),
                      nrow = NROW(preds))
   }
 
@@ -1587,19 +1562,10 @@ dsresids_vec = function(object){
   }
 
   if(family == 'Gamma'){
-    if(NCOL(mcmc_chains(object$model_output, 'shape')) == 1){
-      shape <- family_extracts$shape
-      sigma_mat <- matrix(rep(shape,
-                              NCOL(truth_mat)),
-                          ncol = NCOL(truth_mat))
-      shape <- as.vector(sigma_mat)
-    } else {
-      shape <- family_extracts$shape
-    }
     resids <- matrix(ds_resids_gamma(truth = as.vector(truth_mat),
                                      fitted = as.vector(preds),
                                      draw = 1,
-                                     shape = shape),
+                                     shape = family_extracts$shape),
                      nrow = NROW(preds))
   }
 
