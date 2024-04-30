@@ -114,8 +114,11 @@ posterior_epred.mvgam = function(object,
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'             trend_model = 'AR1',
-#'             data = simdat$data_train)
+#'              trend_model = 'AR1',
+#'              data = simdat$data_train,
+#'              burnin = 300,
+#'              samples = 300,
+#'              chains = 2)
 #'
 #'# Extract linear predictor values
 #'linpreds <- posterior_linpred(mod)

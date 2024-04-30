@@ -55,7 +55,8 @@
 #'             data = dat,
 #'             family = gaussian(),
 #'             burnin = 300,
-#'             samples = 300)
+#'             samples = 300,
+#'             chains = 2)
 #'
 #' # Posterior checks
 #' ppc(mod, type = 'hist')

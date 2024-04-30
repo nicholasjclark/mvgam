@@ -186,7 +186,8 @@ test_that("nmix() post-processing works", {
     # priors can be set in the usual way
     priors = c(prior(std_normal(), class = b),
                prior(normal(1, 1.5), class = Intercept_trend)),
-    samples = 300)
+    samples = 300,
+    chains = 2)
 
   expect_no_error(summary(mod))
   expect_no_error(print(mod))

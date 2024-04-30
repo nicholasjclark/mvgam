@@ -37,7 +37,9 @@
 #'mod1 <- mvgam(y ~ s(season, bs = 'cc'),
 #'              trend_model = 'AR1',
 #'              data = sim$data_train,
-#'              family = Gamma())
+#'              family = Gamma(),
+#'              chains = 2,
+#'              samples = 300)
 #'beta_draws_df <- as.data.frame(mod1, variable = 'betas')
 #'head(beta_draws_df)
 #'str(beta_draws_df)

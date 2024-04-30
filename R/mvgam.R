@@ -335,7 +335,8 @@
 #'               trend_model = RW(),
 #'               family = poisson(),
 #'               burnin = 300,
-#'               samples = 300)
+#'               samples = 300,
+#'               chains = 2)
 #'
 #' # Extract the model summary
 #' summary(mod1)
@@ -399,7 +400,8 @@
 #'               data = mod_data,
 #'               return_model_data = TRUE,
 #'               burnin = 300,
-#'               samples = 300)
+#'               samples = 300,
+#'               chains = 2)
 #'
 #' # The mapping matrix is now supplied as data to the model in the 'Z' element
 #' mod1$model_data$Z
@@ -443,7 +445,8 @@
 #'              data = data_train,
 #'              newdata = data_test,
 #'              burnin = 300,
-#'              samples = 300)
+#'              samples = 300,
+#'              chains = 2)
 #'
 #' # Inspect the model summary, forecast and time-varying coefficient distribution
 #' summary(mod)
@@ -475,7 +478,8 @@
 #'              data = dat$data_train,
 #'              trend_model = 'None',
 #'              burnin = 300,
-#'              samples = 300)
+#'              samples = 300,
+#'              chains = 2)
 #'
 #' # Inspect the model file to see the modification to the linear predictor
 #' # (eta)
@@ -569,7 +573,8 @@
 #'              family = poisson(),
 #'              data = mod_data,
 #'              burnin = 300,
-#'              samples = 300)
+#'              samples = 300,
+#'              chains = 2)
 #' summary(mod)
 #'
 #' # Plot the posterior hindcast
@@ -610,7 +615,8 @@
 #'              family = binomial(),
 #'              data = dat,
 #'              burnin = 300,
-#'              samples = 300)
+#'              samples = 300,
+#'              chains = 2)
 #' summary(mod)
 #' pp_check(mod, type = "bars_grouped",
 #'          group = "series", ndraws = 50)

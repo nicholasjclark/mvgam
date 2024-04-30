@@ -55,8 +55,7 @@ if(any(smooth_labs$class == 'random.effect')){
   on.exit(par(.pardefault))
 
   if(length(re_smooths) == 1){
-    par(mfrow = c(1,1),
-        mar = c(4, 4.5, 3, 4))
+    par(mfrow = c(1,1))
   }
 
   if(length(re_smooths) == 2){

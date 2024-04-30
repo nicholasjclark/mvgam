@@ -51,7 +51,10 @@
 #'# Fit a basic model
 #'mod <- mvgam(y ~ s(season, bs = 'cc') + s(series, bs = 're'),
 #'             data = dat$data_train,
-#'             trend_model = RW())
+#'             trend_model = RW(),
+#'             burnin = 300,
+#'             samples = 300,
+#'             chains = 2)
 #'
 #'# Plot predictions and residuals for each series
 #'plot(mod, type = 'forecast', series = 1)
@@ -77,7 +80,10 @@
 #'mod <- mvgam(y ~ -1,
 #'             trend_formula = ~ s(season, bs = 'cc'),
 #'             data = dat$data_train,
-#'             trend_model = RW())
+#'             trend_model = RW(),
+#'             burnin = 300,
+#'             samples = 300,
+#'             chains = 2)
 #'plot(mod, type = 'smooths', trend_effects = TRUE)
 #'
 #'# But marginaleffects functions work without any modification
@@ -223,10 +229,7 @@ plot.mvgam = function(x, type = 'residuals',
 
     .pardefault <- par(no.readonly=T)
     on.exit(par(.pardefault))
-    oldpar<-par(mfrow=c(r,c),
-                mar=c(2.5, 2.3, 2, 2),
-                oma = c(1, 1, 0, 0),
-                mgp = c(1.5, 0.5, 0))
+    oldpar<-par(mfrow=c(r,c))
 
     } else { ppp<-1;oldpar<-par()}
 

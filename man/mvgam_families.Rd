@@ -152,7 +152,8 @@ mod <- mvgam(
             priors = c(prior(std_normal(), class = b),
                        prior(normal(1, 1.5), class = Intercept_trend)),
             burnin = 300,
-            samples = 300)
+            samples = 300,
+            chains = 2)
 
 # The usual diagnostics
 summary(mod)

@@ -77,7 +77,7 @@ plot_mvgam_smooth = function(object,
   }
 
   if(series > NCOL(object2$ytimes)){
-    stop(paste0('object2 only contains data / predictions for ',
+    stop(paste0('object only contains data / predictions for ',
                 NCOL(object2$ytimes), ' series'),
          call. = FALSE)
   }
@@ -123,7 +123,7 @@ plot_mvgam_smooth = function(object,
 
   if(is.numeric(smooth)){
     if(!smooth %in% seq_along(smooth_terms)){
-      stop(smooth, ' not found in smooth terms of object2')
+      stop(smooth, ' not found in smooth terms of object')
     }
     smooth_int <- smooth
     smooth <- smooth_terms[smooth]
@@ -140,18 +140,20 @@ plot_mvgam_smooth = function(object,
   }))
 
   if(smooth_labs$class[smooth_int] == 'random.effect'){
-    stop('use function "plot_mvgam_randomeffects" to plot "re" bases')
+    message('use function "plot_mvgam_randomeffects" to plot "re" bases')
+    return(invisible)
   }
 
   # Be sure that parametric and by variables are included in newdata
   smooth_terms <- unique(trimws(strsplit(gsub('\\+', ',',
-                                              as.character(object2$mgcv_model$pred.formula)[2]), ',')[[1]]))
+                                              as.character(object2$mgcv_model$pred.formula)[2]),
+                                         ',')[[1]]))
 
   # Remove comma separated names as these won't match the column names in data
   smooth_terms[!grepl(',', smooth_terms)] -> smooth_terms
 
   # Change smooth name to the covariate that needs a sequence of prediction values
-  smooth <- object2$mgcv_model$smooth[[smooth_int]]$term
+  smooth <- all.vars(parse(text = object2$mgcv_model$smooth[[smooth_int]]$term))
 
   # Predictions and plots for multi-dimensional smooths
   if(length(unlist(strsplit(smooth, ','))) >= 2){
@@ -438,10 +440,7 @@ plot_mvgam_smooth = function(object,
   if(derivatives){
     .pardefault <- par(no.readonly=T)
     on.exit(par(.pardefault))
-    par(mfrow = c(2, 1),
-        mar=c(2.5, 2.3, 2, 2),
-        oma = c(1, 1, 0, 0),
-        mgp = c(1.5, 0.5, 0))
+    par(mfrow = c(2, 1))
 
     if(residuals){
       plot(1, type = "n", bty = 'L',

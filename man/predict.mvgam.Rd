@@ -26,14 +26,21 @@ predictions are generated for the original observations used for the model fit.}
 \item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
 \code{newdata} instead for more seamless integration into \code{R} workflows}
 
-\item{type}{When this has the value \code{link} (default) the linear predictor is calculated on the link scale.
+\item{type}{When this has the value \code{link} (default) the linear predictor is
+calculated on the link scale.
 If \code{expected} is used, predictions reflect the expectation of the response (the mean)
 but ignore uncertainty in the observation process. When \code{response} is used,
 the predictions take uncertainty in the observation process into account to return
 predictions on the outcome scale. When \code{variance} is used, the variance of the response
-with respect to the mean (mean-variance relationship) is returned. Two special cases are also allowed:
-type \code{latent_N} will return the estimated latent abundances from an N-mixture distribution,
-while type \code{detection} will return the estimated detection probability from an N-mixture distribution}
+with respect to the mean (mean-variance relationship) is returned.
+When \code{type = "terms"}, each component of the linear predictor is
+returned separately in the form of a \code{list} (possibly with standard
+errors, if \code{summary = TRUE}): this includes parametric model components,
+followed by each smooth component, but excludes any offset and any intercept.
+Two special cases are also allowed:
+type \code{latent_N} will return the estimated latent abundances from an
+N-mixture distribution, while type \code{detection} will return the estimated
+detection probability from an N-mixture distribution}
 
 \item{process_error}{Logical. If \code{TRUE} and a dynamic trend model was fit,
 expected uncertainty in the process model is accounted for by using draws
@@ -56,10 +63,11 @@ function. Only used if \code{summary} is \code{TRUE}.}
 }
 \value{
 Predicted values on the appropriate scale.
-If \code{summary = FALSE} the output is a matrix of dimension \verb{n_draw x n_observations}
+If \code{summary = FALSE} and \code{type != "terms"},
+the output is a matrix of dimension \verb{n_draw x n_observations}
 containing predicted values for each posterior draw in \code{object}.
 
-If \code{summary = TRUE} the output is an \code{n_observations} x \code{E}
+If \code{summary = TRUE} and \code{type != "terms"}, the output is an \code{n_observations} x \code{E}
 matrix. The number of summary statistics \code{E} is equal to \code{2 +
   length(probs)}: The \code{Estimate} column contains point estimates (either
 mean or median depending on argument \code{robust}), while the
@@ -67,6 +75,14 @@ mean or median depending on argument \code{robust}), while the
 deviation or median absolute deviation depending on argument
 \code{robust}). The remaining columns starting with \code{Q} contain
 quantile estimates as specified via argument \code{probs}.
+
+If \code{type = "terms"} and \code{summary = FALSE}, the output is a named \code{list}
+containing a separate slot for each effect, with the effects returned as
+matrices of dimension \verb{n_draw x 1}. If \code{summary = TRUE}, the output resembles that
+from \code{\link[mgcv]{predict.gam}} when using the call
+\code{predict.gam(object, type = "terms", se.fit = TRUE)}, where mean contributions
+from each effect are returned in \code{matrix} form while standard errors (representing
+the interval: \code{(max(probs) - min(probs)) / 2}) are returned in a separate \code{matrix}
 }
 \description{
 Predict from the GAM component of an mvgam model

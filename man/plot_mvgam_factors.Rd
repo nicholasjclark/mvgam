@@ -36,7 +36,8 @@ mod <- mvgam(y ~ s(season, bs = 'cc',
             trend_model = AR(),
             use_lv = TRUE,
             n_lv = 2,
-            data = simdat$data_train)
+            data = simdat$data_train,
+            chains = 2)
 plot_mvgam_factors(mod)
 }
 }

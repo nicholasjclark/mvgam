@@ -28,7 +28,8 @@
 #'             trend_model = AR(),
 #'             data = simdat$data_train,
 #'             burnin = 300,
-#'             samples = 300)
+#'             samples = 300,
+#'             chains = 2)
 #'
 #' # Plot estimated trends for some series
 #' plot_mvgam_trend(mod)
@@ -185,10 +186,7 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
   if(derivatives){
     .pardefault <- par(no.readonly=T)
     on.exit(par(.pardefault))
-    par(mfrow = c(2, 1),
-        mar = c(2.5, 2.3, 2, 2),
-        oma = c(1, 1, 0, 0),
-        mgp = c(1.5, 0.5, 0))
+    par(mfrow = c(2, 1))
 
     plot(1, type = "n", bty = 'L',
            xlab = xlab,

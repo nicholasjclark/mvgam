@@ -259,9 +259,9 @@ example)</p>
 <span class="r-in"><span><span class="co"># but this can be useful for testing whether your updated priors are written correctly)</span></span></span>
 <span class="r-in"><span><span class="va">mod_default</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>              family <span class="op">=</span> <span class="st">'nb'</span>,</span></span>
+<span class="r-in"><span>              family <span class="op">=</span> <span class="fu">nb</span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>              trend_model <span class="op">=</span> <span class="st">'AR2'</span>,</span></span>
+<span class="r-in"><span>              trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the model file with default mvgam priors</span></span></span>
@@ -404,9 +404,9 @@ example)</p>
 <span class="r-in"><span><span class="co"># Look at which priors can be updated in mvgam</span></span></span>
 <span class="r-in"><span><span class="va">test_priors</span> <span class="op">&lt;-</span> <span class="fu">get_mvgam_priors</span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>                              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>                              family <span class="op">=</span> <span class="st">'nb'</span>,</span></span>
+<span class="r-in"><span>                              family <span class="op">=</span> <span class="fu">nb</span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                              data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>                              trend_model <span class="op">=</span> <span class="st">'AR2'</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                              trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">test_priors</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                    param_name param_length</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1               vector&lt;lower=0&gt;[n_sp] lambda;            2</span>
@@ -425,13 +425,13 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.18);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2   mu_raw ~ normal(0.23, 0.71);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.79);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.57, 0.81);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(0.19, 0.65);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.12);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7 phi_inv ~ normal(-0.61, 0.11);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.35);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(-0.34, 0.29);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.88);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.34, 0.67);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     ar2 ~ normal(-0.32, 0.78);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6      sigma ~ exponential(0.8);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.72, 0.36);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>
@@ -444,12 +444,12 @@ example)</p>
 <span class="r-in"><span><span class="co"># setting 'run_model = FALSE'</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>            <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>            family <span class="op">=</span> <span class="st">'nb'</span>,</span></span>
+<span class="r-in"><span>            family <span class="op">=</span> <span class="fu">nb</span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>            trend_model <span class="op">=</span> <span class="st">'AR2'</span>,</span></span>
+<span class="r-in"><span>            trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            priors <span class="op">=</span> <span class="va">test_priors</span>,</span></span>
 <span class="r-in"><span>            run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-in"><span>            <span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> // Stan model code generated by package mvgam</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> functions {</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector rep_each(vector x, int K) {</span>
@@ -588,7 +588,7 @@ example)</p>
 <span class="r-in"><span><span class="co"># No warnings, the model is ready for fitting now in the usual way with the addition</span></span></span>
 <span class="r-in"><span><span class="co"># of the 'priors' argument</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># The same can be done using brms functions; here we will also change the ar1 prior</span></span></span>
+<span class="r-in"><span><span class="co"># The same can be done using 'brms' functions; here we will also change the ar1 prior</span></span></span>
 <span class="r-in"><span><span class="co"># and put some bounds on the ar coefficients to enforce stationarity; we set the</span></span></span>
 <span class="r-in"><span><span class="co"># prior using the 'class' argument in all brms prior functions</span></span></span>
 <span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">mu_raw</span><span class="op">)</span>,</span></span>
@@ -602,9 +602,9 @@ example)</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>            <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>          family <span class="op">=</span> <span class="st">'nb'</span>,</span></span>
+<span class="r-in"><span>          family <span class="op">=</span> <span class="fu">nb</span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>          data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>          trend_model <span class="op">=</span> <span class="st">'AR2'</span>,</span></span>
+<span class="r-in"><span>          trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>          priors <span class="op">=</span> <span class="va">brmsprior</span>,</span></span>
 <span class="r-in"><span>          run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
@@ -747,9 +747,9 @@ example)</p>
 <span class="r-in"><span><span class="va">test_priors</span><span class="op">$</span><span class="va">prior</span><span class="op">[</span><span class="fl">5</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">'ar2_bananas ~ normal(0, 0.25);'</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>            <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>            family <span class="op">=</span> <span class="st">'nb'</span>,</span></span>
+<span class="r-in"><span>            family <span class="op">=</span> <span class="fu">nb</span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>            trend_model <span class="op">=</span> <span class="st">'AR2'</span>,</span></span>
+<span class="r-in"><span>            trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            priors <span class="op">=</span> <span class="va">test_priors</span>,</span></span>
 <span class="r-in"><span>            run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>no match found in model_file for parameter: ar2_bananas</span>
@@ -898,7 +898,7 @@ example)</p>
 <span class="r-in"><span><span class="va">priors</span> <span class="op">&lt;-</span> <span class="fu">get_mvgam_priors</span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">cov</span> <span class="op">+</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                          data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>                          family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                          trend_model <span class="op">=</span> <span class="st">'AR1'</span><span class="op">)</span></span></span>
+<span class="r-in"><span>                          trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Change priors for the intercept and fake covariate effects</span></span></span>
 <span class="r-in"><span><span class="va">priors</span><span class="op">$</span><span class="va">prior</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">'(Intercept) ~ normal(0, 1);'</span></span></span>
@@ -906,7 +906,7 @@ example)</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">cov</span> <span class="op">+</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>             trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span></span>
+<span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             priors <span class="op">=</span> <span class="va">priors</span>,</span></span>
 <span class="r-in"><span>             run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
@@ -1003,7 +1003,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Likewise using brms utilities (note that you can use</span></span></span>
+<span class="r-in"><span><span class="co"># Likewise using 'brms' utilities (note that you can use</span></span></span>
 <span class="r-in"><span><span class="co"># Intercept rather than `(Intercept)`) to change priors on the intercept</span></span></span>
 <span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">cov</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              <span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept</span><span class="op">)</span><span class="op">)</span></span></span>
@@ -1014,7 +1014,7 @@ example)</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">cov</span> <span class="op">+</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>             trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span></span>
+<span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             priors <span class="op">=</span> <span class="va">brmsprior</span>,</span></span>
 <span class="r-in"><span>             run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>

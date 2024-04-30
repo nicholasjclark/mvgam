@@ -60,7 +60,8 @@
 #'                data = dat$data_train,
 #'                newdata = dat$data_test,
 #'                burnin = 300,
-#'                samples = 300)
+#'                samples = 300,
+#'                chains = 2)
 #'
 #'# Fit a less appropriate model
 #'mod_rw <- mvgam(y ~ s(season, bs = 'cc', k = 6),
@@ -69,7 +70,8 @@
 #'               data = dat$data_train,
 #'               newdata = dat$data_test,
 #'               burnin = 300,
-#'               samples = 300)
+#'               samples = 300,
+#'               chains = 2)
 #'
 #'# Compare Discrete Ranked Probability Scores for the testing period
 #'fc_ar2 <- forecast(mod_ar2)

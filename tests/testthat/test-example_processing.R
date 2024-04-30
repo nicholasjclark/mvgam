@@ -325,15 +325,15 @@ test_that("evaluate() functions working", {
 
 test_that("lfo_cv() working", {
   skip_on_cran()
-  lfs <- lfo_cv(mvgam:::mvgam_example1,
+  lfs <- SW(lfo_cv(mvgam:::mvgam_example1,
                 min_t = 27,
-                fc_horizon = 1)
+                fc_horizon = 1))
   expect_true(inherits(lfs, 'mvgam_lfo'))
   expect_no_error(plot(lfs))
 
-  lfs <- lfo_cv(mvgam:::mvgam_example5,
+  lfs <- SW(lfo_cv(mvgam:::mvgam_example5,
                 min_t = 27,
-                fc_horizon = 1)
+                fc_horizon = 1))
   expect_true(inherits(lfs, 'mvgam_lfo'))
   expect_no_error(plot(lfs))
 })
@@ -455,6 +455,7 @@ test_that("forecast() works correctly", {
 
 test_that("loo() works correctly", {
   skip_on_cran()
+  options(mc.cores = 1)
   expect_loo(SW(loo(mvgam:::mvgam_example1)))
   expect_loo(SW(loo(mvgam:::mvgam_example2)))
   expect_loo(SW(loo(mvgam:::mvgam_example3)))

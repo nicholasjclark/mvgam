@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.91</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -32,6 +32,9 @@
     <a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in mvgam</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in mvgam</a>
   </div>
+</li>
+<li class="nav-item">
+  <a class="nav-link" href="../news/index.html">Changelog</a>
 </li>
       </ul><form class="form-inline my-2 my-lg-0" role="search">
         <input type="search" class="form-control me-sm-2" aria-label="Toggle navigation" name="search-input" data-search-index="../search.json" id="search-input" placeholder="Search for" autocomplete="off"></form>
@@ -74,7 +77,348 @@
 <dd><p>Arguments passed to individual methods (if applicable).</p></dd>
 
 </dl></div>
+    <div class="section level2">
+    <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
+    
 
+<p>a <code>list</code> object of the variables that can be extracted, along
+with their aliases</p>
+    </div>
+
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">1</span>, trend_model <span class="op">=</span> <span class="st">'AR1'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>            burnin <span class="op">=</span> <span class="fl">300</span>,</span></span>
+<span class="r-in"><span>            samples <span class="op">=</span> <span class="fl">300</span>,</span></span>
+<span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using cmdstanr as the backend</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb419623b2d.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Init values were only set for a subset of parameters. </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Missing init values for the following parameters:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 1: ar1, sigma, trend, lambda</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 2: ar1, sigma, trend, lambda</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 600 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 600 [ 16%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 600 [ 33%]  (Warmup) </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: normal_lpdf: Scale parameter[1] is 0, but must be positive! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb419623b2d.stan', line 55, column 2 to column 44)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 600 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 600 [ 16%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 600 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 301 / 600 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 600 [ 66%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 600 [ 33%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 600 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 301 / 600 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 600 [ 66%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 600 [ 83%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 600 [ 83%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 600 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.3 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 600 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.4 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.7 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2 chains had an E-BFMI less than 0.2.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
+<span class="r-in"><span><span class="fu">variables</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $observation_pars</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $observation_linpreds</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    orig_name alias</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1   mus[1,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2   mus[2,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3   mus[3,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4   mus[4,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5   mus[5,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6   mus[6,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7   mus[7,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8   mus[8,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9   mus[9,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 mus[10,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11 mus[11,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12 mus[12,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 13 mus[13,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 14 mus[14,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 15 mus[15,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 16 mus[16,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 17 mus[17,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 18 mus[18,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 19 mus[19,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 20 mus[20,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 21 mus[21,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 22 mus[22,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 23 mus[23,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 24 mus[24,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 25 mus[25,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 26 mus[26,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 27 mus[27,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 28 mus[28,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 29 mus[29,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 30 mus[30,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 31 mus[31,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 32 mus[32,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 33 mus[33,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 34 mus[34,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 35 mus[35,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 36 mus[36,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 37 mus[37,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 38 mus[38,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 39 mus[39,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 40 mus[40,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 41 mus[41,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 42 mus[42,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 43 mus[43,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 44 mus[44,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 45 mus[45,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 46 mus[46,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 47 mus[47,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 48 mus[48,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 49 mus[49,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 50 mus[50,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 51 mus[51,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 52 mus[52,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 53 mus[53,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 54 mus[54,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 55 mus[55,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 56 mus[56,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 57 mus[57,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 58 mus[58,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 59 mus[59,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 60 mus[60,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 61 mus[61,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 62 mus[62,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 63 mus[63,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 64 mus[64,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 65 mus[65,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 66 mus[66,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 67 mus[67,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 68 mus[68,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 69 mus[69,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 70 mus[70,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 71 mus[71,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 72 mus[72,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 73 mus[73,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 74 mus[74,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 75 mus[75,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $observation_betas</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   orig_name       alias</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1      b[1] (Intercept)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2      b[2] s(season).1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3      b[3] s(season).2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4      b[4] s(season).3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5      b[5] s(season).4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $observation_smoothpars</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   orig_name         alias</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    rho[1] s(season)_rho</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $observation_re_params</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $posterior_preds</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      orig_name alias</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1   ypred[1,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2   ypred[2,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3   ypred[3,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4   ypred[4,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5   ypred[5,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6   ypred[6,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7   ypred[7,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8   ypred[8,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9   ypred[9,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 ypred[10,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11 ypred[11,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12 ypred[12,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 13 ypred[13,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 14 ypred[14,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 15 ypred[15,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 16 ypred[16,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 17 ypred[17,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 18 ypred[18,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 19 ypred[19,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 20 ypred[20,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 21 ypred[21,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 22 ypred[22,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 23 ypred[23,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 24 ypred[24,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 25 ypred[25,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 26 ypred[26,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 27 ypred[27,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 28 ypred[28,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 29 ypred[29,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 30 ypred[30,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 31 ypred[31,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 32 ypred[32,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 33 ypred[33,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 34 ypred[34,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 35 ypred[35,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 36 ypred[36,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 37 ypred[37,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 38 ypred[38,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 39 ypred[39,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 40 ypred[40,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 41 ypred[41,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 42 ypred[42,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 43 ypred[43,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 44 ypred[44,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 45 ypred[45,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 46 ypred[46,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 47 ypred[47,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 48 ypred[48,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 49 ypred[49,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 50 ypred[50,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 51 ypred[51,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 52 ypred[52,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 53 ypred[53,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 54 ypred[54,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 55 ypred[55,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 56 ypred[56,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 57 ypred[57,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 58 ypred[58,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 59 ypred[59,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 60 ypred[60,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 61 ypred[61,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 62 ypred[62,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 63 ypred[63,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 64 ypred[64,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 65 ypred[65,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 66 ypred[66,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 67 ypred[67,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 68 ypred[68,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 69 ypred[69,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 70 ypred[70,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 71 ypred[71,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 72 ypred[72,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 73 ypred[73,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 74 ypred[74,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 75 ypred[75,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $trend_pars</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   orig_name alias</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1  sigma[1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    ar1[1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $trend_linpreds</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $trend_betas</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $trend_smoothpars</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $trend_re_params</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $trends</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      orig_name alias</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1   trend[1,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2   trend[2,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3   trend[3,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4   trend[4,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5   trend[5,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6   trend[6,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7   trend[7,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8   trend[8,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9   trend[9,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 trend[10,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 11 trend[11,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 12 trend[12,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 13 trend[13,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 14 trend[14,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 15 trend[15,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 16 trend[16,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 17 trend[17,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 18 trend[18,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 19 trend[19,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 20 trend[20,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 21 trend[21,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 22 trend[22,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 23 trend[23,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 24 trend[24,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 25 trend[25,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 26 trend[26,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 27 trend[27,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 28 trend[28,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 29 trend[29,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 30 trend[30,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 31 trend[31,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 32 trend[32,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 33 trend[33,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 34 trend[34,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 35 trend[35,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 36 trend[36,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 37 trend[37,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 38 trend[38,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 39 trend[39,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 40 trend[40,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 41 trend[41,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 42 trend[42,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 43 trend[43,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 44 trend[44,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 45 trend[45,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 46 trend[46,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 47 trend[47,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 48 trend[48,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 49 trend[49,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 50 trend[50,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 51 trend[51,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 52 trend[52,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 53 trend[53,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 54 trend[54,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 55 trend[55,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 56 trend[56,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 57 trend[57,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 58 trend[58,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 59 trend[59,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 60 trend[60,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 61 trend[61,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 62 trend[62,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 63 trend[63,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 64 trend[64,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 65 trend[65,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 66 trend[66,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 67 trend[67,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 68 trend[68,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 69 trend[69,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 70 trend[70,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 71 trend[71,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 72 trend[72,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 73 trend[73,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 74 trend[74,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 75 trend[75,1]    NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside></div>
 

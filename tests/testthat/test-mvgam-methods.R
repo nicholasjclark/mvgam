@@ -193,6 +193,23 @@ test_that("predict has reasonable outputs", {
   expect_error(predict(mvgam:::mvgam_example1, type = 'latent_N'),
                '"latent_N" type only available for N-mixture models',
                fixed = TRUE)
+
+  preds <- predict(mvgam:::mvgam_example5, type = 'terms')
+  expect_true(inherits(preds, 'list'))
+  expect_true(all.equal(names(preds$obs_effects), c('fit', 'se.fit')))
+  expect_true(is.null(preds$process_effects))
+
+  preds <- predict(mvgam:::mvgam_example4, type = 'terms')
+  expect_true(inherits(preds, 'list'))
+  expect_true(all.equal(names(preds$obs_effects), c('fit', 'se.fit')))
+  expect_true(!is.null(preds$process_effects))
+
+  preds <- predict(mvgam:::mvgam_example4, type = 'terms',
+                   summary = FALSE)
+  expect_true(inherits(preds, 'list'))
+  expect_true(is.matrix(preds$obs_effects[[1]]))
+  expect_true(dim(preds$obs_effects[[1]])[[2]] == NROW(mvgam:::mvgam_example4$obs_data))
+  expect_true(is.matrix(preds$process_effects[[1]]))
 })
 
 test_that("get_predict has reasonable outputs", {

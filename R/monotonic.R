@@ -73,7 +73,8 @@
 #'              data = mod_data,
 #'              family = gaussian(),
 #'              burnin = 300,
-#'              samples = 300)
+#'              samples = 300,
+#'              chains = 2)
 #'
 #' plot_predictions(mod2,
 #'                  by = 'x',
@@ -108,7 +109,8 @@
 #'              data = mod_data,
 #'              family = gaussian(),
 #'              burnin = 300,
-#'              samples = 300)
+#'              samples = 300,
+#'              chains = 2)
 #'
 #' # Visualise the different monotonic functions
 #' plot_predictions(mod, condition = c('x', 'fac', 'fac'),

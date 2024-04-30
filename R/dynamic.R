@@ -84,11 +84,12 @@
 #'
 #'# Fit a model using the dynamic function
 #'mod <- mvgam(out ~
-#'             # mis-specify the length scale slightly as this
-#'             # won't be known in practice
-#'             dynamic(predictor, rho = 8, stationary = TRUE),
-#'            family = gaussian(),
-#'            data = data_train)
+#'              # mis-specify the length scale slightly as this
+#'              # won't be known in practice
+#'              dynamic(predictor, rho = 8, stationary = TRUE),
+#'             family = gaussian(),
+#'             data = data_train,
+#'             chains = 2)
 #'
 #'# Inspect the summary
 #'summary(mod)

@@ -109,7 +109,7 @@ packages.
 [![`mvgam` usage
 cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
 
-## Introducing mvgam for fitting Generalized Additive Models to time seriese
+## Introducing mvgam for fitting Generalized Additive Models to time series
 
 We can explore the model’s primary functions using a dataset that is
 available with all `R` installations. Load the `lynx` data and plot the
@@ -319,7 +319,7 @@ summary(lynx_mvgam)
 #> 1 
 #> 
 #> N timepoints:
-#> 50 
+#> 60 
 #> 
 #> Status:
 #> Fitted using Stan 
@@ -329,37 +329,38 @@ summary(lynx_mvgam)
 #> 
 #> GAM coefficient (beta) estimates:
 #>                2.5%    50% 97.5% Rhat n_eff
-#> (Intercept)   6.100  6.600  7.00 1.00   875
-#> s(season).1  -0.620  0.032  0.70 1.00   965
-#> s(season).2  -0.260  0.840  1.80 1.01   432
-#> s(season).3  -0.032  1.200  2.50 1.01   395
-#> s(season).4  -0.480  0.430  1.30 1.01  1063
-#> s(season).5  -1.200 -0.150  0.92 1.00   459
-#> s(season).6  -1.100 -0.015  1.00 1.00   457
-#> s(season).7  -0.710  0.390  1.40 1.00   987
-#> s(season).8  -0.950  0.310  1.80 1.00   446
-#> s(season).9  -1.100 -0.250  0.65 1.00   565
-#> s(season).10 -1.300 -0.710 -0.02 1.01   691
+#> (Intercept)   6.000  6.600  7.00 1.01   319
+#> s(season).1  -0.570  0.031  0.70 1.00   837
+#> s(season).2  -0.260  0.790  1.80 1.00   422
+#> s(season).3  -0.077  1.200  2.50 1.00   379
+#> s(season).4  -0.490  0.420  1.30 1.00   850
+#> s(season).5  -1.200 -0.170  0.87 1.00   413
+#> s(season).6  -1.100 -0.014  1.00 1.00   750
+#> s(season).7  -0.700  0.380  1.40 1.00   619
+#> s(season).8  -0.940  0.280  1.90 1.00   325
+#> s(season).9  -1.100 -0.270  0.72 1.00   371
+#> s(season).10 -1.300 -0.660  0.02 1.00   589
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value
-#> s(season) 9.91     10  19271    0.22
+#> s(season) 9.88     10  18384    0.26
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n_eff
-#> ar1[1]    0.73  1.10 1.400 1.01   614
-#> ar2[1]   -0.82 -0.40 0.049 1.00  1284
-#> ar3[1]   -0.45 -0.12 0.290 1.00   621
-#> sigma[1]  0.40  0.50 0.650 1.00   995
+#> ar1[1]    0.74  1.10 1.400    1   755
+#> ar2[1]   -0.83 -0.40 0.032    1  1485
+#> ar3[1]   -0.46 -0.12 0.310    1   389
+#> sigma[1]  0.40  0.50 0.650    1  1032
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
 #> 0 of 2000 iterations ended with a divergence (0%)
-#> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
+#> 1 of 2000 iterations saturated the maximum tree depth of 12 (0.05%)
+#>  *Run with max_treedepth set to a larger value to avoid saturation
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Thu Apr 18 8:23:57 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Tue Apr 30 11:41:08 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -480,12 +481,11 @@ series (testing and training)
 
 ``` r
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
+#> Out of sample CRPS:
+#> 2820.726661
 ```
 
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
-
-    #> Out of sample CRPS:
-    #> [1] 2850.77
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -602,7 +602,7 @@ summary(mod, include_betas = FALSE)
 #> 3 
 #> 
 #> N timepoints:
-#> 60 
+#> 80 
 #> 
 #> Status:
 #> Fitted using Stan 
@@ -646,7 +646,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Thu Apr 18 8:25:56 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Tue Apr 30 11:42:40 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -662,11 +662,11 @@ for(i in 1:3){
 ```
 
     #> Out of sample CRPS:
-    #> [1] 2.0731
+    #> 2.07309994394723
     #> Out of sample CRPS:
-    #> [1] 1.833157
+    #> 1.8331565279954
     #> Out of sample CRPS:
-    #> [1] 1.736085
+    #> 1.73608537518319
 
 <img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />
 

@@ -41,7 +41,8 @@ mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
              simdat$data_test),
              family = gaussian(),
              burnin = 300,
-             samples = 300)
+             samples = 300,
+             chains = 2)
 plot(mod1, type = 'smooths')
 loo(mod1)
 
@@ -51,7 +52,8 @@ mod2 <- update(mod1,
               s(season, series, bs = 'fs',
               xt = list(bs = 'cc'), k = 4),
               burnin = 300,
-              samples = 300)
+              samples = 300,
+              chains = 2)
 plot(mod2, type = 'smooths')
 loo(mod2)
 
@@ -59,7 +61,8 @@ loo(mod2)
 mod3 <- update(mod2,
               trend_model = 'AR1',
               burnin = 300,
-              samples = 300)
+              samples = 300,
+              chains = 2)
 plot(mod3, type = 'smooths')
 plot(mod3, type = 'trend')
 loo(mod3)

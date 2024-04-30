@@ -156,36 +156,116 @@ package.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>seasonality <span class="op">=</span> <span class="st">'hierarchical'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'sz'</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">)</span></span></span>
+<span class="r-in"><span>              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'fs'</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>            burnin <span class="op">=</span> <span class="fl">300</span>,</span></span>
+<span class="r-in"><span>            samples <span class="op">=</span> <span class="fl">300</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using cmdstanr as the backend</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb442271132.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Init values were only set for a subset of parameters. </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Missing init values for the following parameters:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 1: lambda</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 2: lambda</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 3: lambda</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 4: lambda</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 4 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 600 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 600 [ 16%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 600 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 600 [ 16%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration:   1 / 600 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 100 / 600 [ 16%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration:   1 / 600 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 100 / 600 [ 16%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 600 [ 33%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 600 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 301 / 600 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 600 [ 33%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 600 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 301 / 600 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 600 [ 66%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 200 / 600 [ 33%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 300 / 600 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 301 / 600 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 400 / 600 [ 66%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 200 / 600 [ 33%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 300 / 600 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 301 / 600 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 400 / 600 [ 66%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 600 [ 66%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 600 [ 83%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 500 / 600 [ 83%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 500 / 600 [ 83%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 600 [ 83%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 600 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 600 / 600 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 600 / 600 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.7 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 finished in 0.6 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 finished in 0.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 600 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.8 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> All 4 chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.6 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.9 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 5 of 1200 (0.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Get a list of available plot types</span></span></span>
-<span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"xyz"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Use pp_check(mod, type = "xyz") for a list of available plot types</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Default is a density overlay for all observations</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using 10 posterior draws for ppc type 'dens_overlay' by default.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Rootograms particularly useful for count data</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"rootogram"</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using all posterior draws for ppc type 'rootogram' by default.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Grouping plots by series is useful</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"bars_grouped"</span>,</span></span>
 <span class="r-in"><span>        group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="pp_check.mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"ecdf_overlay_grouped"</span>,</span></span>
 <span class="r-in"><span>        group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="pp_check.mvgam-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"stat_freqpoly_grouped"</span>,</span></span>
 <span class="r-in"><span>        group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Custom functions accepted</span></span></span>
 <span class="r-in"><span><span class="va">prop_zero</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">x</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"stat"</span>, stat <span class="op">=</span> <span class="st">"prop_zero"</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using all posterior draws for ppc type 'stat' by default.</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in get(as.character(FUN), mode = "function", envir = envir):</span> object 'prop_zero' of mode 'function' was not found</span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"stat_grouped"</span>,</span></span>
 <span class="r-in"><span>        stat <span class="op">=</span> <span class="st">"prop_zero"</span>,</span></span>
 <span class="r-in"><span>        group <span class="op">=</span> <span class="st">"series"</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using all posterior draws for ppc type 'stat_grouped' by default.</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in get(as.character(FUN), mode = "function", envir = envir):</span> object 'prop_zero' of mode 'function' was not found</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Some functions accept covariates to set the x-axes</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, x <span class="op">=</span> <span class="st">"season"</span>,</span></span>
@@ -193,10 +273,14 @@ package.</p>
 <span class="r-in"><span>        prob <span class="op">=</span> <span class="fl">0.5</span>,</span></span>
 <span class="r-in"><span>        prob_outer <span class="op">=</span> <span class="fl">0.8</span>,</span></span>
 <span class="r-in"><span>        group <span class="op">=</span> <span class="st">"series"</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using all posterior draws for ppc type 'ribbon_grouped' by default.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Many plots can be made without the observed data</span></span></span>
 <span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, prefix <span class="op">=</span> <span class="st">"ppd"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using 10 posterior draws for ppc type 'dens_overlay' by default.</span>
+<span class="r-plt img"><img src="pp_check.mvgam-7.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
     </div>

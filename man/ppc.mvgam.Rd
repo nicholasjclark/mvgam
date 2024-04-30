@@ -88,7 +88,8 @@ mod <- mvgam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
             data = dat,
             family = gaussian(),
             burnin = 300,
-            samples = 300)
+            samples = 300,
+            chains = 2)
 
 # Posterior checks
 ppc(mod, type = 'hist')

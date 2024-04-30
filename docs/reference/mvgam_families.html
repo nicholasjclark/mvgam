@@ -109,133 +109,235 @@ functions in <code>mvgam</code>, so any call to change these will be silently ig
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span><span class="co"># An N-mixture example using family nmix()</span></span></span>
-<span class="r-in"><span><span class="co"># Simulate data from a Poisson-Binomial N-Mixture model</span></span></span>
-<span class="r-in"><span><span class="co"># True abundance is predicted by a single nonlinear function of temperature</span></span></span>
-<span class="r-in"><span><span class="co"># as well as a nonlinear long-term trend (as a Gaussian Process function)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">gamdat</span> <span class="op">&lt;-</span> <span class="fu">gamSim</span><span class="op">(</span>n <span class="op">=</span> <span class="fl">80</span><span class="op">)</span>; <span class="va">N</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NROW</a></span><span class="op">(</span><span class="va">gamdat</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">abund_linpred</span> <span class="op">&lt;-</span> <span class="va">gamdat</span><span class="op">$</span><span class="va">y</span>; <span class="va">temperature</span> <span class="op">&lt;-</span> <span class="va">gamdat</span><span class="op">$</span><span class="va">x2</span></span></span>
-<span class="r-in"><span><span class="va">trend</span> <span class="op">&lt;-</span> <span class="fu">mvgam</span><span class="fu">:::</span><span class="fu">sim_gp</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">0</span>, <span class="fl">0.1</span><span class="op">)</span>, alpha_gp <span class="op">=</span> <span class="fl">3</span>,</span></span>
-<span class="r-in"><span>                        rho_gp <span class="op">=</span> <span class="fl">16</span>, h <span class="op">=</span> <span class="va">N</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">true_abund</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">floor</a></span><span class="op">(</span><span class="fl">10</span> <span class="op">+</span> <span class="va">abund_linpred</span> <span class="op">+</span> <span class="va">trend</span><span class="op">)</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="co"># Example showing how to set up N-mixture models</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">999</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Simulate observations for species 1, which shows a declining trend and 0.7 detection probability</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>site <span class="op">=</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>          <span class="co"># five replicates per year; six years</span></span></span>
+<span class="r-in"><span>          replicate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>          time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>          species <span class="op">=</span> <span class="st">'sp_1'</span>,</span></span>
+<span class="r-in"><span>          <span class="co"># true abundance declines nonlinearly</span></span></span>
+<span class="r-in"><span>          truth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">28</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">26</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">23</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">16</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">14</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                    <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">14</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>          <span class="co"># observations are taken with detection prob = 0.7</span></span></span>
+<span class="r-in"><span>          obs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">28</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                  <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">26</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                  <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">23</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                  <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                  <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">14</span>, <span class="fl">0.7</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                  <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">14</span>, <span class="fl">0.7</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span> <span class="co"># add 'series' information, which is an identifier of site, replicate and species</span></span></span>
+<span class="r-in"><span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">'site_'</span>, <span class="va">site</span>,</span></span>
+<span class="r-in"><span>                               <span class="st">'_'</span>, <span class="va">species</span>,</span></span>
+<span class="r-in"><span>                               <span class="st">'_rep_'</span>, <span class="va">replicate</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>               time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>               <span class="co"># add a 'cap' variable that defines the maximum latent N to</span></span></span>
+<span class="r-in"><span>               <span class="co"># marginalize over when estimating latent abundance; in other words</span></span></span>
+<span class="r-in"><span>               <span class="co"># how large do we realistically think the true abundance could be?</span></span></span>
+<span class="r-in"><span>               cap <span class="op">=</span> <span class="fl">80</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span> <span class="va">replicate</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">testdat</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Detection probability increases linearly with decreasing rainfall</span></span></span>
-<span class="r-in"><span><span class="va">rainfall</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">N</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">detect_linpred</span> <span class="op">&lt;-</span> <span class="fl">0.4</span> <span class="op">+</span> <span class="op">-</span><span class="fl">0.55</span> <span class="op">*</span> <span class="va">rainfall</span></span></span>
-<span class="r-in"><span><span class="va">detect_prob</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="va">detect_linpred</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Now add another species that has a different temporal trend and a smaller</span></span></span>
+<span class="r-in"><span><span class="co"># detection probability (0.45 for this species)</span></span></span>
+<span class="r-in"><span><span class="va">testdat</span> <span class="op">=</span> <span class="va">testdat</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>site <span class="op">=</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>                             replicate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                             time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                             species <span class="op">=</span> <span class="st">'sp_2'</span>,</span></span>
+<span class="r-in"><span>                             truth <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                       <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">7</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                       <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">15</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                       <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">16</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                       <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">19</span>, <span class="fl">5</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                       <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">18</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                             obs <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">4</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                     <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">7</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                     <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">15</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                     <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">16</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                     <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">19</span>, <span class="fl">0.45</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                     <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">5</span>, <span class="fl">18</span>, <span class="fl">0.45</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span>                    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">'site_'</span>, <span class="va">site</span>,</span></span>
+<span class="r-in"><span>                                                  <span class="st">'_'</span>, <span class="va">species</span>,</span></span>
+<span class="r-in"><span>                                                  <span class="st">'_rep_'</span>, <span class="va">replicate</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                  time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                                  cap <span class="op">=</span> <span class="fl">50</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span>                    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">replicate</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Simulate observed counts</span></span></span>
-<span class="r-in"><span><span class="va">obs_abund</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="va">N</span>, size <span class="op">=</span> <span class="va">true_abund</span>, prob <span class="op">=</span> <span class="va">detect_prob</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># series identifiers</span></span></span>
+<span class="r-in"><span><span class="va">testdat</span><span class="op">$</span><span class="va">species</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">species</span>,</span></span>
+<span class="r-in"><span>                          levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">species</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span>,</span></span>
+<span class="r-in"><span>                         levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Plot true and observed time series</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">true_abund</span>,</span></span>
-<span class="r-in"><span>     type <span class="op">=</span> <span class="st">'l'</span>,</span></span>
-<span class="r-in"><span>     ylab <span class="op">=</span> <span class="st">'Abundance'</span>,</span></span>
-<span class="r-in"><span>     xlab <span class="op">=</span> <span class="st">'Time'</span>,</span></span>
-<span class="r-in"><span>     ylim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">true_abund</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>     bty <span class="op">=</span> <span class="st">'l'</span>,</span></span>
-<span class="r-in"><span>     lwd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/lines.html" class="external-link">lines</a></span><span class="op">(</span><span class="va">obs_abund</span>, col <span class="op">=</span> <span class="st">'darkred'</span>, lwd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/title.html" class="external-link">title</a></span><span class="op">(</span>main <span class="op">=</span> <span class="st">'True = black; observed = red'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># The trend_map to state how replicates are structured</span></span></span>
+<span class="r-in"><span><span class="va">testdat</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span><span class="co"># each unique combination of site*species is a separate process</span></span></span>
+<span class="r-in"><span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">site</span>, <span class="va">species</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">trend</span>, <span class="va">series</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
+<span class="r-in"><span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/distinct.html" class="external-link">distinct</a></span><span class="op">(</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">trend_map</span></span></span>
+<span class="r-in"><span><span class="va">trend_map</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    trend            series</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1      1 site_1_sp_1_rep_1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2      1 site_1_sp_1_rep_2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3      1 site_1_sp_1_rep_3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4      1 site_1_sp_1_rep_4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5      1 site_1_sp_1_rep_5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6      2 site_1_sp_2_rep_1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7      2 site_1_sp_2_rep_2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 8      2 site_1_sp_2_rep_3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 9      2 site_1_sp_2_rep_4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10     2 site_1_sp_2_rep_5</span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Gather data into a dataframe suitable for mvgam modelling;</span></span></span>
-<span class="r-in"><span><span class="co"># This will require a 'cap' variable specifying the maximum K to marginalise</span></span></span>
-<span class="r-in"><span><span class="co"># over when estimating latent abundance (it does NOT have to be a fixed value)</span></span></span>
-<span class="r-in"><span><span class="va">model_dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span><span class="va">obs_abund</span>,</span></span>
-<span class="r-in"><span>                        <span class="va">temperature</span>,</span></span>
-<span class="r-in"><span>                        <span class="va">rainfall</span>,</span></span>
-<span class="r-in"><span>                        cap <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">obs_abund</span><span class="op">)</span> <span class="op">+</span> <span class="fl">20</span>,</span></span>
-<span class="r-in"><span>                        time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="va">N</span>,</span></span>
-<span class="r-in"><span>                        series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="st">'series1'</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Fit a model</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>            <span class="co"># the observation formula sets up linear predictors for</span></span></span>
+<span class="r-in"><span>            <span class="co"># detection probability on the logit scale</span></span></span>
+<span class="r-in"><span>            formula <span class="op">=</span> <span class="va">obs</span> <span class="op">~</span> <span class="va">species</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Training and testing folds</span></span></span>
-<span class="r-in"><span><span class="va">data_train</span> <span class="op">&lt;-</span> <span class="va">model_dat</span> <span class="op"><a href="pipe.html">%&gt;%</a></span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">time</span> <span class="op">&lt;=</span> <span class="fl">74</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">data_test</span> <span class="op">&lt;-</span> <span class="va">model_dat</span> <span class="op"><a href="pipe.html">%&gt;%</a></span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">time</span> <span class="op">&gt;</span> <span class="fl">74</span><span class="op">)</span></span></span>
+<span class="r-in"><span>            <span class="co"># the trend_formula sets up the linear predictors for</span></span></span>
+<span class="r-in"><span>            <span class="co"># the latent abundance processes on the log scale</span></span></span>
+<span class="r-in"><span>            trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">trend</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span> <span class="op">+</span> <span class="va">species</span>,</span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Fit a model with informative priors on the two intercept parameters</span></span></span>
-<span class="r-in"><span><span class="co"># and on the length scale of the GP temporal trend parameter</span></span></span>
-<span class="r-in"><span><span class="co"># Note that the 'trend_formula' applies to the latent count process</span></span></span>
-<span class="r-in"><span><span class="co"># (a Poisson process with log-link), while the 'formula' applies to the</span></span></span>
-<span class="r-in"><span><span class="co"># detection probability (logit link)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span>formula <span class="op">=</span> <span class="va">obs_abund</span> <span class="op">~</span> <span class="va">rainfall</span>,</span></span>
-<span class="r-in"><span>             trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">temperature</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>               <span class="fu">gp</span><span class="op">(</span><span class="va">time</span>, k <span class="op">=</span> <span class="fl">10</span>, c <span class="op">=</span> <span class="fl">5</span><span class="op">/</span><span class="fl">4</span>, scale <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             family <span class="op">=</span> <span class="fu">nmix</span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             data <span class="op">=</span> <span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>             newdata <span class="op">=</span> <span class="va">data_test</span>,</span></span>
-<span class="r-in"><span>             priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu">prior</span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'(Intercept)'</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                        <span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">2</span>, <span class="fl">2</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'(Intercept)_trend'</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                        <span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">15</span>, <span class="fl">5</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'rho_gp_trend(time)'</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>            <span class="co"># the trend_map takes care of the mapping</span></span></span>
+<span class="r-in"><span>            trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Model summary and diagnostics</span></span></span>
+<span class="r-in"><span>            <span class="co"># nmix() family and data</span></span></span>
+<span class="r-in"><span>            family <span class="op">=</span> <span class="fu">nmix</span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>            data <span class="op">=</span> <span class="va">testdat</span>,</span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span>            <span class="co"># priors can be set in the usual way</span></span></span>
+<span class="r-in"><span>            priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu">prior</span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">b</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                       <span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept_trend</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>            burnin <span class="op">=</span> <span class="fl">300</span>,</span></span>
+<span class="r-in"><span>            samples <span class="op">=</span> <span class="fl">300</span>,</span></span>
+<span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using cmdstanr as the backend</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4435869f.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Init values were only set for a subset of parameters. </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Missing init values for the following parameters:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 1: b_raw_trend, lambda_trend</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 2: b_raw_trend, lambda_trend</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 600 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 600 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 600 [ 16%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 600 [ 16%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 600 [ 33%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 600 [ 33%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 600 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 301 / 600 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 600 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 301 / 600 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 600 [ 66%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 600 [ 66%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 600 [ 83%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 600 [ 83%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 600 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 9.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 600 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 10.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 9.8 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 10.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># The usual diagnostics</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'residuals'</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM observation formula:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> obs ~ species - 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000002bc812bd840&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM process formula:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ~s(time, by = trend, k = 4) + species</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000002bc812bd840&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> nmix</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Link function:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> log</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Trend model:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> None</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N process models:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N series:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 10 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N timepoints:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Status:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Fitted using Stan </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 chains, each with iter = 600; warmup = 300; thin = 1 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total post-warmup draws = 600</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM observation model coefficient (beta) estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>              2.5%  50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> speciessp_1 -0.21 0.69   1.4    1   180</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> speciessp_2 -0.99 0.06   0.9    1   345</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM process model coefficient (beta) estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                               2.5%     50%  97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)_trend            2.700  3.0000  3.400 1.00   224</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> speciessp_2_trend           -1.200 -0.6500  0.045 1.00   211</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend1.1_trend -0.082  0.0130  0.220 1.01   156</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend1.2_trend -0.210  0.0073  0.260 1.03    95</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend1.3_trend -0.470 -0.2500 -0.050 1.00   414</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend2.1_trend -0.140 -0.0098  0.080 1.00   316</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend2.2_trend -0.200  0.0180  0.280 1.00   409</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):trendtrend2.3_trend  0.081  0.3300  0.630 1.00   396</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM process smooths:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                       edf Ref.df    F p-value</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):seriestrend1 0.85      3 1.38    0.71</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(time):seriestrend2 1.11      3 0.64    0.51</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Rhat looks reasonable for all parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 600 iterations ended with a divergence (0%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 600 iterations saturated the maximum tree depth of 12 (0%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Tue Apr 30 12:27:10 PM 2024.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Intercept parameters</span></span></span>
-<span class="r-in"><span><span class="fu">mcmc_plot</span><span class="op">(</span><span class="va">mod</span>,</span></span>
-<span class="r-in"><span>          variable <span class="op">=</span> <span class="st">"Intercept"</span>,</span></span>
-<span class="r-in"><span>          regex <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
-<span class="r-in"><span>          type <span class="op">=</span> <span class="st">'hist'</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Hindcasts and forecasts of latent abundance (with truth overlain)</span></span></span>
-<span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'latent_N'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/graphics/points.html" class="external-link">points</a></span><span class="op">(</span><span class="va">true_abund</span>, pch <span class="op">=</span> <span class="fl">16</span>, cex <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Latent abundance predictions are restricted based on 'cap'</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">model_dat</span><span class="op">$</span><span class="va">cap</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="va">fc</span><span class="op">$</span><span class="va">forecasts</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Hindcasts and forecasts of detection probability (with truth overlain)</span></span></span>
-<span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/graphics/points.html" class="external-link">points</a></span><span class="op">(</span><span class="va">detect_prob</span>, pch <span class="op">=</span> <span class="fl">16</span>, cex <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Hindcasts and forecasts of observations</span></span></span>
-<span class="r-in"><span><span class="co"># (after accounting for detection error)</span></span></span>
-<span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'response'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Hindcasts and forecasts of response expectations</span></span></span>
-<span class="r-in"><span><span class="co"># (with truth overlain)</span></span></span>
-<span class="r-in"><span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="forecast.mvgam.html">forecast</a></span><span class="op">(</span>object <span class="op">=</span> <span class="va">mod</span>, type <span class="op">=</span> <span class="st">'expected'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span>; <span class="fu"><a href="https://rdrr.io/r/graphics/points.html" class="external-link">points</a></span><span class="op">(</span><span class="va">detect_prob</span> <span class="op">*</span> <span class="va">true_abund</span>, pch <span class="op">=</span> <span class="fl">16</span>, cex <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Plot conditional effects</span></span></span>
+<span class="r-in"><span><span class="co"># Plotting conditional effects</span></span></span>
 <span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Effects on true abundance can be visualised using type = 'link'</span></span></span>
-<span class="r-in"><span><span class="va">abund_plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>,</span></span>
-<span class="r-in"><span>                                        type <span class="op">=</span> <span class="st">'link'</span>,</span></span>
-<span class="r-in"><span>                                        effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'temperature'</span>, <span class="st">'time'</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                    plot <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Effect of temperature on abundance</span></span></span>
-<span class="r-in"><span><span class="va">abund_plots</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Latent abundance'</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Long-term trend in abundance</span></span></span>
-<span class="r-in"><span><span class="va">abund_plots</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Latent abundance'</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Effect of rainfall on detection probability</span></span></span>
-<span class="r-in"><span><span class="va">det_plot</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>,</span></span>
-<span class="r-in"><span>                                     type <span class="op">=</span> <span class="st">'detection'</span>,</span></span>
-<span class="r-in"><span>                                     effects <span class="op">=</span> <span class="st">'rainfall'</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                 plot <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">det_plot</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># More targeted plots can use marginaleffects capabilities;</span></span></span>
-<span class="r-in"><span><span class="co"># Here visualise how response predictions might change</span></span></span>
-<span class="r-in"><span><span class="co"># if we considered different possible 'cap' limits on latent</span></span></span>
-<span class="r-in"><span><span class="co"># abundance and different rainfall measurements</span></span></span>
-<span class="r-in"><span><span class="fu">plot_predictions</span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">'temperature'</span>,</span></span>
-<span class="r-in"><span>                                       cap <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">15</span>, <span class="fl">20</span>, <span class="fl">40</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                                       rainfall <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">1</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                type <span class="op">=</span> <span class="st">'response'</span>,</span></span>
-<span class="r-in"><span>                conf_level <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Observed abundance'</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span> <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span></span>
+<span class="r-in"><span>                 type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>     <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>     <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/lims.html" class="external-link">ylim</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>     <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>     <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="mvgam_families-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Example showcasing how cbind() is needed for Binomial observations</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate two time series of Binomial trials</span></span></span>
@@ -261,9 +363,236 @@ functions in <code>mvgam</code>, so any call to change these will be silently ig
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span><span class="va">y</span>, <span class="va">ntrials</span><span class="op">)</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="fu">s</span><span class="op">(</span><span class="va">x</span>, by <span class="op">=</span> <span class="va">series</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">dat</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using cmdstanr as the backend</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Init values were only set for a subset of parameters. </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Missing init values for the following parameters:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 1: lambda</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 2: lambda</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 3: lambda</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 4: lambda</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 4 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 6.40751e-209. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 2.22176e-208. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 1.1456e-307. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 1.1456e-307. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 1.1456e-307. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 4.92756e-289. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 4.7683e-231. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 45, column 2 to line 47, column 71)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 2.26151e-86. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 45, column 2 to line 47, column 71)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 1.1456e-307. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 1.1456e-307. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 2.52366e-114. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 1.4643e-114. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 1.1456e-307. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 3 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 1.1456e-307. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 45, column 2 to line 47, column 71)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 1.1456e-307. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 45, column 2 to line 47, column 71)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 8.45239e-88. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 45, column 2 to line 47, column 71)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 1.1456e-307. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 Exception: multi_normal_prec_lpdf: LDLT_Factor of precision parameter is not positive definite.  last conditional variance is 5.70618e-157. (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb45fc97b86.stan', line 40, column 2 to line 42, column 70)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 4 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 3 finished in 1.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 4 finished in 1.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 1.3 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 1.3 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> All 4 chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 1.4 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 19 of 2000 (1.0%) transitions ended with a divergence.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, ntrials) ~ series + s(x, by = series)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000002bc812bd840&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Link function:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> logit</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Trend model:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> None</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N series:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N timepoints:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 50 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Status:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Fitted using Stan </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 chains, each with iter = 1000; warmup = 500; thin = 1 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total post-warmup draws = 2000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                        2.5%     50%  97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)          -0.660 -0.5200 -0.390 1.00   688</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> seriesseries2         0.190  0.3700  0.580 1.01   353</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.1 -0.360 -0.0150  0.110 1.02   202</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.2 -0.370 -0.0160  0.200 1.01   344</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.3 -0.190 -0.0081  0.045 1.02   137</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.4 -0.300 -0.0190  0.090 1.02   240</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.5 -0.055 -0.0020  0.033 1.00   733</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.6 -0.280 -0.0200  0.077 1.02   233</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.7 -0.059 -0.0022  0.027 1.01   328</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.8 -1.300 -0.1200  0.300 1.02   188</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1.9  0.290  0.8400  1.100 1.02   149</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.1 -0.054  0.0720  0.610 1.02   146</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.2 -0.440  0.0015  0.360 1.00   765</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.3 -0.050  0.0140  0.220 1.01   291</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.4 -0.220  0.0120  0.270 1.00   658</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.5 -0.048  0.0027  0.069 1.00  1348</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.6 -0.150  0.0150  0.250 1.00   563</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.7 -0.041  0.0015  0.067 1.00  1543</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.8 -0.640  0.0970  1.100 1.01   566</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2.9 -0.850 -0.6000  0.048 1.02   155</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                     edf Ref.df Chi.sq p-value    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries1 1.35      9    203  &lt;2e-16 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(x):seriesseries2 1.80      9    174  &lt;2e-16 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Rhats above 1.05 found for 1 parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  *Diagnose further to investigate why the chains have not mixed</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 19 of 2000 iterations ended with a divergence (0.95%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  *Try running with larger adapt_delta to remove the divergences</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Tue Apr 30 12:27:17 PM 2024.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

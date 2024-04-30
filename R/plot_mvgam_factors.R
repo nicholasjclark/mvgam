@@ -23,7 +23,8 @@
 #'             trend_model = AR(),
 #'             use_lv = TRUE,
 #'             n_lv = 2,
-#'             data = simdat$data_train)
+#'             data = simdat$data_train,
+#'             chains = 2)
 #'plot_mvgam_factors(mod)
 #'}
 #'@export
@@ -59,20 +60,11 @@ plot_mvgam_factors = function(object, plot = TRUE){
     on.exit(par(.pardefault))
 
     if(object$n_lv <= 2){
-      par(mfrow = c(1, 2),
-          mar=c(2.5, 2.3, 2, 2),
-          oma = c(1, 1, 0, 0),
-          mgp = c(1.5, 0.5, 0))
+      par(mfrow = c(1, 2))
     } else if(object$n_lv <= 4){
-      par(mfrow = c(2, 2),
-          mar=c(2.5, 2.3, 2, 2),
-          oma = c(1, 1, 0, 0),
-          mgp = c(1.5, 0.5, 0))
+      par(mfrow = c(2, 2))
     } else {
-      par(mfrow = c(3, 2),
-          mar=c(2.5, 2.3, 2, 2),
-          oma = c(1, 1, 0, 0),
-          mgp = c(1.5, 0.5, 0))
+      par(mfrow = c(3, 2))
     }
   }
 

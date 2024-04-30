@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.91</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -32,6 +32,9 @@
     <a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in mvgam</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in mvgam</a>
   </div>
+</li>
+<li class="nav-item">
+  <a class="nav-link" href="../news/index.html">Changelog</a>
 </li>
       </ul><form class="form-inline my-2 my-lg-0" role="search">
         <input type="search" class="form-control me-sm-2" aria-label="Toggle navigation" name="search-input" data-search-index="../search.json" id="search-input" placeholder="Search for" autocomplete="off"></form>
@@ -78,7 +81,7 @@
 <span><span class="fu"><a href="https://rdrr.io/r/base/array.html" class="external-link">as.array</a></span><span class="op">(</span><span class="va">x</span>, variable <span class="op">=</span> <span class="st">"betas"</span>, regex <span class="op">=</span> <span class="cn">FALSE</span>, use_alias <span class="op">=</span> <span class="cn">TRUE</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://mc-stan.org/posterior/reference/draws.html" class="external-link">as_draws</a></span><span class="op">(</span></span>
+<span><span class="fu">as_draws</span><span class="op">(</span></span>
 <span>  <span class="va">x</span>,</span>
 <span>  variable <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  regex <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -88,7 +91,7 @@
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://mc-stan.org/posterior/reference/draws_matrix.html" class="external-link">as_draws_matrix</a></span><span class="op">(</span></span>
+<span><span class="fu">as_draws_matrix</span><span class="op">(</span></span>
 <span>  <span class="va">x</span>,</span>
 <span>  variable <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  regex <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -98,7 +101,7 @@
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://mc-stan.org/posterior/reference/draws_df.html" class="external-link">as_draws_df</a></span><span class="op">(</span></span>
+<span><span class="fu">as_draws_df</span><span class="op">(</span></span>
 <span>  <span class="va">x</span>,</span>
 <span>  variable <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  regex <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -108,7 +111,7 @@
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://mc-stan.org/posterior/reference/draws_array.html" class="external-link">as_draws_array</a></span><span class="op">(</span></span>
+<span><span class="fu">as_draws_array</span><span class="op">(</span></span>
 <span>  <span class="va">x</span>,</span>
 <span>  variable <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  regex <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -118,7 +121,7 @@
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://mc-stan.org/posterior/reference/draws_list.html" class="external-link">as_draws_list</a></span><span class="op">(</span></span>
+<span><span class="fu">as_draws_list</span><span class="op">(</span></span>
 <span>  <span class="va">x</span>,</span>
 <span>  variable <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  regex <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -128,7 +131,7 @@
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu"><a href="https://mc-stan.org/posterior/reference/draws_rvars.html" class="external-link">as_draws_rvars</a></span><span class="op">(</span><span class="va">x</span>, variable <span class="op">=</span> <span class="cn">NULL</span>, regex <span class="op">=</span> <span class="cn">FALSE</span>, inc_warmup <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">as_draws_rvars</span><span class="op">(</span><span class="va">x</span>, variable <span class="op">=</span> <span class="cn">NULL</span>, regex <span class="op">=</span> <span class="cn">FALSE</span>, inc_warmup <span class="op">=</span> <span class="cn">FALSE</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -194,22 +197,162 @@ will be selected. Defaults to <code>FALSE</code>.</p></dd>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="va">sim</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="va">mod1</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">sim</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>             samples <span class="op">=</span> <span class="fl">300</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Using cmdstanr as the backend</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4250e16c4.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Init values were only set for a subset of parameters. </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Missing init values for the following parameters:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 1: shape, ar1, sigma, trend, lambda</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 2: shape, ar1, sigma, trend, lambda</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 800 [  0%]  (Warmup) </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: normal_lpdf: Scale parameter[1] is 0, but must be positive! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4250e16c4.stan', line 72, column 2 to column 44)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: gamma_lpdf: Inverse scale parameter[2] is 0, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4250e16c4.stan', line 85, column 4 to line 88, column 50)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 800 [  0%]  (Warmup) </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: gamma_lpdf: Random variable[3] is 0, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4250e16c4.stan', line 78, column 2 to column 28)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: gamma_lpdf: Random variable[3] is 0, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4250e16c4.stan', line 78, column 2 to column 28)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: gamma_lpdf: Inverse scale parameter[7] is 0, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4250e16c4.stan', line 85, column 4 to line 88, column 50)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: multi_normal_prec_lpdf: Precision matrix is not symmetric. Precision matrix[3,6] = 6.59136e+151, but Precision matrix[6,3] = 6.59136e+151 (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4250e16c4.stan', line 60, column 2 to column 78)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: gamma_lpdf: Random variable[3] is 0, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4250e16c4.stan', line 78, column 2 to column 28)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 800 [ 12%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 800 [ 12%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 800 [ 25%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 800 [ 25%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 800 [ 37%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 800 [ 37%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 800 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 800 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 800 [ 62%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 800 [ 62%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 800 [ 62%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 800 [ 62%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 800 [ 75%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 800 [ 75%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 800 [ 87%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 800 [ 87%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 800 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 2.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 800 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 2.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 2.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 2.4 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2 chains had an E-BFMI less than 0.2.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span><span class="va">beta_draws_df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">mod1</span>, variable <span class="op">=</span> <span class="st">'betas'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">beta_draws_df</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   (Intercept) s(season).1 s(season).2 s(season).3 s(season).4 s(season).5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    0.473482   -0.284445    -1.30214   -0.905530   -0.781868   -0.159573</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    0.469718   -0.636203    -1.36969   -1.271590   -0.941246   -0.273656</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3    0.361026   -0.424151    -1.02138   -0.764511   -0.643926   -0.173128</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4    0.440060   -1.021860    -1.23949   -0.843361   -0.740426   -0.388705</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5    0.435705   -1.003680    -1.23545   -0.784314   -0.670782   -0.413590</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6    0.410711   -1.081150    -1.27875   -0.799696   -0.654465   -0.445064</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   s(season).6 s(season).7 s(season).8</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    0.427777     1.18997    0.908878</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    0.532353     1.04850    0.589914</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3    0.645940     1.32733    0.736799</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4    0.681218     1.39484    0.847029</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5    0.715386     1.36414    0.890704</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6    0.773900     1.37622    0.853578</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">beta_draws_df</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 'data.frame':	600 obs. of  9 variables:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ (Intercept): num  0.473 0.47 0.361 0.44 0.436 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).1: num  -0.284 -0.636 -0.424 -1.022 -1.004 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).2: num  -1.3 -1.37 -1.02 -1.24 -1.24 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).3: num  -0.906 -1.272 -0.765 -0.843 -0.784 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).4: num  -0.782 -0.941 -0.644 -0.74 -0.671 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).5: num  -0.16 -0.274 -0.173 -0.389 -0.414 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).6: num  0.428 0.532 0.646 0.681 0.715 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).7: num  1.19 1.05 1.33 1.39 1.36 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ s(season).8: num  0.909 0.59 0.737 0.847 0.891 ...</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">beta_draws_mat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">mod1</span>, variable <span class="op">=</span> <span class="st">'betas'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">beta_draws_mat</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     variable</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> draw (Intercept) s(season).1 s(season).2 s(season).3 s(season).4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    1    0.473482   -0.284445    -1.30214   -0.905530   -0.781868</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    2    0.469718   -0.636203    -1.36969   -1.271590   -0.941246</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    3    0.361026   -0.424151    -1.02138   -0.764511   -0.643926</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    4    0.440060   -1.021860    -1.23949   -0.843361   -0.740426</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    5    0.435705   -1.003680    -1.23545   -0.784314   -0.670782</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    6    0.410711   -1.081150    -1.27875   -0.799696   -0.654465</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     variable</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> draw s(season).5 s(season).6 s(season).7 s(season).8</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    1   -0.159573    0.427777     1.18997    0.908878</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    2   -0.273656    0.532353     1.04850    0.589914</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    3   -0.173128    0.645940     1.32733    0.736799</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    4   -0.388705    0.681218     1.39484    0.847029</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    5   -0.413590    0.715386     1.36414    0.890704</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    6   -0.445064    0.773900     1.37622    0.853578</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">beta_draws_mat</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  num [1:600, 1:9] 0.473 0.47 0.361 0.44 0.436 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "dimnames")=List of 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ draw    : chr [1:600] "1" "2" "3" "4" ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ variable: chr [1:9] "(Intercept)" "s(season).1" "s(season).2" "s(season).3" ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "nchains")= int 2</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">shape_pars</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">mod1</span>, variable <span class="op">=</span> <span class="st">'shape'</span>, regex <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">shape_pars</span><span class="op">)</span><span class="op">}</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">shape_pars</span><span class="op">)</span><span class="co"># }</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     variable</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> draw shape[1] shape[2] shape[3]</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    1  1.38530 0.992625 0.638765</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    2  1.15329 0.955325 0.606799</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    3  1.30158 0.880035 0.742948</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    4  1.50856 0.731812 0.728775</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    5  1.47118 0.729411 0.709449</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    6  1.32299 0.741253 0.770997</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

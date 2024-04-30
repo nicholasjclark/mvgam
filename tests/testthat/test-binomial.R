@@ -84,7 +84,8 @@ test_that("binomial() post-processing works", {
                trend_model = AR(),
                data = dat_train,
                burnin = 500,
-               samples = 200))
+               samples = 200,
+               chains = 2))
   expect_no_error(summary(mod))
   expect_no_error(code(mod))
   expect_no_error(print(mod))
@@ -153,7 +154,8 @@ test_that("binomial() post-processing works", {
                   data = dat_train,
                   newdata = dat_test,
                   burnin = 200,
-                  samples = 200))
+                  samples = 200,
+                  chains = 2))
   fc <- forecast(mod)
   expect_true(inherits(fc, 'mvgam_forecast'))
   expect_no_error(plot_mvgam_uncertainty(mod))
@@ -276,7 +278,8 @@ test_that("bernoulli() post-processing works", {
                family = bernoulli(),
                data = dat_train,
                burnin = 200,
-               samples = 200)
+               samples = 200,
+               chains = 2)
 
   expect_no_error(summary(mod))
   expect_no_error(print(mod))

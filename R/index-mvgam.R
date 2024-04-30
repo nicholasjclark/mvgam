@@ -23,7 +23,8 @@ NULL
 #'              trend_model = AR(),
 #'              data = simdat$data_train,
 #'             burnin = 300,
-#'             samples = 300)
+#'             samples = 300,
+#'             chains = 2)
 #' variables(mod)
 #' }
 #' @export

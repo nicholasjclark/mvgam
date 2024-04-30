@@ -88,7 +88,9 @@ mod <- mvgam(formula = y ~ s(season, bs = 'cc',
             trend_model = CAR(),
             data = dat,
             family = gaussian(),
-            run_model = TRUE)
+            burnin = 300,
+            samples = 300,
+            chains = 2)
 
 # View usual summaries and plots
 summary(mod)

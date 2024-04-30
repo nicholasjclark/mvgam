@@ -113,44 +113,6 @@ validate_series_time = function(data, name = 'data',
   return(data)
 }
 
-#' Get data objects into correct order in case it is not already
-#'@noRd
-sort_data = function(data, series_time = FALSE){
-  if(inherits(data, 'list')){
-    data_arranged <- data
-    if(series_time){
-      temp_dat = data.frame(time = data$index..time..index,
-                            series = data$series) %>%
-        dplyr::mutate(index = dplyr::row_number()) %>%
-        dplyr::arrange(series, time)
-    } else {
-      temp_dat = data.frame(time = data$index..time..index,
-                            series = data$series) %>%
-        dplyr::mutate(index = dplyr::row_number()) %>%
-        dplyr::arrange(time, series)
-    }
-
-    data_arranged <- lapply(data, function(x){
-      if(is.matrix(x)){
-        matrix(x[temp_dat$index,], ncol = NCOL(x))
-      } else {
-        x[temp_dat$index]
-      }
-    })
-    names(data_arranged) <- names(data)
-  } else {
-    if(series_time){
-      data_arranged <- data %>%
-        dplyr::arrange(series, index..time..index)
-    } else {
-      data_arranged <- data %>%
-        dplyr::arrange(index..time..index, series)
-    }
-  }
-
-  return(data_arranged)
-}
-
 #'@importFrom rlang warn
 #'@noRd
 validate_family = function(family, use_stan = TRUE){

@@ -65,7 +65,10 @@ data <- sim_mvgam()
 mod <- mvgam(y ~ 1,
             trend_model = RW(),
             data = data$data_train,
-            newdata = data$data_test)
+            newdata = data$data_test,
+            burnin = 300,
+            samples = 300,
+            chains = 2)
 
 # Extract forecasts into a 'mvgam_forecast' object
 fc <- forecast(mod)

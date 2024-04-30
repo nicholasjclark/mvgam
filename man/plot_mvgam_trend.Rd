@@ -64,7 +64,8 @@ mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
             trend_model = AR(),
             data = simdat$data_train,
             burnin = 300,
-            samples = 300)
+            samples = 300,
+            chains = 2)
 
 # Plot estimated trends for some series
 plot_mvgam_trend(mod)

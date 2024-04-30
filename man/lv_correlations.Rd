@@ -27,7 +27,8 @@ mod <- mvgam(y ~ s(season, bs = 'cc',
             n_lv = 2,
             data = simdat$data_train,
             burnin = 300,
-            samples = 300)
+            samples = 300,
+            chains = 2)
 lvcors <- lv_correlations(mod)
 names(lvcors)
 lapply(lvcors, class)

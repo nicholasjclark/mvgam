@@ -41,10 +41,11 @@ Compute pointwise Log-Likelihoods from fitted \code{mvgam} objects
 # Simulate some data and fit a model
 simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
-            trend_model = AR(),
-            data = simdat$data_train,
-            burnin = 300,
-            samples = 300)
+             trend_model = AR(),
+             data = simdat$data_train,
+             burnin = 300,
+             samples = 300,
+             chains = 2)
 
 # Extract logLikelihood values
 lls <- logLik(mod)

@@ -21,7 +21,10 @@
 #' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
 #'              trend_model = AR(),
-#'              data = simdat$data_train)
+#'              data = simdat$data_train,
+#'              burnin = 300,
+#'              samples = 300,
+#'              chains = 2)
 #' summary(mod)
 #' conditional_effects(mod, type = 'link')
 #'
