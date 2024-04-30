@@ -142,7 +142,7 @@ arguments to be interpreted by the parsing functions in <code>mvgam</code></p>
 <span class="r-in"><span><span class="va">seasonality</span> <span class="op">&lt;-</span> <span class="va">beta1</span> <span class="op">*</span> <span class="va">cov1</span> <span class="op">+</span> <span class="va">beta2</span> <span class="op">*</span> <span class="va">cov2</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Take Gaussian observations with error and return</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span>, mean <span class="op">=</span> <span class="va">x</span> <span class="op">+</span> <span class="va">seasonality</span>, sd <span class="op">=</span> <span class="va">sigma</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span>, mean <span class="op">=</span> <span class="va">x</span> <span class="op">+</span> <span class="va">seasonality</span>, sd <span class="op">=</span> <span class="va">sigma_obs</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>           season <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">12</span>, <span class="fl">20</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="va">n</span><span class="op">]</span>,</span></span>
 <span class="r-in"><span>           time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cumsum</a></span><span class="op">(</span><span class="va">time_dis</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
@@ -156,13 +156,14 @@ arguments to be interpreted by the parsing functions in <code>mvgam</code></p>
 <span class="r-in"><span>                             <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>series <span class="op">=</span> <span class="st">'series2'</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="pipe.html">%&gt;%</a></span></span></span>
 <span class="r-in"><span>      <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># mvgam with CAR(1) trends and series-level seasonal smooths</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>,</span></span>
-<span class="r-in"><span>                            k <span class="op">=</span> <span class="fl">5</span>, by <span class="op">=</span> <span class="va">series</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span><span class="co"># mvgam with CAR(1) trends and series-level seasonal smooths; the</span></span></span>
+<span class="r-in"><span><span class="co"># State-Space representation (using trend_formula) will be more efficient</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span>formula <span class="op">=</span> <span class="va">y</span> <span class="op">~</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>            trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>,</span></span>
+<span class="r-in"><span>                                k <span class="op">=</span> <span class="fl">5</span>, by <span class="op">=</span> <span class="va">trend</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            trend_model <span class="op">=</span> <span class="fu">CAR</span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            data <span class="op">=</span> <span class="va">dat</span>,</span></span>
 <span class="r-in"><span>            family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            burnin <span class="op">=</span> <span class="fl">300</span>,</span></span>
 <span class="r-in"><span>            samples <span class="op">=</span> <span class="fl">300</span>,</span></span>
 <span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Using cmdstanr as the backend</span>
@@ -174,7 +175,7 @@ arguments to be interpreted by the parsing functions in <code>mvgam</code></p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4152e20bf.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpyAHOdT/model-3638ab47d2d.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
@@ -182,79 +183,74 @@ arguments to be interpreted by the parsing functions in <code>mvgam</code></p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Init values were only set for a subset of parameters. </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Missing init values for the following parameters:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 1: sigma_obs, ar1, sigma, trend, lambda</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 2: sigma_obs, ar1, sigma, trend, lambda</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 1: b_raw_trend, sigma, sigma_obs, ar1, LV, lambda_trend</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>  - chain 2: b_raw_trend, sigma, sigma_obs, ar1, LV, lambda_trend</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 600 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 800 [  0%]  (Warmup) </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4152e20bf.stan', line 91, column 4 to line 92, column 64)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/RtmpyAHOdT/model-3638ab47d2d.stan', line 126, column 4 to line 127, column 64)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4152e20bf.stan', line 91, column 4 to line 92, column 64)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: normal_id_glm_lpdf: Scale vector[121] is inf, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/RtmpyAHOdT/model-3638ab47d2d.stan', line 126, column 4 to line 127, column 64)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4152e20bf.stan', line 91, column 4 to line 92, column 64)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 1 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 600 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 800 [  0%]  (Warmup) </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4152e20bf.stan', line 91, column 4 to line 92, column 64)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/RtmpyAHOdT/model-3638ab47d2d.stan', line 126, column 4 to line 127, column 64)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4152e20bf.stan', line 91, column 4 to line 92, column 64)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/RtmpyAHOdT/model-3638ab47d2d.stan', line 126, column 4 to line 127, column 64)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4152e20bf.stan', line 91, column 4 to line 92, column 64)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: normal_lpdf: Scale parameter is 0, but must be positive! (in 'C:/Users/uqnclar2/AppData/Local/Temp/RtmpyAHOdT/model-3638ab47d2d.stan', line 109, column 4 to column 63)</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: normal_lpdf: Scale parameter[1] is 0, but must be positive! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4152e20bf.stan', line 77, column 2 to column 44)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Informational Message: The current Metropolis proposal is about to be rejected because of the following issue:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 Exception: normal_id_glm_lpdf: Scale vector[1] is inf, but must be positive finite! (in 'C:/Users/uqnclar2/AppData/Local/Temp/Rtmpyc0ip7/model-4fb4152e20bf.stan', line 91, column 4 to line 92, column 64)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 If this warning occurs sporadically, such as for highly constrained variable types like covariance matrices, then the sampler is fine,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 but if this warning occurs often then your model may be either severely ill-conditioned or misspecified.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Chain 2 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 600 [ 16%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 600 [ 16%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 600 [ 33%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 600 [ 33%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 600 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 301 / 600 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 600 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 301 / 600 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 600 [ 66%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 600 [ 66%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 600 [ 83%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 600 [ 83%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 600 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 1.0 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 600 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 1.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 800 [ 12%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 800 [ 12%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 800 [ 25%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 800 [ 25%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 800 [ 37%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 800 [ 37%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 800 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 800 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 800 [ 62%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 800 [ 62%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 800 [ 62%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 800 [ 62%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 800 [ 75%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 800 [ 87%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 800 [ 75%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 800 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 2.7 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 800 [ 87%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 800 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 3.5 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.0 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 1.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 3.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 3.8 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Warning: 2 of 2 chains had an E-BFMI less than 0.2.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> See https://mc-stan.org/misc/warnings for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># View usual summaries and plots</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc", k = 5, by = series)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000002bcf92158f8&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM observation formula:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> y ~ 1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x00000229d4865188&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM process formula:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ~s(season, bs = "cc", k = 5, by = trend)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x00000229d4865188&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
@@ -265,6 +261,9 @@ arguments to be interpreted by the parsing functions in <code>mvgam</code></p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Trend model:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> CAR()</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N process models:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> N series:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -273,48 +272,56 @@ arguments to be interpreted by the parsing functions in <code>mvgam</code></p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Status:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Fitted using Stan </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 chains, each with iter = 600; warmup = 300; thin = 1 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 chains, each with iter = 800; warmup = 500; thin = 1 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Total post-warmup draws = 600</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Observation error parameter estimates:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>              2.5%  50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[1] 0.58 0.95   1.3 1.05    86</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[2] 0.42 0.80   1.1 1.02    48</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[1] 0.15 0.39  0.81 1.23    13</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma_obs[2] 0.13 0.31  0.63 1.03    24</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                             2.5%   50%   97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)               -0.069  0.21  0.4700 1.00   139</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriesseries1.1 -0.100  0.33  0.8800 1.00   351</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriesseries1.2 -1.200 -0.63 -0.0750 1.01   313</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriesseries1.3 -0.900 -0.42  0.0320 1.02   227</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriesseries2.1 -0.230  0.24  0.7000 1.00   280</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriesseries2.2 -1.200 -0.45  0.1000 1.03   100</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriesseries2.3 -1.100 -0.46  0.0098 1.01   165</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM observation model coefficient (beta) estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>              2.5%  50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept) -0.21 0.11  0.32 1.05    31</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                          edf Ref.df    F p-value  </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriesseries1 2.47      3 2.91   0.025 *</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriesseries2 1.81      3 2.45   0.158  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Process model AR parameter estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>        2.5%  50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1] 0.12 0.39  0.64 1.01   381</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[2] 0.79 0.87  0.93 1.00   237</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Process error parameter estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          2.5%  50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1] 0.97 1.20   1.4 1.05    49</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2] 0.77 0.97   1.1 1.01    77</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> GAM process model coefficient (beta) estimates:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                2.5%    50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend1.1_trend -0.39  0.027 0.390    1   577</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend1.2_trend -0.81 -0.260 0.130    1   513</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend1.3_trend -0.65 -0.160 0.190    1   416</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend2.1_trend -0.15  0.260 0.770    1   453</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend2.2_trend -0.95 -0.440 0.061    1   555</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):trendtrend2.3_trend -0.83 -0.410 0.015    1   623</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM process smooths:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                         edf Ref.df    F p-value  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriestrend1 1.75      3 1.33   0.632  </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season):seriestrend2 2.05      3 5.08   0.091 .</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Latent trend parameter AR estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>          2.5%  50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   0.40 0.63  0.85 1.04    82</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[2]   0.75 0.86  0.94 1.01   179</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1] 0.60 0.95  1.30 1.08    45</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[2] 0.66 1.00  1.40 1.03    50</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Rhats above 1.05 found for 3 parameters</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Rhats above 1.05 found for 19 parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  *Diagnose further to investigate why the chains have not mixed</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 600 iterations ended with a divergence (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 600 iterations saturated the maximum tree depth of 12 (0%)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1: E-FMI = 0.0837</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2: E-FMI = 0.0716</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  *E-FMI below 0.2 indicates you may need to reparameterize your model</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Tue Apr 30 12:34:56 PM 2024.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Tue Apr 30 3:00:17 PM 2024.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>

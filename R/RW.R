@@ -46,7 +46,7 @@
 #' seasonality <- beta1 * cov1 + beta2 * cov2
 #'
 #'# Take Gaussian observations with error and return
-#' data.frame(y = rnorm(n, mean = x + seasonality, sd = sigma),
+#' data.frame(y = rnorm(n, mean = x + seasonality, sd = sigma_obs),
 #'            season = rep(1:12, 20)[1:n],
 #'            time = cumsum(time_dis))
 #'}
@@ -60,13 +60,14 @@
 #'                              data.frame(series = 'series2'))) %>%
 #'       dplyr::mutate(series = as.factor(series))
 #'
-#'# mvgam with CAR(1) trends and series-level seasonal smooths
-#'mod <- mvgam(formula = y ~ s(season, bs = 'cc',
-#'                             k = 5, by = series),
+#'# mvgam with CAR(1) trends and series-level seasonal smooths; the
+#'# State-Space representation (using trend_formula) will be more efficient
+#'mod <- mvgam(formula = y ~ 1,
+#'             trend_formula = ~ s(season, bs = 'cc',
+#'                                 k = 5, by = trend),
 #'             trend_model = CAR(),
 #'             data = dat,
 #'             family = gaussian(),
-#'             burnin = 300,
 #'             samples = 300,
 #'             chains = 2)
 #'
