@@ -159,6 +159,7 @@ ensure that the code is legal (i.e. to check that lower bounds are smaller than 
 example)
 }
 \examples{
+\donttest{
 # Simulate three integer-valued time series
 library(mvgam)
 dat <- sim_mvgam(trend_rel = 0.5)
@@ -280,7 +281,7 @@ mod <- mvgam(y ~ x0 + x1 + s(x2) + s(x3),
             family = gaussian(),
             run_model = FALSE)
 code(mod)
-
+}
 }
 \seealso{
 \code{\link{mvgam}}, \code{\link{mvgam_formulae}}, \code{\link[brms]{prior}}

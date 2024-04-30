@@ -25,6 +25,7 @@
 #'can be modified through the `mvgam` interface
 #'
 #'@examples
+#'\donttest{
 #'# Simulate three integer-valued time series
 #'library(mvgam)
 #'dat <- sim_mvgam(trend_rel = 0.5)
@@ -146,7 +147,7 @@
 #'             family = gaussian(),
 #'             run_model = FALSE)
 #'code(mod)
-#'
+#'}
 #'@export
 get_mvgam_priors = function(formula,
                             trend_formula,
