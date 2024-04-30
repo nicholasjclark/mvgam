@@ -137,6 +137,7 @@ test_that("binomial() post-processing works", {
   expect_true(inherits(SM(conditional_effects(mod,
                                               type = 'link')),
                        'mvgam_conditional_effects'))
+  options(mc.cores = 1)
   expect_loo(SW(loo(mod)))
 
   dat_test2 <- dat_test
@@ -271,7 +272,7 @@ test_that("bernoulli() behaves appropriately", {
 
 test_that("bernoulli() post-processing works", {
   skip_on_cran()
-  mod <- mvgam(y ~ s(series, bs = 're') +
+  mod <- SW(mvgam(y ~ s(series, bs = 're') +
                  gp(x, by = series, c = 5/4, k = 5),
                trend_model = AR(),
                priors = prior(normal(0, 0.1), class = ar1),
@@ -279,7 +280,7 @@ test_that("bernoulli() post-processing works", {
                data = dat_train,
                burnin = 200,
                samples = 200,
-               chains = 2)
+               chains = 2))
 
   expect_no_error(summary(mod))
   expect_no_error(print(mod))
@@ -324,5 +325,7 @@ test_that("bernoulli() post-processing works", {
   expect_true(inherits(SM(conditional_effects(mod,
                                               type = 'link')),
                        'mvgam_conditional_effects'))
+
+  options(mc.cores = 1)
   expect_loo(SW(loo(mod)))
 })

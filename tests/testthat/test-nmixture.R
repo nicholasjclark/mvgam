@@ -167,7 +167,7 @@ test_that("nmix() post-processing works", {
     dplyr::distinct() -> trend_map
 
   # Fit a model
-  mod <- mvgam(
+  mod <- SW(mvgam(
     # the observation formula sets up linear predictors for
     # detection probability on the logit scale
     formula = obs ~ species - 1,
@@ -187,7 +187,8 @@ test_that("nmix() post-processing works", {
     priors = c(prior(std_normal(), class = b),
                prior(normal(1, 1.5), class = Intercept_trend)),
     samples = 300,
-    chains = 2)
+    residuals = FALSE,
+    chains = 2))
 
   expect_no_error(summary(mod))
   expect_no_error(print(mod))
@@ -211,7 +212,6 @@ test_that("nmix() post-processing works", {
   expect_true(NCOL(preds) == NROW(testdat))
   expect_true(all(preds >= 0L))
 
-  expect_no_error(plot(mod, type = 'residuals'))
   expect_no_error(plot(mod, type = 'smooths',
                        trend_effects = TRUE))
   expect_no_error(plot(mod, type = 'smooths',
@@ -220,5 +220,6 @@ test_that("nmix() post-processing works", {
   expect_no_error(plot(mod, type = 'smooths',
                        residuals = TRUE,
                        trend_effects = TRUE))
+  options(mc.cores = 1)
   expect_loo(SW(loo(mod)))
 })

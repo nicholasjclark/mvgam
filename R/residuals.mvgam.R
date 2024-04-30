@@ -45,7 +45,7 @@ residuals.mvgam <- function(object,
 
   # What was the original time / series order?
   orig_order <- data.frame(series = object$obs_data$series,
-                           time = object$obs_data$time)
+                           time = object$obs_data$index..time..index)
 
   series_numeric <- as.numeric(orig_order$series)
   time_numeric <- orig_order$time
