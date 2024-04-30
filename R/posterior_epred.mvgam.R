@@ -265,7 +265,10 @@ posterior_predict.mvgam = function(object,
 #' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
 #'             trend_model = 'AR1',
-#'             data = simdat$data_train)
+#'             data = simdat$data_train,
+#'             chains = 2,
+#'             burnin = 300,
+#'             samples = 300)
 #'
 #'# Extract fitted values (posterior expectations)
 #'expectations <- fitted(mod)
