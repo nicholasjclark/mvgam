@@ -191,10 +191,7 @@ plot_mvgam_series = function(object,
 
       .pardefault <- par(no.readonly=T)
       on.exit(par(.pardefault))
-      oldpar<-par(mfrow=c(r,c),
-                  mar=c(2.5, 2.3, 2, 2),
-                  oma = c(1, 1, 0, 0),
-                  mgp = c(1.5, 0.5, 0))
+      oldpar <- par(mfrow = c(r,c))
 
     } else { ppp <- 1; oldpar <- par()}
 
@@ -292,12 +289,9 @@ plot_mvgam_series = function(object,
       ylab <- paste0(y)
     }
 
-    layout(matrix(1:4, nrow = 2, byrow = TRUE))
     .pardefault <- par(no.readonly=T)
-    par(.pardefault)
-    oldpar <- par(mar=c(2.5, 2.3, 2, 2),
-                  oma = c(1, 1, 0, 0),
-                  mgp = c(2, 0.5, 0))
+    on.exit(par(.pardefault))
+    layout(matrix(1:4, nrow = 2, byrow = TRUE))
 
     if(!missing(data_test)){
       test <- data.frame(y = data_test$y,

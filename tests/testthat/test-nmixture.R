@@ -1,5 +1,8 @@
 context("n_mixture")
 
+# Simulations take a bit of time to set up
+skip_on_cran()
+
 set.seed(100)
 poisdat <- sim_mvgam()
 
@@ -95,7 +98,6 @@ test_that("latent process intercept is allowed in nmixtures", {
 # Check that the model fits and post-processing works using the
 # example from the families man page
 test_that("nmix() post-processing works", {
-  skip_on_cran()
   set.seed(0)
   data.frame(site = 1,
              # five replicates per year; six years

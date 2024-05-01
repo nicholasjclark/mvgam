@@ -1,5 +1,8 @@
 context("binomial")
 
+# Simulations take a bit of time to set up
+skip_on_cran()
+
 # Simulate two time series of Binomial trials
 trials <- sample(c(20:25), 50, replace = TRUE)
 x <- rnorm(50)
@@ -77,7 +80,6 @@ test_that("cbind() syntax required for binomial()", {
 })
 
 test_that("binomial() post-processing works", {
-  skip_on_cran()
   mod <- SW(mvgam(cbind(y, ntrials) ~ series,
                trend_formula = ~ s(x, by = trend),
                family = binomial(),
@@ -271,7 +273,6 @@ test_that("bernoulli() behaves appropriately", {
 })
 
 test_that("bernoulli() post-processing works", {
-  skip_on_cran()
   mod <- SW(mvgam(y ~ s(series, bs = 're') +
                  gp(x, by = series, c = 5/4, k = 5),
                trend_model = AR(),
