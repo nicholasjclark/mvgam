@@ -63,13 +63,8 @@ jobs:
               rjags
               coda
               testthat
-              xml2
               usethis
               rcmdcheck
-
-      - name: Test timings
-        run: testthat::test_local(reporter = 'junit')
-        shell: Rscript {0}
 
       - uses: r-lib/actions/check-r-package@v2
         with:
