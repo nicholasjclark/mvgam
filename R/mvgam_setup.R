@@ -14,7 +14,7 @@ mvgam_setup <- function(formula,
     # Initialise the GAM for a few iterations to ensure it all works without error
     suppressWarnings(mgcv::gam(formula(formula),
                                data = dat,
-                               method = 'GCV.Cp',
+                               method = 'REML',
                                family = family,
                                control = list(maxit = maxit),
                                drop.unused.levels = FALSE,
@@ -23,7 +23,7 @@ mvgam_setup <- function(formula,
   } else {
     suppressWarnings(mgcv::gam(formula(formula),
                                data = dat,
-                               method = 'GCV.Cp',
+                               method = 'REML',
                                family = family,
                                knots = knots,
                                control = list(maxit = maxit),
@@ -67,7 +67,8 @@ jagam_setup <- function(ss_gam, formula, data_train, family,
                                                      data = data_train,
                                                      family = family_to_mgcvfam(family),
                                                      drop.unused.levels = FALSE,
-                                                     control = list(maxit = 1)))$coefficients)
+                                                     control = list(maxit = 1),
+                                                     method = 'REML'))$coefficients)
     xcols_drop <- grep('s(fakery', fakery_names, fixed = TRUE)
 
     if(!missing(knots)){

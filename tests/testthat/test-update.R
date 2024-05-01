@@ -2,7 +2,8 @@ context("update.mvgam")
 
 test_that("update() working correctly", {
   # Can update trend_model
-  mod <- update(mvgam:::mvgam_example1, trend_model = AR(p = 2),
+  mod <- update(mvgam:::mvgam_example1,
+                trend_model = AR(p = 2),
                 run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(attr(mod$model_data, 'trend_model') == 'AR2')

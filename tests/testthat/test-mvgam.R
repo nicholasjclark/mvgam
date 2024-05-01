@@ -2,6 +2,7 @@ context("mvgam")
 
 # JAGS setup should work, whether installed or not
 test_that("JAGS setups work", {
+  skip_on_cran()
   simdat <- sim_mvgam()
   mod <- mvgam(y ~ s(season),
                trend_model = 'RW',
@@ -474,6 +475,7 @@ test_that("trend_map is behaving propoerly", {
 })
 
 test_that("models with only random effects should work without error", {
+  skip_on_cran()
   sim <- sim_mvgam(n_series = 3)
   mod_data <- sim$data_train
   mod_map <- mvgam(y ~ s(series, bs = 're'),
@@ -483,6 +485,7 @@ test_that("models with only random effects should work without error", {
 })
 
 test_that("models with only fs smooths should work without error", {
+  skip_on_cran()
   sim <- sim_mvgam(n_series = 3)
   mod_data <- sim$data_train
   mod_map <- mvgam(y ~ s(season, series, bs = 'fs'),
@@ -492,6 +495,7 @@ test_that("models with only fs smooths should work without error", {
 })
 
 test_that("trend_formula setup is working properly", {
+  skip_on_cran()
   sim <- sim_mvgam(n_series = 3)
   mod_data <- sim$data_train
   mod_map <- mvgam(y ~ s(series, bs = 're'),

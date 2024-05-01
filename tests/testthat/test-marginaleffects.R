@@ -42,6 +42,7 @@ test_that("get_data gives expected output structure", {
 })
 
 test_that("get_predict gives expected output structure", {
+  skip_on_cran()
   preds <- get_predict(mvgam:::mvgam_example4)
   expect_equal(NROW(preds), NROW(mvgam:::mvgam_example4$obs_data))
 
@@ -70,6 +71,4 @@ test_that("averages give expected output structures", {
   ems <- predictions(mvgam:::mvgam_example2, by = 'series')
   expect_equal(NROW(ems), nlevels(mvgam:::mvgam_example3$obs_data$series))
 })
-
-
 

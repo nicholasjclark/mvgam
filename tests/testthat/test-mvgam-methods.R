@@ -57,18 +57,18 @@ test_that("mcmc diagnostics working properly", {
 
 test_that("compute_edf working properly", {
   mod <- mvgam:::mvgam_example1
-  expect_no_error(mvgam:::compute_edf(mod$mgcv_model,
+  expect_no_error(capture_output(mvgam:::compute_edf(mod$mgcv_model,
                                    mod,
                                    'rho',
                                    'sigma_raw',
-                                   conservative = FALSE))
+                                   conservative = FALSE)))
 
   mod <- mvgam:::mvgam_example4
-  expect_no_error(mvgam:::compute_edf(mod$trend_mgcv_model,
+  expect_no_error(capture_output(mvgam:::compute_edf(mod$trend_mgcv_model,
                                       mod,
                                       'rho_trend',
                                       'sigma_raw_trend',
-                                      conservative = TRUE))
+                                      conservative = TRUE)))
 })
 
 test_that("conditional_effects works properly", {
@@ -104,6 +104,7 @@ test_that("mcmc_plot works properly", {
 })
 
 test_that("pp_check and ppc work properly", {
+  skip_on_cran()
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example1))))
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example1,
                          newdata = mvgam:::mvgam_example1$obs_data[1:10, ]))))
@@ -184,6 +185,7 @@ test_that("logLik has reasonable ouputs", {
 })
 
 test_that("predict has reasonable outputs", {
+  skip_on_cran()
   gaus_preds <- predict(mvgam:::mvgam_example4, type = 'link', summary = FALSE)
   expect_equal(dim(gaus_preds),
                c(30, NROW(mvgam:::mvgam_example2$obs_data)))
@@ -215,6 +217,7 @@ test_that("predict has reasonable outputs", {
 })
 
 test_that("get_predict has reasonable outputs", {
+  skip_on_cran()
   gaus_preds <- predict(mvgam:::mvgam_example1, type = 'link',
                         process_error = FALSE,
                         summary = FALSE)
