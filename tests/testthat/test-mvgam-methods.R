@@ -1,5 +1,7 @@
 context("class methods")
 
+skip_on_cran()
+
 test_that("inverse links working", {
   expect_true(is(mvgam:::family_invlinks('gaussian'), 'function'))
   expect_true(is(mvgam:::family_invlinks('Gamma'), 'function'))
@@ -38,7 +40,6 @@ test_that("add_residuals working properly", {
 })
 
 test_that("mcmc diagnostics working properly", {
-  skip_on_cran()
   expect_true(inherits(nuts_params(mvgam:::mvgam_example1),
                        'data.frame'))
   expect_true(inherits(nuts_params(mvgam:::mvgam_example5),
@@ -86,7 +87,6 @@ test_that("conditional_effects works properly", {
 })
 
 test_that("mcmc_plot works properly", {
-  skip_on_cran()
   expect_ggplot(mcmc_plot(mvgam:::mvgam_example1, type = "dens"))
   expect_ggplot(mcmc_plot(mvgam:::mvgam_example1,
                           type = "scatter",
@@ -104,7 +104,6 @@ test_that("mcmc_plot works properly", {
 })
 
 test_that("pp_check and ppc work properly", {
-  skip_on_cran()
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example1))))
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example1,
                          newdata = mvgam:::mvgam_example1$obs_data[1:10, ]))))
@@ -176,7 +175,6 @@ test_that("coef has resonable outputs", {
 })
 
 test_that("logLik has reasonable ouputs", {
-  skip_on_cran()
   liks <- logLik(mvgam:::mvgam_example4)
   expect_equal(dim(liks),
                c(30, NROW(mvgam:::mvgam_example2$obs_data)))
@@ -185,7 +183,6 @@ test_that("logLik has reasonable ouputs", {
 })
 
 test_that("predict has reasonable outputs", {
-  skip_on_cran()
   gaus_preds <- predict(mvgam:::mvgam_example4, type = 'link', summary = FALSE)
   expect_equal(dim(gaus_preds),
                c(30, NROW(mvgam:::mvgam_example2$obs_data)))
@@ -217,7 +214,6 @@ test_that("predict has reasonable outputs", {
 })
 
 test_that("get_predict has reasonable outputs", {
-  skip_on_cran()
   gaus_preds <- predict(mvgam:::mvgam_example1, type = 'link',
                         process_error = FALSE,
                         summary = FALSE)
@@ -285,7 +281,6 @@ test_that("plot_mvgam_series reasonable outputs", {
 })
 
 test_that("forecast has reasonable outputs", {
-  skip_on_cran()
   set.seed(1234)
   mvgam_examp_dat <- sim_mvgam(family = gaussian(),
                                T = 40,

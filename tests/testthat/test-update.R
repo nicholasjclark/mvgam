@@ -1,5 +1,7 @@
 context("update.mvgam")
 
+skip_on_cran()
+
 test_that("update() working correctly", {
   # Can update trend_model
   mod <- update(mvgam:::mvgam_example1,
