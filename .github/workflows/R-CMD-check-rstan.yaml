@@ -63,6 +63,7 @@ jobs:
               rjags
               coda
               testthat
+              xml2
               usethis
               rcmdcheck
 
