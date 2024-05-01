@@ -61,7 +61,7 @@
 #'stable forecasts
 #'@seealso \code{\link{forecast}}, \code{\link{score}}, \code{\link{lfo_cv}}
 #'@examples
-#'\donttest{
+#'\dontrun{
 #'# Simulate from a Poisson-AR2 model with a seasonal smooth
 #'set.seed(100)
 #'dat <- sim_mvgam(T = 75,

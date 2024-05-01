@@ -8,7 +8,7 @@
 #'@return A \code{list} object containing the mean posterior correlations
 #'and the full array of posterior correlations
 #'@examples
-#'\donttest{
+#'\dontrun{
 #'simdat <- sim_mvgam()
 #'mod <- mvgam(y ~ s(season, bs = 'cc',
 #'                   k = 6),

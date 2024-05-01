@@ -39,7 +39,7 @@
 #'@references Paul-Christian Bürkner, Jonah Gabry & Aki Vehtari (2020). Approximate leave-future-out cross-validation for Bayesian time series models
 #'Journal of Statistical Computation and Simulation. 90:14, 2499-2523.
 #'@examples
-#'\donttest{
+#'\dontrun{
 #'# Simulate from a Poisson-AR2 model with a seasonal smooth
 #'set.seed(100)
 #'dat <- sim_mvgam(T = 75,
@@ -127,9 +127,11 @@ lfo_cv.mvgam = function(object,
   if(missing(data)){
     all_data <- object$obs_data
   } else {
-    all_data <- data
+    all_data <- validate_series_time(data,
+                                     name = 'data',
+                                     trend_model = attr(object$model_data, 'trend_model'))
   }
-  N <- max(all_data$time)
+  N <- max(all_data$index..time..index)
 
   # Default minimum training time is 30, or
   # whatever training time allows for at least 10 lfo_cv calculations
@@ -440,7 +442,7 @@ cv_split = function(data, last_train, fc_horizon = 1){
   if(inherits(data, 'list')){
 
     # Find indices of training and testing splits
-    temp_dat = data.frame(time = data$time,
+    temp_dat = data.frame(time = data$index..time..index,
                           series = data$series) %>%
       dplyr::mutate(index = dplyr::row_number()) %>%
       dplyr::arrange(time, series)
@@ -472,12 +474,12 @@ cv_split = function(data, last_train, fc_horizon = 1){
 
   } else {
     data_train <- data %>%
-      dplyr::filter(time <= last_train) %>%
-      dplyr::arrange(time, series)
+      dplyr::filter(index..time..index <= last_train) %>%
+      dplyr::arrange(index..time..index, series)
 
     data_test <- data %>%
-      dplyr::filter(time > last_train) %>%
-      dplyr::arrange(time, series)
+      dplyr::filter(index..time..index > last_train) %>%
+      dplyr::arrange(index..time..index, series)
 
   }
 

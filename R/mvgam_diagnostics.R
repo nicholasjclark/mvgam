@@ -15,7 +15,7 @@
 #'
 #' @return The exact form of the output depends on the method.
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 #' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
 #'             trend_model = AR(),

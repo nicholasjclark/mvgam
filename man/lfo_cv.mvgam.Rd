@@ -58,7 +58,7 @@ all of the observations up to the time of the failure. We then restart the proce
 until the next refit is triggered (Bürkner et al. 2020).
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate from a Poisson-AR2 model with a seasonal smooth
 set.seed(100)
 dat <- sim_mvgam(T = 75,

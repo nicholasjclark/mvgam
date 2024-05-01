@@ -1,5 +1,7 @@
 context("example post-processing")
 
+# Skip example testing as they are a bit time-consuming
+skip_on_cran()
 test_that("fitted() gives correct dimensions", {
   expect_equal(NROW(mvgam:::mvgam_examp_dat$data_train),
                NROW(fitted(mvgam:::mvgam_example1)))
@@ -295,9 +297,8 @@ test_that("dynamic factor investigations work", {
   expect_true(inherits(facconts, 'data.frame'))
 })
 
-# Skip forecast and loo testing as they are a bit time-consuming
+
 test_that("evaluate() functions working", {
-  skip_on_cran()
   mod <- mvgam:::mvgam_example1
   out <- eval_mvgam(mod,
                     fc_horizon = 6,
@@ -336,7 +337,6 @@ test_that("evaluate() functions working", {
 })
 
 test_that("lfo_cv() working", {
-  skip_on_cran()
   lfs <- SW(lfo_cv(mvgam:::mvgam_example1,
                 min_t = 27,
                 fc_horizon = 1))
@@ -351,7 +351,6 @@ test_that("lfo_cv() working", {
 })
 
 test_that("forecast() works correctly", {
-  skip_on_cran()
   fc <- forecast(mvgam:::mvgam_example1,
                  newdata = mvgam:::mvgam_examp_dat$data_test)
   expect_true(inherits(fc$hindcasts, 'list'))
@@ -466,7 +465,6 @@ test_that("forecast() works correctly", {
 })
 
 test_that("loo() works correctly", {
-  skip_on_cran()
   options(mc.cores = 1)
   expect_loo(SW(loo(mvgam:::mvgam_example1)))
   expect_loo(SW(loo(mvgam:::mvgam_example2)))

@@ -27,7 +27,7 @@ Extract the LOOIC (leave-one-out information criterion) using
 \code{\link[loo:loo]{loo::loo()}}
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate 4 time series with hierarchical seasonality
 # and independent AR1 dynamic processes
 set.seed(111)

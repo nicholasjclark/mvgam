@@ -57,7 +57,7 @@ Note that currently it is not possible to change the default link
 functions in \code{mvgam}, so any call to change these will be silently ignored
 }
 \examples{
-\donttest{
+\dontrun{
 # Example showing how to set up N-mixture models
 set.seed(999)
 # Simulate observations for species 1, which shows a declining trend and 0.7 detection probability

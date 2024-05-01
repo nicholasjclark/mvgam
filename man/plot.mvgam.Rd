@@ -70,7 +70,7 @@ but the individual plotting functions and the functions from the marginaleffects
 offer far more more customisation.
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some time series
 dat <- sim_mvgam(T = 80, n_series = 3)
 

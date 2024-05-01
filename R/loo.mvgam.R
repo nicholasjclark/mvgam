@@ -10,7 +10,7 @@
 #' for details). For `loo_compare.mvgam`, an object of class `compare.loo` (
 #' [loo::loo_compare()] for details)
 #'@examples
-#'\donttest{
+#'\dontrun{
 #'# Simulate 4 time series with hierarchical seasonality
 #'# and independent AR1 dynamic processes
 #'set.seed(111)

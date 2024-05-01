@@ -16,7 +16,7 @@
 #' for other functions in the package. See \code{\link{mvgam-class}} for details.
 #' Use `methods(class = "mvgam")` for an overview on available methods.
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some data and fit a Poisson AR1 model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),

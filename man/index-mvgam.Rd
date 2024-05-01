@@ -27,7 +27,7 @@ with their aliases
 Index \code{mvgam} objects
 }
 \examples{
-\donttest{
+\dontrun{
 simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
              trend_model = AR(),

@@ -20,7 +20,7 @@
 #'original model via the `newdata` argument in \code{\link{mvgam}},
 #'testing observations)
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 #' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),

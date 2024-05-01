@@ -44,7 +44,7 @@
 #' @author Nicholas J Clark
 #' @seealso \code{\link[marginaleffects]{plot_predictions}}, \code{\link[marginaleffects]{plot_slopes}}
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Simulate some data
 #' simdat <- sim_mvgam(family = poisson(),
 #'                     seasonality = 'hierarchical')

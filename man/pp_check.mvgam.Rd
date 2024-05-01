@@ -66,7 +66,7 @@ documentation of the \pkg{\link[bayesplot:bayesplot-package]{bayesplot}}
 package.
 }
 \examples{
-\donttest{
+\dontrun{
 simdat <- sim_mvgam(seasonality = 'hierarchical')
 mod <- mvgam(y ~ series +
               s(season, bs = 'cc', k = 6) +

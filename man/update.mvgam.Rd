@@ -174,7 +174,7 @@ Use \code{methods(class = "mvgam")} for an overview on available methods.
 This function allows a previously fitted \code{mvgam} model to be updated
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some data and fit a Poisson AR1 model
 simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc'),

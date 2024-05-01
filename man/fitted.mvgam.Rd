@@ -74,7 +74,7 @@ in the model. This is in contrast to the set of predict functions (i.e.
 any dynamic trend component has reached stationarity when returning hypothetical predictions
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some data and fit a model
 simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 mod <- mvgam(y ~ s(season, bs = 'cc'),

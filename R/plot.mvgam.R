@@ -44,7 +44,7 @@
 #'@author Nicholas J Clark
 #'@return A base R plot or set of plots
 #'@examples
-#'\donttest{
+#'\dontrun{
 #'# Simulate some time series
 #'dat <- sim_mvgam(T = 80, n_series = 3)
 #'

@@ -77,7 +77,7 @@ continuous variables and the reference category is used for factors. Use
 and create more bespoke conditional effects plots.
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some data
 simdat <- sim_mvgam(family = poisson(),
                     seasonality = 'hierarchical')

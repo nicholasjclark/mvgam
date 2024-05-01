@@ -80,7 +80,7 @@ a broader range of posterior checks that are created using "new data" prediction
 \code{\link{pp_check.mvgam}}
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate some smooth effects and fit a model
 set.seed(0)
 dat <- mgcv::gamSim(1, n = 200, scale = 2)

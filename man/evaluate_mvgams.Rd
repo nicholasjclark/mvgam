@@ -125,7 +125,7 @@ provides a series of summary plots to facilitate model selection. It is essentia
 \code{roll_eval_mvgam}
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate from a Poisson-AR2 model with a seasonal smooth
 set.seed(100)
 dat <- sim_mvgam(T = 75,

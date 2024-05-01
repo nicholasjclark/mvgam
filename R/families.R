@@ -66,7 +66,7 @@ student_t = function(link = 'identity'){
 
 #' @rdname mvgam_families
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' # Example showing how to set up N-mixture models
 #' set.seed(999)
 #'# Simulate observations for species 1, which shows a declining trend and 0.7 detection probability

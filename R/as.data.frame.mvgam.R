@@ -32,7 +32,7 @@
 #'@param ... Ignored
 #'@return A `data.frame`, `matrix`, or `array` containing the posterior draws.
 #'@examples
-#'\donttest{
+#'\dontrun{
 #'sim <- sim_mvgam(family = Gamma())
 #'mod1 <- mvgam(y ~ s(season, bs = 'cc'),
 #'              trend_model = 'AR1',

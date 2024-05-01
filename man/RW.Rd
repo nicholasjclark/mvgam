@@ -39,7 +39,7 @@ they exist purely to help set up a model with particular autoregressive
 trend models.
 }
 \examples{
-\donttest{
+\dontrun{
 # A short example to illustrate CAR(1) models
 # Function to simulate CAR1 data with seasonality
 sim_corcar1 = function(n = 120,

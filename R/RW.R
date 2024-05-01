@@ -17,7 +17,7 @@
 #' arguments to be interpreted by the parsing functions in \code{mvgam}
 #' @rdname RW
 #'@examples
-#'\donttest{
+#'\dontrun{
 #'# A short example to illustrate CAR(1) models
 #'# Function to simulate CAR1 data with seasonality
 #'sim_corcar1 = function(n = 120,

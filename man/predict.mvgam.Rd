@@ -101,3 +101,30 @@ of a \code{mvgam} model, while the forecasting functions
 \code{\link{plot_mvgam_fc}} and \code{\link{forecast.mvgam}} are better suited to generate h-step ahead forecasts
 that respect the temporal dynamics of estimated latent trends.
 }
+\examples{
+\dontrun{
+# Simulate 4 time series with hierarchical seasonality
+# and independent AR1 dynamic processes
+set.seed(111)
+simdat <- sim_mvgam(seasonality = 'hierarchical',
+                   trend_model = 'AR1',
+                   family = gaussian())
+
+# Fit a model with shared seasonality
+mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
+             data = simdat$data_train,
+             family = gaussian(),
+             trend_model = AR(),
+             burnin = 300,
+             samples = 300,
+             chains = 2)
+
+# Generate predictions against observed data
+preds <- predict(mod1, summary = TRUE)
+head(preds)
+
+# Generate predictions against test data
+preds <- predict(mod1, newdata = simdat$data_test, summary = TRUE)
+head(preds)
+}
+}

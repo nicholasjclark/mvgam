@@ -7,7 +7,6 @@ test_that("inverse links working", {
 })
 
 test_that("series_to_mvgam working", {
-  skip_on_cran()
   data("sunspots")
   series <- cbind(sunspots, sunspots)
   colnames(series) <- c('blood', 'bone')
@@ -56,6 +55,7 @@ test_that("mcmc diagnostics working properly", {
 })
 
 test_that("compute_edf working properly", {
+  skip_on_cran()
   mod <- mvgam:::mvgam_example1
   expect_no_error(mvgam:::compute_edf(mod$mgcv_model,
                                    mod,
@@ -174,6 +174,7 @@ test_that("coef has resonable outputs", {
 })
 
 test_that("logLik has reasonable ouputs", {
+  skip_on_cran()
   liks <- logLik(mvgam:::mvgam_example4)
   expect_equal(dim(liks),
                c(30, NROW(mvgam:::mvgam_example2$obs_data)))

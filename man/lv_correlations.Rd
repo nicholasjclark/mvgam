@@ -18,7 +18,7 @@ This function uses samples of latent trends for each series from a fitted
 mvgam model to calculates correlations among series' trends
 }
 \examples{
-\donttest{
+\dontrun{
 simdat <- sim_mvgam()
 mod <- mvgam(y ~ s(season, bs = 'cc',
                   k = 6),
