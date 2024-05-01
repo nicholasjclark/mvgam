@@ -132,7 +132,7 @@ test_that("predict() works correctly", {
                NROW(mvgam:::mvgam_examp_dat$data_test))
   expect_equal(NROW(predict(mvgam:::mvgam_example5,
                             newdata = mvgam:::mvgam_examp_dat$data_test,
-                            process_error = FALSE)),
+                            process_error = TRUE)),
                NROW(mvgam:::mvgam_examp_dat$data_test))
 
   expect_equal(dim(predict(mvgam:::mvgam_example1,

@@ -81,7 +81,7 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
                            mgcv_model){
 
   trend_test <- newdata
-  trend_indicators <- vector(length = length(trend_test[[1]]))
+  trend_indicators <- vector(length = length(trend_test$series))
   for(i in 1:length(trend_test$series)){
     trend_indicators[i] <- trend_map$trend[which(as.character(trend_map$series) ==
                                                    as.character(trend_test$series[i]))]
