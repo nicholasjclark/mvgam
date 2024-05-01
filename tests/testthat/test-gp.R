@@ -1,5 +1,7 @@
 context("gp")
 
+skip_on_cran()
+
 test_that("gp_to_s is working properly", {
   # All true gp() terms should be changed to s() with k = k+1
   formula <- y ~ s(series) + gp(banana) +

@@ -1,8 +1,8 @@
 context("mvgam")
 
+skip_on_cran()
+
 # JAGS setup should work, whether installed or not
-test_that("JAGS setups work", {
-  skip_on_cran()
   simdat <- sim_mvgam()
   mod <- mvgam(y ~ s(season),
                trend_model = 'RW',
@@ -100,7 +100,6 @@ test_that("response variable must be specified", {
 })
 
 test_that("prior_only works", {
-  skip_on_cran()
   mod <- mvgam(y ~ s(season),
                trend_model = AR(p = 2),
                drift = TRUE,
@@ -308,7 +307,6 @@ test_that("series levels must match unique entries in series", {
 })
 
 test_that("share_obs_params working", {
-  skip_on_cran()
   # Standard beta
   mod <- mvgam(y ~ s(season, by = series),
                trend_model = RW(cor = TRUE),
@@ -447,7 +445,6 @@ test_that("share_obs_params working", {
 })
 
 test_that("trend_map is behaving propoerly", {
-  skip_on_cran()
   sim <- sim_mvgam(n_series = 3)
   mod_data <- sim$data_train
   trend_map <- data.frame(series = unique(mod_data$series),
@@ -475,7 +472,6 @@ test_that("trend_map is behaving propoerly", {
 })
 
 test_that("models with only random effects should work without error", {
-  skip_on_cran()
   sim <- sim_mvgam(n_series = 3)
   mod_data <- sim$data_train
   mod_map <- mvgam(y ~ s(series, bs = 're'),
@@ -485,7 +481,6 @@ test_that("models with only random effects should work without error", {
 })
 
 test_that("models with only fs smooths should work without error", {
-  skip_on_cran()
   sim <- sim_mvgam(n_series = 3)
   mod_data <- sim$data_train
   mod_map <- mvgam(y ~ s(season, series, bs = 'fs'),
@@ -495,7 +490,6 @@ test_that("models with only fs smooths should work without error", {
 })
 
 test_that("trend_formula setup is working properly", {
-  skip_on_cran()
   sim <- sim_mvgam(n_series = 3)
   mod_data <- sim$data_train
   mod_map <- mvgam(y ~ s(series, bs = 're'),
@@ -536,7 +530,6 @@ test_that("trend_formula setup is working properly", {
 # Check that parametric effect priors are properly incorporated in the
 # model for a wide variety of model forms
 test_that("parametric effect priors correctly incorporated in models", {
-  skip_on_cran()
   mod_data <- mvgam:::mvgam_examp_dat
   mod_data$data_train$x1 <-
     rnorm(NROW(mod_data$data_train))

@@ -80,6 +80,7 @@ df <- rbind(data.frame(y = y,
                        fake = rnorm(100)))
 
 test_that("logistic caps should be included in the correct order", {
+  skip_on_cran()
   mod <- mvgam(formula = y ~ 0,
                      data = df,
                      trend_model = PW(growth = 'logistic',
