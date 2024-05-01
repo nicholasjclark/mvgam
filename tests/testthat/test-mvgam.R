@@ -2,6 +2,7 @@ context("mvgam")
 
 skip_on_cran()
 
+test_that("JAGS setups should work", {
 # JAGS setup should work, whether installed or not
   simdat <- sim_mvgam()
   mod <- mvgam(y ~ s(season),
