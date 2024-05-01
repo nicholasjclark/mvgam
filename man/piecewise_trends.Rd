@@ -65,6 +65,71 @@ transformed if you are using a \code{poisson()} or \code{nb()} family). It is th
 that you specify the \code{cap} values on the scale of your outcome. Note also that
 no missing values are allowed in \code{cap}.
 }
+\examples{
+\dontrun{
+# Example of logistic growth with possible changepoints
+# Simple logistic growth model
+dNt = function(r, N, k){
+   r * N * (k - N)
+}
+
+# Iterate growth through time
+Nt = function(r, N, t, k) {
+for (i in 1:(t - 1)) {
+
+ # population at next time step is current population + growth,
+ # but we introduce several 'shocks' as changepoints
+ if(i \%in\% c(5, 15, 25, 41, 45, 60, 80)){
+   N[i + 1] <- max(1, N[i] + dNt(r + runif(1, -0.1, 0.1),
+                                 N[i], k))
+   } else {
+   N[i + 1] <- max(1, N[i] + dNt(r, N[i], k))
+   }
+  }
+ N
+}
+
+# Simulate expected values
+set.seed(11)
+expected <- Nt(0.004, 2, 100, 30)
+plot(expected, xlab = 'Time')
+
+# Take Poisson draws
+y <- rpois(100, expected)
+plot(y, xlab = 'Time')
+
+# Assemble data into dataframe and model. We set a
+# fixed carrying capacity of 35 for this example, but note that
+# this value is not required to be fixed at each timepoint
+mod_data <- data.frame(y = y,
+                       time = 1:100,
+                       cap = 35,
+                       series = as.factor('series_1'))
+plot_mvgam_series(data = mod_data)
+
+# The intercept is nonidentifiable when using piecewise
+# trends because the trend functions have their own offset
+# parameters 'm'; it is recommended to always drop intercepts
+# when using these trend models
+mod <- mvgam(y ~ 0,
+             trend_model = PW(growth = 'logistic'),
+             family = poisson(),
+             data = mod_data,
+             chains = 2)
+summary(mod)
+
+# Plot the posterior hindcast
+plot(mod, type = 'forecast')
+
+# View the changepoints with ggplot2 utilities
+library(ggplot2)
+mcmc_plot(mod, variable = 'delta_trend',
+          regex = TRUE) +
+scale_y_discrete(labels = mod$trend_model$changepoints) +
+labs(y = 'Potential changepoint',
+     x = 'Rate change')
+}
+}
 \references{
 Taylor, Sean J., and Benjamin Letham. "Forecasting at scale." The American Statistician 72.1 (2018): 37-45.
 }
