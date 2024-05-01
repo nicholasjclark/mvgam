@@ -1,5 +1,7 @@
 context("RW,AR,VAR,CAR")
 
+skip_on_cran()
+
 test_that("ma and cor options should work for trends other than VAR", {
   test <- mvgam(y ~ s(series, bs = 're') +
                        s(season, bs = 'cc') - 1,

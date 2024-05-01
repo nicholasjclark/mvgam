@@ -1,5 +1,7 @@
 context("offsets")
 
+skip_on_cran()
+
 test_that("offset incorporated into link-level linpred for beta", {
   beta_data$data_train$pop <- as.numeric(beta_data$data_train$series) + 0.5
   beta_data$data_test$pop <- as.numeric(beta_data$data_test$series) + 0.5
