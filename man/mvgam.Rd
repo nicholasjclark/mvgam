@@ -458,6 +458,7 @@ head(beta_draws_df)
 str(beta_draws_df)
 
 # Investigate model fit
+options(mc.cores = 1)
 loo(mod1)
 
 

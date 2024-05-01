@@ -216,27 +216,29 @@ predict.mvgam = function(object,
       # Draw from fixed sigma for latent variable models
       if(object$use_lv & is.null(object$trend_map)){
         if(attr(object$model_data, 'trend_model') != 'GP'){
-          trends <- array(rnorm(n_draws * object$n_lv * NROW(newdata),
+          trends <- array(rnorm(n_draws * object$n_lv * length(newdata[[1]]),
                                 mean = 0,
                                 sd = 0.1),
-                          dim = c(n_draws, object$n_lv, NROW(newdata)))
+                          dim = c(n_draws, object$n_lv, length(newdata[[1]])))
         } else {
-          trends <- array(rnorm(n_draws * object$n_lv * NROW(newdata),
+          trends <- array(rnorm(n_draws * object$n_lv * length(newdata[[1]]),
                                 mean = 0,
                                 sd = 0.25),
-                          dim = c(n_draws, object$n_lv, NROW(newdata)))
+                          dim = c(n_draws, object$n_lv, length(newdata[[1]])))
         }
 
         lv_coefs <- mcmc_chains(object$model_output, 'lv_coefs')
 
         trend_predictions <- matrix(NA, nrow = n_draws,
-                                    ncol = NROW(newdata))
+                                    ncol = length(newdata[[1]]))
         for(i in 1:n_draws){
-          for(x in 1:NROW(newdata)){
+          for(x in 1:length(newdata[[1]])){
             trend_predictions[i, x] <- t(trends[i,,series_ind[x]]) %*%
               matrix(lv_coefs[i,], nrow = object$n_lv)[,series_ind[x]]
           }
         }
+        trend_predictions <- as.vector(trend_predictions)
+
       }
 
       if(!object$use_lv){

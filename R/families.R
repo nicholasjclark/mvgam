@@ -201,7 +201,6 @@ student_t = function(link = 'identity'){
 #'              family = binomial(),
 #'              data = dat)
 #' summary(mod)
-#'
 #' }
 #' @export
 nmix = function(link = 'log'){

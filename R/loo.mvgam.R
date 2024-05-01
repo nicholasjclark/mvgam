@@ -26,7 +26,10 @@
 #'              burnin = 300,
 #'              samples = 300,
 #'              chains = 2)
+#'
+#'# Inspect the model and calculate LOO
 #'plot(mod1, type = 'smooths')
+#'options(mc.cores = 1)
 #'loo(mod1)
 #'
 #'# Now fit a model with hierarchical seasonality

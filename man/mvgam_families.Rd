@@ -192,7 +192,6 @@ mod <- mvgam(cbind(y, ntrials) ~ series + s(x, by = series),
              family = binomial(),
              data = dat)
 summary(mod)
-
 }
 }
 \author{

@@ -104,6 +104,11 @@ test_that("predict() works correctly", {
                dim(predict(mvgam:::mvgam_example2, type = 'expected',
                            process_error = FALSE)))
 
+  expect_equal(dim(predict(mvgam:::mvgam_example1, type = 'expected',
+                           process_error = TRUE)),
+               dim(predict(mvgam:::mvgam_example2, type = 'expected',
+                           process_error = TRUE)))
+
   expect_equal(dim(posterior_linpred(mvgam:::mvgam_example1, type = 'expected',
                            process_error = FALSE)),
                dim(posterior_linpred(mvgam:::mvgam_example2, type = 'expected',
@@ -136,6 +141,13 @@ test_that("predict() works correctly", {
                dim(predict(mvgam:::mvgam_example2,
                            newdata = mvgam:::mvgam_examp_dat$data_test,
                            process_error = FALSE)))
+
+  expect_equal(dim(predict(mvgam:::mvgam_example4,
+                           newdata = mvgam:::mvgam_examp_dat$data_test,
+                           process_error = TRUE)),
+               dim(predict(mvgam:::mvgam_example5,
+                           newdata = mvgam:::mvgam_examp_dat$data_test,
+                           process_error = TRUE)))
 
   expect_equal(dim(predict(mvgam:::mvgam_example3,
                            newdata = mvgam:::mvgam_examp_dat$data_test,
