@@ -1,5 +1,8 @@
 context("monotonic")
 
+# Simulations are a bit time-consuming
+skip_on_cran()
+
 # Simulate data from a monotonically increasing function
 set.seed(123123)
 x <- runif(80) * 4 - 1

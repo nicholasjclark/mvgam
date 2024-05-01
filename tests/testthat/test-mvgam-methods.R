@@ -55,7 +55,6 @@ test_that("mcmc diagnostics working properly", {
 })
 
 test_that("compute_edf working properly", {
-  skip_on_cran()
   mod <- mvgam:::mvgam_example1
   expect_no_error(mvgam:::compute_edf(mod$mgcv_model,
                                    mod,
@@ -86,6 +85,7 @@ test_that("conditional_effects works properly", {
 })
 
 test_that("mcmc_plot works properly", {
+  skip_on_cran()
   expect_ggplot(mcmc_plot(mvgam:::mvgam_example1, type = "dens"))
   expect_ggplot(mcmc_plot(mvgam:::mvgam_example1,
                           type = "scatter",
@@ -214,13 +214,13 @@ test_that("predict has reasonable outputs", {
 })
 
 test_that("get_predict has reasonable outputs", {
-gaus_preds <- predict(mvgam:::mvgam_example1, type = 'link',
-                      process_error = FALSE,
-                      summary = FALSE)
-meffects_preds <- get_predict(mvgam:::mvgam_example1, type = 'link')
-expect_true(NROW(meffects_preds) == NCOL(gaus_preds))
-expect_true(identical(meffects_preds$estimate,
-                      apply(gaus_preds, 2, median)))
+  gaus_preds <- predict(mvgam:::mvgam_example1, type = 'link',
+                        process_error = FALSE,
+                        summary = FALSE)
+  meffects_preds <- get_predict(mvgam:::mvgam_example1, type = 'link')
+  expect_true(NROW(meffects_preds) == NCOL(gaus_preds))
+  expect_true(identical(meffects_preds$estimate,
+                        apply(gaus_preds, 2, median)))
 })
 
 test_that("hindcast has reasonable outputs", {

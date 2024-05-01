@@ -90,15 +90,16 @@ test_that("family must be correctly specified", {
 })
 
 test_that("response variable must be specified", {
-expect_error(mod <- mvgam( ~ s(season),
-                          trend_model = 'AR1',
-                          data = beta_data$data_train,
-                          family = betar(),
-                          run_model = FALSE),
-             'response variable is missing from formula')
+  expect_error(mod <- mvgam( ~ s(season),
+                             trend_model = 'AR1',
+                             data = beta_data$data_train,
+                             family = betar(),
+                             run_model = FALSE),
+               'response variable is missing from formula')
 })
 
 test_that("prior_only works", {
+  skip_on_cran()
   mod <- mvgam(y ~ s(season),
                trend_model = AR(p = 2),
                drift = TRUE,
@@ -529,6 +530,7 @@ test_that("trend_formula setup is working properly", {
 # Check that parametric effect priors are properly incorporated in the
 # model for a wide variety of model forms
 test_that("parametric effect priors correctly incorporated in models", {
+  skip_on_cran()
   mod_data <- mvgam:::mvgam_examp_dat
   mod_data$data_train$x1 <-
     rnorm(NROW(mod_data$data_train))

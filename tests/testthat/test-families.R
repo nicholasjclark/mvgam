@@ -18,6 +18,7 @@ test_that("distributions work correctly", {
 })
 
 test_that("family setups work correctly", {
+  skip_on_cran()
   simdat <- sim_mvgam(family = poisson())
   mod <- mvgam(y ~ -1,
                trend_model = PW(),

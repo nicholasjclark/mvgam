@@ -75,12 +75,6 @@ test_that("rho argument cannot be larger than N - 1", {
                fixed = TRUE)
 })
 
-set.seed(100)
-beta_data <- sim_mvgam(family = betar(),
-                       trend_model = 'GP',
-                       trend_rel = 0.5,
-                       T = 60)
-
 test_that("dynamic to spline works for trend_formulas", {
   beta_data$data_train$random <- rnorm(NROW(beta_data$data_train))
   mod <- mvgam(y ~ dynamic(random, rho = 5),
