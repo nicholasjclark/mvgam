@@ -307,6 +307,7 @@ test_that("series levels must match unique entries in series", {
 })
 
 test_that("share_obs_params working", {
+  skip_on_cran()
   # Standard beta
   mod <- mvgam(y ~ s(season, by = series),
                trend_model = RW(cor = TRUE),
@@ -445,6 +446,7 @@ test_that("share_obs_params working", {
 })
 
 test_that("trend_map is behaving propoerly", {
+  skip_on_cran()
   sim <- sim_mvgam(n_series = 3)
   mod_data <- sim$data_train
   trend_map <- data.frame(series = unique(mod_data$series),

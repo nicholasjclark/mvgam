@@ -76,6 +76,7 @@ test_that("rho argument cannot be larger than N - 1", {
 })
 
 test_that("dynamic to spline works for trend_formulas", {
+  skip_on_cran()
   beta_data$data_train$random <- rnorm(NROW(beta_data$data_train))
   mod <- mvgam(y ~ dynamic(random, rho = 5),
                trend_formula = ~ dynamic(random, rho = 15),
@@ -91,6 +92,7 @@ test_that("dynamic to spline works for trend_formulas", {
 })
 
 test_that("dynamic to Hilbert works for trend_formulas", {
+  skip_on_cran()
   beta_data$data_train$random <- rnorm(NROW(beta_data$data_train))
   mod <- mvgam(y ~ dynamic(random),
                trend_formula = ~ dynamic(random, k = 22),

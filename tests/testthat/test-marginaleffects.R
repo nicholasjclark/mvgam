@@ -1,7 +1,6 @@
 context("marginaleffects")
 
 test_that("data_grid gives expected output structure", {
-
   # Dataframe example
   simdat <- sim_mvgam(n_series = 3, prop_trend = 1,
                       trend_model = GP(),
@@ -51,6 +50,7 @@ test_that("get_predict gives expected output structure", {
 })
 
 test_that("averages give expected output structures", {
+  skip_on_cran()
   ems <- avg_predictions(mvgam:::mvgam_example3)
   expect_equal(NROW(ems), 1)
   expect_true(all(c("estimate", "conf.low", "conf.high") %in% colnames(ems)))
