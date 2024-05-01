@@ -66,6 +66,10 @@ jobs:
               usethis
               rcmdcheck
 
+      - name: Test timings
+        run: testthat::test_local(reporter = 'junit')
+        shell: Rscript {0}
+
       - uses: r-lib/actions/check-r-package@v2
         with:
           build_args: 'c("--no-manual", "--no-build-vignettes")'
