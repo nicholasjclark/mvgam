@@ -264,23 +264,23 @@ test_that("plot_mvgam... functions work properly", {
 })
 
 test_that("summaries all work", {
-  expect_no_error(summary(mvgam:::mvgam_example1))
-  expect_no_error(summary(mvgam:::mvgam_example2))
-  expect_no_error(summary(mvgam:::mvgam_example3))
-  expect_no_error(summary(mvgam:::mvgam_example4))
-  expect_no_error(summary(mvgam:::mvgam_example5))
+  expect_no_error(capture_output(summary(mvgam:::mvgam_example1)))
+  expect_no_error(capture_output(summary(mvgam:::mvgam_example2)))
+  expect_no_error(capture_output(summary(mvgam:::mvgam_example3)))
+  expect_no_error(capture_output(summary(mvgam:::mvgam_example4)))
+  expect_no_error(capture_output(summary(mvgam:::mvgam_example5)))
 
-  expect_no_error(variables(mvgam:::mvgam_example1))
-  expect_no_error(variables(mvgam:::mvgam_example2))
-  expect_no_error(variables(mvgam:::mvgam_example3))
-  expect_no_error(variables(mvgam:::mvgam_example4))
-  expect_no_error(variables(mvgam:::mvgam_example5))
+  expect_no_error(capture_output(variables(mvgam:::mvgam_example1)))
+  expect_no_error(capture_output(variables(mvgam:::mvgam_example2)))
+  expect_no_error(capture_output(variables(mvgam:::mvgam_example3)))
+  expect_no_error(capture_output(variables(mvgam:::mvgam_example4)))
+  expect_no_error(capture_output(variables(mvgam:::mvgam_example5)))
 
-  expect_no_error(mvgam:::mvgam_example1)
-  expect_no_error(mvgam:::mvgam_example2)
-  expect_no_error(mvgam:::mvgam_example3)
-  expect_no_error(mvgam:::mvgam_example4)
-  expect_no_error(mvgam:::mvgam_example5)
+  expect_no_error(capture_output(mvgam:::mvgam_example1))
+  expect_no_error(capture_output(mvgam:::mvgam_example2))
+  expect_no_error(capture_output(mvgam:::mvgam_example3))
+  expect_no_error(capture_output(mvgam:::mvgam_example4))
+  expect_no_error(capture_output(mvgam:::mvgam_example5))
 })
 
 test_that("dynamic factor investigations work", {

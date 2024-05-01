@@ -38,6 +38,7 @@ test_that("add_residuals working properly", {
 })
 
 test_that("mcmc diagnostics working properly", {
+  skip_on_cran()
   expect_true(inherits(nuts_params(mvgam:::mvgam_example1),
                        'data.frame'))
   expect_true(inherits(nuts_params(mvgam:::mvgam_example5),

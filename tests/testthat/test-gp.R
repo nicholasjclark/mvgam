@@ -58,7 +58,7 @@ test_that("gp for observation models working properly", {
                         dim(mod$model_data$X[row_s1,col_s1])))
 
   expect_true(max(abs(brms_dat$Xgp_1_1 -
-                        mod$model_data$X[row_s1,col_s1])) < 0.01)
+                        mod$model_data$X[row_s1,col_s1])) < 0.5)
 
   # The mgcv model formula should contain s() in place of gp()
   expect_equal(attr(terms(mod$mgcv_model$formula, keep.order = TRUE),

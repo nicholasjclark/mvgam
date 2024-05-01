@@ -192,8 +192,8 @@ test_that("nmix() post-processing works", {
     residuals = FALSE,
     chains = 2))
 
-  expect_no_error(summary(mod))
-  expect_no_error(print(mod))
+  expect_no_error(capture_output(summary(mod)))
+  expect_no_error(capture_output(print(mod)))
   expect_true(inherits(hindcast(mod), 'mvgam_forecast'))
   expect_true(inherits(hindcast(mod,
                                 type = 'latent_N'),

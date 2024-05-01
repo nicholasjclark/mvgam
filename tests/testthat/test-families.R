@@ -26,7 +26,7 @@ test_that("family setups work correctly", {
                family = poisson(),
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
-  expect_no_error(print(mod))
+  expect_no_error(capture_output(print(mod)))
 
   simdat <- sim_mvgam(family = nb(),
                       n_lv = 2)
@@ -36,7 +36,7 @@ test_that("family setups work correctly", {
                family = nb(),
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
-  expect_no_error(print(mod))
+  expect_no_error(capture_output(print(mod)))
 
   simdat <- sim_mvgam(family = lognormal(),
                       trend_model = VAR())
@@ -46,7 +46,7 @@ test_that("family setups work correctly", {
                family = lognormal(),
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
-  expect_no_error(print(mod))
+  expect_no_error(capture_output(print(mod)))
 
   simdat <- sim_mvgam(family = bernoulli(),
                       trend_model = VAR(cor = TRUE))
@@ -56,7 +56,7 @@ test_that("family setups work correctly", {
                family = bernoulli(),
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
-  expect_no_error(print(mod))
+  expect_no_error(capture_output(print(mod)))
 
   simdat <- sim_mvgam(family = student_t(),
                       trend_model = GP())
@@ -66,7 +66,7 @@ test_that("family setups work correctly", {
                family = student_t(),
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
-  expect_no_error(print(mod))
+  expect_no_error(capture_output(print(mod)))
 
   simdat <- sim_mvgam(family = Gamma(),
                       seasonality = 'shared',
@@ -77,7 +77,7 @@ test_that("family setups work correctly", {
                family = Gamma(),
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
-  expect_no_error(print(mod))
+  expect_no_error(capture_output(print(mod)))
 
   simdat <- sim_mvgam(family = betar(),
                       seasonality = 'hierarchical',
@@ -88,5 +88,5 @@ test_that("family setups work correctly", {
                family = betar(),
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
-  expect_no_error(print(mod))
+  expect_no_error(capture_output(print(mod)))
 })

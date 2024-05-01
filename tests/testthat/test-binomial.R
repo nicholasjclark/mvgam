@@ -88,9 +88,9 @@ test_that("binomial() post-processing works", {
                burnin = 500,
                samples = 200,
                chains = 2))
-  expect_no_error(summary(mod))
-  expect_no_error(code(mod))
-  expect_no_error(print(mod))
+  expect_no_error(capture_output(summary(mod)))
+  expect_no_error(capture_output(code(mod)))
+  expect_no_error(capture_output(print(mod)))
 
   preds <- predict(mod, summary = FALSE, type = 'response')
   expect_true(NCOL(preds) == NROW(dat_train))
@@ -283,8 +283,8 @@ test_that("bernoulli() post-processing works", {
                samples = 200,
                chains = 2))
 
-  expect_no_error(summary(mod))
-  expect_no_error(print(mod))
+  expect_no_error(capture_output(summary(mod)))
+  expect_no_error(capture_output(print(mod)))
 
   preds <- predict(mod, summary = FALSE, type = 'response')
   expect_true(NCOL(preds) == NROW(dat_train))

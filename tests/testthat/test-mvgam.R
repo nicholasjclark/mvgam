@@ -108,7 +108,7 @@ test_that("prior_only works", {
                family = gaussian(),
                threads = 2,
                run_model = FALSE)
-  expect_no_error(code(mod))
+  expect_no_error(capture_output(code(mod)))
   expect_true(!any(grepl('likelihood functions',
                          mod$model_file, fixed = TRUE)))
   expect_true(!any(grepl('flat_ys ~ ',
@@ -122,7 +122,7 @@ test_that("prior_only works", {
                family = gaussian(),
                threads = 2,
                run_model = FALSE)
-  expect_no_error(code(mod))
+  expect_no_error(capture_output(code(mod)))
   expect_true(!any(grepl('likelihood functions',
                          mod$model_file, fixed = TRUE)))
   expect_true(!any(grepl('flat_ys ~ ',
@@ -136,7 +136,7 @@ test_that("prior_only works", {
                family = gaussian(),
                threads = 2,
                run_model = FALSE)
-  expect_no_error(code(mod))
+  expect_no_error(capture_output(code(mod)))
   expect_true(!any(grepl('likelihood functions',
                          mod$model_file, fixed = TRUE)))
   expect_true(!any(grepl('flat_ys ~ ',
@@ -149,7 +149,7 @@ test_that("prior_only works", {
                prior_simulation = TRUE,
                family = betar(),
                run_model = FALSE)
-  expect_no_error(code(mod))
+  expect_no_error(capture_output(code(mod)))
   expect_true(!any(grepl('likelihood functions',
                          mod$model_file, fixed = TRUE)))
   expect_true(!any(grepl('flat_ys ~ ',
@@ -162,7 +162,7 @@ test_that("prior_only works", {
                prior_simulation = TRUE,
                family = betar(),
                run_model = FALSE)
-  expect_no_error(code(mod))
+  expect_no_error(capture_output(code(mod)))
   expect_true(!any(grepl('likelihood functions',
                          mod$model_file, fixed = TRUE)))
   expect_true(!any(grepl('flat_ys ~ ',
