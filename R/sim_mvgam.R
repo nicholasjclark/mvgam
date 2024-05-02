@@ -59,12 +59,12 @@
 #'@return A \code{list} object containing outputs needed for \code{\link{mvgam}}, including 'data_train' and 'data_test',
 #'as well as some additional information about the simulated seasonality and trend dependencies
 #'@examples
-#'#Simulate series with observations bounded at 0 and 1 (Beta responses)
-#'sim_data <- sim_mvgam(family = betar(), trend_model = 'GP', prop_trend = 0.6)
+#'# Simulate series with observations bounded at 0 and 1 (Beta responses)
+#'sim_data <- sim_mvgam(family = betar(), trend_model = RW(), prop_trend = 0.6)
 #'plot_mvgam_series(data = sim_data$data_train, series = 'all')
 #'
-#'#Now simulate series with overdispersed discrete observations
-#'sim_data <- sim_mvgam(family = nb(), trend_model = 'GP', prop_trend = 0.6, phi = 10)
+#'# Now simulate series with overdispersed discrete observations
+#'sim_data <- sim_mvgam(family = nb(), trend_model = RW(), prop_trend = 0.6, phi = 10)
 #'plot_mvgam_series(data = sim_data$data_train, series = 'all')
 #'@export
 

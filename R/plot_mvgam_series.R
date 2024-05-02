@@ -33,6 +33,15 @@
 #'cumulative distribution functions, and a histogram for the series. If \code{series == 'all'},
 #'a set of observed time series plots is returned in which all series are shown on each plot but
 #'only a single focal series is highlighted, with all remaining series shown as faint gray lines.
+#'@examples
+#'# Simulate and plot series with observations bounded at 0 and 1 (Beta responses)
+#'sim_data <- sim_mvgam(family = betar(), trend_model = RW(), prop_trend = 0.6)
+#'plot_mvgam_series(data = sim_data$data_train, series = 'all')
+#'plot_mvgam_series(data = sim_data$data_train, newdata = sim_data$data_test, series = 1)
+#'
+#'# Now simulate series with overdispersed discrete observations
+#'sim_data <- sim_mvgam(family = nb(), trend_model = RW(), prop_trend = 0.6, phi = 10)
+#'plot_mvgam_series(data = sim_data$data_train, series = 'all')
 #'@export
 plot_mvgam_series = function(object,
                              data,

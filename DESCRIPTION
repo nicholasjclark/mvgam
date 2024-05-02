@@ -2,15 +2,9 @@ Package: mvgam
 Title: Multivariate (Dynamic) Generalized Additive Models
 Version: 1.1.0
 Date: 2024-05-01
-Authors@R:
-    person("Nicholas J", "Clark", , "nicholas.j.clark1214@gmail.com", role = c("aut", "cre"),
-           comment = c(ORCID = "0000-0001-7131-3301"))
-Description: Fit Bayesian Dynamic Generalized Additive Models to sets of time series. 
-             The primary purpose of the package is to build dynamic nonlinear models that incorporate 
-             semiparametric effects in observation and process components of State-Space models. 
-             Estimation is performed using Markov Chain Monte Carlo
-             with Hamiltonian Monte Carlo in the software 'Stan'. 
-             References: Clark & Wells (2022) <doi:10.1111/2041-210X.13974>.
+Authors@R: person("Nicholas J", "Clark", , "nicholas.j.clark1214@gmail.com", role = c("aut", "cre"), comment = c(ORCID = "0000-0001-7131-3301"))
+Description: Fit Bayesian Dynamic Generalized Additive Models to sets of time series. This package builds dynamic nonlinear State-Space models that can incorporate semiparametric effects in observation and process components. Estimation is performed using Markov Chain Monte Carlo with Hamiltonian Monte Carlo in the software 'Stan'. 
+References: Clark & Wells (2022) <doi:10.1111/2041-210X.13974>.
 URL: https://github.com/nicholasjclark/mvgam, https://nicholasjclark.github.io/mvgam/
 BugReports: https://github.com/nicholasjclark/mvgam/issues
 License: MIT + file LICENSE

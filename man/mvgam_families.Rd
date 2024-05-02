@@ -17,6 +17,9 @@ nmix(link = "log")
 \item{link}{a specification for the family link function. At present these cannot
 be changed}
 }
+\value{
+Objects of class \code{family}
+}
 \description{
 Supported mvgam families
 }

@@ -32,7 +32,7 @@ Extract the LOOIC (leave-one-out information criterion) using
 # and independent AR1 dynamic processes
 set.seed(111)
 simdat <- sim_mvgam(seasonality = 'hierarchical',
-                   trend_model = 'AR1',
+                   trend_model = AR(),
                    family = gaussian())
 
 # Fit a model with shared seasonality
@@ -40,12 +40,11 @@ mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
              data = rbind(simdat$data_train,
              simdat$data_test),
              family = gaussian(),
-             burnin = 300,
-             samples = 300,
              chains = 2)
 
 # Inspect the model and calculate LOO
 plot(mod1, type = 'smooths')
+mc.cores.def <- getOption('mc.cores')
 options(mc.cores = 1)
 loo(mod1)
 
@@ -54,17 +53,13 @@ mod2 <- update(mod1,
               formula = y ~ s(season, bs = 'cc', k = 6) +
               s(season, series, bs = 'fs',
               xt = list(bs = 'cc'), k = 4),
-              burnin = 300,
-              samples = 300,
               chains = 2)
 plot(mod2, type = 'smooths')
 loo(mod2)
 
 # Now add AR1 dynamic errors to mod2
 mod3 <- update(mod2,
-              trend_model = 'AR1',
-              burnin = 300,
-              samples = 300,
+              trend_model = AR(),
               chains = 2)
 plot(mod3, type = 'smooths')
 plot(mod3, type = 'trend')
@@ -72,5 +67,6 @@ loo(mod3)
 
 # Compare models using LOO
 loo_compare(mod1, mod2, mod3)
+options(mc.cores = mc.cores.def)
 }
 }

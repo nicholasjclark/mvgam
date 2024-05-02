@@ -412,8 +412,6 @@ mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
               data = dat$data_train,
               trend_model = RW(),
               family = poisson(),
-              burnin = 300,
-              samples = 300,
               chains = 2)
 
 # Extract the model summary
@@ -458,8 +456,10 @@ head(beta_draws_df)
 str(beta_draws_df)
 
 # Investigate model fit
+mc.cores.def <- getOption('mc.cores')
 options(mc.cores = 1)
 loo(mod1)
+options(mc.cores = mc.cores.def)
 
 
 # Example of supplying a trend_map so that some series can share
@@ -478,8 +478,6 @@ mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
              trend_model = AR(),
              data = mod_data,
              return_model_data = TRUE,
-             burnin = 300,
-             samples = 300,
              chains = 2)
 
 # The mapping matrix is now supplied as data to the model in the 'Z' element
@@ -523,8 +521,6 @@ mod <- mvgam(out ~
              family = gaussian(),
              data = data_train,
              newdata = data_test,
-             burnin = 300,
-             samples = 300,
              chains = 2)
 
 # Inspect the model summary, forecast and time-varying coefficient distribution
@@ -555,9 +551,6 @@ mod <- mvgam(formula = y ~ offset(offset) +
               s(season, bs = 'cc') +
               s(season, by = series, m = 1, k = 5),
              data = dat$data_train,
-             trend_model = 'None',
-             burnin = 300,
-             samples = 300,
              chains = 2)
 
 # Inspect the model file to see the modification to the linear predictor
@@ -628,8 +621,6 @@ plot_mvgam_series(data = dat, series = 'all')
 mod <- mvgam(cbind(y, ntrials) ~ series + s(x, by = series),
              family = binomial(),
              data = dat,
-             burnin = 300,
-             samples = 300,
              chains = 2)
 summary(mod)
 pp_check(mod, type = "bars_grouped",

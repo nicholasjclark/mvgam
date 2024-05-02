@@ -96,8 +96,7 @@
 #'plot(lfo_ar2)
 #'plot(lfo_rw)
 #'
-#'# Proportion of timepoints in which AR2 model gives
-#'# better forecasts
+#'# Proportion of timepoints in which AR2 model gives better forecasts
 #'length(which((lfo_ar2$elpds - lfo_rw$elpds) > 0)) /
 #'       length(lfo_ar2$elpds)
 #'
@@ -256,13 +255,9 @@ plot.mvgam_lfo = function(x, ...){
   object <- x
 
   # Graphical parameters
-  layout(matrix(1:2, nrow = 2))
   .pardefault <- par(no.readonly=T)
-  par(.pardefault)
-  par(mfrow = c(2, 1),
-      mar=c(2.5, 2.3, 2, 2),
-      oma = c(1, 1, 0, 0),
-      mgp = c(1.5, 0.5, 0))
+  on.exit(par(.pardefault))
+  par(mfrow = c(2, 1))
 
   # Plot Pareto-k values over time
   object$pareto_ks[which(is.infinite(object$pareto_ks))] <-
@@ -326,10 +321,6 @@ plot.mvgam_lfo = function(x, ...){
          pch = 16, col = "#7C0000", cex = 1.25)
 
   box(bty = 'l', lwd = 2)
-
-  invisible()
-  par(.pardefault)
-  layout(1)
 }
 
 #' Function to generate informative priors based on the posterior

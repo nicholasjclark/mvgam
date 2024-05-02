@@ -115,8 +115,7 @@ lfo_rw <- lfo_cv(mod_rw,
 plot(lfo_ar2)
 plot(lfo_rw)
 
-# Proportion of timepoints in which AR2 model gives
-# better forecasts
+# Proportion of timepoints in which AR2 model gives better forecasts
 length(which((lfo_ar2$elpds - lfo_rw$elpds) > 0)) /
       length(lfo_ar2$elpds)
 
