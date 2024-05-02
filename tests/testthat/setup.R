@@ -17,6 +17,7 @@ expect_loo <- function(object, ...) {
 SM <- suppressMessages
 SW <- suppressWarnings
 
+#ptm <- proc.time()
 set.seed(100)
 beta_data <- sim_mvgam(family = betar(),
                        trend_model = 'GP',
@@ -29,3 +30,4 @@ gaus_data <- sim_mvgam(family = gaussian(),
                        mu = c(-1, 0, 1),
                        trend_rel = 0.5,
                        prop_missing = 0.2)
+#cat(paste0('setup took:\n')); proc.time() - ptm
