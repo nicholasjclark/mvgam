@@ -61,5 +61,7 @@ Suggests:
     runjags,
     usethis,
     testthat
+Additional_repositories:
+    https://mc-stan.org/r-packages/
 LinkingTo: Rcpp, RcppArmadillo
 VignetteBuilder: knitr
