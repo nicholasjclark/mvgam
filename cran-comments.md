@@ -1,7 +1,7 @@
 ## Initial release (version 1.1.0)
 
 ## Response to previous check comments
-* DESCRIPTION has been shortened appropriately
+* DESCRIPTION has been shortened appropriately and the References tag placed in the correct location
 * Missing Rd tags have been added for all exported functions
 * Code that previously wrote home filespace has been removed
 * Examples that previously used non-exported functions have been fixed

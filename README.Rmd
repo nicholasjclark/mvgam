@@ -24,8 +24,10 @@ knitr::opts_chunk$set(
 *mvgam*
 ================
 [![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
-[![test-coverage](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml)
-[![codecov](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
+[![Test status](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml)
+[![Coverage status](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
+[![CRAN Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org/package=mvgam)
+[![CRAN Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
 The goal of `mvgam` is to fit Bayesian Dynamic Generalized Additive Models to time series data. The motivation for the package is described in [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974){target="_blank"} (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling coming from [Michael Betancourt](https://betanalpha.github.io/writing/){target="_blank"}, [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/){target="_blank"} and [Emily Fox](https://emilybfox.su.domains/){target="_blank"}, among many others. 
 
@@ -39,7 +41,7 @@ A series of [vignettes cover data formatting, forecasting and several extended c
 * [Phylogenetic smoothing using mgcv](https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/){target="_blank"}
   
 ## Installation
-Install from `GitHub` using:
+Install the stable version from `CRAN` using: `install.packages('mvgam')`, or install the development version from `GitHub` using:
 `devtools::install_github("nicholasjclark/mvgam")`. Note that to condition models on observed data, either `JAGS` (along with packages `rjags` and `runjags`) or `Stan` must be installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/){target="_blank"}, for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}. You will need a fairly recent version of `Stan` to ensure all syntax is recognized. If you see warnings such as `variable "array" does not exist`, this is usually a sign that you need to update `Stan`. We highly recommend you use `Cmdstan` through the `cmdstanr` interface. This is because `Cmdstan` is easier to install, is more up to date with new features, and uses less memory than `Rstan`. See [this documentation from the `Cmdstan` team for more information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan){target="_blank"}. 
 
 ## Citing mvgam and related software
@@ -267,7 +269,7 @@ for(i in 1:3){
 }
 ```
 
-```{r beta_fc, echo=FALSE}
+```{r beta_fc, echo=FALSE, message=FALSE}
 layout(matrix(1:4, nrow = 2, byrow = TRUE))
 par(mar=c(3, 3, 2, 2),
     oma = c(2, 2, 0, 0),

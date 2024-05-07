@@ -6,8 +6,14 @@
 # *mvgam*
 
 [![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
-[![test-coverage](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml)
-[![codecov](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
+[![Test
+status](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml)
+[![Coverage
+status](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
+[![CRAN
+Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org/package=mvgam)
+[![CRAN
+Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
 The goal of `mvgam` is to fit Bayesian Dynamic Generalized Additive
 Models to time series data. The motivation for the package is described
@@ -47,12 +53,13 @@ been compiled:
 
 ## Installation
 
-Install from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`. Note that to
-condition models on observed data, either `JAGS` (along with packages
-`rjags` and `runjags`) or `Stan` must be installed (along with either
-`rstan` and/or `cmdstanr`). Please refer to installation links for
-`JAGS` <a href="https://sourceforge.net/projects/mcmc-jags/files/"
+Install the stable version from `CRAN` using:
+`install.packages('mvgam')`, or install the development version from
+`GitHub` using: `devtools::install_github("nicholasjclark/mvgam")`. Note
+that to condition models on observed data, either `JAGS` (along with
+packages `rjags` and `runjags`) or `Stan` must be installed (along with
+either `rstan` and/or `cmdstanr`). Please refer to installation links
+for `JAGS` <a href="https://sourceforge.net/projects/mcmc-jags/files/"
 target="_blank">here</a>, for `Stan` with `rstan`
 <a href="https://mc-stan.org/users/interfaces/rstan"
 target="_blank">here</a>, or for `Stan` with `cmdstandr`
@@ -329,28 +336,28 @@ summary(lynx_mvgam)
 #> 
 #> GAM coefficient (beta) estimates:
 #>                 2.5%     50%  97.5% Rhat n_eff
-#> (Intercept)   6.0000  6.6000  7.000 1.00   672
-#> s(season).1  -0.6600  0.0073  0.700 1.00   823
-#> s(season).2  -0.2000  0.8700  1.800 1.00   452
-#> s(season).3  -0.0047  1.3000  2.600 1.01   404
-#> s(season).4  -0.5900  0.4400  1.400 1.00  1054
-#> s(season).5  -1.3000 -0.1900  0.980 1.01   584
-#> s(season).6  -1.1000 -0.0520  1.100 1.00   740
-#> s(season).7  -0.7000  0.4200  1.500 1.00   731
-#> s(season).8  -0.9200  0.3800  1.900 1.01   398
-#> s(season).9  -1.1000 -0.2100  0.760 1.01   490
-#> s(season).10 -1.4000 -0.7000 -0.033 1.00   644
+#> (Intercept)   6.0000  6.6000  7.000 1.01   793
+#> s(season).1  -0.6000  0.0570  0.740 1.00   899
+#> s(season).2  -0.2500  0.7600  1.900 1.01   433
+#> s(season).3   0.0054  1.1000  2.500 1.01   401
+#> s(season).4  -0.5200  0.4200  1.400 1.00   934
+#> s(season).5  -1.2000 -0.1500  0.980 1.01   542
+#> s(season).6  -1.1000  0.0061  1.100 1.00   656
+#> s(season).7  -0.8100  0.3300  1.400 1.01   887
+#> s(season).8  -0.9800  0.1700  1.800 1.01   457
+#> s(season).9  -1.1000 -0.3200  0.680 1.01   540
+#> s(season).10 -1.4000 -0.6400 -0.027 1.01   746
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value
-#> s(season) 9.95     10  19747    0.25
+#> s(season) 9.97     10  17566     0.3
 #> 
 #> Latent trend AR parameter estimates:
-#>           2.5%    50% 97.5% Rhat n_eff
-#> ar1[1]    0.73  1.100 1.400    1   746
-#> ar2[1]   -0.82 -0.400 0.058    1  1496
-#> ar3[1]   -0.46 -0.098 0.350    1   580
-#> sigma[1]  0.40  0.500 0.640    1  1278
+#>           2.5%   50% 97.5% Rhat n_eff
+#> ar1[1]    0.77  1.10 1.400 1.00   899
+#> ar2[1]   -0.85 -0.40 0.038 1.00  1686
+#> ar3[1]   -0.48 -0.13 0.300 1.01   562
+#> sigma[1]  0.40  0.50 0.640 1.00  1202
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -359,7 +366,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Apr 30 4:10:25 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Wed May 08 9:37:54 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -481,7 +488,7 @@ series (testing and training)
 ``` r
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 #> Out of sample CRPS:
-#> 2781.0102345
+#> 2910.858471
 ```
 
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -645,7 +652,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Apr 30 4:12:04 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Wed May 08 9:38:56 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -659,13 +666,6 @@ for(i in 1:3){
   plot(mod, type = 'forecast', series = i)
 }
 ```
-
-    #> Out of sample CRPS:
-    #> 2.07309994394723
-    #> Out of sample CRPS:
-    #> 1.8331565279954
-    #> Out of sample CRPS:
-    #> 1.73608537518319
 
 <img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />
 

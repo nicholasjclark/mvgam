@@ -24,7 +24,8 @@ Models</a>.
 
 ## Installation
 
-Install the development version from `GitHub` using:
+Install the stable version from CRAN using: `install.packages('mvgam')`,
+or install the development version from `GitHub` using:
 `devtools::install_github("nicholasjclark/mvgam")`. Note that to
 actually condition models with MCMC sampling, either the `JAGS` software
 must be installed (along with the `R` packages `rjags` and `runjags`) or
@@ -89,10 +90,10 @@ Gaussian Process dynamic trends:
 
 ``` r
 data <- sim_mvgam(family = betar(),
-                 T = 80,
-                 trend_model = 'GP',
-                 trend_rel = 0.5, 
-                 seasonality = 'shared')
+                  T = 80,
+                  trend_model = GP(),
+                  trend_rel = 0.5, 
+                  seasonality = 'shared')
 ```
 
 Plot the series to see how they evolve over time
@@ -116,7 +117,7 @@ exponential covariance functions to capture temporal dynamics
 ``` r
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
                s(season, by = series, m = 1, k = 5),
-             trend_model = 'GP',
+             trend_model = GP(),
              data = data$data_train,
              newdata = data$data_test,
              family = betar())
