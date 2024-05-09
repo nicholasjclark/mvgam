@@ -30,28 +30,12 @@ jobs:
         with:
           use-public-rspm: true
 
-      # As cmdstanr is not yet on CRAN, configure the action to only install the
-      # 'Depends' packages by default and then manually specify the 'Suggests'
-      # packages that are needed for R CMD CHECK
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           dependencies: NA
           extra-packages: |
-              knitr
-              extraDistr
-              lubridate
-              wrswoR
-              tweedie
-              splines2
-              xts
-              collapse
-              rmarkdown
-              ggplot2
-              coda
-              testthat
-              usethis
-              rcmdcheck
               devtools
+              testthat
 
       - name: Memory check
         run: |
