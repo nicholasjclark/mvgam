@@ -55,4 +55,4 @@ jobs:
 
       - name: Memory check
         run: |
-          R -d "valgrind --tool=memcheck --leak-check=full" --vanilla < memcheck.R
+          R -d valgrind -f memcheck.R
