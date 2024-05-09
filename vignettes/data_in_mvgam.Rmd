@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE,   
-  dpi = 150,
+  dpi = 100,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
