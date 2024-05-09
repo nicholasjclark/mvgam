@@ -62,10 +62,17 @@ loo.mvgam <- function(x, ...) {
                                        summary = FALSE,
                                        process_error = TRUE),
                     newdata = x$obs_data,
-                    family_pars = mvgam:::extract_family_pars(x),
+                    family_pars = extract_family_pars(x),
                     include_forecast = FALSE)
   logliks <- logliks[,!apply(logliks, 2, function(x) all(!is.finite(x)))]
 
+  # Remove any remaining non-finite values (very occasionally happens with
+  # some observation families)
+  min_noinf = function(x){
+    x <- x[is.finite(x)]
+    min(x)
+  }
+  logliks[!is.finite(logliks)] <- min_noinf(logliks)
   releffs <- loo::relative_eff(exp(logliks),
                                chain_id = sort(rep(1:x$model_output@sim$chains,
                                                    (NROW(logliks) /
