@@ -1,4 +1,4 @@
-## ----echo = FALSE-------------------------------------------------------------
+## ----echo = FALSE-----------------------------------------------------
 NOT_CRAN <- identical(tolower(Sys.getenv("NOT_CRAN")), "true")
 knitr::opts_chunk$set(
   collapse = TRUE,
@@ -7,10 +7,11 @@ knitr::opts_chunk$set(
   eval = NOT_CRAN
 )
 
-## ----setup, include=FALSE-----------------------------------------------------
+
+## ----setup, include=FALSE---------------------------------------------
 knitr::opts_chunk$set(
   echo = TRUE,   
-  dpi = 150,
+  dpi = 100,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
@@ -19,7 +20,8 @@ library(mvgam)
 library(ggplot2)
 theme_set(theme_bw(base_size = 12, base_family = 'serif'))
 
-## -----------------------------------------------------------------------------
+
+## ---------------------------------------------------------------------
 set.seed(122)
 simdat <- sim_mvgam(trend_model = 'AR1',
                     prop_trend = 0.6,
@@ -29,10 +31,12 @@ trend_map <- data.frame(series = unique(simdat$data_train$series),
                         trend = c(1, 1, 2))
 trend_map
 
-## -----------------------------------------------------------------------------
+
+## ---------------------------------------------------------------------
 all.equal(levels(trend_map$series), levels(simdat$data_train$series))
 
-## -----------------------------------------------------------------------------
+
+## ---------------------------------------------------------------------
 fake_mod <- mvgam(y ~ 
                     # observation model formula, which has a 
                     # different intercept per series
@@ -54,13 +58,16 @@ fake_mod <- mvgam(y ~
                   data = simdat$data_train,
                   run_model = FALSE)
 
-## -----------------------------------------------------------------------------
+
+## ---------------------------------------------------------------------
 code(fake_mod)
 
-## -----------------------------------------------------------------------------
+
+## ---------------------------------------------------------------------
 fake_mod$model_data$Z
 
-## ----full_mod, include = FALSE, results='hide'--------------------------------
+
+## ----full_mod, include = FALSE, results='hide'------------------------
 full_mod <- mvgam(y ~ series - 1,
                   trend_formula = ~ s(season, bs = 'cc', k = 6),
                   trend_model = 'AR1',
@@ -68,31 +75,27 @@ full_mod <- mvgam(y ~ series - 1,
                   family = poisson(),
                   data = simdat$data_train)
 
-## ----eval=FALSE---------------------------------------------------------------
-#  full_mod <- mvgam(y ~ series - 1,
-#                    trend_formula = ~ s(season, bs = 'cc', k = 6),
-#                    trend_model = 'AR1',
-#                    trend_map = trend_map,
-#                    family = poisson(),
-#                    data = simdat$data_train)
 
-## -----------------------------------------------------------------------------
+## ----eval=FALSE-------------------------------------------------------
+## full_mod <- mvgam(y ~ series - 1,
+##                   trend_formula = ~ s(season, bs = 'cc', k = 6),
+##                   trend_model = 'AR1',
+##                   trend_map = trend_map,
+##                   family = poisson(),
+##                   data = simdat$data_train)
+
+
+## ---------------------------------------------------------------------
 summary(full_mod)
 
-## -----------------------------------------------------------------------------
-plot(conditional_effects(full_mod, type = 'link'), ask = FALSE)
 
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------
 plot(full_mod, type = 'trend', series = 1)
 plot(full_mod, type = 'trend', series = 2)
 plot(full_mod, type = 'trend', series = 3)
 
-## -----------------------------------------------------------------------------
-plot(full_mod, type = 'forecast', series = 1)
-plot(full_mod, type = 'forecast', series = 2)
-plot(full_mod, type = 'forecast', series = 3)
 
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------
 set.seed(543210)
 # simulate a nonlinear relationship using the mgcv function gamSim
 signal_dat <- gamSim(n = 100, eg = 1, scale = 1)
@@ -106,19 +109,15 @@ productivity <- signal_dat$x2
 true_signal <- as.vector(scale(signal_dat$y) +
                          arima.sim(100, model = list(ar = 0.8, sd = 0.1)))
 
-## -----------------------------------------------------------------------------
+
+## ---------------------------------------------------------------------
 plot(true_signal, type = 'l',
      bty = 'l', lwd = 2,
      ylab = 'True signal',
      xlab = 'Time')
 
-## -----------------------------------------------------------------------------
-plot(true_signal ~ productivity,
-     pch = 16, bty = 'l',
-     ylab = 'True signal',
-     xlab = 'Productivity')
 
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------
 set.seed(543210)
 sim_series = function(n_series = 3, true_signal){
   temp_effects <- gamSim(n = 100, eg = 7, scale = 0.1)
@@ -141,11 +140,13 @@ sim_series = function(n_series = 3, true_signal){
 model_dat <- sim_series(true_signal = true_signal) %>%
   dplyr::mutate(series = factor(series))
 
-## -----------------------------------------------------------------------------
+
+## ---------------------------------------------------------------------
 plot_mvgam_series(data = model_dat, y = 'observed',
                   series = 'all')
 
-## -----------------------------------------------------------------------------
+
+## ---------------------------------------------------------------------
  plot(observed ~ temperature, data = model_dat %>%
    dplyr::filter(series == 'sensor_1'),
    pch = 16, bty = 'l',
@@ -162,7 +163,8 @@ plot_mvgam_series(data = model_dat, y = 'observed',
    ylab = 'Sensor 3',
    xlab = 'Temperature')
 
-## ----sensor_mod, include = FALSE, results='hide'------------------------------
+
+## ----sensor_mod, include = FALSE, results='hide'----------------------
 mod <- mvgam(formula =
                # formula for observations, allowing for different
                # intercepts and smooth effects of temperature
@@ -197,61 +199,57 @@ mod <- mvgam(formula =
              adapt_delta = 0.95,
              data = model_dat)
 
-## ----eval=FALSE---------------------------------------------------------------
-#  mod <- mvgam(formula =
-#                 # formula for observations, allowing for different
-#                 # intercepts and hierarchical smooth effects of temperature
-#                 observed ~ series +
-#                 s(temperature, k = 10) +
-#                 s(series, temperature, bs = 'sz', k = 8),
-#  
-#               trend_formula =
-#                 # formula for the latent signal, which can depend
-#                 # nonlinearly on productivity
-#                 ~ s(productivity, k = 8),
-#  
-#               trend_model =
-#                 # in addition to productivity effects, the signal is
-#                 # assumed to exhibit temporal autocorrelation
-#                 'AR1',
-#  
-#               trend_map =
-#                 # trend_map forces all sensors to track the same
-#                 # latent signal
-#                 data.frame(series = unique(model_dat$series),
-#                            trend = c(1, 1, 1)),
-#  
-#               # informative priors on process error
-#               # and observation error will help with convergence
-#               priors = c(prior(normal(2, 0.5), class = sigma),
-#                          prior(normal(1, 0.5), class = sigma_obs)),
-#  
-#               # Gaussian observations
-#               family = gaussian(),
-#               data = model_dat)
 
-## -----------------------------------------------------------------------------
+## ----eval=FALSE-------------------------------------------------------
+## mod <- mvgam(formula =
+##                # formula for observations, allowing for different
+##                # intercepts and hierarchical smooth effects of temperature
+##                observed ~ series +
+##                s(temperature, k = 10) +
+##                s(series, temperature, bs = 'sz', k = 8),
+## 
+##              trend_formula =
+##                # formula for the latent signal, which can depend
+##                # nonlinearly on productivity
+##                ~ s(productivity, k = 8),
+## 
+##              trend_model =
+##                # in addition to productivity effects, the signal is
+##                # assumed to exhibit temporal autocorrelation
+##                'AR1',
+## 
+##              trend_map =
+##                # trend_map forces all sensors to track the same
+##                # latent signal
+##                data.frame(series = unique(model_dat$series),
+##                           trend = c(1, 1, 1)),
+## 
+##              # informative priors on process error
+##              # and observation error will help with convergence
+##              priors = c(prior(normal(2, 0.5), class = sigma),
+##                         prior(normal(1, 0.5), class = sigma_obs)),
+## 
+##              # Gaussian observations
+##              family = gaussian(),
+##              data = model_dat)
+
+
+## ---------------------------------------------------------------------
 summary(mod, include_betas = FALSE)
 
-## -----------------------------------------------------------------------------
-plot(mod, type = 'smooths', trend_effects = TRUE)
 
-## -----------------------------------------------------------------------------
-plot(mod, type = 'smooths')
+## ---------------------------------------------------------------------
+conditional_effects(mod, type = 'link')
 
-## -----------------------------------------------------------------------------
-plot(conditional_effects(mod, type = 'link'), ask = FALSE)
 
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------
 plot_predictions(mod, 
                  condition = c('temperature', 'series', 'series'),
                  points = 0.5) +
   theme(legend.position = 'none')
 
-## -----------------------------------------------------------------------------
-pairs(mod, variable = c('sigma[1]', 'sigma_obs[1]'))
 
-## -----------------------------------------------------------------------------
+## ---------------------------------------------------------------------
 plot(mod, type = 'trend')
 
 # Overlay the true simulated signal

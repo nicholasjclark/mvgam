@@ -16,9 +16,9 @@ Rcpp::NumericVector ar3_recursC(double drift, double ar1,
 
   int T = h + 3;
   Rcpp::NumericVector states(T);
+  states[0] = last_trends[0];
   states[1] = last_trends[1];
   states[2] = last_trends[2];
-  states[3] = last_trends[3];
 
   for(int t = 3; t < T; ++t) {
     states[t] = drift +

@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE,   
-  dpi = 150,
+  dpi = 100,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
@@ -113,24 +113,14 @@ The summary of this model is informative as it shows that only two latent proces
 summary(full_mod)
 ```
 
-Quick plots of all main effects can be made using `conditional_effects()`:
-```{r}
-plot(conditional_effects(full_mod, type = 'link'), ask = FALSE)
-```
-
-Even more informative are the plots of the latent processes. Both series 1 and 2 share the exact same estimates, while the estimates for series 3 are different:
+Both series 1 and 2 share the exact same latent process estimates, while the estimates for series 3 are different:
 ```{r}
 plot(full_mod, type = 'trend', series = 1)
 plot(full_mod, type = 'trend', series = 2)
 plot(full_mod, type = 'trend', series = 3)
 ```
 
-However, the forecasts for series' 1 and 2 differ because they have different intercepts in the observation model
-```{r}
-plot(full_mod, type = 'forecast', series = 1)
-plot(full_mod, type = 'forecast', series = 2)
-plot(full_mod, type = 'forecast', series = 3)
-```
+However, forecasts for series' 1 and 2 will differ because they have different intercepts in the observation model
 
 ## Example: signal detection
 Now we will explore a more complicated example. Here we simulate a true hidden signal that we are trying to track. This signal depends nonlinearly on some covariate (called `productivity`, which represents a measure of how productive the landscape is). The signal also demonstrates a fairly large amount of temporal autocorrelation:
@@ -155,14 +145,6 @@ plot(true_signal, type = 'l',
      bty = 'l', lwd = 2,
      ylab = 'True signal',
      xlab = 'Time')
-```
-
-And plot the relationship between the signal and the `productivity` covariate:
-```{r}
-plot(true_signal ~ productivity,
-     pch = 16, bty = 'l',
-     ylab = 'True signal',
-     xlab = 'Productivity')
 ```
 
 Next we simulate three sensors that are trying to track the same hidden signal. All of these sensors have different observation errors that can depend nonlinearly on a second external covariate, called `temperature` in this example. Again this makes use of `gamSim`
@@ -293,19 +275,9 @@ summary(mod, include_betas = FALSE)
 ```
 
 ### Inspecting effects on both process and observation models
-Don't pay much attention to the approximate *p*-values of the smooth terms. The calculation for these values is incredibly sensitive to the estimates for the smoothing parameters so I don't tend to find them to be very meaningful. What are meaningful, however, are prediction-based plots of the smooth functions. For example, here is the estimated response of the underlying signal to `productivity`:
+Don't pay much attention to the approximate *p*-values of the smooth terms. The calculation for these values is incredibly sensitive to the estimates for the smoothing parameters so I don't tend to find them to be very meaningful. What are meaningful, however, are prediction-based plots of the smooth functions. All main effects can be quickly plotted with `conditional_effects`:
 ```{r}
-plot(mod, type = 'smooths', trend_effects = TRUE)
-```
-
-And here are the estimated relationships between the sensor observations and the `temperature` covariate:
-```{r}
-plot(mod, type = 'smooths')
-```
-
-All main effects can be quickly plotted with `conditional_effects`:
-```{r}
-plot(conditional_effects(mod, type = 'link'), ask = FALSE)
+conditional_effects(mod, type = 'link')
 ```
 
 `conditional_effects` is simply a wrapper to the more flexible `plot_predictions` function from the `marginaleffects` package. We can get more useful plots of these effects using this function for further customisation:
@@ -316,12 +288,7 @@ plot_predictions(mod,
   theme(legend.position = 'none')
 ```
 
-We have successfully estimated effects, some of them nonlinear, that impact the hidden process AND the observations. All in a single joint model. But there can always be challenges with these models, particularly when estimating both process and observation error at the same time. For example, a `pairs` plot for the observation error for sensor 1 and the hidden process error shows some strong correlations that we might want to deal with by using a more structured prior:
-```{r}
-pairs(mod, variable = c('sigma[1]', 'sigma_obs[1]'))
-```
-
-But we will leave the model as-is for this example
+We have successfully estimated effects, some of them nonlinear, that impact the hidden process AND the observations. All in a single joint model. But there can always be challenges with these models, particularly when estimating both process and observation error at the same time.
 
 ### Recovering the hidden signal
 A final but very key question is whether we can successfully recover the true hidden signal. The `trend` slot in the returned model parameters has the estimates for this signal, which we can easily plot using the `mvgam` S3 method for `plot`. We can also overlay the true values for the hidden signal, which shows that our model has done a good job of recovering it:
