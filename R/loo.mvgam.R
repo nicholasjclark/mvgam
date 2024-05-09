@@ -54,7 +54,16 @@
 #'}
 #' @export
 loo.mvgam <- function(x, ...) {
-  logliks <- logLik(x, include_forecast = FALSE)
+  x$series_names <- levels(x$obs_data$series)
+  logliks <- logLik(x,
+                    linpreds = predict(x,
+                                       newdata = x$obs_data,
+                                       type = 'link',
+                                       summary = FALSE,
+                                       process_error = TRUE),
+                    newdata = x$obs_data,
+                    family_pars = mvgam:::extract_family_pars(x),
+                    include_forecast = FALSE)
   logliks <- logliks[,!apply(logliks, 2, function(x) all(!is.finite(x)))]
 
   releffs <- loo::relative_eff(exp(logliks),

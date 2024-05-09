@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      NOT_CRAN: false
 
     steps:
       - uses: actions/checkout@v2
@@ -46,19 +47,11 @@ jobs:
               collapse
               rmarkdown
               ggplot2
-              rjags
               coda
-              stan-dev/cmdstanr
               testthat
               usethis
               rcmdcheck
               devtools
-
-      - name: Build Cmdstan
-        run: |
-          cmdstanr::check_cmdstan_toolchain(fix = TRUE)
-          cmdstanr::install_cmdstan()
-        shell: Rscript {0}
 
       - name: Memory check
         run: |
