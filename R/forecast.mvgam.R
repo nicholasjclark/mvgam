@@ -904,7 +904,7 @@ forecast_draws = function(object,
           cap <- data.frame(series = data_test$series,
                             time = data_test$index..time..index,
                             cap = suppressWarnings(linkfun(data_test$cap,
-                                                           link = family_links$link)))
+                                                           link = family_links()$link)))
 
           if(any(is.na(cap$cap)) | any(is.infinite(cap$cap))){
             stop(paste0('Missing or infinite values found for some "cap" terms\n',

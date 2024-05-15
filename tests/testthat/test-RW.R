@@ -155,12 +155,23 @@ dat <- rbind(dplyr::bind_cols(sim_corcar1(phi = 0.65,
                               data.frame(series = 'series2'))) %>%
        dplyr::mutate(series = as.factor(series))
 
+dat_train <- dat %>%
+  dplyr::group_by(series) %>%
+  dplyr::arrange(time) %>%
+  dplyr::slice_head(n = 110) %>%
+  dplyr::ungroup()
+dat_test <- dat %>%
+  dplyr::group_by(series) %>%
+  dplyr::arrange(time) %>%
+  dplyr::slice_tail(n = 10)%>%
+  dplyr::ungroup()
+
 test_that("CAR1 sets up correctly", {
   # mvgam with CAR(1) trends and series-level seasonal smooths
   mod <- mvgam(formula = y ~ s(season, bs = 'cc',
                                k = 5, by = series),
                trend_model = CAR(),
-               data = dat,
+               data = dat_train,
                family = gaussian(),
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
@@ -175,7 +186,7 @@ test_that("CAR1 sets up correctly", {
                                k = 5, by = series),
                trend_model = CAR(),
                drift = TRUE,
-               data = dat,
+               data = dat_train,
                family = gaussian(),
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
