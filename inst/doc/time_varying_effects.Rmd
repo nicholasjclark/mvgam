@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE,   
-  dpi = 150,
+  dpi = 100,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
@@ -80,12 +80,6 @@ data_train <- data[1:190,]
 data_test <- data[191:200,]
 ```
 
-Plot the series
-```{r}
-plot_mvgam_series(data = data_train, newdata = data_test, y = 'out')
-```
-
-
 ### The `dynamic()` function
 Time-varying coefficients can be fairly easily set up using the `s()` or `gp()` wrapper functions in `mvgam` formulae by fitting a nonlinear effect of `time` and using the covariate of interest as the numeric `by` variable (see `?mgcv::s` or `?brms::gp` for more details). The `dynamic()` formula wrapper offers a way to automate this process, and will eventually allow for a broader variety of time-varying effects (such as random walk or AR processes). Depending on the arguments that are specified to `dynamic`, it will either set up a low-rank GP smooth function using `s()` with `bs = 'gp'` and a fixed value of the length scale parameter $\rho$, or it will set up a Hilbert space approximate GP using the `gp()` function with `c=5/4` so that $\rho$ is estimated (see `?dynamic` for more details). In this first example we will use the `s()` option, and will mis-specify the $\rho$ parameter here as, in practice, it is never known. This call to `dynamic()` will set up the following smooth: `s(time, by = temp, bs = "gp", m = c(-2, 8, 2), k = 40)`
 ```{r, include=FALSE}
@@ -105,12 +99,7 @@ Inspect the model summary, which shows how the `dynamic()` wrapper was used to c
 summary(mod, include_betas = FALSE)
 ```
 
-Because this model used a spline with a `gp` basis, it's smooths can be visualised just like any other `gam`. Plot the estimated time-varying coefficient for the in-sample training period
-```{r}
-plot(mod, type = 'smooths')
-```
-
-We can also plot the estimates for the in-sample and out-of-sample periods to see how the Gaussian Process function produces sensible smooth forecasts. Here we supply the full dataset to the `newdata` argument in `plot_mvgam_smooth` to inspect posterior forecasts of the time-varying smooth function. Overlay the true simulated function to see that the model has adequately estimated it's dynamics in both the training and testing data partitions
+Because this model used a spline with a `gp` basis, it's smooths can be visualised just like any other `gam`. We can plot the estimates for the in-sample and out-of-sample periods to see how the Gaussian Process function produces sensible smooth forecasts. Here we supply the full dataset to the `newdata` argument in `plot_mvgam_smooth` to inspect posterior forecasts of the time-varying smooth function. Overlay the true simulated function to see that the model has adequately estimated it's dynamics in both the training and testing data partitions
 ```{r}
 plot_mvgam_smooth(mod, smooth = 1, newdata = data)
 abline(v = 190, lty = 'dashed', lwd = 2)
@@ -162,21 +151,6 @@ lines(beta_temp, lwd = 2.5, col = 'white')
 lines(beta_temp, lwd = 2)
 ```
 
-Both the above plot and the below `plot_predictions()` call show that the effect in this case is similar to what we estimated in the approximate GP smooth model above:
-```{r}
-plot_predictions(mod, 
-                 newdata = datagrid(time = unique,
-                                    temp = range_round),
-                 by = c('time', 'temp', 'temp'),
-                 type = 'link')
-```
-
-Forecasts are also similar:
-```{r}
-fc <- forecast(mod, newdata = data_test)
-plot(fc)
-```
-
 ## Salmon survival example
 Here we will use openly available data on marine survival of Chinook salmon to illustrate how time-varying effects can be used to improve ecological time series models. [Scheuerell and Williams (2005)](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1365-2419.2005.00346.x) used a dynamic linear model to examine the relationship between marine survival of Chinook salmon and an index of ocean upwelling strength along the west coast of the USA. The authors hypothesized that stronger upwelling in April should create better growing conditions for phytoplankton, which would then translate into more zooplankton and provide better foraging opportunities for juvenile salmon entering the ocean. The data on survival is measured as a proportional variable over 42 years (1964–2005) and is available in the `MARSS` package:
 ```{r}
@@ -222,9 +196,9 @@ mod0 <- mvgam(formula = survival ~ 1,
 
 ```{r eval = FALSE}
 mod0 <- mvgam(formula = survival ~ 1,
-             trend_model = 'RW',
-             family = betar(),
-             data = model_data)
+              trend_model = RW(),
+              family = betar(),
+              data = model_data)
 ```
 
 The summary of this model shows good behaviour of the Hamiltonian Monte Carlo sampler and provides useful summaries on the Beta observation model parameters:
@@ -236,12 +210,6 @@ A plot of the underlying dynamic component shows how it has easily handled the t
 ```{r}
 plot(mod0, type = 'trend')
 ```
-
-Posterior hindcasts are also good and will automatically respect the observational data bounding at 0 and 1:
-```{r}
-plot(mod0, type = 'forecast')
-```
-
 
 ### Including time-varying upwelling effects
 Now we can increase the complexity of our model by constructing and fitting a State-Space model with a time-varying effect of the coastal upwelling index in addition to the autoregressive dynamics. We again use a Beta observation model to capture the restrictions of our proportional observations, but this time will include a `dynamic()` effect of `CUI.apr` in the latent process model. We do not specify the $\rho$ parameter, instead opting to estimate it using a Hilbert space approximate GP:
@@ -297,14 +265,6 @@ Why does the process error not need to be as flexible in the second model? Becau
 plot(mod1, type = 'smooth', trend_effects = TRUE)
 ```
 
-Or on the outcome scale, at a range of possible `CUI.apr` values, using `plot_predictions()`:
-```{r}
-plot_predictions(mod1, newdata = datagrid(CUI.apr = range_round,
-                                          time = unique),
-                 by = c('time', 'CUI.apr', 'CUI.apr'))
-```
-
-
 ### Comparing model predictive performances
 A key question when fitting multiple time series models is whether one of them provides better predictions than the other. There are several options in `mvgam` for exploring this quantitatively. First, we can compare models based on in-sample approximate leave-one-out cross-validation as implemented in the popular `loo` package:
 ```{r}
@@ -340,7 +300,7 @@ plot(x = 1:length(lfo_mod0$elpds) + 30,
 abline(h = 0, lty = 'dashed')
 ```
 
-A useful exercise to further expand this model would be to think about what kinds of predictors might impact measurement error, which could easily be implemented into the observation formula in `mvgam`. But for now, we will leave the model as-is.
+A useful exercise to further expand this model would be to think about what kinds of predictors might impact measurement error, which could easily be implemented into the observation formula in `mvgam()`. But for now, we will leave the model as-is.
 
 ## Further reading
 The following papers and resources offer a lot of useful material about dynamic linear models and how they can be applied / evaluated in practice:

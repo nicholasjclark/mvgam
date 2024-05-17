@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE,   
-  dpi = 150,
+  dpi = 100,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
@@ -52,32 +52,17 @@ The returned object is a `list` containing training and testing data (`sim_mvgam
 str(simdat)
 ```
 
-Each series in this case has a shared seasonal pattern, which we can visualise:
-```{r, fig.alt = "Simulating data for dynamic GAM models in mvgam"}
-plot(simdat$global_seasonality[1:12], 
-     type = 'l', lwd = 2,
-     ylab = 'Relative effect',
-     xlab = 'Season',
-     bty = 'l')
-```
-
-The resulting time series are similar to what we might encounter when dealing with count-valued data that can take small counts:
+Each series in this case has a shared seasonal pattern. The resulting time series are similar to what we might encounter when dealing with count-valued data that can take small counts:
 ```{r, fig.alt = "Plotting time series features for GAM models in mvgam"}
 plot_mvgam_series(data = simdat$data_train, 
                   series = 'all')
 ```
 
-For each individual series, we can plot the training and testing data, as well as some more specific features of the observed data:
+For individual series, we can plot the training and testing data, as well as some more specific features of the observed data:
 ```{r, fig.alt = "Plotting time series features for GAM models in mvgam"}
 plot_mvgam_series(data = simdat$data_train, 
                   newdata = simdat$data_test,
                   series = 1)
-plot_mvgam_series(data = simdat$data_train, 
-                  newdata = simdat$data_test,
-                  series = 2)
-plot_mvgam_series(data = simdat$data_train, 
-                  newdata = simdat$data_test,
-                  series = 3)
 ```
 
 ### Modelling dynamics with splines
@@ -144,11 +129,7 @@ And now the length scale ($\rho$) parameters:
 mcmc_plot(mod2, variable = c('rho_gp'), regex = TRUE, type = 'areas')
 ```
 
-We can also plot the nonlinear effects as before:
-```{r, fig.alt = "Plotting Gaussian Process effects in mvgam"}
-plot(mod2, type = 'smooths')
-```
-These can also be plotted using `marginaleffects` utilities:
+We can also plot the nonlinear effects using `marginaleffects` utilities:
 ```{r, fig.alt = "Summarising latent Gaussian Process parameters in mvgam and marginaleffects"}
 require('ggplot2')
 plot_predictions(mod2, 
@@ -171,16 +152,13 @@ The objects we have created are of class `mvgam_forecast`, which contain informa
 str(fc_mod1)
 ```
 
-We can plot the forecasts for each series from each model using the `S3 plot` method for objects of this class:
+We can plot the forecasts for some series from each model using the `S3 plot` method for objects of this class:
 ```{r}
 plot(fc_mod1, series = 1)
 plot(fc_mod2, series = 1)
 
 plot(fc_mod1, series = 2)
 plot(fc_mod2, series = 2)
-
-plot(fc_mod1, series = 3)
-plot(fc_mod2, series = 3)
 ```
 
 Clearly the two models do not produce equivalent forecasts. We will come back to scoring these forecasts in a moment.

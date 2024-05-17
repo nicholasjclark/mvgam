@@ -854,8 +854,17 @@ mvgam = function(formula,
   # For monotonic smooths, need to determine which direction to place
   # coefficient constraints
   smooth_labs <- do.call(rbind, lapply(seq_along(ss_gam$smooth), function(x){
-    data.frame(label = ss_gam$smooth[[x]]$label, class = class(ss_gam$smooth[[x]])[1])
+    data.frame(label = ss_gam$smooth[[x]]$label,
+               class = class(ss_gam$smooth[[x]])[1],
+               id = ifelse(is.null(ss_gam$smooth[[x]]$id),
+                           NA, ss_gam$smooth[[x]]$id))
   }))
+
+  # Check for 'id' arguments, which are not yet supported
+  if(any(!is.na(smooth_labs$id))){
+    stop('smooth terms with the "id" argument not yet supported by mvgam',
+         call. = FALSE)
+  }
 
   if(any(smooth_labs$class == 'random.effect')){
     re_smooths <- smooth_labs %>%

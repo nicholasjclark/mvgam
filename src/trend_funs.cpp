@@ -16,17 +16,17 @@ Rcpp::NumericVector ar3_recursC(double drift, double ar1,
 
   int T = h + 3;
   Rcpp::NumericVector states(T);
-  states[1] = last_trends[1];
-  states[2] = last_trends[2];
-  states[3] = last_trends[3];
+  states(0) = last_trends(0);
+  states(1) = last_trends(1);
+  states(2) = last_trends(2);
 
   for(int t = 3; t < T; ++t) {
-    states[t] = drift +
-      ar1 * (states[t - 1] - linpreds[t - 1]) +
-      ar2 * (states[t - 2] - linpreds[t - 2]) +
-      ar3 * (states[t - 3] - linpreds[t - 3]) +
-      linpreds[t]  +
-      errors[t];
+    states(t) = drift +
+      ar1 * (states(t - 1) - linpreds(t - 1)) +
+      ar2 * (states(t - 2) - linpreds(t - 2)) +
+      ar3 * (states(t - 3) - linpreds(t - 3)) +
+      linpreds(t)  +
+      errors(t);
   }
   return states[Rcpp::Range(3, T-1)];
 }

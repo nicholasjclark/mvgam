@@ -119,7 +119,7 @@ logLik.mvgam = function(object,
   series_obs <- as.numeric(all_dat$series)
 
   # Supply forecast NAs if include_forecast is FALSE
-  if(!is.null(object$test_data) & !include_forecast){
+  if(!is.null(object$test_data) & !include_forecast & missing(newdata)){
     n_fc_obs <- length(object$test_data$y)
     n_obs <- length(obs)
     obs[((n_obs - n_fc_obs) + 1):n_obs] <- NA

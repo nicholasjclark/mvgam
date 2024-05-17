@@ -100,3 +100,71 @@ test_that("logistic caps should be included in the correct order", {
                     dplyr::arrange(time) %>%
                     dplyr::pull(cap)))))
 })
+
+test_that("piecewise models fit and forecast without error", {
+  skip_on_cran()
+  # Example of logistic growth with possible changepoints
+  # Simple logistic growth model
+  dNt = function(r, N, k){
+    r * N * (k - N)
+  }
+
+  # Iterate growth through time
+  Nt = function(r, N, t, k) {
+    for (i in 1:(t - 1)) {
+
+      # population at next time step is current population + growth,
+      # but we introduce several 'shocks' as changepoints
+      if(i %in% c(5, 15, 25, 41, 45, 60, 80)){
+        N[i + 1] <- max(1, N[i] + dNt(r + runif(1, -0.1, 0.1),
+                                      N[i], k))
+      } else {
+        N[i + 1] <- max(1, N[i] + dNt(r, N[i], k))
+      }
+    }
+    N
+  }
+
+  # Simulate expected values
+  set.seed(11)
+  expected <- Nt(0.004, 2, 100, 30)
+  plot(expected, xlab = 'Time')
+
+  # Take Poisson draws
+  y <- rpois(100, expected)
+
+  # Assemble data into dataframe and model. We set a
+  # fixed carrying capacity of 35 for this example, but note that
+  # this value is not required to be fixed at each timepoint
+  mod_data <- data.frame(y = y,
+                         time = 1:100,
+                         cap = 35,
+                         series = as.factor('series_1'))
+  dat_train <- mod_data %>%
+    dplyr::filter(time <= 90)
+  dat_test <- mod_data %>%
+    dplyr::filter(time > 90)
+
+  # The intercept is nonidentifiable when using piecewise
+  # trends because the trend functions have their own offset
+  # parameters 'm'; it is recommended to always drop intercepts
+  # when using these trend models
+  mod <- mvgam(y ~ 0,
+               trend_model = PW(growth = 'logistic'),
+               family = poisson(),
+               data = dat_train,
+               chains = 2)
+  # Compute and plot forecasts
+  fc <- forecast(mod, newdata = dat_test)
+  expect_no_error(capture_output(plot(fc)))
+
+  # Should also work for piecewise linear
+  mod <- mvgam(y ~ 0,
+               trend_model = PW(growth = 'linear'),
+               family = poisson(),
+               data = dat_train,
+               chains = 2)
+  # Compute and plot forecasts
+  fc <- forecast(mod, newdata = dat_test)
+  expect_no_error(capture_output(plot(fc)))
+})

@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE,   
-  dpi = 150,
+  dpi = 100,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
@@ -146,7 +146,7 @@ z_{i,t} & \sim \text{Normal}(ar1_i^{distance} * z_{i,t-1}, \sigma_i) \end{align*
 Where $distance$ is a vector of non-negative measurements of the time differences between successive observations. See the **Examples** section in `?CAR` for an illustration of how to set these models up. 
 
 ## Regression formulae
-`mvgam` supports an observation model regression formula, built off the `mvgcv` package, as well as an optional process model regression formula. The formulae supplied to \code{\link{mvgam}} are exactly like those supplied to `glm()` except that smooth terms, `s()`,
+`mvgam` supports an observation model regression formula, built off the `mgcv` package, as well as an optional process model regression formula. The formulae supplied to \code{\link{mvgam}} are exactly like those supplied to `glm()` except that smooth terms, `s()`,
 `te()`, `ti()` and `t2()`, time-varying effects using `dynamic()`, monotonically increasing (using `s(x, bs = 'moi')`) or decreasing splines (using `s(x, bs = 'mod')`; see `?smooth.construct.moi.smooth.spec` for details), as well as Gaussian Process functions using `gp()`, can be added to the right hand side (and `.` is not supported in `mvgam` formulae). See `?mvgam_formulae` for more guidance.
   
 For setting up State-Space models, the optional process model formula can be used (see [the State-Space model vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html) and [the shared latent states vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html) for guidance on using trend formulae).
@@ -223,15 +223,7 @@ You can also summarize multiple variables, which is helpful to search for data r
 summary(model_data)
 ```
 
-We have some `NA`s in our response variable `count`. Let's visualize the data as a heatmap to get a sense of where these are distributed (`NA`s are shown as red bars in the below plot)
-```{r}
-image(is.na(t(model_data %>%
-                dplyr::arrange(dplyr::desc(time)))), axes = F,
-      col = c('grey80', 'darkred'))
-axis(3, at = seq(0,1, len = NCOL(model_data)), labels = colnames(model_data))
-```
-
-These observations will generally be thrown out by most modelling packages in \R. But as you will see when we work through the tutorials, `mvgam` keeps these in the data so that predictions can be automatically returned for the full dataset. The time series and some of its descriptive features can be plotted using `plot_mvgam_series()`:
+We have some `NA`s in our response variable `count`. These observations will generally be thrown out by most modelling packages in \R. But as you will see when we work through the tutorials, `mvgam` keeps these in the data so that predictions can be automatically returned for the full dataset. The time series and some of its descriptive features can be plotted using `plot_mvgam_series()`:
 ```{r}
 plot_mvgam_series(data = model_data, series = 1, y = 'count')
 ```
@@ -314,7 +306,6 @@ mcmc_plot(object = model1,
 We can also use the wide range of posterior checking functions available in `bayesplot` (see `?mvgam::ppc_check.mvgam` for details):
 ```{r}
 pp_check(object = model1)
-pp_check(model1, type = "rootogram")
 ```
 
 There is clearly some variation in these yearly intercept estimates. But how do these translate into time-varying predictions? To understand this, we can plot posterior hindcasts from this model for the training period using `plot.mvgam` with `type = 'forecast'`
@@ -334,13 +325,6 @@ hc <- hindcast(model1, type = 'link')
 range(hc$hindcasts$PP)
 ```
 
-Objects of class `mvgam_forecast` have an associated plot function as well:
-```{r Plot hindcasts on the linear predictor scale}
-plot(hc)
-```
-
-This plot can look a bit confusing as it seems like there is linear interpolation from the end of one year to the start of the next. But this is just due to the way the lines are automatically connected in base \R plots  
-  
 In any regression analysis, a key question is whether the residuals show any patterns that can be indicative of un-modelled sources of variation. For GLMs, we can use a modified residual called the [Dunn-Smyth, or randomized quantile, residual](https://www.jstor.org/stable/1390802){target="_blank"}. Inspect Dunn-Smyth residuals from the model using `plot.mvgam` with `type = 'residuals'`
 ```{r Plot posterior residuals}
 plot(model1, type = 'residuals')
@@ -365,22 +349,12 @@ model1b <- mvgam(count ~ s(year_fac, bs = 're') - 1,
 
 ```{r eval=FALSE}
 model1b <- mvgam(count ~ s(year_fac, bs = 're') - 1,
-                family = poisson(),
-                data = data_train,
-                newdata = data_test)
+                 family = poisson(),
+                 data = data_train,
+                 newdata = data_test)
 ```
 
-Repeating the plots above gives insight into how the model's hierarchical prior formulation provides all the structure needed to sample values for un-modelled years
-```{r}
-plot(model1b, type = 're')
-```
-
-
-```{r}
-plot(model1b, type = 'forecast')
-```
-
-We can also view the test data in the forecast plot to see that the predictions do not capture the temporal variation in the test set
+We can view the test data in the forecast plot to see that the predictions do not capture the temporal variation in the test set
 ```{r Plotting predictions against test data}
 plot(model1b, type = 'forecast', newdata = data_test)
 ```
@@ -428,12 +402,7 @@ Rather than printing the summary each time, we can also quickly look at the post
 coef(model2)
 ```
 
-Look at the estimated effect of `ndvi` using `plot.mvgam` with `type = 'pterms'`
-```{r Plot NDVI effect}
-plot(model2, type = 'pterms')
-```
-
-This plot indicates a positive linear effect of `ndvi` on `log(counts)`. But it may be easier to visualise using a histogram, especially for parametric (linear) effects. This can be done by first extracting the posterior coefficients as we did in the first example:
+Look at the estimated effect of `ndvi` using using a histogram. This can be done by first extracting the posterior coefficients:
 ```{r}
 beta_post <- as.data.frame(model2, variable = 'betas')
 dplyr::glimpse(beta_post)
@@ -455,19 +424,9 @@ abline(v = 0, lwd = 2.5)
 ```
 
 ### `marginaleffects` support
-Given our model used a nonlinear link function (log link in this example), it can still be difficult to fully understand what relationship our model is estimating between a predictor and the response. Fortunately, the `marginaleffects` package makes this relatively straightforward. Objects of class `mvgam` can be used with `marginaleffects` to inspect contrasts, scenario-based predictions, conditional and marginal effects, all on the outcome scale. Here we will use the `plot_predictions` function from `marginaleffects` to inspect the conditional effect of `ndvi` (use `?plot_predictions` for guidance on how to modify these plots):
+Given our model used a nonlinear link function (log link in this example), it can still be difficult to fully understand what relationship our model is estimating between a predictor and the response. Fortunately, the `marginaleffects` package makes this relatively straightforward. Objects of class `mvgam` can be used with `marginaleffects` to inspect contrasts, scenario-based predictions, conditional and marginal effects, all on the outcome scale. Like `brms`, `mvgam` has the simple `conditional_effects` function to make quick and informative plots for main effects, which rely on `marginaleffects` support. This will likely be your go-to function for quickly understanding patterns from fitted `mvgam` models
 ```{r warning=FALSE}
-plot_predictions(model2, 
-                 condition = "ndvi",
-                 # include the observed count values
-                 # as points, and show rugs for the observed
-                 # ndvi and count values on the axes
-                 points = 0.5, rug = TRUE)
-```
-
-Now it is easier to get a sense of the nonlinear but positive relationship estimated between `ndvi` and `count`. Like `brms`, `mvgam` has the simple `conditional_effects` function to make quick and informative plots for main effects. This will likely be your go-to function for quickly understanding patterns from fitted `mvgam` models
-```{r warning=FALSE}
-plot(conditional_effects(model2), ask = FALSE)
+conditional_effects(model2)
 ```
 
 ## Adding predictors as smooths
@@ -504,33 +463,9 @@ Where the smooth function $f_{time}$ is built by summing across a set of weighte
 summary(model3)
 ```
 
-The summary above now contains posterior estimates for the smoothing parameters as well as the basis coefficients for the nonlinear effect of `time`. We can visualize the conditional `time` effect using the `plot` function with `type = 'smooths'`:
-```{r}
-plot(model3, type = 'smooths')
-```
-
-By default this plots shows posterior empirical quantiles, but it can also be helpful to view some realizations of the underlying function (here, each line is a different potential curve drawn from the posterior of all possible curves):
-```{r}
-plot(model3, type = 'smooths', realisations = TRUE,
-     n_realisations = 30)
-```
-
-### Derivatives of smooths
-A useful question when modelling using GAMs is to identify where the function is changing most rapidly. To address this, we can plot estimated 1st derivatives of the spline:
-```{r Plot smooth term derivatives, warning = FALSE, fig.asp = 1}
-plot(model3, type = 'smooths', derivatives = TRUE)
-```
-
-Here, values above `>0` indicate the function was increasing at that time point, while values `<0` indicate the function was declining. The most rapid declines appear to have been happening around timepoints 50 and again toward the end of the training period, for example.
-  
-Use `conditional_effects` again for useful plots on the outcome scale:
+The summary above now contains posterior estimates for the smoothing parameters as well as the basis coefficients for the nonlinear effect of `time`. We can visualize `conditional_effects` as before:
 ```{r warning=FALSE}
-plot(conditional_effects(model3), ask = FALSE)
-```
-
-Or on the link scale:
-```{r warning=FALSE}
-plot(conditional_effects(model3, type = 'link'), ask = FALSE)
+conditional_effects(model3, type = 'link')
 ```
 
 Inspect the underlying `Stan` code to gain some idea of how the spline is being penalized:
@@ -589,13 +524,6 @@ f(\boldsymbol{ndvi}) & = \sum_{k=1}^{K}b * \beta_{smooth} \\
 Here the term $z_t$ captures autocorrelated latent residuals, which are modelled using an AR1 process. You can also notice that this model is estimating autocorrelated errors for the full time period, even though some of these time points have missing observations. This is useful for getting more realistic estimates of the residual autocorrelation parameters. Summarise the model to see how it now returns posterior summaries for the latent AR1 process:
 ```{r Summarise the mvgam autocorrelated error model, class.output="scroll-300"}
 summary(model4)
-```
-
-View conditional smooths for the `ndvi` effect:
-```{r warning=FALSE, message=FALSE}
-plot_predictions(model4, 
-                 condition = "ndvi",
-                 points = 0.5, rug = TRUE)
 ```
 
 View posterior hindcasts / forecasts and compare against the out of sample test data

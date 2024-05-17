@@ -705,7 +705,7 @@ add_nmix_posterior = function(model_output,
                          function(x) paste0('lv_coefs[',
                                             x[1], ',',
                                             x[2], ']'))
-  lv_coef_samps <- as.matrix(replicate(NROW(ps), as.vector(t(Z))))
+  lv_coef_samps <- t(as.matrix(replicate(NROW(ps), as.vector(t(Z)))))
   model_output <- add_samples(model_output = model_output,
                               names = lv_coef_names,
                               samples = lv_coef_samps,

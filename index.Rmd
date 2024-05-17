@@ -13,7 +13,7 @@ always_allow_html: true
 The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Dynamic Generalized Additive Models (DGAMs) for time series with dynamic trend components. The package provides an interface to fit Bayesian DGAMs using either `JAGS` or `Stan` as the backend, but note that users are strongly encouraged to opt for `Stan` over `JAGS`. The formula syntax is based on that of the package `mgcv` to provide a familiar GAM modelling interface. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*). An introduction to the package and some worked examples are shown in this seminar: [Ecological Forecasting with Dynamic Generalized Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ){target="_blank"}.
   
 ## Installation
-Install the development version from `GitHub` using:
+Install the stable version from CRAN using: `install.packages('mvgam')`, or install the development version from `GitHub` using:
 `devtools::install_github("nicholasjclark/mvgam")`. Note that to actually condition models with MCMC sampling, either the `JAGS` software must be installed (along with the `R` packages `rjags` and `runjags`) or the `Stan` software must be installed (along with either `rstan` and/or `cmdstanr`). Only `rstan` is listed as a dependency of `mvgam` to ensure that installation is less difficult. If users wish to fit the models using `mvgam`, please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/), for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan), or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/). You will need a fairly recent version of `Stan` (preferably 2.29 or above) to ensure all the model syntax is recognized. We highly recommend you use `Cmdstan` through the `cmdstanr` interface as the backend. This is because `Cmdstan` is easier to install, is more up to date with new features, and uses less memory than `Rstan`. See [this documentation from the `Cmdstan` team for more information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan). 
 
 ## Introductory seminar
@@ -47,10 +47,10 @@ library(mvgam)
 
 ```{r, eval = FALSE}
 data <- sim_mvgam(family = betar(),
-                 T = 80,
-                 trend_model = 'GP',
-                 trend_rel = 0.5, 
-                 seasonality = 'shared')
+                  T = 80,
+                  trend_model = GP(),
+                  trend_rel = 0.5, 
+                  seasonality = 'shared')
 ```
 
 Plot the series to see how they evolve over time
@@ -63,7 +63,7 @@ Fit a DGAM to these series that uses a hierarchical cyclic seasonal smooth term 
 ```{r, eval = FALSE}
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
                s(season, by = series, m = 1, k = 5),
-             trend_model = 'GP',
+             trend_model = GP(),
              data = data$data_train,
              newdata = data$data_test,
              family = betar())

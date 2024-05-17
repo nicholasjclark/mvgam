@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE,   
-  dpi = 150,
+  dpi = 100,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
@@ -97,14 +97,6 @@ Note that we have z-scored the counts in this example as that will make it easie
 plot_mvgam_series(data = plankton_data, series = 'all')
 ```
 
-It is always helpful to check the data for `NA`s before attempting any models:
-```{r}
-image(is.na(t(plankton_data)), axes = F,
-      col = c('grey80', 'darkred'))
-axis(3, at = seq(0,1, len = NCOL(plankton_data)), 
-     labels = colnames(plankton_data))
-```
-
 We have some missing observations, but this isn't an issue for modelling in `mvgam`. A useful property to understand about these counts is that they tend to be highly seasonal. Below are some plots of z-scored counts against the z-scored temperature measurements in the lake for each month:
 ```{r}
 plankton_data %>%
@@ -133,20 +125,6 @@ plankton_data %>%
   ylab('z-score') +
   xlab('Time') +
   ggtitle('Temperature (black) vs Diatoms (red)')
-```
-
-```{r}
-plankton_data %>%
-  dplyr::filter(series == 'Greens') %>%
-  ggplot(aes(x = time, y = temp)) +
-  geom_line(size = 1.1) +
-  geom_line(aes(y = y), col = 'white',
-            size = 1.3) +
-  geom_line(aes(y = y), col = 'darkred',
-            size = 1.1) +
-  ylab('z-score') +
-  xlab('Time') +
-  ggtitle('Temperature (black) vs Greens (red)')
 ```
 
 We will have to try and capture this seasonality in our process model, which should be easy to do given the flexibility of GAMs. Next we will split the data into training and testing splits:
@@ -192,25 +170,13 @@ The "global" tensor product smooth function can be quickly visualized:
 plot_mvgam_smooth(notrend_mod, smooth = 1)
 ```
 
-On this plot, red indicates below-average linear predictors and white indicates above-average. We can then plot the deviation smooths for each algal group to see how they vary from the "global" pattern:
+On this plot, red indicates below-average linear predictors and white indicates above-average. We can then plot the deviation smooths for a few algal groups to see how they vary from the "global" pattern:
 ```{r}
 plot_mvgam_smooth(notrend_mod, smooth = 2)
 ```
 
 ```{r}
 plot_mvgam_smooth(notrend_mod, smooth = 3)
-```
-
-```{r}
-plot_mvgam_smooth(notrend_mod, smooth = 4)
-```
-
-```{r}
-plot_mvgam_smooth(notrend_mod, smooth = 5)
-```
-
-```{r}
-plot_mvgam_smooth(notrend_mod, smooth = 6)
 ```
 
 These multidimensional smooths have done a good job of capturing the seasonal variation in our observations:
@@ -226,15 +192,7 @@ plot(notrend_mod, type = 'forecast', series = 2)
 plot(notrend_mod, type = 'forecast', series = 3)
 ```
 
-```{r}
-plot(notrend_mod, type = 'forecast', series = 4)
-```
-
-```{r}
-plot(notrend_mod, type = 'forecast', series = 5)
-```
-
-This basic model gives us confidence that we can capture the seasonal variation in the observations. But the model has not captured the remaining temporal dynamics, which is obvious when we inspect Dunn-Smyth residuals for each series:
+This basic model gives us confidence that we can capture the seasonal variation in the observations. But the model has not captured the remaining temporal dynamics, which is obvious when we inspect Dunn-Smyth residuals for a few series:
 ```{r}
 plot(notrend_mod, type = 'residuals', series = 1)
 ```
@@ -247,13 +205,6 @@ plot(notrend_mod, type = 'residuals', series = 2)
 plot(notrend_mod, type = 'residuals', series = 3)
 ```
 
-```{r}
-plot(notrend_mod, type = 'residuals', series = 4)
-```
-
-```{r}
-plot(notrend_mod, type = 'residuals', series = 5)
-```
 
 ### Multiseries dynamics
 Now it is time to get into multivariate State-Space models. We will fit two models that can both incorporate lagged cross-dependencies in the latent process models. The first model assumes that the process errors operate independently from one another, while the second assumes that there may be contemporaneous correlations in the process errors. Both models include a Vector Autoregressive component for the process means, and so both can model complex community dynamics. The models can be described mathematically as follows:
@@ -349,12 +300,7 @@ The convergence of this model isn't fabulous (more on this in a moment). But we 
 plot(var_mod, 'smooths', trend_effects = TRUE)
 ```
 
-The VAR matrix is of particular interest here, as it captures lagged dependencies and cross-dependencies in the latent process model:
-```{r warning=FALSE, message=FALSE}
-mcmc_plot(var_mod, variable = 'A', regex = TRUE, type = 'hist')
-```
-
-Unfortunately `bayesplot` doesn't know this is a matrix of parameters so what we see is actually the transpose of the VAR matrix. A little bit of wrangling gives us these histograms in the correct order:
+The VAR matrix is of particular interest here, as it captures lagged dependencies and cross-dependencies in the latent process model. Unfortunately `bayesplot` doesn't know this is a matrix of parameters so what we see is actually the transpose of the VAR matrix. A little bit of wrangling gives us these histograms in the correct order:
 ```{r warning=FALSE, message=FALSE}
 A_pars <- matrix(NA, nrow = 5, ncol = 5)
 for(i in 1:5){
@@ -367,15 +313,8 @@ mcmc_plot(var_mod,
           type = 'hist')
 ```
 
-There is a lot happening in this matrix. Each cell captures the lagged effect of the process in the column on the process in the row in the next timestep. So for example, the effect in cell [1,3], which is quite strongly negative, means that an *increase* in the process for series 3 (Greens) at time $t$ is expected to lead to a subsequent *decrease* in the process for series 1 (Bluegreens) at time $t+1$. The latent process model is now capturing these effects and the smooth seasonal effects, so the trend plot shows our best estimate of what the *true* count should have been at each time point:
-```{r}
-plot(var_mod, type = 'trend', series = 1)
-```
-
-```{r}
-plot(var_mod, type = 'trend', series = 3)
-```
-
+There is a lot happening in this matrix. Each cell captures the lagged effect of the process in the column on the process in the row in the next timestep. So for example, the effect in cell [1,3], which is quite strongly negative, means that an *increase* in the process for series 3 (Greens) at time $t$ is expected to lead to a subsequent *decrease* in the process for series 1 (Bluegreens) at time $t+1$. The latent process model is now capturing these effects and the smooth seasonal effects.
+  
 The process error $(\Sigma)$ captures unmodelled variation in the process models. Again, we fixed the off-diagonals to 0, so the histograms for these will look like flat boxes:
 ```{r warning=FALSE, message=FALSE}
 Sigma_pars <- matrix(NA, nrow = 5, ncol = 5)
@@ -441,14 +380,6 @@ varcor_mod <- mvgam(
   priors = priors)
 ```
 
-Plot convergence diagnostics for the two models, which shows that both models display similar levels of convergence:
-```{r warning=FALSE, message=FALSE}
-mcmc_plot(varcor_mod, type = 'rhat') +
-  labs(title = 'VAR1cor')
-mcmc_plot(var_mod, type = 'rhat') +
-  labs(title = 'VAR1')
-```
-
 The $(\Sigma)$ matrix now captures any evidence of contemporaneously correlated process error:
 ```{r warning=FALSE, message=FALSE}
 Sigma_pars <- matrix(NA, nrow = 5, ncol = 5)
@@ -472,45 +403,7 @@ rownames(median_correlations) <- colnames(median_correlations) <- levels(plankto
 round(median_correlations, 2)
 ```
 
-Because this model is able to capture correlated errors, the VAR matrix has changed slightly:
-```{r warning=FALSE, message=FALSE}
-A_pars <- matrix(NA, nrow = 5, ncol = 5)
-for(i in 1:5){
-  for(j in 1:5){
-    A_pars[i, j] <- paste0('A[', i, ',', j, ']')
-  }
-}
-mcmc_plot(varcor_mod, 
-          variable = as.vector(t(A_pars)), 
-          type = 'hist')
-```
-
-We still have some evidence of lagged cross-dependence, but some of these interactions have now been pulled more toward zero. But which model is better? Forecasts don't appear to differ very much, at least qualitatively (here are forecasts for three of the series, for each model):
-```{r}
-plot(var_mod, type = 'forecast', series = 1, newdata = plankton_test)
-```
-
-```{r}
-plot(varcor_mod, type = 'forecast', series = 1, newdata = plankton_test)
-```
-
-```{r}
-plot(var_mod, type = 'forecast', series = 2, newdata = plankton_test)
-```
-
-```{r}
-plot(varcor_mod, type = 'forecast', series = 2, newdata = plankton_test)
-```
-
-```{r}
-plot(var_mod, type = 'forecast', series = 3, newdata = plankton_test)
-```
-
-```{r}
-plot(varcor_mod, type = 'forecast', series = 3, newdata = plankton_test)
-```
-
-We can compute the variogram score for out of sample forecasts to get a sense of which model does a better job of capturing the dependence structure in the true evaluation set:
+But which model is better? We can compute the variogram score for out of sample forecasts to get a sense of which model does a better job of capturing the dependence structure in the true evaluation set:
 ```{r}
 # create forecast objects for each model
 fcvar <- forecast(var_mod)

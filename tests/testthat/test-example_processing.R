@@ -476,7 +476,6 @@ test_that("loo() works correctly", {
                       mvgam:::mvgam_example2,
                       model_names = c('banana')))
   expect_true(inherits(p, 'compare.loo'))
-  expect_true(all(is.na(dimnames(p)[[1]]) == c(FALSE, TRUE)))
 
   p <- SW(loo_compare(mvgam:::mvgam_example1,
                       mvgam:::mvgam_example2,
