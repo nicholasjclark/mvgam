@@ -48,7 +48,7 @@ residuals.mvgam <- function(object,
                            time = object$obs_data$index..time..index)
 
   series_numeric <- as.numeric(orig_order$series)
-  time_numeric <- orig_order$time
+  time_numeric <- match(orig_order$time, unique(orig_order$time))
 
   # Build a matrix to return residuals in this order
   resid_matrix <- matrix(NA, nrow = NROW(orig_order),

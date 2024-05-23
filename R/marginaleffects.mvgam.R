@@ -127,7 +127,9 @@ get_data.mvgam = function (x, source = "environment", verbose = TRUE, ...) {
         trend_indicators[i] <- x$trend_map$trend[which(x$trend_map$series ==
                                                          orig_dat$series[i])]
       }
-      trend_indicators <- as.factor(paste0('trend', trend_indicators))
+      trend_indicators <- factor(paste0('trend', trend_indicators),
+                                 levels = paste0('trend',
+                                                 unique(x$trend_map$trend)))
 
       # Trend-level data, before any slicing that took place
       trend_level_data <- data.frame(trend_series = trend_indicators,

@@ -86,7 +86,9 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
     trend_indicators[i] <- trend_map$trend[which(as.character(trend_map$series) ==
                                                    as.character(trend_test$series[i]))]
   }
-  trend_indicators <- as.factor(paste0('trend', trend_indicators))
+  trend_indicators <- factor(paste0('trend', trend_indicators),
+                             levels = paste0('trend',
+                                             unique(trend_map$trend)))
   trend_test$series <- trend_indicators
   trend_test$y <- NULL
 
