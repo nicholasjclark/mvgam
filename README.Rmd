@@ -70,6 +70,7 @@ some features of `mvgam` which specifically rely on certain packages. The most i
 We can explore the model’s primary functions using a dataset that is available with all `R` installations. Load the `lynx` data and plot the series as well as its autocorrelation function
 ```{r include = FALSE}
 library(mvgam)
+library(ggplot2); theme_set(theme_bw())
 ```
 
 ```{r echo = FALSE}

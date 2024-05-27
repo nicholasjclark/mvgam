@@ -12,7 +12,7 @@ of the bayesplot package."><!-- mathjax --><script src="https://cdnjs.cloudflare
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.2</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -156,50 +156,49 @@ package.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>seasonality <span class="op">=</span> <span class="st">'hierarchical'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span> <span class="op">+</span></span></span>
-<span class="r-in"><span>              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'fs'</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>            burnin <span class="op">=</span> <span class="fl">300</span>,</span></span>
-<span class="r-in"><span>            samples <span class="op">=</span> <span class="fl">300</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Use pp_check(mod, type = "xyz") for a list of available plot types</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Default is a density overlay for all observations</span></span></span>
-<span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Rootograms particularly useful for count data</span></span></span>
-<span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"rootogram"</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Grouping plots by series is useful</span></span></span>
-<span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"bars_grouped"</span>,</span></span>
-<span class="r-in"><span>        group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"ecdf_overlay_grouped"</span>,</span></span>
-<span class="r-in"><span>        group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"stat_freqpoly_grouped"</span>,</span></span>
-<span class="r-in"><span>        group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Custom functions accepted</span></span></span>
-<span class="r-in"><span><span class="va">prop_zero</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">x</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"stat"</span>, stat <span class="op">=</span> <span class="st">"prop_zero"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"stat_grouped"</span>,</span></span>
-<span class="r-in"><span>        stat <span class="op">=</span> <span class="st">"prop_zero"</span>,</span></span>
-<span class="r-in"><span>        group <span class="op">=</span> <span class="st">"series"</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Some functions accept covariates to set the x-axes</span></span></span>
-<span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, x <span class="op">=</span> <span class="st">"season"</span>,</span></span>
-<span class="r-in"><span>        type <span class="op">=</span> <span class="st">"ribbon_grouped"</span>,</span></span>
-<span class="r-in"><span>        prob <span class="op">=</span> <span class="fl">0.5</span>,</span></span>
-<span class="r-in"><span>        prob_outer <span class="op">=</span> <span class="fl">0.8</span>,</span></span>
-<span class="r-in"><span>        group <span class="op">=</span> <span class="st">"series"</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Many plots can be made without the observed data</span></span></span>
-<span class="r-in"><span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, prefix <span class="op">=</span> <span class="st">"ppd"</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
-<span class="r-in"><span></span></span>
-</code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span>
+<span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>seasonality <span class="op">=</span> <span class="st">'hierarchical'</span><span class="op">)</span></span>
+<span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span></span>
+<span>              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span> <span class="op">+</span></span>
+<span>              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'fs'</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span>
+<span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
+<span>            burnin <span class="op">=</span> <span class="fl">300</span>,</span>
+<span>            samples <span class="op">=</span> <span class="fl">300</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Use pp_check(mod, type = "xyz") for a list of available plot types</span></span>
+<span></span>
+<span><span class="co"># Default is a density overlay for all observations</span></span>
+<span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Rootograms particularly useful for count data</span></span>
+<span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"rootogram"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Grouping plots by series is useful</span></span>
+<span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"bars_grouped"</span>,</span>
+<span>        group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
+<span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"ecdf_overlay_grouped"</span>,</span>
+<span>        group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
+<span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"stat_freqpoly_grouped"</span>,</span>
+<span>        group <span class="op">=</span> <span class="st">"series"</span>, ndraws <span class="op">=</span> <span class="fl">50</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Custom functions accepted</span></span>
+<span><span class="va">prop_zero</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">x</span> <span class="op">==</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"stat"</span>, stat <span class="op">=</span> <span class="st">"prop_zero"</span><span class="op">)</span></span>
+<span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"stat_grouped"</span>,</span>
+<span>        stat <span class="op">=</span> <span class="st">"prop_zero"</span>,</span>
+<span>        group <span class="op">=</span> <span class="st">"series"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Some functions accept covariates to set the x-axes</span></span>
+<span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, x <span class="op">=</span> <span class="st">"season"</span>,</span>
+<span>        type <span class="op">=</span> <span class="st">"ribbon_grouped"</span>,</span>
+<span>        prob <span class="op">=</span> <span class="fl">0.5</span>,</span>
+<span>        prob_outer <span class="op">=</span> <span class="fl">0.8</span>,</span>
+<span>        group <span class="op">=</span> <span class="st">"series"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Many plots can be made without the observed data</span></span>
+<span><span class="fu">pp_check</span><span class="op">(</span><span class="va">mod</span>, prefix <span class="op">=</span> <span class="st">"ppd"</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span></span></code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside></div>

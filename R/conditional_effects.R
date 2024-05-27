@@ -281,28 +281,28 @@ split_termlabs = function(lab){
     if(length(term_struc$term) == 3){
       out[[1]] <- c(all.vars(parse(text = term_struc$term[1:2])),
                     term_struc$by)
-      out[[2]] <- c(all.vars(parse(text = term_struc$term[1, 3])),
+      out[[2]] <- c(all.vars(parse(text = term_struc$term[c(1, 3)])),
                     term_struc$by)
-      out[[3]] <- c(all.vars(parse(text = term_struc$term[2, 3])),
+      out[[3]] <- c(all.vars(parse(text = term_struc$term[c(2, 3)])),
                     term_struc$by)
     }
 
     if(length(term_struc$term) == 4){
       out[[1]] <- c(all.vars(parse(text = term_struc$term[1:2])),
                     term_struc$by)
-      out[[2]] <- c(all.vars(parse(text = term_struc$term[1, 3])),
+      out[[2]] <- c(all.vars(parse(text = term_struc$term[c(1, 3)])),
                     term_struc$by)
-      out[[3]] <- c(all.vars(parse(text = term_struc$term[1, 4])),
+      out[[3]] <- c(all.vars(parse(text = term_struc$term[c(1, 4)])),
                     term_struc$by)
-      out[[4]] <- c(all.vars(parse(text = term_struc$term[2, 3])),
+      out[[4]] <- c(all.vars(parse(text = term_struc$term[c(2, 3)])),
                     term_struc$by)
-      out[[5]] <- c(all.vars(parse(text = term_struc$term[2, 4])),
+      out[[5]] <- c(all.vars(parse(text = term_struc$term[c(2, 4)])),
                     term_struc$by)
     }
 
   } else if(grepl('dynamic(', lab, fixed = TRUE)){
     term_struc <- eval(rlang::parse_expr(lab))
-    out[[1]] <- c('time', all.vars(parse(text = term_struc$term[2, 4])))
+    out[[1]] <- c('time', all.vars(parse(text = term_struc$term[c(2, 4)])))
   } else {
     out[[1]] <- lab
   }
