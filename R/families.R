@@ -854,26 +854,6 @@ family_par_names = function(family){
   return(out)
 }
 
-#' Family specific initial value functions for Stan
-#' @noRd
-family_inits = function(family, trend_model,
-                        smooths_included, model_data){
-
-  # No longer specifying inits for family- or trend-specific parameters
-  # as there is a risk the user will place bounds on priors that conflict
-  # with the inits. Just let Stan choose reasonable and diffuse inits,
-  # this is better anyway for sampling
-  inits <- function() {
-    if(model_data$num_basis == 1){
-      list(b_raw = array(runif(model_data$num_basis, -2, 2)))
-    } else {
-      list(b_raw = runif(model_data$num_basis, -2, 2))
-    }
-  }
-
-  return(inits)
-}
-
 #' Define which parameters to monitor / extract
 #' @noRd
 extract_family_pars = function(object, newdata = NULL){

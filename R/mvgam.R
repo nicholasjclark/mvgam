@@ -1364,9 +1364,9 @@ mvgam = function(formula,
       param <- c(param, 'mu_raw', 'sigma_raw')
     }
 
-    # Sensible inits needed for the betas
-    inits <- family_inits(family = family_char, trend_model,
-                          smooths_included, model_data)
+    # Don't place inits when using Stan; may add options later for users
+    # to supply them though
+    inits <- NULL
 
     # Include any GP term updates
     if(!is.null(gp_terms)){
@@ -1822,7 +1822,6 @@ mvgam = function(formula,
                                               algorithm = algorithm,
                                               prior_simulation = prior_simulation,
                                               data = model_data,
-                                              inits = inits,
                                               chains = chains,
                                               parallel = parallel,
                                               silent = silent,
@@ -1842,7 +1841,6 @@ mvgam = function(formula,
                                            algorithm = algorithm,
                                            prior_simulation = prior_simulation,
                                            data = model_data,
-                                           inits = inits,
                                            chains = chains,
                                            parallel = parallel,
                                            silent = silent,

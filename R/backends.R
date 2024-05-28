@@ -68,7 +68,6 @@
                                    algorithm = 'sampling',
                                    prior_simulation = FALSE,
                                    data,
-                                   inits,
                                    chains = 4,
                                    parallel = TRUE,
                                    silent = 1L,
@@ -93,10 +92,6 @@
     }
   }
 
-  warn_inits_def <- getOption('cmdstanr_warn_inits')
-  options(cmdstanr_warn_inits = FALSE)
-  on.exit(options(cmdstanr_warn_inits = warn_inits_def))
-
   # Construct cmdstanr sampling arguments
   args <- nlist(data = data)
   dots <- list(...)
@@ -115,7 +110,6 @@
     c(args) <- nlist(
       chains = chains,
       refresh = 100,
-      init = inits,
       max_treedepth,
       adapt_delta,
       diagnostics = NULL,
@@ -200,7 +194,6 @@
                                 algorithm = 'sampling',
                                 prior_simulation = FALSE,
                                 data,
-                                inits,
                                 chains = 4,
                                 parallel = TRUE,
                                 silent = 1L,
@@ -284,7 +277,6 @@
                      chains = chains,
                      control = stan_control,
                      show_messages = silent < 1L,
-                     init = inits,
                      verbose = FALSE,
                      thin = thin,
                      pars = NA,

@@ -1,3 +1,7 @@
+# mvgam 1.1.2
+* Added options for silencing some of the 'Stan' compiler and modeling messages using the `silent` argument in `mvgam()`
+* Fixed a small bug that prevented `conditional_effects.mvgam()` from handling effects with three-way interactions
+
 # mvgam 1.1.1
 * Changed indexing of an internal c++ function after Prof Brian Ripley’s   
   email: Dear maintainer, Please see the problems shown on 
