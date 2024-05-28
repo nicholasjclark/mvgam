@@ -139,7 +139,7 @@ as_one_integer <- function(x, allow_na = FALSE) {
 
 #'@noRd
 deparse0 = function (x, max_char = NULL, ...) {
-  out <- collapse(deparse(x, ...))
+  out <- paste(deparse(x, ...), sep = "", collapse = "")
   if (isTRUE(max_char > 0)) {
     out <- substr(out, 1L, max_char)
   }
@@ -150,7 +150,8 @@ deparse0 = function (x, max_char = NULL, ...) {
 validate_silent <- function(silent) {
   silent <- as_one_integer(silent)
   if (silent < 0 || silent > 2) {
-    stop2("'silent' must be between 0 and 2.")
+    stop("'silent' must be between 0 and 2.",
+         call. = FALSE)
   }
   silent
 }
