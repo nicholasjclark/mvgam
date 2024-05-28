@@ -38,13 +38,13 @@ A series of [vignettes cover data formatting, forecasting and several extended c
 * [Distributed lags (and hierarchical distributed lags) using `mgcv` and `mvgam`](https://ecogambler.netlify.app/blog/distributed-lags-mgcv/){target="_blank"}
 * [Ecological Forecasting with Dynamic GAMs; a tutorial and detailed case study](https://www.youtube.com/watch?v=RwllLjgPUmM){target="_blank"}
 * [How to interpret and report nonlinear effects from Generalized Additive Models](https://ecogambler.netlify.app/blog/interpreting-gams/){target="_blank"}
-* [Phylogenetic smoothing using mgcv](https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/){target="_blank"}
+* [Phylogenetic smoothing using `mgcv`](https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/){target="_blank"}
   
 ## Installation
 Install the stable version from `CRAN` using: `install.packages('mvgam')`, or install the development version from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`. Note that to condition models on observed data, either `JAGS` (along with packages `rjags` and `runjags`) or `Stan` must be installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/){target="_blank"}, for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}. You will need a fairly recent version of `Stan` to ensure all syntax is recognized. If you see warnings such as `variable "array" does not exist`, this is usually a sign that you need to update `Stan`. We highly recommend you use `Cmdstan` through the `cmdstanr` interface. This is because `Cmdstan` is easier to install, is more up to date with new features, and uses less memory than `Rstan`. See [this documentation from the `Cmdstan` team for more information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan){target="_blank"}. 
+`devtools::install_github("nicholasjclark/mvgam")`. Note that to condition models on observed data, either `JAGS` (along with packages `rjags` and `runjags`) or `Stan` must be installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/){target="_blank"}, for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}. You will need a fairly recent version of `Stan` to ensure all syntax is recognized. If you see warnings such as `variable "array" does not exist`, this is usually a sign that you need to update `Stan`. We highly recommend you use `Cmdstan` through the `cmdstanr` interface. This is because `Cmdstan` is easier to install, is more up to date with new features, and uses less memory than `r`stan`. See [this documentation from the `Cmdstan` team for more information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan){target="_blank"}. 
 
-## Citing mvgam and related software
+## Citing `mvgam` and related software
 When using any software please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work, so we highly encourage you to cite any packages that you rely on for your research.
 
 When using `mvgam`, please cite the following:
@@ -66,7 +66,7 @@ some features of `mvgam` which specifically rely on certain packages. The most i
 ## Cheatsheet
 [![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
 
-## Introducing mvgam for fitting Generalized Additive Models to time series
+## Introducing `mvgam` for fitting Generalized Additive Models to time series
 We can explore the model’s primary functions using a dataset that is available with all `R` installations. Load the `lynx` data and plot the series as well as its autocorrelation function
 ```{r include = FALSE}
 library(mvgam)
@@ -113,7 +113,7 @@ Inspect the series in a bit more detail using `mvgam`'s plotting utility
 plot_mvgam_series(data = lynx_train, y = 'population')
 ```
 
-Now we will formulate an `mvgam` model; this model fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the temporal process (in this case an `AR3` process). We assume the outcome follows a Poisson distribution and will condition the model in `Stan` using MCMC sampling with the `Cmdstan` interface:
+Formulate an `mvgam` model; this model fits a GAM in which a cyclic smooth function for `season` is estimated jointly with a full time series model for the temporal process (in this case an `AR3` process). We assume the outcome follows a Poisson distribution and will condition the model in `Stan` using MCMC sampling with the `Cmdstan` interface:
 ```{r, include=FALSE}
 lynx_mvgam <- mvgam(data = lynx_train,
                newdata = lynx_test,
@@ -144,7 +144,7 @@ Have a look at this model's summary to see what is being estimated. Note that no
 summary(lynx_mvgam)
 ```
 
-As with any `MCMC` software, we can inspect traceplots. Here for the `GAM` smoothing parameters, using `mvgam`'s reliance on the excellent `bayesplot` library:
+As with any MCMC software, we can inspect traceplots. Here for the GAM smoothing parameters, using `mvgam`'s reliance on the excellent `bayesplot` library:
 ```{r, fig.alt = "Smoothing parameter posterior distributions estimated with Stan in mvgam"}
 mcmc_plot(lynx_mvgam, variable = 'rho', regex = TRUE, type = 'trace')
 ```

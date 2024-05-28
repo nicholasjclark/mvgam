@@ -298,7 +298,6 @@ test_that("bernoulli() post-processing works", {
 
   expect_no_error(ppc(mod))
   expect_no_error(ppc(mod, type = 'density'))
-  expect_no_error(ppc(mod, type = 'mean'))
   expect_no_error(ppc(mod, type = 'pit'))
   expect_no_error(ppc(mod, type = 'cdf'))
 

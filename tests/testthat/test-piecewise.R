@@ -128,7 +128,6 @@ test_that("piecewise models fit and forecast without error", {
   # Simulate expected values
   set.seed(11)
   expected <- Nt(0.004, 2, 100, 30)
-  plot(expected, xlab = 'Time')
 
   # Take Poisson draws
   y <- rpois(100, expected)
@@ -153,17 +152,20 @@ test_that("piecewise models fit and forecast without error", {
                trend_model = PW(growth = 'logistic'),
                family = poisson(),
                data = dat_train,
-               chains = 2)
+               chains = 2,
+               silent = 2)
   # Compute and plot forecasts
   fc <- forecast(mod, newdata = dat_test)
   expect_no_error(capture_output(plot(fc)))
 
   # Should also work for piecewise linear
   mod <- mvgam(y ~ 0,
-               trend_model = PW(growth = 'linear'),
+               trend_model = PW(growth = 'linear',
+                                n_changepoints = 5),
                family = poisson(),
                data = dat_train,
-               chains = 2)
+               chains = 2,
+               silent = 2)
   # Compute and plot forecasts
   fc <- forecast(mod, newdata = dat_test)
   expect_no_error(capture_output(plot(fc)))

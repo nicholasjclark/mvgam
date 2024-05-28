@@ -49,7 +49,7 @@ been compiled:
   target="_blank">How to interpret and report nonlinear effects from
   Generalized Additive Models</a>
 - <a href="https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/"
-  target="_blank">Phylogenetic smoothing using mgcv</a>
+  target="_blank">Phylogenetic smoothing using <code>mgcv</code></a>
 
 ## Installation
 
@@ -69,13 +69,11 @@ recognized. If you see warnings such as
 `variable "array" does not exist`, this is usually a sign that you need
 to update `Stan`. We highly recommend you use `Cmdstan` through the
 `cmdstanr` interface. This is because `Cmdstan` is easier to install, is
-more up to date with new features, and uses less memory than `Rstan`.
-See <a
-href="http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan"
-target="_blank">this documentation from the <code>Cmdstan</code> team
-for more information</a>.
+more up to date with new features, and uses less memory than
+`r`stan`. See [this documentation from the`Cmdstan\` team for more
+information\](<http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan>){target=“\_blank”}.
 
-## Citing mvgam and related software
+## Citing `mvgam` and related software
 
 When using any software please make sure to appropriately acknowledge
 the hard work that developers and maintainers put into making these
@@ -116,7 +114,7 @@ packages.
 [![`mvgam` usage
 cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
 
-## Introducing mvgam for fitting Generalized Additive Models to time series
+## Introducing `mvgam` for fitting Generalized Additive Models to time series
 
 We can explore the model’s primary functions using a dataset that is
 available with all `R` installations. Load the `lynx` data and plot the
@@ -183,12 +181,11 @@ plot_mvgam_series(data = lynx_train, y = 'population')
 
 <img src="man/figures/README-unnamed-chunk-8-1.png" alt="Plotting time series features with the mvgam R package" width="60%" style="display: block; margin: auto;" />
 
-Now we will formulate an `mvgam` model; this model fits a GAM in which a
-cyclic smooth function for `season` is estimated jointly with a full
-time series model for the temporal process (in this case an `AR3`
-process). We assume the outcome follows a Poisson distribution and will
-condition the model in `Stan` using MCMC sampling with the `Cmdstan`
-interface:
+Formulate an `mvgam` model; this model fits a GAM in which a cyclic
+smooth function for `season` is estimated jointly with a full time
+series model for the temporal process (in this case an `AR3` process).
+We assume the outcome follows a Poisson distribution and will condition
+the model in `Stan` using MCMC sampling with the `Cmdstan` interface:
 
 ``` r
 lynx_mvgam <- mvgam(population ~ s(season, bs = 'cc', k = 12),
@@ -336,28 +333,28 @@ summary(lynx_mvgam)
 #> 
 #> GAM coefficient (beta) estimates:
 #>                2.5%    50% 97.5% Rhat n_eff
-#> (Intercept)   6.000  6.600  7.00 1.00   536
-#> s(season).1  -0.660  0.033  0.74 1.00  1116
-#> s(season).2  -0.320  0.800  1.80 1.01   477
-#> s(season).3  -0.042  1.200  2.40 1.02   391
-#> s(season).4  -0.510  0.450  1.50 1.00  1047
-#> s(season).5  -1.200 -0.130  1.00 1.01   600
-#> s(season).6  -1.100  0.013  1.10 1.01   641
-#> s(season).7  -0.690  0.370  1.40 1.01   926
-#> s(season).8  -1.000  0.280  1.80 1.02   431
-#> s(season).9  -1.100 -0.260  0.64 1.01   579
-#> s(season).10 -1.400 -0.690 -0.01 1.00   842
+#> (Intercept)   6.100  6.600  7.00 1.00   557
+#> s(season).1  -0.580  0.028  0.72 1.00  1088
+#> s(season).2  -0.220  0.870  1.80 1.00   423
+#> s(season).3   0.019  1.300  2.50 1.01   335
+#> s(season).4  -0.420  0.440  1.40 1.00   949
+#> s(season).5  -1.200 -0.180  0.91 1.01   481
+#> s(season).6  -1.200 -0.057  1.10 1.00   651
+#> s(season).7  -0.830  0.390  1.50 1.00   770
+#> s(season).8  -1.000  0.300  1.80 1.01   346
+#> s(season).9  -1.100 -0.250  0.70 1.00   477
+#> s(season).10 -1.400 -0.690 -0.03 1.00   592
 #> 
 #> Approximate significance of GAM smooths:
-#>            edf Ref.df Chi.sq p-value
-#> s(season) 9.95     10  18558    0.25
+#>           edf Ref.df Chi.sq p-value
+#> s(season) 9.9     10  21012     0.2
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n_eff
-#> ar1[1]    0.73  1.10 1.400 1.01   770
-#> ar2[1]   -0.84 -0.41 0.088 1.00  1418
-#> ar3[1]   -0.47 -0.12 0.280 1.01   615
-#> sigma[1]  0.40  0.50 0.650 1.00  1260
+#> ar1[1]    0.72  1.10 1.400    1   593
+#> ar2[1]   -0.84 -0.39 0.075    1  1443
+#> ar3[1]   -0.47 -0.11 0.320    1   475
+#> sigma[1]  0.40  0.50 0.630    1  1106
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -366,14 +363,14 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Mon May 27 10:17:55 AM 2024.
+#> Samples were drawn using NUTS(diag_e) at Wed May 29 8:37:46 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
 ```
 
-As with any `MCMC` software, we can inspect traceplots. Here for the
-`GAM` smoothing parameters, using `mvgam`’s reliance on the excellent
+As with any MCMC software, we can inspect traceplots. Here for the GAM
+smoothing parameters, using `mvgam`’s reliance on the excellent
 `bayesplot` library:
 
 ``` r
@@ -486,7 +483,7 @@ series (testing and training)
 ``` r
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 #> Out of sample CRPS:
-#> 2911.9366665
+#> 2810.7573045
 ```
 
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -616,41 +613,41 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Observation precision parameter estimates:
 #>        2.5% 50% 97.5% Rhat n_eff
-#> phi[1]  5.6 8.3    12    1  1560
-#> phi[2]  5.7 8.6    13    1  1249
-#> phi[3]  5.6 8.5    12    1  1965
+#> phi[1]  5.6 8.3    12    1  1528
+#> phi[2]  5.8 8.8    13    1  1347
+#> phi[3]  5.7 8.4    12    1  1430
 #> 
 #> GAM coefficient (beta) estimates:
 #>              2.5%  50% 97.5% Rhat n_eff
-#> (Intercept) -0.16 0.19  0.45    1   834
+#> (Intercept) -0.15 0.19  0.45    1  1001
 #> 
 #> Approximate significance of GAM smooths:
 #>                            edf Ref.df Chi.sq p-value    
-#> s(season)                4.580      5  33.15  <2e-16 ***
-#> s(season):seriesseries_1 1.991      4   0.19    0.98    
-#> s(season):seriesseries_2 1.050      4   0.34    0.99    
-#> s(season):seriesseries_3 0.844      4   2.43    0.82    
+#> s(season)                4.297      5  39.37  <2e-16 ***
+#> s(season):seriesseries_1 0.936      4   0.50    0.98    
+#> s(season):seriesseries_2 0.935      4   0.39    0.99    
+#> s(season):seriesseries_3 0.645      4   2.81    0.86    
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
-#>             2.5%  50% 97.5% Rhat n_eff
-#> alpha_gp[1] 0.06 0.42  0.91 1.00   692
-#> alpha_gp[2] 0.39 0.73  1.30 1.00  1174
-#> alpha_gp[3] 0.17 0.47  1.00 1.01  1069
-#> rho_gp[1]   1.20 3.70 13.00 1.01   663
-#> rho_gp[2]   1.90 7.50 37.00 1.01   251
-#> rho_gp[3]   1.30 4.70 18.00 1.00   814
+#>              2.5%  50% 97.5% Rhat n_eff
+#> alpha_gp[1] 0.078 0.42  0.90 1.00   877
+#> alpha_gp[2] 0.380 0.73  1.30 1.00  1130
+#> alpha_gp[3] 0.170 0.47  0.97 1.00   886
+#> rho_gp[1]   1.200 3.70 14.00 1.01   797
+#> rho_gp[2]   1.700 7.30 34.00 1.02   463
+#> rho_gp[3]   1.300 4.70 20.00 1.00   722
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
-#> 5 of 2000 iterations ended with a divergence (0.25%)
+#> 4 of 2000 iterations ended with a divergence (0.2%)
 #>  *Try running with larger adapt_delta to remove the divergences
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Mon May 27 10:19:23 AM 2024.
+#> Samples were drawn using NUTS(diag_e) at Wed May 29 8:39:04 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
