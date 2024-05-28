@@ -38,8 +38,9 @@ mvgam(
   algorithm = getOption("brms.algorithm", "sampling"),
   autoformat = TRUE,
   save_all_pars = FALSE,
-  max_treedepth,
-  adapt_delta,
+  max_treedepth = 12,
+  adapt_delta = 0.85,
+  silent = 1,
   jags_path,
   ...
 )
@@ -266,6 +267,12 @@ to a value closer to \code{1} (e.g. from \code{0.95} to \code{0.99}, or from \co
 The step size used by the numerical integrator is a function of \code{adapt_delta} in that increasing
 \code{adapt_delta} will result in a smaller step size and fewer divergences. Increasing \code{adapt_delta} will
 typically result in a slower sampler, but it will always lead to a more robust sampler}
+
+\item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (the default), most of the informational
+messages of compiler and sampler are suppressed. If \code{2}, even more messages are suppressed. The
+actual sampling progress is still printed. Set \code{refresh = 0} to turn this off as well. If using
+\code{backend = "rstan"} you can also set open_progress = FALSE to prevent opening additional
+progress bars.}
 
 \item{jags_path}{Optional character vector specifying the path to the location of the \code{JAGS} executable (.exe) to use
 for modelling if \code{use_stan == FALSE}. If missing, the path will be recovered from a call to \code{\link[runjags]{findjags}}}

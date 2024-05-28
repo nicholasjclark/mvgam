@@ -113,6 +113,48 @@ validate_series_time = function(data, name = 'data',
   return(data)
 }
 
+#'@noRd
+as_one_logical = function (x, allow_na = FALSE) {
+  s <- substitute(x)
+  x <- as.logical(x)
+  if (length(x) != 1L || anyNA(x) && !allow_na) {
+    s <- deparse0(s, max_char = 100L)
+    stop("Cannot coerce '", s, "' to a single logical value.",
+         call. = FALSE)
+  }
+  x
+}
+
+#'@noRd
+as_one_integer <- function(x, allow_na = FALSE) {
+  s <- substitute(x)
+  x <- suppressWarnings(as.integer(x))
+  if (length(x) != 1L || anyNA(x) && !allow_na) {
+    s <- deparse0(s, max_char = 100L)
+    stop("Cannot coerce '", s, "' to a single integer value.",
+         call. = FALSE)
+  }
+  x
+}
+
+#'@noRd
+deparse0 = function (x, max_char = NULL, ...) {
+  out <- collapse(deparse(x, ...))
+  if (isTRUE(max_char > 0)) {
+    out <- substr(out, 1L, max_char)
+  }
+  out
+}
+
+#'@noRd
+validate_silent <- function(silent) {
+  silent <- as_one_integer(silent)
+  if (silent < 0 || silent > 2) {
+    stop2("'silent' must be between 0 and 2.")
+  }
+  silent
+}
+
 #'@importFrom rlang warn
 #'@noRd
 validate_family = function(family, use_stan = TRUE){

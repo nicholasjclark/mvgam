@@ -190,7 +190,8 @@ test_that("nmix() post-processing works", {
                prior(normal(1, 1.5), class = Intercept_trend)),
     samples = 300,
     residuals = FALSE,
-    chains = 2))
+    chains = 2,
+    silent = 2))
 
   expect_no_error(capture_output(summary(mod)))
   expect_no_error(capture_output(print(mod)))
