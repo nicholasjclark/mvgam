@@ -67,11 +67,14 @@ target="_blank">here</a>, or for `Stan` with `cmdstandr`
 will need a fairly recent version of `Stan` to ensure all syntax is
 recognized. If you see warnings such as
 `variable "array" does not exist`, this is usually a sign that you need
-to update `Stan`. We highly recommend you use `Cmdstan` through the
-`cmdstanr` interface. This is because `Cmdstan` is easier to install, is
-more up to date with new features, and uses less memory than
-`r`stan`. See [this documentation from the`Cmdstan\` team for more
-information\](<http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan>){target=“\_blank”}.
+to update `Stan`.
+
+We highly recommend you use `Cmdstan` through the `cmdstanr` interface.
+This is because `Cmdstan` is easier to install, is more up to date with
+new features, and uses less memory than `rstan`. See <a
+href="http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan"
+target="_blank">this documentation from the <code>Cmdstan</code> team
+for more information</a>.
 
 ## Citing `mvgam` and related software
 
@@ -332,29 +335,29 @@ summary(lynx_mvgam)
 #> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                2.5%    50% 97.5% Rhat n_eff
-#> (Intercept)   6.100  6.600  7.00 1.00   557
-#> s(season).1  -0.580  0.028  0.72 1.00  1088
-#> s(season).2  -0.220  0.870  1.80 1.00   423
-#> s(season).3   0.019  1.300  2.50 1.01   335
-#> s(season).4  -0.420  0.440  1.40 1.00   949
-#> s(season).5  -1.200 -0.180  0.91 1.01   481
-#> s(season).6  -1.200 -0.057  1.10 1.00   651
-#> s(season).7  -0.830  0.390  1.50 1.00   770
-#> s(season).8  -1.000  0.300  1.80 1.01   346
-#> s(season).9  -1.100 -0.250  0.70 1.00   477
-#> s(season).10 -1.400 -0.690 -0.03 1.00   592
+#>                2.5%     50%   97.5% Rhat n_eff
+#> (Intercept)   6.100  6.6000  7.0000 1.01   482
+#> s(season).1  -0.620  0.0440  0.7400 1.00   613
+#> s(season).2  -0.240  0.7700  1.8000 1.00   558
+#> s(season).3  -0.084  1.2000  2.5000 1.01   420
+#> s(season).4  -0.570  0.4300  1.4000 1.00   874
+#> s(season).5  -1.200 -0.1100  0.9500 1.00   576
+#> s(season).6  -1.100  0.0048  1.1000 1.00   692
+#> s(season).7  -0.740  0.3300  1.4000 1.00   688
+#> s(season).8  -1.000  0.2100  1.7000 1.00   377
+#> s(season).9  -1.200 -0.3200  0.7000 1.00   485
+#> s(season).10 -1.400 -0.6600 -0.0045 1.00   895
 #> 
 #> Approximate significance of GAM smooths:
-#>           edf Ref.df Chi.sq p-value
-#> s(season) 9.9     10  21012     0.2
+#>            edf Ref.df Chi.sq p-value
+#> s(season) 9.87     10  18287    0.27
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%   50% 97.5% Rhat n_eff
-#> ar1[1]    0.72  1.10 1.400    1   593
-#> ar2[1]   -0.84 -0.39 0.075    1  1443
-#> ar3[1]   -0.47 -0.11 0.320    1   475
-#> sigma[1]  0.40  0.50 0.630    1  1106
+#> ar1[1]    0.72  1.10 1.400    1   819
+#> ar2[1]   -0.82 -0.41 0.058    1  1710
+#> ar3[1]   -0.46 -0.13 0.300    1   590
+#> sigma[1]  0.40  0.50 0.640    1  1103
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -363,7 +366,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Wed May 29 8:37:46 AM 2024.
+#> Samples were drawn using NUTS(diag_e) at Wed May 29 10:06:36 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -483,7 +486,7 @@ series (testing and training)
 ``` r
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 #> Out of sample CRPS:
-#> 2810.7573045
+#> 2849.61788275
 ```
 
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -647,7 +650,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Wed May 29 8:39:04 AM 2024.
+#> Samples were drawn using NUTS(diag_e) at Wed May 29 10:07:56 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
