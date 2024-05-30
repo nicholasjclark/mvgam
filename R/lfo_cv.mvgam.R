@@ -156,10 +156,17 @@ lfo_cv.mvgam = function(object,
                           fc_horizon = fc_horizon)
 
   # Fit model to training and forecast all remaining testing observations
+  noncentred <- if(is.null(attr(object$model_data, 'noncentred'))){
+    FALSE
+  } else {
+    TRUE
+  }
+
   fit_past <- update(object,
                     data = data_splits$data_train,
                     newdata = data_splits$data_test,
-                    lfo = TRUE)
+                    lfo = TRUE,
+                    noncentred = noncentred)
 
   # Calculate log likelihoods of forecast observations for the next
   # fc_horizon ahead observations

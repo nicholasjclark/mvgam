@@ -1,5 +1,7 @@
 # mvgam 1.1.2
 * Added options for silencing some of the 'Stan' compiler and modeling messages using the `silent` argument in `mvgam()`
+* Added an option to use the non-centred parameterisation for some autoregressive trend models,
+which speeds up mixing most of the time
 * Fixed a small bug that prevented `conditional_effects.mvgam()` from handling effects with three-way interactions
 
 # mvgam 1.1.1

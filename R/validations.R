@@ -247,7 +247,7 @@ validate_family_resrictions = function(response, family){
 }
 
 #'@noRd
-validate_trend_model = function(trend_model, drift = FALSE){
+validate_trend_model = function(trend_model, drift = FALSE, noncentred = FALSE){
   if(inherits(trend_model, 'mvgam_trend')){
     ma_term <- if(trend_model$ma){ 'MA' } else { NULL }
     cor_term <- if(trend_model$cor){ 'cor' } else { NULL }
@@ -273,6 +273,10 @@ validate_trend_model = function(trend_model, drift = FALSE){
   if(trend_model %in% c('VAR','VAR1','VAR1cor','VARMA1,1cor','GP') & drift){
     stop('drift terms not allowed for VAR or GP models',
          call. = FALSE)
+  }
+
+  if(!trend_model %in% c('RW','AR1', 'AR2', 'AR3') & noncentred){
+    message('Non-centering of trends currently not available for this model')
   }
 
   if(trend_model %in% c('PWlinear', 'PWlogistic'))

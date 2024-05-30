@@ -72,6 +72,37 @@ test_that("gp for observation models working properly", {
                     'term.labels'))
 })
 
+test_that("noncentring with gp terms working properly", {
+  mod <- mvgam(y ~ s(series, bs = 're') +
+                 s(season, bs = 'cc', k = 8) +
+                 gp(time, by = series),
+               trend_model = RW(),
+               drift = TRUE,
+               data = gaus_data$data_train,
+               newdata = gaus_data$data_test,
+               family = gaussian(),
+               noncentred = TRUE,
+               run_model = FALSE)
+
+  # Model file should have the non-centred trend parameterisation now
+  expect_true(
+    any(grepl(trimws("trend = trend_raw .* rep_matrix(sigma', rows(trend_raw));"),
+              trimws(mod$model_file),
+              fixed = TRUE))
+  )
+
+  expect_true(
+    any(grepl(trimws("trend[2 : n, s] += drift[s] + trend[1 : (n - 1), s];"),
+              trimws(mod$model_file),
+              fixed = TRUE))
+  )
+
+  # Gp data structures should be in the model_data
+  expect_true("l_gp_time_byseriesseries_1" %in% names(mod$model_data))
+  expect_true("b_idx_gp_time_byseriesseries_1" %in% names(mod$model_data))
+  expect_true("k_gp_time_byseriesseries_1" %in% names(mod$model_data))
+})
+
 test_that("gp for process models working properly", {
   mod <- mvgam(y ~ s(series, bs = 're'),
                trend_formula = ~

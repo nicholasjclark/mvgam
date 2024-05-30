@@ -159,13 +159,13 @@ test_that("piecewise models fit and forecast without error", {
   expect_no_error(capture_output(plot(fc)))
 
   # Should also work for piecewise linear
-  mod <- mvgam(y ~ 0,
+  mod <- SW(mvgam(y ~ 0,
                trend_model = PW(growth = 'linear',
                                 n_changepoints = 5),
                family = poisson(),
                data = dat_train,
                chains = 2,
-               silent = 2)
+               silent = 2))
   # Compute and plot forecasts
   fc <- forecast(mod, newdata = dat_test)
   expect_no_error(capture_output(plot(fc)))

@@ -123,6 +123,7 @@ lynx_mvgam <- mvgam(data = lynx_train,
                knots = list(season = c(0.5, 19.5)),
                family = poisson(),
                trend_model = AR(p = 3),
+               noncentred = TRUE,
                use_stan = TRUE)
 ```
 
@@ -134,11 +135,6 @@ lynx_mvgam <- mvgam(population ~ s(season, bs = 'cc', k = 12),
                     family = poisson(),
                     trend_model = AR(p = 3),
                     backend = 'cmdstanr')
-```
-
-Inspect the `Stan` code for the model
-```{r}
-code(lynx_mvgam)
 ```
 
 Have a look at this model's summary to see what is being estimated. Note that no pathological behaviours have been detected and we achieve good effective sample sizes / mixing for all parameters

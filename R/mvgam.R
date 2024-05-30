@@ -130,6 +130,10 @@
 #'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
 #'predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift parameters will also likely
 #'be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}
+#'@param noncentred \code{logical} experimental feature to use the non-centred parameterisation for autoregressive
+#'dynamic trend models. Only available if there is no `trend_formula` and for certain trend models
+#'(i.e. `RW`, `AR1`, `AR2`, and `AR3`, with or without `drift`). Not available for moving average or correlated
+#'error models
 #'@param chains \code{integer} specifying the number of parallel chains for the model. Ignored
 #'if `algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')`
 #'@param burnin \code{integer} specifying the number of warmup iterations of the Markov chain to run
@@ -311,8 +315,11 @@
 #'@examples
 #'\donttest{
 #'# Simulate a collection of three time series that have shared seasonal dynamics
-# # and independent random walk trends, with a Poisson observation process
-#'dat <- sim_mvgam(T = 80, n_series = 3, prop_missing = 0.1,
+# # and independent AR1 trends, with a Poisson observation process
+#'dat <- sim_mvgam(T = 80,
+#'                 n_series = 3,
+#'                 trend_model = AR(p = 1),
+#'                 prop_missing = 0.1,
 #'                 prop_trend = 0.6)
 #'
 #'# Plot key summary statistics for a single series
@@ -322,11 +329,11 @@
 #'plot_mvgam_series(data = dat$data_train, series = 'all')
 #'
 #'# Formulate a model using Stan where series share a cyclic smooth for
-#'# seasonality and each series has an independent random walk temporal process;
+#'# seasonality and each series has an independent AR1 temporal process;
 #'# Set run_model = FALSE to inspect the returned objects
 #'mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
 #'              data = dat$data_train,
-#'              trend_model = RW(),
+#'              trend_model = AR(),
 #'              family = poisson(),
 #'              use_stan = TRUE,
 #'              run_model = FALSE)
@@ -337,7 +344,7 @@
 #' # Now fit the model
 #' mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
 #'               data = dat$data_train,
-#'               trend_model = RW(),
+#'               trend_model = AR(),
 #'               family = poisson(),
 #'               chains = 2)
 #'
@@ -576,6 +583,7 @@ mvgam = function(formula,
                  trend_map,
                  trend_model = 'None',
                  drift = FALSE,
+                 noncentred = FALSE,
                  chains = 4,
                  burnin = 500,
                  samples = 500,
@@ -607,7 +615,9 @@ mvgam = function(formula,
 
   # Validate trend_model
   orig_trend_model <- trend_model
-  trend_model <- validate_trend_model(orig_trend_model, drift = drift)
+  trend_model <- validate_trend_model(orig_trend_model,
+                                      drift = drift,
+                                      noncentred = noncentred)
 
   # Ensure series and time variables are present
   data_train <- validate_series_time(data_train, name = 'data',
@@ -667,7 +677,6 @@ mvgam = function(formula,
         max(data_train$index..time..index)
     }
   }
-
 
   # Lighten the final object if this is an lfo run
   if(lfo) return_model_data <- FALSE
@@ -1580,6 +1589,21 @@ mvgam = function(formula,
       priors <- NULL
     }
 
+    # Updates for non-centering of basic trend models (RW, AR1-3)
+    if(noncentred & !add_ma & !add_cor & trend_model %in% c('RW',
+                                                            'AR1',
+                                                            'AR2',
+                                                            'AR3')){
+      if(use_lv){
+        message('Non-centering of trends currently not available for this model')
+        noncentred = FALSE
+      } else {
+        vectorised$model_file <- noncent_trend(model_file = vectorised$model_file,
+                                               trend_model = trend_model,
+                                               drift = drift)
+      }
+    }
+
     # Add any correlated error or moving average processes; this comes after
     # priors as currently there is no option to change priors on these parameters
     if(add_ma | add_cor){
@@ -1994,6 +2018,9 @@ mvgam = function(formula,
   #### Return the output as class mvgam ####
   trim_data <- list()
   attr(trim_data, 'trend_model') <- trend_model
+  attr(model_data, 'noncentred') <- if(noncentred) TRUE else NULL
+  attr(trim_data, 'noncentred') <- if(noncentred) TRUE else NULL
+
   output <- structure(list(call = orig_formula,
                            trend_call = if(!missing(trend_formula)){
                              trend_formula

@@ -207,6 +207,142 @@ test_that("JAGS setups should work", {
   expect_true(inherits(mod, 'mvgam_prefit'))
 })
 
+test_that("noncentring working properly for a range of models", {
+  # First check messages
+  expect_message(mvgam(y ~ s(series, bs = 're') +
+                         s(season, bs = 'cc', k = 8) +
+                         s(time, bs = 'moi', k = 8),
+                       trend_model = RW(ma = TRUE),
+                       drift = TRUE,
+                       data = gaus_data$data_train,
+                       newdata = gaus_data$data_test,
+                       family = gaussian(),
+                       noncentred = TRUE,
+                       run_model = FALSE),
+                 'Non-centering of trends currently not available for this model')
+
+  expect_message(mvgam(y ~ s(series, bs = 're') +
+                         s(season, bs = 'cc', k = 8) +
+                         s(time, bs = 'moi', k = 8),
+                       trend_model = RW(cor = TRUE),
+                       drift = TRUE,
+                       data = gaus_data$data_train,
+                       newdata = gaus_data$data_test,
+                       family = gaussian(),
+                       noncentred = TRUE,
+                       run_model = FALSE),
+                 'Non-centering of trends currently not available for this model')
+
+  expect_message(mvgam(y ~ s(series, bs = 're') +
+                         s(season, bs = 'cc', k = 8) +
+                         s(time, bs = 'moi', k = 8),
+                       trend_model = AR(p = 2, cor = TRUE),
+                       drift = TRUE,
+                       data = gaus_data$data_train,
+                       newdata = gaus_data$data_test,
+                       family = gaussian(),
+                       noncentred = TRUE,
+                       run_model = FALSE),
+                 'Non-centering of trends currently not available for this model')
+
+  expect_message(mvgam(y ~ s(series, bs = 're') +
+                         s(season, bs = 'cc', k = 8) +
+                         s(season, series, bs = 'sz'),
+                       trend_model = VAR(),
+                       data = gaus_data$data_train,
+                       newdata = gaus_data$data_test,
+                       family = gaussian(),
+                       noncentred = TRUE,
+                       run_model = FALSE),
+                 'Non-centering of trends currently not available for this model')
+
+  # Now check that the non-centering is incorporated properly
+  mod <- mvgam(y ~ s(series, bs = 're') +
+                 s(season, bs = 'cc', k = 8) +
+                 s(time, bs = 'moi', k = 8),
+               trend_model = RW(),
+               drift = TRUE,
+               data = gaus_data$data_train,
+               newdata = gaus_data$data_test,
+               family = gaussian(),
+               noncentred = TRUE,
+               run_model = FALSE)
+
+  # Model file should have the non-centred trend parameterisation now
+  expect_true(
+    any(grepl(trimws("trend = trend_raw .* rep_matrix(sigma', rows(trend_raw));"),
+              trimws(mod$model_file),
+              fixed = TRUE))
+  )
+
+  expect_true(
+    any(grepl(trimws("trend[2 : n, s] += drift[s] + trend[1 : (n - 1), s];"),
+              trimws(mod$model_file),
+              fixed = TRUE))
+  )
+
+  expect_true(
+    any(grepl(trimws("to_vector(trend_raw) ~ std_normal();"),
+              trimws(mod$model_file),
+              fixed = TRUE))
+  )
+
+  expect_true(
+    any(grepl(trimws("b[b_idx_s_time_] = abs(b_raw[b_idx_s_time_]) * 1;"),
+              trimws(mod$model_file),
+              fixed = TRUE))
+  )
+
+  mod <- mvgam(y ~ s(series, bs = 're') +
+                 s(season, bs = 'cc', k = 8) +
+                 s(season, series, bs = 'sz'),
+               trend_model = AR(p = 3),
+               priors = c(prior(beta(2,2), class = ar1,
+                              lb = 0, ub = 1),
+                          prior(exponential(3.466), class = sigma)),
+               data = gaus_data$data_train,
+               newdata = gaus_data$data_test,
+               family = gaussian(),
+               noncentred = TRUE,
+               run_model = FALSE)
+
+  expect_true(
+    any(grepl(trimws("ar1 ~ beta(2, 2);"),
+              trimws(mod$model_file),
+              fixed = TRUE))
+  )
+
+  expect_true(
+    any(grepl(trimws("sigma ~ exponential(3.466);"),
+              trimws(mod$model_file),
+              fixed = TRUE))
+  )
+
+  expect_true(
+    any(grepl(trimws("trend = trend_raw .* rep_matrix(sigma', rows(trend_raw));"),
+              trimws(mod$model_file),
+              fixed = TRUE))
+  )
+
+  expect_true(
+    any(grepl(trimws("trend[2, s] += ar1[s] * trend[1, s];"),
+              trimws(mod$model_file),
+              fixed = TRUE))
+  )
+
+  expect_true(
+    any(grepl(trimws("trend[3, s] += ar1[s] * trend[2, s] + ar2[s] * trend[1, s];"),
+              trimws(mod$model_file),
+              fixed = TRUE))
+  )
+
+  expect_true(
+    any(grepl(trimws("to_vector(trend_raw) ~ std_normal();"),
+              trimws(mod$model_file),
+              fixed = TRUE))
+  )
+})
+
 test_that("prior_only works", {
   mod <- mvgam(y ~ s(season),
                trend_model = AR(p = 2),

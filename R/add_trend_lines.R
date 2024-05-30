@@ -466,7 +466,7 @@ add_trend_lines = function(model_file, stan = FALSE,
         } else {
           model_file[grep('// raw basis', model_file) + 1] <-
             paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1.5,upper=1.5>[n_series] ar1;\n\n',
-                   '// latent trend AR2 terms\nvector<lower=-1.5,upper=1.5>[n_series] ar2;\n\n',
+                   '// latent trend AR2 terms\nvector<lower=-1,upper=1>[n_series] ar2;\n\n',
                    '// latent trend drift terms\nvector[n_series] drift;')
 
           model_file[grep('trend[1, s] ~ ', model_file, fixed = T)] <-
@@ -507,7 +507,7 @@ add_trend_lines = function(model_file, stan = FALSE,
         } else {
           model_file[grep('// raw basis', model_file) + 1] <-
             paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1.5,upper=1.5>[n_series] ar1;\n\n',
-                   '// latent trend AR2 terms\nvector<lower=-1.5,upper=1.5>[n_series] ar2;')
+                   '// latent trend AR2 terms\nvector<lower=-1,upper=1>[n_series] ar2;')
           model_file[grep('// trend estimates', model_file) + 2] <-
             paste0('trend[1, s] ~ normal(0, sigma[s]);')
 
@@ -559,8 +559,8 @@ add_trend_lines = function(model_file, stan = FALSE,
         } else {
           model_file[grep('// raw basis', model_file) + 1] <-
             paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1.5,upper=1.5>[n_series] ar1;\n\n',
-                   '// latent trend AR2 terms\nvector<lower=-1.5,upper=1.5>[n_series] ar2;\n\n',
-                   '// latent trend AR3 terms\nvector<lower=-1.5,upper=1.5>[n_series] ar3;\n\n',
+                   '// latent trend AR2 terms\nvector<lower=-1,upper=1>[n_series] ar2;\n\n',
+                   '// latent trend AR3 terms\nvector<lower=-1,upper=1>[n_series] ar3;\n\n',
                    '// latent trend drift terms\nvector[n_series] drift;')
 
           model_file[grep('trend[1, s] ~ ', model_file, fixed = T)] <-
@@ -613,8 +613,8 @@ add_trend_lines = function(model_file, stan = FALSE,
         } else {
           model_file[grep('// raw basis', model_file) + 1] <-
             paste0('row_vector[num_basis] b_raw;\n\n// latent trend AR1 terms\nvector<lower=-1.5,upper=1.5>[n_series] ar1;\n\n',
-                   '// latent trend AR2 terms\nvector<lower=-1.5,upper=1.5>[n_series] ar2;\n\n',
-                   '// latent trend AR3 terms\nvector<lower=-1.5,upper=1.5>[n_series] ar3;')
+                   '// latent trend AR2 terms\nvector<lower=-1,upper=1>[n_series] ar2;\n\n',
+                   '// latent trend AR3 terms\nvector<lower=-1,upper=1>[n_series] ar3;')
           model_file[grep('// trend estimates', model_file) + 2] <-
             paste0('trend[1, s] ~ normal(0, sigma[s]);')
 

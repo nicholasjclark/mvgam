@@ -2539,7 +2539,8 @@ add_trend_predictors = function(trend_formula,
                          trend_model = 'None',
                          return_model_data = TRUE,
                          run_model = FALSE,
-                         autoformat = FALSE)
+                         autoformat = FALSE,
+                         noncentred = FALSE)
   } else {
     # Construct the model file and data structures for training only
     trend_mvgam <- mvgam(trend_formula,
@@ -2549,7 +2550,8 @@ add_trend_predictors = function(trend_formula,
                          trend_model = 'None',
                          return_model_data = TRUE,
                          run_model = FALSE,
-                         autoformat = FALSE)
+                         autoformat = FALSE,
+                         noncentred = FALSE)
   }
 
   trend_model_file <- trend_mvgam$model_file

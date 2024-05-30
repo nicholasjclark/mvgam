@@ -23,6 +23,7 @@ mvgam(
   trend_map,
   trend_model = "None",
   drift = FALSE,
+  noncentred = FALSE,
   chains = 4,
   burnin = 500,
   samples = 500,
@@ -182,6 +183,11 @@ trend is expected to broadly follow a non-zero slope. Only available for
 the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
 predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift parameters will also likely
 be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}}
+
+\item{noncentred}{\code{logical} experimental feature to use the non-centred parameterisation for autoregressive
+dynamic trend models. Only available if there is no \code{trend_formula} and for certain trend models
+(i.e. \code{RW}, \code{AR1}, \code{AR2}, and \code{AR3}, with or without \code{drift}). Not available for moving average or correlated
+error models}
 
 \item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
 if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
@@ -392,7 +398,10 @@ variety of trend models. Users are strongly encouraged to opt for \code{Stan} ov
 \examples{
 \donttest{
 # Simulate a collection of three time series that have shared seasonal dynamics
-dat <- sim_mvgam(T = 80, n_series = 3, prop_missing = 0.1,
+dat <- sim_mvgam(T = 80,
+                n_series = 3,
+                trend_model = AR(p = 1),
+                prop_missing = 0.1,
                 prop_trend = 0.6)
 
 # Plot key summary statistics for a single series
@@ -402,11 +411,11 @@ plot_mvgam_series(data = dat$data_train, series = 1)
 plot_mvgam_series(data = dat$data_train, series = 'all')
 
 # Formulate a model using Stan where series share a cyclic smooth for
-# seasonality and each series has an independent random walk temporal process;
+# seasonality and each series has an independent AR1 temporal process;
 # Set run_model = FALSE to inspect the returned objects
 mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
              data = dat$data_train,
-             trend_model = RW(),
+             trend_model = AR(),
              family = poisson(),
              use_stan = TRUE,
              run_model = FALSE)
@@ -417,7 +426,7 @@ code(mod1)
 # Now fit the model
 mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
               data = dat$data_train,
-              trend_model = RW(),
+              trend_model = AR(),
               family = poisson(),
               chains = 2)
 
