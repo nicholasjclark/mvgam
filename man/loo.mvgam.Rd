@@ -5,12 +5,16 @@
 \alias{loo_compare.mvgam}
 \title{LOO information criteria for \code{mvgam} models}
 \usage{
-\method{loo}{mvgam}(x, ...)
+\method{loo}{mvgam}(x, incl_dynamics = TRUE, ...)
 
-\method{loo_compare}{mvgam}(x, ..., model_names = NULL)
+\method{loo_compare}{mvgam}(x, ..., model_names = NULL, incl_dynamics = TRUE)
 }
 \arguments{
 \item{x}{Object of class \code{mvgam}}
+
+\item{incl_dynamics}{Logical; indicates if any latent dynamic structures that
+were included in the model should be considered when calculating in-sample
+log-likelihoods. Defaults to \code{TRUE}}
 
 \item{...}{More \code{mvgam} objects.}
 

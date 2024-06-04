@@ -121,11 +121,12 @@ families are:
 \item\code{student_t()} for real-valued data
 \item\code{Gamma()} for non-negative real-valued data
 \item\code{bernoulli()} for binary data
-\item\code{nb()} for count data
 \item\code{poisson()} for count data
+\item\code{nb()} for overdispersed count data
 \item\code{binomial()} for count data with imperfect detection when the number of trials is known;
-note that the \code{cbind()} function must be used to bind the discrete observations and the number
+note that the \code{cbind()} function must be used to bind the discrete observations and the discrete number
 of trials
+\item\code{beta_binomial()} as for \code{binomial()} but allows for overdispersion
 \item\code{nmix()} for count data with imperfect detection when the number of trials
 is unknown and should be modeled via a State-Space N-Mixture model.
 The latent states are Poisson, capturing the 'true' latent
@@ -186,8 +187,8 @@ be unidentifiable if using dynamic factor models. Therefore this defaults to \co
 
 \item{noncentred}{\code{logical} experimental feature to use the non-centred parameterisation for autoregressive
 dynamic trend models. Only available if there is no \code{trend_formula} and for certain trend models
-(i.e. \code{RW}, \code{AR1}, \code{AR2}, and \code{AR3}, with or without \code{drift}). Not available for moving average or correlated
-error models}
+(i.e. \code{RW}, \code{AR1}, \code{AR2}, \code{AR3}, or \code{CAR1} with or without \code{drift}). Not available for moving average or
+correlated error models}
 
 \item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
 if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
@@ -398,8 +399,11 @@ variety of trend models. Users are strongly encouraged to opt for \code{Stan} ov
 \examples{
 \donttest{
 # Simulate a collection of three time series that have shared seasonal dynamics
+# and independent AR1 trends, with a Poisson observation process
+set.seed(0)
 dat <- sim_mvgam(T = 80,
                 n_series = 3,
+                mu = 2,
                 trend_model = AR(p = 1),
                 prop_missing = 0.1,
                 prop_trend = 0.6)
@@ -423,11 +427,12 @@ mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
 # View the model code in Stan language
 code(mod1)
 
-# Now fit the model
+# Now fit the model, noting that 'noncentred = TRUE' will likely give performance gains
 mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
               data = dat$data_train,
               trend_model = AR(),
               family = poisson(),
+              noncentred = TRUE,
               chains = 2)
 
 # Extract the model summary

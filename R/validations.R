@@ -275,7 +275,7 @@ validate_trend_model = function(trend_model, drift = FALSE, noncentred = FALSE){
          call. = FALSE)
   }
 
-  if(!trend_model %in% c('RW','AR1', 'AR2', 'AR3') & noncentred){
+  if(!trend_model %in% c('RW','AR1', 'AR2', 'AR3', 'CAR1') & noncentred){
     message('Non-centering of trends currently not available for this model')
   }
 
@@ -457,10 +457,10 @@ validate_trendmap = function(trend_map,
   }
 
   # No point in trend mapping if trend model is 'None'
-  if(trend_model == 'None'){
-    stop('cannot set up latent trends when "trend_model = None"',
-         call. = FALSE)
-  }
+  # if(trend_model == 'None'){
+  #   stop('cannot set up latent trends when "trend_model = None"',
+  #        call. = FALSE)
+  # }
 
   # trend_map must have an entry for each unique time series
   if(!all(sort(trend_map$series) == sort(unique(data_train$series)))){
@@ -564,8 +564,8 @@ validate_trend_restrictions = function(trend_model,
                               trend = 1:length(unique(data_train$series)))
     }
 
-    if(!trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'CAR1')){
-      stop('only RW, AR1, AR2, AR3, CAR1 and VAR trends currently supported for trend predictor models',
+    if(!trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'CAR1')){
+      stop('only None, RW, AR1, AR2, AR3, CAR1 and VAR trends currently supported for trend predictor models',
            call. = FALSE)
     }
   }
@@ -594,12 +594,6 @@ validate_trend_restrictions = function(trend_model,
     if(n_lv > length(unique(data_train$series))){
       stop('number of latent variables cannot be greater than number of series')
     }
-  }
-
-  # No point in latent variables if trend_model is None
-  if(trend_model == 'None' & use_lv){
-    use_lv <- FALSE
-    warning('No point in latent variables if trend model is None; changing use_lv to FALSE')
   }
 
   if(missing(trend_map)){

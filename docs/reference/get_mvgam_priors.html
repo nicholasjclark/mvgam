@@ -134,11 +134,12 @@ families are:</p><ul><li><p><code><a href="https://rdrr.io/r/stats/family.html" 
 <li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
 <li><p><code>bernoulli()</code> for binary data</p></li>
-<li><p><code>nb()</code> for count data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</p></li>
+<li><p><code>nb()</code> for overdispersed count data</p></li>
 <li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> for count data with imperfect detection when the number of trials is known;
-note that the <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code> function must be used to bind the discrete observations and the number
+note that the <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code> function must be used to bind the discrete observations and the discrete number
 of trials</p></li>
+<li><p><code>beta_binomial()</code> as for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> but allows for overdispersion</p></li>
 <li><p><code><a href="mvgam_families.html">nmix()</a></code> for count data with imperfect detection when the number of trials
 is unknown and should be modeled via a State-Space N-Mixture model.
 The latent states are Poisson, capturing the 'true' latent
@@ -264,6 +265,7 @@ example)</p>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>              trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the model file with default mvgam priors</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod_default</span><span class="op">)</span></span></span>
@@ -314,7 +316,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5, upper=1.5&gt;[n_series] ar1;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR2 terms</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5, upper=1.5&gt;[n_series] ar2;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1, upper=1&gt;[n_series] ar2;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend variance parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] sigma;</span>
@@ -414,7 +416,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2                           vector[1] mu_raw;            1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 3               vector&lt;lower=0&gt;[1] sigma_raw;            1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 4 vector&lt;lower=-1.5,upper=1.5&gt;[n_series] ar1;            3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 vector&lt;lower=-1.5,upper=1.5&gt;[n_series] ar2;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     vector&lt;lower=-1,upper=1&gt;[n_series] ar2;            3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6            vector&lt;lower=0&gt;[n_series] sigma;            3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7          vector&lt;lower=0&gt;[n_series] phi_inv;            3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                    param_info                             prior</span>
@@ -426,13 +428,13 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.03);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2   mu_raw ~ normal(0.55, 0.15);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.04);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.48, 0.63);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(0.37, 0.76);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.47);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7   phi_inv ~ normal(0.32, 0.1);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.18);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2   mu_raw ~ normal(0.23, 0.71);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.79);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.57, 0.81);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(0.19, 0.65);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.12);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7 phi_inv ~ normal(-0.61, 0.11);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>
@@ -450,6 +452,7 @@ example)</p>
 <span class="r-in"><span>            trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            priors <span class="op">=</span> <span class="va">test_priors</span>,</span></span>
 <span class="r-in"><span>            run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
 <span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> // Stan model code generated by package mvgam</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> functions {</span>
@@ -498,7 +501,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5, upper=1.5&gt;[n_series] ar1;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR2 terms</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5, upper=1.5&gt;[n_series] ar2;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1, upper=1&gt;[n_series] ar2;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend variance parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] sigma;</span>
@@ -608,6 +611,7 @@ example)</p>
 <span class="r-in"><span>          trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>          priors <span class="op">=</span> <span class="va">brmsprior</span>,</span></span>
 <span class="r-in"><span>          run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
 <span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> // Stan model code generated by package mvgam</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> functions {</span>
@@ -754,6 +758,7 @@ example)</p>
 <span class="r-in"><span>            priors <span class="op">=</span> <span class="va">test_priors</span>,</span></span>
 <span class="r-in"><span>            run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>no match found in model_file for parameter: ar2_bananas</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
 <span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> // Stan model code generated by package mvgam</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> functions {</span>
@@ -802,7 +807,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5, upper=1.5&gt;[n_series] ar1;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR2 terms</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5, upper=1.5&gt;[n_series] ar2;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1, upper=1&gt;[n_series] ar2;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend variance parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] sigma;</span>
@@ -911,6 +916,7 @@ example)</p>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             priors <span class="op">=</span> <span class="va">priors</span>,</span></span>
 <span class="r-in"><span>             run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
 <span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod2</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> // Stan model code generated by package mvgam</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> data {</span>
@@ -1019,6 +1025,7 @@ example)</p>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             priors <span class="op">=</span> <span class="va">brmsprior</span>,</span></span>
 <span class="r-in"><span>             run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
 <span class="r-in"><span><span class="fu"><a href="code.html">code</a></span><span class="op">(</span><span class="va">mod2</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> // Stan model code generated by package mvgam</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> data {</span>

@@ -74,11 +74,12 @@
 #'   \item`student_t()` for real-valued data
 #'   \item`Gamma()` for non-negative real-valued data
 #'   \item`bernoulli()` for binary data
-#'   \item`nb()` for count data
 #'   \item`poisson()` for count data
+#'   \item`nb()` for overdispersed count data
 #'   \item`binomial()` for count data with imperfect detection when the number of trials is known;
-#'   note that the `cbind()` function must be used to bind the discrete observations and the number
+#'   note that the `cbind()` function must be used to bind the discrete observations and the discrete number
 #'   of trials
+#'   \item`beta_binomial()` as for `binomial()` but allows for overdispersion
 #'   \item`nmix()` for count data with imperfect detection when the number of trials
 #'   is unknown and should be modeled via a State-Space N-Mixture model.
 #'   The latent states are Poisson, capturing the 'true' latent
@@ -132,8 +133,8 @@
 #'be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}
 #'@param noncentred \code{logical} experimental feature to use the non-centred parameterisation for autoregressive
 #'dynamic trend models. Only available if there is no `trend_formula` and for certain trend models
-#'(i.e. `RW`, `AR1`, `AR2`, and `AR3`, with or without `drift`). Not available for moving average or correlated
-#'error models
+#'(i.e. `RW`, `AR1`, `AR2`, `AR3`, or `CAR1` with or without `drift`). Not available for moving average or
+#'correlated error models
 #'@param chains \code{integer} specifying the number of parallel chains for the model. Ignored
 #'if `algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')`
 #'@param burnin \code{integer} specifying the number of warmup iterations of the Markov chain to run
@@ -315,9 +316,11 @@
 #'@examples
 #'\donttest{
 #'# Simulate a collection of three time series that have shared seasonal dynamics
-# # and independent AR1 trends, with a Poisson observation process
+#'# and independent AR1 trends, with a Poisson observation process
+#'set.seed(0)
 #'dat <- sim_mvgam(T = 80,
 #'                 n_series = 3,
+#'                 mu = 2,
 #'                 trend_model = AR(p = 1),
 #'                 prop_missing = 0.1,
 #'                 prop_trend = 0.6)
@@ -341,11 +344,12 @@
 #' # View the model code in Stan language
 #' code(mod1)
 #'
-#' # Now fit the model
+#' # Now fit the model, noting that 'noncentred = TRUE' will likely give performance gains
 #' mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
 #'               data = dat$data_train,
 #'               trend_model = AR(),
 #'               family = poisson(),
+#'               noncentred = TRUE,
 #'               chains = 2)
 #'
 #' # Extract the model summary
@@ -1405,6 +1409,7 @@ mvgam = function(formula,
                                      family = family_char,
                                      threads = threads,
                                      trend_model = trend_model,
+                                     use_lv = use_lv,
                                      offset = offset,
                                      drift = drift)
 
@@ -1431,8 +1436,8 @@ mvgam = function(formula,
       vectorised$model_file <- trend_map_setup$model_file
       vectorised$model_data <- trend_map_setup$model_data
 
-      if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
-        param <- c(param, 'sigma')
+      if(trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
+        param <- unique(c(param, 'trend', 'sigma'))
       }
 
       # If trend formula specified, add the predictors for the trend models
@@ -1460,7 +1465,7 @@ mvgam = function(formula,
         vectorised$model_data <- trend_pred_setup$model_data
         trend_mgcv_model <- trend_pred_setup$trend_mgcv_model
 
-        param <- c(param, 'b_trend', 'trend_mus')
+        param <- unique(c(param, 'trend', 'b_trend', 'trend_mus'))
 
         if(trend_pred_setup$trend_smooths_included){
           param <- c(param, 'rho_trend', 'lambda_trend')
@@ -1583,26 +1588,24 @@ mvgam = function(formula,
 
     # Add in any user-specified priors
     if(!missing(priors)){
-      vectorised$model_file <- update_priors(vectorised$model_file, priors,
+      vectorised$model_file <- update_priors(vectorised$model_file,
+                                             priors,
                                              use_stan = TRUE)
     } else {
       priors <- NULL
     }
 
-    # Updates for non-centering of basic trend models (RW, AR1-3)
-    if(noncentred & !add_ma & !add_cor & trend_model %in% c('RW',
-                                                            'AR1',
-                                                            'AR2',
-                                                            'AR3')){
-      if(use_lv){
-        message('Non-centering of trends currently not available for this model')
-        noncentred = FALSE
-      } else {
-        vectorised$model_file <- noncent_trend(model_file = vectorised$model_file,
-                                               trend_model = trend_model,
-                                               drift = drift)
-      }
-    }
+    # Check if non-centering can be used
+    nc_check <- check_noncent(model_file = vectorised$model_file,
+                              noncentred = noncentred,
+                              use_lv = use_lv,
+                              trend_map = trend_map,
+                              add_ma = add_ma,
+                              add_cor = add_cor,
+                              trend_model = trend_model,
+                              drift = drift,
+                              silent = silent)
+    vectorised$model_file <- nc_check$model_file; noncentred <- nc_check$noncentred
 
     # Add any correlated error or moving average processes; this comes after
     # priors as currently there is no option to change priors on these parameters

@@ -74,7 +74,8 @@ plot_mvgam_trend = function(object, series = 1, newdata, data_test,
          call. = FALSE)
   }
 
-  if(attr(object$model_data, 'trend_model') == 'None'){
+  if(attr(object$model_data, 'trend_model') == 'None' &
+     !object$use_lv){
     stop('no trend was estimated in object',
          call. = FALSE)
   }

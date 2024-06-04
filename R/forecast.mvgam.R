@@ -710,7 +710,7 @@ forecast_draws = function(object,
   }
   if(attr(object$model_data, 'trend_model') == 'None' |
      nmix_notrend){
-    if(type == 'trend' & !nmix_notrend){
+    if(type == 'trend' & !nmix_notrend & !use_lv){
       stop('No trend_model was used in this model',
            call. = FALSE)
     }

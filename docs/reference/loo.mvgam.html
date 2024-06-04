@@ -67,16 +67,22 @@ loo::loo()"><!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu">loo</span><span class="op">(</span><span class="va">x</span>, <span class="va">...</span><span class="op">)</span></span>
+<span><span class="fu">loo</span><span class="op">(</span><span class="va">x</span>, incl_dynamics <span class="op">=</span> <span class="cn">TRUE</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu">loo_compare</span><span class="op">(</span><span class="va">x</span>, <span class="va">...</span>, model_names <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">loo_compare</span><span class="op">(</span><span class="va">x</span>, <span class="va">...</span>, model_names <span class="op">=</span> <span class="cn">NULL</span>, incl_dynamics <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>x</dt>
 <dd><p>Object of class <code>mvgam</code></p></dd>
+
+
+<dt>incl_dynamics</dt>
+<dd><p>Logical; indicates if any latent dynamic structures that
+were included in the model should be considered when calculating in-sample
+log-likelihoods. Defaults to <code>TRUE</code></p></dd>
 
 
 <dt>...</dt>

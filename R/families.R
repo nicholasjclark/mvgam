@@ -20,6 +20,8 @@
 #'   \item \code{\link[mgcv]{nb}} with log-link, for count data
 #'   \item \code{\link[brms]{lognormal}} with identity-link, for non-negative real-valued data
 #'   \item \code{\link[brms]{bernoulli}} with logit-link, for binary data
+#'   \item \code{\link[brms]{beta_binomial}} with logit-link, as for `binomial()` but allows
+#'   for overdispersion
 #'   }
 #'
 #'Finally, \code{mvgam} supports the three extended families described here:

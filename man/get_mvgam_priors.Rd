@@ -65,11 +65,12 @@ families are:
 \item\code{student_t()} for real-valued data
 \item\code{Gamma()} for non-negative real-valued data
 \item\code{bernoulli()} for binary data
-\item\code{nb()} for count data
 \item\code{poisson()} for count data
+\item\code{nb()} for overdispersed count data
 \item\code{binomial()} for count data with imperfect detection when the number of trials is known;
-note that the \code{cbind()} function must be used to bind the discrete observations and the number
+note that the \code{cbind()} function must be used to bind the discrete observations and the discrete number
 of trials
+\item\code{beta_binomial()} as for \code{binomial()} but allows for overdispersion
 \item\code{nmix()} for count data with imperfect detection when the number of trials
 is unknown and should be modeled via a State-Space N-Mixture model.
 The latent states are Poisson, capturing the 'true' latent

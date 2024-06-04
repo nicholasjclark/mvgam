@@ -57,6 +57,15 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="1.1.2" id="mvgam-112">mvgam 1.1.2<a class="anchor" aria-label="anchor" href="#mvgam-112"></a></h2>
+<ul><li>Added options for silencing some of the ‘Stan’ compiler and modeling messages using the <code>silent</code> argument in <code><a href="../reference/mvgam.html">mvgam()</a></code>
+</li>
+<li>Added an option to use <code>trend_model = 'None'</code> in State-Space models, increasing flexibility by ensuring the process error evolves as white noise (<a href="https://github.com/nicholasjclark/mvgam/issues/51" class="external-link">#51</a>)</li>
+<li>Added an option to use the non-centred parameterisation for some autoregressive trend models, which speeds up mixing most of the time</li>
+<li>Changed default priors on autoregressive coefficients (AR1, AR2, AR3) to enforce stationarity, which is a much more sensible prior in the majority of contexts</li>
+<li>Fixed a small bug that prevented <code><a href="../reference/conditional_effects.mvgam.html">conditional_effects.mvgam()</a></code> from handling effects with three-way interactions</li>
+</ul></div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="1.1.1" id="mvgam-111">mvgam 1.1.1<a class="anchor" aria-label="anchor" href="#mvgam-111"></a></h2><p class="text-muted">CRAN release: 2024-05-10</p>
 <ul><li>Changed indexing of an internal c++ function after Prof Brian Ripley’s<br>
 email: Dear maintainer, Please see the problems shown on <a href="https://cran.r-project.org/web/checks/check_results_mvgam.html" class="external-link uri">https://cran.r-project.org/web/checks/check_results_mvgam.html</a>. Please correct before 2024-05-22 to safely retain your package on CRAN. The CRAN Team</li>

@@ -228,6 +228,7 @@ get_mvgam_priors = function(formula,
   # If trend_formula supplied, first run get_mvgam_priors for the observation model
   # and then modify the resulting output
   if(!missing(trend_formula)){
+    if(trend_model == 'None') trend_model <- 'RW'
     validate_trend_formula(trend_formula)
     prior_df <- get_mvgam_priors(formula = orig_formula,
                                  data = data,
@@ -403,11 +404,11 @@ get_mvgam_priors = function(formula,
       }
     }
 
-    # No point in latent variables if trend model is None
-    if(trend_model == 'None' & use_lv){
-      use_lv <- FALSE
-      warning('No point in latent variables if trend model is None; changing use_lv to FALSE')
-    }
+    # # No point in latent variables if trend model is None
+    # if(trend_model == 'None' & use_lv){
+    #   use_lv <- FALSE
+    #   warning('No point in latent variables if trend model is None; changing use_lv to FALSE')
+    # }
 
     # Fill in missing observations in data_train so the size of the dataset is correct when
     # building the initial JAGS model
@@ -884,7 +885,7 @@ get_mvgam_priors = function(formula,
     }
 
     if(trend_model == 'CAR1'){
-      trend_df <- data.frame(param_name = c(paste0('vector<lower=0,upper=1.5>[',
+      trend_df <- data.frame(param_name = c(paste0('vector<lower=0,upper=1>[',
                                                    ifelse(use_lv, 'n_lv', 'n_series'),
                                                    '] ar1;'),
                                             paste0('vector<lower=0>[',
@@ -912,7 +913,7 @@ get_mvgam_priors = function(formula,
 
     if(trend_model == 'AR1'){
       if(use_stan){
-        trend_df <- data.frame(param_name = c(paste0('vector<lower=-1.5,upper=1.5>[',
+        trend_df <- data.frame(param_name = c(paste0('vector<lower=-1,upper=1>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),
                                                      '] ar1;'),
                                               paste0('vector<lower=0>[',
@@ -937,7 +938,7 @@ get_mvgam_priors = function(formula,
                                       ');'
                                )))
       } else {
-        trend_df <- data.frame(param_name = c(paste0('vector<lower=-1.5,upper=1.5>[',
+        trend_df <- data.frame(param_name = c(paste0('vector<lower=-1,upper=1>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),
                                                      '] ar1;'),
                                               paste0('vector<lower=0>[',
@@ -967,7 +968,7 @@ get_mvgam_priors = function(formula,
 
     if(trend_model == 'AR2'){
       if(use_stan){
-        trend_df <- data.frame(param_name = c(paste0('vector<lower=-1.5,upper=1.5>[',
+        trend_df <- data.frame(param_name = c(paste0('vector<lower=-1,upper=1>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),
                                                      '] ar1;'),
                                               paste0('vector<lower=-1,upper=1>[',
@@ -1004,7 +1005,7 @@ get_mvgam_priors = function(formula,
                                       ');'
                                )))
       } else {
-        trend_df <- data.frame(param_name = c(paste0('vector<lower=-1.5,upper=1.5>[',
+        trend_df <- data.frame(param_name = c(paste0('vector<lower=-1,upper=1>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),
                                                      '] ar1;'),
                                               paste0('vector<lower=-1,upper=1>[',
@@ -1046,7 +1047,7 @@ get_mvgam_priors = function(formula,
 
     if(trend_model == 'AR3'){
       if(use_stan){
-        trend_df <- data.frame(param_name = c(paste0('vector<lower=-1.5,upper=1.5>[',
+        trend_df <- data.frame(param_name = c(paste0('vector<lower=-1,upper=1>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),
                                                      '] ar1;'),
                                               paste0('vector<lower=-1,upper=1>[',
@@ -1095,7 +1096,7 @@ get_mvgam_priors = function(formula,
                                       ');'
                                )))
       } else {
-        trend_df <- data.frame(param_name = c(paste0('vector<lower=-1.5,upper=1.5>[',
+        trend_df <- data.frame(param_name = c(paste0('vector<lower=-1,upper=1>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),
                                                      '] ar1;'),
                                               paste0('vector<lower=-1,upper=1>[',

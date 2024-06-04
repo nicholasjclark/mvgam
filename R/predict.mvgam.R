@@ -163,7 +163,7 @@ predict.mvgam = function(object,
                             mgcv_model = object$trend_mgcv_model)
 
       # Extract process error estimates
-      if(attr(object$model_data, 'trend_model') %in% c('RW','AR1','AR2','AR3','CAR1')){
+      if(attr(object$model_data, 'trend_model') %in% c('None', 'RW','AR1','AR2','AR3','CAR1')){
         if(object$family == 'nmix'){
           family_pars <- list(sigma_obs = .Machine$double.eps)
         } else {

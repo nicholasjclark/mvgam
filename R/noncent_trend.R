@@ -46,6 +46,21 @@ noncent_trend = function(model_file, trend_model, drift){
     model_file <- readLines(textConnection(model_file), n = -1)
   }
 
+  if(trend_model == 'CAR1'){
+    model_file[grep("vector[num_basis] b;",
+                    model_file, fixed = TRUE)] <-
+      paste0("vector[num_basis] b;\n\n",
+             "// latent trends\n",
+             "matrix[n, n_series] trend;\n",
+             "trend = trend_raw .* rep_matrix(sigma', rows(trend_raw));\n",
+             "for (s in 1 : n_series) {\n",
+             "trend[2 : n, s] +=",
+             drift_text,
+             " pow(ar1[s], to_vector(time_dis[2 : n, s])) .* trend[1 : (n - 1), s];\n",
+             "}\n")
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
+
   if(trend_model == 'AR2'){
     model_file[grep("vector[num_basis] b;",
                     model_file, fixed = TRUE)] <-
@@ -100,4 +115,45 @@ noncent_trend = function(model_file, trend_model, drift){
   model_file <- readLines(textConnection(model_file), n = -1)
   model_file
 
+}
+
+#' @noRd
+check_noncent = function(model_file,
+                         noncentred,
+                         use_lv,
+                         trend_map,
+                         add_ma,
+                         add_cor,
+                         trend_model,
+                         drift,
+                         silent){
+
+  if(!missing(trend_map)) use_lv <- TRUE
+  if(!noncentred & !use_lv & !add_ma & !add_cor & trend_model %in% c('RW',
+                                                          'AR1',
+                                                          'AR2',
+                                                          'AR3',
+                                                          'CAR1')){
+    if(silent <= 1L){
+      message('Your model may benefit from using "noncentred = TRUE"')
+    }
+  }
+
+  if(noncentred & !add_ma & !add_cor & trend_model %in% c('RW',
+                                                          'AR1',
+                                                          'AR2',
+                                                          'AR3',
+                                                          'CAR1')){
+    if(use_lv){
+      message('Non-centering of trends currently not available for this model')
+      noncentred <- FALSE
+    } else {
+      model_file <- noncent_trend(model_file = model_file,
+                                  trend_model = trend_model,
+                                  drift = drift)
+    }
+  }
+
+  return(list(model_file = model_file,
+              noncentred = noncentred))
 }

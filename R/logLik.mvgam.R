@@ -3,8 +3,8 @@
 #'@importFrom parallel setDefaultCluster stopCluster
 #'@param object \code{list} object returned from \code{mvgam}
 #'@param linpreds Optional `matrix` of linear predictor draws to use for calculating
-#'poitwise log-likelihoods
-#'@param newdata Optional `data.frame` of `list` object specifying which series each column
+#'pointwise log-likelihoods
+#'@param newdata Optional `data.frame` or `list` object specifying which series each column
 #'in `linpreds` belongs to. If `linpreds` is supplied, then `newdata` must also be supplied
 #'@param family_pars Optional `list` containing posterior draws of
 #'family-specific parameters (i.e. shape, scale or overdispersion parameters). Required if

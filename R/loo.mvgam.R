@@ -4,6 +4,9 @@
 #' [loo::loo()]
 #' @importFrom loo loo is.loo
 #' @param x Object of class `mvgam`
+#' @param incl_dynamics Logical; indicates if any latent dynamic structures that
+#' were included in the model should be considered when calculating in-sample
+#' log-likelihoods. Defaults to `TRUE`
 #' @param ... Additional arguments for [loo::loo()]
 #' @rdname loo.mvgam
 #' @return  for `loo.mvgam`, an object of class `psis_loo` (see [loo::loo()]
@@ -53,26 +56,23 @@
 #'options(mc.cores = mc.cores.def)
 #'}
 #' @export
-loo.mvgam <- function(x, ...) {
-  x$series_names <- levels(x$obs_data$series)
-  logliks <- logLik(x,
-                    linpreds = predict(x,
-                                       newdata = x$obs_data,
-                                       type = 'link',
-                                       summary = FALSE,
-                                       process_error = TRUE),
-                    newdata = x$obs_data,
-                    family_pars = extract_family_pars(x),
-                    include_forecast = FALSE)
-  logliks <- logliks[,!apply(logliks, 2, function(x) all(!is.finite(x)))]
-
-  # Remove any remaining non-finite values (very occasionally happens with
-  # some observation families)
-  min_noinf = function(x){
-    x <- x[is.finite(x)]
-    min(x)
+loo.mvgam <- function(x, incl_dynamics = TRUE, ...) {
+  if(x$family == 'nmix' | incl_dynamics){
+    logliks <- logLik(x, include_forecast = FALSE)
+  } else {
+    x$series_names <- levels(x$obs_data$series)
+    logliks <- logLik(x,
+                      linpreds = predict(x,
+                                         newdata = x$obs_data,
+                                         type = 'link',
+                                         summary = FALSE,
+                                         process_error = FALSE),
+                      newdata = x$obs_data,
+                      family_pars = extract_family_pars(x),
+                      include_forecast = FALSE)
   }
-  logliks[!is.finite(logliks)] <- min_noinf(logliks)
+
+  logliks <- clean_ll(x, logliks)
   releffs <- loo::relative_eff(exp(logliks),
                                chain_id = sort(rep(1:x$model_output@sim$chains,
                                                    (NROW(logliks) /
@@ -85,15 +85,19 @@ loo.mvgam <- function(x, ...) {
 #' @param ... More \code{mvgam} objects.
 #' @param model_names If `NULL` (the default) will use model names derived
 #' from deparsing the call. Otherwise will use the passed values as model names.
+#' @param incl_dynamics Logical; indicates if any latent dynamic structures that
+#' were included in the model should be considered when calculating in-sample
+#' log-likelihoods. Defaults to `TRUE`
 #' @rdname loo.mvgam
 #' @export
 loo_compare.mvgam <- function(x, ...,
-                              model_names = NULL) {
+                              model_names = NULL,
+                              incl_dynamics = TRUE) {
 
   models <- split_mod_dots(x, ..., model_names = model_names)
   loos <- named_list(names(models))
   for (i in seq_along(models)) {
-    loos[[i]] <- loo(models[[i]])
+    loos[[i]] <- loo(models[[i]], incl_dynamics = incl_dynamics)
   }
   loo_compare(loos)
 }
@@ -142,4 +146,23 @@ named_list = function (names, values = NULL) {
     values <- vector("list", length(names))
   }
   setNames(values, names)
+}
+
+#'@noRd
+clean_ll = function(x, logliks){
+
+  # First remove any columns that are all NA (these had missing observations)
+  logliks <- logliks[,!apply(logliks, 2, function(x) all(!is.finite(x)))]
+
+  # Next resample any remaining non-finite values (occasionally happens with
+  # some observation families)
+  samp_noinf = function(x){
+    x_finite <- x[is.finite(x)]
+    x[!is.finite(x)] <- sample(x_finite, length(x[!is.finite(x)]), replace = TRUE)
+    x
+  }
+  logliks <- apply(logliks, 2, samp_noinf)
+
+  # return
+  logliks
 }

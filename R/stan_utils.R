@@ -1077,13 +1077,21 @@ mcmc_chains = function(object,
 #'\code{Stan}'s `reduce_sum` function and have a slow running model that cannot be sped
 #'up by any other means
 #' @return A `list` containing the updated Stan model and model data
-vectorise_stan_lik = function(model_file, model_data, family = 'poisson',
-                              trend_model = 'None', offset = FALSE,
+vectorise_stan_lik = function(model_file,
+                              model_data,
+                              family = 'poisson',
+                              trend_model = 'None',
+                              use_lv = FALSE,
+                              offset = FALSE,
                               drift = FALSE,
                               threads = 1){
 
   if(family %in% c('binomial', 'beta_binomial', 'bernoulli')){
     family <- 'poisson'
+  }
+
+  if(use_lv & trend_model == 'None'){
+    trend_model <- 'RW'
   }
 
   # Hack for adding VAR1 models
@@ -2260,7 +2268,7 @@ if(trend_model != 'VAR1'){
   model_file <- readLines(textConnection(model_file), n = -1)
 
   # We can estimate the variance parameters if a trend map is supplied
-  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
+  if(trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
     model_file <- model_file[-grep('vector[num_basis] b_raw;',
                                    model_file, fixed = TRUE)]
     model_file[grep("// raw basis coefficients",
@@ -2587,7 +2595,7 @@ add_trend_predictors = function(trend_formula,
                   model_file, fixed = TRUE)] <-
     "// latent states and loading matrix"
 
-  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
+  if(trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
     model_file[grep("// latent factor SD terms",
                     model_file, fixed = TRUE)] <-
       "// latent state SD terms"
@@ -3021,7 +3029,7 @@ add_trend_predictors = function(trend_formula,
              "// trend random effects\n",
              paste(random_param_lines, collapse = '\n'))
 
-    if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
+    if(trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
       model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);", model_file,
                       fixed = TRUE)] <- paste0(
                         "sigma_raw_trend ~ exponential(0.5);\n",
@@ -3071,6 +3079,20 @@ add_trend_predictors = function(trend_formula,
   model_file <- readLines(textConnection(model_file), n = -1)
 
   #### Trend model specific updates ####
+  if(trend_model == 'None'){
+    model_file <- model_file[-c(grep("for(j in 1:n_lv){", model_file, fixed = TRUE):
+                                  (grep("for(j in 1:n_lv){", model_file, fixed = TRUE) + 2))]
+
+      model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);",
+                      model_file, fixed = TRUE)] <-
+        paste0("for(j in 1:n_lv){\n",
+               "for(i in 1:n){\n",
+               "LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]], sigma[j]);\n",
+               "}\n}")
+
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
+
   if(trend_model == 'RW'){
     model_file <- model_file[-c(grep("for(j in 1:n_lv){", model_file, fixed = TRUE):
                                   (grep("for(j in 1:n_lv){", model_file, fixed = TRUE) + 2))]

@@ -207,6 +207,26 @@ test_that("JAGS setups should work", {
   expect_true(inherits(mod, 'mvgam_prefit'))
 })
 
+test_that("trend = 'None' works for State Space", {
+  mod <- mvgam(y ~ s(series, bs = 're'),
+               trend_formula = ~ s(season, bs = 'cc', k = 8) +
+                 s(time, bs = 'moi', k = 8),
+               trend_model = 'None',
+               data = gaus_data$data_train,
+               newdata = gaus_data$data_test,
+               family = gaussian(),
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+
+  expect_true(any(grepl(trimws("LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]], sigma[j]);"),
+                        trimws(mod$model_file),
+                        fixed = TRUE)))
+
+  expect_true(any(grepl(trimws("trend[i, s] = dot_product(Z[s,  : ], LV[i,  : ]);"),
+                        trimws(mod$model_file),
+                        fixed = TRUE)))
+})
+
 test_that("noncentring working properly for a range of models", {
   # First check messages
   expect_message(mvgam(y ~ s(series, bs = 're') +

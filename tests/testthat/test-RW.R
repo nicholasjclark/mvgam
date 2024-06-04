@@ -178,7 +178,7 @@ test_that("CAR1 sets up correctly", {
   expect_true(exists('time_dis', mod$model_data))
   expect_true(exists('index..time..index', mod$obs_data))
   expect_true(attr(mod$model_data, 'trend_model') == 'CAR1')
-  expect_true(any(grepl('vector<lower=0,upper=1.5>[n_series]ar1;',
+  expect_true(any(grepl('vector<lower=0,upper=1>[n_series]ar1;',
                         gsub(' ', '', mod$model_file), fixed = TRUE)))
 
   # Drift terms allowed

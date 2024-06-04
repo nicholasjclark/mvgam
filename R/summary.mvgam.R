@@ -38,6 +38,10 @@ summary.mvgam = function(object,
                          smooth_test = TRUE,
                          digits = 2, ...){
 
+#### Some adjustments for cleaner summaries ####
+  if(attr(object$model_data, 'trend_model') == 'None' &
+     object$use_lv & object$family != 'nmix') attr(object$model_data, 'trend_model') <- 'RW'
+
 #### Smooth tests ####
   if(smooth_test){
     if(inherits(object$trend_model, 'mvgam_trend')){
@@ -328,7 +332,10 @@ if(object$use_lv){
         }
         print(suppressWarnings(mcmc_summary(object$model_output, c('drift', 'theta'),
                            digits = digits,
-                           variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder')))[,c(3:7)])
+                           variational = object$algorithm %in% c('fullrank',
+                                                                 'meanfield',
+                                                                 'laplace',
+                                                                 'pathfinder')))[,c(3:7)])
       } else {
         if(!is.null(object$trend_call)){
           if(inherits(object$trend_model, 'mvgam_trend')){
@@ -336,7 +343,7 @@ if(object$use_lv){
           } else {
             trend_model <- object$trend_model
           }
-          if(trend_model == 'None'){
+          if(trend_model == 'None' & object$family == 'nmix'){
 
           } else {
             cat("\nProcess error parameter estimates:\n")

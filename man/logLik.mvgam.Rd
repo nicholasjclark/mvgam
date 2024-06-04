@@ -10,9 +10,9 @@
 \item{object}{\code{list} object returned from \code{mvgam}}
 
 \item{linpreds}{Optional \code{matrix} of linear predictor draws to use for calculating
-poitwise log-likelihoods}
+pointwise log-likelihoods}
 
-\item{newdata}{Optional \code{data.frame} of \code{list} object specifying which series each column
+\item{newdata}{Optional \code{data.frame} or \code{list} object specifying which series each column
 in \code{linpreds} belongs to. If \code{linpreds} is supplied, then \code{newdata} must also be supplied}
 
 \item{family_pars}{Optional \code{list} containing posterior draws of
