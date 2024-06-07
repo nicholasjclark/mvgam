@@ -458,7 +458,7 @@ add_MaCor = function(model_file,
           }
           model_file[insert_line] <-
             paste0(model_file[insert_line],
-                   'for(j in 1:n_series){\n',
+                   '\nfor(j in 1:n_series){\n',
                    'trend[1, j] = ',
                    if(drift){ 'drift[j] + '} else {NULL},
                    'error[1, j];\n',
@@ -487,7 +487,7 @@ add_MaCor = function(model_file,
           }
           model_file[insert_line] <-
             paste0(model_file[insert_line],
-                   'for(j in 1:n_series){\n',
+                   '\nfor(j in 1:n_series){\n',
                    'trend[1, j] = ',
                    if(drift){ 'drift[j] + '} else {NULL},
                    'error[1, j];\n',
@@ -521,7 +521,7 @@ add_MaCor = function(model_file,
           }
           model_file[insert_line] <-
             paste0(model_file[insert_line],
-                   'for(j in 1:n_series){\n',
+                   '\nfor(j in 1:n_series){\n',
                    'trend[1, j] = ',
                    if(drift){ 'drift[j] + '} else {NULL},
                    'error[1, j];\n',

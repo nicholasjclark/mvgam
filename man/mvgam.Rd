@@ -186,8 +186,8 @@ predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift
 be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}}
 
 \item{noncentred}{\code{logical} experimental feature to use the non-centred parameterisation for autoregressive
-dynamic trend models. Only available if there is no \code{trend_formula} and for certain trend models
-(i.e. \code{RW}, \code{AR1}, \code{AR2}, \code{AR3}, or \code{CAR1} with or without \code{drift}). Not available for moving average or
+dynamic trend models. Only available for certain trend models
+(i.e. \code{RW}, \code{AR1}, \code{AR2}, \code{AR3}, or \code{CAR1} with or without \code{drift}). Not yet available for moving average or
 correlated error models}
 
 \item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored

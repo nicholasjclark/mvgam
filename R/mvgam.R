@@ -132,8 +132,8 @@
 #'predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift parameters will also likely
 #'be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}
 #'@param noncentred \code{logical} experimental feature to use the non-centred parameterisation for autoregressive
-#'dynamic trend models. Only available if there is no `trend_formula` and for certain trend models
-#'(i.e. `RW`, `AR1`, `AR2`, `AR3`, or `CAR1` with or without `drift`). Not available for moving average or
+#'dynamic trend models. Only available for certain trend models
+#'(i.e. `RW`, `AR1`, `AR2`, `AR3`, or `CAR1` with or without `drift`). Not yet available for moving average or
 #'correlated error models
 #'@param chains \code{integer} specifying the number of parallel chains for the model. Ignored
 #'if `algorithm %in% c('meanfield', 'fullrank', 'pathfinder', 'laplace')`

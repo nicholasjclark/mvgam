@@ -3229,7 +3229,7 @@ add_trend_predictors = function(trend_formula,
                "}\n}")
       model_file <- model_file[-grep("LV[2, 1:n_lv] ~ normal(drift + LV[1, 1:n_lv] * ar1, 0.1);",
                                      model_file, fixed = TRUE)]
-      model_file <- model_file[-grep('LV_raw[3, 1:n_lv] ~ normal(drift + LV_raw[2, 1:n_lv] * ar1 + LV_raw[1, 1:n_lv] * ar2, 0.1);',
+      model_file <- model_file[-grep('LV[3, 1:n_lv] ~ normal(drift + LV[2, 1:n_lv] * ar1 + LV[1, 1:n_lv] * ar2, 0.1);',
                                      model_file, fixed = TRUE)]
     } else {
       model_file[grep("LV[1, 1:n_lv] ~ normal(0, sigma);",
@@ -3243,7 +3243,7 @@ add_trend_predictors = function(trend_formula,
                "}\n}")
       model_file <- model_file[-grep("LV[2, 1:n_lv] ~ normal(LV[1, 1:n_lv] * ar1, 0.1);",
                                      model_file, fixed = TRUE)]
-      model_file <- model_file[-grep('LV_raw[3, 1:n_lv] ~ normal(LV_raw[2, 1:n_lv] * ar1 + LV_raw[1, 1:n_lv] * ar2, 0.1);',
+      model_file <- model_file[-grep('LV[3, 1:n_lv] ~ normal(LV[2, 1:n_lv] * ar1 + LV[1, 1:n_lv] * ar2, 0.1);',
                                      model_file, fixed = TRUE)]
     }
 
