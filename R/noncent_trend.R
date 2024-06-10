@@ -137,7 +137,7 @@ noncent_lv = function(model_file, trend_model, drift){
 
 
   # Add LV calculations in transformed params
-  if(trend_model == 'RW'){
+  if(trend_model == 'None'){
     model_file[grep("trend_mus = X_trend * b_trend;",
                     model_file, fixed = TRUE)] <-
       paste0("trend_mus = X_trend * b_trend;\n\n",
@@ -145,6 +145,20 @@ noncent_lv = function(model_file, trend_model, drift){
              "for(j in 1:n_lv){\n",
              "for(i in 1:n){\n",
              "LV[i, j] += trend_mus[ytimes_trend[i, j]];\n",
+             "}\n",
+             "}")
+    model_file <- readLines(textConnection(model_file), n = -1)
+  }
+
+  if(trend_model == 'RW'){
+    model_file[grep("trend_mus = X_trend * b_trend;",
+                    model_file, fixed = TRUE)] <-
+      paste0("trend_mus = X_trend * b_trend;\n\n",
+             "LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));\n",
+             "for(j in 1:n_lv){\n",
+             "LV[1, j] += trend_mus[ytimes_trend[1, j]];\n",
+             "for(i in 2:n){\n",
+             "LV[i, j] += trend_mus[ytimes_trend[i, j]] + 1 * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]);\n",
              "}\n",
              "}")
     model_file <- readLines(textConnection(model_file), n = -1)
@@ -212,13 +226,21 @@ noncent_lv = function(model_file, trend_model, drift){
 
   # Remove LV statements from model block and replace with the
   # z scores
-  trend_start <- grep("LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);",
-                      model_file, fixed = TRUE) - 1
-  end_braces <- grep("}",
-                     model_file, fixed = TRUE)
-  p <- function(f,b) function(a) f(a,b)
-  trend_end <- end_braces[Position(p(`==`,1),
-                                   sign(end_braces - trend_start))] + 1
+  if(trend_model == 'None'){
+    trend_start <- grep("LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]], sigma[j]);",
+                        model_file, fixed = TRUE) - 2
+    trend_end <- grep("LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]], sigma[j]);",
+                        model_file, fixed = TRUE) + 2
+  } else {
+    trend_start <- grep("LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);",
+                        model_file, fixed = TRUE) - 1
+    end_braces <- grep("}",
+                       model_file, fixed = TRUE)
+    p <- function(f,b) function(a) f(a,b)
+    trend_end <- end_braces[Position(p(`==`,1),
+                                     sign(end_braces - trend_start))] + 1
+  }
+
   model_file <- model_file[-(trend_start:trend_end)]
 
   model_file[grep("// priors for latent state SD parameters",
@@ -249,6 +271,12 @@ check_noncent = function(model_file,
     trendmap <- FALSE
   }
 
+  if(!noncentred & use_lv & trendmap & trend_model == 'None'){
+    if(silent <= 1L){
+      message('Your model may benefit from using "noncentred = TRUE"')
+    }
+  }
+
   if(!noncentred & !add_ma & !add_cor & trend_model %in% c('RW',
                                                           'AR1',
                                                           'AR2',
@@ -272,7 +300,8 @@ check_noncent = function(model_file,
                                                           'AR1',
                                                           'AR2',
                                                           'AR3',
-                                                          'CAR1')){
+                                                          'CAR1',
+                                                          'None')){
     if(use_lv & trendmap){
       model_file <- noncent_lv(model_file = model_file,
                                trend_model = trend_model,

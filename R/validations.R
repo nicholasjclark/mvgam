@@ -275,7 +275,7 @@ validate_trend_model = function(trend_model, drift = FALSE, noncentred = FALSE){
          call. = FALSE)
   }
 
-  if(!trend_model %in% c('RW','AR1', 'AR2', 'AR3', 'CAR1') & noncentred){
+  if(!trend_model %in% c('None', 'RW','AR1', 'AR2', 'AR3', 'CAR1') & noncentred){
     message('Non-centering of trends currently not available for this model')
   }
 
