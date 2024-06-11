@@ -169,6 +169,9 @@ DGAMs can be useful for working with time series data:
 - <a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/"
   target="_blank">Distributed lags (and hierarchical distributed lags)
   using mgcv and mvgam</a>
+- <a href="https://ecogambler.netlify.app/blog/time-varying-seasonality/"
+  target="_blank">Incorporating time-varying seasonality in forecast
+  models</a>
 
 The package can also be used to generate all necessary data structures,
 initial value functions and modelling code necessary to fit DGAMs using

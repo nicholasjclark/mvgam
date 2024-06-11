@@ -39,6 +39,7 @@ A series of [vignettes cover data formatting, forecasting and several extended c
 * [Ecological Forecasting with Dynamic GAMs; a tutorial and detailed case study](https://www.youtube.com/watch?v=RwllLjgPUmM){target="_blank"}
 * [How to interpret and report nonlinear effects from Generalized Additive Models](https://ecogambler.netlify.app/blog/interpreting-gams/){target="_blank"}
 * [Phylogenetic smoothing using `mgcv`](https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/){target="_blank"}
+* [Incorporating time-varying seasonality in forecast models](https://ecogambler.netlify.app/blog/time-varying-seasonality/){target="_blank"}
   
 ## Installation
 Install the stable version from `CRAN` using: `install.packages('mvgam')`, or install the development version from `GitHub` using:

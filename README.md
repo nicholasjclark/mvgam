@@ -50,6 +50,9 @@ been compiled:
   Generalized Additive Models</a>
 - <a href="https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/"
   target="_blank">Phylogenetic smoothing using <code>mgcv</code></a>
+- <a href="https://ecogambler.netlify.app/blog/time-varying-seasonality/"
+  target="_blank">Incorporating time-varying seasonality in forecast
+  models</a>
 
 ## Installation
 
@@ -231,31 +234,31 @@ summary(lynx_mvgam)
 #> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                2.5%    50% 97.5% Rhat n_eff
-#> (Intercept)   6.300  6.600  6.90 1.00  1254
-#> s(season).1  -0.580 -0.018  0.53 1.00  1272
-#> s(season).2   0.530  1.200  1.80 1.00   890
-#> s(season).3   0.940  1.800  2.50 1.00   831
-#> s(season).4  -0.230  0.500  1.20 1.00   953
-#> s(season).5  -1.300 -0.580  0.29 1.01   693
-#> s(season).6  -1.200 -0.330  0.51 1.00  1114
-#> s(season).7  -0.290  0.590  1.40 1.00  1052
-#> s(season).8  -0.081  0.940  1.80 1.00   732
-#> s(season).9  -0.750 -0.056  0.56 1.00   894
-#> s(season).10 -1.300 -0.860 -0.43 1.00  1110
+#>               2.5%    50% 97.5% Rhat n_eff
+#> (Intercept)   6.20  6.600  6.90    1  1177
+#> s(season).1  -0.55 -0.052  0.47    1  1078
+#> s(season).2   0.54  1.200  1.90    1   943
+#> s(season).3   1.10  1.900  2.60    1   920
+#> s(season).4  -0.11  0.540  1.20    1  1126
+#> s(season).5  -1.30 -0.580  0.14    1   757
+#> s(season).6  -1.10 -0.370  0.44    1  1156
+#> s(season).7  -0.24  0.670  1.50    1  1167
+#> s(season).8   0.12  1.100  1.90    1   630
+#> s(season).9  -0.54  0.050  0.66    1   977
+#> s(season).10 -1.40 -0.940 -0.53    1  1130
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value   
-#> s(season) 9.92     10  34956  0.0035 **
+#> s(season) 9.98     10  38892  0.0012 **
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend AR parameter estimates:
 #>           2.5%  50% 97.5% Rhat n_eff
-#> ar1[1]   0.640 0.97  1.40 1.01   447
-#> ar2[1]   0.067 0.52  0.88 1.00   724
-#> ar3[1]   0.026 0.43  0.92 1.01   380
-#> sigma[1] 0.360 0.46  0.60 1.00   974
+#> ar1[1]   0.610 0.86  0.99    1  1330
+#> ar2[1]   0.055 0.45  0.83    1   496
+#> ar3[1]   0.068 0.45  0.95    1   413
+#> sigma[1] 0.370 0.46  0.58    1   907
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -264,7 +267,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Thu May 30 3:12:02 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Wed Jun 12 9:37:37 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -384,7 +387,7 @@ series (testing and training)
 ``` r
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 #> Out of sample DRPS:
-#> 1972.5119685
+#> 1879.7308065
 ```
 
 <img src="man/figures/README-unnamed-chunk-20-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -548,7 +551,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Thu May 30 3:13:22 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Wed Jun 12 9:38:57 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
