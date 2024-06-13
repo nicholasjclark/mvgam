@@ -432,8 +432,6 @@ get_mvgam_priors = function(formula,
     ss_gam <- try(mvgam_setup(formula = formula,
                               family = family_to_mgcvfam(family),
                               dat = data_train,
-                              drop.unused.levels = FALSE,
-                              maxit = 5,
                               knots = knots),
                   silent = TRUE)
     if(inherits(ss_gam, 'try-error')){

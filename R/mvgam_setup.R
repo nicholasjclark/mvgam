@@ -8,30 +8,31 @@ mvgam_setup <- function(formula,
                         dat = list(),
                         na.action,
                         drop.unused.levels = FALSE,
-                        maxit = 5) {
+                        maxit = 4) {
 
   if(missing(knots)){
     # Initialise the GAM for a few iterations to ensure it all works without error
     suppressWarnings(mgcv::gam(formula(formula),
                                data = dat,
-                               method = 'REML',
                                family = family,
-                               control = list(maxit = maxit),
+                               control = list(maxit = maxit,
+                                              epsilon = 1,
+                                              newton = list(conv.tol = 1)),
                                drop.unused.levels = FALSE,
                                na.action = na.fail,
                                select = TRUE))
   } else {
     suppressWarnings(mgcv::gam(formula(formula),
                                data = dat,
-                               method = 'REML',
                                family = family,
                                knots = knots,
-                               control = list(maxit = maxit),
+                               control = list(maxit = maxit,
+                                              epsilon = 1,
+                                              newton = list(conv.tol = 1)),
                                drop.unused.levels = FALSE,
                                na.action = na.fail,
                                select = TRUE))
   }
-
 }
 
 #' Generic JAGAM setup function
