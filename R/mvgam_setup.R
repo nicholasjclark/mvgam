@@ -8,7 +8,7 @@ mvgam_setup <- function(formula,
                         dat = list(),
                         na.action,
                         drop.unused.levels = FALSE,
-                        maxit = 4) {
+                        maxit = 5) {
 
   if(missing(knots)){
     # Initialise the GAM for a few iterations to ensure it all works without error
@@ -16,8 +16,8 @@ mvgam_setup <- function(formula,
                                data = dat,
                                family = family,
                                control = list(maxit = maxit,
-                                              epsilon = 1,
-                                              newton = list(conv.tol = 1)),
+                                              epsilon = 5,
+                                              newton = list(conv.tol = 5)),
                                drop.unused.levels = FALSE,
                                na.action = na.fail,
                                select = TRUE))
@@ -27,8 +27,8 @@ mvgam_setup <- function(formula,
                                family = family,
                                knots = knots,
                                control = list(maxit = maxit,
-                                              epsilon = 1,
-                                              newton = list(conv.tol = 1)),
+                                              epsilon = 5,
+                                              newton = list(conv.tol = 5)),
                                drop.unused.levels = FALSE,
                                na.action = na.fail,
                                select = TRUE))

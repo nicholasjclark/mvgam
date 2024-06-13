@@ -9,10 +9,17 @@
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
 #'@param min_t Integer specifying the minimum training time required before making predictions
 #'from the data. Default is either `30`, or whatever training time allows for at least
-#'`10` lfo-cv calculations (i.e. `pmin(max(data$time) - 10, 30)`)
+#'`10` lfo-cv calculations (i.e. `pmin(max(data$time) - 10, 30)`). This value is essentially
+#'arbitrary so it is highly recommended to change it to something that is more suitable to the
+#'data and models being evaluated
 #'@param fc_horizon Integer specifying the number of time steps ahead for evaluating forecasts
 #'@param pareto_k_threshold Proportion specifying the threshold over which the Pareto shape parameter
 #'is considered unstable, triggering a model refit. Default is `0.7`
+#'@param silent Verbosity level between `0` and `2`. If `1` (the default), most of the informational
+#'messages of compiler and sampler are suppressed. If `2`, even more messages are suppressed. The
+#'actual sampling progress is still printed. Set `refresh = 0` to turn this off as well. If using
+#'`backend = "rstan"` you can also set open_progress = FALSE to prevent opening additional
+#'progress bars.
 #'@param ... Ignored
 #'@details Approximate leave-future-out cross-validation uses an expanding training window scheme
 #' to evaluate a model on its forecasting ability. The steps used in this function mirror those laid out
@@ -118,6 +125,7 @@ lfo_cv.mvgam = function(object,
                         min_t,
                         fc_horizon = 1,
                         pareto_k_threshold = 0.7,
+                        silent = 1,
                         ...){
 
   validate_proportional(pareto_k_threshold)
@@ -162,11 +170,16 @@ lfo_cv.mvgam = function(object,
     TRUE
   }
 
+  if(silent < 1L){
+    cat('Approximating elpd for training point', min_t, '...\n')
+  }
+
   fit_past <- update(object,
                     data = data_splits$data_train,
                     newdata = data_splits$data_test,
                     lfo = TRUE,
-                    noncentred = noncentred)
+                    noncentred = noncentred,
+                    silent = silent)
 
   # Calculate log likelihoods of forecast observations for the next
   # fc_horizon ahead observations
@@ -181,9 +194,12 @@ lfo_cv.mvgam = function(object,
   # Iterate over i > min_t
   i_refit <- min_t
   refits <- min_t
-  ks <- NULL
+  ks <- 0
 
   for(i in (min_t + 1):(N - fc_horizon)) {
+    if(silent < 1L){
+      cat('Approximating elpd for training point', i, '...\n')
+    }
 
     # Get log likelihoods of what would be the
     # last training observations for calculating Pareto k values
@@ -217,7 +233,9 @@ lfo_cv.mvgam = function(object,
       fit_past <- update(fit_past,
                          data = data_splits$data_train,
                          newdata = data_splits$data_test,
-                         lfo = TRUE)
+                         lfo = TRUE,
+                         noncentred = noncentred,
+                         silent = silent)
 
       # Calculate ELPD as before
       fc_indices <- which(c(data_splits$data_train$time,
@@ -236,17 +254,17 @@ lfo_cv.mvgam = function(object,
       approx_elpds[i + 1] <- log_sum_exp(lw + sum_rows(loglik_past[,fc_indices]))
     }
   }
-  return(structure(list(elpds = approx_elpds[(min_t + 1):(N - fc_horizon)],
+  return(structure(list(elpds = approx_elpds[(min_t + 1):N],
                         sum_ELPD = sum(approx_elpds, na.rm = TRUE),
                         pareto_ks = ks,
-                        eval_timepoints = (min_t + 1):(N - fc_horizon),
+                        eval_timepoints = (min_t + 1):N,
                         pareto_k_threshold = pareto_k_threshold),
                    class = 'mvgam_lfo'))
 }
 
 #' Plot Pareto-k and ELPD values from a leave-future-out object
 #'
-#' This function takes an object of class `mvgam_lfo` and create several
+#' This function takes an object of class `mvgam_lfo` and creates several
 #' informative diagnostic plots
 #' @importFrom graphics layout axis lines abline polygon points
 #' @param x An object of class `mvgam_lfo`
@@ -254,7 +272,7 @@ lfo_cv.mvgam = function(object,
 #' @return A base `R` plot of Pareto-k and ELPD values over the
 #' evaluation timepoints. For the Pareto-k plot, a dashed red line indicates the
 #' specified threshold chosen for triggering model refits. For the ELPD plot,
-#' a dashed red line indicated the bottom 10% quantile of ELPD values. Points below
+#' a dashed red line indicates the bottom 10% quantile of ELPD values. Points below
 #' this threshold may represent outliers that were more difficult to forecast
 #' @export
 plot.mvgam_lfo = function(x, ...){

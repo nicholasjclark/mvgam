@@ -7,7 +7,15 @@
 \usage{
 lfo_cv(object, ...)
 
-\method{lfo_cv}{mvgam}(object, data, min_t, fc_horizon = 1, pareto_k_threshold = 0.7, ...)
+\method{lfo_cv}{mvgam}(
+  object,
+  data,
+  min_t,
+  fc_horizon = 1,
+  pareto_k_threshold = 0.7,
+  silent = 1,
+  ...
+)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
@@ -22,12 +30,20 @@ Any other variables to be included in the linear predictor of \code{formula} mus
 
 \item{min_t}{Integer specifying the minimum training time required before making predictions
 from the data. Default is either \code{30}, or whatever training time allows for at least
-\code{10} lfo-cv calculations (i.e. \code{pmin(max(data$time) - 10, 30)})}
+\code{10} lfo-cv calculations (i.e. \code{pmin(max(data$time) - 10, 30)}). This value is essentially
+arbitrary so it is highly recommended to change it to something that is more suitable to the
+data and models being evaluated}
 
 \item{fc_horizon}{Integer specifying the number of time steps ahead for evaluating forecasts}
 
 \item{pareto_k_threshold}{Proportion specifying the threshold over which the Pareto shape parameter
 is considered unstable, triggering a model refit. Default is \code{0.7}}
+
+\item{silent}{Verbosity level between \code{0} and \code{2}. If \code{1} (the default), most of the informational
+messages of compiler and sampler are suppressed. If \code{2}, even more messages are suppressed. The
+actual sampling progress is still printed. Set \code{refresh = 0} to turn this off as well. If using
+\code{backend = "rstan"} you can also set open_progress = FALSE to prevent opening additional
+progress bars.}
 }
 \value{
 A \code{list} of class \code{mvgam_lfo} containing the approximate ELPD scores,

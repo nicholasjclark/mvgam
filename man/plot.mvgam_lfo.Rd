@@ -15,10 +15,10 @@
 A base \code{R} plot of Pareto-k and ELPD values over the
 evaluation timepoints. For the Pareto-k plot, a dashed red line indicates the
 specified threshold chosen for triggering model refits. For the ELPD plot,
-a dashed red line indicated the bottom 10\% quantile of ELPD values. Points below
+a dashed red line indicates the bottom 10\% quantile of ELPD values. Points below
 this threshold may represent outliers that were more difficult to forecast
 }
 \description{
-This function takes an object of class \code{mvgam_lfo} and create several
+This function takes an object of class \code{mvgam_lfo} and creates several
 informative diagnostic plots
 }

@@ -1,5 +1,6 @@
 # mvgam 1.1.2
 * Added options for silencing some of the 'Stan' compiler and modeling messages using the `silent` argument in `mvgam()`
+* Improved efficiency of the model initialisation by tweaking parameters of the underlying 'mgcv' `gam` object's convergence criteria, resulting in much faster model setups
 * Added an option to use `trend_model = 'None'` in State-Space models, increasing flexibility by ensuring the process error evolves as white noise (#51)
 * Added an option to use the non-centred parameterisation for some autoregressive trend models,
 which speeds up mixing most of the time
