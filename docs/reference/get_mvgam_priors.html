@@ -313,7 +313,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] phi_inv;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR1 terms</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5, upper=1.5&gt;[n_series] ar1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1, upper=1&gt;[n_series] ar1;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR2 terms</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1, upper=1&gt;[n_series] ar2;</span>
@@ -411,14 +411,14 @@ example)</p>
 <span class="r-in"><span>                              data <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>                              trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span>p <span class="op">=</span> <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">test_priors</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                    param_name param_length</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1               vector&lt;lower=0&gt;[n_sp] lambda;            2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2                           vector[1] mu_raw;            1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3               vector&lt;lower=0&gt;[1] sigma_raw;            1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 vector&lt;lower=-1.5,upper=1.5&gt;[n_series] ar1;            3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5     vector&lt;lower=-1,upper=1&gt;[n_series] ar2;            3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6            vector&lt;lower=0&gt;[n_series] sigma;            3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7          vector&lt;lower=0&gt;[n_series] phi_inv;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                param_name param_length</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1           vector&lt;lower=0&gt;[n_sp] lambda;            2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2                       vector[1] mu_raw;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3           vector&lt;lower=0&gt;[1] sigma_raw;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 vector&lt;lower=-1,upper=1&gt;[n_series] ar1;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 vector&lt;lower=-1,upper=1&gt;[n_series] ar2;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6        vector&lt;lower=0&gt;[n_series] sigma;            3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7      vector&lt;lower=0&gt;[n_series] phi_inv;            3</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                    param_info                             prior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1 s(season) smooth parameters           lambda ~ normal(5, 30);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2          s(series) pop mean            mu_raw ~ std_normal();</span>
@@ -428,13 +428,13 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.18);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2   mu_raw ~ normal(0.23, 0.71);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.79);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.57, 0.81);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(0.19, 0.65);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.12);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7 phi_inv ~ normal(-0.61, 0.11);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.71);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2   mu_raw ~ normal(-0.27, 0.7);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.72);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.08, 0.45);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(-0.2, 0.35);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.17);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.73, 0.69);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>
@@ -498,7 +498,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] phi_inv;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR1 terms</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5, upper=1.5&gt;[n_series] ar1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1, upper=1&gt;[n_series] ar1;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR2 terms</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1, upper=1&gt;[n_series] ar2;</span>
@@ -804,7 +804,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] phi_inv;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR1 terms</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5, upper=1.5&gt;[n_series] ar1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1, upper=1&gt;[n_series] ar1;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR2 terms</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1, upper=1&gt;[n_series] ar2;</span>
@@ -939,7 +939,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] b_raw;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR1 terms</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5, upper=1.5&gt;[n_series] ar1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1, upper=1&gt;[n_series] ar1;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend variance parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] sigma;</span>
@@ -1048,7 +1048,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector[num_basis] b_raw;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend AR1 terms</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1.5, upper=1.5&gt;[n_series] ar1;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=-1, upper=1&gt;[n_series] ar1;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   // latent trend variance parameters</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   vector&lt;lower=0&gt;[n_series] sigma;</span>

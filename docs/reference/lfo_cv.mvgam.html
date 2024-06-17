@@ -66,7 +66,15 @@
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">lfo_cv</span><span class="op">(</span><span class="va">object</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu">lfo_cv</span><span class="op">(</span><span class="va">object</span>, <span class="va">data</span>, <span class="va">min_t</span>, fc_horizon <span class="op">=</span> <span class="fl">1</span>, pareto_k_threshold <span class="op">=</span> <span class="fl">0.7</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">lfo_cv</span><span class="op">(</span></span>
+<span>  <span class="va">object</span>,</span>
+<span>  <span class="va">data</span>,</span>
+<span>  <span class="va">min_t</span>,</span>
+<span>  fc_horizon <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  pareto_k_threshold <span class="op">=</span> <span class="fl">0.7</span>,</span>
+<span>  silent <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  <span class="va">...</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -90,7 +98,9 @@ Any other variables to be included in the linear predictor of <code>formula</cod
 <dt>min_t</dt>
 <dd><p>Integer specifying the minimum training time required before making predictions
 from the data. Default is either <code>30</code>, or whatever training time allows for at least
-<code>10</code> lfo-cv calculations (i.e. <code>pmin(max(data$time) - 10, 30)</code>)</p></dd>
+<code>10</code> lfo-cv calculations (i.e. <code>pmin(max(data$time) - 10, 30)</code>). This value is essentially
+arbitrary so it is highly recommended to change it to something that is more suitable to the
+data and models being evaluated</p></dd>
 
 
 <dt>fc_horizon</dt>
@@ -100,6 +110,14 @@ from the data. Default is either <code>30</code>, or whatever training time allo
 <dt>pareto_k_threshold</dt>
 <dd><p>Proportion specifying the threshold over which the Pareto shape parameter
 is considered unstable, triggering a model refit. Default is <code>0.7</code></p></dd>
+
+
+<dt>silent</dt>
+<dd><p>Verbosity level between <code>0</code> and <code>2</code>. If <code>1</code> (the default), most of the informational
+messages of compiler and sampler are suppressed. If <code>2</code>, even more messages are suppressed. The
+actual sampling progress is still printed. Set <code>refresh = 0</code> to turn this off as well. If using
+<code>backend = "rstan"</code> you can also set open_progress = FALSE to prevent opening additional
+progress bars.</p></dd>
 
 </dl></div>
     <div class="section level2">

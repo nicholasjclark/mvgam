@@ -104,6 +104,34 @@ from deparsing the call. Otherwise will use the passed values as model names.</p
 <p>for details). For <code>loo_compare.mvgam</code>, an object of class <code>compare.loo</code> (
 <code><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo::loo_compare()</a></code> for details)</p>
     </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>When comparing two (or more) fitted <code>mvgam</code> models, we can estimate the
+difference in their in-sample predictive accuracies using the Expcted Log Predictive
+Density (ELPD). This metric can be approximated using Pareto Smoothed Importance Sampling, which
+is a method to re-weight posterior draws to approximate what predictions the models might have
+made for a given datapoint had that datapoint not been included in the original model fit (i.e.
+if we were to run a leave-one-out cross-validation and then made a prediction for the held-out
+datapoint). See details from <code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo::loo()</a></code> and <code><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo::loo_compare()</a></code> for further information
+on how this importance sampling works.</p>
+<p>There are two fundamentally different ways to calculate ELPD from <code>mvgam</code> models that included
+dynamic latent processes (i.e. "trend_models"). The first is to use the predictions that were
+generated when estimating these latent processes by setting <code>incl_dynamics = TRUE</code>. This works
+in the same way that setting <code>incl_autocor = TRUE</code> in <code><a href="https://paul-buerkner.github.io/brms/reference/prepare_predictions.html" class="external-link">brms::prepare_predictions()</a></code>. But it may
+also be desirable to compare predictions by considering that the dynamic processes are nuisance
+parameters that we'd wish to account for when making inferences about other processes in the
+model (i.e. the linear predictor effects). Setting <code>incl_dynamics = FALSE</code> will accomplish
+this by ignoring the dynamic processes when making predictions. This option matches up with
+what <code>mvgam</code>'s prediction functions return (i.e. <code><a href="predict.mvgam.html">predict.mvgam</a></code>, <code><a href="ppc.mvgam.html">ppc</a></code>,
+<code><a href="pp_check.mvgam.html">pp_check.mvgam</a></code>, <code><a href="posterior_epred.mvgam.html">posterior_epred.mvgam</a></code>) and will be far less forgiving
+of models that may be overfitting the training data due to highly flexible dynamic processes
+(such as Random Walks, for example). However setting <code>incl_dynamics = FALSE</code> will often result
+in less stable Pareto k diagnostics for models with dynamic trends, making ELPD comparisons
+difficult and unstable. It is therefore recommended to generally stick with
+<code>incl_dynamics = TRUE</code> when comparing models based on in-sample fits, and then to perhaps use
+forecast evaluations for further scrutiny of models (see for example <code><a href="forecast.mvgam.html">forecast.mvgam</a></code>,
+<code><a href="score.mvgam_forecast.html">score.mvgam_forecast</a></code> and <code><a href="lfo_cv.mvgam.html">lfo_cv</a></code>)</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
@@ -123,7 +151,7 @@ from deparsing the call. Otherwise will use the passed values as model names.</p
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the model and calculate LOO</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod1</span>, type <span class="op">=</span> <span class="st">'smooths'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">mc.cores.def</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">'mc.cores'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>mc.cores <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">loo</span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
@@ -134,20 +162,36 @@ from deparsing the call. Otherwise will use the passed values as model names.</p
 <span class="r-in"><span>              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'fs'</span>,</span></span>
 <span class="r-in"><span>              xt <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod2</span>, type <span class="op">=</span> <span class="st">'smooths'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod2</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">loo</span><span class="op">(</span><span class="va">mod2</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now add AR1 dynamic errors to mod2</span></span></span>
 <span class="r-in"><span><span class="va">mod3</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">mod2</span>,</span></span>
 <span class="r-in"><span>              trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod3</span>, type <span class="op">=</span> <span class="st">'smooths'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod3</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod3</span>, type <span class="op">=</span> <span class="st">'trend'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">loo</span><span class="op">(</span><span class="va">mod3</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compare models using LOO</span></span></span>
 <span class="r-in"><span><span class="fu">loo_compare</span><span class="op">(</span><span class="va">mod1</span>, <span class="va">mod2</span>, <span class="va">mod3</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>mc.cores <span class="op">=</span> <span class="va">mc.cores.def</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Compare forecast abilities using an expanding training window and</span></span></span>
+<span class="r-in"><span><span class="co"># forecasting ahead 1 timepoint from each window; the first window by includes</span></span></span>
+<span class="r-in"><span><span class="co"># the first 92 timepoints (of the 100 that were simulated)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">mod2</span><span class="op">$</span><span class="va">obs_data</span><span class="op">$</span><span class="va">time</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">lfo_mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="lfo_cv.mvgam.html">lfo_cv</a></span><span class="op">(</span><span class="va">mod2</span>, min_t <span class="op">=</span> <span class="fl">92</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">lfo_mod3</span> <span class="op">&lt;-</span> <span class="fu"><a href="lfo_cv.mvgam.html">lfo_cv</a></span><span class="op">(</span><span class="va">mod3</span>, min_t <span class="op">=</span> <span class="fl">92</span><span class="op">)</span></span></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Take the difference in forecast ELPDs; a model with higher ELPD is preferred,</span></span></span>
+<span class="r-in"><span><span class="co"># so negative values here indicate that mod3 gave better forecasts for a particular</span></span></span>
+<span class="r-in"><span><span class="co"># out of sample timepoint</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span>y <span class="op">=</span> <span class="va">lfo_mod2</span><span class="op">$</span><span class="va">elpds</span> <span class="op">-</span> <span class="va">lfo_mod3</span><span class="op">$</span><span class="va">elpds</span>,</span></span>
+<span class="r-in"><span>    x <span class="op">=</span> <span class="va">lfo_mod2</span><span class="op">$</span><span class="va">eval_timepoints</span>, pch <span class="op">=</span> <span class="fl">16</span>,</span></span>
+<span class="r-in"><span>    ylab <span class="op">=</span> <span class="st">'ELPD_mod2 - ELPD_mod3'</span>,</span></span>
+<span class="r-in"><span>    xlab <span class="op">=</span> <span class="st">'Evaluation timepoint'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span>h <span class="op">=</span> <span class="fl">0</span>, lty <span class="op">=</span> <span class="st">'dashed'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 </code></pre></div>
     </div>

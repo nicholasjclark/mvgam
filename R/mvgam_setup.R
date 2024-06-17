@@ -233,7 +233,7 @@ init_gam <- function(formula,
   dl <- eval(inp, data, parent.frame())
   if (!control$keepData) { rm(data)} ## save space
   names(dl) <- vars ## list of all variables needed
-  var.summary <- mgcv:::variable.summary(gp$pf,dl,nrow(mf)) ## summarize the input data
+  var.summary <- variable_summary(gp$pf,dl,nrow(mf)) ## summarize the input data
   rm(dl)
 
   G <- gam_setup(gp,pterms=pterms,
@@ -244,7 +244,7 @@ init_gam <- function(formula,
   G$model <- mf;G$terms <- terms;G$family <- family;G$call <- cl
   G$var.summary <- var.summary
 
-  lambda <- mgcv:::initial.spg(G$X,
+  lambda <- initial_spg(G$X,
                                G$y,
                                G$w,
                                family,
@@ -276,7 +276,7 @@ init_gam <- function(formula,
   return(G)
 }
 
-#'@importFrom mgcv gam.side smoothCon get.var Rrank interpret.gam
+#'@importFrom mgcv gam.side smoothCon get.var Rrank interpret.gam initial.sp
 #'@importFrom stats .getXlevels model.matrix model.offset na.omit
 #'@importFrom methods cbind2
 #' @noRd
@@ -823,4 +823,136 @@ clone_smooth_spec <- function(specb, spec){
     specb$xt <- spec$xt
   }
   specb
+}
+
+#' @noRd
+variable_summary <- function(pf, dl, n){
+  v.n <- length(dl)
+  v.name <- v.name1 <- names(dl)
+  if (v.n) {
+    k <- 0
+    for (i in 1:v.n) if (length(dl[[i]]) >= n) {
+      k <- k + 1
+      v.name[k] <- v.name1[i]
+    }
+    if (k > 0)
+      v.name <- v.name[1:k]
+    else v.name <- rep("", k)
+  }
+  p.name <- all.vars(pf[-2])
+  vs <- list()
+  v.n <- length(v.name)
+  if (v.n > 0)
+    for (i in 1:v.n) {
+      if (v.name[i] %in% p.name)
+        para <- TRUE
+      else para <- FALSE
+      if (para && is.matrix(dl[[v.name[i]]]) && ncol(dl[[v.name[i]]]) >
+          1) {
+        x <- matrix(apply(dl[[v.name[i]]], 2, quantile,
+                          probs = 0.5, type = 3, na.rm = TRUE), 1, ncol(dl[[v.name[i]]]))
+      }
+      else {
+        x <- dl[[v.name[i]]]
+        if (is.character(x))
+          x <- as.factor(x)
+        if (is.factor(x)) {
+          x <- x[!is.na(x)]
+          lx <- levels(x)
+          freq <- tabulate(x)
+          ii <- min((1:length(lx))[freq == max(freq)])
+          x <- factor(lx[ii], levels = lx)
+        }
+        else {
+          x <- as.numeric(x)
+          x <- c(min(x, na.rm = TRUE), as.numeric(quantile(x,
+                                                           probs = 0.5, type = 3, na.rm = TRUE)), max(x,
+                                                                                                      na.rm = TRUE))
+        }
+      }
+      vs[[v.name[i]]] <- x
+    }
+  vs
+}
+
+#' @noRd
+initial_spg <- function(x, y, weights, family, S, rank, off, offset = NULL,
+                         L = NULL, lsp0 = NULL, type = 1, start = NULL, mustart = NULL,
+                         etastart = NULL, E = NULL, ...){
+  if (length(S) == 0)
+    return(rep(0, 0))
+  nobs <- nrow(x)
+  if (is.null(mustart))
+    mukeep <- NULL
+  else mukeep <- mustart
+  eval(family$initialize)
+  if (inherits(family, "general.family")) {
+    lbb <- family$ll(y, x, start, weights, family, offset = offset,
+                     deriv = 1)$lbb
+    pcount <- rep(0, ncol(lbb))
+    for (i in 1:length(S)) {
+      ind <- off[i]:(off[i] + ncol(S[[i]]) - 1)
+      dlb <- -diag(lbb[ind, ind, drop = FALSE])
+      indp <- rowSums(abs(S[[i]])) > max(S[[i]]) * .Machine$double.eps^0.75 &
+        dlb != 0
+      ind <- ind[indp]
+      pcount[ind] <- pcount[ind] + 1
+    }
+    lambda <- rep(0, length(S))
+    for (i in 1:length(S)) {
+      ind <- off[i]:(off[i] + ncol(S[[i]]) - 1)
+      lami <- 1
+      dlb <- abs(diag(lbb[ind, ind, drop = FALSE]))
+      dS <- diag(S[[i]])
+      pc <- pcount[ind]
+      ind <- rowSums(abs(S[[i]])) > max(S[[i]]) * .Machine$double.eps^0.75 &
+        dlb != 0
+      dlb <- dlb[ind]/pc[ind]
+      dS <- dS[ind]
+      rm <- max(length(dS)/rank[i], 1)
+      while (sqrt(mean(dlb/(dlb + lami * dS * rm)) * mean(dlb)/mean(dlb +
+                                                                    lami * dS * rm)) > 0.4) lami <- lami * 5
+      while (sqrt(mean(dlb/(dlb + lami * dS * rm)) * mean(dlb)/mean(dlb +
+                                                                    lami * dS * rm)) < 0.4) lami <- lami/5
+      lambda[i] <- lami
+    }
+  }
+  else {
+    if (is.null(mukeep)) {
+      if (!is.null(start))
+        etastart <- drop(x %*% start)
+      if (!is.null(etastart))
+        mustart <- family$linkinv(etastart)
+    }
+    else mustart <- mukeep
+    if (inherits(family, "extended.family")) {
+      theta <- family$getTheta()
+      Ddo <- family$Dd(y, mustart, theta, weights)
+      mu.eta2 <- family$mu.eta(family$linkfun(mustart))^2
+      w <- 0.5 * as.numeric(Ddo$Dmu2 * mu.eta2)
+      if (any(w < 0))
+        w <- 0.5 * as.numeric(Ddo$EDmu2 * mu.eta2)
+    }
+    else w <- as.numeric(weights * family$mu.eta(family$linkfun(mustart))^2/family$variance(mustart))
+    w <- sqrt(w)
+    if (type == 1) {
+      lambda <- mgcv::initial.sp(w * x, S, off)
+    }
+    else {
+      csX <- colSums((w * x)^2)
+      lambda <- rep(0, length(S))
+      for (i in 1:length(S)) {
+        ind <- off[i]:(off[i] + ncol(S[[i]]) - 1)
+        lambda[i] <- sum(csX[ind])/sqrt(sum(S[[i]]^2))
+      }
+    }
+  }
+  if (!is.null(L)) {
+    lsp <- log(lambda)
+    if (is.null(lsp0))
+      lsp0 <- rep(0, nrow(L))
+    lsp <- as.numeric(coef(lm(lsp ~ L - 1 + offset(lsp0))))
+    lambda <- exp(lsp)
+  }
+  lambda
 }
