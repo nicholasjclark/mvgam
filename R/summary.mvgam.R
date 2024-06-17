@@ -286,7 +286,12 @@ if(!is.null(attr(object$mgcv_model, 'gp_att_table'))){
 }
 
 if(any(!is.na(object$sp_names)) & smooth_test){
-  gam_sig_table <- summary(object$mgcv_model)$s.table[, c(1,2,3,4), drop = FALSE]
+  gam_sig_table <- try(suppressWarnings(summary(object$mgcv_model)$s.table[, c(1,2,3,4), drop = FALSE]), silent = TRUE)
+  if(inherits(gam_sig_table, 'try-error')){
+    object$mgcv_model$R <- NULL
+    gam_sig_table <- suppressWarnings(summary(object$mgcv_model)$s.table[, c(1,2,3,4), drop = FALSE])
+    gam_sig_table[,2] <- unlist(purrr::map(object$mgcv_model$smooth, 'df'), use.names = FALSE)
+  }
   if(!is.null(attr(object$mgcv_model, 'gp_att_table'))){
     gp_names <- unlist(purrr::map(attr(object$mgcv_model,
                                        'gp_att_table'), 'name'))
@@ -713,7 +718,13 @@ if(!is.null(object$trend_call)){
   }
 
   if(any(!is.na(object$trend_sp_names)) & smooth_test){
-    gam_sig_table <- summary(object$trend_mgcv_model)$s.table[, c(1,2,3,4), drop = FALSE]
+
+    gam_sig_table <- try(suppressWarnings(summary(object$trend_mgcv_model)$s.table[, c(1,2,3,4), drop = FALSE]), silent = TRUE)
+    if(inherits(gam_sig_table, 'try-error')){
+      object$trend_mgcv_model$R <- NULL
+      gam_sig_table <- suppressWarnings(summary(object$trend_mgcv_model)$s.table[, c(1,2,3,4), drop = FALSE])
+      gam_sig_table[,2] <- unlist(purrr::map(object$trend_mgcv_model$smooth, 'df'), use.names = FALSE)
+    }
     if(!is.null(attr(object$trend_mgcv_model, 'gp_att_table'))){
       gp_names <- unlist(purrr::map(attr(object$trend_mgcv_model, 'gp_att_table'), 'name'))
       if(all(rownames(gam_sig_table) %in% gsub('gp(', 's(', gp_names, fixed = TRUE))){
