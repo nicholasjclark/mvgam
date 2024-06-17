@@ -276,7 +276,9 @@ init_gam <- function(formula,
   return(G)
 }
 
-#'@importFrom mgcv gam.side smoothCon get.var
+#'@importFrom mgcv gam.side smoothCon get.var Rrank interpret.gam
+#'@importFrom stats .getXlevels model.matrix model.offset na.omit
+#'@importFrom methods cbind2
 #' @noRd
 gam_setup <- function(formula, pterms, data = stop("No data supplied to gam_setup"),
                        knots = NULL, sp = NULL, min.sp = NULL, H = NULL, absorb.cons = TRUE,
@@ -287,7 +289,7 @@ gam_setup <- function(formula, pterms, data = stop("No data supplied to gam_setu
   if (inherits(formula, "split.gam.formula"))
     split <- formula
   else if (inherits(formula, "formula"))
-    split <- interpret.gam(formula)
+    split <- mgcv::interpret.gam(formula)
   else stop("First argument is no sort of formula!")
   if (length(split$smooth.spec) == 0) {
     if (split$pfok == 0)
@@ -488,7 +490,7 @@ gam_setup <- function(formula, pterms, data = stop("No data supplied to gam_setu
     qrx <- qr(Xp, LAPACK = TRUE)
     R <- qr.R(qrx)
     p <- ncol(R)
-    rank <- Rrank(R)
+    rank <- mgcv::Rrank(R)
     QtX <- qr.qty(qrx, X)[1:rank, ]
     if (rank < p) {
       R <- R[1:rank, ]
