@@ -655,7 +655,7 @@ clean_gpnames = function(gp_names){
   gp_names_clean <- gsub("%", "percent", gp_names_clean, fixed = TRUE)
   gp_names_clean <- gsub("[.]+", "_", gp_names_clean, fixed = TRUE)
   gp_names_clean <- gsub("'", "", gp_names_clean, fixed = TRUE)
-  gp_names_clean <- gsub("’", "", gp_names_clean, fixed = TRUE)
+  #gp_names_clean <- gsub("’", "", gp_names_clean, fixed = TRUE)
   gp_names_clean
 }
 

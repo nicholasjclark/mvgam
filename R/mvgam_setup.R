@@ -875,6 +875,7 @@ variable_summary <- function(pf, dl, n){
   vs
 }
 
+#' @importFrom stats lm
 #' @noRd
 initial_spg <- function(x, y, weights, family, S, rank, off, offset = NULL,
                          L = NULL, lsp0 = NULL, type = 1, start = NULL, mustart = NULL,

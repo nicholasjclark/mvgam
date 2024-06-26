@@ -134,7 +134,7 @@ predict.mvgam = function(object,
   # terms is the easiest return type, so evaluate it first
   if(type == 'terms'){
     out <- list()
-    out$obs_effects <- mvgam:::terms_preds(object = object,
+    out$obs_effects <- terms_preds(object = object,
                                    newdata = newdata,
                                    summary = summary,
                                    robust = robust,
