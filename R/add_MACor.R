@@ -13,6 +13,12 @@ add_MaCor = function(model_file,
 
   if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
 
+    if(any(grepl('ytimes_trend', model_file))){
+      remove_trendmus <- FALSE
+    } else {
+      remove_trendmus <- TRUE
+    }
+
     # Update transformed data
       if(any(grepl('vector<lower=0>[n_lv] sigma;',
                    model_file, fixed = TRUE))){
@@ -136,8 +142,15 @@ add_MaCor = function(model_file,
 
       if(add_cor){
         if(trend_model %in% c('AR1', 'RW')){
-          model_file[grep('// derived latent states',
-                          model_file, fixed = TRUE)] <-
+          if(any(grep('// derived latent states',
+                      model_file, fixed = TRUE))){
+            to_modify <- grep('// derived latent states',
+                              model_file, fixed = TRUE)
+          } else {
+            to_modify <- grep('// derived latent trends',
+                              model_file, fixed = TRUE)
+          }
+          model_file[to_modify] <-
             paste0('// derived latent states\n',
                    'LV[1] = ',
                    if(drift){ 'drift + '} else {NULL},
@@ -167,8 +180,15 @@ add_MaCor = function(model_file,
         }
 
         if(trend_model == 'AR2'){
-          model_file[grep('// derived latent states',
-                          model_file, fixed = TRUE)] <-
+          if(any(grep('// derived latent states',
+                      model_file, fixed = TRUE))){
+            to_modify <- grep('// derived latent states',
+                              model_file, fixed = TRUE)
+          } else {
+            to_modify <- grep('// derived latent trends',
+                              model_file, fixed = TRUE)
+          }
+          model_file[to_modify] <-
             paste0('// derived latent states\n',
                    'LV[1] = ',
                    if(drift){ 'drift + '} else {NULL},
@@ -209,10 +229,79 @@ add_MaCor = function(model_file,
                    '}\n')
         }
 
+        if(trend_model == 'AR3'){
+          if(any(grep('// derived latent states',
+                      model_file, fixed = TRUE))){
+            to_modify <- grep('// derived latent states',
+                              model_file, fixed = TRUE)
+          } else {
+            to_modify <- grep('// derived latent trends',
+                              model_file, fixed = TRUE)
+          }
+          model_file[to_modify] <-
+            paste0('// derived latent states\n',
+                   'LV[1] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'trend_mus[ytimes_trend[1, 1:n_lv]] + error[1];\n',
+                   if(add_ma){
+                     paste0('epsilon[1] = error[1];\n',
+                            'epsilon[2] = theta * error[1];\n',
+                            'epsilon[3] = theta * error[2];\n')
+                   } else {
+                     NULL
+                   },
+                   'LV[2] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'trend_mus[ytimes_trend[2, 1:n_lv]] + ',
+                   'ar1 .* (LV[1] - trend_mus[ytimes_trend[1, 1:n_lv]]) + ',
+                   if(add_ma){
+                     'epsilon[2] + error[2];\n'
+                   } else {
+                     'error[2];\n'
+                   },
+                   'LV[3] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'trend_mus[ytimes_trend[3, 1:n_lv]] + ',
+                   'ar1 .* (LV[2] - trend_mus[ytimes_trend[2, 1:n_lv]]) + ',
+                   'ar2 .* (LV[1] - trend_mus[ytimes_trend[1, 1:n_lv]]) + ',
+                   if(add_ma){
+                     'epsilon[3] + error[3];\n'
+                   } else {
+                     'error[3];\n'
+                   },
+                   'for (i in 4:n) {\n',
+                   if(add_ma){
+                     paste0('// lagged error ma process\n',
+                            'epsilon[i] = theta * error[i - 1];\n',
+                            '// full ARMA process\n')
+                   } else {
+                     '// full AR process\n'
+                   },
+                   'LV[i] = ',
+                   if(drift){ 'drift + '} else {NULL},
+                   'trend_mus[ytimes_trend[i, 1:n_lv]] + ',
+                   'ar1 .* (LV[i - 1] - trend_mus[ytimes_trend[i - 1, 1:n_lv]]) + ',
+                   'ar2 .* (LV[i - 2] - trend_mus[ytimes_trend[i - 2, 1:n_lv]]) + ',
+                   'ar3 .* (LV[i - 3] - trend_mus[ytimes_trend[i - 3, 1:n_lv]]) + ',
+                   if(add_ma){
+                     'epsilon[i] + error[i];\n'
+                   } else {
+                     'error[i];\n'
+                   },
+                   '}\n')
+        }
+
       } else {
         if(trend_model %in% c('AR1', 'RW')){
-          model_file[grep('// derived latent states',
-                          model_file, fixed = TRUE)] <-
+          if(any(grep('// derived latent states',
+                      model_file, fixed = TRUE))){
+            to_modify <- grep('// derived latent states',
+                              model_file, fixed = TRUE)
+          } else {
+            to_modify <- grep('// derived latent trends',
+                              model_file, fixed = TRUE)
+          }
+          model_file[to_modify] <-
             paste0('// derived latent states\n',
                    'for(j in 1:n_lv){\n',
                    'LV[1, j] = ',
@@ -233,8 +322,15 @@ add_MaCor = function(model_file,
         }
 
         if(trend_model == 'AR2'){
-          model_file[grep('// derived latent states',
-                          model_file, fixed = TRUE)] <-
+          if(any(grep('// derived latent states',
+                      model_file, fixed = TRUE))){
+            to_modify <- grep('// derived latent states',
+                              model_file, fixed = TRUE)
+          } else {
+            to_modify <- grep('// derived latent trends',
+                              model_file, fixed = TRUE)
+          }
+          model_file[to_modify] <-
             paste0('// derived latent states\n',
                    'for(j in 1:n_lv){\n',
                    'LV[1, j] = ',
@@ -256,6 +352,49 @@ add_MaCor = function(model_file,
                    'trend_mus[ytimes_trend[i, j]] + ',
                    'ar1[j] * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]) + ',
                    'ar2[j] * (LV[i - 2, j] - trend_mus[ytimes_trend[i - 2, j]]) + ',
+                   'epsilon[i, j] + error[i, j];\n',
+                   '}\n}')
+        }
+
+        if(trend_model == 'AR3'){
+          if(any(grep('// derived latent states',
+                      model_file, fixed = TRUE))){
+            to_modify <- grep('// derived latent states',
+                              model_file, fixed = TRUE)
+          } else {
+            to_modify <- grep('// derived latent trends',
+                              model_file, fixed = TRUE)
+          }
+          model_file[to_modify] <-
+            paste0('// derived latent states\n',
+                   'for(j in 1:n_lv){\n',
+                   'LV[1, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'trend_mus[ytimes_trend[1, j]] + error[1, j];\n',
+                   'epsilon[1, j] = error[1, j];\n',
+                   'epsilon[2, j] = theta[j] * error[1, j];\n',
+                   'epsilon[3, j] = theta[j] * error[2, j];\n',
+                   'LV[2, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'trend_mus[ytimes_trend[2, j]] + ',
+                   'ar1[j] * (LV[1, j] - trend_mus[ytimes_trend[1, j]]) + ',
+                   'epsilon[2, j] + error[2, j];\n',
+                   'LV[3, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'trend_mus[ytimes_trend[1, j]] + ',
+                   'ar1[j] * (LV[2, j] - trend_mus[ytimes_trend[2, j]]) + ',
+                   'ar2[j] * (LV[1, j] - trend_mus[ytimes_trend[1, j]]) + ',
+                   'epsilon[3, j] + error[3, j];\n',
+                   'for(i in 4:n){\n',
+                   '// lagged error ma process\n',
+                   'epsilon[i, j] = theta[j] * error[i-1, j];\n',
+                   '// full ARMA process\n',
+                   'LV[i, j] = ',
+                   if(drift){ 'drift[j] + '} else {NULL},
+                   'trend_mus[ytimes_trend[i, j]] + ',
+                   'ar1[j] * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]) + ',
+                   'ar2[j] * (LV[i - 2, j] - trend_mus[ytimes_trend[i - 2, j]]) + ',
+                   'ar3[j] * (LV[i - 3, j] - trend_mus[ytimes_trend[i - 3, j]]) + ',
                    'epsilon[i, j] + error[i, j];\n',
                    '}\n}')
         }
@@ -576,10 +715,20 @@ add_MaCor = function(model_file,
     # Update model block
     if(any(grepl('vector<lower=0>[n_lv] sigma;',
                  model_file, fixed = TRUE))){
-      start <- grep('LV[1, j] ~ normal',
-                    model_file, fixed = TRUE) - 1
-      end <- grep('LV[i, j] ~ normal',
-                  model_file, fixed = TRUE) + 2
+      if(any(grepl('LV[1, j] ~ normal',
+                        model_file, fixed = TRUE))){
+        start <- grep('LV[1, j] ~ normal',
+                      model_file, fixed = TRUE) - 1
+        end <- grep('LV[i, j] ~ normal',
+                    model_file, fixed = TRUE) + 2
+      } else {
+        start <- grep('LV[1, 1:n_lv] ~ normal(',
+                      model_file, fixed = TRUE) - 1
+        first <- grep(':n, j] ~ normal(', model_file, fixed = TRUE)
+        second <- grep('sigma[j]);', model_file, fixed = TRUE)
+        end <- intersect(first, second) + 1
+      }
+
       model_file <- model_file[-c(start:end)]
       model_file[start] <- paste0(
         '// contemporaneous errors\n',
@@ -645,6 +794,36 @@ add_MaCor = function(model_file,
         },
         '\n',
         model_file[start])
+    }
+
+    if(remove_trendmus){
+      model_file <- gsub('trend_mus[ytimes_trend[1, 1:n_lv]] +',
+                         '',
+                         model_file, fixed = TRUE)
+      model_file <- gsub('trend_mus[ytimes_trend[i, 1:n_lv]] + ',
+                         '',
+                         model_file, fixed = TRUE)
+      model_file <- gsub(' - trend_mus[ytimes_trend[i - 1, 1:n_lv]]',
+                         '',
+                         model_file, fixed = TRUE)
+      model_file <- gsub(' - trend_mus[ytimes_trend[1, 1:n_lv]]',
+                         '',
+                         model_file, fixed = TRUE)
+      model_file <- gsub(' - trend_mus[ytimes_trend[i - 2, 1:n_lv]]',
+                         '',
+                         model_file, fixed = TRUE)
+      model_file <- gsub('trend_mus[ytimes_trend[2, 1:n_lv]] + ',
+                         '',
+                         model_file, fixed = TRUE)
+      model_file <- gsub('trend_mus[ytimes_trend[3, 1:n_lv]] + ',
+                         '',
+                         model_file, fixed = TRUE)
+      model_file <- gsub(' - trend_mus[ytimes_trend[2, 1:n_lv]]',
+                         '',
+                         model_file, fixed = TRUE)
+      model_file <- gsub(' - trend_mus[ytimes_trend[i - 3, 1:n_lv]]',
+                         '',
+                         model_file, fixed = TRUE)
     }
     model_file <- readLines(textConnection(model_file), n = -1)
   }

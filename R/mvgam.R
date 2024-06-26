@@ -420,7 +420,7 @@
 #'              chains = 2)
 #'
 #' # The mapping matrix is now supplied as data to the model in the 'Z' element
-#' mod1$model_data$Z
+#' mod$model_data$Z
 #' code(mod)
 #'
 #' # The first two series share an identical latent trend; the third is different
