@@ -29,7 +29,8 @@ GP = function(...){
 make_gp_additions = function(gp_details, data,
                              newdata,
                              model_data, mgcv_model,
-                             gp_terms){
+                             gp_terms,
+                             family = gaussian()){
   # Need to expand combination of GPs if any of the by variables
   # is a factor; mvgam will drop unused levels automatically
   by <- gp_details$by
@@ -99,7 +100,8 @@ make_gp_additions = function(gp_details, data,
                       level = level[x],
                       scale = scale[x],
                       k = term_k,
-                      boundary = boundary[x])
+                      boundary = boundary[x],
+                      family = family_to_brmsfam(family))
   })
 
   # Consolidate Stan data objects and add to model_data
@@ -266,7 +268,7 @@ gp_to_s <- function(formula){
 #' @noRd
 get_gp_attributes = function(formula){
   gp_terms <- rownames(attr(terms(formula), 'factors'))[
-    grep('gp', rownames(attr(terms(formula), 'factors')))]
+    grep('gp(', rownames(attr(terms(formula), 'factors')), fixed = TRUE)]
   gp_attributes <- lapply(seq_along(gp_terms), function(x){
     eval(rlang::parse_expr(gp_terms[x]))
   })
@@ -521,7 +523,8 @@ prep_gp_covariate = function(data,
                              level = NA,
                              scale = TRUE,
                              boundary = 5.0/4,
-                             k = 20){
+                             k = 20,
+                             family = gaussian()){
 
   # Get default gp param priors from a call to brms::get_prior()
   def_gp_prior <- suppressWarnings(brms::get_prior(formula(paste0(response,
@@ -533,7 +536,8 @@ prep_gp_covariate = function(data,
                                                  scale,
                                                  ', c = ',
                                                  boundary,
-                                                 ')')), data))
+                                                 ')')), data = data,
+                                                 family = family))
   def_gp_prior <- def_gp_prior[def_gp_prior$prior != '',]
   def_rho <- def_gp_prior$prior[min(which(def_gp_prior$class == 'lscale'))]
   if(def_rho == ''){
@@ -650,6 +654,8 @@ clean_gpnames = function(gp_names){
   gp_names_clean <- gsub("\"", "", gp_names_clean, fixed = TRUE)
   gp_names_clean <- gsub("%", "percent", gp_names_clean, fixed = TRUE)
   gp_names_clean <- gsub("[.]+", "_", gp_names_clean, fixed = TRUE)
+  gp_names_clean <- gsub("'", "", gp_names_clean, fixed = TRUE)
+  gp_names_clean <- gsub("’", "", gp_names_clean, fixed = TRUE)
   gp_names_clean
 }
 
@@ -729,9 +735,10 @@ add_gp_model_file = function(model_file, model_data, mgcv_model, gp_additions){
   for(i in seq_along(unique(unlist(s_to_remove)))){
     model_data[[paste0('S',
                        unique(unlist(s_to_remove))[i])]] <- NULL
-    model_file <- model_file[-grep(paste0('mgcv smooth penalty matrix S',
-                                          unique(unlist(s_to_remove))[i]),
-                                   model_file, fixed = TRUE)]
+    model_file <- model_file[-grep(paste0('\\bmgcv smooth penalty matrix S',
+                                          unique(unlist(s_to_remove))[i],
+                                          '\\b'),
+                                   model_file)]
   }
 
   # Add alpha, rho and z lines in parameters and model blocks

@@ -515,7 +515,8 @@ get_mvgam_priors = function(formula,
                                         newdata = NULL,
                                         model_data = list(X = t(predict(ss_gam, type = 'lpmatrix'))),
                                         mgcv_model = ss_gam,
-                                        gp_terms = gp_terms)
+                                        gp_terms = gp_terms,
+                                        family = family)
       gp_names <- unlist(purrr::map(gp_additions$gp_att_table, 'name'))
       alpha_priors <- unlist(purrr::map(gp_additions$gp_att_table,
                                         'def_alpha'))

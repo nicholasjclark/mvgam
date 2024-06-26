@@ -756,7 +756,7 @@ mvgam = function(formula,
   if(use_stan){
     def_priors <- adapt_brms_priors(c(make_default_scales(orig_y,
                                                           family),
-                                      make_default_int(orig_y,
+                                              make_default_int(orig_y,
                                                        family = if(add_nmix){
                                                          nmix()
                                                        } else {
@@ -1389,7 +1389,8 @@ mvgam = function(formula,
                                         newdata = data_test,
                                         model_data = stan_objects$model_data,
                                         mgcv_model = ss_gam,
-                                        gp_terms = gp_terms)
+                                        gp_terms = gp_terms,
+                                        family = family)
       stan_objects$model_data <- gp_additions$model_data
       ss_gam <- gp_additions$mgcv_model
 

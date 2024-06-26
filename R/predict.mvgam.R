@@ -134,7 +134,7 @@ predict.mvgam = function(object,
   # terms is the easiest return type, so evaluate it first
   if(type == 'terms'){
     out <- list()
-    out$obs_effects <- terms_preds(object = object,
+    out$obs_effects <- mvgam:::terms_preds(object = object,
                                    newdata = newdata,
                                    summary = summary,
                                    robust = robust,
@@ -467,7 +467,7 @@ terms_preds = function(object, newdata, summary = TRUE,
     effect_names <- colnames(predict(object$mgcv_model,
                                          type = 'terms',
                                          se.fit = FALSE))
-    coef_names <- names(coef(object$trend_mgcv_model))
+    coef_names <- names(coef(object$mgcv_model))
   }
 
   # Contributions considering full uncertainties
