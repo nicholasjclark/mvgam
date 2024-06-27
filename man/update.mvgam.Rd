@@ -20,6 +20,7 @@
   chains,
   burnin,
   samples,
+  threads,
   algorithm,
   lfo = FALSE,
   ...
@@ -142,6 +143,12 @@ if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
 
 \item{samples}{\code{integer} specifying the number of post-warmup iterations of the Markov chain to run for
 sampling the posterior distribution}
+
+\item{threads}{\code{integer} Experimental option to use multithreading for within-chain
+parallelisation in \code{Stan}. We recommend its use only if you are experienced with
+\code{Stan}'s \code{reduce_sum} function and have a slow running model that cannot be sped
+up by any other means. Only available for some families(\code{poisson()}, \code{nb()}, \code{gaussian()}) and
+when using \code{Cmdstan} as the backend}
 
 \item{algorithm}{Character string naming the estimation approach to use.
 Options are \code{"sampling"} for MCMC (the default), \code{"meanfield"} for

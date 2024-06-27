@@ -2022,9 +2022,12 @@ mvgam = function(formula,
 
   #### Return the output as class mvgam ####
   trim_data <- list()
+  attr(model_data, 'trend_model') <- trend_model
   attr(trim_data, 'trend_model') <- trend_model
   attr(model_data, 'noncentred') <- if(noncentred) TRUE else NULL
   attr(trim_data, 'noncentred') <- if(noncentred) TRUE else NULL
+  attr(model_data, 'threads') <- threads
+  attr(trim_data, 'threads') <- threads
 
   output <- structure(list(call = orig_formula,
                            trend_call = if(!missing(trend_formula)){
