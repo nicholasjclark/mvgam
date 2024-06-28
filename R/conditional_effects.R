@@ -200,7 +200,6 @@ conditional_effects.mvgam = function(x,
 
   class(out) <- 'mvgam_conditional_effects'
   return(out)
-
 }
 
 #' @rdname conditional_effects.mvgam

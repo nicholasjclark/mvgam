@@ -1,7 +1,7 @@
 Package: mvgam
 Title: Multivariate (Dynamic) Generalized Additive Models
 Version: 1.1.2
-Date: 2024-05-10
+Date: 2024-06-28
 Authors@R: person("Nicholas J", "Clark", , "nicholas.j.clark1214@gmail.com", role = c("aut", "cre"), comment = c(ORCID = "0000-0001-7131-3301"))
 Description: Fit Bayesian Dynamic Generalized Additive Models to sets of time series. Users can build dynamic nonlinear State-Space models that can incorporate semiparametric effects in observation and process components, using a wide range of observation families. Estimation is performed using Markov Chain Monte Carlo with Hamiltonian Monte Carlo in the software 'Stan'. References: Clark & Wells (2022) <doi:10.1111/2041-210X.13974>.
 URL: https://github.com/nicholasjclark/mvgam, https://nicholasjclark.github.io/mvgam/
@@ -9,10 +9,10 @@ BugReports: https://github.com/nicholasjclark/mvgam/issues
 License: MIT + file LICENSE
 Depends: 
     R (>= 3.6.0),
-    mgcv (>= 1.8-13),
     brms (>= 2.17)
 Imports: 
     methods,
+    mgcv (>= 1.8-13),
     insight (>= 0.19.1),
     marginaleffects (>= 0.16.0),
     Rcpp (>= 0.12.0),
@@ -22,13 +22,11 @@ Imports:
     rstantools (>= 2.1.1),
     bayesplot (>= 1.5.0),
     ggplot2 (>= 2.0.0),
-    matrixStats,
     parallel,
     pbapply,
     mvnfast,
     purrr,
     zoo,
-    scoringRules,
     smooth,
     dplyr,
     magrittr,
@@ -39,6 +37,8 @@ LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
 Suggests: 
+    scoringRules,
+    matrixStats,
     cmdstanr (>= 0.5.0),
     tweedie,
     splines2,

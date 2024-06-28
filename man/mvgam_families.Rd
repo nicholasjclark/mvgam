@@ -4,6 +4,8 @@
 \alias{mvgam_families}
 \alias{tweedie}
 \alias{student_t}
+\alias{betar}
+\alias{nb}
 \alias{nmix}
 \title{Supported mvgam families}
 \usage{
@@ -11,11 +13,17 @@ tweedie(link = "log")
 
 student_t(link = "identity")
 
+betar(...)
+
+nb(...)
+
 nmix(link = "log")
 }
 \arguments{
 \item{link}{a specification for the family link function. At present these cannot
 be changed}
+
+\item{...}{Arguments to be passed to the \pkg{mgcv} version of the associated functions}
 }
 \value{
 Objects of class \code{family}

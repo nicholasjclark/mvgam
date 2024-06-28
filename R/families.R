@@ -3,8 +3,10 @@
 #' @importFrom stats pnorm ppois plogis gaussian poisson Gamma dnbinom rnbinom dnorm dbeta
 #' @importFrom stats binomial rbinom pbinom dbinom qbinom qlogis
 #' @importFrom brms lognormal student bernoulli rstudent_t qstudent_t dstudent_t pstudent_t dbeta_binomial rbeta_binomial pbeta_binomial
+#' @importFrom mgcv betar nb
 #' @param link a specification for the family link function. At present these cannot
 #' be changed
+#' @param ... Arguments to be passed to the \pkg{mgcv} version of the associated functions
 #' @details \code{mvgam} currently supports the following standard observation families:
 #'\itemize{
 #'   \item \code{\link[stats]{gaussian}} with identity link, for real-valued data
@@ -64,6 +66,18 @@ student_t = function(link = 'identity'){
                  linkinv = linktemp$linkinv, mu.eta = linktemp$mu.eta,
                  valideta = linktemp$valideta),
             class = c("extended.family", "family"))
+}
+
+#' @rdname mvgam_families
+#' @export
+betar = function(...){
+  mgcv::betar(...)
+}
+
+#' @rdname mvgam_families
+#' @export
+nb = function(...){
+  mgcv::nb(...)
 }
 
 #' @rdname mvgam_families

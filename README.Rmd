@@ -182,7 +182,7 @@ plot_mvgam_smooth(lynx_mvgam, series = 1,
 
 As for many types of regression models, it is often more useful to plot model effects on the outcome scale. `mvgam` has support for the wonderful `marginaleffects` package, allowing a wide variety of posterior contrasts, averages, conditional and marginal predictions to be calculated and plotted. Below is the conditional effect of season plotted on the outcome scale, for example:
 ```{r, fig.alt = "Using marginaleffects and mvgam to plot GAM smooth functions in R"}
-require(ggplot2)
+require(ggplot2); require(marginaleffects)
 plot_predictions(lynx_mvgam, condition = 'season', points = 0.5) +
   theme_classic()
 ```

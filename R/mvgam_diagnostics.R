@@ -79,6 +79,8 @@ rhat.mvgam <- function(x, pars = NULL, ...) {
 #' @export neff_ratio
 #' @export
 neff_ratio.mvgam <- function(object, pars = NULL, ...) {
+  insight::check_if_installed("matrixStats",
+                              reason = 'to calculate effective sample sizes')
   # bayesplot uses outdated ess code from rstan
   # bayesplot::neff_ratio(object$fit, pars = pars, ...)
   if(is.null(pars)){
@@ -105,6 +107,8 @@ neff_ratio.mvgam <- function(object, pars = NULL, ...) {
 #' @export neff_ratio
 #' @export
 neff_ratio.mvgam <- function(object, pars = NULL, ...) {
+  insight::check_if_installed("matrixStats",
+                              reason = 'to calculate effective sample sizes')
   # bayesplot uses outdated ess code from rstan
   # bayesplot::neff_ratio(object$fit, pars = pars, ...)
   if(is.null(pars)){
