@@ -204,7 +204,7 @@ validate_family = function(family, use_stan = TRUE){
 }
 
 #'@noRd
-validate_family_resrictions = function(response, family){
+validate_family_restrictions = function(response, family){
 
   response <- response[!is.na(response)]
 
@@ -746,7 +746,13 @@ check_nmix = function(family, family_char,
 
 #'@noRd
 validate_threads = function(family_char, threads){
-  if(threads > 1 & !family_char %in% c('poisson', 'negative binomial', 'gaussian')){
+  if(threads > 1 & !family_char %in% c('poisson',
+                                       'negative binomial',
+                                       'gaussian',
+                                       'lognormal',
+                                       'beta',
+                                       'student',
+                                       'Gamma')){
     warning('multithreading not yet supported for this family; setting threads = 1')
     threads <- 1
   }

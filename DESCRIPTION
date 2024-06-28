@@ -10,12 +10,12 @@ License: MIT + file LICENSE
 Depends: 
     R (>= 3.6.0),
     mgcv (>= 1.8-13),
-    Rcpp (>= 0.12.0),
-    brms (>= 2.17),
-    marginaleffects,
-    insight (>= 0.19.1),
-    methods
+    brms (>= 2.17)
 Imports: 
+    methods,
+    insight (>= 0.19.1),
+    marginaleffects (>= 0.16.0),
+    Rcpp (>= 0.12.0),
     rstan (>= 2.29.0),
     posterior (>= 1.0.0),
     loo (>= 2.3.1),

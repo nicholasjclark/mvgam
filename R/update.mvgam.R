@@ -59,6 +59,7 @@ update.mvgam = function(object,
                         chains,
                         burnin,
                         samples,
+                        threads,
                         algorithm,
                         lfo = FALSE,
                         ...){
@@ -74,6 +75,11 @@ update.mvgam = function(object,
 
   if(missing(samples)){
     samples <- object$model_output@sim$iter - burnin
+  }
+
+  if(missing(threads)){
+    threads <- attr(object$model_data, 'threads')
+    if(is.null(threads)) threads <- 1
   }
 
   if(missing(algorithm)){
@@ -192,6 +198,7 @@ update.mvgam = function(object,
                          burnin = burnin,
                          samples = samples,
                          algorithm = algorithm,
+                         threads = threads,
                          ...)
   } else {
     updated_mod <- mvgam(formula = formula,
@@ -212,6 +219,7 @@ update.mvgam = function(object,
                          burnin = burnin,
                          samples = samples,
                          algorithm = algorithm,
+                         threads = threads,
                          ...)
   }
 

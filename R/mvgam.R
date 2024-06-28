@@ -383,6 +383,7 @@
 #' plot(mod1, type = 'smooths', realisations = TRUE)
 #'
 #' # Plot conditional response predictions using marginaleffects
+#' library(marginaleffects)
 #' conditional_effects(mod1)
 #' plot_predictions(mod1, condition = 'season', points = 0.5)
 #'
@@ -736,7 +737,7 @@ mvgam = function(formula,
   # Some general family-level restrictions can now be checked
   orig_y <- data_train$y
   if(any(!is.na(orig_y))){
-    validate_family_resrictions(response = orig_y, family = family)
+    validate_family_restrictions(response = orig_y, family = family)
   }
 
   # Fill in missing observations in data_train so the size of the dataset is correct when
@@ -2022,9 +2023,12 @@ mvgam = function(formula,
 
   #### Return the output as class mvgam ####
   trim_data <- list()
+  attr(model_data, 'trend_model') <- trend_model
   attr(trim_data, 'trend_model') <- trend_model
   attr(model_data, 'noncentred') <- if(noncentred) TRUE else NULL
   attr(trim_data, 'noncentred') <- if(noncentred) TRUE else NULL
+  attr(model_data, 'threads') <- threads
+  attr(trim_data, 'threads') <- threads
 
   output <- structure(list(call = orig_formula,
                            trend_call = if(!missing(trend_formula)){

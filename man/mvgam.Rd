@@ -466,6 +466,7 @@ plot(mod1, type = 'smooths', residuals = TRUE)
 plot(mod1, type = 'smooths', realisations = TRUE)
 
 # Plot conditional response predictions using marginaleffects
+library(marginaleffects)
 conditional_effects(mod1)
 plot_predictions(mod1, condition = 'season', points = 0.5)
 

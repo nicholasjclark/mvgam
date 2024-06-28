@@ -424,7 +424,7 @@ get_mvgam_priors = function(formula,
     data_train[[out_name]] <- replace_nas(data_train[[out_name]])
 
     # Some general family-level restrictions can now be checked
-    validate_family_resrictions(response = data_train[[out_name]],
+    validate_family_restrictions(response = data_train[[out_name]],
                                 family = family)
 
     # Use a small fit from mgcv to extract relevant information on smooths included

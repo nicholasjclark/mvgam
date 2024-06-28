@@ -46,25 +46,25 @@ test_that("variable extraction works correctly", {
                                  'rho_gp', regex = TRUE),
                        'matrix'))
   expect_true(inherits(as_draws(mvgam:::mvgam_example5,
-                                 'rho_gp', regex = TRUE),
+                                'rho_gp', regex = TRUE),
                        'draws'))
   expect_true(inherits(as_draws(mvgam:::mvgam_example1,
                                 'obs_params', regex = TRUE),
                        'draws'))
   expect_true(inherits(as_draws_df(mvgam:::mvgam_example1,
-                                'obs_params', regex = TRUE),
+                                   'obs_params', regex = TRUE),
                        'draws'))
   expect_true(inherits(as_draws_matrix(mvgam:::mvgam_example4,
-                                   'obs_params'),
+                                       'obs_params'),
                        'draws'))
   expect_true(inherits(as_draws_matrix(mvgam:::mvgam_example4,
                                        'trend_params'),
                        'draws'))
   expect_true(inherits(as_draws_list(mvgam:::mvgam_example4,
-                                       'betas'),
+                                     'betas'),
                        'draws'))
   expect_true(inherits(as_draws_rvars(mvgam:::mvgam_example4,
-                                     'trend_betas'),
+                                      'trend_betas'),
                        'draws'))
 })
 
@@ -112,9 +112,9 @@ test_that("predict() works correctly", {
                            process_error = TRUE)))
 
   expect_equal(dim(posterior_linpred(mvgam:::mvgam_example1, type = 'expected',
-                           process_error = FALSE)),
+                                     process_error = FALSE)),
                dim(posterior_linpred(mvgam:::mvgam_example2, type = 'expected',
-                           process_error = FALSE)))
+                                     process_error = FALSE)))
 
   expect_equal(dim(posterior_linpred(mvgam:::mvgam_example1, type = 'expected',
                                      process_error = FALSE,
@@ -129,8 +129,8 @@ test_that("predict() works correctly", {
                            process_error = FALSE)))
 
   expect_equal(NROW(predict(mvgam:::mvgam_example1,
-                           newdata = mvgam:::mvgam_examp_dat$data_test,
-                           process_error = FALSE)),
+                            newdata = mvgam:::mvgam_examp_dat$data_test,
+                            process_error = FALSE)),
                NROW(mvgam:::mvgam_examp_dat$data_test))
   expect_equal(NROW(predict(mvgam:::mvgam_example5,
                             newdata = mvgam:::mvgam_examp_dat$data_test,
@@ -173,42 +173,42 @@ test_that("mcmc_plot() works correctly", {
 })
 
 test_that("marginaleffects works correctly", {
-  expect_ggplot(plot_slopes(mvgam:::mvgam_example1,
-                            variables = 'season',
-                            condition = 'season',
-                            type = 'link'))
-  expect_ggplot(plot_slopes(mvgam:::mvgam_example2,
-                            variables = 'season',
-                            condition = 'season',
-                            type = 'link'))
-  expect_ggplot(plot_slopes(mvgam:::mvgam_example3,
-                            variables = 'season',
-                            condition = 'season',
-                            type = 'link'))
-  expect_ggplot(plot_slopes(mvgam:::mvgam_example4,
-                            variables = 'season',
-                            condition = 'season',
-                            type = 'link'))
-  expect_ggplot(plot_slopes(mvgam:::mvgam_example5,
-                            variables = 'season',
-                            condition = 'season',
-                            type = 'link'))
+  expect_ggplot(marginaleffects::plot_slopes(mvgam:::mvgam_example1,
+                                             variables = 'season',
+                                             condition = 'season',
+                                             type = 'link'))
+  expect_ggplot(marginaleffects::plot_slopes(mvgam:::mvgam_example2,
+                                             variables = 'season',
+                                             condition = 'season',
+                                             type = 'link'))
+  expect_ggplot(marginaleffects::plot_slopes(mvgam:::mvgam_example3,
+                                             variables = 'season',
+                                             condition = 'season',
+                                             type = 'link'))
+  expect_ggplot(marginaleffects::plot_slopes(mvgam:::mvgam_example4,
+                                             variables = 'season',
+                                             condition = 'season',
+                                             type = 'link'))
+  expect_ggplot(marginaleffects::plot_slopes(mvgam:::mvgam_example5,
+                                             variables = 'season',
+                                             condition = 'season',
+                                             type = 'link'))
 
-  expect_ggplot(plot_predictions(mvgam:::mvgam_example1,
-                                 condition = 'season',
-                                 type = 'link'))
-  expect_ggplot(plot_predictions(mvgam:::mvgam_example2,
-                                 condition = 'season',
-                                 type = 'link'))
-  expect_ggplot(plot_predictions(mvgam:::mvgam_example3,
-                                 condition = 'season',
-                                 type = 'link'))
-  expect_ggplot(plot_predictions(mvgam:::mvgam_example4,
-                                 condition = 'season',
-                                 type = 'link'))
-  expect_ggplot(plot_predictions(mvgam:::mvgam_example5,
-                                 condition = 'season',
-                                 type = 'link'))
+  expect_ggplot(marginaleffects::plot_predictions(mvgam:::mvgam_example1,
+                                                  condition = 'season',
+                                                  type = 'link'))
+  expect_ggplot(marginaleffects::plot_predictions(mvgam:::mvgam_example2,
+                                                  condition = 'season',
+                                                  type = 'link'))
+  expect_ggplot(marginaleffects::plot_predictions(mvgam:::mvgam_example3,
+                                                  condition = 'season',
+                                                  type = 'link'))
+  expect_ggplot(marginaleffects::plot_predictions(mvgam:::mvgam_example4,
+                                                  condition = 'season',
+                                                  type = 'link'))
+  expect_ggplot(marginaleffects::plot_predictions(mvgam:::mvgam_example5,
+                                                  condition = 'season',
+                                                  type = 'link'))
 })
 
 test_that("plot_mvgam... functions work properly", {
@@ -217,7 +217,7 @@ test_that("plot_mvgam... functions work properly", {
   expect_no_error(plot(mvgam:::mvgam_example4, type = 'forecast'))
   expect_no_error(SW(plot(mvgam:::mvgam_example3, type = 'smooths')))
   expect_no_error(SW(plot(mvgam:::mvgam_example3, type = 'smooths',
-                       realisations = TRUE)))
+                          realisations = TRUE)))
   expect_no_error(plot_mvgam_smooth(mvgam:::mvgam_example1,
                                     smooth = 1,
                                     derivatives = TRUE))
@@ -228,10 +228,10 @@ test_that("plot_mvgam... functions work properly", {
                                     smooth = 1,
                                     realisations = TRUE))
   expect_error(plot_mvgam_smooth(mvgam:::mvgam_example4,
-                                    smooth = 1))
+                                 smooth = 1))
   expect_no_error(plot_mvgam_smooth(mvgam:::mvgam_example4,
-                                         smooth = 1,
-                                         trend_effects = TRUE))
+                                    smooth = 1,
+                                    trend_effects = TRUE))
   expect_no_error(plot_mvgam_smooth(mvgam:::mvgam_example4,
                                     smooth = 1,
                                     derivatives = TRUE,
@@ -338,14 +338,14 @@ test_that("evaluate() functions working", {
 
 test_that("lfo_cv() working", {
   lfs <- SW(lfo_cv(mvgam:::mvgam_example1,
-                min_t = 27,
-                fc_horizon = 1))
+                   min_t = 27,
+                   fc_horizon = 1))
   expect_true(inherits(lfs, 'mvgam_lfo'))
   expect_no_error(plot(lfs))
 
   lfs <- SW(lfo_cv(mvgam:::mvgam_example5,
-                min_t = 27,
-                fc_horizon = 1))
+                   min_t = 27,
+                   fc_horizon = 1))
   expect_true(inherits(lfs, 'mvgam_lfo'))
   expect_no_error(plot(lfs))
 })
