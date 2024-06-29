@@ -417,7 +417,6 @@
 #' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
 #'              trend_map = trend_map,
 #'              trend_model = AR(),
-#'              noncentred = TRUE,
 #'              data = mod_data,
 #'              return_model_data = TRUE,
 #'              chains = 2)

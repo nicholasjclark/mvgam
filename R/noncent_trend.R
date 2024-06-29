@@ -232,8 +232,15 @@ noncent_lv = function(model_file, trend_model, drift){
     trend_end <- grep("LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]], sigma[j]);",
                         model_file, fixed = TRUE) + 2
   } else {
-    trend_start <- grep("LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);",
-                        model_file, fixed = TRUE) - 1
+    if(any(grepl("LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);",
+                model_file, fixed = TRUE))){
+      trend_start <- grep("LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);",
+                          model_file, fixed = TRUE) - 1
+    } else {
+      trend_start <- grep("LV[1, 1:n_lv] ~ normal(0, sigma);",
+                          model_file, fixed = TRUE) - 1
+    }
+
     end_braces <- grep("}",
                        model_file, fixed = TRUE)
     p <- function(f,b) function(a) f(a,b)
@@ -243,12 +250,23 @@ noncent_lv = function(model_file, trend_model, drift){
 
   model_file <- model_file[-(trend_start:trend_end)]
 
-  model_file[grep("// priors for latent state SD parameters",
-                  model_file, fixed = TRUE) + 1] <-
-    paste0(model_file[grep("// priors for latent state SD parameters",
-                           model_file, fixed = TRUE) + 1],
-           '\n',
-           "to_vector(LV_raw) ~ std_normal();")
+  if(any(grepl("// priors for latent state SD parameters",
+              model_file, fixed = TRUE))){
+    model_file[grep("// priors for latent state SD parameters",
+                    model_file, fixed = TRUE) + 1] <-
+      paste0(model_file[grep("// priors for latent state SD parameters",
+                             model_file, fixed = TRUE) + 1],
+             '\n',
+             "to_vector(LV_raw) ~ std_normal();")
+  } else {
+    model_file[grep("// priors for factor SD parameters",
+                    model_file, fixed = TRUE) + 1] <-
+      paste0(model_file[grep("// priors for factor SD parameters",
+                             model_file, fixed = TRUE) + 1],
+             '\n',
+             "to_vector(LV_raw) ~ std_normal();")
+  }
+
   model_file <- readLines(textConnection(model_file), n = -1)
   model_file
 
@@ -269,6 +287,14 @@ check_noncent = function(model_file,
     trendmap <- TRUE
   } else {
     trendmap <- FALSE
+  }
+
+  # Haven't yet implemented noncentering for trend_map models that don't
+  # use the trend_formula
+  if(trendmap &
+     !any(grepl('trend_mus', model_file, fixed = TRUE)) &
+     use_lv){
+    trendmap <- FALSE; noncentred <- FALSE
   }
 
   if(!noncentred & use_lv & trendmap & trend_model == 'None'){
