@@ -77,7 +77,7 @@ continuous variables and the reference category is used for factors. Use
 and create more bespoke conditional effects plots.
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate some data
 simdat <- sim_mvgam(family = poisson(),
                     seasonality = 'hierarchical')
@@ -86,9 +86,7 @@ simdat <- sim_mvgam(family = poisson(),
 mod <- mvgam(y ~ s(season, by = series, k = 5) + year:series,
              family = poisson(),
              data = simdat$data_train,
-             chains = 2,
-             burnin = 300,
-             samples = 300)
+             chains = 2)
 
 # Plot all main effects on the response scale
 conditional_effects(mod)
@@ -106,9 +104,7 @@ dat <- mgcv::gamSim(1, n = 200, scale = 2)
 mod <- mvgam(y ~ te(x0, x1, k = 5) + s(x2, k = 6) + s(x3, k = 6),
             data = dat,
             family = gaussian(),
-            chains = 2,
-            burnin = 300,
-            samples = 300)
+            chains = 2)
 conditional_effects(mod)
 conditional_effects(mod, conf_level = 0.5, type = 'link')
 }

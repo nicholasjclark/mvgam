@@ -29,7 +29,7 @@ sum due to the weaker penalty on the factor's precision. If
 \code{plot == TRUE}, the factors are also plotted.
 }
 \examples{
-\dontrun{
+\donttest{
 simdat <- sim_mvgam()
 mod <- mvgam(y ~ s(season, bs = 'cc',
                   k = 6),

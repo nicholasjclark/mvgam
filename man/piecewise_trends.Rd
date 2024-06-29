@@ -66,7 +66,7 @@ that you specify the \code{cap} values on the scale of your outcome. Note also t
 no missing values are allowed in \code{cap}.
 }
 \examples{
-\dontrun{
+\donttest{
 # Example of logistic growth with possible changepoints
 # Simple logistic growth model
 dNt = function(r, N, k){

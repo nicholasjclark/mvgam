@@ -65,12 +65,15 @@ and produces plots of observed time series, ACF, CDF and histograms for explorat
 }
 \examples{
 # Simulate and plot series with observations bounded at 0 and 1 (Beta responses)
-sim_data <- sim_mvgam(family = betar(), trend_model = RW(), prop_trend = 0.6)
+sim_data <- sim_mvgam(family = betar(),
+                     trend_model = RW(), prop_trend = 0.6)
 plot_mvgam_series(data = sim_data$data_train, series = 'all')
-plot_mvgam_series(data = sim_data$data_train, newdata = sim_data$data_test, series = 1)
+plot_mvgam_series(data = sim_data$data_train,
+                 newdata = sim_data$data_test, series = 1)
 
 # Now simulate series with overdispersed discrete observations
-sim_data <- sim_mvgam(family = nb(), trend_model = RW(), prop_trend = 0.6, phi = 10)
+sim_data <- sim_mvgam(family = nb(), trend_model = RW(),
+                     prop_trend = 0.6, phi = 10)
 plot_mvgam_series(data = sim_data$data_train, series = 'all')
 }
 \author{

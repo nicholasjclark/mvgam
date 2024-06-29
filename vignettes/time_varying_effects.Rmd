@@ -85,13 +85,15 @@ Time-varying coefficients can be fairly easily set up using the `s()` or `gp()` 
 ```{r, include=FALSE}
 mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
              family = gaussian(),
-             data = data_train)
+             data = data_train,
+             silent = 2)
 ```
 
 ```{r, eval=FALSE}
 mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
              family = gaussian(),
-             data = data_train)
+             data = data_train,
+             silent = 2)
 ```
 
 Inspect the model summary, which shows how the `dynamic()` wrapper was used to construct a low-rank Gaussian Process smooth function:
@@ -109,6 +111,7 @@ lines(beta_temp, lwd = 2)
 
 We can also use `plot_predictions` from the `marginaleffects` package to visualise the time-varying coefficient for what the effect would be estimated to be at different values of $temperature$:
 ```{r}
+require(marginaleffects)
 range_round = function(x){
   round(range(x, na.rm = TRUE), 2)
 }
@@ -129,13 +132,15 @@ The syntax is very similar if we wish to estimate the parameters of the underlyi
 ```{r include=FALSE}
 mod <- mvgam(out ~ dynamic(temp, k = 40),
              family = gaussian(),
-             data = data_train)
+             data = data_train,
+             silent = 2)
 ```
 
 ```{r eval=FALSE}
 mod <- mvgam(out ~ dynamic(temp, k = 40),
              family = gaussian(),
-             data = data_train)
+             data = data_train,
+             silent = 2)
 ```
 
 This model summary now contains estimates for the marginal deviation and length scale parameters of the underlying Gaussian Process function:
@@ -186,19 +191,23 @@ plot_mvgam_series(data = model_data, y = 'survival')
 
 
 ### A State-Space Beta regression
-`mvgam` can easily handle data that are bounded at 0 and 1 with a Beta observation model (using the `mgcv` function `betar()`, see `?mgcv::betar` for details).  First we will fit a simple State-Space model that uses a Random Walk dynamic process model with no predictors and a Beta observation model:
+`mvgam` can easily handle data that are bounded at 0 and 1 with a Beta observation model (using the `mgcv` function `betar()`, see `?mgcv::betar` for details).  First we will fit a simple State-Space model that uses an AR1 dynamic process model with no predictors and a Beta observation model:
 ```{r include = FALSE}
 mod0 <- mvgam(formula = survival ~ 1,
-             trend_model = 'RW',
+             trend_model = AR(),
+             noncentred = TRUE,
              family = betar(),
-             data = model_data)
+             data = model_data,
+             silent = 2)
 ```
 
 ```{r eval = FALSE}
 mod0 <- mvgam(formula = survival ~ 1,
-              trend_model = RW(),
-              family = betar(),
-              data = model_data)
+             trend_model = AR(),
+             noncentred = TRUE,
+             family = betar(),
+             data = model_data,
+             silent = 2)
 ```
 
 The summary of this model shows good behaviour of the Hamiltonian Monte Carlo sampler and provides useful summaries on the Beta observation model parameters:
@@ -216,18 +225,22 @@ Now we can increase the complexity of our model by constructing and fitting a St
 ```{r include=FALSE}
 mod1 <- mvgam(formula = survival ~ 1,
               trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE),
-              trend_model = 'RW',
+              trend_model = AR(),
+              noncentred = TRUE,
               family = betar(),
               data = model_data,
-              adapt_delta = 0.99)
+              adapt_delta = 0.99,
+              silent = 2)
 ```
 
 ```{r eval=FALSE}
 mod1 <- mvgam(formula = survival ~ 1,
               trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE),
-              trend_model = 'RW',
+              trend_model = AR(),
+              noncentred = TRUE,
               family = betar(),
-              data = model_data)
+              data = model_data,
+              silent = 2)
 ```
 
 The summary for this model now includes estimates for the time-varying GP parameters:
@@ -254,15 +267,15 @@ mod1_sigma <- as.data.frame(mod1, variable = 'sigma', regex = TRUE) %>%
 sigmas <- rbind(mod0_sigma, mod1_sigma)
 
 # Plot using ggplot2
-library(ggplot2)
+require(ggplot2)
 ggplot(sigmas, aes(y = `sigma[1]`, fill = model)) +
   geom_density(alpha = 0.3, colour = NA) +
   coord_flip()
 ```
 
-Why does the process error not need to be as flexible in the second model? Because the estimates of this dynamic process are now informed partly by the time-varying effect of upwelling, which we can visualise on the link scale using `plot()` with `trend_effects = TRUE`:
+Why does the process error not need to be as flexible in the second model? Because the estimates of this dynamic process are now informed partly by the time-varying effect of upwelling, which we can visualise on the link scale using `plot()`:
 ```{r}
-plot(mod1, type = 'smooth', trend_effects = TRUE)
+plot(mod1, type = 'smooths', trend_effects = TRUE)
 ```
 
 ### Comparing model predictive performances

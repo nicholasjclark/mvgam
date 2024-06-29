@@ -339,6 +339,7 @@
 #'              data = dat$data_train,
 #'              trend_model = AR(),
 #'              family = poisson(),
+#'              noncentred = TRUE,
 #'              use_stan = TRUE,
 #'              run_model = FALSE)
 #'
@@ -416,6 +417,7 @@
 #' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
 #'              trend_map = trend_map,
 #'              trend_model = AR(),
+#'              noncentred = TRUE,
 #'              data = mod_data,
 #'              return_model_data = TRUE,
 #'              chains = 2)
@@ -478,7 +480,8 @@
 #' # Example showing how to incorporate an offset; simulate some count data
 #' # with different means per series
 #' set.seed(100)
-#' dat <- sim_mvgam(prop_trend = 0, mu = c(0, 2, 2), seasonality = 'hierarchical')
+#' dat <- sim_mvgam(prop_trend = 0, mu = c(0, 2, 2),
+#'                  seasonality = 'hierarchical')
 #'
 #' # Add offset terms to the training and testing data
 #' dat$data_train$offset <- 0.5 * as.numeric(dat$data_train$series)

@@ -80,15 +80,13 @@ a broader range of posterior checks that are created using "new data" prediction
 \code{\link{pp_check.mvgam}}
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate some smooth effects and fit a model
 set.seed(0)
 dat <- mgcv::gamSim(1, n = 200, scale = 2)
 mod <- mvgam(y ~ s(x0) + s(x1) + s(x2) + s(x3),
             data = dat,
             family = gaussian(),
-            burnin = 300,
-            samples = 300,
             chains = 2)
 
 # Posterior checks

@@ -54,7 +54,7 @@ set automatically to ensure enough basis functions are used to approximate the e
 wiggliness of the underlying dynamic function (\code{k} will increase as \code{rho} decreases)
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate a time-varying coefficient
 #(as a Gaussian Process with length scale = 10)
 set.seed(1111)

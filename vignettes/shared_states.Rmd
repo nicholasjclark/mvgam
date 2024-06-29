@@ -39,7 +39,7 @@ This vignette gives an example of how `mvgam` can be used to estimate models whe
 The `trend_map` argument in the `mvgam()` function is an optional `data.frame` that can be used to specify which series should depend on which latent process models (called "trends" in `mvgam`). This can be particularly useful if we wish to force multiple observed time series to depend on the same latent trend process, but with different observation processes. If this argument is supplied, a latent factor model is set up by setting `use_lv = TRUE` and using the supplied `trend_map` to set up the shared trends. Users familiar with the `MARSS` family of packages will recognize this as a way of specifying the $Z$ matrix. This `data.frame` needs to have column names `series` and `trend`, with integer values in the `trend` column to state which trend each series should depend on. The `series` column should have a single unique entry for each time series in the data, with names that perfectly match the factor levels of the `series` variable in `data`). For example, if we were to simulate a collection of three integer-valued time series (using `sim_mvgam`), the following `trend_map` would force the first two series to share the same latent trend process:
 ```{r}
 set.seed(122)
-simdat <- sim_mvgam(trend_model = 'AR1',
+simdat <- sim_mvgam(trend_model = AR(),
                     prop_trend = 0.6,
                     mu = c(0, 1, 2),
                     family = poisson())
@@ -66,8 +66,10 @@ fake_mod <- mvgam(y ~
                   trend_formula = ~ s(season, bs = 'cc', k = 6),
                   
                   # AR1 dynamics (each latent process model has DIFFERENT)
-                  # dynamics
-                  trend_model = 'AR1',
+                  # dynamics; processes are estimated using the noncentred
+                  # parameterisation for improved efficiency
+                  trend_model = AR(),
+                  noncentred = TRUE,
                   
                   # supplied trend_map
                   trend_map = trend_map,
@@ -93,19 +95,23 @@ Though this model doesn't perfectly match the data-generating process (which all
 ```{r full_mod, include = FALSE, results='hide'}
 full_mod <- mvgam(y ~ series - 1,
                   trend_formula = ~ s(season, bs = 'cc', k = 6),
-                  trend_model = 'AR1',
+                  trend_model = AR(),
+                  noncentred = TRUE,
                   trend_map = trend_map,
                   family = poisson(),
-                  data = simdat$data_train)
+                  data = simdat$data_train,
+                  silent = 2)
 ```
 
 ```{r eval=FALSE}
 full_mod <- mvgam(y ~ series - 1,
                   trend_formula = ~ s(season, bs = 'cc', k = 6),
-                  trend_model = 'AR1',
+                  trend_model = AR(),
+                  noncentred = TRUE,
                   trend_map = trend_map,
                   family = poisson(),
-                  data = simdat$data_train)
+                  data = simdat$data_train,
+                  silent = 2)
 ```
 
 The summary of this model is informative as it shows that only two latent process models have been estimated, even though we have three observed time series. The model converges well
@@ -125,9 +131,9 @@ However, forecasts for series' 1 and 2 will differ because they have different i
 ## Example: signal detection
 Now we will explore a more complicated example. Here we simulate a true hidden signal that we are trying to track. This signal depends nonlinearly on some covariate (called `productivity`, which represents a measure of how productive the landscape is). The signal also demonstrates a fairly large amount of temporal autocorrelation:
 ```{r}
-set.seed(543210)
+set.seed(0)
 # simulate a nonlinear relationship using the mgcv function gamSim
-signal_dat <- gamSim(n = 100, eg = 1, scale = 1)
+signal_dat <- mgcv::gamSim(n = 100, eg = 1, scale = 1)
 
 # productivity is one of the variables in the simulated data
 productivity <- signal_dat$x2
@@ -149,9 +155,8 @@ plot(true_signal, type = 'l',
 
 Next we simulate three sensors that are trying to track the same hidden signal. All of these sensors have different observation errors that can depend nonlinearly on a second external covariate, called `temperature` in this example. Again this makes use of `gamSim`
 ```{r}
-set.seed(543210)
 sim_series = function(n_series = 3, true_signal){
-  temp_effects <- gamSim(n = 100, eg = 7, scale = 0.1)
+  temp_effects <- mgcv::gamSim(n = 100, eg = 7, scale = 0.1)
   temperature <- temp_effects$y
   alphas <- rnorm(n_series, sd = 2)
 
@@ -215,7 +220,8 @@ mod <- mvgam(formula =
              trend_model =
                # in addition to productivity effects, the signal is
                # assumed to exhibit temporal autocorrelation
-               'AR1',
+               AR(),
+             noncentred = TRUE,
              
              trend_map =
                # trend_map forces all sensors to track the same
@@ -232,7 +238,8 @@ mod <- mvgam(formula =
              family = gaussian(),
              burnin = 600,
              adapt_delta = 0.95,
-             data = model_dat)
+             data = model_dat,
+             silent = 2)
 ```
 
 ```{r eval=FALSE}
@@ -251,7 +258,8 @@ mod <- mvgam(formula =
              trend_model =
                # in addition to productivity effects, the signal is
                # assumed to exhibit temporal autocorrelation
-               'AR1',
+               AR(),
+             noncentred = TRUE,
              
              trend_map =
                # trend_map forces all sensors to track the same
@@ -266,7 +274,8 @@ mod <- mvgam(formula =
              
              # Gaussian observations
              family = gaussian(),
-             data = model_dat)
+             data = model_dat,
+             silent = 2)
 ```
 
 View a reduced version of the model summary because there will be many spline coefficients in this model
@@ -282,6 +291,7 @@ conditional_effects(mod, type = 'link')
 
 `conditional_effects` is simply a wrapper to the more flexible `plot_predictions` function from the `marginaleffects` package. We can get more useful plots of these effects using this function for further customisation:
 ```{r}
+require(marginaleffects)
 plot_predictions(mod, 
                  condition = c('temperature', 'series', 'series'),
                  points = 0.5) +

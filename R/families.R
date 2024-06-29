@@ -82,7 +82,7 @@ nb = function(...){
 
 #' @rdname mvgam_families
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Example showing how to set up N-mixture models
 #' set.seed(999)
 #'# Simulate observations for species 1, which shows a declining trend and 0.7 detection probability
@@ -176,15 +176,13 @@ nb = function(...){
 #'             # priors can be set in the usual way
 #'             priors = c(prior(std_normal(), class = b),
 #'                        prior(normal(1, 1.5), class = Intercept_trend)),
-#'             burnin = 300,
-#'             samples = 300,
 #'             chains = 2)
 #'
 #' # The usual diagnostics
 #' summary(mod)
 #'
 #' # Plotting conditional effects
-#' library(ggplot2)
+#' library(ggplot2); library(marginaleffects)
 #' plot_predictions(mod, condition = 'species',
 #'                  type = 'detection') +
 #'      ylab('Pr(detection)') +

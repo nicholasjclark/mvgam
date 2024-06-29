@@ -182,20 +182,20 @@ Use \code{methods(class = "mvgam")} for an overview on available methods.
 This function allows a previously fitted \code{mvgam} model to be updated
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate some data and fit a Poisson AR1 model
 simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc'),
              trend_model = AR(),
+             noncentred = TRUE,
              data = simdat$data_train,
-             burnin = 300,
-             samples = 300,
              chains = 2)
 summary(mod)
 conditional_effects(mod, type = 'link')
 
 # Update to an AR2 model
-updated_mod <- update(mod, trend_model = AR(p = 2))
+updated_mod <- update(mod, trend_model = AR(p = 2),
+                      noncentred = TRUE)
 summary(updated_mod)
 conditional_effects(updated_mod, type = 'link')
 
@@ -204,6 +204,7 @@ conditional_effects(updated_mod, type = 'link')
 simdat$data_train$trials <- max(simdat$data_train$y) + 15
 updated_mod <- update(mod,
                       formula = cbind(y, trials) ~ s(season, bs = 'cc'),
+                      noncentred = TRUE,
                       data = simdat$data_train,
                       family = binomial())
 summary(updated_mod)
