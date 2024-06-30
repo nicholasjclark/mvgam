@@ -189,7 +189,7 @@ plot_mvgam_series(data = lynx_train, y = 'population')
 
 Formulate an `mvgam` model; this model fits a GAM in which a cyclic
 smooth function for `season` is estimated jointly with a full time
-series model for the temporal process (in this case an `AR3` process).
+series model for the temporal process (in this case an `AR1` process).
 We assume the outcome follows a Poisson distribution and will condition
 the model in `Stan` using MCMC sampling with the `Cmdstan` interface:
 
@@ -199,7 +199,7 @@ lynx_mvgam <- mvgam(population ~ s(season, bs = 'cc', k = 12),
                     data = lynx_train,
                     newdata = lynx_test,
                     family = poisson(),
-                    trend_model = AR(p = 3),
+                    trend_model = AR(p = 1),
                     backend = 'cmdstanr')
 ```
 
@@ -219,7 +219,7 @@ summary(lynx_mvgam)
 #> log
 #> 
 #> Trend model:
-#> AR(p = 3)
+#> AR(p = 1)
 #> 
 #> N series:
 #> 1 
@@ -234,31 +234,29 @@ summary(lynx_mvgam)
 #> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>               2.5%    50% 97.5% Rhat n_eff
-#> (Intercept)   6.20  6.600  6.90 1.00  1100
-#> s(season).1  -0.56 -0.070  0.51 1.00  1202
-#> s(season).2   0.57  1.200  1.90 1.00  1102
-#> s(season).3   1.10  1.900  2.70 1.00  1073
-#> s(season).4  -0.14  0.520  1.20 1.00  1169
-#> s(season).5  -1.30 -0.590  0.18 1.00   961
-#> s(season).6  -1.10 -0.350  0.41 1.00  1257
-#> s(season).7  -0.19  0.670  1.40 1.00  1171
-#> s(season).8   0.10  1.100  1.90 1.01   627
-#> s(season).9  -0.54  0.051  0.63 1.00  1044
-#> s(season).10 -1.40 -0.950 -0.54 1.00  1069
+#>                2.5%   50%  97.5% Rhat n_eff
+#> (Intercept)   6.400  6.60  6.900    1   709
+#> s(season).1  -0.680 -0.13  0.360    1  1111
+#> s(season).2   0.730  1.30  1.900    1  1091
+#> s(season).3   1.200  1.90  2.500    1   733
+#> s(season).4  -0.085  0.54  1.100    1   900
+#> s(season).5  -1.300 -0.68 -0.089    1   850
+#> s(season).6  -1.200 -0.54  0.130    1  1139
+#> s(season).7   0.074  0.71  1.400    1  1063
+#> s(season).8   0.620  1.30  2.100    1   715
+#> s(season).9  -0.380  0.21  0.830    1   839
+#> s(season).10 -1.400 -0.85 -0.350    1   871
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value    
-#> s(season) 9.93     10   46.1 1.5e-06 ***
+#> s(season) 9.97     10   48.3  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
-#> Latent trend AR parameter estimates:
-#>           2.5%  50% 97.5% Rhat n_eff
-#> ar1[1]   0.600 0.86  0.99 1.00  1331
-#> ar2[1]   0.038 0.45  0.86 1.00   421
-#> ar3[1]   0.079 0.45  0.93 1.01   379
-#> sigma[1] 0.360 0.46  0.59 1.00   663
+#> Latent trend parameter AR estimates:
+#>          2.5%  50% 97.5% Rhat n_eff
+#> ar1[1]   0.60 0.83  0.97    1   656
+#> sigma[1] 0.39 0.47  0.62    1   715
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -267,7 +265,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Fri Jun 28 3:39:52 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Mon Jul 01 8:32:43 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -387,8 +385,8 @@ series (testing and training)
 
 ``` r
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
-#> Out of sample CRPS:
-#> 1846.84576525
+#> Out of sample DRPS:
+#> 2420.7128115
 ```
 
 <img src="man/figures/README-unnamed-chunk-20-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -425,7 +423,7 @@ model can also be performed using `mvgam`. Have a look at the model’s
 residuals, which are posterior empirical quantiles of Dunn-Smyth
 randomised quantile residuals so should follow approximate normality. We
 are primarily looking for a lack of autocorrelation, which would suggest
-our AR3 model is appropriate for the latent trend
+our AR1 model is appropriate for the latent trend
 
 ``` r
 plot(lynx_mvgam, type = 'residuals')
@@ -552,7 +550,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Fri Jun 28 3:40:36 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Mon Jul 01 8:34:07 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)

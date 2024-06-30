@@ -1,8 +1,7 @@
-## Version 1.1.1
+## Version 1.1.2
 
-## Response to previous check comments
-* Changed indexing of an internal c++ function after Prof Brian Ripley’s email: Dear maintainer, Please see the problems shown on https://cran.r-project.org/web/checks/check_results_mvgam.html. Please correct before 2024-05-22 to safely retain your package on CRAN. The CRAN Team. I presume this was triggered by a memory 'Invalid read of size' message from `valgrind`, which occurred in one of the examples and one of the tests. Strangely this behaviour did not occur in other examples that use identical codes, so I suspect it may have been a false positive. But nevertheless I have made some changes and re-checked with `valgrind` (see '`valgrind` memory check results' below)
-* Also reduced sizes of vignette html files in response to several NOTEs about the large package install size
+## Summary of changes
+This version brings a few efficiency updates and added functionality to enhance the user interface. There are no major structural changes or modifications that would break pre-existing workflows
 
 ## Test environments
 * Windows install: R 4.3.1
