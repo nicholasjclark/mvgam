@@ -102,49 +102,215 @@ detection probability from an N-mixture distribution</p></dd>
     
 
 <p>An object of class <code>mvgam_forecast</code> containing hindcast distributions.
-See <code><a href="mvgam_forecast-class.html">mvgam_forecast-class</a></code> for details.
-#'@seealso <code><a href="forecast.mvgam.html">forecast.mvgam</a></code></p>
-
-
+See <code><a href="mvgam_forecast-class.html">mvgam_forecast-class</a></code> for details.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Posterior retrodictions are drawn from the fitted <code>mvgam</code> and
 organized into a convenient format</p>
     </div>
+    <div class="section level2">
+    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
+    <div class="dont-index"><p><code><a href="forecast.mvgam.html">forecast.mvgam</a></code></p></div>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
-<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">3</span>, trend_model <span class="op">=</span> <span class="st">'AR1'</span><span class="op">)</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">3</span>, trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>            noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
 <span class="r-in"><span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>            burnin <span class="op">=</span> <span class="fl">300</span>,</span></span>
-<span class="r-in"><span>            samples <span class="op">=</span> <span class="fl">300</span>,</span></span>
 <span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpysUQB0/model-5e0c3fcb2957.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 1.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 1.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 1.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Hindcasts on response scale</span></span></span>
 <span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu">hindcast</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> List of 15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x00000284ad65f818&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ trend_model: chr "AR1"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ ma         : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ cor        : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ label      : language AR()</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "class")= chr "mvgam_trend"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ drift             : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ use_lv            : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ fit_engine        : chr "stan"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ type              : chr "response"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ series_names      : chr [1:3] "series_1" "series_2" "series_3"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_observations:List of 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:75] 0 1 1 0 1 0 0 0 1 1 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:75] 0 0 1 2 1 0 6 4 10 3 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:75] 0 0 0 1 0 2 1 0 2 2 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_times       : int [1:75] 1 2 3 4 5 6 7 8 9 10 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_observations : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_times        : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ hindcasts         :List of 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:75] 0 0 0 0 0 1 0 1 2 0 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,1]" "ypred[2,1]" "ypred[3,1]" "ypred[4,1]" ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:75] 0 0 1 0 2 0 2 3 1 1 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,2]" "ypred[2,2]" "ypred[3,2]" "ypred[4,2]" ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:75] 0 1 1 1 0 0 0 1 0 0 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "ypred[1,3]" "ypred[2,3]" "ypred[3,3]" "ypred[4,3]" ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ forecasts         : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr "mvgam_forecast"</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
+<span class="r-plt img"><img src="hindcast.mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
+<span class="r-plt img"><img src="hindcast.mvgam-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> No non-missing values in test_observations; cannot calculate forecast score</span>
+<span class="r-plt img"><img src="hindcast.mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Hindcasts as expectations</span></span></span>
 <span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu">hindcast</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'expected'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> List of 15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x00000284ad65f818&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ trend_model: chr "AR1"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ ma         : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ cor        : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ label      : language AR()</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "class")= chr "mvgam_trend"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ drift             : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ use_lv            : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ fit_engine        : chr "stan"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ type              : chr "expected"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ series_names      : chr [1:3] "series_1" "series_2" "series_3"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_observations:List of 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:75] 0 1 1 0 1 0 0 0 1 1 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:75] 0 0 1 2 1 0 6 4 10 3 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:75] 0 0 0 1 0 2 1 0 2 2 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_times       : int [1:75] 1 2 3 4 5 6 7 8 9 10 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_observations : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_times        : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ hindcasts         :List of 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:75] 0.703 0.719 0.59 0.868 0.447 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:75] 0.961 0.302 0.697 0.163 0.975 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:75] 0.327 0.903 0.49 0.856 0.525 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ forecasts         : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr "mvgam_forecast"</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="hindcast.mvgam-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="hindcast.mvgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="hindcast.mvgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Estimated latent trends</span></span></span>
 <span class="r-in"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu">hindcast</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'trend'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">hc</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> List of 15</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x00000284ad65f818&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ trend_model: chr "AR1"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ ma         : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ cor        : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ label      : language AR()</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "class")= chr "mvgam_trend"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ drift             : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ use_lv            : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ fit_engine        : chr "stan"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ type              : chr "trend"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ series_names      : chr [1:3] "series_1" "series_2" "series_3"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_observations:List of 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:75] 0 1 1 0 1 0 0 0 1 1 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:75] 0 0 1 2 1 0 6 4 10 3 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:75] 0 0 0 1 0 2 1 0 2 2 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ train_times       : int [1:75] 1 2 3 4 5 6 7 8 9 10 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_observations : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ test_times        : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ hindcasts         :List of 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: num [1:1000, 1:75] -0.0664 -0.0634 0.0409 0.0564 -0.2752 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "trend[1,1]" "trend[2,1]" "trend[3,1]" "trend[4,1]" ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: num [1:1000, 1:75] 0.245 -0.93 0.207 -1.618 0.505 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "trend[1,2]" "trend[2,2]" "trend[3,2]" "trend[4,2]" ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: num [1:1000, 1:75] -0.8309 0.1639 -0.1439 0.0417 -0.1144 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, "dimnames")=List of 2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:75] "trend[1,3]" "trend[2,3]" "trend[3,3]" "trend[4,3]" ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ forecasts         : NULL</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr "mvgam_forecast"</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="hindcast.mvgam-7.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="hindcast.mvgam-8.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">hc</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-plt img"><img src="hindcast.mvgam-9.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

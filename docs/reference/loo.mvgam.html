@@ -135,7 +135,7 @@ forecast evaluations for further scrutiny of models (see for example <code><a hr
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate 4 time series with hierarchical seasonality</span></span></span>
 <span class="r-in"><span><span class="co"># and independent AR1 dynamic processes</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">111</span><span class="op">)</span></span></span>
@@ -149,12 +149,74 @@ forecast evaluations for further scrutiny of models (see for example <code><a hr
 <span class="r-in"><span>             <span class="va">simdat</span><span class="op">$</span><span class="va">data_test</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpysUQB0/model-5e0c36ad77ff.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.6 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the model and calculate LOO</span></span></span>
 <span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="loo.mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="va">mc.cores.def</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">'mc.cores'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>mc.cores <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">loo</span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 300 log-likelihood matrix</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate   SE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo   -400.4 10.9</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo         6.8  0.6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> looic       800.8 21.8</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Monte Carlo SE of elpd_loo is 0.1.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> All Pareto k estimates are good (k &lt; 0.5).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now fit a model with hierarchical seasonality</span></span></span>
 <span class="r-in"><span><span class="va">mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">mod1</span>,</span></span>
@@ -162,27 +224,372 @@ forecast evaluations for further scrutiny of models (see for example <code><a hr
 <span class="r-in"><span>              <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'fs'</span>,</span></span>
 <span class="r-in"><span>              xt <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpysUQB0/model-5e0c4c9e2ae4.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 1.0 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 1.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 1.3 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod2</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="loo.mvgam-2.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="loo.mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu">loo</span><span class="op">(</span><span class="va">mod2</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 300 log-likelihood matrix</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate   SE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo   -348.7 11.7</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo        12.7  1.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> looic       697.4 23.3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Monte Carlo SE of elpd_loo is 0.1.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> All Pareto k estimates are good (k &lt; 0.5).</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now add AR1 dynamic errors to mod2</span></span></span>
 <span class="r-in"><span><span class="va">mod3</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">mod2</span>,</span></span>
 <span class="r-in"><span>              trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpysUQB0/model-5e0c6ff41314.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 7.9 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 155.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 81.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 155.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod3</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="loo.mvgam-4.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="loo.mvgam-5.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod3</span>, type <span class="op">=</span> <span class="st">'trend'</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="loo.mvgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu">loo</span><span class="op">(</span><span class="va">mod3</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 300 log-likelihood matrix</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate   SE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo   -280.3 10.9</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo       247.5 12.6</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> looic       560.6 21.9</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Monte Carlo SE of elpd_loo is NA.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Pareto k diagnostic values:</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                          Count Pct.    Min. n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.5]   (good)      76   25.3%   0         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  (0.5, 0.7]   (ok)       145   48.3%   0         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.7, 1]   (bad)       77   25.7%   0         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    (1, Inf)   (very bad)   2    0.7%   0         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compare models using LOO</span></span></span>
 <span class="r-in"><span><span class="fu">loo_compare</span><span class="op">(</span><span class="va">mod1</span>, <span class="va">mod2</span>, <span class="va">mod3</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      elpd_diff se_diff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mod3    0.0       0.0 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mod2  -68.4       4.3 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> mod1 -120.1       8.5 </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>mc.cores <span class="op">=</span> <span class="va">mc.cores.def</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compare forecast abilities using an expanding training window and</span></span></span>
 <span class="r-in"><span><span class="co"># forecasting ahead 1 timepoint from each window; the first window by includes</span></span></span>
 <span class="r-in"><span><span class="co"># the first 92 timepoints (of the 100 that were simulated)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">mod2</span><span class="op">$</span><span class="va">obs_data</span><span class="op">$</span><span class="va">time</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 100</span>
 <span class="r-in"><span><span class="va">lfo_mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="lfo_cv.mvgam.html">lfo_cv</a></span><span class="op">(</span><span class="va">mod2</span>, min_t <span class="op">=</span> <span class="fl">92</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 1.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 1.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 1.3 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="va">lfo_mod3</span> <span class="op">&lt;-</span> <span class="fu"><a href="lfo_cv.mvgam.html">lfo_cv</a></span><span class="op">(</span><span class="va">mod3</span>, min_t <span class="op">=</span> <span class="fl">92</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 5.6 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 8.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 7.0 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 8.6 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 6.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 10.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 8.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 10.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 5.4 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 5.6 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 5.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 5.7 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 10.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 12.3 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 11.4 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 12.4 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Take the difference in forecast ELPDs; a model with higher ELPD is preferred,</span></span></span>
 <span class="r-in"><span><span class="co"># so negative values here indicate that mod3 gave better forecasts for a particular</span></span></span>
@@ -192,7 +599,8 @@ forecast evaluations for further scrutiny of models (see for example <code><a hr
 <span class="r-in"><span>    ylab <span class="op">=</span> <span class="st">'ELPD_mod2 - ELPD_mod3'</span>,</span></span>
 <span class="r-in"><span>    xlab <span class="op">=</span> <span class="st">'Evaluation timepoint'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span>h <span class="op">=</span> <span class="fl">0</span>, lty <span class="op">=</span> <span class="st">'dashed'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-plt img"><img src="loo.mvgam-7.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

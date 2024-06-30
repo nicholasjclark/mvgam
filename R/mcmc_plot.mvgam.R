@@ -23,12 +23,11 @@
 #' that can be used for argument `variable`
 #' @examples
 #' \dontrun{
-#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
 #'              trend_model = AR(),
+#'              noncentred = TRUE,
 #'              data = simdat$data_train,
-#'              burnin = 300,
-#'              samples = 300,
 #'              chains = 2)
 #' mcmc_plot(mod)
 #' mcmc_plot(mod, type = 'neff_hist')

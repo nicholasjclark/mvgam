@@ -153,14 +153,21 @@ only a single focal series is highlighted, with all remaining series shown as fa
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="co"># Simulate and plot series with observations bounded at 0 and 1 (Beta responses)</span></span>
-<span><span class="va">sim_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu">betar</span><span class="op">(</span><span class="op">)</span>, trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">RW</a></span><span class="op">(</span><span class="op">)</span>, prop_trend <span class="op">=</span> <span class="fl">0.6</span><span class="op">)</span></span>
-<span><span class="fu">plot_mvgam_series</span><span class="op">(</span>data <span class="op">=</span> <span class="va">sim_data</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span>
-<span><span class="fu">plot_mvgam_series</span><span class="op">(</span>data <span class="op">=</span> <span class="va">sim_data</span><span class="op">$</span><span class="va">data_train</span>, newdata <span class="op">=</span> <span class="va">sim_data</span><span class="op">$</span><span class="va">data_test</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Now simulate series with overdispersed discrete observations</span></span>
-<span><span class="va">sim_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu">nb</span><span class="op">(</span><span class="op">)</span>, trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">RW</a></span><span class="op">(</span><span class="op">)</span>, prop_trend <span class="op">=</span> <span class="fl">0.6</span>, phi <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span>
-<span><span class="fu">plot_mvgam_series</span><span class="op">(</span>data <span class="op">=</span> <span class="va">sim_data</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Simulate and plot series with observations bounded at 0 and 1 (Beta responses)</span></span></span>
+<span class="r-in"><span><span class="va">sim_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                     trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">RW</a></span><span class="op">(</span><span class="op">)</span>, prop_trend <span class="op">=</span> <span class="fl">0.6</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">plot_mvgam_series</span><span class="op">(</span>data <span class="op">=</span> <span class="va">sim_data</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot_mvgam_series-1.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="fu">plot_mvgam_series</span><span class="op">(</span>data <span class="op">=</span> <span class="va">sim_data</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>                 newdata <span class="op">=</span> <span class="va">sim_data</span><span class="op">$</span><span class="va">data_test</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot_mvgam_series-2.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># Now simulate series with overdispersed discrete observations</span></span></span>
+<span class="r-in"><span><span class="va">sim_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="mvgam_families.html">nb</a></span><span class="op">(</span><span class="op">)</span>, trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">RW</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                     prop_trend <span class="op">=</span> <span class="fl">0.6</span>, phi <span class="op">=</span> <span class="fl">10</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">plot_mvgam_series</span><span class="op">(</span>data <span class="op">=</span> <span class="va">sim_data</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="plot_mvgam_series-3.png" alt="" width="700" height="433"></span>
+</code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside></div>

@@ -168,7 +168,7 @@ and create more bespoke conditional effects plots.</p>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
 <span class="r-in"><span><span class="co"># Simulate some data</span></span></span>
 <span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                    seasonality <span class="op">=</span> <span class="st">'hierarchical'</span><span class="op">)</span></span></span>
@@ -177,32 +177,139 @@ and create more bespoke conditional effects plots.</p>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span> <span class="op">+</span> <span class="va">year</span><span class="op">:</span><span class="va">series</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
-<span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
-<span class="r-in"><span>             burnin <span class="op">=</span> <span class="fl">300</span>,</span></span>
-<span class="r-in"><span>             samples <span class="op">=</span> <span class="fl">300</span><span class="op">)</span></span></span>
+<span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpU5rG2n/model-3fc011f623e7.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.7 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.8 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.8 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 1.0 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot all main effects on the response scale</span></span></span>
 <span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-1.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Change the prediction interval to 70% using plot_predictions() argument</span></span></span>
 <span class="r-in"><span><span class="co"># 'conf_level'</span></span></span>
 <span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>, conf_level <span class="op">=</span> <span class="fl">0.7</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-3.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-4.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot all main effects on the link scale</span></span></span>
 <span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-5.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Works the same for smooth terms, including smooth interactions</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gamSim.html" class="external-link">gamSim</a></span><span class="op">(</span><span class="fl">1</span>, n <span class="op">=</span> <span class="fl">200</span>, scale <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Gu &amp; Wahba 4 term additive model</span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="ti.html">te</a></span><span class="op">(</span><span class="va">x0</span>, <span class="va">x1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span> <span class="op">+</span> <span class="fu">s</span><span class="op">(</span><span class="va">x2</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span> <span class="op">+</span> <span class="fu">s</span><span class="op">(</span><span class="va">x3</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            data <span class="op">=</span> <span class="va">dat</span>,</span></span>
 <span class="r-in"><span>            family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
-<span class="r-in"><span>            burnin <span class="op">=</span> <span class="fl">300</span>,</span></span>
-<span class="r-in"><span>            samples <span class="op">=</span> <span class="fl">300</span><span class="op">)</span></span></span>
+<span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpU5rG2n/model-3fc072543cb.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 2.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 2.9 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 2.7 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 3.0 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-7.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-8.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-9.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>, conf_level <span class="op">=</span> <span class="fl">0.5</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-10.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-11.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="conditional_effects.mvgam-12.png" alt="" width="700" height="433"></span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>

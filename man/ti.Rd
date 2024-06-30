@@ -24,7 +24,7 @@ functions of the \pkg{mgcv} package. When using them, please cite the
 appropriate references obtained via \code{citation("mgcv")}.
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate some data
 dat <- mgcv::gamSim(1, n = 200, scale = 2)
 

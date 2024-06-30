@@ -113,22 +113,81 @@ all parameters are included.</p></dd>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span></span>
-<span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">1</span>, trend_model <span class="op">=</span> <span class="st">'AR1'</span><span class="op">)</span></span>
-<span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span>
-<span>            trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
-<span>            burnin <span class="op">=</span> <span class="fl">300</span>,</span>
-<span>            samples <span class="op">=</span> <span class="fl">300</span>,</span>
-<span>            chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
-<span><span class="va">np</span> <span class="op">&lt;-</span> <span class="fu">nuts_params</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">np</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># extract the number of divergence transitions</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">np</span>, <span class="va">Parameter</span> <span class="op">==</span> <span class="st">"divergent__"</span><span class="op">)</span><span class="op">$</span><span class="va">Value</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu">neff_ratio</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="op">}</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>n_series <span class="op">=</span> <span class="fl">1</span>, trend_model <span class="op">=</span> <span class="st">'AR1'</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>            trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>            noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
+<span class="r-in"><span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
+<span class="r-in"><span>            chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpU5rG2n/model-3fc01ad15937.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.3 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.4 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.3 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-in"><span><span class="va">np</span> <span class="op">&lt;-</span> <span class="fu">nuts_params</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">np</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   Chain Iteration     Parameter    Value</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1     1         1 accept_stat__ 0.944154</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2     1         2 accept_stat__ 0.947702</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3     1         3 accept_stat__ 0.919436</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     1         4 accept_stat__ 0.920023</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     1         5 accept_stat__ 0.998240</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     1         6 accept_stat__ 0.941577</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="co"># extract the number of divergence transitions</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">np</span>, <span class="va">Parameter</span> <span class="op">==</span> <span class="st">"divergent__"</span><span class="op">)</span><span class="op">$</span><span class="va">Value</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0</span>
+<span class="r-in"><span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fu">neff_ratio</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  mus[1,1]  mus[2,1]  mus[3,1]  mus[4,1]  mus[5,1]  mus[6,1] </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 0.4479520 0.7294096 0.7456069 0.8241892 0.7841851 0.7799631 </span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
+</code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside></div>

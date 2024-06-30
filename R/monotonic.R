@@ -44,7 +44,7 @@
 #' @author Nicholas J Clark
 #' @name monotonic
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Simulate data from a monotonically increasing function
 #' set.seed(123123)
 #' x <- runif(80) * 4 - 1
@@ -72,8 +72,6 @@
 #' mod2 <- mvgam(y ~ s(x, bs = 'moi', k = 18),
 #'              data = mod_data,
 #'              family = gaussian(),
-#'              burnin = 300,
-#'              samples = 300,
 #'              chains = 2)
 #'
 #' plot_predictions(mod2,
@@ -108,8 +106,6 @@
 #' mod <- mvgam(y ~ s(x, bs = 'moi', by = fac, k = 8),
 #'              data = mod_data,
 #'              family = gaussian(),
-#'              burnin = 300,
-#'              samples = 300,
 #'              chains = 2)
 #'
 #' # Visualise the different monotonic functions

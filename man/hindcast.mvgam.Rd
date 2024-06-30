@@ -33,7 +33,6 @@ detection probability from an N-mixture distribution}
 \value{
 An object of class \code{mvgam_forecast} containing hindcast distributions.
 See \code{\link{mvgam_forecast-class}} for details.
-#'@seealso \code{\link{forecast.mvgam}}
 }
 \description{
 Extract hindcasts for a fitted \code{mvgam} object
@@ -43,13 +42,12 @@ Posterior retrodictions are drawn from the fitted \code{mvgam} and
 organized into a convenient format
 }
 \examples{
-\dontrun{
-simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
+\donttest{
+simdat <- sim_mvgam(n_series = 3, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc'),
             trend_model = AR(),
+            noncentred = TRUE,
             data = simdat$data_train,
-            burnin = 300,
-            samples = 300,
             chains = 2)
 
 # Hindcasts on response scale
@@ -73,4 +71,7 @@ plot(hc, series = 1)
 plot(hc, series = 2)
 plot(hc, series = 3)
 }
+}
+\seealso{
+\code{\link{forecast.mvgam}}
 }

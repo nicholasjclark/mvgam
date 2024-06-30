@@ -7,7 +7,8 @@
 #'organized into a convenient format
 #'@return An object of class \code{mvgam_forecast} containing hindcast distributions.
 #'See \code{\link{mvgam_forecast-class}} for details.
-#'#'@seealso \code{\link{forecast.mvgam}}
+#'
+#'@seealso \code{\link{forecast.mvgam}}
 #'@export
 hindcast <- function(object, ...){
   UseMethod("hindcast", object)
@@ -16,13 +17,12 @@ hindcast <- function(object, ...){
 #'@rdname hindcast.mvgam
 #'@method hindcast mvgam
 #' @examples
-#' \dontrun{
-#' simdat <- sim_mvgam(n_series = 3, trend_model = 'AR1')
+#' \donttest{
+#' simdat <- sim_mvgam(n_series = 3, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
 #'             trend_model = AR(),
+#'             noncentred = TRUE,
 #'             data = simdat$data_train,
-#'             burnin = 300,
-#'             samples = 300,
 #'             chains = 2)
 #'
 #' # Hindcasts on response scale

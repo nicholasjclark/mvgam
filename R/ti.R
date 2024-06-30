@@ -18,7 +18,7 @@
 #'
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Simulate some data
 #' dat <- mgcv::gamSim(1, n = 200, scale = 2)
 #'
