@@ -54,6 +54,7 @@
 #' plot(x, y)
 #'
 #' # A standard TRPS smooth doesn't capture monotonicity
+#' library(mgcv)
 #' mod_data <- data.frame(y = y, x = x)
 #' mod <- gam(y ~ s(x, k = 16),
 #'            data = mod_data,
