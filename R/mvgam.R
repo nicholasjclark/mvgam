@@ -1427,7 +1427,9 @@ mvgam = function(formula,
     # Add modifications for trend mapping and trend predictors, if
     # supplied
     trend_sp_names <- NA
+    if(add_nmix) drop_trend_int <- FALSE else drop_trend_int <- TRUE
     if(!missing(trend_map)){
+      drop_trend_int <- FALSE
       trend_map_setup <- trend_map_mods(model_file = vectorised$model_file,
                                         model_data = vectorised$model_data,
                                         trend_map = trend_map,
@@ -1460,7 +1462,7 @@ mvgam = function(formula,
           },
           model_file = vectorised$model_file,
           model_data = vectorised$model_data,
-          nmix = add_nmix,
+          drop_trend_int = drop_trend_int,
           drift = drift)
 
         vectorised$model_file <- trend_pred_setup$model_file

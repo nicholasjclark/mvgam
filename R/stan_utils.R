@@ -2441,7 +2441,7 @@ add_trend_predictors = function(trend_formula,
                                 data_test,
                                 model_file,
                                 model_data,
-                                nmix = FALSE,
+                                drop_trend_int = TRUE,
                                 drift = FALSE){
 
   #### Creating the trend mvgam model file and data structures ####
@@ -2457,8 +2457,8 @@ add_trend_predictors = function(trend_formula,
   }
 
   # Drop any intercept from the formula if this is not an N-mixture model
-  # as the intercept will almost surely be unidentifiable
-  if(!nmix){
+  # or a trend_map was supplied, as the intercept will almost surely be unidentifiable
+  if(drop_trend_int){
     if(attr(terms(trend_formula), 'intercept') == 1){
       trend_formula <- update(trend_formula, trend_y  ~ . -1)
     } else {
