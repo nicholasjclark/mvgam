@@ -422,6 +422,7 @@ mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
              data = dat$data_train,
              trend_model = AR(),
              family = poisson(),
+             noncentred = TRUE,
              use_stan = TRUE,
              run_model = FALSE)
 
@@ -466,6 +467,7 @@ plot(mod1, type = 'smooths', residuals = TRUE)
 plot(mod1, type = 'smooths', realisations = TRUE)
 
 # Plot conditional response predictions using marginaleffects
+library(marginaleffects)
 conditional_effects(mod1)
 plot_predictions(mod1, condition = 'season', points = 0.5)
 
@@ -560,7 +562,8 @@ points(beta_temp, pch = 16)
 # Example showing how to incorporate an offset; simulate some count data
 # with different means per series
 set.seed(100)
-dat <- sim_mvgam(prop_trend = 0, mu = c(0, 2, 2), seasonality = 'hierarchical')
+dat <- sim_mvgam(prop_trend = 0, mu = c(0, 2, 2),
+                 seasonality = 'hierarchical')
 
 # Add offset terms to the training and testing data
 dat$data_train$offset <- 0.5 * as.numeric(dat$data_train$series)

@@ -59,7 +59,7 @@ forecast evaluations for further scrutiny of models (see for example \code{\link
 \code{\link{score.mvgam_forecast}} and \code{\link{lfo_cv}})
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate 4 time series with hierarchical seasonality
 # and independent AR1 dynamic processes
 set.seed(111)

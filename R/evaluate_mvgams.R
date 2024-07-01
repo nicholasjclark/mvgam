@@ -714,9 +714,11 @@ sis_score <- function(truth, fc, interval_width = 0.9,
 }
 
 #' Compute the multivariate energy score
-#' @importFrom scoringRules es_sample
 #' @noRd
 energy_score <- function(truth, fc, log = FALSE) {
+  insight::check_if_installed("scoringRules",
+                              reason = 'to calculate energy scores')
+
   # es_sample can't handle any NAs
   has_nas <- apply(fc, 2, function(x) any(is.na(x)))
   fc <- fc[,!has_nas]
@@ -724,7 +726,7 @@ energy_score <- function(truth, fc, log = FALSE) {
     truth <- log(truth + 0.001)
     fc <- log(fc + 0.001)
   }
-  es <- es_sample(y = truth, dat = fc)
+  es <- scoringRules::es_sample(y = truth, dat = fc)
   return(es)
 }
 

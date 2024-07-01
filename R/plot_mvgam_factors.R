@@ -16,7 +16,7 @@
 #'@return A \code{dataframe} of factor contributions and,
 #'optionally, a series of base \code{R} plots
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'simdat <- sim_mvgam()
 #'mod <- mvgam(y ~ s(season, bs = 'cc',
 #'                   k = 6),

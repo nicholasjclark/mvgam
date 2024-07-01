@@ -44,7 +44,7 @@
 #'@author Nicholas J Clark
 #'@return A base R plot or set of plots
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate some time series
 #'dat <- sim_mvgam(T = 80, n_series = 3)
 #'
@@ -52,8 +52,6 @@
 #'mod <- mvgam(y ~ s(season, bs = 'cc') + s(series, bs = 're'),
 #'             data = dat$data_train,
 #'             trend_model = RW(),
-#'             burnin = 300,
-#'             samples = 300,
 #'             chains = 2)
 #'
 #'# Plot predictions and residuals for each series
@@ -69,6 +67,7 @@
 #'plot(mod, type = 're')
 #'
 #'# More flexible plots with 'marginaleffects' utilities
+#'library(marginaleffects)
 #'plot_predictions(mod, condition = 'season', type = 'link')
 #'plot_predictions(mod,
 #'                 condition = c('season', 'series', 'series'),
@@ -81,8 +80,6 @@
 #'             trend_formula = ~ s(season, bs = 'cc'),
 #'             data = dat$data_train,
 #'             trend_model = RW(),
-#'             burnin = 300,
-#'             samples = 300,
 #'             chains = 2)
 #'plot(mod, type = 'smooths', trend_effects = TRUE)
 #'

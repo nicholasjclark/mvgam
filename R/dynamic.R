@@ -39,7 +39,7 @@
 #' @rdname dynamic
 #' @return a `list` object for internal usage in 'mvgam'
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate a time-varying coefficient
 #'#(as a Gaussian Process with length scale = 10)
 #'set.seed(1111)

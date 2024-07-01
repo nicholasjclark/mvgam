@@ -15,13 +15,12 @@
 #'
 #' @return The exact form of the output depends on the method.
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 #' mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
 #'             trend_model = AR(),
+#'             noncentred = TRUE,
 #'             data = simdat$data_train,
-#'             burnin = 300,
-#'             samples = 300,
 #'             chains = 2)
 #' np <- nuts_params(mod)
 #' head(np)
@@ -79,6 +78,8 @@ rhat.mvgam <- function(x, pars = NULL, ...) {
 #' @export neff_ratio
 #' @export
 neff_ratio.mvgam <- function(object, pars = NULL, ...) {
+  insight::check_if_installed("matrixStats",
+                              reason = 'to calculate effective sample sizes')
   # bayesplot uses outdated ess code from rstan
   # bayesplot::neff_ratio(object$fit, pars = pars, ...)
   if(is.null(pars)){
@@ -105,6 +106,8 @@ neff_ratio.mvgam <- function(object, pars = NULL, ...) {
 #' @export neff_ratio
 #' @export
 neff_ratio.mvgam <- function(object, pars = NULL, ...) {
+  insight::check_if_installed("matrixStats",
+                              reason = 'to calculate effective sample sizes')
   # bayesplot uses outdated ess code from rstan
   # bayesplot::neff_ratio(object$fit, pars = pars, ...)
   if(is.null(pars)){

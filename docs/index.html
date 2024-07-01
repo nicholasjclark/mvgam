@@ -114,14 +114,14 @@
 <li>
 <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</li>
 <li>
-<code>betar()</code> for proportional data on <code>(0,1)</code>
+<code><a href="reference/mvgam_families.html">betar()</a></code> for proportional data on <code>(0,1)</code>
 </li>
 <li>
 <code>bernoulli()</code> for binary data</li>
 <li>
 <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</li>
 <li>
-<code>nb()</code> for overdispersed count data</li>
+<code><a href="reference/mvgam_families.html">nb()</a></code> for overdispersed count data</li>
 <li>
 <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> for count data with known number of trials</li>
 <li>
@@ -131,9 +131,9 @@
 <li>
 <code><a href="reference/mvgam_families.html">tweedie()</a></code> for overdispersed count data</li>
 </ul>
-<p>Note that only <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code>nb()</code>, and <code><a href="reference/mvgam_families.html">tweedie()</a></code> are available if using <code>JAGS</code>. All families, apart from <code><a href="reference/mvgam_families.html">tweedie()</a></code>, are supported if using <code>Stan</code>. See <code>??mvgam_families</code> for more information. Below is a simple example for simulating and modelling proportional data with <code>Beta</code> observations over a set of seasonal series with independent Gaussian Process dynamic trends:</p>
+<p>Note that only <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>, <code><a href="reference/mvgam_families.html">nb()</a></code>, and <code><a href="reference/mvgam_families.html">tweedie()</a></code> are available if using <code>JAGS</code>. All families, apart from <code><a href="reference/mvgam_families.html">tweedie()</a></code>, are supported if using <code>Stan</code>. See <code>??mvgam_families</code> for more information. Below is a simple example for simulating and modelling proportional data with <code>Beta</code> observations over a set of seasonal series with independent Gaussian Process dynamic trends:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu">betar</span><span class="op">(</span><span class="op">)</span>,</span>
+<code class="sourceCode R"><span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                  T <span class="op">=</span> <span class="fl">80</span>,</span>
 <span>                  trend_model <span class="op">=</span> <span class="fu"><a href="reference/GP.html">GP</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                  trend_rel <span class="op">=</span> <span class="fl">0.5</span>, </span>
@@ -150,7 +150,7 @@ Simulating and analysing multivariate time series with Dynamic Generalized Addit
 <span>             trend_model <span class="op">=</span> <span class="fu"><a href="reference/GP.html">GP</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>             data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>,</span>
 <span>             newdata <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_test</span>,</span>
-<span>             family <span class="op">=</span> <span class="fu">betar</span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span>             family <span class="op">=</span> <span class="fu"><a href="reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>Plot the estimated posterior hindcast and forecast distributions for each series</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">4</span>, nrow <span class="op">=</span> <span class="fl">2</span>, byrow <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span></span>

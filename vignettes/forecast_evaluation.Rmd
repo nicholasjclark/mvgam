@@ -36,12 +36,12 @@ theme_set(theme_bw(base_size = 12, base_family = 'serif'))
 The purpose of this vignette is to show how the `mvgam` package can be used to produce probabilistic forecasts and to evaluate those forecasts using a variety of proper scoring rules.
 
 ## Simulating discrete time series
-We begin by simulating some data to show how forecasts are computed and evaluated in `mvgam`. The `sim_mvgam()` function can be used to simulate series that come from a variety of response distributions as well as seasonal patterns and/or dynamic temporal patterns. Here we simulate a collection of three time count-valued series. These series all share the same seasonal pattern but have different temporal dynamics. By setting `trend_model = 'GP'` and `prop_trend = 0.75`, we are generating time series that have smooth underlying temporal trends (evolving as Gaussian Processes with squared exponential kernel) and moderate seasonal patterns. The observations are Poisson-distributed and we allow 10% of observations to be missing.
+We begin by simulating some data to show how forecasts are computed and evaluated in `mvgam`. The `sim_mvgam()` function can be used to simulate series that come from a variety of response distributions as well as seasonal patterns and/or dynamic temporal patterns. Here we simulate a collection of three time count-valued series. These series all share the same seasonal pattern but have different temporal dynamics. By setting `trend_model = GP()` and `prop_trend = 0.75`, we are generating time series that have smooth underlying temporal trends (evolving as Gaussian Processes with squared exponential kernel) and moderate seasonal patterns. The observations are Poisson-distributed and we allow 10% of observations to be missing.
 ```{r}
 set.seed(2345)
 simdat <- sim_mvgam(T = 100, 
                     n_series = 3, 
-                    trend_model = 'GP',
+                    trend_model = GP(),
                     prop_trend = 0.75,
                     family = poisson(),
                     prop_missing = 0.10)
@@ -80,7 +80,8 @@ mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 8) +
                 s(time, by = series, bs = 'cr', k = 20),
               knots = list(season = c(0.5, 12.5)),
               trend_model = 'None',
-              data = simdat$data_train)
+              data = simdat$data_train,
+              silent = 2)
 ```
 
 The model fits without issue:
@@ -88,9 +89,9 @@ The model fits without issue:
 summary(mod1, include_betas = FALSE)
 ```
 
-And we can plot the partial effects of the splines to see that they are estimated to be highly nonlinear
+And we can plot the conditional effects of the splines (on the link scale) to see that they are estimated to be highly nonlinear
 ```{r, fig.alt = "Plotting GAM smooth functions using mvgam"}
-plot(mod1, type = 'smooths')
+conditional_effects(mod1, type = 'link')
 ```
 
 ### Modelling dynamics with GPs
@@ -102,7 +103,8 @@ mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) +
               knots = list(season = c(0.5, 12.5)),
               trend_model = 'None',
               data = simdat$data_train,
-              adapt_delta = 0.98)
+              adapt_delta = 0.98,
+              silent = 2)
 ```
 
 ```{r eval=FALSE}
@@ -111,7 +113,8 @@ mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) +
                    scale = FALSE),
               knots = list(season = c(0.5, 12.5)),
               trend_model = 'None',
-              data = simdat$data_train)
+              data = simdat$data_train,
+              silent = 2)
 ```
 
 The summary for this model now contains information on the GP parameters for each time series:
@@ -129,13 +132,9 @@ And now the length scale ($\rho$) parameters:
 mcmc_plot(mod2, variable = c('rho_gp'), regex = TRUE, type = 'areas')
 ```
 
-We can also plot the nonlinear effects using `marginaleffects` utilities:
-```{r, fig.alt = "Summarising latent Gaussian Process parameters in mvgam and marginaleffects"}
-require('ggplot2')
-plot_predictions(mod2, 
-                 condition = c('time', 'series', 'series'),
-                 type = 'link') +
-  theme(legend.position = 'none')
+We can again plot the nonlinear effects:
+```{r, fig.alt = "Plotting latent Gaussian Process effects in mvgam and marginaleffects"}
+conditional_effects(mod2, type = 'link')
 ```
 
 The estimates for the temporal trends are fairly similar for the two models, but below we will see if they produce similar forecasts
@@ -173,7 +172,8 @@ mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) +
               trend_model = 'None',
               data = simdat$data_train,
               newdata = simdat$data_test,
-              adapt_delta = 0.98)
+              adapt_delta = 0.98,
+              silent = 2)
 ```
 
 ```{r eval=FALSE}
@@ -183,7 +183,8 @@ mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) +
               knots = list(season = c(0.5, 12.5)),
               trend_model = 'None',
               data = simdat$data_train,
-              newdata = simdat$data_test)
+              newdata = simdat$data_test,
+              silent = 2)
 ```
 
 Because the model already contains a forecast distribution, we do not need to feed `newdata` to the `forecast()` function:

@@ -56,6 +56,8 @@ jobs:
               wrswoR
               tweedie
               splines2
+              scoringRules
+              matrixStats
               xts
               collapse
               rmarkdown

@@ -26,7 +26,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.91</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.2</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -49,6 +49,9 @@
     <a class="dropdown-item" href="../articles/time_varying_effects.html">Time-varying effects in mvgam</a>
     <a class="dropdown-item" href="../articles/trend_formulas.html">State-Space models in mvgam</a>
   </div>
+</li>
+<li class="nav-item">
+  <a class="nav-link" href="../news/index.html">Changelog</a>
 </li>
       </ul>
 <form class="form-inline my-2 my-lg-0" role="search">
@@ -78,7 +81,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2024-03-25</h4>
+            <h4 data-toc-skip class="date">2024-06-29</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/shared_states.Rmd" class="external-link"><code>vignettes/shared_states.Rmd</code></a></small>
       <div class="d-none name"><code>shared_states.Rmd</code></div>
@@ -115,22 +118,22 @@ collection of three integer-valued time series (using
 force the first two series to share the same latent trend process:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">122</span><span class="op">)</span></span>
-<span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span>
+<span><span class="va">simdat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>trend_model <span class="op">=</span> <span class="fu"><a href="../reference/RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                    prop_trend <span class="op">=</span> <span class="fl">0.6</span>,</span>
 <span>                    mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span>,</span>
 <span>                    family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">trend_map</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">series</span><span class="op">)</span>,</span>
 <span>                        trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">trend_map</span></span></code></pre></div>
-<pre><code><span><span class="co">##     series trend</span></span>
-<span><span class="co">## 1 series_1     1</span></span>
-<span><span class="co">## 2 series_2     1</span></span>
-<span><span class="co">## 3 series_3     2</span></span></code></pre>
+<span><span class="va">trend_map</span></span>
+<span><span class="co">#&gt;     series trend</span></span>
+<span><span class="co">#&gt; 1 series_1     1</span></span>
+<span><span class="co">#&gt; 2 series_2     1</span></span>
+<span><span class="co">#&gt; 3 series_3     2</span></span></code></pre></div>
 <p>We can see that the factor levels in <code>trend_map</code> match
 those in the data:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/all.equal.html" class="external-link">all.equal</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">trend_map</span><span class="op">$</span><span class="va">series</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## [1] TRUE</span></span></code></pre>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/all.equal.html" class="external-link">all.equal</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">trend_map</span><span class="op">$</span><span class="va">series</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">$</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="checking-trend_map-with-run_model-false">Checking <code>trend_map</code> with
 <code>run_model = FALSE</code><a class="anchor" aria-label="anchor" href="#checking-trend_map-with-run_model-false"></a>
@@ -146,7 +149,7 @@ contain a shared nonlinear smooth function to capture repeated
 seasonality. This model is not too complicated but it does show how we
 can learn shared and independent effects for collections of time series
 in the <code>mvgam</code> framework:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fake_mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> </span>
 <span>                    <span class="co"># observation model formula, which has a </span></span>
 <span>                    <span class="co"># different intercept per series</span></span>
@@ -157,8 +160,10 @@ in the <code>mvgam</code> framework:</p>
 <span>                  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span>
 <span>                  </span>
 <span>                  <span class="co"># AR1 dynamics (each latent process model has DIFFERENT)</span></span>
-<span>                  <span class="co"># dynamics</span></span>
-<span>                  trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span>
+<span>                  <span class="co"># dynamics; processes are estimated using the noncentred</span></span>
+<span>                  <span class="co"># parameterisation for improved efficiency</span></span>
+<span>                  trend_model <span class="op">=</span> <span class="fu"><a href="../reference/RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>                  noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>                  </span>
 <span>                  <span class="co"># supplied trend_map</span></span>
 <span>                  trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span>
@@ -170,142 +175,145 @@ in the <code>mvgam</code> framework:</p>
 <p>Inspecting the <code>Stan</code> code shows how this model is a
 dynamic factor model in which the loadings are constructed to reflect
 the supplied <code>trend_map</code>:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/code.html">code</a></span><span class="op">(</span><span class="va">fake_mod</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## // Stan model code generated by package mvgam</span></span>
-<span><span class="co">## data {</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; total_obs; // total number of observations</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; n; // number of timepoints per series</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; n_sp_trend; // number of trend smoothing parameters</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; n_lv; // number of dynamic factors</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; n_series; // number of series</span></span>
-<span><span class="co">##   matrix[n_series, n_lv] Z; // matrix mapping series to latent states</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; num_basis; // total number of basis coefficients</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; num_basis_trend; // number of trend basis coefficients</span></span>
-<span><span class="co">##   vector[num_basis_trend] zero_trend; // prior locations for trend basis coefficients</span></span>
-<span><span class="co">##   matrix[total_obs, num_basis] X; // mgcv GAM design matrix</span></span>
-<span><span class="co">##   matrix[n * n_lv, num_basis_trend] X_trend; // trend model design matrix</span></span>
-<span><span class="co">##   array[n, n_series] int&lt;lower=0&gt; ytimes; // time-ordered matrix (which col in X belongs to each [time, series] observation?)</span></span>
-<span><span class="co">##   array[n, n_lv] int ytimes_trend;</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations</span></span>
-<span><span class="co">##   matrix[4, 4] S_trend1; // mgcv smooth penalty matrix S_trend1</span></span>
-<span><span class="co">##   array[n_nonmissing] int&lt;lower=0&gt; flat_ys; // flattened nonmissing observations</span></span>
-<span><span class="co">##   matrix[n_nonmissing, num_basis] flat_xs; // X values for nonmissing observations</span></span>
-<span><span class="co">##   array[n_nonmissing] int&lt;lower=0&gt; obs_ind; // indices of nonmissing observations</span></span>
-<span><span class="co">## }</span></span>
-<span><span class="co">## transformed data {</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">## }</span></span>
-<span><span class="co">## parameters {</span></span>
-<span><span class="co">##   // raw basis coefficients</span></span>
-<span><span class="co">##   vector[num_basis] b_raw;</span></span>
-<span><span class="co">##   vector[num_basis_trend] b_raw_trend;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // latent state SD terms</span></span>
-<span><span class="co">##   vector&lt;lower=0&gt;[n_lv] sigma;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // latent state AR1 terms</span></span>
-<span><span class="co">##   vector&lt;lower=-1.5, upper=1.5&gt;[n_lv] ar1;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // latent states</span></span>
-<span><span class="co">##   matrix[n, n_lv] LV;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // smoothing parameters</span></span>
-<span><span class="co">##   vector&lt;lower=0&gt;[n_sp_trend] lambda_trend;</span></span>
-<span><span class="co">## }</span></span>
-<span><span class="co">## transformed parameters {</span></span>
-<span><span class="co">##   // latent states and loading matrix</span></span>
-<span><span class="co">##   vector[n * n_lv] trend_mus;</span></span>
-<span><span class="co">##   matrix[n, n_series] trend;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // basis coefficients</span></span>
-<span><span class="co">##   vector[num_basis] b;</span></span>
-<span><span class="co">##   vector[num_basis_trend] b_trend;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // observation model basis coefficients</span></span>
-<span><span class="co">##   b[1 : num_basis] = b_raw[1 : num_basis];</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // process model basis coefficients</span></span>
-<span><span class="co">##   b_trend[1 : num_basis_trend] = b_raw_trend[1 : num_basis_trend];</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // latent process linear predictors</span></span>
-<span><span class="co">##   trend_mus = X_trend * b_trend;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // derived latent states</span></span>
-<span><span class="co">##   for (i in 1 : n) {</span></span>
-<span><span class="co">##     for (s in 1 : n_series) {</span></span>
-<span><span class="co">##       trend[i, s] = dot_product(Z[s,  : ], LV[i,  : ]);</span></span>
-<span><span class="co">##     }</span></span>
-<span><span class="co">##   }</span></span>
-<span><span class="co">## }</span></span>
-<span><span class="co">## model {</span></span>
-<span><span class="co">##   // prior for seriesseries_1...</span></span>
-<span><span class="co">##   b_raw[1] ~ student_t(3, 0, 2);</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // prior for seriesseries_2...</span></span>
-<span><span class="co">##   b_raw[2] ~ student_t(3, 0, 2);</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // prior for seriesseries_3...</span></span>
-<span><span class="co">##   b_raw[3] ~ student_t(3, 0, 2);</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // priors for AR parameters</span></span>
-<span><span class="co">##   ar1 ~ std_normal();</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // priors for latent state SD parameters</span></span>
-<span><span class="co">##   sigma ~ student_t(3, 0, 2.5);</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // dynamic process models</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // prior for s(season)_trend...</span></span>
-<span><span class="co">##   b_raw_trend[1 : 4] ~ multi_normal_prec(zero_trend[1 : 4],</span></span>
-<span><span class="co">##                                          S_trend1[1 : 4, 1 : 4]</span></span>
-<span><span class="co">##                                          * lambda_trend[1]);</span></span>
-<span><span class="co">##   lambda_trend ~ normal(5, 30);</span></span>
-<span><span class="co">##   for (j in 1 : n_lv) {</span></span>
-<span><span class="co">##     LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);</span></span>
-<span><span class="co">##     for (i in 2 : n) {</span></span>
-<span><span class="co">##       LV[i, j] ~ normal(trend_mus[ytimes_trend[i, j]]</span></span>
-<span><span class="co">##                         + ar1[j]</span></span>
-<span><span class="co">##                           * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]),</span></span>
-<span><span class="co">##                         sigma[j]);</span></span>
-<span><span class="co">##     }</span></span>
-<span><span class="co">##   }</span></span>
-<span><span class="co">##   {</span></span>
-<span><span class="co">##     // likelihood functions</span></span>
-<span><span class="co">##     vector[n_nonmissing] flat_trends;</span></span>
-<span><span class="co">##     flat_trends = to_vector(trend)[obs_ind];</span></span>
-<span><span class="co">##     flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends), 0.0,</span></span>
-<span><span class="co">##                               append_row(b, 1.0));</span></span>
-<span><span class="co">##   }</span></span>
-<span><span class="co">## }</span></span>
-<span><span class="co">## generated quantities {</span></span>
-<span><span class="co">##   vector[total_obs] eta;</span></span>
-<span><span class="co">##   matrix[n, n_series] mus;</span></span>
-<span><span class="co">##   vector[n_sp_trend] rho_trend;</span></span>
-<span><span class="co">##   vector[n_lv] penalty;</span></span>
-<span><span class="co">##   array[n, n_series] int ypred;</span></span>
-<span><span class="co">##   penalty = 1.0 / (sigma .* sigma);</span></span>
-<span><span class="co">##   rho_trend = log(lambda_trend);</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   matrix[n_series, n_lv] lv_coefs = Z;</span></span>
-<span><span class="co">##   // posterior predictions</span></span>
-<span><span class="co">##   eta = X * b;</span></span>
-<span><span class="co">##   for (s in 1 : n_series) {</span></span>
-<span><span class="co">##     mus[1 : n, s] = eta[ytimes[1 : n, s]] + trend[1 : n, s];</span></span>
-<span><span class="co">##     ypred[1 : n, s] = poisson_log_rng(mus[1 : n, s]);</span></span>
-<span><span class="co">##   }</span></span>
-<span><span class="co">## }</span></span></code></pre>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/code.html">code</a></span><span class="op">(</span><span class="va">fake_mod</span><span class="op">)</span></span>
+<span><span class="co">#&gt; // Stan model code generated by package mvgam</span></span>
+<span><span class="co">#&gt; data {</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; total_obs; // total number of observations</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; n; // number of timepoints per series</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; n_sp_trend; // number of trend smoothing parameters</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; n_lv; // number of dynamic factors</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; n_series; // number of series</span></span>
+<span><span class="co">#&gt;   matrix[n_series, n_lv] Z; // matrix mapping series to latent states</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; num_basis; // total number of basis coefficients</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; num_basis_trend; // number of trend basis coefficients</span></span>
+<span><span class="co">#&gt;   vector[num_basis_trend] zero_trend; // prior locations for trend basis coefficients</span></span>
+<span><span class="co">#&gt;   matrix[total_obs, num_basis] X; // mgcv GAM design matrix</span></span>
+<span><span class="co">#&gt;   matrix[n * n_lv, num_basis_trend] X_trend; // trend model design matrix</span></span>
+<span><span class="co">#&gt;   array[n, n_series] int&lt;lower=0&gt; ytimes; // time-ordered matrix (which col in X belongs to each [time, series] observation?)</span></span>
+<span><span class="co">#&gt;   array[n, n_lv] int ytimes_trend;</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations</span></span>
+<span><span class="co">#&gt;   matrix[4, 4] S_trend1; // mgcv smooth penalty matrix S_trend1</span></span>
+<span><span class="co">#&gt;   array[n_nonmissing] int&lt;lower=0&gt; flat_ys; // flattened nonmissing observations</span></span>
+<span><span class="co">#&gt;   matrix[n_nonmissing, num_basis] flat_xs; // X values for nonmissing observations</span></span>
+<span><span class="co">#&gt;   array[n_nonmissing] int&lt;lower=0&gt; obs_ind; // indices of nonmissing observations</span></span>
+<span><span class="co">#&gt; }</span></span>
+<span><span class="co">#&gt; transformed data {</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt; }</span></span>
+<span><span class="co">#&gt; parameters {</span></span>
+<span><span class="co">#&gt;   // raw basis coefficients</span></span>
+<span><span class="co">#&gt;   vector[num_basis] b_raw;</span></span>
+<span><span class="co">#&gt;   vector[num_basis_trend] b_raw_trend;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // latent state SD terms</span></span>
+<span><span class="co">#&gt;   vector&lt;lower=0&gt;[n_lv] sigma;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // latent state AR1 terms</span></span>
+<span><span class="co">#&gt;   vector&lt;lower=-1, upper=1&gt;[n_lv] ar1;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // raw latent states</span></span>
+<span><span class="co">#&gt;   matrix[n, n_lv] LV_raw;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // smoothing parameters</span></span>
+<span><span class="co">#&gt;   vector&lt;lower=0&gt;[n_sp_trend] lambda_trend;</span></span>
+<span><span class="co">#&gt; }</span></span>
+<span><span class="co">#&gt; transformed parameters {</span></span>
+<span><span class="co">#&gt;   // raw latent states</span></span>
+<span><span class="co">#&gt;   vector[n * n_lv] trend_mus;</span></span>
+<span><span class="co">#&gt;   matrix[n, n_series] trend;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // basis coefficients</span></span>
+<span><span class="co">#&gt;   vector[num_basis] b;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // latent states</span></span>
+<span><span class="co">#&gt;   matrix[n, n_lv] LV;</span></span>
+<span><span class="co">#&gt;   vector[num_basis_trend] b_trend;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // observation model basis coefficients</span></span>
+<span><span class="co">#&gt;   b[1 : num_basis] = b_raw[1 : num_basis];</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // process model basis coefficients</span></span>
+<span><span class="co">#&gt;   b_trend[1 : num_basis_trend] = b_raw_trend[1 : num_basis_trend];</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // latent process linear predictors</span></span>
+<span><span class="co">#&gt;   trend_mus = X_trend * b_trend;</span></span>
+<span><span class="co">#&gt;   LV = LV_raw .* rep_matrix(sigma', rows(LV_raw));</span></span>
+<span><span class="co">#&gt;   for (j in 1 : n_lv) {</span></span>
+<span><span class="co">#&gt;     LV[1, j] += trend_mus[ytimes_trend[1, j]];</span></span>
+<span><span class="co">#&gt;     for (i in 2 : n) {</span></span>
+<span><span class="co">#&gt;       LV[i, j] += trend_mus[ytimes_trend[i, j]]</span></span>
+<span><span class="co">#&gt;                   + ar1[j] * (LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]);</span></span>
+<span><span class="co">#&gt;     }</span></span>
+<span><span class="co">#&gt;   }</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // derived latent states</span></span>
+<span><span class="co">#&gt;   for (i in 1 : n) {</span></span>
+<span><span class="co">#&gt;     for (s in 1 : n_series) {</span></span>
+<span><span class="co">#&gt;       trend[i, s] = dot_product(Z[s,  : ], LV[i,  : ]);</span></span>
+<span><span class="co">#&gt;     }</span></span>
+<span><span class="co">#&gt;   }</span></span>
+<span><span class="co">#&gt; }</span></span>
+<span><span class="co">#&gt; model {</span></span>
+<span><span class="co">#&gt;   // prior for seriesseries_1...</span></span>
+<span><span class="co">#&gt;   b_raw[1] ~ student_t(3, 0, 2);</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // prior for seriesseries_2...</span></span>
+<span><span class="co">#&gt;   b_raw[2] ~ student_t(3, 0, 2);</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // prior for seriesseries_3...</span></span>
+<span><span class="co">#&gt;   b_raw[3] ~ student_t(3, 0, 2);</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // priors for AR parameters</span></span>
+<span><span class="co">#&gt;   ar1 ~ std_normal();</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // priors for latent state SD parameters</span></span>
+<span><span class="co">#&gt;   sigma ~ student_t(3, 0, 2.5);</span></span>
+<span><span class="co">#&gt;   to_vector(LV_raw) ~ std_normal();</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // dynamic process models</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // prior for s(season)_trend...</span></span>
+<span><span class="co">#&gt;   b_raw_trend[1 : 4] ~ multi_normal_prec(zero_trend[1 : 4],</span></span>
+<span><span class="co">#&gt;                                          S_trend1[1 : 4, 1 : 4]</span></span>
+<span><span class="co">#&gt;                                          * lambda_trend[1]);</span></span>
+<span><span class="co">#&gt;   lambda_trend ~ normal(5, 30);</span></span>
+<span><span class="co">#&gt;   {</span></span>
+<span><span class="co">#&gt;     // likelihood functions</span></span>
+<span><span class="co">#&gt;     vector[n_nonmissing] flat_trends;</span></span>
+<span><span class="co">#&gt;     flat_trends = to_vector(trend)[obs_ind];</span></span>
+<span><span class="co">#&gt;     flat_ys ~ poisson_log_glm(append_col(flat_xs, flat_trends), 0.0,</span></span>
+<span><span class="co">#&gt;                               append_row(b, 1.0));</span></span>
+<span><span class="co">#&gt;   }</span></span>
+<span><span class="co">#&gt; }</span></span>
+<span><span class="co">#&gt; generated quantities {</span></span>
+<span><span class="co">#&gt;   vector[total_obs] eta;</span></span>
+<span><span class="co">#&gt;   matrix[n, n_series] mus;</span></span>
+<span><span class="co">#&gt;   vector[n_sp_trend] rho_trend;</span></span>
+<span><span class="co">#&gt;   vector[n_lv] penalty;</span></span>
+<span><span class="co">#&gt;   array[n, n_series] int ypred;</span></span>
+<span><span class="co">#&gt;   penalty = 1.0 / (sigma .* sigma);</span></span>
+<span><span class="co">#&gt;   rho_trend = log(lambda_trend);</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   matrix[n_series, n_lv] lv_coefs = Z;</span></span>
+<span><span class="co">#&gt;   // posterior predictions</span></span>
+<span><span class="co">#&gt;   eta = X * b;</span></span>
+<span><span class="co">#&gt;   for (s in 1 : n_series) {</span></span>
+<span><span class="co">#&gt;     mus[1 : n, s] = eta[ytimes[1 : n, s]] + trend[1 : n, s];</span></span>
+<span><span class="co">#&gt;     ypred[1 : n, s] = poisson_log_rng(mus[1 : n, s]);</span></span>
+<span><span class="co">#&gt;   }</span></span>
+<span><span class="co">#&gt; }</span></span></code></pre></div>
 <p>Notice the line that states “lv_coefs = Z;”. This uses the supplied
 <span class="math inline">\(Z\)</span> matrix to construct the loading
 coefficients. The supplied matrix now looks exactly like what you’d use
 if you were to create a similar model in the <code>MARSS</code>
 package:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">fake_mod</span><span class="op">$</span><span class="va">model_data</span><span class="op">$</span><span class="va">Z</span></span></code></pre></div>
-<pre><code><span><span class="co">##      [,1] [,2]</span></span>
-<span><span class="co">## [1,]    1    0</span></span>
-<span><span class="co">## [2,]    1    0</span></span>
-<span><span class="co">## [3,]    0    1</span></span></code></pre>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fake_mod</span><span class="op">$</span><span class="va">model_data</span><span class="op">$</span><span class="va">Z</span></span>
+<span><span class="co">#&gt;      [,1] [,2]</span></span>
+<span><span class="co">#&gt; [1,]    1    0</span></span>
+<span><span class="co">#&gt; [2,]    1    0</span></span>
+<span><span class="co">#&gt; [3,]    0    1</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="fitting-and-inspecting-the-model">Fitting and inspecting the model<a class="anchor" aria-label="anchor" href="#fitting-and-inspecting-the-model"></a>
@@ -313,114 +321,101 @@ package:</p>
 <p>Though this model doesn’t perfectly match the data-generating process
 (which allowed each series to have different underlying dynamics), we
 can still fit it to show what the resulting inferences look like:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">full_mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">-</span> <span class="fl">1</span>,</span>
 <span>                  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span>
-<span>                  trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span>
+<span>                  trend_model <span class="op">=</span> <span class="fu"><a href="../reference/RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>                  noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>                  trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span>
 <span>                  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>                  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span><span class="op">)</span></span></code></pre></div>
+<span>                  data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
+<span>                  silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
 <p>The summary of this model is informative as it shows that only two
 latent process models have been estimated, even though we have three
 observed time series. The model converges well</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">full_mod</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## GAM observation formula:</span></span>
-<span><span class="co">## y ~ series - 1</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM process formula:</span></span>
-<span><span class="co">## ~s(season, bs = "cc", k = 6)</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Family:</span></span>
-<span><span class="co">## poisson</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Link function:</span></span>
-<span><span class="co">## log</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Trend model:</span></span>
-<span><span class="co">## AR1</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## N process models:</span></span>
-<span><span class="co">## 2 </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## N series:</span></span>
-<span><span class="co">## 3 </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## N timepoints:</span></span>
-<span><span class="co">## 75 </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Status:</span></span>
-<span><span class="co">## Fitted using Stan </span></span>
-<span><span class="co">## 4 chains, each with iter = 1000; warmup = 500; thin = 1 </span></span>
-<span><span class="co">## Total post-warmup draws = 2000</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM observation model coefficient (beta) estimates:</span></span>
-<span><span class="co">##                 2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## seriesseries_1 -0.15 0.088  0.31 1.00  1895</span></span>
-<span><span class="co">## seriesseries_2  0.92 1.100  1.20 1.00  1267</span></span>
-<span><span class="co">## seriesseries_3  1.90 2.100  2.30 1.02   256</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Process model AR parameter estimates:</span></span>
-<span><span class="co">##         2.5%    50%  97.5% Rhat n_eff</span></span>
-<span><span class="co">## ar1[1] -0.72 -0.420 -0.056    1   676</span></span>
-<span><span class="co">## ar1[2] -0.28 -0.011  0.280    1  1433</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Process error parameter estimates:</span></span>
-<span><span class="co">##          2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## sigma[1] 0.33 0.49  0.67    1   487</span></span>
-<span><span class="co">## sigma[2] 0.59 0.73  0.91    1   948</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM process model coefficient (beta) estimates:</span></span>
-<span><span class="co">##                    2.5%    50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## s(season).1_trend -0.22 -0.011  0.20    1  1612</span></span>
-<span><span class="co">## s(season).2_trend -0.27 -0.045  0.18    1  1745</span></span>
-<span><span class="co">## s(season).3_trend -0.15  0.074  0.29    1  1347</span></span>
-<span><span class="co">## s(season).4_trend -0.15  0.067  0.28    1  1561</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##            edf Ref.df    F p-value</span></span>
-<span><span class="co">## s(season) 1.52      4 0.21    0.92</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Stan MCMC diagnostics:</span></span>
-<span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">## Rhat looks reasonable for all parameters</span></span>
-<span><span class="co">## 0 of 2000 iterations ended with a divergence (0%)</span></span>
-<span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
-<span><span class="co">## E-FMI indicated no pathological behavior</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Mar 25 1:53:19 PM 2024.</span></span>
-<span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
-<span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
-<span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
-<p>Quick plots of all main effects can be made using
-<code>conditional_effects()</code>:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">full_mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span>, ask <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-8-1.png" width="60%" style="display: block; margin: auto;"><img src="shared_states_files/figure-html/unnamed-chunk-8-2.png" width="60%" style="display: block; margin: auto;"></p>
-<p>Even more informative are the plots of the latent processes. Both
-series 1 and 2 share the exact same estimates, while the estimates for
-series 3 are different:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">full_mod</span><span class="op">)</span></span>
+<span><span class="co">#&gt; GAM observation formula:</span></span>
+<span><span class="co">#&gt; y ~ series - 1</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; GAM process formula:</span></span>
+<span><span class="co">#&gt; ~s(season, bs = "cc", k = 6)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Family:</span></span>
+<span><span class="co">#&gt; poisson</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Link function:</span></span>
+<span><span class="co">#&gt; log</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Trend model:</span></span>
+<span><span class="co">#&gt; AR()</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; N process models:</span></span>
+<span><span class="co">#&gt; 2 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; N series:</span></span>
+<span><span class="co">#&gt; 3 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; N timepoints:</span></span>
+<span><span class="co">#&gt; 75 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Status:</span></span>
+<span><span class="co">#&gt; Fitted using Stan </span></span>
+<span><span class="co">#&gt; 4 chains, each with iter = 1000; warmup = 500; thin = 1 </span></span>
+<span><span class="co">#&gt; Total post-warmup draws = 2000</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
+<span><span class="co">#&gt;                 2.5%   50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; seriesseries_1 -0.14 0.084  0.29 1.00  1720</span></span>
+<span><span class="co">#&gt; seriesseries_2  0.91 1.100  1.20 1.00  1374</span></span>
+<span><span class="co">#&gt; seriesseries_3  1.90 2.100  2.30 1.01   447</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Process model AR parameter estimates:</span></span>
+<span><span class="co">#&gt;         2.5%    50%  97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; ar1[1] -0.72 -0.430 -0.037 1.01   560</span></span>
+<span><span class="co">#&gt; ar1[2] -0.30 -0.017  0.270 1.01   286</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Process error parameter estimates:</span></span>
+<span><span class="co">#&gt;          2.5%  50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; sigma[1] 0.34 0.49  0.65    1   819</span></span>
+<span><span class="co">#&gt; sigma[2] 0.59 0.73  0.90    1   573</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; GAM process model coefficient (beta) estimates:</span></span>
+<span><span class="co">#&gt;                    2.5%    50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; s(season).1_trend -0.20 -0.003  0.21 1.01   857</span></span>
+<span><span class="co">#&gt; s(season).2_trend -0.27 -0.046  0.17 1.00   918</span></span>
+<span><span class="co">#&gt; s(season).3_trend -0.15  0.068  0.28 1.00   850</span></span>
+<span><span class="co">#&gt; s(season).4_trend -0.14  0.064  0.27 1.00   972</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
+<span><span class="co">#&gt;            edf Ref.df Chi.sq p-value</span></span>
+<span><span class="co">#&gt; s(season) 2.33      4   0.38    0.93</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
+<span><span class="co">#&gt; n_eff / iter looks reasonable for all parameters</span></span>
+<span><span class="co">#&gt; Rhat looks reasonable for all parameters</span></span>
+<span><span class="co">#&gt; 0 of 2000 iterations ended with a divergence (0%)</span></span>
+<span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
+<span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Sat Jun 29 1:55:28 PM 2024.</span></span>
+<span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
+<span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
+<span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span></code></pre></div>
+<p>Both series 1 and 2 share the exact same latent process estimates,
+while the estimates for series 3 are different:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">full_mod</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
 <p><img src="shared_states_files/figure-html/unnamed-chunk-9-1.png" width="60%" style="display: block; margin: auto;"></p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">full_mod</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
 <p><img src="shared_states_files/figure-html/unnamed-chunk-9-2.png" width="60%" style="display: block; margin: auto;"></p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">full_mod</span>, type <span class="op">=</span> <span class="st">'trend'</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
 <p><img src="shared_states_files/figure-html/unnamed-chunk-9-3.png" width="60%" style="display: block; margin: auto;"></p>
-<p>However, the forecasts for series’ 1 and 2 differ because they have
+<p>However, forecasts for series’ 1 and 2 will differ because they have
 different intercepts in the observation model</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">full_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-10-1.png" width="60%" style="display: block; margin: auto;"></p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">full_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-10-2.png" width="60%" style="display: block; margin: auto;"></p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">full_mod</span>, type <span class="op">=</span> <span class="st">'forecast'</span>, series <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-10-3.png" width="60%" style="display: block; margin: auto;"></p>
 </div>
 </div>
 <div class="section level2">
@@ -431,13 +426,13 @@ true hidden signal that we are trying to track. This signal depends
 nonlinearly on some covariate (called <code>productivity</code>, which
 represents a measure of how productive the landscape is). The signal
 also demonstrates a fairly large amount of temporal autocorrelation:</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">543210</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span></span>
 <span><span class="co"># simulate a nonlinear relationship using the mgcv function gamSim</span></span>
-<span><span class="va">signal_dat</span> <span class="op">&lt;-</span> <span class="fu">gamSim</span><span class="op">(</span>n <span class="op">=</span> <span class="fl">100</span>, eg <span class="op">=</span> <span class="fl">1</span>, scale <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## Gu &amp; Wahba 4 term additive model</span></span></code></pre>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># productivity is one of the variables in the simulated data</span></span>
+<span><span class="va">signal_dat</span> <span class="op">&lt;-</span> <span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gamSim.html" class="external-link">gamSim</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">100</span>, eg <span class="op">=</span> <span class="fl">1</span>, scale <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Gu &amp; Wahba 4 term additive model</span></span>
+<span></span>
+<span><span class="co"># productivity is one of the variables in the simulated data</span></span>
 <span><span class="va">productivity</span> <span class="op">&lt;-</span> <span class="va">signal_dat</span><span class="op">$</span><span class="va">x2</span></span>
 <span></span>
 <span><span class="co"># simulate the true signal, which already has a nonlinear relationship</span></span>
@@ -446,29 +441,20 @@ also demonstrates a fairly large amount of temporal autocorrelation:</p>
 <span><span class="va">true_signal</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/vector.html" class="external-link">as.vector</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/scale.html" class="external-link">scale</a></span><span class="op">(</span><span class="va">signal_dat</span><span class="op">$</span><span class="va">y</span><span class="op">)</span> <span class="op">+</span></span>
 <span>                         <span class="fu"><a href="https://rdrr.io/r/stats/arima.sim.html" class="external-link">arima.sim</a></span><span class="op">(</span><span class="fl">100</span>, model <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>ar <span class="op">=</span> <span class="fl">0.8</span>, sd <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>Plot the signal to inspect it’s evolution over time</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">true_signal</span>, type <span class="op">=</span> <span class="st">'l'</span>,</span>
 <span>     bty <span class="op">=</span> <span class="st">'l'</span>, lwd <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>     ylab <span class="op">=</span> <span class="st">'True signal'</span>,</span>
 <span>     xlab <span class="op">=</span> <span class="st">'Time'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-12-1.png" width="60%" style="display: block; margin: auto;"></p>
-<p>And plot the relationship between the signal and the
-<code>productivity</code> covariate:</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">true_signal</span> <span class="op">~</span> <span class="va">productivity</span>,</span>
-<span>     pch <span class="op">=</span> <span class="fl">16</span>, bty <span class="op">=</span> <span class="st">'l'</span>,</span>
-<span>     ylab <span class="op">=</span> <span class="st">'True signal'</span>,</span>
-<span>     xlab <span class="op">=</span> <span class="st">'Productivity'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-13-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="shared_states_files/figure-html/unnamed-chunk-11-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>Next we simulate three sensors that are trying to track the same
 hidden signal. All of these sensors have different observation errors
 that can depend nonlinearly on a second external covariate, called
 <code>temperature</code> in this example. Again this makes use of
 <code>gamSim</code></p>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">543210</span><span class="op">)</span></span>
-<span><span class="va">sim_series</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">n_series</span> <span class="op">=</span> <span class="fl">3</span>, <span class="va">true_signal</span><span class="op">)</span><span class="op">{</span></span>
-<span>  <span class="va">temp_effects</span> <span class="op">&lt;-</span> <span class="fu">gamSim</span><span class="op">(</span>n <span class="op">=</span> <span class="fl">100</span>, eg <span class="op">=</span> <span class="fl">7</span>, scale <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">sim_series</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">n_series</span> <span class="op">=</span> <span class="fl">3</span>, <span class="va">true_signal</span><span class="op">)</span><span class="op">{</span></span>
+<span>  <span class="va">temp_effects</span> <span class="op">&lt;-</span> <span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gamSim.html" class="external-link">gamSim</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">100</span>, eg <span class="op">=</span> <span class="fl">7</span>, scale <span class="op">=</span> <span class="fl">0.1</span><span class="op">)</span></span>
 <span>  <span class="va">temperature</span> <span class="op">&lt;-</span> <span class="va">temp_effects</span><span class="op">$</span><span class="va">y</span></span>
 <span>  <span class="va">alphas</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n_series</span>, sd <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
 <span></span>
@@ -486,36 +472,36 @@ that can depend nonlinearly on a second external covariate, called
 <span>   <span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
 <span>  <span class="op">}</span></span>
 <span><span class="va">model_dat</span> <span class="op">&lt;-</span> <span class="fu">sim_series</span><span class="op">(</span>true_signal <span class="op">=</span> <span class="va">true_signal</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## Gu &amp; Wahba 4 term additive model, correlated predictors</span></span></code></pre>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Gu &amp; Wahba 4 term additive model, correlated predictors</span></span></code></pre></div>
 <p>Plot the sensor observations</p>
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">model_dat</span>, y <span class="op">=</span> <span class="st">'observed'</span>,</span>
 <span>                  series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-15-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="shared_states_files/figure-html/unnamed-chunk-13-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>And now plot the observed relationships between the three sensors and
 the <code>temperature</code> covariate</p>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">observed</span> <span class="op">~</span> <span class="va">temperature</span>, data <span class="op">=</span> <span class="va">model_dat</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>   <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">series</span> <span class="op">==</span> <span class="st">'sensor_1'</span><span class="op">)</span>,</span>
 <span>   pch <span class="op">=</span> <span class="fl">16</span>, bty <span class="op">=</span> <span class="st">'l'</span>,</span>
 <span>   ylab <span class="op">=</span> <span class="st">'Sensor 1'</span>,</span>
 <span>   xlab <span class="op">=</span> <span class="st">'Temperature'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-16-1.png" width="60%" style="display: block; margin: auto;"></p>
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<p><img src="shared_states_files/figure-html/unnamed-chunk-14-1.png" width="60%" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">observed</span> <span class="op">~</span> <span class="va">temperature</span>, data <span class="op">=</span> <span class="va">model_dat</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>   <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">series</span> <span class="op">==</span> <span class="st">'sensor_2'</span><span class="op">)</span>,</span>
 <span>   pch <span class="op">=</span> <span class="fl">16</span>, bty <span class="op">=</span> <span class="st">'l'</span>,</span>
 <span>   ylab <span class="op">=</span> <span class="st">'Sensor 2'</span>,</span>
 <span>   xlab <span class="op">=</span> <span class="st">'Temperature'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-16-2.png" width="60%" style="display: block; margin: auto;"></p>
-<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<p><img src="shared_states_files/figure-html/unnamed-chunk-14-2.png" width="60%" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">observed</span> <span class="op">~</span> <span class="va">temperature</span>, data <span class="op">=</span> <span class="va">model_dat</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>   <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">series</span> <span class="op">==</span> <span class="st">'sensor_3'</span><span class="op">)</span>,</span>
 <span>   pch <span class="op">=</span> <span class="fl">16</span>, bty <span class="op">=</span> <span class="st">'l'</span>,</span>
 <span>   ylab <span class="op">=</span> <span class="st">'Sensor 3'</span>,</span>
 <span>   xlab <span class="op">=</span> <span class="st">'Temperature'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-16-3.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="shared_states_files/figure-html/unnamed-chunk-14-3.png" width="60%" style="display: block; margin: auto;"></p>
 <div class="section level3">
 <h3 id="the-shared-signal-model">The shared signal model<a class="anchor" aria-label="anchor" href="#the-shared-signal-model"></a>
 </h3>
@@ -529,7 +515,7 @@ tracking the same latent signal. We use informative priors on the two
 variance components (process error and observation error), which reflect
 our prior belief that the observation error is smaller overall than the
 true process error</p>
-<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span>formula <span class="op">=</span></span>
 <span>               <span class="co"># formula for observations, allowing for different</span></span>
 <span>               <span class="co"># intercepts and hierarchical smooth effects of temperature</span></span>
@@ -545,7 +531,8 @@ true process error</p>
 <span>             trend_model <span class="op">=</span></span>
 <span>               <span class="co"># in addition to productivity effects, the signal is</span></span>
 <span>               <span class="co"># assumed to exhibit temporal autocorrelation</span></span>
-<span>               <span class="st">'AR1'</span>,</span>
+<span>               <span class="fu"><a href="../reference/RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>             noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>             </span>
 <span>             trend_map <span class="op">=</span></span>
 <span>               <span class="co"># trend_map forces all sensors to track the same</span></span>
@@ -560,87 +547,85 @@ true process error</p>
 <span>             </span>
 <span>             <span class="co"># Gaussian observations</span></span>
 <span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>             data <span class="op">=</span> <span class="va">model_dat</span><span class="op">)</span></span></code></pre></div>
+<span>             data <span class="op">=</span> <span class="va">model_dat</span>,</span>
+<span>             silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
 <p>View a reduced version of the model summary because there will be
 many spline coefficients in this model</p>
-<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span>, include_betas <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## GAM observation formula:</span></span>
-<span><span class="co">## observed ~ series + s(temperature, k = 10) + s(series, temperature, </span></span>
-<span><span class="co">##     bs = "sz", k = 8)</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM process formula:</span></span>
-<span><span class="co">## ~s(productivity, k = 8)</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Family:</span></span>
-<span><span class="co">## gaussian</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Link function:</span></span>
-<span><span class="co">## identity</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Trend model:</span></span>
-<span><span class="co">## AR1</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## N process models:</span></span>
-<span><span class="co">## 1 </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## N series:</span></span>
-<span><span class="co">## 3 </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## N timepoints:</span></span>
-<span><span class="co">## 100 </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Status:</span></span>
-<span><span class="co">## Fitted using Stan </span></span>
-<span><span class="co">## 4 chains, each with iter = 1100; warmup = 600; thin = 1 </span></span>
-<span><span class="co">## Total post-warmup draws = 2000</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Observation error parameter estimates:</span></span>
-<span><span class="co">##              2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## sigma_obs[1]  1.6 1.9   2.2    1  1757</span></span>
-<span><span class="co">## sigma_obs[2]  1.4 1.7   2.0    1  1090</span></span>
-<span><span class="co">## sigma_obs[3]  1.3 1.5   1.8    1  1339</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM observation model coefficient (beta) estimates:</span></span>
-<span><span class="co">##                 2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## (Intercept)     0.72  1.70  2.50 1.01   360</span></span>
-<span><span class="co">## seriessensor_2 -2.10 -0.96  0.32 1.00  1068</span></span>
-<span><span class="co">## seriessensor_3 -3.40 -2.00 -0.39 1.00  1154</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">##                        edf Ref.df    F p-value    </span></span>
-<span><span class="co">## s(temperature)        1.22      9 12.7  &lt;2e-16 ***</span></span>
-<span><span class="co">## s(series,temperature) 1.92     16  1.0   0.011 *  </span></span>
-<span><span class="co">## ---</span></span>
-<span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Process model AR parameter estimates:</span></span>
-<span><span class="co">##        2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## ar1[1] 0.33 0.59  0.83    1   492</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Process error parameter estimates:</span></span>
-<span><span class="co">##          2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## sigma[1] 0.72   1   1.3 1.01   392</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##                 edf Ref.df    F p-value    </span></span>
-<span><span class="co">## s(productivity) 3.6      7 9.34 0.00036 ***</span></span>
-<span><span class="co">## ---</span></span>
-<span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Stan MCMC diagnostics:</span></span>
-<span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">## Rhats above 1.05 found for 28 parameters</span></span>
-<span><span class="co">##  *Diagnose further to investigate why the chains have not mixed</span></span>
-<span><span class="co">## 0 of 2000 iterations ended with a divergence (0%)</span></span>
-<span><span class="co">## 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
-<span><span class="co">## E-FMI indicated no pathological behavior</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Mar 25 1:55:37 PM 2024.</span></span>
-<span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
-<span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
-<span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span>, include_betas <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="co">#&gt; GAM observation formula:</span></span>
+<span><span class="co">#&gt; observed ~ series + s(temperature, k = 10) + s(series, temperature, </span></span>
+<span><span class="co">#&gt;     bs = "sz", k = 8)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; GAM process formula:</span></span>
+<span><span class="co">#&gt; ~s(productivity, k = 8)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Family:</span></span>
+<span><span class="co">#&gt; gaussian</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Link function:</span></span>
+<span><span class="co">#&gt; identity</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Trend model:</span></span>
+<span><span class="co">#&gt; AR()</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; N process models:</span></span>
+<span><span class="co">#&gt; 1 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; N series:</span></span>
+<span><span class="co">#&gt; 3 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; N timepoints:</span></span>
+<span><span class="co">#&gt; 100 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Status:</span></span>
+<span><span class="co">#&gt; Fitted using Stan </span></span>
+<span><span class="co">#&gt; 4 chains, each with iter = 1100; warmup = 600; thin = 1 </span></span>
+<span><span class="co">#&gt; Total post-warmup draws = 2000</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Observation error parameter estimates:</span></span>
+<span><span class="co">#&gt;              2.5% 50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; sigma_obs[1]  1.4 1.7   2.1    1  1298</span></span>
+<span><span class="co">#&gt; sigma_obs[2]  1.7 2.0   2.3    1  1946</span></span>
+<span><span class="co">#&gt; sigma_obs[3]  2.0 2.3   2.7    1  2569</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
+<span><span class="co">#&gt;                 2.5%  50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; (Intercept)    -3.40 -2.1 -0.69    1  1067</span></span>
+<span><span class="co">#&gt; seriessensor_2 -2.80 -1.4 -0.14    1  1169</span></span>
+<span><span class="co">#&gt; seriessensor_3  0.63  3.1  4.80    1  1055</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Approximate significance of GAM observation smooths:</span></span>
+<span><span class="co">#&gt;                        edf Ref.df Chi.sq p-value    </span></span>
+<span><span class="co">#&gt; s(temperature)        1.39      9   0.11       1    </span></span>
+<span><span class="co">#&gt; s(series,temperature) 2.78     16 107.40 5.4e-05 ***</span></span>
+<span><span class="co">#&gt; ---</span></span>
+<span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Process model AR parameter estimates:</span></span>
+<span><span class="co">#&gt;        2.5% 50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; ar1[1] 0.37 0.6   0.8 1.01   616</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Process error parameter estimates:</span></span>
+<span><span class="co">#&gt;          2.5% 50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; sigma[1]  1.5 1.8   2.2 1.01   649</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
+<span><span class="co">#&gt;                   edf Ref.df Chi.sq p-value</span></span>
+<span><span class="co">#&gt; s(productivity) 0.926      7   5.45       1</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
+<span><span class="co">#&gt; n_eff / iter looks reasonable for all parameters</span></span>
+<span><span class="co">#&gt; Rhat looks reasonable for all parameters</span></span>
+<span><span class="co">#&gt; 0 of 2000 iterations ended with a divergence (0%)</span></span>
+<span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
+<span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Sat Jun 29 1:56:38 PM 2024.</span></span>
+<span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
+<span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
+<span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="inspecting-effects-on-both-process-and-observation-models">Inspecting effects on both process and observation models<a class="anchor" aria-label="anchor" href="#inspecting-effects-on-both-process-and-observation-models"></a>
@@ -649,44 +634,28 @@ many spline coefficients in this model</p>
 smooth terms. The calculation for these values is incredibly sensitive
 to the estimates for the smoothing parameters so I don’t tend to find
 them to be very meaningful. What are meaningful, however, are
-prediction-based plots of the smooth functions. For example, here is the
-estimated response of the underlying signal to
-<code>productivity</code>:</p>
-<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, trend_effects <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-19-1.png" width="60%" style="display: block; margin: auto;"></p>
-<p>And here are the estimated relationships between the sensor
-observations and the <code>temperature</code> covariate:</p>
-<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'smooths'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-20-1.png" width="60%" style="display: block; margin: auto;"></p>
-<p>All main effects can be quickly plotted with
-<code>conditional_effects</code>:</p>
-<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span>, ask <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-21-1.png" width="60%" style="display: block; margin: auto;"><img src="shared_states_files/figure-html/unnamed-chunk-21-2.png" width="60%" style="display: block; margin: auto;"><img src="shared_states_files/figure-html/unnamed-chunk-21-3.png" width="60%" style="display: block; margin: auto;"><img src="shared_states_files/figure-html/unnamed-chunk-21-4.png" width="60%" style="display: block; margin: auto;"></p>
+prediction-based plots of the smooth functions. All main effects can be
+quickly plotted with <code>conditional_effects</code>:</p>
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></code></pre></div>
+<p><img src="shared_states_files/figure-html/unnamed-chunk-17-1.png" width="60%" style="display: block; margin: auto;"><img src="shared_states_files/figure-html/unnamed-chunk-17-2.png" width="60%" style="display: block; margin: auto;"><img src="shared_states_files/figure-html/unnamed-chunk-17-3.png" width="60%" style="display: block; margin: auto;"><img src="shared_states_files/figure-html/unnamed-chunk-17-4.png" width="60%" style="display: block; margin: auto;"></p>
 <p><code>conditional_effects</code> is simply a wrapper to the more
 flexible <code>plot_predictions</code> function from the
 <code>marginaleffects</code> package. We can get more useful plots of
 these effects using this function for further customisation:</p>
-<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">plot_predictions</span><span class="op">(</span><span class="va">mod</span>, </span>
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="va"><a href="https://marginaleffects.com/" class="external-link">marginaleffects</a></span><span class="op">)</span></span>
+<span><span class="co">#&gt; Loading required package: marginaleffects</span></span>
+<span><span class="fu"><a href="https://marginaleffects.com/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, </span>
 <span>                 condition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'temperature'</span>, <span class="st">'series'</span>, <span class="st">'series'</span><span class="op">)</span>,</span>
 <span>                 points <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-22-1.png" width="60%" style="display: block; margin: auto;"></p>
+<span>  <span class="fu">theme</span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></code></pre></div>
+<p><img src="shared_states_files/figure-html/unnamed-chunk-18-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>We have successfully estimated effects, some of them nonlinear, that
 impact the hidden process AND the observations. All in a single joint
 model. But there can always be challenges with these models,
 particularly when estimating both process and observation error at the
-same time. For example, a <code>pairs</code> plot for the observation
-error for sensor 1 and the hidden process error shows some strong
-correlations that we might want to deal with by using a more structured
-prior:</p>
-<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/pairs.html" class="external-link">pairs</a></span><span class="op">(</span><span class="va">mod</span>, variable <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'sigma[1]'</span>, <span class="st">'sigma_obs[1]'</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-23-1.png" width="60%" style="display: block; margin: auto;"></p>
-<p>But we will leave the model as-is for this example</p>
+same time.</p>
 </div>
 <div class="section level3">
 <h3 id="recovering-the-hidden-signal">Recovering the hidden signal<a class="anchor" aria-label="anchor" href="#recovering-the-hidden-signal"></a>
@@ -697,13 +666,13 @@ model parameters has the estimates for this signal, which we can easily
 plot using the <code>mvgam</code> S3 method for <code>plot</code>. We
 can also overlay the true values for the hidden signal, which shows that
 our model has done a good job of recovering it:</p>
-<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'trend'</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Overlay the true simulated signal</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/points.html" class="external-link">points</a></span><span class="op">(</span><span class="va">true_signal</span>, pch <span class="op">=</span> <span class="fl">16</span>, cex <span class="op">=</span> <span class="fl">1</span>, col <span class="op">=</span> <span class="st">'white'</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/graphics/points.html" class="external-link">points</a></span><span class="op">(</span><span class="va">true_signal</span>, pch <span class="op">=</span> <span class="fl">16</span>, cex <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span></span></code></pre></div>
-<p><img src="shared_states_files/figure-html/unnamed-chunk-24-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="shared_states_files/figure-html/unnamed-chunk-19-1.png" width="60%" style="display: block; margin: auto;"></p>
 </div>
 </div>
 <div class="section level2">
@@ -712,7 +681,7 @@ our model has done a good job of recovering it:</p>
 <p>The following papers and resources offer a lot of useful material
 about other types of State-Space models and how they can be applied in
 practice:</p>
-<p>Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. “<a href="https://d1wqtxts1xzle7.cloudfront.net/30588864/rjournal_2012-1_holmes_et_al-libre.pdf?1391843792=&amp;response-content-disposition=inline%3B+filename%3DMARSS_Multivariate_Autoregressive_State.pdf&amp;Expires=1695861526&amp;Signature=TCRXULs0mUKRM4m1pmvZxwE10bUqS6vzLcuKeUBCj57YIjx23iTxS1fEgBpV0fs2wb5XAw7ZkG84XyMaoS~vjiqZ-DpheQDHwAHpIWG-TcckHQjEjPWTNajFvAemToUdCiHnDa~yrhW9HRgXjgncdalkjzjvjT3HLSW8mcjBDhQN-WJ3MKQFSXtxoBpWfcuPYbf-HC1E1oSl7957y~w0I1gcIVdu6LHjP~CEKXa0BQzS4xuarL2nz~tHD2MverbNJYMrDGrAxIi-MX6i~lfHWuwV6UKRdoOZ0pXIcMYWBTv9V5xYey76aMKTICiJ~0NqXLZdXO5qlS4~~2nFEO7b7w__&amp;Key-Pair-Id=APKAJLOHF5GGSLRBV4ZA" class="external-link">MARSS:
+<p>Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. “<a href="https://journal.r-project.org/archive/2012/RJ-2012-002/index.html" class="external-link">MARSS:
 multivariate autoregressive state-space models for analyzing time-series
 data.</a>” <em>R Journal</em>. 4.1 (2012): 11.</p>
 <p>Ward, Eric J., et al. “<a href="https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.1365-2664.2009.01745.x" class="external-link">Inferring

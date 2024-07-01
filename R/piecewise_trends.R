@@ -48,7 +48,7 @@
 #'
 #' @rdname piecewise_trends
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Example of logistic growth with possible changepoints
 #' # Simple logistic growth model
 #' dNt = function(r, N, k){

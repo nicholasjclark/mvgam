@@ -44,7 +44,7 @@
 #' @author Nicholas J Clark
 #' @seealso \code{\link[marginaleffects]{plot_predictions}}, \code{\link[marginaleffects]{plot_slopes}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Simulate some data
 #' simdat <- sim_mvgam(family = poisson(),
 #'                     seasonality = 'hierarchical')
@@ -53,9 +53,7 @@
 #' mod <- mvgam(y ~ s(season, by = series, k = 5) + year:series,
 #'              family = poisson(),
 #'              data = simdat$data_train,
-#'              chains = 2,
-#'              burnin = 300,
-#'              samples = 300)
+#'              chains = 2)
 #'
 #' # Plot all main effects on the response scale
 #' conditional_effects(mod)
@@ -73,9 +71,7 @@
 #' mod <- mvgam(y ~ te(x0, x1, k = 5) + s(x2, k = 6) + s(x3, k = 6),
 #'             data = dat,
 #'             family = gaussian(),
-#'             chains = 2,
-#'             burnin = 300,
-#'             samples = 300)
+#'             chains = 2)
 #' conditional_effects(mod)
 #' conditional_effects(mod, conf_level = 0.5, type = 'link')
 #' }
@@ -200,7 +196,6 @@ conditional_effects.mvgam = function(x,
 
   class(out) <- 'mvgam_conditional_effects'
   return(out)
-
 }
 
 #' @rdname conditional_effects.mvgam

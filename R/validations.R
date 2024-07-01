@@ -204,7 +204,7 @@ validate_family = function(family, use_stan = TRUE){
 }
 
 #'@noRd
-validate_family_resrictions = function(response, family){
+validate_family_restrictions = function(response, family){
 
   response <- response[!is.na(response)]
 

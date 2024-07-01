@@ -23,7 +23,7 @@ knitr::opts_chunk$set(
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE,   
-  dpi = 150,
+  dpi = 100,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
@@ -39,7 +39,7 @@ This vignette gives an example of how `mvgam` can be used to estimate models whe
 The `trend_map` argument in the `mvgam()` function is an optional `data.frame` that can be used to specify which series should depend on which latent process models (called "trends" in `mvgam`). This can be particularly useful if we wish to force multiple observed time series to depend on the same latent trend process, but with different observation processes. If this argument is supplied, a latent factor model is set up by setting `use_lv = TRUE` and using the supplied `trend_map` to set up the shared trends. Users familiar with the `MARSS` family of packages will recognize this as a way of specifying the $Z$ matrix. This `data.frame` needs to have column names `series` and `trend`, with integer values in the `trend` column to state which trend each series should depend on. The `series` column should have a single unique entry for each time series in the data, with names that perfectly match the factor levels of the `series` variable in `data`). For example, if we were to simulate a collection of three integer-valued time series (using `sim_mvgam`), the following `trend_map` would force the first two series to share the same latent trend process:
 ```{r}
 set.seed(122)
-simdat <- sim_mvgam(trend_model = 'AR1',
+simdat <- sim_mvgam(trend_model = AR(),
                     prop_trend = 0.6,
                     mu = c(0, 1, 2),
                     family = poisson())
@@ -66,8 +66,10 @@ fake_mod <- mvgam(y ~
                   trend_formula = ~ s(season, bs = 'cc', k = 6),
                   
                   # AR1 dynamics (each latent process model has DIFFERENT)
-                  # dynamics
-                  trend_model = 'AR1',
+                  # dynamics; processes are estimated using the noncentred
+                  # parameterisation for improved efficiency
+                  trend_model = AR(),
+                  noncentred = TRUE,
                   
                   # supplied trend_map
                   trend_map = trend_map,
@@ -93,19 +95,23 @@ Though this model doesn't perfectly match the data-generating process (which all
 ```{r full_mod, include = FALSE, results='hide'}
 full_mod <- mvgam(y ~ series - 1,
                   trend_formula = ~ s(season, bs = 'cc', k = 6),
-                  trend_model = 'AR1',
+                  trend_model = AR(),
+                  noncentred = TRUE,
                   trend_map = trend_map,
                   family = poisson(),
-                  data = simdat$data_train)
+                  data = simdat$data_train,
+                  silent = 2)
 ```
 
 ```{r eval=FALSE}
 full_mod <- mvgam(y ~ series - 1,
                   trend_formula = ~ s(season, bs = 'cc', k = 6),
-                  trend_model = 'AR1',
+                  trend_model = AR(),
+                  noncentred = TRUE,
                   trend_map = trend_map,
                   family = poisson(),
-                  data = simdat$data_train)
+                  data = simdat$data_train,
+                  silent = 2)
 ```
 
 The summary of this model is informative as it shows that only two latent process models have been estimated, even though we have three observed time series. The model converges well
@@ -113,31 +119,21 @@ The summary of this model is informative as it shows that only two latent proces
 summary(full_mod)
 ```
 
-Quick plots of all main effects can be made using `conditional_effects()`:
-```{r}
-plot(conditional_effects(full_mod, type = 'link'), ask = FALSE)
-```
-
-Even more informative are the plots of the latent processes. Both series 1 and 2 share the exact same estimates, while the estimates for series 3 are different:
+Both series 1 and 2 share the exact same latent process estimates, while the estimates for series 3 are different:
 ```{r}
 plot(full_mod, type = 'trend', series = 1)
 plot(full_mod, type = 'trend', series = 2)
 plot(full_mod, type = 'trend', series = 3)
 ```
 
-However, the forecasts for series' 1 and 2 differ because they have different intercepts in the observation model
-```{r}
-plot(full_mod, type = 'forecast', series = 1)
-plot(full_mod, type = 'forecast', series = 2)
-plot(full_mod, type = 'forecast', series = 3)
-```
+However, forecasts for series' 1 and 2 will differ because they have different intercepts in the observation model
 
 ## Example: signal detection
 Now we will explore a more complicated example. Here we simulate a true hidden signal that we are trying to track. This signal depends nonlinearly on some covariate (called `productivity`, which represents a measure of how productive the landscape is). The signal also demonstrates a fairly large amount of temporal autocorrelation:
 ```{r}
-set.seed(543210)
+set.seed(0)
 # simulate a nonlinear relationship using the mgcv function gamSim
-signal_dat <- gamSim(n = 100, eg = 1, scale = 1)
+signal_dat <- mgcv::gamSim(n = 100, eg = 1, scale = 1)
 
 # productivity is one of the variables in the simulated data
 productivity <- signal_dat$x2
@@ -157,19 +153,10 @@ plot(true_signal, type = 'l',
      xlab = 'Time')
 ```
 
-And plot the relationship between the signal and the `productivity` covariate:
-```{r}
-plot(true_signal ~ productivity,
-     pch = 16, bty = 'l',
-     ylab = 'True signal',
-     xlab = 'Productivity')
-```
-
 Next we simulate three sensors that are trying to track the same hidden signal. All of these sensors have different observation errors that can depend nonlinearly on a second external covariate, called `temperature` in this example. Again this makes use of `gamSim`
 ```{r}
-set.seed(543210)
 sim_series = function(n_series = 3, true_signal){
-  temp_effects <- gamSim(n = 100, eg = 7, scale = 0.1)
+  temp_effects <- mgcv::gamSim(n = 100, eg = 7, scale = 0.1)
   temperature <- temp_effects$y
   alphas <- rnorm(n_series, sd = 2)
 
@@ -233,7 +220,8 @@ mod <- mvgam(formula =
              trend_model =
                # in addition to productivity effects, the signal is
                # assumed to exhibit temporal autocorrelation
-               'AR1',
+               AR(),
+             noncentred = TRUE,
              
              trend_map =
                # trend_map forces all sensors to track the same
@@ -250,7 +238,8 @@ mod <- mvgam(formula =
              family = gaussian(),
              burnin = 600,
              adapt_delta = 0.95,
-             data = model_dat)
+             data = model_dat,
+             silent = 2)
 ```
 
 ```{r eval=FALSE}
@@ -269,7 +258,8 @@ mod <- mvgam(formula =
              trend_model =
                # in addition to productivity effects, the signal is
                # assumed to exhibit temporal autocorrelation
-               'AR1',
+               AR(),
+             noncentred = TRUE,
              
              trend_map =
                # trend_map forces all sensors to track the same
@@ -284,7 +274,8 @@ mod <- mvgam(formula =
              
              # Gaussian observations
              family = gaussian(),
-             data = model_dat)
+             data = model_dat,
+             silent = 2)
 ```
 
 View a reduced version of the model summary because there will be many spline coefficients in this model
@@ -293,35 +284,21 @@ summary(mod, include_betas = FALSE)
 ```
 
 ### Inspecting effects on both process and observation models
-Don't pay much attention to the approximate *p*-values of the smooth terms. The calculation for these values is incredibly sensitive to the estimates for the smoothing parameters so I don't tend to find them to be very meaningful. What are meaningful, however, are prediction-based plots of the smooth functions. For example, here is the estimated response of the underlying signal to `productivity`:
+Don't pay much attention to the approximate *p*-values of the smooth terms. The calculation for these values is incredibly sensitive to the estimates for the smoothing parameters so I don't tend to find them to be very meaningful. What are meaningful, however, are prediction-based plots of the smooth functions. All main effects can be quickly plotted with `conditional_effects`:
 ```{r}
-plot(mod, type = 'smooths', trend_effects = TRUE)
-```
-
-And here are the estimated relationships between the sensor observations and the `temperature` covariate:
-```{r}
-plot(mod, type = 'smooths')
-```
-
-All main effects can be quickly plotted with `conditional_effects`:
-```{r}
-plot(conditional_effects(mod, type = 'link'), ask = FALSE)
+conditional_effects(mod, type = 'link')
 ```
 
 `conditional_effects` is simply a wrapper to the more flexible `plot_predictions` function from the `marginaleffects` package. We can get more useful plots of these effects using this function for further customisation:
 ```{r}
+require(marginaleffects)
 plot_predictions(mod, 
                  condition = c('temperature', 'series', 'series'),
                  points = 0.5) +
   theme(legend.position = 'none')
 ```
 
-We have successfully estimated effects, some of them nonlinear, that impact the hidden process AND the observations. All in a single joint model. But there can always be challenges with these models, particularly when estimating both process and observation error at the same time. For example, a `pairs` plot for the observation error for sensor 1 and the hidden process error shows some strong correlations that we might want to deal with by using a more structured prior:
-```{r}
-pairs(mod, variable = c('sigma[1]', 'sigma_obs[1]'))
-```
-
-But we will leave the model as-is for this example
+We have successfully estimated effects, some of them nonlinear, that impact the hidden process AND the observations. All in a single joint model. But there can always be challenges with these models, particularly when estimating both process and observation error at the same time.
 
 ### Recovering the hidden signal
 A final but very key question is whether we can successfully recover the true hidden signal. The `trend` slot in the returned model parameters has the estimates for this signal, which we can easily plot using the `mvgam` S3 method for `plot`. We can also overlay the true values for the hidden signal, which shows that our model has done a good job of recovering it:
@@ -336,7 +313,7 @@ points(true_signal, pch = 16, cex = 0.8)
 ## Further reading
 The following papers and resources offer a lot of useful material about other types of State-Space models and how they can be applied in practice:
   
-Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. "[MARSS: multivariate autoregressive state-space models for analyzing time-series data.](https://d1wqtxts1xzle7.cloudfront.net/30588864/rjournal_2012-1_holmes_et_al-libre.pdf?1391843792=&response-content-disposition=inline%3B+filename%3DMARSS_Multivariate_Autoregressive_State.pdf&Expires=1695861526&Signature=TCRXULs0mUKRM4m1pmvZxwE10bUqS6vzLcuKeUBCj57YIjx23iTxS1fEgBpV0fs2wb5XAw7ZkG84XyMaoS~vjiqZ-DpheQDHwAHpIWG-TcckHQjEjPWTNajFvAemToUdCiHnDa~yrhW9HRgXjgncdalkjzjvjT3HLSW8mcjBDhQN-WJ3MKQFSXtxoBpWfcuPYbf-HC1E1oSl7957y~w0I1gcIVdu6LHjP~CEKXa0BQzS4xuarL2nz~tHD2MverbNJYMrDGrAxIi-MX6i~lfHWuwV6UKRdoOZ0pXIcMYWBTv9V5xYey76aMKTICiJ~0NqXLZdXO5qlS4~~2nFEO7b7w__&Key-Pair-Id=APKAJLOHF5GGSLRBV4ZA)" *R Journal*. 4.1 (2012): 11.
+Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. "[MARSS: multivariate autoregressive state-space models for analyzing time-series data.](https://journal.r-project.org/archive/2012/RJ-2012-002/index.html)" *R Journal*. 4.1 (2012): 11.
   
 Ward, Eric J., et al. "[Inferring spatial structure from time‐series data: using multivariate state‐space models to detect metapopulation structure of California sea lions in the Gulf of California, Mexico.](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.1365-2664.2009.01745.x)" *Journal of Applied Ecology* 47.1 (2010): 47-56.
   

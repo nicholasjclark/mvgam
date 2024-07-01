@@ -68,11 +68,12 @@ of a \code{mvgam} model, while the forecasting functions
 that respect the temporal dynamics of estimated latent trends.
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate some data and fit a model
 simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 mod <- mvgam(y ~ s(season, bs = 'cc'),
             trend_model = AR(),
+            noncentred = TRUE,
             data = simdat$data_train)
 
 # Compute posterior expectations

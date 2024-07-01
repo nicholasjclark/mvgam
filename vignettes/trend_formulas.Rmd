@@ -231,7 +231,7 @@ priors <- get_mvgam_priors(
     te(temp, month, k = c(4, 4), by = trend),
   
   # VAR1 model with uncorrelated process errors
-  trend_model = 'VAR1',
+  trend_model = VAR(),
   family = gaussian(),
   data = plankton_train)
 ```
@@ -265,8 +265,9 @@ var_mod <- mvgam(y ~ -1,
                  family = gaussian(),
                  data = plankton_train,
                  newdata = plankton_test,
-                 trend_model = 'VAR1',
+                 trend_model = VAR(),
                  priors = priors, 
+                 adapt_delta = 0.99,
                  burnin = 1000)
 ```
 
@@ -280,13 +281,14 @@ var_mod <- mvgam(
     te(temp, month, k = c(4, 4), by = trend),
   
   # VAR1 model with uncorrelated process errors
-  trend_model = 'VAR1',
+  trend_model = VAR(),
   family = gaussian(),
   data = plankton_train,
   newdata = plankton_test,
   
   # include the updated priors
-  priors = priors)
+  priors = priors,
+  silent = 2)
 ```
 
 ### Inspecting SS models
@@ -313,7 +315,7 @@ mcmc_plot(var_mod,
           type = 'hist')
 ```
 
-There is a lot happening in this matrix. Each cell captures the lagged effect of the process in the column on the process in the row in the next timestep. So for example, the effect in cell [1,3], which is quite strongly negative, means that an *increase* in the process for series 3 (Greens) at time $t$ is expected to lead to a subsequent *decrease* in the process for series 1 (Bluegreens) at time $t+1$. The latent process model is now capturing these effects and the smooth seasonal effects.
+There is a lot happening in this matrix. Each cell captures the lagged effect of the process in the column on the process in the row in the next timestep. So for example, the effect in cell [1,3] shows how an *increase* in the process for series 3 (Greens) at time $t$ is expected to impact the process for series 1 (Bluegreens) at time $t+1$. The latent process model is now capturing these effects and the smooth seasonal effects.
   
 The process error $(\Sigma)$ captures unmodelled variation in the process models. Again, we fixed the off-diagonals to 0, so the histograms for these will look like flat boxes:
 ```{r warning=FALSE, message=FALSE}
@@ -356,8 +358,9 @@ varcor_mod <- mvgam(y ~ -1,
                  family = gaussian(),
                  data = plankton_train,
                  newdata = plankton_test,
-                 trend_model = 'VAR1cor',
+                 trend_model = VAR(cor = TRUE),
                  burnin = 1000,
+                 adapt_delta = 0.99,
                  priors = priors)
 ```
 
@@ -371,13 +374,14 @@ varcor_mod <- mvgam(
     te(temp, month, k = c(4, 4), by = trend),
   
   # VAR1 model with correlated process errors
-  trend_model = 'VAR1cor',
+  trend_model = VAR(cor = TRUE),
   family = gaussian(),
   data = plankton_train,
   newdata = plankton_test,
   
   # include the updated priors
-  priors = priors)
+  priors = priors,
+  silent = 2)
 ```
 
 The $(\Sigma)$ matrix now captures any evidence of contemporaneously correlated process error:
@@ -393,7 +397,7 @@ mcmc_plot(varcor_mod,
           type = 'hist')
 ```
 
-This symmetric matrix tells us there is support for correlated process errors. For example, series 1 and 3 (Bluegreens and Greens) show negatively correlated process errors, while series 1 and 4 (Bluegreens and Other.algae) show positively correlated errors. But it is easier to interpret these estimates if we convert the covariance matrix to a correlation matrix. Here we compute the posterior median process error correlations:
+This symmetric matrix tells us there is support for correlated process errors, as several of the off-diagonal entries are strongly non-zero. But it is easier to interpret these estimates if we convert the covariance matrix to a correlation matrix. Here we compute the posterior median process error correlations:
 ```{r}
 Sigma_post <- as.matrix(varcor_mod, variable = 'Sigma', regex = TRUE)
 median_correlations <- cov2cor(matrix(apply(Sigma_post, 2, median),

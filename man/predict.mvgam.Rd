@@ -102,7 +102,7 @@ of a \code{mvgam} model, while the forecasting functions
 that respect the temporal dynamics of estimated latent trends.
 }
 \examples{
-\dontrun{
+\donttest{
 # Simulate 4 time series with hierarchical seasonality
 # and independent AR1 dynamic processes
 set.seed(111)
@@ -115,8 +115,7 @@ mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
              data = simdat$data_train,
              family = gaussian(),
              trend_model = AR(),
-             burnin = 300,
-             samples = 300,
+             noncentred = TRUE,
              chains = 2)
 
 # Generate predictions against observed data

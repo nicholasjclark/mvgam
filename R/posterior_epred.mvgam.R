@@ -39,11 +39,12 @@
 #' @seealso \code{\link{hindcast.mvgam}} \code{\link{posterior_linpred.mvgam}} \code{\link{posterior_predict.mvgam}}
 #' @aliases posterior_epred
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
 #'             trend_model = AR(),
+#'             noncentred = TRUE,
 #'             data = simdat$data_train)
 #'
 #'# Compute posterior expectations
@@ -110,14 +111,13 @@ posterior_epred.mvgam = function(object,
 #' and \code{n_obs} is the number of observations in \code{newdata}
 #' @seealso \code{\link{hindcast.mvgam}} \code{\link{posterior_epred.mvgam}} \code{\link{posterior_predict.mvgam}}
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' # Simulate some data and fit a model
 #' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
-#'              trend_model = 'AR1',
+#'              trend_model = AR(),
+#'              noncentred = TRUE,
 #'              data = simdat$data_train,
-#'              burnin = 300,
-#'              samples = 300,
 #'              chains = 2)
 #'
 #'# Extract linear predictor values

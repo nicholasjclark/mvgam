@@ -6,6 +6,7 @@
 #'
 #'@importFrom stats rnorm rbeta rpois rlnorm rgamma cor cov2cor cov stl ts
 #'@importFrom brms lognormal
+#'@importFrom Matrix nearPD
 #'@param T \code{integer}. Number of observations (timepoints)
 #'@param n_series \code{integer}. Number of discrete time series
 #'@param seasonality \code{character}. Either \code{shared}, meaning that all series share the exact same seasonal pattern,

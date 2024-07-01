@@ -61,7 +61,7 @@
 #'   from each effect are returned in `matrix` form while standard errors (representing
 #'   the interval: `(max(probs) - min(probs)) / 2`) are returned in a separate `matrix`
 #'@examples
-#'\dontrun{
+#'\donttest{
 #'# Simulate 4 time series with hierarchical seasonality
 #'# and independent AR1 dynamic processes
 #'set.seed(111)
@@ -74,8 +74,7 @@
 #'              data = simdat$data_train,
 #'              family = gaussian(),
 #'              trend_model = AR(),
-#'              burnin = 300,
-#'              samples = 300,
+#'              noncentred = TRUE,
 #'              chains = 2)
 #'
 #'# Generate predictions against observed data
