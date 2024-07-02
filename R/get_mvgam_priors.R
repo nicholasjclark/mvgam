@@ -248,8 +248,11 @@ get_mvgam_priors = function(formula,
                                         fixed = TRUE),
                                    collapse = " "))
 
-    # Drop any intercept from the formula if this is not an N-mixture model
-    if(family_char != 'nmix'){
+    # Drop any intercept from the formula if this is not an N-mixture model or if a
+    # trend_map was not originally supplied
+    if(family_char == 'nmix') drop_trend_int <- FALSE else drop_trend_int <- TRUE
+    if(!missing(trend_map)) drop_trend_int <- FALSE
+    if(drop_trend_int){
       if(attr(terms(trend_formula), 'intercept') == 1){
         trend_formula <- update(trend_formula, trend_y  ~ . -1)
       } else {

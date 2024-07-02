@@ -27,7 +27,8 @@
 #'(i.e. by allowing effects to vary across process models, even when some time series share the same underlying
 #'process model). This feature is only currently available for `RW()`, `AR()` and `VAR()` trend models.
 #'In `nmix()` family models, the `trend_formula` is used to set up a linear predictor for the underlying
-#'latent abundance
+#'latent abundance. If this is supplied but you do not also supply a `trend_map`,
+#'the intercept parameter in this formula will automatically be surpressed to maintain identifiability. In other words, the latent process is assumed to be zero-centred
 #'@param knots An optional \code{list} containing user specified knot values to be used for basis construction.
 #'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
 #'(note that the number of knots is not always just `k`). Different terms can use different numbers of knots,
@@ -123,8 +124,9 @@
 #'`use_lv = TRUE` and using the mapping to set up the shared trends. Needs to have column names
 #'`series` and `trend`, with integer values in the `trend` column to state which trend each series
 #'should depend on. The `series` column should have a single unique entry for each series in the
-#'data (names should perfectly match factor levels of the `series` variable in `data`). See examples
-#'for details
+#'data (names should perfectly match factor levels of the `series` variable in `data`). Note that
+#'if this is supplied, the intercept parameter in the process model will NOT be automatically suppressed.
+#'See examples for details
 #'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
 #'trend is expected to broadly follow a non-zero slope. Only available for
 #'`RW()` and `AR()` trend models. Note that if the latent trend is more or less stationary,

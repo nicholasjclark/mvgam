@@ -42,7 +42,8 @@ the identifier \code{series} in this formula to specify effects that vary across
 (i.e. by allowing effects to vary across process models, even when some time series share the same underlying
 process model). This feature is only currently available for \code{RW()}, \code{AR()} and \code{VAR()} trend models.
 In \code{nmix()} family models, the \code{trend_formula} is used to set up a linear predictor for the underlying
-latent abundance}
+latent abundance. If this is supplied but you do not also supply a \code{trend_map},
+the intercept parameter in this formula will automatically be surpressed to maintain identifiability. In other words, the latent process is assumed to be zero-centred}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:
@@ -87,8 +88,9 @@ different observation processes. If supplied, a latent factor model is set up by
 \code{use_lv = TRUE} and using the mapping to set up the shared trends. Needs to have column names
 \code{series} and \code{trend}, with integer values in the \code{trend} column to state which trend each series
 should depend on. The \code{series} column should have a single unique entry for each series in the
-data (names should perfectly match factor levels of the \code{series} variable in \code{data}). See examples
-for details}
+data (names should perfectly match factor levels of the \code{series} variable in \code{data}). Note that
+if this is supplied, the intercept parameter in the process model will NOT be automatically suppressed.
+See examples for details}
 
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. Only available for
