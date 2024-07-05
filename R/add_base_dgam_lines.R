@@ -227,12 +227,12 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                }
 
                for (j in 1:n_lv) {
-               LV_raw[3, j] ~ dnorm(drift[j] + ar1[j]*LV_raw[2, j] + ar2[j]*LV_raw[1, j], penalty[j])
+               LV_raw[3, j] ~ dnorm(drift[j]*2 + ar1[j]*LV_raw[2, j] + ar2[j]*LV_raw[1, j], penalty[j])
                }
 
                for (i in 4:n) {
                for (j in 1:n_lv) {
-               LV_raw[i, j] ~ dnorm(drift[j] + ar1[j]*LV_raw[i - 1, j] +
+               LV_raw[i, j] ~ dnorm(drift[j]*(i - 1) + ar1[j]*LV_raw[i - 1, j] +
                ar2[j]*LV_raw[i - 2, j] + ar3[j]*LV_raw[i - 3, j], penalty[j])
                }
                }
@@ -365,12 +365,12 @@ add_base_dgam_lines = function(use_lv, stan = FALSE, offset = FALSE){
                           }
 
                           for (s in 1:n_series) {
-                          trend[3, s] ~ dnorm(drift[s] + ar1[s]*trend[2, s] + ar2[s]*trend[1, s], tau[s])
+                          trend[3, s] ~ dnorm(drift[s]*2 + ar1[s]*trend[2, s] + ar2[s]*trend[1, s], tau[s])
                           }
 
                           for (i in 4:n) {
                           for (s in 1:n_series){
-                          trend[i, s] ~ dnorm(drift[s] + ar1[s]*trend[i - 1, s] + ar2[s]*trend[i - 2, s] + ar3[s]*trend[i - 3, s], tau[s])
+                          trend[i, s] ~ dnorm(drift[s]*(i - 1) + ar1[s]*trend[i - 1, s] + ar2[s]*trend[i - 2, s] + ar3[s]*trend[i - 3, s], tau[s])
                           }
                           }
 

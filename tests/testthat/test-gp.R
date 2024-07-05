@@ -92,7 +92,7 @@ test_that("noncentring with gp terms working properly", {
   )
 
   expect_true(
-    any(grepl(trimws("trend[2 : n, s] += drift[s] + trend[1 : (n - 1), s];"),
+    any(grepl(trimws("trend[2 : n, s] += trend[1 : (n - 1), s];"),
               trimws(mod$model_file),
               fixed = TRUE))
   )

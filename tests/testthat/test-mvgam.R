@@ -18,6 +18,19 @@ test_that("response variable must be specified", {
                'response variable is missing from formula')
 })
 
+test_that("drift deprecation message works", {
+  expect_message(mvgam(y ~ s(series, bs = 're') +
+                         s(season, bs = 'cc', k = 8) +
+                         s(time, bs = 'moi', k = 8),
+                       trend_model = RW(ma = TRUE),
+                       drift = TRUE,
+                       data = gaus_data$data_train,
+                       newdata = gaus_data$data_test,
+                       family = gaussian(),
+                       run_model = FALSE),
+                 'The "drift" argument is deprecated; use fixed effects of "time" instead')
+})
+
 test_that("id to link smooths not allowed yet", {
   expect_error(mod <- mvgam(y ~ s(time, id = 1) +
                                s(time, by = series, id = 1),
@@ -137,6 +150,7 @@ test_that("JAGS setups should work", {
                use_stan = FALSE,
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
                trend_model = 'AR1',
@@ -145,33 +159,34 @@ test_that("JAGS setups should work", {
                use_stan = FALSE,
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
                trend_model = 'AR2',
-               drift = TRUE,
                data = simdat$data_train,
                family = poisson(),
                use_stan = FALSE,
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
                trend_model = 'AR1',
-               drift = TRUE,
                data = simdat$data_train,
                family = nb(),
                use_stan = FALSE,
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
                trend_model = 'AR3',
-               drift = TRUE,
                data = simdat$data_train,
                family = nb(),
                use_stan = FALSE,
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
                trend_model = 'AR1',
@@ -180,31 +195,31 @@ test_that("JAGS setups should work", {
                use_stan = FALSE,
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
                trend_model = 'AR3',
-               drift = TRUE,
                data = simdat$data_train,
                family = tweedie(),
                use_stan = FALSE,
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(mod$drift == FALSE)
 
   expect_true(inherits(get_mvgam_priors(y ~ s(season),
                                         trend_model = 'RW',
-                                        drift = TRUE,
                                         data = simdat$data_train,
                                         family = tweedie(),
                                         use_stan = FALSE),
                        'data.frame'))
   mod <- mvgam(y ~ s(season),
                trend_model = 'RW',
-               drift = TRUE,
                data = simdat$data_train,
                family = tweedie(),
                use_stan = FALSE,
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(mod$drift == FALSE)
 })
 
 test_that("trend = 'None' works for State Space", {
@@ -233,7 +248,6 @@ test_that("noncentring working properly for a range of models", {
                          s(season, bs = 'cc', k = 8) +
                          s(time, bs = 'moi', k = 8),
                        trend_model = RW(ma = TRUE),
-                       drift = TRUE,
                        data = gaus_data$data_train,
                        newdata = gaus_data$data_test,
                        family = gaussian(),
@@ -245,7 +259,6 @@ test_that("noncentring working properly for a range of models", {
                          s(season, bs = 'cc', k = 8) +
                          s(time, bs = 'moi', k = 8),
                        trend_model = RW(cor = TRUE),
-                       drift = TRUE,
                        data = gaus_data$data_train,
                        newdata = gaus_data$data_test,
                        family = gaussian(),
@@ -257,7 +270,6 @@ test_that("noncentring working properly for a range of models", {
                          s(season, bs = 'cc', k = 8) +
                          s(time, bs = 'moi', k = 8),
                        trend_model = AR(p = 2, cor = TRUE),
-                       drift = TRUE,
                        data = gaus_data$data_train,
                        newdata = gaus_data$data_test,
                        family = gaussian(),
@@ -281,7 +293,6 @@ test_that("noncentring working properly for a range of models", {
                  s(season, bs = 'cc', k = 8) +
                  s(time, bs = 'moi', k = 8),
                trend_model = RW(),
-               drift = TRUE,
                data = gaus_data$data_train,
                newdata = gaus_data$data_test,
                family = gaussian(),
@@ -296,7 +307,7 @@ test_that("noncentring working properly for a range of models", {
   )
 
   expect_true(
-    any(grepl(trimws("trend[2 : n, s] += drift[s] + trend[1 : (n - 1), s];"),
+    any(grepl(trimws("trend[2 : n, s] += trend[1 : (n - 1), s];"),
               trimws(mod$model_file),
               fixed = TRUE))
   )
@@ -366,7 +377,6 @@ test_that("noncentring working properly for a range of models", {
 test_that("prior_only works", {
   mod <- mvgam(y ~ s(season),
                trend_model = AR(p = 2),
-               drift = TRUE,
                data = gaus_data$data_train,
                prior_simulation = TRUE,
                family = gaussian(),
@@ -408,7 +418,6 @@ test_that("prior_only works", {
 
   mod <- mvgam(y ~ s(season),
                trend_model = AR(p = 3),
-               drift = TRUE,
                data = beta_data$data_train,
                prior_simulation = TRUE,
                family = betar(),

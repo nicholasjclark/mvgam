@@ -27,8 +27,9 @@
 #'(i.e. by allowing effects to vary across process models, even when some time series share the same underlying
 #'process model). This feature is only currently available for `RW()`, `AR()` and `VAR()` trend models.
 #'In `nmix()` family models, the `trend_formula` is used to set up a linear predictor for the underlying
-#'latent abundance. If this is supplied but you do not also supply a `trend_map`,
-#'the intercept parameter in this formula will automatically be surpressed to maintain identifiability. In other words, the latent process is assumed to be zero-centred
+#'latent abundance. Be aware that it can be very challenging to simultaneously estimate intercept parameters
+#'for both the observation mode (captured by `formula`) and the process model (captured by `trend_formula`).
+#'Users are recommended to drop one of these using the `- 1` convention in the formula right hand side.
 #'@param knots An optional \code{list} containing user specified knot values to be used for basis construction.
 #'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
 #'(note that the number of knots is not always just `k`). Different terms can use different numbers of knots,
@@ -127,15 +128,16 @@
 #'data (names should perfectly match factor levels of the `series` variable in `data`). Note that
 #'if this is supplied, the intercept parameter in the process model will NOT be automatically suppressed.
 #'See examples for details
-#'@param drift \code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
-#'trend is expected to broadly follow a non-zero slope. Only available for
-#'`RW()` and `AR()` trend models. Note that if the latent trend is more or less stationary,
-#'the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-#'predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift parameters will also likely
-#'be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}
-#'@param noncentred \code{logical} experimental feature to use the non-centred parameterisation for
-#'trend models. Only available for certain trend models
-#'(i.e. `RW()`, `AR()`, or `CAR()` with or without `drift`, or for
+#'@param drift Deprecated. If you wish to estimate drift parameters, include parametric fixed effects
+#'of 'time' in your formulae instead.
+#'@param noncentred \code{logical} Use the non-centred parameterisation for autoregressive
+#'trend models? Setting to `TRUE` will reparameterise the model to avoid possible
+#'degeneracies that can show up when estimating the latent dynamic random effects. For some
+#'models, this can produce big gains in efficiency, meaning that fewer burnin and sampling
+#'iterations are required for posterior exploration. But for other models, where the data
+#'are highly informative about the latent dynamic processes, this can actually lead to worse
+#'performance. Only available for certain trend models
+#'(i.e. `RW()`, `AR()`, or `CAR()`, or for
 #'`trend = 'None'` when using a `trend_formula`). Not yet available for moving average or
 #'correlated error models
 #'@param chains \code{integer} specifying the number of parallel chains for the model. Ignored
@@ -192,7 +194,7 @@
 #'  many spline parameters and latent trend parameters. But rigorous testing has not
 #'  been carried out
 #'@param autoformat \code{Logical}. Use the `stanc` parser to automatically format the
-#'`Stan` code and check for deprecations. Defaults to `TRUE`
+#'`Stan` code and check for deprecations. Only for development purposes, so leave to `TRUE`
 #' @param save_all_pars \code{Logical} flag to indicate if draws from all
 #'   variables defined in Stan's \code{parameters} block should be saved
 #'   (default is \code{FALSE}).
@@ -624,6 +626,9 @@ mvgam = function(formula,
   orig_data <- data_train
 
   # Validate trend_model
+  if(drift &  silent < 2L)
+    message('The "drift" argument is deprecated; use fixed effects of "time" instead')
+  drift <- FALSE
   orig_trend_model <- trend_model
   trend_model <- validate_trend_model(orig_trend_model,
                                       drift = drift,
@@ -1432,9 +1437,7 @@ mvgam = function(formula,
     # Add modifications for trend mapping and trend predictors, if
     # supplied
     trend_sp_names <- NA
-    if(add_nmix) drop_trend_int <- FALSE else drop_trend_int <- TRUE
     if(!missing(trend_map)){
-      drop_trend_int <- FALSE
       trend_map_setup <- trend_map_mods(model_file = vectorised$model_file,
                                         model_data = vectorised$model_data,
                                         trend_map = trend_map,
@@ -1467,7 +1470,7 @@ mvgam = function(formula,
           },
           model_file = vectorised$model_file,
           model_data = vectorised$model_data,
-          drop_trend_int = drop_trend_int,
+          drop_trend_int = FALSE,
           drift = drift)
 
         vectorised$model_file <- trend_pred_setup$model_file
@@ -1769,7 +1772,7 @@ mvgam = function(formula,
                                } else {
                                  NULL
                                },
-                               drift = drift,
+                               drift = FALSE,
                                priors = priors,
                                model_file = if(use_stan){
                                  vectorised$model_file
@@ -2050,7 +2053,7 @@ mvgam = function(formula,
                            } else {
                              NULL
                            },
-                           drift = drift,
+                           drift = FALSE,
                            priors = priors,
                            model_output = out_gam_mod,
                            model_file = if(use_stan){

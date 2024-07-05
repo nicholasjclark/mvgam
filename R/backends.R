@@ -115,8 +115,11 @@
       diagnostics = NULL,
       iter_sampling = samples,
       iter_warmup = burnin,
-      show_messages = silent < 2,
-      show_exceptions = silent == 0)
+      show_messages = silent < 2)
+
+    if(utils::packageVersion('cmdstanr') >= '0.7.0'){
+      c(args) <- nlist(show_exceptions = silent == 0)
+    }
 
     if(parallel){
       c(args) <- nlist(parallel_chains = min(c(chains, parallel::detectCores() - 1)))

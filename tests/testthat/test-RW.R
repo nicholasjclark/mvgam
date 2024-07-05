@@ -14,24 +14,7 @@ test_that("ma and cor options should work for trends other than VAR", {
                         gsub(' ', '', test$model_file), fixed = TRUE)))
   expect_true(attr(test$model_data, 'trend_model') == 'AR1')
 
-  # Drift terms allowed
-  test <- mvgam(y ~ s(series, bs = 're') +
-                  s(season, bs = 'cc') - 1,
-                trend_model = AR(p = 1, ma = TRUE),
-                drift = TRUE,
-                data = gaus_data$data_train,
-                family = gaussian(),
-                run_model = FALSE)
-  expect_true(inherits(test, 'mvgam_prefit'))
-  expect_true(any(grepl('vector<lower=-1,upper=1>[n_series]theta;',
-                        gsub(' ', '', test$model_file), fixed = TRUE)))
-  expect_true(attr(test$model_data, 'trend_model') == 'AR1')
-  expect_true(any(grepl('drift~std_normal();',
-                        gsub(' ', '', test$model_file), fixed = TRUE)))
-  expect_true(any(grepl('vector[n_series]drift;',
-                        gsub(' ', '', test$model_file), fixed = TRUE)))
-  expect_true(test$drift)
-
+  # Correlation works
   test <- mvgam(y ~ s(series, bs = 're') +
                        s(season, bs = 'cc') - 1,
                      trend_model = AR(p = 1, cor = TRUE),
@@ -102,15 +85,6 @@ test_that("VARMAs are set up correctly", {
 
   expect_true(any(grepl('// unconstrained ma inverse partial autocorrelations',
                         varma$model_file, fixed = TRUE)))
-
-  expect_error(mvgam(y ~ s(series, bs = 're'),
-                 trend_formula = ~ s(season, bs = 'cc'),
-                 trend_model = VAR(ma = TRUE),
-                 drift = TRUE,
-                 data = gaus_data$data_train,
-                 family = gaussian(),
-                 run_model = FALSE),
-               'drift terms not allowed for VAR or GP models')
 })
 
 # Replicate CAR1 example
@@ -180,24 +154,6 @@ test_that("CAR1 sets up correctly", {
   expect_true(attr(mod$model_data, 'trend_model') == 'CAR1')
   expect_true(any(grepl('vector<lower=0,upper=1>[n_series]ar1;',
                         gsub(' ', '', mod$model_file), fixed = TRUE)))
-
-  # Drift terms allowed
-  mod <- mvgam(formula = y ~ s(season, bs = 'cc',
-                               k = 5, by = series),
-               trend_model = CAR(),
-               drift = TRUE,
-               data = dat_train,
-               family = gaussian(),
-               run_model = FALSE)
-  expect_true(inherits(mod, 'mvgam_prefit'))
-  expect_true(exists('time_dis', mod$model_data))
-  expect_true(exists('index..time..index', mod$obs_data))
-  expect_true(attr(mod$model_data, 'trend_model') == 'CAR1')
-  expect_true(any(grepl('drift~std_normal();',
-                        gsub(' ', '', mod$model_file), fixed = TRUE)))
-  expect_true(any(grepl('vector[n_series]drift;',
-                        gsub(' ', '', mod$model_file), fixed = TRUE)))
-  expect_true(mod$drift)
 
   # Will work for regularly-spaced data as well
   mod <- mvgam(formula = y ~ s(season, bs = 'cc',

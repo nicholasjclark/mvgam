@@ -1,5 +1,16 @@
 context("mvgam_priors")
 
+test_that("drift deprecation message works", {
+  expect_message(get_mvgam_priors(y ~ s(series, bs = 're') +
+                         s(season, bs = 'cc', k = 8) +
+                         s(time, bs = 'moi', k = 8),
+                       trend_model = RW(ma = TRUE),
+                       drift = TRUE,
+                       data = gaus_data$data_train,
+                       family = gaussian()),
+                 'The "drift" argument is deprecated; use fixed effects of "time" instead')
+})
+
 # Generating this many model skeletons takes time; CRAN will complain
 skip_on_cran()
 

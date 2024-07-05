@@ -104,8 +104,9 @@ the identifier <code>series</code> in this formula to specify effects that vary 
 (i.e. by allowing effects to vary across process models, even when some time series share the same underlying
 process model). This feature is only currently available for <code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="RW.html">VAR()</a></code> trend models.
 In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>trend_formula</code> is used to set up a linear predictor for the underlying
-latent abundance. If this is supplied but you do not also supply a <code>trend_map</code>,
-the intercept parameter in this formula will automatically be surpressed to maintain identifiability. In other words, the latent process is assumed to be zero-centred</p></dd>
+latent abundance. Be aware that it can be very challenging to simultaneously estimate intercept parameters
+for both the observation mode (captured by <code>formula</code>) and the process model (captured by <code>trend_formula</code>).
+Users are recommended to drop one of these using the <code>- 1</code> convention in the formula right hand side.</p></dd>
 
 
 <dt>data</dt>
@@ -207,12 +208,8 @@ See examples for details</p></dd>
 
 
 <dt>drift</dt>
-<dd><p><code>logical</code> estimate a drift parameter in the latent trend components. Useful if the latent
-trend is expected to broadly follow a non-zero slope. Only available for
-<code><a href="RW.html">RW()</a></code> and <code><a href="RW.html">AR()</a></code> trend models. Note that if the latent trend is more or less stationary,
-the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-predictor (which it is by default when calling <code><a href="https://rdrr.io/pkg/mgcv/man/jagam.html" class="external-link">jagam</a></code>). Drift parameters will also likely
-be unidentifiable if using dynamic factor models. Therefore this defaults to <code>FALSE</code></p></dd>
+<dd><p>Deprecated. If you wish to estimate drift parameters, include parametric fixed effects
+of 'time' in your formulae instead.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -429,14 +426,14 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5       trend AR2 coefficient               ar2 ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.44);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(-0.46, 0.72);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.43);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.87, 0.18);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5       ar2 ~ normal(-0.7, 0.9);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.15);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7   phi_inv ~ normal(0.44, 0.7);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                  example_change new_lowerbound new_upperbound</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1   lambda ~ exponential(0.74);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2 mu_raw ~ normal(-0.05, 0.86);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.1);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4    ar1 ~ normal(-0.74, 0.35);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     ar2 ~ normal(0.64, 0.46);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6    sigma ~ exponential(0.89);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7 phi_inv ~ normal(0.19, 0.32);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>

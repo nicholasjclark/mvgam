@@ -42,8 +42,9 @@ the identifier \code{series} in this formula to specify effects that vary across
 (i.e. by allowing effects to vary across process models, even when some time series share the same underlying
 process model). This feature is only currently available for \code{RW()}, \code{AR()} and \code{VAR()} trend models.
 In \code{nmix()} family models, the \code{trend_formula} is used to set up a linear predictor for the underlying
-latent abundance. If this is supplied but you do not also supply a \code{trend_map},
-the intercept parameter in this formula will automatically be surpressed to maintain identifiability. In other words, the latent process is assumed to be zero-centred}
+latent abundance. Be aware that it can be very challenging to simultaneously estimate intercept parameters
+for both the observation mode (captured by \code{formula}) and the process model (captured by \code{trend_formula}).
+Users are recommended to drop one of these using the \code{- 1} convention in the formula right hand side.}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:

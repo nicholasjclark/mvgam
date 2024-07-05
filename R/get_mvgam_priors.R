@@ -172,6 +172,9 @@ get_mvgam_priors = function(formula,
   orig_data <- data_train
 
   # Validate the trend arguments
+  if(drift)
+    message('The "drift" argument is deprecated; use fixed effects of "time" instead')
+  drift <- FALSE
   orig_trend_model <- trend_model
   trend_model <- validate_trend_model(orig_trend_model,
                                       drift = drift,

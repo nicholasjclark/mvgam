@@ -1,6 +1,12 @@
-# mvgam 1.1.3
+# mvgam 1.1.3 (development version; not yet on CRAN)
 ## New functionalities
-* Added option for process model intercept parameter to be included when a `trend_map` is supplied. This breaks the assumption that the process has to be zero-centred, adding flexibility but also potentially inducing nonidentifiabilities with respect to any observation model intercepts. Thoughtful priors are a must for these models
+* Allow intercepts to be included in process models when `trend_formula` is supplied. This breaks the assumption that the process has to be zero-centred, adding flexibility but also potentially inducing nonidentifiabilities with respect to any observation model intercepts. Thoughtful priors are a must for these models
+
+## Deprecations
+* The `drift` argument has been deprecated. It is now recommended for users to include parametric fixed effects of "time" in their respective GAM formulae to capture any expected drift effects
+
+## Bug fixes
+* Added a new check to ensure that exception messages are only suppressed by the `silent` argument if the user's version of 'cmdstanr' is adequate
 
 # mvgam 1.1.2
 ## New functionalities

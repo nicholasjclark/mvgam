@@ -64,8 +64,9 @@ the identifier \code{series} in this formula to specify effects that vary across
 (i.e. by allowing effects to vary across process models, even when some time series share the same underlying
 process model). This feature is only currently available for \code{RW()}, \code{AR()} and \code{VAR()} trend models.
 In \code{nmix()} family models, the \code{trend_formula} is used to set up a linear predictor for the underlying
-latent abundance. If this is supplied but you do not also supply a \code{trend_map},
-the intercept parameter in this formula will automatically be surpressed to maintain identifiability. In other words, the latent process is assumed to be zero-centred}
+latent abundance. Be aware that it can be very challenging to simultaneously estimate intercept parameters
+for both the observation mode (captured by \code{formula}) and the process model (captured by \code{trend_formula}).
+Users are recommended to drop one of these using the \code{- 1} convention in the formula right hand side.}
 
 \item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
 For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
@@ -180,16 +181,17 @@ For all trend types apart from \code{GP()}, \code{CAR()} and \code{PW()}, moving
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
 multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
 
-\item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
-trend is expected to broadly follow a non-zero slope. Only available for
-\code{RW()} and \code{AR()} trend models. Note that if the latent trend is more or less stationary,
-the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift parameters will also likely
-be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}}
+\item{drift}{Deprecated. If you wish to estimate drift parameters, include parametric fixed effects
+of 'time' in your formulae instead.}
 
-\item{noncentred}{\code{logical} experimental feature to use the non-centred parameterisation for
-trend models. Only available for certain trend models
-(i.e. \code{RW()}, \code{AR()}, or \code{CAR()} with or without \code{drift}, or for
+\item{noncentred}{\code{logical} Use the non-centred parameterisation for autoregressive
+trend models? Setting to \code{TRUE} will reparameterise the model to avoid possible
+degeneracies that can show up when estimating the latent dynamic random effects. For some
+models, this can produce big gains in efficiency, meaning that fewer burnin and sampling
+iterations are required for posterior exploration. But for other models, where the data
+are highly informative about the latent dynamic processes, this can actually lead to worse
+performance. Only available for certain trend models
+(i.e. \code{RW()}, \code{AR()}, or \code{CAR()}, or for
 \code{trend = 'None'} when using a \code{trend_formula}). Not yet available for moving average or
 correlated error models}
 
@@ -260,7 +262,7 @@ many spline parameters and latent trend parameters. But rigorous testing has not
 been carried out}
 
 \item{autoformat}{\code{Logical}. Use the \code{stanc} parser to automatically format the
-\code{Stan} code and check for deprecations. Defaults to \code{TRUE}}
+\code{Stan} code and check for deprecations. Only for development purposes, so leave to \code{TRUE}}
 
 \item{save_all_pars}{\code{Logical} flag to indicate if draws from all
 variables defined in Stan's \code{parameters} block should be saved

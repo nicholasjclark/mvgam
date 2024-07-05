@@ -270,11 +270,6 @@ validate_trend_model = function(trend_model, drift = FALSE, noncentred = FALSE){
     trend_model <- 'VARMA1,1cor'
   }
 
-  if(trend_model %in% c('VAR','VAR1','VAR1cor','VARMA1,1cor','GP') & drift){
-    stop('drift terms not allowed for VAR or GP models',
-         call. = FALSE)
-  }
-
   if(!trend_model %in% c('None', 'RW','AR1', 'AR2', 'AR3', 'CAR1') & noncentred){
     message('Non-centering of trends currently not available for this model')
   }
@@ -540,9 +535,21 @@ validate_trend_restrictions = function(trend_model,
          call. = FALSE)
   }
 
-  if(drift && use_lv){
-    warning('Cannot identify drift terms in latent factor models; setting "drift = FALSE"',
+  if(use_lv & drift){
+    warning('Cannot identify drift terms for this model\ninclude "time" as a fixed effect instead',
+         call. = FALSE)
+    drift <- FALSE
+  }
+
+  if(drift && trend_model == 'CAR1'){
+    warning('Cannot identify drift terms for CAR models; setting "drift = FALSE"',
             call. = FALSE)
+    drift <- FALSE
+  }
+
+  if(trend_model %in% c('VAR','VAR1','VAR1cor','VARMA1,1cor','GP') & drift){
+    warning('Cannot identify drift terms for VAR or GP models; setting "drift = FALSE"',
+         call. = FALSE)
     drift <- FALSE
   }
 
@@ -611,7 +618,8 @@ validate_trend_restrictions = function(trend_model,
               use_var1cor = use_var1cor,
               use_lv = use_lv,
               n_lv = n_lv,
-              trend_map = trend_map))
+              trend_map = trend_map,
+              drift = drift))
 }
 
 #'@noRd

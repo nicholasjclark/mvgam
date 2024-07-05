@@ -37,8 +37,9 @@ the identifier \code{series} in this formula to specify effects that vary across
 (i.e. by allowing effects to vary across process models, even when some time series share the same underlying
 process model). This feature is only currently available for \code{RW()}, \code{AR()} and \code{VAR()} trend models.
 In \code{nmix()} family models, the \code{trend_formula} is used to set up a linear predictor for the underlying
-latent abundance. If this is supplied but you do not also supply a \code{trend_map},
-the intercept parameter in this formula will automatically be surpressed to maintain identifiability. In other words, the latent process is assumed to be zero-centred}
+latent abundance. Be aware that it can be very challenging to simultaneously estimate intercept parameters
+for both the observation mode (captured by \code{formula}) and the process model (captured by \code{trend_formula}).
+Users are recommended to drop one of these using the \code{- 1} convention in the formula right hand side.}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:
@@ -127,12 +128,8 @@ data (names should perfectly match factor levels of the \code{series} variable i
 if this is supplied, the intercept parameter in the process model will NOT be automatically suppressed.
 See examples for details}
 
-\item{drift}{\code{logical} estimate a drift parameter in the latent trend components. Useful if the latent
-trend is expected to broadly follow a non-zero slope. Only available for
-\code{RW()} and \code{AR()} trend models. Note that if the latent trend is more or less stationary,
-the drift parameter can become unidentifiable, especially if an intercept term is included in the GAM linear
-predictor (which it is by default when calling \code{\link[mgcv]{jagam}}). Drift parameters will also likely
-be unidentifiable if using dynamic factor models. Therefore this defaults to \code{FALSE}}
+\item{drift}{Deprecated. If you wish to estimate drift parameters, include parametric fixed effects
+of 'time' in your formulae instead.}
 }
 \value{
 either a \code{data.frame} containing the prior definitions (if any suitable
