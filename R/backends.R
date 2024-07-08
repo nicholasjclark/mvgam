@@ -636,6 +636,15 @@ read_csv_as_stanfit <- function(files, variables = NULL,
 .autoformat <- function(stan_file, overwrite_file = TRUE,
                         backend = 'cmdstanr', silent = TRUE){
 
+  # Can make LV models slightly more efficient by not filling in zeros in a loop
+  if(any(grepl('lv_coefs_raw[i, j] = 0;', stan_file, fixed = TRUE))){
+    starts <- mvgam:::grepws('lv_coefs_raw[i, j] = 0;', stan_file) - 2
+    ends <- mvgam:::grepws('lv_coefs_raw[i, j] = 0;', stan_file) + 2
+    stan_file <- stan_file[-c(starts:ends)]
+    stan_file[mvgam:::grepws('matrix[n_series, n_lv] lv_coefs_raw;', stan_file)] <-
+      'matrix[n_series, n_lv] lv_coefs_raw = rep_matrix(0, n_series, n_lv);'
+  }
+
   # No need to fill lv_coefs in each iteration if this is a
   # trend_formula model
   if(any(grepl('lv_coefs = Z;',

@@ -9,7 +9,7 @@ sim_mvgam(
   n_series = 3,
   seasonality = "shared",
   use_lv = FALSE,
-  n_lv = 1,
+  n_lv = 0,
   trend_model = "RW",
   drift = FALSE,
   prop_trend = 0.2,
@@ -36,7 +36,8 @@ or \code{hierarchical}, meaning that there is a global seasonality but each seri
 \item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series}
 
-\item{n_lv}{\code{integer}. Number of latent dynamic factors for generating the series' trends}
+\item{n_lv}{\code{integer}. Number of latent dynamic factors for generating the series' trends.
+Defaults to \code{0}, meaning that dynamics are estimated independently for each series}
 
 \item{trend_model}{\code{character} specifying the time series dynamics for the latent trend. Options are:
 \itemize{

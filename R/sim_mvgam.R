@@ -13,7 +13,8 @@
 #'or \code{hierarchical}, meaning that there is a global seasonality but each series' pattern can deviate slightly
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
-#'@param n_lv \code{integer}. Number of latent dynamic factors for generating the series' trends
+#'@param n_lv \code{integer}. Number of latent dynamic factors for generating the series' trends.
+#'Defaults to `0`, meaning that dynamics are estimated independently for each series
 #'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
 #'\itemize{
 #'   \item `None` (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
@@ -73,7 +74,7 @@ sim_mvgam = function(T = 100,
                      n_series = 3,
                      seasonality = 'shared',
                      use_lv = FALSE,
-                     n_lv = 1,
+                     n_lv = 0,
                      trend_model = 'RW',
                      drift = FALSE,
                      prop_trend = 0.2,
@@ -124,11 +125,11 @@ sim_mvgam = function(T = 100,
   validate_proportional(prop_missing)
 
   # Check n_lv
-  validate_pos_integer(n_lv)
-
-  if(n_lv == 1){
+  if(n_lv == 0){
     use_lv <- FALSE
+    n_lv <- n_series
   } else {
+    validate_pos_integer(n_lv)
     use_lv <- TRUE
   }
 
@@ -137,8 +138,6 @@ sim_mvgam = function(T = 100,
       warning('Argument "n_lv" cannot be greater than n_series; changing n_lv to match n_series')
       n_lv <- n_series
     }
-  } else {
-    n_lv <- n_series
   }
 
   # Check seasonality
@@ -253,7 +252,7 @@ sim_mvgam = function(T = 100,
                         'VAR1', 'VAR1cor')){
     # Sample trend drift terms so they are (hopefully) not too correlated
     if(drift){
-      trend_alphas <- rnorm(n_lv, sd = 0.15)
+      trend_alphas <- rnorm(n_lv, sd = 0.5)
     } else {
       trend_alphas <- rep(0, n_lv)
     }
@@ -261,13 +260,13 @@ sim_mvgam = function(T = 100,
     # Simulate latent trends
     if(!trend_model %in% c('VAR1', 'VAR1cor')){
       trends <- do.call(cbind, lapply(seq_len(n_lv), function(x){
-        sim_ar3(drift = trend_alphas[x],
+        sim_ar3(drift = 0,
                 ar1 = ar1s[x],
                 ar2 = ar2s[x],
                 ar3 = ar3s[x],
                 tau = 1,
                 last_trends = rnorm(3),
-                h = T)
+                h = T) + trend_alphas[x] * 1:T
       }))
     }
 
@@ -349,9 +348,9 @@ sim_mvgam = function(T = 100,
     diag(corMat) <- 1
     stddev <- rep(1, n_series)
     Sigma <- stddev %*% t(stddev) * corMat
-    loadings <- matrix(mvnfast::rmvn(n = n_lv, mu = rep(0, n_series),
+    loadings <- as.matrix(matrix(mvnfast::rmvn(n = n_lv, mu = rep(0, n_series),
                                      sigma = as.matrix(Matrix::nearPD(Sigma)$mat)),
-                       ncol = n_series)
+                       ncol = n_series))
 
   } else {
     # Else use independent trend loadings
