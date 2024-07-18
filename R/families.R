@@ -540,9 +540,8 @@ mvgam_predict = function(Xp,
                                 betas) + attr(Xp, 'model.offset')))
       out <- mu * (1 - mu)
     } else {
-      out <- plogis(((matrix(Xp, ncol = NCOL(Xp)) %*%
-                        betas)) +
-                      attr(Xp, 'model.offset'))
+      out <- plogis(as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
+                                 betas) + attr(Xp, 'model.offset')))
     }
   }
 
