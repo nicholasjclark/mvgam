@@ -1,6 +1,6 @@
-#'Simulate a set of discrete time series for mvgam modelling
+#'Simulate a set of time series for mvgam modelling
 #'
-#'This function simulates discrete time series data for fitting a multivariate GAM that includes
+#'This function simulates sets of time series data for fitting a multivariate GAM that includes
 #'shared seasonality and dependence on state-space latent dynamic factors. Random dependencies among series, i.e.
 #'correlations in their long-term trends, are included in the form of correlated loadings on the latent dynamic factors
 #'

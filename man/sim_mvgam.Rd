@@ -2,7 +2,7 @@
 % Please edit documentation in R/sim_mvgam.R
 \name{sim_mvgam}
 \alias{sim_mvgam}
-\title{Simulate a set of discrete time series for mvgam modelling}
+\title{Simulate a set of time series for mvgam modelling}
 \usage{
 sim_mvgam(
   T = 100,
@@ -100,7 +100,7 @@ A \code{list} object containing outputs needed for \code{\link{mvgam}}, includin
 as well as some additional information about the simulated seasonality and trend dependencies
 }
 \description{
-This function simulates discrete time series data for fitting a multivariate GAM that includes
+This function simulates sets of time series data for fitting a multivariate GAM that includes
 shared seasonality and dependence on state-space latent dynamic factors. Random dependencies among series, i.e.
 correlations in their long-term trends, are included in the form of correlated loadings on the latent dynamic factors
 }
