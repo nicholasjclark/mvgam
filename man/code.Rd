@@ -8,9 +8,9 @@
 \usage{
 code(object)
 
-\method{stancode}{mvgam_prefit}(object)
+\method{stancode}{mvgam_prefit}(object, ...)
 
-\method{stancode}{mvgam}(object)
+\method{stancode}{mvgam}(object, ...)
 }
 \arguments{
 \item{object}{An object of class \code{mvgam} or \code{mvgam_prefit},

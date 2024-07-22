@@ -503,7 +503,7 @@ eval_smoothDotmodDotsmooth = function(smooth,
 
   # set some values to NA if too far from the data
   if (gratia::smooth_dim(smooth) == 2L && (!is.null(dist) && dist > 0)) {
-    eval_sm <- too_far_to_na(smooth,
+    eval_sm <- gratia::too_far_to_na(smooth,
                              input = eval_sm,
                              reference = model[["model"]],
                              cols = c(".estimate", ".se"),
@@ -561,7 +561,7 @@ eval_smoothDotmoiDotsmooth = function(smooth,
 
   # set some values to NA if too far from the data
   if (gratia::smooth_dim(smooth) == 2L && (!is.null(dist) && dist > 0)) {
-    eval_sm <- too_far_to_na(smooth,
+    eval_sm <- gratia::too_far_to_na(smooth,
                              input = eval_sm,
                              reference = model[["model"]],
                              cols = c(".estimate", ".se"),
@@ -626,7 +626,7 @@ eval_smoothDotmoiDotsmooth = function(smooth,
     ## if this is a by variable, filter the by variable for the required
     ## level now
     if (gratia::is_factor_by_smooth(smooth)) {
-      data <- data %>% filter(.data[[by_var]] == gratia::by_level(smooth))
+      data <- data %>% dplyr::filter(.data[[by_var]] == gratia::by_level(smooth))
     }
   }
   data

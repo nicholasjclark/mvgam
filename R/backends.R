@@ -638,10 +638,10 @@ read_csv_as_stanfit <- function(files, variables = NULL,
 
   # Can make LV models slightly more efficient by not filling in zeros in a loop
   if(any(grepl('lv_coefs_raw[i, j] = 0;', stan_file, fixed = TRUE))){
-    starts <- mvgam:::grepws('lv_coefs_raw[i, j] = 0;', stan_file) - 2
-    ends <- mvgam:::grepws('lv_coefs_raw[i, j] = 0;', stan_file) + 2
+    starts <- grepws('lv_coefs_raw[i, j] = 0;', stan_file) - 2
+    ends <- grepws('lv_coefs_raw[i, j] = 0;', stan_file) + 2
     stan_file <- stan_file[-c(starts:ends)]
-    stan_file[mvgam:::grepws('matrix[n_series, n_lv] lv_coefs_raw;', stan_file)] <-
+    stan_file[grepws('matrix[n_series, n_lv] lv_coefs_raw;', stan_file)] <-
       'matrix[n_series, n_lv] lv_coefs_raw = rep_matrix(0, n_series, n_lv);'
   }
 
