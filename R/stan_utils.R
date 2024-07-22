@@ -34,6 +34,7 @@ print.mvgammodel = function(x, ...){
 }
 
 #' @export
+#' @importFrom brms stancode
 #' @rdname code
 stancode.mvgam_prefit = function(object){
 

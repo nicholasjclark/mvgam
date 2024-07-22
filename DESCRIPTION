@@ -52,6 +52,7 @@ Suggests:
     rjags,
     coda,
     runjags,
+    tibble (>= 3.0.0),
     usethis,
     testthat
 Additional_repositories: https://mc-stan.org/r-packages/
