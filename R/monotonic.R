@@ -413,76 +413,25 @@ add_mono_model_file = function(model_file,
               model_data = model_data))
 }
 
-#' S3 methods to evaluate individual smooths
-#' @param smooth currently an object that inherits from class `mgcv.smooth`
-#' @param ... arguments passed to other methods
-#' @export
-`eval_smooth` <- function(smooth, ...) {
-  UseMethod("eval_smooth")
+# Add moi and mod smooth eval_smooth methods to gratia namespace
+# on load
+.onLoad <- function(libname, pkgname) {
+  if(requireNamespace("gratia", quietly = TRUE)){
+    registerS3method("eval_smooth",
+                     "moi.smooth",
+                     eval_smoothDotmoiDotsmooth,
+                     envir = asNamespace("gratia"))
+    registerS3method("eval_smooth",
+                     "mod.smooth",
+                     eval_smoothDotmodDotsmooth,
+                     envir = asNamespace("gratia"))
+  }
 }
 
-#' Evaluation of a monotonically increasing function
+#' Evaluation of a monotonic functions in mvgam
 #' These evaluation functions are needed so that gratia::draw methods work with mvgam
 #' monotonic smooths
-#' @rdname monotonic
-#' @export
-eval_smooth.moi.smooth = function(smooth,
-                                  model,
-                                  n = 100,
-                                  n_3d = NULL,
-                                  n_4d = NULL,
-                                  data = NULL,
-                                  unconditional = FALSE,
-                                  overall_uncertainty = TRUE,
-                                  dist = NULL,
-                                  ...) {
-
-  insight::check_if_installed("gratia")
-  model$cmX <- model$coefficients
-
-  ## deal with data if supplied
-  data <- process_user_data_for_eval(
-    data = data, model = model,
-    n = n, n_3d = n_3d, n_4d = n_4d,
-    id = which_smooth(
-      model,
-      smooth_label(smooth)
-    )
-  )
-
-  by_var <- gratia::by_variable(smooth) # even if not a by as we want NA later
-  if (by_var == "NA") {
-    by_var <- NA_character_
-  }
-
-  ## values of spline at data
-  eval_sm <- gratia::spline_values(smooth,
-                                   data = data,
-                                   unconditional = unconditional,
-                                   model = model,
-                                   overall_uncertainty = overall_uncertainty
-  )
-
-  ## add on info regarding by variable
-  eval_sm <- add_by_var_column(eval_sm, by_var = by_var)
-  ## add on spline type info
-  eval_sm <- add_smooth_type_column(eval_sm, sm_type = "Mono inc P spline")
-
-  # set some values to NA if too far from the data
-  if (gratia::smooth_dim(smooth) == 2L && (!is.null(dist) && dist > 0)) {
-    eval_sm <- too_far_to_na(smooth,
-                             input = eval_sm,
-                             reference = model[["model"]],
-                             cols = c(".estimate", ".se"),
-                             dist = dist
-    )
-  }
-  ## return
-  eval_sm
-}
-
-#' Evaluation of a monotonically decreasing function
-#' @rdname monotonic
+#' @rdname eval_smooth_monotonic
 #' @param model an object of class `"gam"`
 #' @param smooth a smooth object of class `"moi.smooth"` or `"mod.smooth"`
 #' @param n numeric; the number of points over the range of the covariate at
@@ -509,8 +458,9 @@ eval_smooth.moi.smooth = function(smooth,
 #'   and `dist` is a distance within the unit square. See
 #'   [mgcv::exclude.too.far()] for further details.
 #' @param ... ignored.
+#' @aliases eval_smooth.mod.smooth
 #' @export
-eval_smooth.mod.smooth = function(smooth,
+eval_smoothDotmodDotsmooth = function(smooth,
                                   model,
                                   n = 100,
                                   n_3d = NULL,
@@ -529,7 +479,7 @@ eval_smooth.mod.smooth = function(smooth,
     n = n, n_3d = n_3d, n_4d = n_4d,
     id = which_smooth(
       model,
-      smooth_label(smooth)
+      gratia::smooth_label(smooth)
     )
   )
 
@@ -550,6 +500,64 @@ eval_smooth.mod.smooth = function(smooth,
   eval_sm <- add_by_var_column(eval_sm, by_var = by_var)
   ## add on spline type info
   eval_sm <- add_smooth_type_column(eval_sm, sm_type = "Mono dec P spline")
+
+  # set some values to NA if too far from the data
+  if (gratia::smooth_dim(smooth) == 2L && (!is.null(dist) && dist > 0)) {
+    eval_sm <- too_far_to_na(smooth,
+                             input = eval_sm,
+                             reference = model[["model"]],
+                             cols = c(".estimate", ".se"),
+                             dist = dist
+    )
+  }
+  ## return
+  eval_sm
+}
+
+#' @rdname eval_smooth_monotonic
+#' @aliases eval_smooth.moi.smooth
+#' @export
+eval_smoothDotmoiDotsmooth = function(smooth,
+                                      model,
+                                      n = 100,
+                                      n_3d = NULL,
+                                      n_4d = NULL,
+                                      data = NULL,
+                                      unconditional = FALSE,
+                                      overall_uncertainty = TRUE,
+                                      dist = NULL,
+                                      ...) {
+
+  insight::check_if_installed("gratia")
+  model$cmX <- model$coefficients
+
+  ## deal with data if supplied
+  data <- process_user_data_for_eval(
+    data = data, model = model,
+    n = n, n_3d = n_3d, n_4d = n_4d,
+    id = which_smooth(
+      model,
+      gratia::smooth_label(smooth)
+    )
+  )
+
+  by_var <- gratia::by_variable(smooth) # even if not a by as we want NA later
+  if (by_var == "NA") {
+    by_var <- NA_character_
+  }
+
+  ## values of spline at data
+  eval_sm <- gratia::spline_values(smooth,
+                                   data = data,
+                                   unconditional = unconditional,
+                                   model = model,
+                                   overall_uncertainty = overall_uncertainty
+  )
+
+  ## add on info regarding by variable
+  eval_sm <- add_by_var_column(eval_sm, by_var = by_var)
+  ## add on spline type info
+  eval_sm <- add_smooth_type_column(eval_sm, sm_type = "Mono inc P spline")
 
   # set some values to NA if too far from the data
   if (gratia::smooth_dim(smooth) == 2L && (!is.null(dist) && dist > 0)) {
@@ -591,7 +599,7 @@ eval_smooth.mod.smooth = function(smooth,
   if (is.gamm(object) || is.gamm4(object)) {
     object <- object[["gam"]]
   }
-  smooths <- smooths(object)
+  smooths <- gratia::smooths(object)
   which(term == smooths)
 }
 
@@ -600,7 +608,7 @@ eval_smooth.mod.smooth = function(smooth,
     data, model, n, n_3d, n_4d, id,
     var_order = NULL) {
   if (is.null(data)) {
-    data <- smooth_data(
+    data <- gratia::smooth_data(
       model = model,
       n = n,
       n_3d = n_3d,
@@ -609,9 +617,9 @@ eval_smooth.mod.smooth = function(smooth,
       var_order = var_order
     )
   } else {
-    smooth <- get_smooths_by_id(model, id)[[1L]]
-    vars <- smooth_variable(smooth)
-    by_var <- by_variable(smooth)
+    smooth <- gratia::get_smooths_by_id(model, id)[[1L]]
+    vars <- gratia::smooth_variable(smooth)
+    by_var <- gratia::by_variable(smooth)
     if (!identical(by_var, "NA")) {
       vars <- append(vars, by_var)
     }
