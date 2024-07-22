@@ -1,15 +1,50 @@
-#' Print the model code from an mvgam object
+#' Stan code for mvgam models
 #'
+#' Generate Stan code for \pkg{mvgam} models
 #'
+#' @param object An object of class `mvgam` or `mvgam_prefit`,
+#' returned from a call to \code{mvgam}
+#' @return A character string containing the fully commented \pkg{Stan} code
+#'   to fit a \pkg{mvgam} model. It is of class \code{c("character", "brmsmodel")}
+#'   to facilitate pretty printing.
 #' @export
-#' @param object \code{list} object returned from \code{mvgam}
-#' @return A `character string` containing the model code in a tidy format
+#' @examples
+#' simdat <- sim_mvgam()
+#' mod <- mvgam(y ~ s(season) +
+#'                s(time, by = series),
+#'              family = poisson(),
+#'              data = simdat$data_train,
+#'              run_model = FALSE)
+#' stancode(mod)
+#'
 code = function(object){
   if(!class(object) %in% c('mvgam', 'mvgam_prefit')){
     stop('argument "object" must be of class "mvgam" or "mvgam_prefit"')
   }
 
-  cat(object$model_file, sep = '\n')
+  scode <- readLines(textConnection(object$model_file), n = -1)
+  class(scode) <- c("character", "mvgammodel")
+  scode
+}
+
+#' @export
+print.mvgammodel = function(x, ...){
+  cat(x, sep = '\n')
+  invisible(x)
+}
+
+#' @export
+#' @rdname code
+stancode.mvgam_prefit = function(object){
+
+  code(object)
+}
+
+#' @export
+#' @rdname code
+stancode.mvgam = function(object){
+
+  code(object)
 }
 
 #' @noRd

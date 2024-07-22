@@ -2,16 +2,35 @@
 % Please edit documentation in R/stan_utils.R
 \name{code}
 \alias{code}
-\title{Print the model code from an mvgam object}
+\alias{stancode.mvgam_prefit}
+\alias{stancode.mvgam}
+\title{Stan code for mvgam models}
 \usage{
 code(object)
+
+\method{stancode}{mvgam_prefit}(object)
+
+\method{stancode}{mvgam}(object)
 }
 \arguments{
-\item{object}{\code{list} object returned from \code{mvgam}}
+\item{object}{An object of class \code{mvgam} or \code{mvgam_prefit},
+returned from a call to \code{mvgam}}
 }
 \value{
-A \verb{character string} containing the model code in a tidy format
+A character string containing the fully commented \pkg{Stan} code
+to fit a \pkg{mvgam} model. It is of class \code{c("character", "brmsmodel")}
+to facilitate pretty printing.
 }
 \description{
-Print the model code from an mvgam object
+Generate Stan code for \pkg{mvgam} models
+}
+\examples{
+simdat <- sim_mvgam()
+mod <- mvgam(y ~ s(season) +
+               s(time, by = series),
+             family = poisson(),
+             data = simdat$data_train,
+             run_model = FALSE)
+stancode(mod)
+
 }

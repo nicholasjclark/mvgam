@@ -107,6 +107,27 @@ mod <- mvgam(y ~ te(x0, x1, k = 5) + s(x2, k = 6) + s(x3, k = 6),
             chains = 2)
 conditional_effects(mod)
 conditional_effects(mod, conf_level = 0.5, type = 'link')
+
+\dontrun{
+# ggplot objects can be modified and combined with the help of many
+# additional packages. Here is an example using the patchwork package
+
+# Simulate some nonlinear data
+dat <- mgcv::gamSim(1, n = 200, scale = 2)
+mod <- mvgam(y ~ s(x1, bs = 'moi') +
+               te(x0, x2),
+             data = dat,
+             family = gaussian())
+
+# Extract the list of ggplot conditional_effect plots
+m <- plot(conditional_effects(mod), plot = FALSE)
+
+# Add custom labels and arrange plots together using patchwork::wrap_plots()
+library(patchwork)
+library(ggplot2)
+wrap_plots(m[[1]] + labs(title = 's(x1, bs = "moi")'),
+           m[[2]] + labs(title = 'te(x0, x2)'))
+}
 }
 }
 \seealso{

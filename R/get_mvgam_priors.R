@@ -155,6 +155,7 @@ get_mvgam_priors = function(formula,
                             data_train,
                             family = 'poisson',
                             knots,
+                            trend_knots,
                             use_lv = FALSE,
                             n_lv,
                             use_stan = TRUE,
@@ -305,7 +306,7 @@ get_mvgam_priors = function(formula,
                                        data = trend_train,
                                        family = gaussian(),
                                        trend_model = 'None',
-                                       knots = knots)
+                                       knots = trend_knots)
 
     # Modify some of the term names and return
     if(any(grepl('fixed effect', trend_prior_df$param_info))){
