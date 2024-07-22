@@ -413,10 +413,17 @@ add_mono_model_file = function(model_file,
               model_data = model_data))
 }
 
+#' S3 methods to evaluate individual smooths
+#' @param smooth currently an object that inherits from class `mgcv.smooth`
+#' @param ... arguments passed to other methods
+#' @export
+`eval_smooth` <- function(smooth, ...) {
+  UseMethod("eval_smooth")
+}
+
 #' Evaluation of a monotonically increasing function
 #' These evaluation functions are needed so that gratia::draw methods work with mvgam
 #' monotonic smooths
-#' @importFrom gratia eval_smooth smooths by_variable smooth_label spline_values is_factor_by_smooth by_level smooth_dim
 #' @rdname monotonic
 #' @export
 eval_smooth.moi.smooth = function(smooth,
@@ -429,6 +436,8 @@ eval_smooth.moi.smooth = function(smooth,
                                   overall_uncertainty = TRUE,
                                   dist = NULL,
                                   ...) {
+
+  insight::check_if_installed("gratia")
   model$cmX <- model$coefficients
 
   ## deal with data if supplied
@@ -511,6 +520,7 @@ eval_smooth.mod.smooth = function(smooth,
                                   overall_uncertainty = TRUE,
                                   dist = NULL,
                                   ...) {
+  insight::check_if_installed("gratia")
   model$cmX <- model$coefficients
 
   ## deal with data if supplied
@@ -614,7 +624,6 @@ eval_smooth.mod.smooth = function(smooth,
   data
 }
 
-#' @importFrom tibble add_column
 #' @noRd
 `add_by_var_column` <- function(object, by_var, n = NULL) {
   if (is.null(n)) {
