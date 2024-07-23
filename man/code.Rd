@@ -15,6 +15,8 @@ code(object)
 \arguments{
 \item{object}{An object of class \code{mvgam} or \code{mvgam_prefit},
 returned from a call to \code{mvgam}}
+
+\item{...}{ignored}
 }
 \value{
 A character string containing the fully commented \pkg{Stan} code

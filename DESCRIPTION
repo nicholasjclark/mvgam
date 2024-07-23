@@ -52,11 +52,12 @@ Suggests:
     rjags,
     coda,
     runjags,
-    tibble (>= 3.0.0),
     usethis,
     testthat
 Enhances:
-    gratia
+    gratia (>= 0.9.0), 
+    tibble (>= 3.0.0),
+    tidyr 
 Additional_repositories: https://mc-stan.org/r-packages/
 LinkingTo: Rcpp, RcppArmadillo
 VignetteBuilder: knitr

@@ -412,7 +412,7 @@ eval_smoothDothilbertDotsmooth = function(smooth,
   lcms <- length(column_means)
   nc <- ncol(V)
   meanL1 <- smooth[["meanL1"]]
-  eta_idx <- gratia:::lss_eta_index(model)
+  eta_idx <- lss_eta_index(model)
   para.seq <- start:end
 
   if (isTRUE(overall_uncertainty) && attr(smooth, "nCons") > 0L) {
@@ -696,4 +696,17 @@ eval_smoothDotmoiDotsmooth = function(smooth,
   }
   insight::check_if_installed("tibble")
   tibble::add_column(object, .type = rep(sm_type, times = n), .after = 1L)
+}
+
+#' @noRd
+lss_eta_index <- function(object){
+  function (object)
+  {
+    lpi <- attr(formula(object), "lpi")
+    if (is.null(lpi)) {
+      lpi <- list(seq_along(coef(object)))
+    }
+    attr(lpi, "overlap") <- NULL
+    lpi
+  }
 }
