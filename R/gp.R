@@ -207,6 +207,7 @@ make_gp_additions = function(gp_details, data,
        gsub('gp(', 's(', gp_assign$label, fixed = TRUE) &
        mgcv_model$smooth[[i]]$first.para %in% gp_assign$first.para){
       mgcv_model$smooth[[i]]$gp_term <- TRUE
+      class(mgcv_model$smooth[[i]]) <- c('tprs.smooth', 'hilbert.smooth', 'mgcv.smooth')
     } else {
       mgcv_model$smooth[[i]]$gp_term <- FALSE
     }

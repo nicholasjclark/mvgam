@@ -147,7 +147,7 @@ plot_mvgam_smooth = function(object,
   # Be sure that parametric and by variables are included in newdata
   smooth_terms <- unique(trimws(strsplit(gsub('\\+', ',',
                                               as.character(object2$mgcv_model$pred.formula)[2]),
-                                         ',')[[1]]))
+                                         ',')[[1L]]))
 
   # Remove comma separated names as these won't match the column names in data
   smooth_terms[!grepl(',', smooth_terms)] -> smooth_terms
@@ -156,7 +156,7 @@ plot_mvgam_smooth = function(object,
   smooth <- all.vars(parse(text = object2$mgcv_model$smooth[[smooth_int]]$term))
 
   # Predictions and plots for multi-dimensional smooths
-  if(length(unlist(strsplit(smooth, ','))) >= 2){
+  if(length(unlist(strsplit(smooth, ','))) >= 2L){
 
     # Use default mgcv plotting for bivariate smooths as it is quicker
     if(inherits(object2$mgcv_model$smooth[[smooth_int]], 'tprs.smooth') |

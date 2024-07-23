@@ -14,7 +14,7 @@ obs_Xp_matrix = function(newdata, mgcv_model){
       stop('not all required variables have been supplied in newdata!',
            call. = FALSE)
     }
-    if(length(terms_include) > 0){
+    if(length(terms_include) > 0L){
       newnames <- vector()
       newnames[1] <- 'time'
       for(i in 1:length(terms_include)){
