@@ -186,8 +186,6 @@ band. Affects the fill of the interval.}
 
 \item{smooth_col}{colour specification for the smooth line.}
 
-\item{resid_col}{colour specification for the partial residuals.}
-
 \item{contour_col}{colour specification for contour lines.}
 
 \item{n_contour}{numeric; the number of contour bins. Will result in
@@ -256,6 +254,8 @@ ggplot objects is returned, 1 per term plotted.}
 \item{smooth}{a smooth object of class \code{"gp.smooth"} (returned from a model using either the
 \code{dynamic()} function or the \code{gp()} function) or of class \code{"moi.smooth"} or \code{"mod.smooth"}
 (returned from a model using the 'moi' or 'mod' basis).}
+
+\item{model}{a fitted \code{mgcv} model of clas \code{gam} or \code{bam}.}
 }
 \description{
 These evaluation and plotting functions exist to allow some popular \code{gratia}

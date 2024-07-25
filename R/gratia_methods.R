@@ -30,6 +30,7 @@
 #' methods to work with `mvgam` models
 #' @name gratia_mvgam_enhancements
 #' @param object a fitted mvgam, the result of a call to [mvgam()].
+#' @param model a fitted `mgcv` model of clas `gam` or `bam`.
 #' @param data a data frame of covariate values at which to evaluate the
 #'   model's smooth functions.
 #' @param smooth a smooth object of class `"gp.smooth"` (returned from a model using either the
