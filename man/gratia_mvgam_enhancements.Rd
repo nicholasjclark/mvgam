@@ -186,6 +186,8 @@ band. Affects the fill of the interval.}
 
 \item{smooth_col}{colour specification for the smooth line.}
 
+\item{resid_col}{colour specification for residual points. Ignored.}
+
 \item{contour_col}{colour specification for contour lines.}
 
 \item{n_contour}{numeric; the number of contour bins. Will result in

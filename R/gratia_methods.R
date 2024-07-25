@@ -98,6 +98,7 @@
 #' @param ci_col colour specification for the confidence/credible intervals
 #'   band. Affects the fill of the interval.
 #' @param smooth_col colour specification for the smooth line.
+#' @param resid_col colour specification for residual points. Ignored.
 #' @param contour_col colour specification for contour lines.
 #' @param n_contour numeric; the number of contour bins. Will result in
 #'   `n_contour - 1` contour lines being drawn. See [ggplot2::geom_contour()].
