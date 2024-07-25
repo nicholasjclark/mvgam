@@ -180,6 +180,12 @@ plot_mvgam_smooth(lynx_mvgam, series = 1,
                   derivatives = TRUE)
 ```
 
+If you have the `gratia` package installed, it can also be used to plot partial effects of smooths on the link scale
+```{r, fig.alt = "Plotting GAM smooth functions in mvgam using gratia"}
+require(gratia)
+draw(lynx_mvgam)
+```
+
 As for many types of regression models, it is often more useful to plot model effects on the outcome scale. `mvgam` has support for the wonderful `marginaleffects` package, allowing a wide variety of posterior contrasts, averages, conditional and marginal predictions to be calculated and plotted. Below is the conditional effect of season plotted on the outcome scale, for example:
 ```{r, fig.alt = "Using marginaleffects and mvgam to plot GAM smooth functions in R"}
 require(ggplot2); require(marginaleffects)

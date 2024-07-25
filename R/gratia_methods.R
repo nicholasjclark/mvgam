@@ -24,14 +24,17 @@
   }
 }
 
-#' Plot estimated smooths from a fitted mvgam model
+#' Enhance mvgam post-processing using gratia functionality
 #'
-#' Plots estimated smooths from a fitted mvgam model in a similar way to
-#' `mgcv::plot.gam()` but instead of using base graphics, [ggplot2::ggplot()]
-#' is used instead.
-#'
+#' These evaluation and plotting functions exist to allow some popular `gratia`
+#' methods to work with `mvgam` models
+#' @name gratia_mvgam_enhancements
 #' @param object a fitted mvgam, the result of a call to [mvgam()].
-#' @param data a optional data frame that may or may not be used? FIXME!
+#' @param data a data frame of covariate values at which to evaluate the
+#'   model's smooth functions.
+#' @param smooth a smooth object of class `"gp.smooth"` (returned from a model using either the
+#' `dynamic()` function or the `gp()` function) or of class `"moi.smooth"` or `"mod.smooth"`
+#' (returned from a model using the 'moi' or 'mod' basis).
 #' @param trend_effects logical specifying whether smooth terms from the `trend_formula` should
 #' be drawn. If `FALSE`, only terms from the observation formula are drawn. If `TRUE`, only
 #' terms from the `trend_formula` are drawn.
@@ -65,15 +68,16 @@
 #' @param ci_level numeric between 0 and 1; the coverage of credible interval.
 #' @param n numeric; the number of points over the range of the covariate at
 #'   which to evaluate the smooth.
-#' @param n_3d numeric; the number of new observations to generate for the third
-#'   dimension of a 3D smooth.
-#' @param n_4d numeric; the number of new observations to generate for the
-#'   dimensions higher than 2 (!) of a *k*D smooth (*k* >= 4). For example, if
-#'   the smooth is a 4D smooth, each of dimensions 3 and 4 will get `n_4d`
-#'   new observations.
-#' @param unconditional logical; should confidence intervals include the
-#'   uncertainty due to smoothness selection? If `TRUE`, the corrected Bayesian
-#'   covariance matrix will be used.
+#' @param n_3d,n_4d numeric; the number of points over the range of last
+#'   covariate in a 3D or 4D smooth. The default is `NULL` which achieves the
+#'   standard behaviour of using `n` points over the range of all covariate,
+#'   resulting in `n^d` evaluation points, where `d` is the dimension of the
+#'   smooth. For `d > 2` this can result in very many evaluation points and slow
+#'   performance. For smooths of `d > 4`, the value of `n_4d` will be used for
+#'   all dimensions `> 4`, unless this is `NULL`, in which case the default
+#'   behaviour (using `n` for all dimensions) will be observed.
+#' @param unconditional ignored for `mvgam` models as all appropriate
+#' uncertainties are already included in the posterior estimates.
 #' @param overall_uncertainty ignored for `mvgam` models as all appropriate
 #' uncertainties are already included in the posterior estimates.
 #' @param dist numeric; if greater than 0, this is used to determine when
@@ -93,7 +97,6 @@
 #' @param ci_col colour specification for the confidence/credible intervals
 #'   band. Affects the fill of the interval.
 #' @param smooth_col colour specification for the smooth line.
-#' @param resid_col colour specification for the partial residuals.
 #' @param contour_col colour specification for contour lines.
 #' @param n_contour numeric; the number of contour bins. Will result in
 #'   `n_contour - 1` contour lines being drawn. See [ggplot2::geom_contour()].
@@ -140,20 +143,32 @@
 #' @param wrap logical; wrap plots as a patchwork? If \code{FALSE}, a list of
 #'   ggplot objects is returned, 1 per term plotted.
 #' @param envir an environment to look up the data within.
-#' @param ... additional arguments passed to [patchwork::wrap_plots()].
+#' @param ... additional arguments passed to other methods.
 #'
-#' @note Internally, plots of each smooth are created using [ggplot2::ggplot()]
-#'   and composed into a single plot using [patchwork::wrap_plots()]. As a
-#'   result, it is not possible to use `+` to add to the plots in the way one
-#'   might typically work with `ggplot()` plots. Instead, use the `&` operator;
-#'   see the examples.
+#' @details These methods allow `mvgam` models to be *Enhanced* if users have the `gratia`
+#' package installed, making available the popular `draw()` function to plot partial effects
+#' of `mvgam` smooth functions using [ggplot2::ggplot()] utilities
+#' @author Nicholas J Clark
+#' @examples
+#' \dontrun{
+#' # Fit a simple GAM and draw partial effects of smooths using gratia
+#' set.seed(0)
+#' library(ggplot2); theme_set(theme_bw())
+#' library(gratia)
+#' dat <- mgcv::gamSim(1, n = 200, scale = 2)
+#' mod <- mvgam(y ~ s(x1, bs = 'moi') +
+#'               te(x0, x2), data = dat,
+#'              family = gaussian())
 #'
-#' @return The object returned is created by [patchwork::wrap_plots()].
-#'
-#' @author Nicholas Clark
-#'
+#' draw(mod)
+#'}
+
+NULL
+
+
+
+#' @rdname gratia_mvgam_enhancements
 #' @aliases draw.mvgam
-#'
 #' @export
 #'
 `drawDotmvgam` <- function(
@@ -217,7 +232,7 @@
                              n = n,
                              n_3d = n_3d,
                              n_4d = n_4d,
-                             unconditional = unconditional,
+                             unconditional = FALSE,
                              overall_uncertainty = FALSE,
                              constant = constant,
                              fun = fun,
@@ -263,7 +278,7 @@
                              n = n,
                              n_3d = n_3d,
                              n_4d = n_4d,
-                             unconditional = unconditional,
+                             unconditional = FALSE,
                              overall_uncertainty = FALSE,
                              constant = constant,
                              fun = fun,
@@ -299,38 +314,7 @@
   sm_plots
 }
 
-#' Evaluation of a Hilbert space approximate GP functions in mvgam
-#' These evaluation functions are needed so that gratia::draw methods work with mvgam
-#' dynamic smooths
-#' @rdname GP
-#' @param model an object of class `"gam"`
-#' @param smooth a smooth object of class `"gp.smooth"`, returned from a model using either the
-#' `dynamic()` function or the `gp()` function, which both make use of with a Hilbert
-#' space approximate GPs
-#' @param n numeric; the number of points over the range of the covariate at
-#'   which to evaluate the smooth.
-#' @param n_3d,n_4d numeric; the number of points over the range of last
-#'   covariate in a 3D or 4D smooth. The default is `NULL` which achieves the
-#'   standard behaviour of using `n` points over the range of all covariate,
-#'   resulting in `n^d` evaluation points, where `d` is the dimension of the
-#'   smooth. For `d > 2` this can result in very many evaluation points and slow
-#'   performance. For smooths of `d > 4`, the value of `n_4d` will be used for
-#'   all dimensions `> 4`, unless this is `NULL`, in which case the default
-#'   behaviour (using `n` for all dimensions) will be observed.
-#' @param data a data frame of covariate values at which to evaluate the
-#'   smooth.
-#' @param unconditional logical; should confidence intervals include the
-#'   uncertainty due to smoothness selection? If `TRUE`, the corrected Bayesian
-#'   covariance matrix will be used.
-#' @param overall_uncertainty logical; should the uncertainty in the model
-#'  constant term be included in the standard error of the evaluate values of
-#'  the smooth?
-#' @param dist numeric; if greater than 0, this is used to determine when
-#'   a location is too far from data to be plotted when plotting 2-D smooths.
-#'   The data are scaled into the unit square before deciding what to exclude,
-#'   and `dist` is a distance within the unit square. See
-#'   [mgcv::exclude.too.far()] for further details.
-#' @param ... ignored.
+#' @rdname gratia_mvgam_enhancements
 #' @aliases eval_smooth.hilbert.smooth
 #' @export
 eval_smoothDothilbertDotsmooth = function(smooth,
@@ -476,36 +460,7 @@ eval_smoothDothilbertDotsmooth = function(smooth,
   return(eval_sm)
 }
 
-#' Evaluation of a monotonic functions in mvgam
-#' These evaluation functions are needed so that gratia::draw methods work with mvgam
-#' monotonic smooths
-#' @rdname eval_smooth_monotonic
-#' @param model an object of class `"gam"`
-#' @param smooth a smooth object of class `"moi.smooth"` or `"mod.smooth"`
-#' @param n numeric; the number of points over the range of the covariate at
-#'   which to evaluate the smooth.
-#' @param n_3d,n_4d numeric; the number of points over the range of last
-#'   covariate in a 3D or 4D smooth. The default is `NULL` which achieves the
-#'   standard behaviour of using `n` points over the range of all covariate,
-#'   resulting in `n^d` evaluation points, where `d` is the dimension of the
-#'   smooth. For `d > 2` this can result in very many evaluation points and slow
-#'   performance. For smooths of `d > 4`, the value of `n_4d` will be used for
-#'   all dimensions `> 4`, unless this is `NULL`, in which case the default
-#'   behaviour (using `n` for all dimensions) will be observed.
-#' @param data a data frame of covariate values at which to evaluate the
-#'   smooth.
-#' @param unconditional logical; should confidence intervals include the
-#'   uncertainty due to smoothness selection? If `TRUE`, the corrected Bayesian
-#'   covariance matrix will be used.
-#' @param overall_uncertainty logical; should the uncertainty in the model
-#'  constant term be included in the standard error of the evaluate values of
-#'  the smooth?
-#' @param dist numeric; if greater than 0, this is used to determine when
-#'   a location is too far from data to be plotted when plotting 2-D smooths.
-#'   The data are scaled into the unit square before deciding what to exclude,
-#'   and `dist` is a distance within the unit square. See
-#'   [mgcv::exclude.too.far()] for further details.
-#' @param ... ignored.
+#' @rdname gratia_mvgam_enhancements
 #' @aliases eval_smooth.mod.smooth
 #' @export
 eval_smoothDotmodDotsmooth = function(smooth,
@@ -562,7 +517,7 @@ eval_smoothDotmodDotsmooth = function(smooth,
   eval_sm
 }
 
-#' @rdname eval_smooth_monotonic
+#' @rdname gratia_mvgam_enhancements
 #' @aliases eval_smooth.moi.smooth
 #' @export
 eval_smoothDotmoiDotsmooth = function(smooth,
@@ -666,7 +621,7 @@ eval_smoothDotmoiDotsmooth = function(smooth,
     )
   } else {
     smooth <- gratia::get_smooths_by_id(model, id)[[1L]]
-    vars <- gratia::smooth_variable(smooth)
+    vars <- smooth_variable(smooth)
     by_var <- gratia::by_variable(smooth)
     if (!identical(by_var, "NA")) {
       vars <- append(vars, by_var)
@@ -709,4 +664,10 @@ lss_eta_index <- function(object){
     attr(lpi, "overlap") <- NULL
     lpi
   }
+}
+
+#' @noRd
+smooth_variable <- function (smooth) {
+  gratia::check_is_mgcv_smooth(smooth)
+  smooth[["term"]]
 }

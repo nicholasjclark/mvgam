@@ -41,7 +41,7 @@
 #'@examples
 #'\donttest{
 #'# Simulate a time-varying coefficient
-#'#(as a Gaussian Process with length scale = 10)
+#'# (as a Gaussian Process with length scale = 10)
 #'set.seed(1111)
 #'N <- 200
 #'
