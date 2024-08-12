@@ -249,9 +249,7 @@
 #'\code{\link{mvgam_trends}}.
 #'\cr
 #'\cr
-#'*Priors*: A \code{\link[mgcv]{jagam}} model file is generated from \code{formula} and
-#'modified to include any latent
-#'temporal processes. Default priors for intercepts and any scale parameters are generated
+#'*Priors*: Default priors for intercepts and any scale parameters are generated
 #'using the same practice as \pkg{brms}. Prior distributions for most important model parameters can be
 #'altered by the user to inspect model
 #'sensitivities to given priors (see \code{\link{get_mvgam_priors}} for details).
@@ -300,18 +298,49 @@
 #'*Using Stan*: `mvgam` is primarily designed to use Hamiltonian Monte Carlo for parameter estimation
 #'via the software `Stan` (using either the `cmdstanr` or `rstan` interface).
 #'There are great advantages when using `Stan` over Gibbs / Metropolis Hastings samplers, which includes the option
-#'to estimate smooth latent trends via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408).
-#'This often makes sense for ecological series, which we expect to change smoothly. In `mvgam`, latent squared
-#'exponential GP trends are approximated using by default \code{20} basis functions, which saves computational
-#'costs compared to fitting full GPs while adequately estimating
-#'GP \code{alpha} and \code{rho} parameters. Because of the many advantages of `Stan` over `JAGS`,
+#'to estimate nonlinear effects via [Hilbert space approximate Gaussian Processes](https://arxiv.org/abs/2004.11408),
+#'the availability of a variety of inference algorithms (i.e. variational inference, laplacian inference etc...) and
+#'[capabilities to enforce stationarity for complex Vector Autoregressions](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648).
+#'Because of the many advantages of `Stan` over `JAGS`,
 #'*further development of the package will only be applied to `Stan`*. This includes the planned addition
 #'of more response distributions, plans to handle zero-inflation, and plans to incorporate a greater
 #'variety of trend models. Users are strongly encouraged to opt for `Stan` over `JAGS` in any proceeding workflows
+#'\cr
+#'\cr
+#'*How to start?*: The [`mvgam` cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf) is a
+#'good starting place if you are just learning to use the package. It gives an overview of the package's key functions and objects,
+#'as well as providing a reasonable workflow that new users can follow. In general it is recommended to
+#'\itemize{
+#'   \item 1. Check that your time series data are in a suitable long format for `mvgam` modeling (see the [data formatting vignette](https://nicholasjclark.github.io/mvgam/articles/data_in_mvgam.html) for guidance)
+#'   \item 2. Inspect features of the data using \code{\link{plot_mvgam_series}}. Now is also a good time to familiarise yourself
+#'   with the package's example workflows that are detailed in the vignettes. In particular,
+#'   the [getting started vignette](https://nicholasjclark.github.io/mvgam/articles/shared_states.html),
+#'   the [shared latent states vignette](https://nicholasjclark.github.io/mvgam/articles/shared_states.html),
+#'   the [time-varying effects vignette](https://nicholasjclark.github.io/mvgam/articles/time_varying_effects.html) and
+#'   the [State-Space models vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html) all provide
+#'   detailed information about how to structure, fit and interrogate Dynamic Generalized Additive Models in `mvgam`. Some
+#'   more specialized how-to articles include
+#'   ["Incorporating time-varying seasonality in forecast models"](https://ecogambler.netlify.app/blog/time-varying-seasonality/)
+#'   and ["Temporal autocorrelation in GAMs and the `mvgam` package"](https://ecogambler.netlify.app/blog/autocorrelated-gams/)
+#'   \item 3. Carefully think about how to structure linear predictor effects (i.e. smooth terms using \code{\link[mgcv]{s}},
+#'   \code{\link[mgcv]{te}} or \code{\link[mgcv]{ti}}, GPs using \code{\link[brms]{gp}}, dynamic time-varying effects using \code{\link{dynamic}}, and parametric terms), latent temporal trend components (see \code{\link{mvgam_trends}}) and the appropriate
+#'   observation family (see \code{\link{mvgam_families}}). Use \code{\link{get_mvgam_priors}} to see default prior distributions
+#'   for stochastic parameters
+#'   \item 4. Change default priors using appropriate prior knowledge (see \code{\link[brms]{prior}})
+#'   \item 5. Fit the model using either Hamiltonian Monte Carlo or an approximation algorithm (i.e. change the `backend` argument)
+#'   and use \code{\link{summary.mvgam}}, \code{\link{conditional_effects.mvgam}}, \code{\link{mcmc_plot.mvgam}}, \code{\link{pp_check.mvgam}} and
+#'   \code{\link{plot.mvgam}} to inspect / interrogate the model
+#'   \item 6. Update the model as needed and use \code{\link{loo_compare.mvgam}} for in-sample model comparisons, or alternatively
+#'   use \code{\link{forecast.mvgam}} and \code{\link{score.mvgam_forecast}} to compare models based on out-of-sample forecasts (see the [forecast evaluation vignette](https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html) for guidance)
+#'   \item 7. When satisfied with the model structure, use \code{\link{predict.mvgam}},
+#'   \code{\link[marginaleffects]{plot_predictions}} and/or \code{\link[marginaleffects]{plot_slopes}} for
+#'   more targeted inferences (see ["How to interpret and report nonlinear effects from Generalized Additive Models"](https://ecogambler.netlify.app/blog/interpreting-gams/) for some guidance on interpreting GAMs)
+#'   }
 #'@author Nicholas J Clark
 #'@references Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 #'Methods in Ecology and Evolution. 14:3, 771-784.
 #'@seealso \code{\link[mgcv]{jagam}}, \code{\link[mgcv]{gam}}, \code{\link[mgcv]{gam.models}},
+#'\code{\link{get_mvgam_priors}}
 #'@return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
 #'unsampled covariate values), Dunn-Smyth residuals for each series and key information needed

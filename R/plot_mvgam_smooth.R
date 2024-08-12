@@ -31,13 +31,22 @@
 #'in addition to any other variables included in the linear predictor of the original model's \code{formula}.
 #'Note that this currently is only supported for plotting univariate smooths
 #'@details Smooth functions are shown as empirical quantiles (or spaghetti plots) of posterior partial expectations
-#' across a sequence of 500 values between the variable's \code{min} and \code{max},
+#' across a sequence of values between the variable's \code{min} and \code{max},
 #'while zeroing out effects of all other variables. At present, only univariate and bivariate smooth plots
 #'are allowed, though note that bivariate smooths rely on default behaviour from
-#'\code{\link[mgcv]{plot.gam}}. For more nuanced visualisation, supply
-#'\code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model
+#'\code{\link[mgcv]{plot.gam}}. `plot_mvgam_smooth` generates posterior predictions from an
+#'object of class \code{mvgam}, calculates posterior empirical quantiles and plots them.
+#'If `realisations = FALSE`, the returned plot shows 90, 60, 40 and 20 percent posterior
+#'quantiles (as ribbons of increasingly darker shades or red) as well as the posterior
+#' median (as a dark red line). If `realisations = FALSE`, a set of `n_realisations` posterior
+#' draws are shown. For more nuanced visualisation, supply
+#'\code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model or use the more flexible \code{\link{conditional_effects.mvgam}}. Alternatively, if you prefer to use partial
+#'effect plots in the style of `gratia`, and if you have the `gratia` package installed, you can
+#'use `draw.mvgam`. See \code{\link{gratia_mvgam_enhancements}} for details.
 #'@return A base \code{R} graphics plot
-#'@seealso \code{\link[mgcv]{plot.gam}}
+#'@seealso \code{\link[mgcv]{plot.gam}}, \code{\link{conditional_effects.mvgam}},
+#'\code{\link{gratia_mvgam_enhancements}}
+#'@author Nicholas J Clark
 #'@export
 plot_mvgam_smooth = function(object,
                              trend_effects = FALSE,

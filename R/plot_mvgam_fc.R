@@ -33,8 +33,11 @@
 #'observation family from the fitted model. Discrete families (\code{poisson}, \code{negative binomial}, \code{tweedie})
 #'use the Discrete Rank Probability Score. Other families use the Continuous Rank Probability Score. The value
 #'returned is the \code{sum} of all scores within the out of sample forecast horizon
-#'@details `plot_mvgam_fc` draws posterior predictions from an object of class \code{mvgam} and calculates posterior
-#'empirical quantiles.
+#'@details `plot_mvgam_fc` generates posterior predictions from an object of class \code{mvgam}, calculates posterior
+#' empirical quantiles and plots them against the observed data. If `realisations = FALSE`, the returned plot shows
+#' 90, 60, 40 and 20 percent posterior quantiles (as ribbons of increasingly darker shades or red)
+#' as well as the posterior median (as a dark red line). If `realisations = FALSE`, a set of `n_realisations` posterior
+#' draws are shown.
 #'
 #'`plot.mvgam_forecast` takes an object of class `mvgam_forecast`, in which forecasts have already
 #'been computed, and plots the resulting forecast distribution.

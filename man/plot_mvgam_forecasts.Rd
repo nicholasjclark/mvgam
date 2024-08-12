@@ -94,8 +94,11 @@ and the out of sample probabilistic forecast score
 Plot mvgam posterior predictions for a specified series
 }
 \details{
-\code{plot_mvgam_fc} draws posterior predictions from an object of class \code{mvgam} and calculates posterior
-empirical quantiles.
+\code{plot_mvgam_fc} generates posterior predictions from an object of class \code{mvgam}, calculates posterior
+empirical quantiles and plots them against the observed data. If \code{realisations = FALSE}, the returned plot shows
+90, 60, 40 and 20 percent posterior quantiles (as ribbons of increasingly darker shades or red)
+as well as the posterior median (as a dark red line). If \code{realisations = FALSE}, a set of \code{n_realisations} posterior
+draws are shown.
 
 \code{plot.mvgam_forecast} takes an object of class \code{mvgam_forecast}, in which forecasts have already
 been computed, and plots the resulting forecast distribution.

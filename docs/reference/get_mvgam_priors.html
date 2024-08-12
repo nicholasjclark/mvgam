@@ -73,6 +73,7 @@ changed for a given <code>mvgam</code> model, as well listing their default dist
 <span>  <span class="va">data_train</span>,</span>
 <span>  family <span class="op">=</span> <span class="st">"poisson"</span>,</span>
 <span>  <span class="va">knots</span>,</span>
+<span>  <span class="va">trend_knots</span>,</span>
 <span>  use_lv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">n_lv</span>,</span>
 <span>  use_stan <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -158,6 +159,11 @@ See <code><a href="mvgam_families.html">mvgam_families</a></code> for more detai
 For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
 (note that the number of knots is not always just <code>k</code>). Different terms can use different numbers of knots,
 unless they share a covariate</p></dd>
+
+
+<dt>trend_knots</dt>
+<dd><p>As for <code>knots</code> above, this is an optional <code>list</code> of knot values for smooth
+functions within the <code>trend_formula</code></p></dd>
 
 
 <dt>use_lv</dt>
@@ -428,12 +434,12 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.71);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2   mu_raw ~ normal(-0.27, 0.7);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.72);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.08, 0.45);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(-0.2, 0.35);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.17);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.73, 0.69);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(-0.65, 0.97);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.49);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(0.95, 0.51);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(-0.43, 0.5);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.35);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(-0.19, 0.3);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>

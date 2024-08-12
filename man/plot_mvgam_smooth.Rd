@@ -63,12 +63,23 @@ This function plots posterior empirical quantiles for a series-specific smooth t
 }
 \details{
 Smooth functions are shown as empirical quantiles (or spaghetti plots) of posterior partial expectations
-across a sequence of 500 values between the variable's \code{min} and \code{max},
+across a sequence of values between the variable's \code{min} and \code{max},
 while zeroing out effects of all other variables. At present, only univariate and bivariate smooth plots
 are allowed, though note that bivariate smooths rely on default behaviour from
-\code{\link[mgcv]{plot.gam}}. For more nuanced visualisation, supply
-\code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model
+\code{\link[mgcv]{plot.gam}}. \code{plot_mvgam_smooth} generates posterior predictions from an
+object of class \code{mvgam}, calculates posterior empirical quantiles and plots them.
+If \code{realisations = FALSE}, the returned plot shows 90, 60, 40 and 20 percent posterior
+quantiles (as ribbons of increasingly darker shades or red) as well as the posterior
+median (as a dark red line). If \code{realisations = FALSE}, a set of \code{n_realisations} posterior
+draws are shown. For more nuanced visualisation, supply
+\code{newdata} just as you would when predicting from a \code{\link[mgcv]{gam}} model or use the more flexible \code{\link{conditional_effects.mvgam}}. Alternatively, if you prefer to use partial
+effect plots in the style of \code{gratia}, and if you have the \code{gratia} package installed, you can
+use \code{draw.mvgam}. See \code{\link{gratia_mvgam_enhancements}} for details.
 }
 \seealso{
-\code{\link[mgcv]{plot.gam}}
+\code{\link[mgcv]{plot.gam}}, \code{\link{conditional_effects.mvgam}},
+\code{\link{gratia_mvgam_enhancements}}
+}
+\author{
+Nicholas J Clark
 }

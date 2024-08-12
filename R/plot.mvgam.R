@@ -36,11 +36,13 @@
 #'@param ... Additional arguments for each individual plotting function.
 #'@details These plots are useful for getting an overview of the fitted model and its estimated
 #'random effects or smooth functions,
-#'but the individual plotting functions and the functions from the marginaleffects package
+#'but the individual plotting functions and the functions from the `marginaleffects` and `gratia` packages
 #'offer far more more customisation.
 #'@seealso \code{\link{plot_mvgam_resids}}, \code{\link{plot_mvgam_smooth}}, \code{\link{plot_mvgam_fc}},
 #'\code{\link{plot_mvgam_trend}}, \code{\link{plot_mvgam_uncertainty}}, \code{\link{plot_mvgam_factors}},
-#'\code{\link{plot_mvgam_randomeffects}}, \code{\link[marginaleffects]{plot_predictions}}, \code{\link[marginaleffects]{plot_slopes}}
+#'\code{\link{plot_mvgam_randomeffects}}, \code{\link{conditional_effects.mvgam}},
+#'\code{\link[marginaleffects]{plot_predictions}}, \code{\link[marginaleffects]{plot_slopes}},
+#'\code{\link{gratia_mvgam_enhancements}}
 #'@author Nicholas J Clark
 #'@return A base R plot or set of plots
 #'@examples
