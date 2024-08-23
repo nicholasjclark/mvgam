@@ -26,7 +26,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.3</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -81,7 +81,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2024-04-15</h4>
+            <h4 data-toc-skip class="date">2024-08-24</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/nmixtures.Rmd" class="external-link"><code>vignettes/nmixtures.Rmd</code></a></small>
       <div class="d-none name"><code>nmixtures.Rmd</code></div>
@@ -194,7 +194,7 @@ without adding too much computational cost:</p>
 <span><span class="co"># Now add another species that has a different temporal trend and a smaller </span></span>
 <span><span class="co"># detection probability (0.45 for this species)</span></span>
 <span><span class="va">testdat</span> <span class="op">=</span> <span class="va">testdat</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>site <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">bind_rows</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>site <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>                              replicate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span>,</span>
 <span>                              time <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sort.html" class="external-link">sort</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, <span class="fl">5</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>                              species <span class="op">=</span> <span class="st">'sp_2'</span>,</span>
@@ -228,31 +228,30 @@ we’d like to allow certain effects to vary by species</p>
 <span>                         levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">$</span><span class="va">series</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>Preview the dataset to get an idea of how it is structured:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://pillar.r-lib.org/reference/glimpse.html" class="external-link">glimpse</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## Rows: 60</span></span>
-<span><span class="co">## Columns: 7</span></span>
-<span><span class="co">## $ site    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,…</span></span>
-<span><span class="co">## $ time    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5,…</span></span>
-<span><span class="co">## $ species <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp…</span></span>
-<span><span class="co">## $ truth   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 28, 28, 28, 28, 28, 26, 26, 26, 26, 26, 23, 23, 23, 23, 23, 16…</span></span>
-<span><span class="co">## $ obs     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 20, 19, 23, 17, 18, 21, 18, 21, 19, 18, 17, 16, 20, 11, 19, 9,…</span></span>
-<span><span class="co">## $ series  <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> site_1_sp_1_rep_1, site_1_sp_1_rep_2, site_1_sp_1_rep_3, site_…</span></span>
-<span><span class="co">## $ cap     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 10…</span></span></code></pre>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">testdat</span>, <span class="fl">12</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">##    site time species truth obs            series cap</span></span>
-<span><span class="co">## 1     1    1    sp_1    28  20 site_1_sp_1_rep_1 100</span></span>
-<span><span class="co">## 2     1    1    sp_1    28  19 site_1_sp_1_rep_2 100</span></span>
-<span><span class="co">## 3     1    1    sp_1    28  23 site_1_sp_1_rep_3 100</span></span>
-<span><span class="co">## 4     1    1    sp_1    28  17 site_1_sp_1_rep_4 100</span></span>
-<span><span class="co">## 5     1    1    sp_1    28  18 site_1_sp_1_rep_5 100</span></span>
-<span><span class="co">## 6     1    2    sp_1    26  21 site_1_sp_1_rep_1 100</span></span>
-<span><span class="co">## 7     1    2    sp_1    26  18 site_1_sp_1_rep_2 100</span></span>
-<span><span class="co">## 8     1    2    sp_1    26  21 site_1_sp_1_rep_3 100</span></span>
-<span><span class="co">## 9     1    2    sp_1    26  19 site_1_sp_1_rep_4 100</span></span>
-<span><span class="co">## 10    1    2    sp_1    26  18 site_1_sp_1_rep_5 100</span></span>
-<span><span class="co">## 11    1    3    sp_1    23  17 site_1_sp_1_rep_1 100</span></span>
-<span><span class="co">## 12    1    3    sp_1    23  16 site_1_sp_1_rep_2 100</span></span></code></pre>
+<code class="sourceCode R"><span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://pillar.r-lib.org/reference/glimpse.html" class="external-link">glimpse</a></span><span class="op">(</span><span class="va">testdat</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Rows: 60</span></span>
+<span><span class="co">#&gt; Columns: 7</span></span>
+<span><span class="co">#&gt; $ site    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,…</span></span>
+<span><span class="co">#&gt; $ time    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5,…</span></span>
+<span><span class="co">#&gt; $ species <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp…</span></span>
+<span><span class="co">#&gt; $ truth   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 28, 28, 28, 28, 28, 26, 26, 26, 26, 26, 23, 23, 23, 23, 23, 16…</span></span>
+<span><span class="co">#&gt; $ obs     <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 20, 19, 23, 17, 18, 21, 18, 21, 19, 18, 17, 16, 20, 11, 19, 9,…</span></span>
+<span><span class="co">#&gt; $ series  <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> site_1_sp_1_rep_1, site_1_sp_1_rep_2, site_1_sp_1_rep_3, site_…</span></span>
+<span><span class="co">#&gt; $ cap     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 10…</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">testdat</span>, <span class="fl">12</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    site time species truth obs            series cap</span></span>
+<span><span class="co">#&gt; 1     1    1    sp_1    28  20 site_1_sp_1_rep_1 100</span></span>
+<span><span class="co">#&gt; 2     1    1    sp_1    28  19 site_1_sp_1_rep_2 100</span></span>
+<span><span class="co">#&gt; 3     1    1    sp_1    28  23 site_1_sp_1_rep_3 100</span></span>
+<span><span class="co">#&gt; 4     1    1    sp_1    28  17 site_1_sp_1_rep_4 100</span></span>
+<span><span class="co">#&gt; 5     1    1    sp_1    28  18 site_1_sp_1_rep_5 100</span></span>
+<span><span class="co">#&gt; 6     1    2    sp_1    26  21 site_1_sp_1_rep_1 100</span></span>
+<span><span class="co">#&gt; 7     1    2    sp_1    26  18 site_1_sp_1_rep_2 100</span></span>
+<span><span class="co">#&gt; 8     1    2    sp_1    26  21 site_1_sp_1_rep_3 100</span></span>
+<span><span class="co">#&gt; 9     1    2    sp_1    26  19 site_1_sp_1_rep_4 100</span></span>
+<span><span class="co">#&gt; 10    1    2    sp_1    26  18 site_1_sp_1_rep_5 100</span></span>
+<span><span class="co">#&gt; 11    1    3    sp_1    23  17 site_1_sp_1_rep_1 100</span></span>
+<span><span class="co">#&gt; 12    1    3    sp_1    23  16 site_1_sp_1_rep_2 100</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="setting-up-the-trend_map">Setting up the <code>trend_map</code><a class="anchor" aria-label="anchor" href="#setting-up-the-trend_map"></a>
 </h3>
@@ -262,24 +261,24 @@ latent process model (see more information about this argument in the <a href="h
 mapping operates by species and site to state that each set of replicate
 observations from the same time point should all share the exact same
 latent abundance model:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">testdat</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="co"># each unique combination of site*species is a separate process</span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">site</span>, <span class="va">species</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">trend</span>, <span class="va">series</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/distinct.html" class="external-link">distinct</a></span><span class="op">(</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">trend_map</span></span>
-<span><span class="va">trend_map</span></span></code></pre></div>
-<pre><code><span><span class="co">##    trend            series</span></span>
-<span><span class="co">## 1      1 site_1_sp_1_rep_1</span></span>
-<span><span class="co">## 2      1 site_1_sp_1_rep_2</span></span>
-<span><span class="co">## 3      1 site_1_sp_1_rep_3</span></span>
-<span><span class="co">## 4      1 site_1_sp_1_rep_4</span></span>
-<span><span class="co">## 5      1 site_1_sp_1_rep_5</span></span>
-<span><span class="co">## 6      2 site_1_sp_2_rep_1</span></span>
-<span><span class="co">## 7      2 site_1_sp_2_rep_2</span></span>
-<span><span class="co">## 8      2 site_1_sp_2_rep_3</span></span>
-<span><span class="co">## 9      2 site_1_sp_2_rep_4</span></span>
-<span><span class="co">## 10     2 site_1_sp_2_rep_5</span></span></code></pre>
+<span><span class="va">trend_map</span></span>
+<span><span class="co">#&gt;    trend            series</span></span>
+<span><span class="co">#&gt; 1      1 site_1_sp_1_rep_1</span></span>
+<span><span class="co">#&gt; 2      1 site_1_sp_1_rep_2</span></span>
+<span><span class="co">#&gt; 3      1 site_1_sp_1_rep_3</span></span>
+<span><span class="co">#&gt; 4      1 site_1_sp_1_rep_4</span></span>
+<span><span class="co">#&gt; 5      1 site_1_sp_1_rep_5</span></span>
+<span><span class="co">#&gt; 6      2 site_1_sp_2_rep_1</span></span>
+<span><span class="co">#&gt; 7      2 site_1_sp_2_rep_2</span></span>
+<span><span class="co">#&gt; 8      2 site_1_sp_2_rep_3</span></span>
+<span><span class="co">#&gt; 9      2 site_1_sp_2_rep_4</span></span>
+<span><span class="co">#&gt; 10     2 site_1_sp_2_rep_5</span></span></code></pre></div>
 <p>Notice how all of the replicates for species 1 in site 1 share the
 same process (i.e. the same <code>trend</code>). This will ensure that
 all replicates are Binomial draws of the same latent N.</p>
@@ -292,7 +291,7 @@ model will allow each species to have different detection probabilities
 and different temporal trends. We will use <code>Cmdstan</code> as the
 backend, which by default will use Hamiltonian Monte Carlo for full
 Bayesian inference</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span></span>
 <span>  <span class="co"># the observation formula sets up linear predictors for</span></span>
 <span>  <span class="co"># detection probability on the logit scale</span></span>
@@ -315,248 +314,248 @@ Bayesian inference</p>
 <span>  samples <span class="op">=</span> <span class="fl">1000</span><span class="op">)</span></span></code></pre></div>
 <p>View the automatically-generated <code>Stan</code> code to get a
 sense of how the marginalization over latent N works</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/code.html">code</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## // Stan model code generated by package mvgam</span></span>
-<span><span class="co">## data {</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; total_obs; // total number of observations</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; n; // number of timepoints per series</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; n_sp_trend; // number of trend smoothing parameters</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; n_lv; // number of dynamic factors</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; n_series; // number of series</span></span>
-<span><span class="co">##   matrix[n_series, n_lv] Z; // matrix mapping series to latent states</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; num_basis; // total number of basis coefficients</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; num_basis_trend; // number of trend basis coefficients</span></span>
-<span><span class="co">##   vector[num_basis_trend] zero_trend; // prior locations for trend basis coefficients</span></span>
-<span><span class="co">##   matrix[total_obs, num_basis] X; // mgcv GAM design matrix</span></span>
-<span><span class="co">##   matrix[n * n_lv, num_basis_trend] X_trend; // trend model design matrix</span></span>
-<span><span class="co">##   array[n, n_series] int&lt;lower=0&gt; ytimes; // time-ordered matrix (which col in X belongs to each [time, series] observation?)</span></span>
-<span><span class="co">##   array[n, n_lv] int ytimes_trend;</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations</span></span>
-<span><span class="co">##   array[total_obs] int&lt;lower=0&gt; cap; // upper limits of latent abundances</span></span>
-<span><span class="co">##   array[total_obs] int ytimes_array; // sorted ytimes</span></span>
-<span><span class="co">##   array[n, n_series] int&lt;lower=0&gt; ytimes_pred; // time-ordered matrix for prediction</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; K_groups; // number of unique replicated observations</span></span>
-<span><span class="co">##   int&lt;lower=0&gt; K_reps; // maximum number of replicate observations</span></span>
-<span><span class="co">##   array[K_groups] int&lt;lower=0&gt; K_starts; // col of K_inds where each group starts</span></span>
-<span><span class="co">##   array[K_groups] int&lt;lower=0&gt; K_stops; // col of K_inds where each group ends</span></span>
-<span><span class="co">##   array[K_groups, K_reps] int&lt;lower=0&gt; K_inds; // indices of replicated observations</span></span>
-<span><span class="co">##   matrix[3, 6] S_trend1; // mgcv smooth penalty matrix S_trend1</span></span>
-<span><span class="co">##   matrix[3, 6] S_trend2; // mgcv smooth penalty matrix S_trend2</span></span>
-<span><span class="co">##   array[total_obs] int&lt;lower=0&gt; flat_ys; // flattened observations</span></span>
-<span><span class="co">## }</span></span>
-<span><span class="co">## transformed data {</span></span>
-<span><span class="co">##   matrix[total_obs, num_basis] X_ordered = X[ytimes_array,  : ];</span></span>
-<span><span class="co">##   array[K_groups] int&lt;lower=0&gt; Y_max;</span></span>
-<span><span class="co">##   array[K_groups] int&lt;lower=0&gt; N_max;</span></span>
-<span><span class="co">##   for (k in 1 : K_groups) {</span></span>
-<span><span class="co">##     Y_max[k] = max(flat_ys[K_inds[k, K_starts[k] : K_stops[k]]]);</span></span>
-<span><span class="co">##     N_max[k] = max(cap[K_inds[k, K_starts[k] : K_stops[k]]]);</span></span>
-<span><span class="co">##   }</span></span>
-<span><span class="co">## }</span></span>
-<span><span class="co">## parameters {</span></span>
-<span><span class="co">##   // raw basis coefficients</span></span>
-<span><span class="co">##   vector[num_basis] b_raw;</span></span>
-<span><span class="co">##   vector[num_basis_trend] b_raw_trend;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // smoothing parameters</span></span>
-<span><span class="co">##   vector&lt;lower=0&gt;[n_sp_trend] lambda_trend;</span></span>
-<span><span class="co">## }</span></span>
-<span><span class="co">## transformed parameters {</span></span>
-<span><span class="co">##   // detection probability</span></span>
-<span><span class="co">##   vector[total_obs] p;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // latent states</span></span>
-<span><span class="co">##   matrix[n, n_lv] LV;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // latent states and loading matrix</span></span>
-<span><span class="co">##   vector[n * n_lv] trend_mus;</span></span>
-<span><span class="co">##   matrix[n, n_series] trend;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // basis coefficients</span></span>
-<span><span class="co">##   vector[num_basis] b;</span></span>
-<span><span class="co">##   vector[num_basis_trend] b_trend;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // observation model basis coefficients</span></span>
-<span><span class="co">##   b[1 : num_basis] = b_raw[1 : num_basis];</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // process model basis coefficients</span></span>
-<span><span class="co">##   b_trend[1 : num_basis_trend] = b_raw_trend[1 : num_basis_trend];</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // detection probability</span></span>
-<span><span class="co">##   p = X_ordered * b;</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // latent process linear predictors</span></span>
-<span><span class="co">##   trend_mus = X_trend * b_trend;</span></span>
-<span><span class="co">##   for (j in 1 : n_lv) {</span></span>
-<span><span class="co">##     LV[1 : n, j] = trend_mus[ytimes_trend[1 : n, j]];</span></span>
-<span><span class="co">##   }</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // derived latent states</span></span>
-<span><span class="co">##   for (i in 1 : n) {</span></span>
-<span><span class="co">##     for (s in 1 : n_series) {</span></span>
-<span><span class="co">##       trend[i, s] = dot_product(Z[s,  : ], LV[i,  : ]);</span></span>
-<span><span class="co">##     }</span></span>
-<span><span class="co">##   }</span></span>
-<span><span class="co">## }</span></span>
-<span><span class="co">## model {</span></span>
-<span><span class="co">##   // prior for speciessp_1...</span></span>
-<span><span class="co">##   b_raw[1] ~ std_normal();</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // prior for speciessp_2...</span></span>
-<span><span class="co">##   b_raw[2] ~ std_normal();</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // dynamic process models</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // prior for (Intercept)_trend...</span></span>
-<span><span class="co">##   b_raw_trend[1] ~ normal(1, 1.5);</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // prior for speciessp_2_trend...</span></span>
-<span><span class="co">##   b_raw_trend[2] ~ std_normal();</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // prior for s(time):trendtrend1_trend...</span></span>
-<span><span class="co">##   b_raw_trend[3 : 5] ~ multi_normal_prec(zero_trend[3 : 5],</span></span>
-<span><span class="co">##                                          S_trend1[1 : 3, 1 : 3]</span></span>
-<span><span class="co">##                                          * lambda_trend[1]</span></span>
-<span><span class="co">##                                          + S_trend1[1 : 3, 4 : 6]</span></span>
-<span><span class="co">##                                            * lambda_trend[2]);</span></span>
-<span><span class="co">##   </span></span>
-<span><span class="co">##   // prior for s(time):trendtrend2_trend...</span></span>
-<span><span class="co">##   b_raw_trend[6 : 8] ~ multi_normal_prec(zero_trend[6 : 8],</span></span>
-<span><span class="co">##                                          S_trend2[1 : 3, 1 : 3]</span></span>
-<span><span class="co">##                                          * lambda_trend[3]</span></span>
-<span><span class="co">##                                          + S_trend2[1 : 3, 4 : 6]</span></span>
-<span><span class="co">##                                            * lambda_trend[4]);</span></span>
-<span><span class="co">##   lambda_trend ~ normal(5, 30);</span></span>
-<span><span class="co">##   {</span></span>
-<span><span class="co">##     // likelihood functions</span></span>
-<span><span class="co">##     array[total_obs] real flat_trends;</span></span>
-<span><span class="co">##     array[total_obs] real flat_ps;</span></span>
-<span><span class="co">##     flat_trends = to_array_1d(trend);</span></span>
-<span><span class="co">##     flat_ps = to_array_1d(p);</span></span>
-<span><span class="co">##     </span></span>
-<span><span class="co">##     // loop over replicate sampling window (each site*time*species combination)</span></span>
-<span><span class="co">##     for (k in 1 : K_groups) {</span></span>
-<span><span class="co">##       // all log_lambdas are identical because they represent site*time</span></span>
-<span><span class="co">##       // covariates; so just use the first measurement</span></span>
-<span><span class="co">##       real log_lambda = flat_trends[K_inds[k, 1]];</span></span>
-<span><span class="co">##       vector[N_max[k] - Y_max[k] + 1] terms;</span></span>
-<span><span class="co">##       int l = 0;</span></span>
-<span><span class="co">##       </span></span>
-<span><span class="co">##       // marginalize over latent abundance</span></span>
-<span><span class="co">##       for (Ni in Y_max[k] : N_max[k]) {</span></span>
-<span><span class="co">##         l = l + 1;</span></span>
-<span><span class="co">##         // factor for poisson prob of latent Ni; compute</span></span>
-<span><span class="co">##         </span></span>
-<span><span class="co">##         // only once per sampling window</span></span>
-<span><span class="co">##         terms[l] = poisson_log_lpmf(Ni | log_lambda)</span></span>
-<span><span class="co">##                    + // for each replicate observation, binomial prob observed is</span></span>
-<span><span class="co">##                    // computed in a vectorized statement</span></span>
-<span><span class="co">##                    binomial_logit_lpmf(flat_ys[K_inds[k, K_starts[k] : K_stops[k]]] | Ni, flat_ps[K_inds[k, K_starts[k] : K_stops[k]]]);</span></span>
-<span><span class="co">##       }</span></span>
-<span><span class="co">##       target += log_sum_exp(terms);</span></span>
-<span><span class="co">##     }</span></span>
-<span><span class="co">##   }</span></span>
-<span><span class="co">## }</span></span>
-<span><span class="co">## generated quantities {</span></span>
-<span><span class="co">##   vector[n_lv] penalty = rep_vector(1e12, n_lv);</span></span>
-<span><span class="co">##   vector[n_sp_trend] rho_trend = log(lambda_trend);</span></span>
-<span><span class="co">## }</span></span></code></pre>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/code.html">code</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span>
+<span><span class="co">#&gt; // Stan model code generated by package mvgam</span></span>
+<span><span class="co">#&gt; data {</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; total_obs; // total number of observations</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; n; // number of timepoints per series</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; n_sp_trend; // number of trend smoothing parameters</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; n_lv; // number of dynamic factors</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; n_series; // number of series</span></span>
+<span><span class="co">#&gt;   matrix[n_series, n_lv] Z; // matrix mapping series to latent states</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; num_basis; // total number of basis coefficients</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; num_basis_trend; // number of trend basis coefficients</span></span>
+<span><span class="co">#&gt;   vector[num_basis_trend] zero_trend; // prior locations for trend basis coefficients</span></span>
+<span><span class="co">#&gt;   matrix[total_obs, num_basis] X; // mgcv GAM design matrix</span></span>
+<span><span class="co">#&gt;   matrix[n * n_lv, num_basis_trend] X_trend; // trend model design matrix</span></span>
+<span><span class="co">#&gt;   array[n, n_series] int&lt;lower=0&gt; ytimes; // time-ordered matrix (which col in X belongs to each [time, series] observation?)</span></span>
+<span><span class="co">#&gt;   array[n, n_lv] int ytimes_trend;</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; n_nonmissing; // number of nonmissing observations</span></span>
+<span><span class="co">#&gt;   array[total_obs] int&lt;lower=0&gt; cap; // upper limits of latent abundances</span></span>
+<span><span class="co">#&gt;   array[total_obs] int ytimes_array; // sorted ytimes</span></span>
+<span><span class="co">#&gt;   array[n, n_series] int&lt;lower=0&gt; ytimes_pred; // time-ordered matrix for prediction</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; K_groups; // number of unique replicated observations</span></span>
+<span><span class="co">#&gt;   int&lt;lower=0&gt; K_reps; // maximum number of replicate observations</span></span>
+<span><span class="co">#&gt;   array[K_groups] int&lt;lower=0&gt; K_starts; // col of K_inds where each group starts</span></span>
+<span><span class="co">#&gt;   array[K_groups] int&lt;lower=0&gt; K_stops; // col of K_inds where each group ends</span></span>
+<span><span class="co">#&gt;   array[K_groups, K_reps] int&lt;lower=0&gt; K_inds; // indices of replicated observations</span></span>
+<span><span class="co">#&gt;   matrix[3, 6] S_trend1; // mgcv smooth penalty matrix S_trend1</span></span>
+<span><span class="co">#&gt;   matrix[3, 6] S_trend2; // mgcv smooth penalty matrix S_trend2</span></span>
+<span><span class="co">#&gt;   array[total_obs] int&lt;lower=0&gt; flat_ys; // flattened observations</span></span>
+<span><span class="co">#&gt; }</span></span>
+<span><span class="co">#&gt; transformed data {</span></span>
+<span><span class="co">#&gt;   matrix[total_obs, num_basis] X_ordered = X[ytimes_array,  : ];</span></span>
+<span><span class="co">#&gt;   array[K_groups] int&lt;lower=0&gt; Y_max;</span></span>
+<span><span class="co">#&gt;   array[K_groups] int&lt;lower=0&gt; N_max;</span></span>
+<span><span class="co">#&gt;   for (k in 1 : K_groups) {</span></span>
+<span><span class="co">#&gt;     Y_max[k] = max(flat_ys[K_inds[k, K_starts[k] : K_stops[k]]]);</span></span>
+<span><span class="co">#&gt;     N_max[k] = max(cap[K_inds[k, K_starts[k] : K_stops[k]]]);</span></span>
+<span><span class="co">#&gt;   }</span></span>
+<span><span class="co">#&gt; }</span></span>
+<span><span class="co">#&gt; parameters {</span></span>
+<span><span class="co">#&gt;   // raw basis coefficients</span></span>
+<span><span class="co">#&gt;   vector[num_basis] b_raw;</span></span>
+<span><span class="co">#&gt;   vector[num_basis_trend] b_raw_trend;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // smoothing parameters</span></span>
+<span><span class="co">#&gt;   vector&lt;lower=0&gt;[n_sp_trend] lambda_trend;</span></span>
+<span><span class="co">#&gt; }</span></span>
+<span><span class="co">#&gt; transformed parameters {</span></span>
+<span><span class="co">#&gt;   // detection probability</span></span>
+<span><span class="co">#&gt;   vector[total_obs] p;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // latent states</span></span>
+<span><span class="co">#&gt;   matrix[n, n_lv] LV;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // latent states and loading matrix</span></span>
+<span><span class="co">#&gt;   vector[n * n_lv] trend_mus;</span></span>
+<span><span class="co">#&gt;   matrix[n, n_series] trend;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // basis coefficients</span></span>
+<span><span class="co">#&gt;   vector[num_basis] b;</span></span>
+<span><span class="co">#&gt;   vector[num_basis_trend] b_trend;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // observation model basis coefficients</span></span>
+<span><span class="co">#&gt;   b[1 : num_basis] = b_raw[1 : num_basis];</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // process model basis coefficients</span></span>
+<span><span class="co">#&gt;   b_trend[1 : num_basis_trend] = b_raw_trend[1 : num_basis_trend];</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // detection probability</span></span>
+<span><span class="co">#&gt;   p = X_ordered * b;</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // latent process linear predictors</span></span>
+<span><span class="co">#&gt;   trend_mus = X_trend * b_trend;</span></span>
+<span><span class="co">#&gt;   for (j in 1 : n_lv) {</span></span>
+<span><span class="co">#&gt;     LV[1 : n, j] = trend_mus[ytimes_trend[1 : n, j]];</span></span>
+<span><span class="co">#&gt;   }</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // derived latent states</span></span>
+<span><span class="co">#&gt;   for (i in 1 : n) {</span></span>
+<span><span class="co">#&gt;     for (s in 1 : n_series) {</span></span>
+<span><span class="co">#&gt;       trend[i, s] = dot_product(Z[s,  : ], LV[i,  : ]);</span></span>
+<span><span class="co">#&gt;     }</span></span>
+<span><span class="co">#&gt;   }</span></span>
+<span><span class="co">#&gt; }</span></span>
+<span><span class="co">#&gt; model {</span></span>
+<span><span class="co">#&gt;   // prior for speciessp_1...</span></span>
+<span><span class="co">#&gt;   b_raw[1] ~ std_normal();</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // prior for speciessp_2...</span></span>
+<span><span class="co">#&gt;   b_raw[2] ~ std_normal();</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // dynamic process models</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // prior for (Intercept)_trend...</span></span>
+<span><span class="co">#&gt;   b_raw_trend[1] ~ normal(1, 1.5);</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // prior for speciessp_2_trend...</span></span>
+<span><span class="co">#&gt;   b_raw_trend[2] ~ std_normal();</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // prior for s(time):trendtrend1_trend...</span></span>
+<span><span class="co">#&gt;   b_raw_trend[3 : 5] ~ multi_normal_prec(zero_trend[3 : 5],</span></span>
+<span><span class="co">#&gt;                                          S_trend1[1 : 3, 1 : 3]</span></span>
+<span><span class="co">#&gt;                                          * lambda_trend[1]</span></span>
+<span><span class="co">#&gt;                                          + S_trend1[1 : 3, 4 : 6]</span></span>
+<span><span class="co">#&gt;                                            * lambda_trend[2]);</span></span>
+<span><span class="co">#&gt;   </span></span>
+<span><span class="co">#&gt;   // prior for s(time):trendtrend2_trend...</span></span>
+<span><span class="co">#&gt;   b_raw_trend[6 : 8] ~ multi_normal_prec(zero_trend[6 : 8],</span></span>
+<span><span class="co">#&gt;                                          S_trend2[1 : 3, 1 : 3]</span></span>
+<span><span class="co">#&gt;                                          * lambda_trend[3]</span></span>
+<span><span class="co">#&gt;                                          + S_trend2[1 : 3, 4 : 6]</span></span>
+<span><span class="co">#&gt;                                            * lambda_trend[4]);</span></span>
+<span><span class="co">#&gt;   lambda_trend ~ normal(5, 30);</span></span>
+<span><span class="co">#&gt;   {</span></span>
+<span><span class="co">#&gt;     // likelihood functions</span></span>
+<span><span class="co">#&gt;     array[total_obs] real flat_trends;</span></span>
+<span><span class="co">#&gt;     array[total_obs] real flat_ps;</span></span>
+<span><span class="co">#&gt;     flat_trends = to_array_1d(trend);</span></span>
+<span><span class="co">#&gt;     flat_ps = to_array_1d(p);</span></span>
+<span><span class="co">#&gt;     </span></span>
+<span><span class="co">#&gt;     // loop over replicate sampling window (each site*time*species combination)</span></span>
+<span><span class="co">#&gt;     for (k in 1 : K_groups) {</span></span>
+<span><span class="co">#&gt;       // all log_lambdas are identical because they represent site*time</span></span>
+<span><span class="co">#&gt;       // covariates; so just use the first measurement</span></span>
+<span><span class="co">#&gt;       real log_lambda = flat_trends[K_inds[k, 1]];</span></span>
+<span><span class="co">#&gt;       vector[N_max[k] - Y_max[k] + 1] terms;</span></span>
+<span><span class="co">#&gt;       int l = 0;</span></span>
+<span><span class="co">#&gt;       </span></span>
+<span><span class="co">#&gt;       // marginalize over latent abundance</span></span>
+<span><span class="co">#&gt;       for (Ni in Y_max[k] : N_max[k]) {</span></span>
+<span><span class="co">#&gt;         l = l + 1;</span></span>
+<span><span class="co">#&gt;         // factor for poisson prob of latent Ni; compute</span></span>
+<span><span class="co">#&gt;         </span></span>
+<span><span class="co">#&gt;         // only once per sampling window</span></span>
+<span><span class="co">#&gt;         terms[l] = poisson_log_lpmf(Ni | log_lambda)</span></span>
+<span><span class="co">#&gt;                    + // for each replicate observation, binomial prob observed is</span></span>
+<span><span class="co">#&gt;                    // computed in a vectorized statement</span></span>
+<span><span class="co">#&gt;                    binomial_logit_lpmf(flat_ys[K_inds[k, K_starts[k] : K_stops[k]]] | Ni, flat_ps[K_inds[k, K_starts[k] : K_stops[k]]]);</span></span>
+<span><span class="co">#&gt;       }</span></span>
+<span><span class="co">#&gt;       target += log_sum_exp(terms);</span></span>
+<span><span class="co">#&gt;     }</span></span>
+<span><span class="co">#&gt;   }</span></span>
+<span><span class="co">#&gt; }</span></span>
+<span><span class="co">#&gt; generated quantities {</span></span>
+<span><span class="co">#&gt;   vector[n_lv] penalty = rep_vector(1e12, n_lv);</span></span>
+<span><span class="co">#&gt;   vector[n_sp_trend] rho_trend = log(lambda_trend);</span></span>
+<span><span class="co">#&gt; }</span></span></code></pre></div>
 <p>The posterior summary of this model shows that it has converged
 nicely</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## GAM observation formula:</span></span>
-<span><span class="co">## obs ~ species - 1</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM process formula:</span></span>
-<span><span class="co">## ~s(time, by = trend, k = 4) + species</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Family:</span></span>
-<span><span class="co">## nmix</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Link function:</span></span>
-<span><span class="co">## log</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Trend model:</span></span>
-<span><span class="co">## None</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## N process models:</span></span>
-<span><span class="co">## 2 </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## N series:</span></span>
-<span><span class="co">## 10 </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## N timepoints:</span></span>
-<span><span class="co">## 6 </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Status:</span></span>
-<span><span class="co">## Fitted using Stan </span></span>
-<span><span class="co">## 4 chains, each with iter = 1500; warmup = 500; thin = 1 </span></span>
-<span><span class="co">## Total post-warmup draws = 4000</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM observation model coefficient (beta) estimates:</span></span>
-<span><span class="co">##              2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">## speciessp_1 -0.22 0.710  1.40    1  1989</span></span>
-<span><span class="co">## speciessp_2 -1.20 0.011  0.88    1  1974</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM process model coefficient (beta) estimates:</span></span>
-<span><span class="co">##                               2.5%     50%  97.5% Rhat n_eff</span></span>
-<span><span class="co">## (Intercept)_trend            2.700  3.0000  3.400 1.00  1795</span></span>
-<span><span class="co">## speciessp_2_trend           -1.200 -0.6300  0.130 1.00  1767</span></span>
-<span><span class="co">## s(time):trendtrend1.1_trend -0.078  0.0160  0.240 1.00  1047</span></span>
-<span><span class="co">## s(time):trendtrend1.2_trend -0.250  0.0062  0.280 1.00  2061</span></span>
-<span><span class="co">## s(time):trendtrend1.3_trend -0.460 -0.2500 -0.027 1.00  2329</span></span>
-<span><span class="co">## s(time):trendtrend2.1_trend -0.260 -0.0130  0.095 1.01   661</span></span>
-<span><span class="co">## s(time):trendtrend2.2_trend -0.190  0.0320  0.490 1.01   765</span></span>
-<span><span class="co">## s(time):trendtrend2.3_trend  0.055  0.3300  0.640 1.00  2182</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##                        edf Ref.df   F p-value</span></span>
-<span><span class="co">## s(time):seriestrend1 0.984      3 0.6    0.90</span></span>
-<span><span class="co">## s(time):seriestrend2 0.860      3 2.5    0.53</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Stan MCMC diagnostics:</span></span>
-<span><span class="co">## n_eff / iter looks reasonable for all parameters</span></span>
-<span><span class="co">## Rhat looks reasonable for all parameters</span></span>
-<span><span class="co">## 0 of 4000 iterations ended with a divergence (0%)</span></span>
-<span><span class="co">## 0 of 4000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
-<span><span class="co">## E-FMI indicated no pathological behavior</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Samples were drawn using NUTS(diag_e) at Mon Apr 15 6:51:13 PM 2024.</span></span>
-<span><span class="co">## For each parameter, n_eff is a crude measure of effective sample size,</span></span>
-<span><span class="co">## and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
-<span><span class="co">## (at convergence, Rhat = 1)</span></span></code></pre>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span>
+<span><span class="co">#&gt; GAM observation formula:</span></span>
+<span><span class="co">#&gt; obs ~ species - 1</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; GAM process formula:</span></span>
+<span><span class="co">#&gt; ~s(time, by = trend, k = 4) + species</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Family:</span></span>
+<span><span class="co">#&gt; nmix</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Link function:</span></span>
+<span><span class="co">#&gt; log</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Trend model:</span></span>
+<span><span class="co">#&gt; None</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; N process models:</span></span>
+<span><span class="co">#&gt; 2 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; N series:</span></span>
+<span><span class="co">#&gt; 10 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; N timepoints:</span></span>
+<span><span class="co">#&gt; 6 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Status:</span></span>
+<span><span class="co">#&gt; Fitted using Stan </span></span>
+<span><span class="co">#&gt; 4 chains, each with iter = 1500; warmup = 500; thin = 1 </span></span>
+<span><span class="co">#&gt; Total post-warmup draws = 4000</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
+<span><span class="co">#&gt;              2.5%   50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; speciessp_1 -0.29 0.710  1.40    1  1582</span></span>
+<span><span class="co">#&gt; speciessp_2 -1.20 0.012  0.89    1  2164</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; GAM process model coefficient (beta) estimates:</span></span>
+<span><span class="co">#&gt;                               2.5%     50%  97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; (Intercept)_trend            2.700  3.0000  3.400    1  1397</span></span>
+<span><span class="co">#&gt; speciessp_2_trend           -1.200 -0.6200  0.140    1  1532</span></span>
+<span><span class="co">#&gt; s(time):trendtrend1.1_trend -0.078  0.0160  0.210    1   760</span></span>
+<span><span class="co">#&gt; s(time):trendtrend1.2_trend -0.240  0.0043  0.260    1  2660</span></span>
+<span><span class="co">#&gt; s(time):trendtrend1.3_trend -0.460 -0.2500 -0.038    1  1621</span></span>
+<span><span class="co">#&gt; s(time):trendtrend2.1_trend -0.210 -0.0140  0.082    1   915</span></span>
+<span><span class="co">#&gt; s(time):trendtrend2.2_trend -0.190  0.0280  0.410    1  1079</span></span>
+<span><span class="co">#&gt; s(time):trendtrend2.3_trend  0.061  0.3300  0.630    1  2273</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
+<span><span class="co">#&gt;                        edf Ref.df Chi.sq p-value</span></span>
+<span><span class="co">#&gt; s(time):seriestrend1 1.042      3   1.69    0.83</span></span>
+<span><span class="co">#&gt; s(time):seriestrend2 0.937      3   4.33    0.86</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
+<span><span class="co">#&gt; n_eff / iter looks reasonable for all parameters</span></span>
+<span><span class="co">#&gt; Rhat looks reasonable for all parameters</span></span>
+<span><span class="co">#&gt; 0 of 4000 iterations ended with a divergence (0%)</span></span>
+<span><span class="co">#&gt; 0 of 4000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
+<span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Sat Aug 24 8:01:18 AM 2024.</span></span>
+<span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
+<span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
+<span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span></code></pre></div>
 <p><code>loo()</code> functionality works just as it does for all
 <code>mvgam</code> models to aid in model comparison / selection (though
 note that Pareto K values often give warnings for mixture models so
 these may not be too helpful)</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">loo</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span></span></code></pre>
-<pre><code><span><span class="co">## </span></span>
-<span><span class="co">## Computed from 4000 by 60 log-likelihood matrix</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">##          Estimate   SE</span></span>
-<span><span class="co">## elpd_loo   -219.4 12.8</span></span>
-<span><span class="co">## p_loo        73.0 11.8</span></span>
-<span><span class="co">## looic       438.8 25.7</span></span>
-<span><span class="co">## ------</span></span>
-<span><span class="co">## Monte Carlo SE of elpd_loo is NA.</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Pareto k diagnostic values:</span></span>
-<span><span class="co">##                          Count Pct.    Min. n_eff</span></span>
-<span><span class="co">## (-Inf, 0.5]   (good)     27    45.0%   541       </span></span>
-<span><span class="co">##  (0.5, 0.7]   (ok)        3     5.0%   695       </span></span>
-<span><span class="co">##    (0.7, 1]   (bad)      11    18.3%   18        </span></span>
-<span><span class="co">##    (1, Inf)   (very bad) 19    31.7%   2         </span></span>
-<span><span class="co">## See help('pareto-k-diagnostic') for details.</span></span></code></pre>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">loo</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Computed from 4000 by 60 log-likelihood matrix</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt;          Estimate   SE</span></span>
+<span><span class="co">#&gt; elpd_loo   -225.7 13.2</span></span>
+<span><span class="co">#&gt; p_loo        79.1 12.2</span></span>
+<span><span class="co">#&gt; looic       451.5 26.5</span></span>
+<span><span class="co">#&gt; ------</span></span>
+<span><span class="co">#&gt; Monte Carlo SE of elpd_loo is NA.</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Pareto k diagnostic values:</span></span>
+<span><span class="co">#&gt;                          Count Pct.    Min. n_eff</span></span>
+<span><span class="co">#&gt; (-Inf, 0.5]   (good)     25    41.7%   1649      </span></span>
+<span><span class="co">#&gt;  (0.5, 0.7]   (ok)        4     6.7%   579       </span></span>
+<span><span class="co">#&gt;    (0.7, 1]   (bad)       6    10.0%   17        </span></span>
+<span><span class="co">#&gt;    (1, Inf)   (very bad) 25    41.7%   2         </span></span>
+<span><span class="co">#&gt; See help('pareto-k-diagnostic') for details.</span></span></code></pre></div>
 <p>Plot the estimated smooths of time from each species’ latent
 abundance process (on the log scale)</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'smooths'</span>, trend_effects <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<p><img src="nmixtures_files/figure-html/unnamed-chunk-10-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="nmixtures_files/figure-html/unnamed-chunk-11-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p><code>marginaleffects</code> support allows for more useful
 prediction-based interrogations on different scales (though note that at
 the time of writing this Vignette, you must have the development version
@@ -569,19 +568,19 @@ additional prediction scales that can be used (i.e. <code>link</code>,
 For example, here are the estimated detection probabilities per species,
 which show that the model has done a nice job of estimating these
 parameters:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">plot_predictions</span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span>
 <span>                 type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu">ylim</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu">theme_classic</span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu">theme</span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="nmixtures_files/figure-html/unnamed-chunk-11-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="nmixtures_files/figure-html/unnamed-chunk-12-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>A common goal in N-mixture modelling is to estimate the true latent
 abundance. The model has automatically generated predictions for the
 unknown latent abundance that are conditional on the observations. We
 can extract these and produce decent plots using a small function</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">hc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/hindcast.mvgam.html">hindcast</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'latent_N'</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Function to plot latent abundance estimates vs truth</span></span>
@@ -637,12 +636,12 @@ can extract these and produce decent plots using a small function</p>
 shown below. Here, the red points show the imperfect observations, the
 black line shows the true latent abundance, and the ribbons show
 credible intervals of our estimates:</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">plot_latentN</span><span class="op">(</span><span class="va">hc</span>, <span class="va">testdat</span>, species <span class="op">=</span> <span class="st">'sp_1'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="nmixtures_files/figure-html/unnamed-chunk-13-1.png" width="60%" style="display: block; margin: auto;"></p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<p><img src="nmixtures_files/figure-html/unnamed-chunk-14-1.png" width="60%" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">plot_latentN</span><span class="op">(</span><span class="va">hc</span>, <span class="va">testdat</span>, species <span class="op">=</span> <span class="st">'sp_2'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="nmixtures_files/figure-html/unnamed-chunk-13-2.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="nmixtures_files/figure-html/unnamed-chunk-14-2.png" width="60%" style="display: block; margin: auto;"></p>
 <p>We can see that estimates for both species have correctly captured
 the true temporal variation and magnitudes in abundance</p>
 </div>
@@ -659,7 +658,7 @@ examine how we can include possibly nonlinear effects in the latent
 process and detection probability models.</p>
 <p>Download the data and grab observations / covariate measurements for
 one species</p>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Date link</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/load.html" class="external-link">load</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/connections.html" class="external-link">url</a></span><span class="op">(</span><span class="st">'https://github.com/doserjef/spAbundance/raw/main/data/dataNMixSim.rda'</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">data.one.sp</span> <span class="op">&lt;-</span> <span class="va">dataNMixSim</span></span>
@@ -683,7 +682,7 @@ indicators of <code>time</code> and <code>series</code> for working in
 <code>mvgam</code>. We also add the <code>cap</code> variable to
 represent the maximum latent N to marginalize over for each
 observation</p>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mod_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>,</span>
 <span>                    <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NROW</a></span><span class="op">(</span><span class="va">data.one.sp</span><span class="op">$</span><span class="va">y</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">{</span></span>
 <span>                      <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="va">data.one.sp</span><span class="op">$</span><span class="va">y</span><span class="op">[</span><span class="va">x</span>,<span class="op">]</span>,</span>
@@ -702,45 +701,43 @@ observation</p>
 <span>                cap <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">data.one.sp</span><span class="op">$</span><span class="va">y</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">+</span> <span class="fl">20</span><span class="op">)</span></span></code></pre></div>
 <p>The data include observations for 225 sites with three replicates per
 site, though some observations are missing</p>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NROW</a></span><span class="op">(</span><span class="va">mod_data</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## [1] 675</span></span></code></pre>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://pillar.r-lib.org/reference/glimpse.html" class="external-link">glimpse</a></span><span class="op">(</span><span class="va">mod_data</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## Rows: 675</span></span>
-<span><span class="co">## Columns: 11</span></span>
-<span><span class="co">## $ y         <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1, NA, NA, NA, 2, 2, NA, 1, NA, NA, 0, 1, 0, 0, 0, 0, NA, NA…</span></span>
-<span><span class="co">## $ abund_cov <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -0.3734384, -0.3734384, -0.3734384, 0.7064305, 0.7064305, 0.…</span></span>
-<span><span class="co">## $ abund_fac <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> 3, 3, 3, 4, 4, 4, 9, 9, 9, 2, 2, 2, 3, 3, 3, 2, 2, 2, 1, 1, …</span></span>
-<span><span class="co">## $ det_cov   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -1.2827999, -1.6141176, 0.5560101, -0.6389295, 0.1954809, 0.…</span></span>
-<span><span class="co">## $ det_cov2  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.03047314, -0.04295646, 1.04763941, 0.91753754, 1.04555361,…</span></span>
-<span><span class="co">## $ replicate <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, …</span></span>
-<span><span class="co">## $ site      <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> site1, site1, site1, site2, site2, site2, site3, site3, site…</span></span>
-<span><span class="co">## $ species   <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, …</span></span>
-<span><span class="co">## $ series    <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> site1_sp_1_1, site1_sp_1_2, site1_sp_1_3, site2_sp_1_1, site…</span></span>
-<span><span class="co">## $ time      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, …</span></span>
-<span><span class="co">## $ cap       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, …</span></span></code></pre>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">mod_data</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">##    y  abund_cov abund_fac    det_cov    det_cov2 replicate  site species</span></span>
-<span><span class="co">## 1  1 -0.3734384         3 -1.2827999  2.03047314         1 site1    sp_1</span></span>
-<span><span class="co">## 2 NA -0.3734384         3 -1.6141176 -0.04295646         2 site1    sp_1</span></span>
-<span><span class="co">## 3 NA -0.3734384         3  0.5560101  1.04763941         3 site1    sp_1</span></span>
-<span><span class="co">## 4 NA  0.7064305         4 -0.6389295  0.91753754         1 site2    sp_1</span></span>
-<span><span class="co">## 5  2  0.7064305         4  0.1954809  1.04555361         2 site2    sp_1</span></span>
-<span><span class="co">## 6  2  0.7064305         4  0.9673034  1.91971178         3 site2    sp_1</span></span>
-<span><span class="co">##         series time cap</span></span>
-<span><span class="co">## 1 site1_sp_1_1    1  33</span></span>
-<span><span class="co">## 2 site1_sp_1_2    1  33</span></span>
-<span><span class="co">## 3 site1_sp_1_3    1  33</span></span>
-<span><span class="co">## 4 site2_sp_1_1    1  33</span></span>
-<span><span class="co">## 5 site2_sp_1_2    1  33</span></span>
-<span><span class="co">## 6 site2_sp_1_3    1  33</span></span></code></pre>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NROW</a></span><span class="op">(</span><span class="va">mod_data</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 675</span></span>
+<span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://pillar.r-lib.org/reference/glimpse.html" class="external-link">glimpse</a></span><span class="op">(</span><span class="va">mod_data</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Rows: 675</span></span>
+<span><span class="co">#&gt; Columns: 11</span></span>
+<span><span class="co">#&gt; $ y         <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1, NA, NA, NA, 2, 2, NA, 1, NA, NA, 0, 1, 0, 0, 0, 0, NA, NA…</span></span>
+<span><span class="co">#&gt; $ abund_cov <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -0.3734384, -0.3734384, -0.3734384, 0.7064305, 0.7064305, 0.…</span></span>
+<span><span class="co">#&gt; $ abund_fac <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> 3, 3, 3, 4, 4, 4, 9, 9, 9, 2, 2, 2, 3, 3, 3, 2, 2, 2, 1, 1, …</span></span>
+<span><span class="co">#&gt; $ det_cov   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -1.2827999, -0.9044467, -1.7369637, -3.0537476, 0.1954809, 0…</span></span>
+<span><span class="co">#&gt; $ det_cov2  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.03047314, -0.08574977, -2.06259523, -0.69356429, 1.0455536…</span></span>
+<span><span class="co">#&gt; $ replicate <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, …</span></span>
+<span><span class="co">#&gt; $ site      <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> site1, site1, site1, site2, site2, site2, site3, site3, site…</span></span>
+<span><span class="co">#&gt; $ species   <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, …</span></span>
+<span><span class="co">#&gt; $ series    <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> site1_sp_1_1, site1_sp_1_2, site1_sp_1_3, site2_sp_1_1, site…</span></span>
+<span><span class="co">#&gt; $ time      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, …</span></span>
+<span><span class="co">#&gt; $ cap       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, …</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">mod_data</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    y  abund_cov abund_fac    det_cov    det_cov2 replicate  site species</span></span>
+<span><span class="co">#&gt; 1  1 -0.3734384         3 -1.2827999  2.03047314         1 site1    sp_1</span></span>
+<span><span class="co">#&gt; 2 NA -0.3734384         3 -0.9044467 -0.08574977         2 site1    sp_1</span></span>
+<span><span class="co">#&gt; 3 NA -0.3734384         3 -1.7369637 -2.06259523         3 site1    sp_1</span></span>
+<span><span class="co">#&gt; 4 NA  0.7064305         4 -3.0537476 -0.69356429         1 site2    sp_1</span></span>
+<span><span class="co">#&gt; 5  2  0.7064305         4  0.1954809  1.04555361         2 site2    sp_1</span></span>
+<span><span class="co">#&gt; 6  2  0.7064305         4  0.9673034  1.91971178         3 site2    sp_1</span></span>
+<span><span class="co">#&gt;         series time cap</span></span>
+<span><span class="co">#&gt; 1 site1_sp_1_1    1  33</span></span>
+<span><span class="co">#&gt; 2 site1_sp_1_2    1  33</span></span>
+<span><span class="co">#&gt; 3 site1_sp_1_3    1  33</span></span>
+<span><span class="co">#&gt; 4 site2_sp_1_1    1  33</span></span>
+<span><span class="co">#&gt; 5 site2_sp_1_2    1  33</span></span>
+<span><span class="co">#&gt; 6 site2_sp_1_3    1  33</span></span></code></pre></div>
 <p>The final step for data preparation is of course the
 <code>trend_map</code>, which sets up the mapping between observation
 replicates and the latent abundance models. This is done in the same way
 as in the example above</p>
-<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mod_data</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="co"># each unique combination of site*species is a separate process</span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>trend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">site</span>, <span class="va">species</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
@@ -749,20 +746,20 @@ as in the example above</p>
 <span></span>
 <span><span class="va">trend_map</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="va">trend</span><span class="op">)</span> <span class="op"><a href="../reference/pipe.html">%&gt;%</a></span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fl">12</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">##    trend         series</span></span>
-<span><span class="co">## 1      1 site100_sp_1_1</span></span>
-<span><span class="co">## 2      1 site100_sp_1_2</span></span>
-<span><span class="co">## 3      1 site100_sp_1_3</span></span>
-<span><span class="co">## 4      2 site101_sp_1_1</span></span>
-<span><span class="co">## 5      2 site101_sp_1_2</span></span>
-<span><span class="co">## 6      2 site101_sp_1_3</span></span>
-<span><span class="co">## 7      3 site102_sp_1_1</span></span>
-<span><span class="co">## 8      3 site102_sp_1_2</span></span>
-<span><span class="co">## 9      3 site102_sp_1_3</span></span>
-<span><span class="co">## 10     4 site103_sp_1_1</span></span>
-<span><span class="co">## 11     4 site103_sp_1_2</span></span>
-<span><span class="co">## 12     4 site103_sp_1_3</span></span></code></pre>
+<span>  <span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="fl">12</span><span class="op">)</span></span>
+<span><span class="co">#&gt;    trend         series</span></span>
+<span><span class="co">#&gt; 1      1 site100_sp_1_1</span></span>
+<span><span class="co">#&gt; 2      1 site100_sp_1_2</span></span>
+<span><span class="co">#&gt; 3      1 site100_sp_1_3</span></span>
+<span><span class="co">#&gt; 4      2 site101_sp_1_1</span></span>
+<span><span class="co">#&gt; 5      2 site101_sp_1_2</span></span>
+<span><span class="co">#&gt; 6      2 site101_sp_1_3</span></span>
+<span><span class="co">#&gt; 7      3 site102_sp_1_1</span></span>
+<span><span class="co">#&gt; 8      3 site102_sp_1_2</span></span>
+<span><span class="co">#&gt; 9      3 site102_sp_1_3</span></span>
+<span><span class="co">#&gt; 10     4 site103_sp_1_1</span></span>
+<span><span class="co">#&gt; 11     4 site103_sp_1_2</span></span>
+<span><span class="co">#&gt; 12     4 site103_sp_1_3</span></span></code></pre></div>
 <p>Now we are ready to fit a model using <code><a href="../reference/mvgam.html">mvgam()</a></code>. Here we
 will use penalized splines for each of the continuous covariate effects
 to detect possible nonlinear associations. We also showcase how
@@ -770,7 +767,7 @@ to detect possible nonlinear associations. We also showcase how
 algorithms available in <code>Stan</code> by using the meanfield
 variational Bayes approximator (this reduces computation time to around
 12 seconds for this example)</p>
-<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span></span>
 <span>  <span class="co"># effects of covariates on detection probability;</span></span>
 <span>  <span class="co"># here we use penalized splines for both continuous covariates</span></span>
@@ -805,82 +802,82 @@ variational Bayes approximator (this reduces computation time to around
 all individual spline coefficients. Notice how we no longer receive
 information on convergence because we did not use MCMC sampling for this
 model</p>
-<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span>, include_betas <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## GAM observation formula:</span></span>
-<span><span class="co">## y ~ s(det_cov, k = 3) + s(det_cov2, k = 3)</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM process formula:</span></span>
-<span><span class="co">## ~s(abund_cov, k = 3) + s(abund_fac, bs = "re")</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Family:</span></span>
-<span><span class="co">## nmix</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Link function:</span></span>
-<span><span class="co">## log</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Trend model:</span></span>
-<span><span class="co">## None</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## N process models:</span></span>
-<span><span class="co">## 225 </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## N series:</span></span>
-<span><span class="co">## 675 </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## N timepoints:</span></span>
-<span><span class="co">## 1 </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Status:</span></span>
-<span><span class="co">## Fitted using Stan </span></span>
-<span><span class="co">## 1 chains, each with iter = 1000; warmup = ; thin = 1 </span></span>
-<span><span class="co">## Total post-warmup draws = 1000</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM observation model coefficient (beta) estimates:</span></span>
-<span><span class="co">##             2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## (Intercept) 0.19 0.47  0.77  NaN   NaN</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM observation smooths:</span></span>
-<span><span class="co">##              edf Ref.df Chi.sq p-value    </span></span>
-<span><span class="co">## s(det_cov)  1.09      2   91.1 4.9e-05 ***</span></span>
-<span><span class="co">## s(det_cov2) 1.50      2  274.7 &lt; 2e-16 ***</span></span>
-<span><span class="co">## ---</span></span>
-<span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM process model coefficient (beta) estimates:</span></span>
-<span><span class="co">##                     2.5%   50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">## (Intercept)_trend -0.087 0.064   0.2  NaN   NaN</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## GAM process model group-level estimates:</span></span>
-<span><span class="co">##                           2.5%   50%  97.5% Rhat n.eff</span></span>
-<span><span class="co">## mean(s(abund_fac))_trend -0.31 -0.19 -0.064  NaN   NaN</span></span>
-<span><span class="co">## sd(s(abund_fac))_trend    0.26  0.40  0.650  NaN   NaN</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">##                edf Ref.df    F p-value  </span></span>
-<span><span class="co">## s(abund_cov) 0.913      2 5.63   0.234  </span></span>
-<span><span class="co">## s(abund_fac) 8.795     10 2.95   0.035 *</span></span>
-<span><span class="co">## ---</span></span>
-<span><span class="co">## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Posterior approximation used: no diagnostics to compute</span></span></code></pre>
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span>, include_betas <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="co">#&gt; GAM observation formula:</span></span>
+<span><span class="co">#&gt; y ~ s(det_cov, k = 3) + s(det_cov2, k = 3)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; GAM process formula:</span></span>
+<span><span class="co">#&gt; ~s(abund_cov, k = 3) + s(abund_fac, bs = "re")</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Family:</span></span>
+<span><span class="co">#&gt; nmix</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Link function:</span></span>
+<span><span class="co">#&gt; log</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Trend model:</span></span>
+<span><span class="co">#&gt; None</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; N process models:</span></span>
+<span><span class="co">#&gt; 225 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; N series:</span></span>
+<span><span class="co">#&gt; 675 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; N timepoints:</span></span>
+<span><span class="co">#&gt; 1 </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Status:</span></span>
+<span><span class="co">#&gt; Fitted using Stan </span></span>
+<span><span class="co">#&gt; 1 chains, each with iter = 1000; warmup = ; thin = 1 </span></span>
+<span><span class="co">#&gt; Total post-warmup draws = 1000</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
+<span><span class="co">#&gt;              2.5%  50% 97.5% Rhat n.eff</span></span>
+<span><span class="co">#&gt; (Intercept) 0.066 0.38  0.68  NaN   NaN</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Approximate significance of GAM observation smooths:</span></span>
+<span><span class="co">#&gt;              edf Ref.df Chi.sq p-value    </span></span>
+<span><span class="co">#&gt; s(det_cov)  1.20      2    155 1.8e-05 ***</span></span>
+<span><span class="co">#&gt; s(det_cov2) 1.05      2    606 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; ---</span></span>
+<span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; GAM process model coefficient (beta) estimates:</span></span>
+<span><span class="co">#&gt;                   2.5%  50% 97.5% Rhat n.eff</span></span>
+<span><span class="co">#&gt; (Intercept)_trend 0.14 0.28  0.42  NaN   NaN</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; GAM process model group-level estimates:</span></span>
+<span><span class="co">#&gt;                           2.5%   50% 97.5% Rhat n.eff</span></span>
+<span><span class="co">#&gt; mean(s(abund_fac))_trend -0.65 -0.52 -0.37  NaN   NaN</span></span>
+<span><span class="co">#&gt; sd(s(abund_fac))_trend    0.28  0.41  0.64  NaN   NaN</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
+<span><span class="co">#&gt;               edf Ref.df Chi.sq p-value    </span></span>
+<span><span class="co">#&gt; s(abund_cov) 1.08      2   1.13 0.21268    </span></span>
+<span><span class="co">#&gt; s(abund_fac) 8.84     10  30.62 0.00034 ***</span></span>
+<span><span class="co">#&gt; ---</span></span>
+<span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Posterior approximation used: no diagnostics to compute</span></span></code></pre></div>
 <p>Again we can make use of <code>marginaleffects</code> support for
 interrogating the model through targeted predictions. First, we can
 inspect the estimated average detection probability</p>
-<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">avg_predictions</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span></span></code></pre></div>
-<pre><code><span><span class="co">## </span></span>
-<span><span class="co">##  Estimate 2.5 % 97.5 %</span></span>
-<span><span class="co">##     0.594 0.538  0.655</span></span>
-<span><span class="co">## </span></span>
-<span><span class="co">## Columns: estimate, conf.low, conf.high </span></span>
-<span><span class="co">## Type:  detection</span></span></code></pre>
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/predictions.html" class="external-link">avg_predictions</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt;  Estimate 2.5 % 97.5 %</span></span>
+<span><span class="co">#&gt;     0.576 0.512  0.634</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Columns: estimate, conf.low, conf.high </span></span>
+<span><span class="co">#&gt; Type:  detection</span></span></code></pre></div>
 <p>Next investigate estimated effects of covariates on latent abundance
 using the <code>conditional_effects()</code> function and specifying
 <code>type = 'link'</code>; this will return plots on the expectation
 scale</p>
-<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">abund_plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>,</span>
 <span>                                        type <span class="op">=</span> <span class="st">'link'</span>,</span>
 <span>                                        effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'abund_cov'</span>,</span>
@@ -888,19 +885,19 @@ scale</p>
 <span>                    plot <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 <p>The effect of the continuous covariate on expected latent
 abundance</p>
-<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">abund_plots</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
 <span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Expected latent abundance'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="nmixtures_files/figure-html/unnamed-chunk-23-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="nmixtures_files/figure-html/unnamed-chunk-24-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>The effect of the factor covariate on expected latent abundance,
 estimated as a hierarchical random effect</p>
-<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">abund_plots</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
 <span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Expected latent abundance'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="nmixtures_files/figure-html/unnamed-chunk-24-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="nmixtures_files/figure-html/unnamed-chunk-25-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>Now we can investigate estimated effects of covariates on detection
 probability using <code>type = 'detection'</code></p>
-<div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">det_plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>,</span>
 <span>                                      type <span class="op">=</span> <span class="st">'detection'</span>,</span>
 <span>                                      effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'det_cov'</span>,</span>
@@ -910,29 +907,29 @@ probability using <code>type = 'detection'</code></p>
 logit scale according to the model summary (based on their approximate
 significances). But inspecting conditional effects of each covariate on
 the probability scale is more intuitive and useful</p>
-<div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">det_plots</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
 <span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="nmixtures_files/figure-html/unnamed-chunk-26-1.png" width="60%" style="display: block; margin: auto;"></p>
-<div class="sourceCode" id="cb42"><pre class="downlit sourceCode r">
+<p><img src="nmixtures_files/figure-html/unnamed-chunk-27-1.png" width="60%" style="display: block; margin: auto;"></p>
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">det_plots</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
 <span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="nmixtures_files/figure-html/unnamed-chunk-26-2.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="nmixtures_files/figure-html/unnamed-chunk-27-2.png" width="60%" style="display: block; margin: auto;"></p>
 <p>More targeted predictions are also easy with
 <code>marginaleffects</code> support. For example, we can ask: How does
 detection probability change as we change <em>both</em> detection
 covariates?</p>
-<div class="sourceCode" id="cb43"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fivenum_round</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/fivenum.html" class="external-link">fivenum</a></span><span class="op">(</span><span class="va">x</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">plot_predictions</span><span class="op">(</span><span class="va">mod</span>, </span>
-<span>                 newdata <span class="op">=</span> <span class="fu">datagrid</span><span class="op">(</span>det_cov <span class="op">=</span> <span class="va">unique</span>,</span>
+<span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, </span>
+<span>                 newdata <span class="op">=</span> <span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/datagrid.html" class="external-link">datagrid</a></span><span class="op">(</span>det_cov <span class="op">=</span> <span class="va">unique</span>,</span>
 <span>                                    det_cov2 <span class="op">=</span> <span class="va">fivenum_round</span><span class="op">)</span>,</span>
 <span>                 by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'det_cov'</span>, <span class="st">'det_cov2'</span><span class="op">)</span>,</span>
 <span>                 type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu">theme_classic</span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="nmixtures_files/figure-html/unnamed-chunk-27-1.png" width="60%" style="display: block; margin: auto;"></p>
+<p><img src="nmixtures_files/figure-html/unnamed-chunk-28-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>The model has found support for some important covariate effects, but
 of course we’d want to interrogate how well the model predicts and think
 about possible spatial effects to capture unmodelled variation in latent

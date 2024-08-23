@@ -66,7 +66,7 @@ summary(glm(y ~ series + time,
 ```
 
 ```{r}
-summary(gam(y ~ series + s(time, by = series),
+summary(mgcv::gam(y ~ series + s(time, by = series),
             data = simdat$data_train,
             family = poisson()))
 ```
@@ -82,7 +82,7 @@ gauss_dat
 
 A call to `gam` using the `mgcv` package leads to a model that actually fits (though it does give an unhelpful warning message):
 ```{r}
-gam(outcome ~ time,
+mgcv::gam(outcome ~ time,
     family = betar(),
     data = gauss_dat)
 ```

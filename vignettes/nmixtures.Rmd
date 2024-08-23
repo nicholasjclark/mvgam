@@ -229,7 +229,7 @@ plot(mod, type = 'smooths', trend_effects = TRUE)
 
 `marginaleffects` support allows for more useful prediction-based interrogations on different scales (though note that at the time of writing this Vignette, you must have the development version of `marginaleffects` installed for `nmix()` models to be supported; use `remotes::install_github('vincentarelbundock/marginaleffects')` to install). Objects that use family `nmix()` have a few additional prediction scales that can be used (i.e. `link`, `response`, `detection` or `latent_N`). For example, here are the estimated detection probabilities per species, which show that the model has done a nice job of estimating these parameters:
 ```{r}
-plot_predictions(mod, condition = 'species',
+marginaleffects::plot_predictions(mod, condition = 'species',
                  type = 'detection') +
   ylab('Pr(detection)') +
   ylim(c(0, 1)) +
@@ -440,7 +440,7 @@ summary(mod, include_betas = FALSE)
 
 Again we can make use of `marginaleffects` support for interrogating the model through targeted predictions. First, we can inspect the estimated average detection probability
 ```{r}
-avg_predictions(mod, type = 'detection')
+marginaleffects::avg_predictions(mod, type = 'detection')
 ```
 
 Next investigate estimated effects of covariates on latent abundance using the `conditional_effects()` function and specifying `type = 'link'`; this will return plots on the expectation scale
@@ -485,8 +485,8 @@ More targeted predictions are also easy with `marginaleffects` support. For exam
 ```{r}
 fivenum_round = function(x)round(fivenum(x, na.rm = TRUE), 2)
 
-plot_predictions(mod, 
-                 newdata = datagrid(det_cov = unique,
+marginaleffects::plot_predictions(mod, 
+                 newdata = marginaleffects::datagrid(det_cov = unique,
                                     det_cov2 = fivenum_round),
                  by = c('det_cov', 'det_cov2'),
                  type = 'detection') +
