@@ -4,13 +4,16 @@
 \alias{code}
 \alias{stancode.mvgam_prefit}
 \alias{stancode.mvgam}
-\title{Stan code for mvgam models}
+\alias{standata.mvgam_prefit}
+\title{Stan code and data objects for mvgam models}
 \usage{
 code(object)
 
 \method{stancode}{mvgam_prefit}(object, ...)
 
 \method{stancode}{mvgam}(object, ...)
+
+\method{standata}{mvgam_prefit}(object, ...)
 }
 \arguments{
 \item{object}{An object of class \code{mvgam} or \code{mvgam_prefit},
@@ -19,12 +22,12 @@ returned from a call to \code{mvgam}}
 \item{...}{ignored}
 }
 \value{
-A character string containing the fully commented \pkg{Stan} code
-to fit a \pkg{mvgam} model. It is of class \code{c("character", "brmsmodel")}
-to facilitate pretty printing.
+Either a character string containing the fully commented \pkg{Stan} code
+to fit a \pkg{mvgam} model or a named list containing the data objects needed
+to fit the model in Stan.
 }
 \description{
-Generate Stan code for \pkg{mvgam} models
+Generate Stan code and data objects for \pkg{mvgam} models
 }
 \examples{
 simdat <- sim_mvgam()
@@ -33,6 +36,12 @@ mod <- mvgam(y ~ s(season) +
              family = poisson(),
              data = simdat$data_train,
              run_model = FALSE)
+
+# View Stan model code
 stancode(mod)
+
+# View Stan model data
+sdata <- standata(mod)
+str(sdata)
 
 }

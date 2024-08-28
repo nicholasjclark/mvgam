@@ -77,5 +77,5 @@ str(fc_scores)
 }
 }
 \seealso{
-\code{\link{forecast.mvgam}}
+\code{\link{forecast.mvgam}}, \code{\link{ensemble}}
 }

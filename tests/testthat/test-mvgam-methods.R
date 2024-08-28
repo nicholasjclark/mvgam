@@ -1,7 +1,5 @@
 context("class methods")
 
-skip_on_cran()
-
 test_that("inverse links working", {
   expect_true(is(mvgam:::family_invlinks('gaussian'), 'function'))
   expect_true(is(mvgam:::family_invlinks('Gamma'), 'function'))
@@ -15,19 +13,34 @@ test_that("series_to_mvgam working", {
   expect_true(inherits(series_to_mvgam(series,
                                        frequency(series),
                                        0.85),
-           'list'))
+                       'list'))
 
   # An xts object example
   dates <- seq(as.Date("2001-05-01"), length=30, by="quarter")
   data  <- cbind(c(gas = rpois(30, cumprod(1+rnorm(30, mean = 0.01, sd = 0.001)))),
-  c(oil = rpois(30, cumprod(1+rnorm(30, mean = 0.01, sd = 0.001)))))
+                 c(oil = rpois(30, cumprod(1+rnorm(30, mean = 0.01, sd = 0.001)))))
   series <- xts::xts(x = data, order.by = dates)
   colnames(series) <- c('gas', 'oil')
-  expect_true(inherits(series_to_mvgam(series,
-                                       freq = 4,
-                                       train_prop = 0.85),
-                       'list'))
+  expect_list(series_to_mvgam(series,
+                              freq = 4,
+                              train_prop = 0.85))
 })
+
+test_that("stancode and standata working properly", {
+   simdat <- sim_mvgam()
+   mod <- mvgam(y ~ s(season) +
+                  s(time, by = series),
+                family = poisson(),
+                data = simdat$data_train,
+                run_model = FALSE)
+
+   expect_character(stancode(mod))
+
+   expect_list(standata(mod))
+})
+
+# Skip remaining time-consuming tests on CRAN
+skip_on_cran()
 
 test_that("add_residuals working properly", {
   mod <- mvgam:::mvgam_example1
@@ -280,7 +293,7 @@ test_that("plot_mvgam_series reasonable outputs", {
                                     series = 'all'))
 })
 
-test_that("forecast has reasonable outputs", {
+test_that("forecast and ensemble have reasonable outputs", {
   set.seed(1234)
   mvgam_examp_dat <- sim_mvgam(family = gaussian(),
                                T = 40,
@@ -294,4 +307,24 @@ test_that("forecast has reasonable outputs", {
                    nlevels(newdat$series)))
   expect_equal(fc$test_observations[[1]],
                newdat$y[which(newdat$series == 'series_1')])
+
+  # Check that ensemble.mvgam_forecast works
+  fc2 <- forecast(object = mvgam:::mvgam_example3,
+                  newdata = newdat)
+
+  fc_ens <- ensemble(fc, fc2, ndraws = 3000)
+  expect_equal(dim(fc_ens$forecasts[[1]]),
+               c(3000, NROW(newdat) /
+                   nlevels(newdat$series)))
+  expect_equal(fc_ens$test_observations[[1]],
+               newdat$y[which(newdat$series == 'series_1')])
+
+
+  fc_ens <- ensemble(fc, fc2, ndraws = 19)
+  expect_equal(dim(fc_ens$forecasts[[1]]),
+               c(19, NROW(newdat) /
+                   nlevels(newdat$series)))
+
+  # ndraws must be positive integer
+  expect_error(ensemble(fc, fc2, ndraws = 0))
 })

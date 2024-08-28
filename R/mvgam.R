@@ -366,7 +366,8 @@
 #'plot_mvgam_series(data = dat$data_train, series = 'all')
 #'
 #'# Formulate a model using Stan where series share a cyclic smooth for
-#'# seasonality and each series has an independent AR1 temporal process;
+#'# seasonality and each series has an independent AR1 temporal process.
+#'# Note that 'noncentred = TRUE' will likely give performance gains.
 #'# Set run_model = FALSE to inspect the returned objects
 #'mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
 #'              data = dat$data_train,
@@ -377,9 +378,13 @@
 #'              run_model = FALSE)
 #'
 #' # View the model code in Stan language
-#' code(mod1)
+#' stancode(mod1)
 #'
-#' # Now fit the model, noting that 'noncentred = TRUE' will likely give performance gains
+#' # View the data objects needed to fit the model in Stan
+#' sdata1 <- standata(mod1)
+#' str(sdata1)
+#'
+#' # Now fit the model
 #' mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
 #'               data = dat$data_train,
 #'               trend_model = AR(),

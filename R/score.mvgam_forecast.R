@@ -49,7 +49,7 @@
 #'str(fc_scores)
 #'}
 #'@method score mvgam_forecast
-#'@seealso \code{\link{forecast.mvgam}}
+#'@seealso \code{\link{forecast.mvgam}}, \code{\link{ensemble}}
 #'@export
 score.mvgam_forecast = function(object, score = 'crps',
                                 log = FALSE, weights,

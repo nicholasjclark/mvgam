@@ -454,7 +454,7 @@ mvgam_predict = function(Xp,
       mu <- ((matrix(Xp, ncol = NCOL(Xp)) %*%
                 betas)) + attr(Xp, 'model.offset')
       sd <- as.vector(family_pars$sigma_obs)
-      out <- (exp((sd) ^ 2) - 1) * exp((2 * mu + sd ^ 2))
+      out <- as.vector((exp((sd) ^ 2) - 1) * exp((2 * mu + sd ^ 2)))
 
     } else {
       mu <- as.vector((matrix(Xp, ncol = NCOL(Xp)) %*%
@@ -610,10 +610,10 @@ mvgam_predict = function(Xp,
       out <- ((n * p) * (1 - p)) * ((alpha + beta + n) / (alpha + beta + 1))
 
     } else {
-      out <- plogis(((matrix(Xp, ncol = NCOL(Xp)) %*%
+      out <- as.vector(plogis(((matrix(Xp, ncol = NCOL(Xp)) %*%
                         betas)) +
                       attr(Xp, 'model.offset')) *
-        as.vector(family_pars$trials)
+        as.vector(family_pars$trials))
     }
   }
 
@@ -640,9 +640,9 @@ mvgam_predict = function(Xp,
                              betas) + attr(Xp, 'model.offset')))
       out <- mu + mu^2 / as.vector(family_pars$phi)
     } else {
-      out <- exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
+      out <- as.vector(exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                      betas)) +
-                   attr(Xp, 'model.offset'))
+                   attr(Xp, 'model.offset')))
     }
   }
 
@@ -735,9 +735,9 @@ mvgam_predict = function(Xp,
                    attr(Xp, 'model.offset')) ^ 1.5) *
         as.vector(family_pars$phi)
       } else {
-      out <- exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
+      out <- as.vector(exp(((matrix(Xp, ncol = NCOL(Xp)) %*%
                      betas)) +
-                   attr(Xp, 'model.offset'))
+                   attr(Xp, 'model.offset')))
     }
   }
   return(out)

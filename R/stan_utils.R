@@ -1,12 +1,12 @@
-#' Stan code for mvgam models
+#' Stan code and data objects for mvgam models
 #'
-#' Generate Stan code for \pkg{mvgam} models
+#' Generate Stan code and data objects for \pkg{mvgam} models
 #'
 #' @param object An object of class `mvgam` or `mvgam_prefit`,
 #' returned from a call to \code{mvgam}
-#' @return A character string containing the fully commented \pkg{Stan} code
-#'   to fit a \pkg{mvgam} model. It is of class \code{c("character", "brmsmodel")}
-#'   to facilitate pretty printing.
+#' @return Either a character string containing the fully commented \pkg{Stan} code
+#'   to fit a \pkg{mvgam} model or a named list containing the data objects needed
+#'   to fit the model in Stan.
 #' @export
 #' @examples
 #' simdat <- sim_mvgam()
@@ -15,7 +15,13 @@
 #'              family = poisson(),
 #'              data = simdat$data_train,
 #'              run_model = FALSE)
+#'
+#' # View Stan model code
 #' stancode(mod)
+#'
+#' # View Stan model data
+#' sdata <- standata(mod)
+#' str(sdata)
 #'
 code = function(object){
   if(!class(object) %in% c('mvgam', 'mvgam_prefit')){
@@ -47,6 +53,15 @@ stancode.mvgam_prefit = function(object, ...){
 stancode.mvgam = function(object, ...){
 
   code(object)
+}
+
+#' @export
+#' @importFrom brms standata
+#' @param ... ignored
+#' @rdname code
+standata.mvgam_prefit = function(object, ...){
+
+  object$model_data
 }
 
 #' @noRd

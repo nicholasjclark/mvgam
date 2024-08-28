@@ -19,7 +19,7 @@
 #'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to simulate a forecast distribution
 #'@return An object of class \code{mvgam_forecast} containing hindcast and forecast distributions.
 #'See \code{\link{mvgam_forecast-class}} for details.
-#'@seealso \code{\link{hindcast}}, \code{\link{score}}
+#'@seealso \code{\link{hindcast}}, \code{\link{score}}, \code{\link{ensemble}}
 #'@export
 forecast <- function(object, ...){
   UseMethod("forecast", object)

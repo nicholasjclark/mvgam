@@ -91,5 +91,5 @@ plot(fc, series = 3)
 }
 }
 \seealso{
-\code{\link{hindcast}}, \code{\link{score}}
+\code{\link{hindcast}}, \code{\link{score}}, \code{\link{ensemble}}
 }

@@ -6,6 +6,14 @@ expect_match2 <- function(object, regexp) {
   any(grepl(regexp, object, fixed = TRUE))
 }
 
+expect_character <- function(object, ...) {
+  testthat::expect_true(is(object, "character"), ...)
+}
+
+expect_list <- function(object, ...) {
+  testthat::expect_true(is(object, "list"), ...)
+}
+
 expect_ggplot <- function(object, ...) {
   testthat::expect_true(is(object, "ggplot"), ...)
 }
