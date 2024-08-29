@@ -9,7 +9,7 @@ BugReports: https://github.com/nicholasjclark/mvgam/issues
 License: MIT + file LICENSE
 Depends: 
     R (>= 3.6.0),
-    brms (>= 2.17)
+    brms (>= 2.21.0)
 Imports: 
     methods,
     mgcv (>= 1.8-13),

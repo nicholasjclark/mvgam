@@ -10,6 +10,7 @@
 
 ## Bug fixes
 * Added a new check to ensure that exception messages are only suppressed by the `silent` argument if the user's version of 'cmdstanr' is adequate
+* Updated dependency for 'brms' to version >= '2.21.0' so that `read_csv_as_stanfit` can be imported, which should future-proof the conversion of 'cmdstanr' models to `stanfit` objects (#70)
 
 # mvgam 1.1.2
 ## New functionalities
