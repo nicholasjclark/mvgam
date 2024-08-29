@@ -126,7 +126,7 @@ test_that("piecewise models fit and forecast without error", {
   }
 
   # Simulate expected values
-  set.seed(11)
+  set.seed(555)
   expected <- Nt(0.004, 2, 100, 30)
 
   # Take Poisson draws
@@ -155,7 +155,7 @@ test_that("piecewise models fit and forecast without error", {
                chains = 2,
                silent = 2)
   # Compute and plot forecasts
-  fc <- forecast(mod, newdata = dat_test)
+  fc <- forecast(mod, newdata = dat_test, type = 'trend')
   expect_no_error(capture_output(plot(fc)))
 
   # Should also work for piecewise linear
@@ -167,6 +167,6 @@ test_that("piecewise models fit and forecast without error", {
                chains = 2,
                silent = 2))
   # Compute and plot forecasts
-  fc <- forecast(mod, newdata = dat_test)
+  fc <- forecast(mod, newdata = dat_test, type = 'trend')
   expect_no_error(capture_output(plot(fc)))
 })
