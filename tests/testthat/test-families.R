@@ -50,6 +50,29 @@ test_that("nmix predictions work correctly", {
                                    type = 'detection',
                                    family_pars = family_pars)
   expect_true(all(detects > 0) & all(detects < 1))
+
+  truth <- rpois(10, 6)
+  expect_no_error(mvgam:::mvgam_predict(Xp = Xp,
+                                        family = family,
+                                        betas = betas,
+                                        latent_lambdas = latent_lambdas,
+                                        cap = cap,
+                                        type = 'link',
+                                        density = TRUE,
+                                        truth = truth,
+                                        family_pars = family_pars))
+
+  # Test that the residual calculation is working
+  preds <- runif(10, 0.1, 10)
+  N <- rpois(10, 20)
+  p <- runif(10, 0.3, 0.6)
+  resids <- mvgam:::ds_resids_nmix(truth = truth,
+                                   fitted = 1,
+                                   draw = 1,
+                                   N = as.vector(N),
+                                   p = as.vector(p))
+  expect_true(all(!is.na(resids)))
+
 })
 
 test_that("beta predictions work correctly", {
@@ -92,6 +115,25 @@ test_that("beta predictions work correctly", {
                                  type = 'response',
                                  family_pars = family_pars)
   expect_true(all(preds >= 0) & all(preds <= 1))
+
+  truth <- runif(10, 0.01, 0.99)
+  expect_no_error(mvgam:::mvgam_predict(Xp = Xp,
+                                        family = family,
+                                        betas = betas,
+                                        latent_lambdas = NULL,
+                                        cap = NULL,
+                                        type = 'link',
+                                        density = TRUE,
+                                        truth = truth,
+                                        family_pars = family_pars))
+
+  preds <- runif(10, 0.01, 0.99)
+  resids <- mvgam:::ds_resids_beta(truth = truth,
+                                   fitted = as.vector(preds),
+                                   draw = 1,
+                                   precision = rep(1, 10))
+  expect_true(all(!is.na(resids)))
+
 })
 
 test_that("beta-binomial predictions work correctly", {
@@ -133,6 +175,25 @@ test_that("beta-binomial predictions work correctly", {
                                         cap = NULL,
                                         type = 'response',
                                         family_pars = family_pars) >= 0))
+
+  truth <- rpois(10, 8)
+  expect_no_error(mvgam:::mvgam_predict(Xp = Xp,
+                                        family = family,
+                                        betas = betas,
+                                        latent_lambdas = NULL,
+                                        cap = NULL,
+                                        type = 'link',
+                                        density = TRUE,
+                                        truth = truth,
+                                        family_pars = family_pars))
+
+  p <- runif(10, 0.3, 0.6)
+  resids <- mvgam:::ds_resids_beta_binomial(truth = truth,
+                                            fitted = p,
+                                            draw = 1,
+                                            N = rep(20, 10),
+                                            phi = rep(1, 10))
+  expect_true(all(!is.na(resids)))
 })
 
 test_that("negative binomial predictions work correctly", {
@@ -173,6 +234,24 @@ test_that("negative binomial predictions work correctly", {
                                         cap = NULL,
                                         type = 'response',
                                         family_pars = family_pars) >= 0))
+
+  truth <- rpois(10, 8)
+  expect_no_error(mvgam:::mvgam_predict(Xp = Xp,
+                                        family = family,
+                                        betas = betas,
+                                        latent_lambdas = NULL,
+                                        cap = NULL,
+                                        type = 'link',
+                                        density = TRUE,
+                                        truth = truth,
+                                        family_pars = family_pars))
+
+  preds <- rpois(10, 8)
+  resids <- mvgam:::ds_resids_nb(truth = truth,
+                                 fitted = preds,
+                                 draw = 1,
+                                 size = rep(1, 10))
+  expect_true(all(!is.na(resids)))
 })
 
 test_that("lognormal predictions work correctly", {
@@ -213,6 +292,24 @@ test_that("lognormal predictions work correctly", {
                                         cap = NULL,
                                         type = 'response',
                                         family_pars = family_pars) > 0))
+
+  truth <- runif(10, 0.1, 20)
+  expect_no_error(mvgam:::mvgam_predict(Xp = Xp,
+                                        family = family,
+                                        betas = betas,
+                                        latent_lambdas = NULL,
+                                        cap = NULL,
+                                        type = 'link',
+                                        density = TRUE,
+                                        truth = truth,
+                                        family_pars = family_pars))
+
+  preds <- runif(10, 0.1, 20)
+  resids <- mvgam:::ds_resids_lnorm(truth = truth,
+                                   fitted = preds,
+                                   draw = 1,
+                                   sigma = rep(1, 10))
+  expect_true(all(!is.na(resids)))
 })
 
 test_that("gamma predictions work correctly", {
@@ -253,6 +350,24 @@ test_that("gamma predictions work correctly", {
                                         cap = NULL,
                                         type = 'response',
                                         family_pars = family_pars) > 0))
+
+  truth <- runif(10, 0.1, 20)
+  expect_no_error(mvgam:::mvgam_predict(Xp = Xp,
+                                        family = family,
+                                        betas = betas,
+                                        latent_lambdas = NULL,
+                                        cap = NULL,
+                                        type = 'link',
+                                        density = TRUE,
+                                        truth = truth,
+                                        family_pars = family_pars))
+
+  preds <- runif(10, 0.1, 20)
+  resids <- mvgam:::ds_resids_gamma(truth = truth,
+                                   fitted = preds,
+                                   draw = 1,
+                                   shape = rep(1, 10))
+  expect_true(all(!is.na(resids)))
 })
 
 test_that("student-t predictions work correctly", {
@@ -294,6 +409,25 @@ test_that("student-t predictions work correctly", {
                                         cap = NULL,
                                         type = 'response',
                                         family_pars = family_pars))
+
+  truth <- rnorm(10)
+  expect_no_error(mvgam:::mvgam_predict(Xp = Xp,
+                                        family = family,
+                                        betas = betas,
+                                        latent_lambdas = NULL,
+                                        cap = NULL,
+                                        type = 'link',
+                                        density = TRUE,
+                                        truth = truth,
+                                        family_pars = family_pars))
+
+  preds <- rnorm(10)
+  resids <- mvgam:::ds_resids_student(truth = truth,
+                                     fitted = preds,
+                                     draw = 1,
+                                     sigma = rep(1, 10),
+                                     nu = rep(5, 10))
+  expect_true(all(!is.na(resids)))
 })
 
 test_that("tweedie predictions work correctly", {
@@ -334,6 +468,23 @@ test_that("tweedie predictions work correctly", {
                                         cap = NULL,
                                         type = 'response',
                                         family_pars = family_pars) >= 0))
+
+  truth <- rpois(10, 5)
+  expect_no_error(mvgam:::mvgam_predict(Xp = Xp,
+                                        family = family,
+                                        betas = betas,
+                                        latent_lambdas = NULL,
+                                        cap = NULL,
+                                        type = 'link',
+                                        density = TRUE,
+                                        truth = truth,
+                                        family_pars = family_pars))
+
+  preds <- rpois(10, 5)
+  resids <- mvgam:::ds_resids_tw(truth = truth,
+                                fitted = preds,
+                                draw = 1)
+  expect_true(all(!is.na(resids)))
 })
 
 # Skip actual model setups on CRAN as they take some time
