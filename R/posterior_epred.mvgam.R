@@ -10,7 +10,6 @@
 #' incorporated in the draws computed by \code{posterior_epred} while the
 #' residual error is ignored there. However, the estimated means of both methods
 #' averaged across draws should be very similar.
-#' @importFrom rstantools posterior_epred
 #' @inheritParams predict.mvgam
 #' @param ndraws Positive `integer` indicating how many posterior draws should be used.
 #' If `NULL` (the default) all draws are used.
@@ -37,7 +36,6 @@
 #' where \code{n_samples} is the number of posterior samples from the fitted object
 #' and \code{n_obs} is the number of observations in \code{newdata}
 #' @seealso \code{\link{hindcast.mvgam}} \code{\link{posterior_linpred.mvgam}} \code{\link{posterior_predict.mvgam}}
-#' @aliases posterior_epred
 #' @examples
 #' \donttest{
 #' # Simulate some data and fit a model
@@ -85,7 +83,6 @@ posterior_epred.mvgam = function(object,
 #' Compute posterior draws of the linear predictor, that is draws before
 #' applying any link functions or other transformations. Can be performed for
 #' the data used to fit the model (posterior predictive checks) or for new data.
-#' @importFrom rstantools posterior_linpred
 #' @inheritParams posterior_epred.mvgam
 #' @param transform Logical; if \code{FALSE}
 #'  (the default), draws of the linear predictor are returned.
@@ -166,7 +163,6 @@ posterior_linpred.mvgam = function(object,
 #' \code{\link{posterior_epred.mvgam}}. This is because the residual error
 #' is incorporated in \code{posterior_predict}. However, the estimated means of
 #' both methods averaged across draws should be very similar.
-#' @importFrom rstantools posterior_predict
 #' @inheritParams predict.mvgam
 #' @inheritParams posterior_epred.mvgam
 #' @param process_error Logical. If \code{TRUE} and \code{newdata} is supplied,
@@ -228,6 +224,19 @@ posterior_predict.mvgam = function(object,
   }
   return(out)
 }
+
+#' @export
+#' @importFrom rstantools posterior_predict
+rstantools::posterior_predict
+
+#' @export
+#' @importFrom rstantools posterior_epred
+rstantools::posterior_epred
+
+#' @export
+#' @importFrom rstantools posterior_linpred
+rstantools::posterior_linpred
+
 
 #' Expected Values of the Posterior Predictive Distribution
 #'

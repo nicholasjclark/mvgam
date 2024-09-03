@@ -21,6 +21,38 @@
 #' @author Nicholas J Clark
 NULL
 
+#' @export
+#' @importFrom marginaleffects predictions
+marginaleffects::predictions
+
+#' @export
+#' @importFrom marginaleffects plot_predictions
+marginaleffects::plot_predictions
+
+#' @export
+#' @importFrom marginaleffects slopes
+marginaleffects::slopes
+
+#' @export
+#' @importFrom marginaleffects plot_slopes
+marginaleffects::plot_slopes
+
+#' @export
+#' @importFrom marginaleffects comparisons
+marginaleffects::comparisons
+
+#' @export
+#' @importFrom marginaleffects plot_comparisons
+marginaleffects::plot_comparisons
+
+#' @export
+#' @importFrom marginaleffects datagrid
+marginaleffects::datagrid
+
+#' @export
+#' @importFrom marginaleffects hypotheses
+marginaleffects::hypotheses
+
 #' Functions needed for working with marginaleffects
 #' @rdname mvgam_marginaleffects
 #' @export

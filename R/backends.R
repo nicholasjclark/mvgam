@@ -197,7 +197,8 @@
                                                          'sigma_obs_vec',
                                                          'shape_vec',
                                                          'phi_inv',
-                                                         'lv_coefs_raw'),
+                                                         'lv_coefs_raw',
+                                                         'L_Sigma'),
                                              algorithm = algorithm)
   }
 

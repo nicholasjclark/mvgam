@@ -2,7 +2,6 @@
 #'
 #' Convenient way to call MCMC plotting functions
 #' implemented in the \pkg{bayesplot} package
-#' @importFrom brms mcmc_plot
 #' @importFrom bayesplot color_scheme_set color_scheme_get
 #' @inheritParams brms::mcmc_plot
 #' @inheritParams as.data.frame.mvgam
@@ -119,3 +118,7 @@ mcmc_plot.mvgam = function(object,
   # Return the plot
   return(out_plot)
 }
+
+#' @export
+#' @importFrom brms mcmc_plot
+brms::mcmc_plot

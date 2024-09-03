@@ -2,7 +2,7 @@
 #' @importFrom stats make.link dgamma pgamma rgamma qnorm plnorm runif pbeta dlnorm dpois
 #' @importFrom stats pnorm ppois plogis gaussian poisson Gamma dnbinom rnbinom dnorm dbeta
 #' @importFrom stats binomial rbinom pbinom dbinom qbinom qlogis
-#' @importFrom brms lognormal student bernoulli rstudent_t qstudent_t dstudent_t pstudent_t dbeta_binomial rbeta_binomial pbeta_binomial
+#' @importFrom brms lognormal student beta_binomial bernoulli rstudent_t qstudent_t dstudent_t pstudent_t dbeta_binomial rbeta_binomial pbeta_binomial
 #' @importFrom mgcv betar nb
 #' @param link a specification for the family link function. At present these cannot
 #' be changed
@@ -78,6 +78,30 @@ betar = function(...){
 #' @export
 nb = function(...){
   mgcv::nb(...)
+}
+
+#' @rdname mvgam_families
+#' @export
+lognormal = function(...){
+  brms::lognormal(...)
+}
+
+#' @rdname mvgam_families
+#' @export
+student = function(...){
+  brms::student(...)
+}
+
+#' @rdname mvgam_families
+#' @export
+bernoulli = function(...){
+  brms::bernoulli(...)
+}
+
+#' @rdname mvgam_families
+#' @export
+beta_binomial = function(...){
+  brms::beta_binomial(...)
 }
 
 #' @rdname mvgam_families

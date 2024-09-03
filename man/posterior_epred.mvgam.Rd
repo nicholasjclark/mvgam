@@ -2,7 +2,6 @@
 % Please edit documentation in R/posterior_epred.mvgam.R
 \name{posterior_epred.mvgam}
 \alias{posterior_epred.mvgam}
-\alias{posterior_epred}
 \title{Draws from the Expected Value of the Posterior Predictive Distribution}
 \usage{
 \method{posterior_epred}{mvgam}(
