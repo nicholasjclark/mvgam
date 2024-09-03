@@ -55,10 +55,11 @@ mod <- mvgam(y ~ -1,
              trend_formula = ~ 1,
              trend_model = VAR(cor = TRUE),
              family = gaussian(),
-             data = simdat$data_train)
+             data = simdat$data_train,
+             silent = 2)
 
 # Calulate Generalized IRFs for each series
-irfs <- calc_irfs(mod, h = 12, cumulative = FALSE)
+irfs <- irf(mod, h = 12, cumulative = FALSE)
 
 # Plot them
 plot(irfs, series = 1)
