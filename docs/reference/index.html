@@ -143,6 +143,11 @@
         <dd>Index <code>mvgam</code> objects</dd>
       </dl><dl><dt>
           
+          <code><a href="irf.mvgam.html">irf()</a></code> 
+        </dt>
+        <dd>Calculate latent VAR impulse response functions</dd>
+      </dl><dl><dt>
+          
           <code><a href="lfo_cv.mvgam.html">lfo_cv()</a></code> 
         </dt>
         <dd>Approximate leave-future-out cross-validation of fitted <code>mvgam</code> objects</dd>
@@ -188,7 +193,7 @@
         <dd>Fit a Bayesian dynamic GAM to a univariate or multivariate set of time series</dd>
       </dl><dl><dt>
           
-          <code><a href="mvgam_diagnostics.html">nuts_params(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_diagnostics.html">log_posterior(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_diagnostics.html">rhat(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_diagnostics.html">neff_ratio(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_diagnostics.html">neff_ratio(<i>&lt;mvgam&gt;</i>)</a></code> 
+          <code><a href="mvgam_diagnostics.html">nuts_params(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_diagnostics.html">log_posterior(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_diagnostics.html">rhat(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_diagnostics.html">neff_ratio(<i>&lt;mvgam&gt;</i>)</a></code> 
         </dt>
         <dd>Extract diagnostic quantities of <span class="pkg">mvgam</span> models</dd>
       </dl><dl><dt>
@@ -198,7 +203,7 @@
         <dd>Extract posterior draws from fitted <code>mvgam</code> objects</dd>
       </dl><dl><dt>
           
-          <code><a href="mvgam_families.html">tweedie()</a></code> <code><a href="mvgam_families.html">student_t()</a></code> <code><a href="mvgam_families.html">betar()</a></code> <code><a href="mvgam_families.html">nb()</a></code> <code><a href="mvgam_families.html">nmix()</a></code> 
+          <code><a href="mvgam_families.html">tweedie()</a></code> <code><a href="mvgam_families.html">student_t()</a></code> <code><a href="mvgam_families.html">betar()</a></code> <code><a href="mvgam_families.html">nb()</a></code> <code><a href="mvgam_families.html">lognormal()</a></code> <code><a href="mvgam_families.html">student()</a></code> <code><a href="mvgam_families.html">bernoulli()</a></code> <code><a href="mvgam_families.html">beta_binomial()</a></code> <code><a href="mvgam_families.html">nmix()</a></code> 
         </dt>
         <dd>Supported mvgam families</dd>
       </dl><dl><dt>
@@ -211,6 +216,11 @@
           <code><a href="mvgam_formulae.html">mvgam_formulae</a></code> 
         </dt>
         <dd>Details of formula specifications in <code>mvgam</code></dd>
+      </dl><dl><dt>
+          
+          <code><a href="mvgam_irf-class.html">mvgam_irf-class</a></code> 
+        </dt>
+        <dd><code>mvgam_irf</code> object description</dd>
       </dl><dl><dt>
           
           <code><a href="mvgam_marginaleffects.html">get_coef(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_marginaleffects.html">set_coef(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_marginaleffects.html">get_vcov(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_marginaleffects.html">get_predict(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_marginaleffects.html">get_data(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_marginaleffects.html">get_data(<i>&lt;mvgam_prefit&gt;</i>)</a></code> <code><a href="mvgam_marginaleffects.html">find_predictors(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="mvgam_marginaleffects.html">find_predictors(<i>&lt;mvgam_prefit&gt;</i>)</a></code> 
@@ -236,6 +246,12 @@
           <code><a href="plot.mvgam.html">plot(<i>&lt;mvgam&gt;</i>)</a></code> 
         </dt>
         <dd>Default mvgam plots</dd>
+      </dl><dl><dt>
+          
+          <code><a href="plot.mvgam_irf.html">plot(<i>&lt;mvgam_irf&gt;</i>)</a></code> 
+        </dt>
+        <dd>Plot impulse responses from an mvgam_irf object
+This function takes an <code>mvgam_irf</code> object and produces plots of Impulse Response Functions</dd>
       </dl><dl><dt>
           
           <code><a href="plot.mvgam_lfo.html">plot(<i>&lt;mvgam_lfo&gt;</i>)</a></code> 
@@ -357,11 +373,6 @@ to the format necessary for <code>mvgam</code></dd>
           <code><a href="summary.mvgam.html">summary(<i>&lt;mvgam&gt;</i>)</a></code> <code><a href="summary.mvgam.html">summary(<i>&lt;mvgam_prefit&gt;</i>)</a></code> <code><a href="summary.mvgam.html">coef(<i>&lt;mvgam&gt;</i>)</a></code> 
         </dt>
         <dd>Summary for a fitted mvgam object</dd>
-      </dl><dl><dt>
-          
-          <code><a href="ti.html">ti()</a></code> <code><a href="ti.html">te()</a></code> 
-        </dt>
-        <dd>Defining smooths in <span class="pkg">mvgam</span> formulae</dd>
       </dl><dl><dt>
           
           <code><a href="update.mvgam.html">update(<i>&lt;mvgam&gt;</i>)</a></code> 

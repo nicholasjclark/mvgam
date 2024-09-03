@@ -81,7 +81,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2024-07-05</h4>
+            <h4 data-toc-skip class="date">2024-09-03</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/shared_states.Rmd" class="external-link"><code>vignettes/shared_states.Rmd</code></a></small>
       <div class="d-none name"><code>shared_states.Rmd</code></div>
@@ -157,7 +157,7 @@ in the <code>mvgam</code> framework:</p>
 <span>                  </span>
 <span>                  <span class="co"># process model formula, which has a shared seasonal smooth</span></span>
 <span>                  <span class="co"># (each latent process model shares the SAME smooth)</span></span>
-<span>                  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span>
+<span>                  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span>
 <span>                  </span>
 <span>                  <span class="co"># AR1 dynamics (each latent process model has DIFFERENT)</span></span>
 <span>                  <span class="co"># dynamics; processes are estimated using the noncentred</span></span>
@@ -326,7 +326,7 @@ package:</p>
 can still fit it to show what the resulting inferences look like:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">full_mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">-</span> <span class="fl">1</span>,</span>
-<span>                  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span>
+<span>                  trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">6</span><span class="op">)</span>,</span>
 <span>                  trend_model <span class="op">=</span> <span class="fu"><a href="../reference/RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                  noncentred <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>                  trend_map <span class="op">=</span> <span class="va">trend_map</span>,</span>
@@ -370,31 +370,31 @@ observed time series. The model converges well</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;                 2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; seriesseries_1 -2.70 -0.74   1.2    1   830</span></span>
-<span><span class="co">#&gt; seriesseries_2 -1.60  0.26   2.2    1   816</span></span>
-<span><span class="co">#&gt; seriesseries_3 -0.67  1.30   3.2    1   814</span></span>
+<span><span class="co">#&gt; seriesseries_1 -2.80 -0.67   1.5    1   931</span></span>
+<span><span class="co">#&gt; seriesseries_2 -1.80  0.31   2.5    1   924</span></span>
+<span><span class="co">#&gt; seriesseries_3 -0.84  1.30   3.4    1   920</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Process model AR parameter estimates:</span></span>
-<span><span class="co">#&gt;         2.5%     50%  97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; ar1[1] -0.73 -0.4300 -0.048    1   712</span></span>
-<span><span class="co">#&gt; ar1[2] -0.29 -0.0053  0.280    1   365</span></span>
+<span><span class="co">#&gt;         2.5%    50%  97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; ar1[1] -0.73 -0.430 -0.056 1.00   666</span></span>
+<span><span class="co">#&gt; ar1[2] -0.30 -0.019  0.250 1.01   499</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Process error parameter estimates:</span></span>
 <span><span class="co">#&gt;          2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; sigma[1] 0.34 0.49  0.68    1   877</span></span>
-<span><span class="co">#&gt; sigma[2] 0.59 0.73  0.91    1   581</span></span>
+<span><span class="co">#&gt; sigma[1] 0.33 0.49  0.67    1   854</span></span>
+<span><span class="co">#&gt; sigma[2] 0.59 0.73  0.91    1   755</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM process model coefficient (beta) estimates:</span></span>
-<span><span class="co">#&gt;                    2.5%    50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; (Intercept)_trend -1.10  0.820  2.70    1   823</span></span>
-<span><span class="co">#&gt; s(season).1_trend -0.21 -0.001  0.21    1  1208</span></span>
-<span><span class="co">#&gt; s(season).2_trend -0.28 -0.042  0.17    1  1446</span></span>
-<span><span class="co">#&gt; s(season).3_trend -0.15  0.070  0.29    1  1002</span></span>
-<span><span class="co">#&gt; s(season).4_trend -0.14  0.066  0.27    1  1333</span></span>
+<span><span class="co">#&gt;                    2.5%     50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; (Intercept)_trend -1.40  0.7800  2.90    1   921</span></span>
+<span><span class="co">#&gt; s(season).1_trend -0.21 -0.0072  0.21    1  1822</span></span>
+<span><span class="co">#&gt; s(season).2_trend -0.30 -0.0480  0.18    1  1414</span></span>
+<span><span class="co">#&gt; s(season).3_trend -0.16  0.0680  0.30    1  1664</span></span>
+<span><span class="co">#&gt; s(season).4_trend -0.14  0.0660  0.29    1  1505</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
 <span><span class="co">#&gt;            edf Ref.df Chi.sq p-value</span></span>
-<span><span class="co">#&gt; s(season) 1.42      4   0.73    0.92</span></span>
+<span><span class="co">#&gt; s(season) 1.48      4   0.67    0.93</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
 <span><span class="co">#&gt; n_eff / iter looks reasonable for all parameters</span></span>
@@ -403,7 +403,7 @@ observed time series. The model converges well</p>
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Fri Jul 05 1:03:33 PM 2024.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Sep 03 2:51:42 PM 2024.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span></code></pre></div>
@@ -524,13 +524,13 @@ true process error</p>
 <span>               <span class="co"># formula for observations, allowing for different</span></span>
 <span>               <span class="co"># intercepts and hierarchical smooth effects of temperature</span></span>
 <span>               <span class="va">observed</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> </span>
-<span>               <span class="fu">s</span><span class="op">(</span><span class="va">temperature</span>, k <span class="op">=</span> <span class="fl">10</span><span class="op">)</span> <span class="op">+</span></span>
-<span>               <span class="fu">s</span><span class="op">(</span><span class="va">series</span>, <span class="va">temperature</span>, bs <span class="op">=</span> <span class="st">'sz'</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span>
+<span>               <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">temperature</span>, k <span class="op">=</span> <span class="fl">10</span><span class="op">)</span> <span class="op">+</span></span>
+<span>               <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">series</span>, <span class="va">temperature</span>, bs <span class="op">=</span> <span class="st">'sz'</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span>,</span>
 <span>             </span>
 <span>             trend_formula <span class="op">=</span></span>
 <span>               <span class="co"># formula for the latent signal, which can depend</span></span>
 <span>               <span class="co"># nonlinearly on productivity</span></span>
-<span>               <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">productivity</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span>
+<span>               <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">productivity</span>, k <span class="op">=</span> <span class="fl">8</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span>
 <span>             </span>
 <span>             trend_model <span class="op">=</span></span>
 <span>               <span class="co"># in addition to productivity effects, the signal is</span></span>
@@ -546,8 +546,8 @@ true process error</p>
 <span>             </span>
 <span>             <span class="co"># informative priors on process error</span></span>
 <span>             <span class="co"># and observation error will help with convergence</span></span>
-<span>             priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">sigma</span><span class="op">)</span>,</span>
-<span>                        <span class="fu">prior</span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">sigma_obs</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>             priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">sigma</span><span class="op">)</span>,</span>
+<span>                        <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">sigma_obs</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>             </span>
 <span>             <span class="co"># Gaussian observations</span></span>
 <span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -590,34 +590,34 @@ many spline coefficients in this model</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Observation error parameter estimates:</span></span>
 <span><span class="co">#&gt;              2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; sigma_obs[1]  1.4 1.7   2.1    1  1298</span></span>
-<span><span class="co">#&gt; sigma_obs[2]  1.7 2.0   2.3    1  1946</span></span>
-<span><span class="co">#&gt; sigma_obs[3]  2.0 2.3   2.7    1  2569</span></span>
+<span><span class="co">#&gt; sigma_obs[1]  1.4 1.7   2.1    1  1080</span></span>
+<span><span class="co">#&gt; sigma_obs[2]  1.7 2.0   2.3    1  2112</span></span>
+<span><span class="co">#&gt; sigma_obs[3]  2.0 2.3   2.7    1  2799</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
-<span><span class="co">#&gt;                 2.5%  50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; (Intercept)    -3.40 -2.1 -0.69    1  1067</span></span>
-<span><span class="co">#&gt; seriessensor_2 -2.80 -1.4 -0.14    1  1169</span></span>
-<span><span class="co">#&gt; seriessensor_3  0.63  3.1  4.80    1  1055</span></span>
+<span><span class="co">#&gt;                 2.5%  50%  97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; (Intercept)    -3.40 -2.1 -0.790 1.00   946</span></span>
+<span><span class="co">#&gt; seriessensor_2 -2.80 -1.4 -0.015 1.01  1263</span></span>
+<span><span class="co">#&gt; seriessensor_3  0.53  3.1  4.700 1.00   897</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM observation smooths:</span></span>
 <span><span class="co">#&gt;                        edf Ref.df Chi.sq p-value    </span></span>
-<span><span class="co">#&gt; s(temperature)        1.39      9   0.11       1    </span></span>
-<span><span class="co">#&gt; s(series,temperature) 2.78     16 107.40 5.4e-05 ***</span></span>
+<span><span class="co">#&gt; s(temperature)        1.74      9   0.09       1    </span></span>
+<span><span class="co">#&gt; s(series,temperature) 2.47     16 106.38 7.6e-05 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Process model AR parameter estimates:</span></span>
-<span><span class="co">#&gt;        2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; ar1[1] 0.37 0.6   0.8 1.01   616</span></span>
+<span><span class="co">#&gt;        2.5%  50% 97.5% Rhat n_eff</span></span>
+<span><span class="co">#&gt; ar1[1] 0.39 0.59  0.78 1.01   541</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Process error parameter estimates:</span></span>
 <span><span class="co">#&gt;          2.5% 50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; sigma[1]  1.5 1.8   2.2 1.01   649</span></span>
+<span><span class="co">#&gt; sigma[1]  1.5 1.8   2.2    1   768</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">#&gt;                   edf Ref.df Chi.sq p-value</span></span>
-<span><span class="co">#&gt; s(productivity) 0.926      7   5.45       1</span></span>
+<span><span class="co">#&gt;                  edf Ref.df Chi.sq p-value</span></span>
+<span><span class="co">#&gt; s(productivity) 1.04      7   5.12       1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
 <span><span class="co">#&gt; n_eff / iter looks reasonable for all parameters</span></span>
@@ -626,7 +626,7 @@ many spline coefficients in this model</p>
 <span><span class="co">#&gt; 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Fri Jul 05 1:04:26 PM 2024.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Sep 03 2:53:07 PM 2024.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
 <span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span></code></pre></div>
@@ -641,7 +641,7 @@ them to be very meaningful. What are meaningful, however, are
 prediction-based plots of the smooth functions. All main effects can be
 quickly plotted with <code>conditional_effects</code>:</p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">conditional_effects</span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'link'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="shared_states_files/figure-html/unnamed-chunk-17-1.png" width="60%" style="display: block; margin: auto;"><img src="shared_states_files/figure-html/unnamed-chunk-17-2.png" width="60%" style="display: block; margin: auto;"><img src="shared_states_files/figure-html/unnamed-chunk-17-3.png" width="60%" style="display: block; margin: auto;"><img src="shared_states_files/figure-html/unnamed-chunk-17-4.png" width="60%" style="display: block; margin: auto;"></p>
 <p><code>conditional_effects</code> is simply a wrapper to the more
 flexible <code>plot_predictions</code> function from the
@@ -650,10 +650,10 @@ these effects using this function for further customisation:</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">require</a></span><span class="op">(</span><span class="va"><a href="https://marginaleffects.com/" class="external-link">marginaleffects</a></span><span class="op">)</span></span>
 <span><span class="co">#&gt; Loading required package: marginaleffects</span></span>
-<span><span class="fu"><a href="https://marginaleffects.com/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, </span>
+<span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, </span>
 <span>                 condition <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'temperature'</span>, <span class="st">'series'</span>, <span class="st">'series'</span><span class="op">)</span>,</span>
 <span>                 points <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu">theme</span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="shared_states_files/figure-html/unnamed-chunk-18-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>We have successfully estimated effects, some of them nonlinear, that
 impact the hidden process AND the observations. All in a single joint

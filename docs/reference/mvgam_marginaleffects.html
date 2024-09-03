@@ -156,8 +156,6 @@ arguments.</p></dd>
 <li><p><code><a href="https://rdrr.io/pkg/marginaleffects/man/datagrid.html" class="external-link">datagrid()</a></code> call to specify a custom grid of regressors. For example:</p><ul><li><p><code>newdata = datagrid(cyl = c(4, 6))</code>: <code>cyl</code> variable equal to 4 and 6 and other regressors fixed at their means or modes.</p></li>
 <li><p>See the Examples section and the <code><a href="https://rdrr.io/pkg/marginaleffects/man/datagrid.html" class="external-link">datagrid()</a></code> documentation.</p></li>
 </ul></li>
-<li><p><code><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset()</a></code> call with a single argument to select a subset of the dataset used to fit the model, ex: <code>newdata = subset(treatment == 1)</code></p></li>
-<li><p><code><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">dplyr::filter()</a></code> call with a single argument to select a subset of the dataset used to fit the model, ex: <code>newdata = filter(treatment == 1)</code></p></li>
 <li><p>string:</p><ul><li><p>"mean": Marginal Effects at the Mean. Slopes when each predictor is held at its mean or mode.</p></li>
 <li><p>"median": Marginal Effects at the Median. Slopes when each predictor is held at its median or mode.</p></li>
 <li><p>"marginalmeans": Marginal Effects at Marginal Means. See Details section below.</p></li>

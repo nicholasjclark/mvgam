@@ -81,7 +81,7 @@
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2024-08-24</h4>
+            <h4 data-toc-skip class="date">2024-09-03</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/data_in_mvgam.Rmd" class="external-link"><code>vignettes/data_in_mvgam.Rmd</code></a></small>
       <div class="d-none name"><code>data_in_mvgam.Rmd</code></div>
@@ -111,21 +111,21 @@ data using the <code>sim_mvgam</code> function. See
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, <span class="fl">16</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     y season year   series time</span></span>
 <span><span class="co">#&gt; 1  NA      1    1 series_1    1</span></span>
-<span><span class="co">#&gt; 2   0      1    1 series_2    1</span></span>
+<span><span class="co">#&gt; 2   1      1    1 series_2    1</span></span>
 <span><span class="co">#&gt; 3   0      1    1 series_3    1</span></span>
-<span><span class="co">#&gt; 4   1      1    1 series_4    1</span></span>
-<span><span class="co">#&gt; 5   0      2    1 series_1    2</span></span>
-<span><span class="co">#&gt; 6   2      2    1 series_2    2</span></span>
+<span><span class="co">#&gt; 4  NA      1    1 series_4    1</span></span>
+<span><span class="co">#&gt; 5   1      2    1 series_1    2</span></span>
+<span><span class="co">#&gt; 6  NA      2    1 series_2    2</span></span>
 <span><span class="co">#&gt; 7   1      2    1 series_3    2</span></span>
 <span><span class="co">#&gt; 8  NA      2    1 series_4    2</span></span>
 <span><span class="co">#&gt; 9   0      3    1 series_1    3</span></span>
-<span><span class="co">#&gt; 10 NA      3    1 series_2    3</span></span>
+<span><span class="co">#&gt; 10  3      3    1 series_2    3</span></span>
 <span><span class="co">#&gt; 11  1      3    1 series_3    3</span></span>
-<span><span class="co">#&gt; 12  2      3    1 series_4    3</span></span>
-<span><span class="co">#&gt; 13  0      4    1 series_1    4</span></span>
+<span><span class="co">#&gt; 12  0      3    1 series_4    3</span></span>
+<span><span class="co">#&gt; 13 NA      4    1 series_1    4</span></span>
 <span><span class="co">#&gt; 14  2      4    1 series_2    4</span></span>
-<span><span class="co">#&gt; 15  0      4    1 series_3    4</span></span>
-<span><span class="co">#&gt; 16  3      4    1 series_4    4</span></span></code></pre></div>
+<span><span class="co">#&gt; 15  1      4    1 series_3    4</span></span>
+<span><span class="co">#&gt; 16  1      4    1 series_4    4</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="series-as-a-factor-variable">
 <code>series</code> as a <code>factor</code> variable<a class="anchor" aria-label="anchor" href="#series-as-a-factor-variable"></a>
@@ -176,28 +176,28 @@ time series:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Deviance Residuals: </span></span>
 <span><span class="co">#&gt;     Min       1Q   Median       3Q      Max  </span></span>
-<span><span class="co">#&gt; -2.3329  -1.2350  -0.6016   0.3510   2.5133  </span></span>
+<span><span class="co">#&gt; -1.7390  -0.9456  -0.3864   0.7284   2.8061  </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Coefficients:</span></span>
-<span><span class="co">#&gt;                Estimate Std. Error z value Pr(&gt;|z|)    </span></span>
-<span><span class="co">#&gt; (Intercept)    -1.24362    0.61486  -2.023 0.043114 *  </span></span>
-<span><span class="co">#&gt; seriesseries_2  2.27379    0.60407   3.764 0.000167 ***</span></span>
-<span><span class="co">#&gt; seriesseries_3  1.36576    0.63696   2.144 0.032018 *  </span></span>
-<span><span class="co">#&gt; seriesseries_4  2.32647    0.60468   3.847 0.000119 ***</span></span>
-<span><span class="co">#&gt; time           -0.02912    0.02156  -1.351 0.176694    </span></span>
+<span><span class="co">#&gt;                Estimate Std. Error z value Pr(&gt;|z|)  </span></span>
+<span><span class="co">#&gt; (Intercept)     0.25386    0.36697   0.692   0.4891  </span></span>
+<span><span class="co">#&gt; seriesseries_2  0.60796    0.34442   1.765   0.0775 .</span></span>
+<span><span class="co">#&gt; seriesseries_3 -1.11102    0.52657  -2.110   0.0349 *</span></span>
+<span><span class="co">#&gt; seriesseries_4  0.01518    0.39240   0.039   0.9691  </span></span>
+<span><span class="co">#&gt; time           -0.03449    0.02642  -1.305   0.1918  </span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; (Dispersion parameter for poisson family taken to be 1)</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt;     Null deviance: 134.349  on 58  degrees of freedom</span></span>
-<span><span class="co">#&gt; Residual deviance:  96.445  on 54  degrees of freedom</span></span>
-<span><span class="co">#&gt;   (13 observations deleted due to missingness)</span></span>
-<span><span class="co">#&gt; AIC: 190.39</span></span>
+<span><span class="co">#&gt;     Null deviance: 79.481  on 57  degrees of freedom</span></span>
+<span><span class="co">#&gt; Residual deviance: 61.529  on 53  degrees of freedom</span></span>
+<span><span class="co">#&gt;   (14 observations deleted due to missingness)</span></span>
+<span><span class="co">#&gt; AIC: 148.43</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Number of Fisher Scoring iterations: 6</span></span></code></pre></div>
+<span><span class="co">#&gt; Number of Fisher Scoring iterations: 5</span></span></code></pre></div>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="fu">s</span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span><span class="op">)</span>,</span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="fu">mgcv</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">time</span>, by <span class="op">=</span> <span class="va">series</span><span class="op">)</span>,</span>
 <span>            data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span>
 <span>            family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
@@ -208,25 +208,23 @@ time series:</p>
 <span><span class="co">#&gt; y ~ series + s(time, by = series)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Parametric coefficients:</span></span>
-<span><span class="co">#&gt;                Estimate Std. Error z value Pr(&gt;|z|)   </span></span>
-<span><span class="co">#&gt; (Intercept)     -1.6035     0.6005  -2.671  0.00757 **</span></span>
-<span><span class="co">#&gt; seriesseries_2   1.9155     0.6601   2.902  0.00371 **</span></span>
-<span><span class="co">#&gt; seriesseries_3   1.2765     0.6790   1.880  0.06012 . </span></span>
-<span><span class="co">#&gt; seriesseries_4   2.0982     0.6508   3.224  0.00126 **</span></span>
+<span><span class="co">#&gt;                Estimate Std. Error z value Pr(&gt;|z|)  </span></span>
+<span><span class="co">#&gt; (Intercept)     -0.1536     0.2918  -0.526   0.5987  </span></span>
+<span><span class="co">#&gt; seriesseries_2   0.6781     0.3582   1.893   0.0584 .</span></span>
+<span><span class="co">#&gt; seriesseries_3  -2.2093     1.1016  -2.005   0.0449 *</span></span>
+<span><span class="co">#&gt; seriesseries_4  -0.3154     0.4940  -0.639   0.5231  </span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of smooth terms:</span></span>
-<span><span class="co">#&gt;                          edf Ref.df Chi.sq p-value   </span></span>
-<span><span class="co">#&gt; s(time):seriesseries_1 1.494  1.833  0.575 0.73049   </span></span>
-<span><span class="co">#&gt; s(time):seriesseries_2 2.591  3.278 13.476 0.00574 **</span></span>
-<span><span class="co">#&gt; s(time):seriesseries_3 4.750  5.799  9.781 0.12285   </span></span>
-<span><span class="co">#&gt; s(time):seriesseries_4 4.592  5.621 13.802 0.03315 * </span></span>
-<span><span class="co">#&gt; ---</span></span>
-<span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
+<span><span class="co">#&gt;                          edf Ref.df Chi.sq p-value</span></span>
+<span><span class="co">#&gt; s(time):seriesseries_1 2.752  3.397  1.887   0.608</span></span>
+<span><span class="co">#&gt; s(time):seriesseries_2 1.236  1.436  1.218   0.507</span></span>
+<span><span class="co">#&gt; s(time):seriesseries_3 4.664  5.653  4.517   0.580</span></span>
+<span><span class="co">#&gt; s(time):seriesseries_4 3.461  4.274  6.525   0.194</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; R-sq.(adj) =  0.628   Deviance explained = 68.3%</span></span>
-<span><span class="co">#&gt; UBRE = 0.31332  Scale est. = 1         n = 59</span></span></code></pre></div>
+<span><span class="co">#&gt; R-sq.(adj) =  0.248   Deviance explained = 50.5%</span></span>
+<span><span class="co">#&gt; UBRE = 0.23426  Scale est. = 1         n = 58</span></span></code></pre></div>
 <p>Depending on the observation families you plan to use when building
 models, there may be some restrictions that need to be satisfied within
 the outcome variable. For example, a Beta regression can only handle
@@ -248,17 +246,17 @@ using the <code>betar</code> family:</p>
 <span>                                        levels <span class="op">=</span> <span class="st">'series1'</span><span class="op">)</span>,</span>
 <span>                        time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span><span class="op">)</span></span>
 <span><span class="va">gauss_dat</span></span>
-<span><span class="co">#&gt;       outcome  series time</span></span>
-<span><span class="co">#&gt; 1   0.1754683 series1    1</span></span>
-<span><span class="co">#&gt; 2   0.2411510 series1    2</span></span>
-<span><span class="co">#&gt; 3   1.0221725 series1    3</span></span>
-<span><span class="co">#&gt; 4   0.7186505 series1    4</span></span>
-<span><span class="co">#&gt; 5   0.4864740 series1    5</span></span>
-<span><span class="co">#&gt; 6   1.6725269 series1    6</span></span>
-<span><span class="co">#&gt; 7  -0.2081990 series1    7</span></span>
-<span><span class="co">#&gt; 8   0.2345187 series1    8</span></span>
-<span><span class="co">#&gt; 9  -0.8994249 series1    9</span></span>
-<span><span class="co">#&gt; 10 -0.8554195 series1   10</span></span></code></pre></div>
+<span><span class="co">#&gt;         outcome  series time</span></span>
+<span><span class="co">#&gt; 1  -1.105964948 series1    1</span></span>
+<span><span class="co">#&gt; 2   0.299966201 series1    2</span></span>
+<span><span class="co">#&gt; 3  -0.942046180 series1    3</span></span>
+<span><span class="co">#&gt; 4  -0.001887559 series1    4</span></span>
+<span><span class="co">#&gt; 5   0.339117564 series1    5</span></span>
+<span><span class="co">#&gt; 6   1.458563643 series1    6</span></span>
+<span><span class="co">#&gt; 7  -0.024058830 series1    7</span></span>
+<span><span class="co">#&gt; 8   0.646390934 series1    8</span></span>
+<span><span class="co">#&gt; 9  -0.686607550 series1    9</span></span>
+<span><span class="co">#&gt; 10  0.126273947 series1   10</span></span></code></pre></div>
 <p>A call to <code>gam</code> using the <code>mgcv</code> package leads
 to a model that actually fits (though it does give an unhelpful warning
 message):</p>
@@ -269,14 +267,14 @@ message):</p>
 <span><span class="co">#&gt; Warning in family$saturated.ll(y, prior.weights, theta): saturated likelihood</span></span>
 <span><span class="co">#&gt; may be inaccurate</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Family: Beta regression(0.173) </span></span>
+<span><span class="co">#&gt; Family: Beta regression(0.137) </span></span>
 <span><span class="co">#&gt; Link function: logit </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Formula:</span></span>
 <span><span class="co">#&gt; outcome ~ time</span></span>
 <span><span class="co">#&gt; Total model degrees of freedom 2 </span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; REML score: -121.4149</span></span></code></pre></div>
+<span><span class="co">#&gt; REML score: -149.2203</span></span></code></pre></div>
 <p>But the same call to <code>mvgam</code> gives us something more
 useful:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
@@ -369,15 +367,15 @@ variable are not included in the data:</p>
 <span>                        series <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="st">'series_1'</span><span class="op">)</span>,</span>
 <span>                        outcome <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">8</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">bad_times</span></span>
-<span><span class="co">#&gt;   time   series    outcome</span></span>
-<span><span class="co">#&gt; 1    1 series_1 -0.8227444</span></span>
-<span><span class="co">#&gt; 2    3 series_1 -0.6851957</span></span>
-<span><span class="co">#&gt; 3    5 series_1  1.5221436</span></span>
-<span><span class="co">#&gt; 4    7 series_1 -0.8227729</span></span>
-<span><span class="co">#&gt; 5    9 series_1  1.0787734</span></span>
-<span><span class="co">#&gt; 6   11 series_1 -0.7118972</span></span>
-<span><span class="co">#&gt; 7   13 series_1 -1.2150116</span></span>
-<span><span class="co">#&gt; 8   15 series_1  1.5165404</span></span></code></pre></div>
+<span><span class="co">#&gt;   time   series     outcome</span></span>
+<span><span class="co">#&gt; 1    1 series_1  1.48518852</span></span>
+<span><span class="co">#&gt; 2    3 series_1 -0.56975888</span></span>
+<span><span class="co">#&gt; 3    5 series_1 -0.63240452</span></span>
+<span><span class="co">#&gt; 4    7 series_1 -2.30914822</span></span>
+<span><span class="co">#&gt; 5    9 series_1 -0.03495886</span></span>
+<span><span class="co">#&gt; 6   11 series_1  0.54345770</span></span>
+<span><span class="co">#&gt; 7   13 series_1  0.99494365</span></span>
+<span><span class="co">#&gt; 8   15 series_1 -0.35716657</span></span></code></pre></div>
 <p>Next we call <code>get_mvgam_priors</code> by simply specifying an
 intercept-only model, which is enough to trigger all the checks:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
@@ -398,22 +396,22 @@ be pretty easy using <code>expand.grid</code>:</p>
 <span>  <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html" class="external-link">arrange</a></span><span class="op">(</span><span class="va">time</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">good_times</span></span>
 <span><span class="co">#&gt; Joining with `by = join_by(time, series)`</span></span>
 <span><span class="va">good_times</span></span>
-<span><span class="co">#&gt;    time   series    outcome</span></span>
-<span><span class="co">#&gt; 1     1 series_1 -0.8227444</span></span>
-<span><span class="co">#&gt; 2     2 series_1         NA</span></span>
-<span><span class="co">#&gt; 3     3 series_1 -0.6851957</span></span>
-<span><span class="co">#&gt; 4     4 series_1         NA</span></span>
-<span><span class="co">#&gt; 5     5 series_1  1.5221436</span></span>
-<span><span class="co">#&gt; 6     6 series_1         NA</span></span>
-<span><span class="co">#&gt; 7     7 series_1 -0.8227729</span></span>
-<span><span class="co">#&gt; 8     8 series_1         NA</span></span>
-<span><span class="co">#&gt; 9     9 series_1  1.0787734</span></span>
-<span><span class="co">#&gt; 10   10 series_1         NA</span></span>
-<span><span class="co">#&gt; 11   11 series_1 -0.7118972</span></span>
-<span><span class="co">#&gt; 12   12 series_1         NA</span></span>
-<span><span class="co">#&gt; 13   13 series_1 -1.2150116</span></span>
-<span><span class="co">#&gt; 14   14 series_1         NA</span></span>
-<span><span class="co">#&gt; 15   15 series_1  1.5165404</span></span></code></pre></div>
+<span><span class="co">#&gt;    time   series     outcome</span></span>
+<span><span class="co">#&gt; 1     1 series_1  1.48518852</span></span>
+<span><span class="co">#&gt; 2     2 series_1          NA</span></span>
+<span><span class="co">#&gt; 3     3 series_1 -0.56975888</span></span>
+<span><span class="co">#&gt; 4     4 series_1          NA</span></span>
+<span><span class="co">#&gt; 5     5 series_1 -0.63240452</span></span>
+<span><span class="co">#&gt; 6     6 series_1          NA</span></span>
+<span><span class="co">#&gt; 7     7 series_1 -2.30914822</span></span>
+<span><span class="co">#&gt; 8     8 series_1          NA</span></span>
+<span><span class="co">#&gt; 9     9 series_1 -0.03495886</span></span>
+<span><span class="co">#&gt; 10   10 series_1          NA</span></span>
+<span><span class="co">#&gt; 11   11 series_1  0.54345770</span></span>
+<span><span class="co">#&gt; 12   12 series_1          NA</span></span>
+<span><span class="co">#&gt; 13   13 series_1  0.99494365</span></span>
+<span><span class="co">#&gt; 14   14 series_1          NA</span></span>
+<span><span class="co">#&gt; 15   15 series_1 -0.35716657</span></span></code></pre></div>
 <p>Now the call to <code>get_mvgam_priors</code>, using our filled in
 data, should work:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
@@ -423,9 +421,9 @@ data, should work:</p>
 <span><span class="co">#&gt;                             param_name param_length           param_info</span></span>
 <span><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
 <span><span class="co">#&gt; 2 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
-<span><span class="co">#&gt;                                    prior                 example_change</span></span>
-<span><span class="co">#&gt; 1 (Intercept) ~ student_t(3, -0.7, 2.5);    (Intercept) ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 2      sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(0.91, 0.9);</span></span>
+<span><span class="co">#&gt;                                    prior                   example_change</span></span>
+<span><span class="co">#&gt; 1 (Intercept) ~ student_t(3, -0.2, 2.5);      (Intercept) ~ normal(0, 1);</span></span>
+<span><span class="co">#&gt; 2      sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(-0.47, 0.56);</span></span>
 <span><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
 <span><span class="co">#&gt; 1             NA             NA</span></span>
 <span><span class="co">#&gt; 2             NA             NA</span></span></code></pre></div>
@@ -473,9 +471,9 @@ no observations for this series in the data:</p>
 <span><span class="co">#&gt;                             param_name param_length           param_info</span></span>
 <span><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
 <span><span class="co">#&gt; 2 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
-<span><span class="co">#&gt;                                    prior                   example_change</span></span>
-<span><span class="co">#&gt; 1 (Intercept) ~ student_t(3, -0.5, 2.5);      (Intercept) ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 2      sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(-0.01, 0.79);</span></span>
+<span><span class="co">#&gt;                                    prior                example_change</span></span>
+<span><span class="co">#&gt; 1 (Intercept) ~ student_t(3, -0.4, 2.5);   (Intercept) ~ normal(0, 1);</span></span>
+<span><span class="co">#&gt; 2      sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(-0.62, 1);</span></span>
 <span><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
 <span><span class="co">#&gt; 1             NA             NA</span></span>
 <span><span class="co">#&gt; 2             NA             NA</span></span></code></pre></div>
@@ -498,17 +496,17 @@ values:</p>
 <span>                                       levels <span class="op">=</span> <span class="st">'series1'</span><span class="op">)</span>,</span>
 <span>                       time <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span><span class="op">)</span></span>
 <span><span class="va">miss_dat</span></span>
-<span><span class="co">#&gt;       outcome          cov  series time</span></span>
-<span><span class="co">#&gt; 1  -1.5062280           NA series1    1</span></span>
-<span><span class="co">#&gt; 2   0.8873110 -1.419737577 series1    2</span></span>
-<span><span class="co">#&gt; 3  -0.5854087  0.006758633 series1    3</span></span>
-<span><span class="co">#&gt; 4  -0.8946378 -0.989167769 series1    4</span></span>
-<span><span class="co">#&gt; 5  -0.4520713  2.359401432 series1    5</span></span>
-<span><span class="co">#&gt; 6   0.5739319 -0.802900274 series1    6</span></span>
-<span><span class="co">#&gt; 7  -0.5756935 -0.735234481 series1    7</span></span>
-<span><span class="co">#&gt; 8   0.4873677 -1.386964284 series1    8</span></span>
-<span><span class="co">#&gt; 9   1.2759287 -0.474650053 series1    9</span></span>
-<span><span class="co">#&gt; 10 -1.8709314 -1.539955160 series1   10</span></span></code></pre></div>
+<span><span class="co">#&gt;       outcome         cov  series time</span></span>
+<span><span class="co">#&gt; 1   0.1561020          NA series1    1</span></span>
+<span><span class="co">#&gt; 2   0.1084784  0.98322738 series1    2</span></span>
+<span><span class="co">#&gt; 3   0.0330442  0.28407529 series1    3</span></span>
+<span><span class="co">#&gt; 4   0.6572311 -1.45353685 series1    4</span></span>
+<span><span class="co">#&gt; 5   0.8854784  0.02783985 series1    5</span></span>
+<span><span class="co">#&gt; 6   1.6044159 -1.17292983 series1    6</span></span>
+<span><span class="co">#&gt; 7  -0.9053955  0.88927692 series1    7</span></span>
+<span><span class="co">#&gt; 8   2.3019384  0.36575792 series1    8</span></span>
+<span><span class="co">#&gt; 9   0.1608429 -0.58446531 series1    9</span></span>
+<span><span class="co">#&gt; 10  0.9125095  3.75742498 series1   10</span></span></code></pre></div>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span><span class="va">outcome</span> <span class="op">~</span> <span class="va">cov</span>,</span>
 <span>                 data <span class="op">=</span> <span class="va">miss_dat</span>,</span>
@@ -517,10 +515,10 @@ values:</p>
 <span><span class="co">#&gt; 1                          (Intercept)            1          (Intercept)</span></span>
 <span><span class="co">#&gt; 2                                  cov            1     cov fixed effect</span></span>
 <span><span class="co">#&gt; 3 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
-<span><span class="co">#&gt;                                    prior                  example_change</span></span>
-<span><span class="co">#&gt; 1 (Intercept) ~ student_t(3, -0.5, 2.5);     (Intercept) ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 2              cov ~ student_t(3, 0, 2);             cov ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 3      sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(0.47, 0.76);</span></span>
+<span><span class="co">#&gt;                                   prior                  example_change</span></span>
+<span><span class="co">#&gt; 1 (Intercept) ~ student_t(3, 0.4, 2.5);     (Intercept) ~ normal(0, 1);</span></span>
+<span><span class="co">#&gt; 2             cov ~ student_t(3, 0, 2);             cov ~ normal(0, 1);</span></span>
+<span><span class="co">#&gt; 3     sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(-0.59, 0.3);</span></span>
 <span><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
 <span><span class="co">#&gt; 1             NA             NA</span></span>
 <span><span class="co">#&gt; 2             NA             NA</span></span>
@@ -551,14 +549,14 @@ change the <code>cov</code> predictor to be a <code>matrix</code>:</p>
 <span><span class="co">#&gt; 5                                 cov4            1    cov4 fixed effect</span></span>
 <span><span class="co">#&gt; 6                                 cov5            1    cov5 fixed effect</span></span>
 <span><span class="co">#&gt; 7 vector&lt;lower=0&gt;[n_series] sigma_obs;            1 observation error sd</span></span>
-<span><span class="co">#&gt;                                    prior                  example_change</span></span>
-<span><span class="co">#&gt; 1 (Intercept) ~ student_t(3, -0.4, 2.5);     (Intercept) ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 2             cov1 ~ student_t(3, 0, 2);            cov1 ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 3             cov2 ~ student_t(3, 0, 2);            cov2 ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 4             cov3 ~ student_t(3, 0, 2);            cov3 ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 5             cov4 ~ student_t(3, 0, 2);            cov4 ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 6             cov5 ~ student_t(3, 0, 2);            cov5 ~ normal(0, 1);</span></span>
-<span><span class="co">#&gt; 7      sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(-0.4, 0.32);</span></span>
+<span><span class="co">#&gt;                                    prior                   example_change</span></span>
+<span><span class="co">#&gt; 1 (Intercept) ~ student_t(3, -0.2, 2.5);      (Intercept) ~ normal(0, 1);</span></span>
+<span><span class="co">#&gt; 2             cov1 ~ student_t(3, 0, 2);             cov1 ~ normal(0, 1);</span></span>
+<span><span class="co">#&gt; 3             cov2 ~ student_t(3, 0, 2);             cov2 ~ normal(0, 1);</span></span>
+<span><span class="co">#&gt; 4             cov3 ~ student_t(3, 0, 2);             cov3 ~ normal(0, 1);</span></span>
+<span><span class="co">#&gt; 5             cov4 ~ student_t(3, 0, 2);             cov4 ~ normal(0, 1);</span></span>
+<span><span class="co">#&gt; 6             cov5 ~ student_t(3, 0, 2);             cov5 ~ normal(0, 1);</span></span>
+<span><span class="co">#&gt; 7      sigma_obs ~ student_t(3, 0, 2.5); sigma_obs ~ normal(-0.32, 0.68);</span></span>
 <span><span class="co">#&gt;   new_lowerbound new_upperbound</span></span>
 <span><span class="co">#&gt; 1             NA             NA</span></span>
 <span><span class="co">#&gt; 2             NA             NA</span></span>
@@ -740,8 +738,8 @@ for checking the package-generated <code>Stan</code> code for any
 inefficiencies that can be fixed to lead to sampling performance
 improvements:</p>
 <div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">testmod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu">s</span><span class="op">(</span><span class="va">epiWeek</span>, by <span class="op">=</span> <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">+</span></span>
-<span>                   <span class="fu">s</span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span>,</span>
+<code class="sourceCode R"><span><span class="va">testmod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">epiWeek</span>, by <span class="op">=</span> <span class="va">series</span>, bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span> <span class="op">+</span></span>
+<span>                   <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">series</span>, bs <span class="op">=</span> <span class="st">'re'</span><span class="op">)</span>,</span>
 <span>                 trend_model <span class="op">=</span> <span class="st">'AR1'</span>,</span>
 <span>                 data <span class="op">=</span> <span class="va">model_dat</span>,</span>
 <span>                 backend <span class="op">=</span> <span class="st">'cmdstanr'</span>,</span>
@@ -770,7 +768,7 @@ sampling:</p>
 <span><span class="co">#&gt;  $ S8          : num [1:8, 1:8] 1.037 -0.416 0.419 0.117 0.188 ...</span></span>
 <span><span class="co">#&gt;  $ p_coefs     : Named num 0</span></span>
 <span><span class="co">#&gt;   ..- attr(*, "names")= chr "(Intercept)"</span></span>
-<span><span class="co">#&gt;  $ p_taus      : num 1.14</span></span>
+<span><span class="co">#&gt;  $ p_taus      : num 0.945</span></span>
 <span><span class="co">#&gt;  $ ytimes      : int [1:416, 1:8] 1 9 17 25 33 41 49 57 65 73 ...</span></span>
 <span><span class="co">#&gt;  $ n_series    : int 8</span></span>
 <span><span class="co">#&gt;  $ sp          : Named num [1:9] 0.368 0.368 0.368 0.368 0.368 ...</span></span>
