@@ -198,10 +198,6 @@ plot(notrend_mod, type = 'residuals', series = 1)
 ```
 
 ```{r}
-plot(notrend_mod, type = 'residuals', series = 2)
-```
-
-```{r}
 plot(notrend_mod, type = 'residuals', series = 3)
 ```
 
@@ -213,11 +209,11 @@ Now it is time to get into multivariate State-Space models. We will fit two mode
 \boldsymbol{count}_t & \sim \text{Normal}(\mu_{obs[t]}, \sigma_{obs}) \\
 \mu_{obs[t]} & = process_t \\
 process_t & \sim \text{MVNormal}(\mu_{process[t]}, \Sigma_{process}) \\
-\mu_{process[t]} & = VAR * process_{t-1} + f_{global}(\boldsymbol{month},\boldsymbol{temp})_t + f_{series}(\boldsymbol{month},\boldsymbol{temp})_t \\
+\mu_{process[t]} & = A * process_{t-1} + f_{global}(\boldsymbol{month},\boldsymbol{temp})_t + f_{series}(\boldsymbol{month},\boldsymbol{temp})_t \\
 f_{global}(\boldsymbol{month},\boldsymbol{temp}) & = \sum_{k=1}^{K}b_{global} * \beta_{global} \\
 f_{series}(\boldsymbol{month},\boldsymbol{temp}) & = \sum_{k=1}^{K}b_{series} * \beta_{series} \end{align*}
 
-Here you can see that there are no terms in the observation model apart from the underlying process model. But we could easily add covariates into the observation model if we felt that they could explain some of the systematic observation errors. We also assume independent observation processes (there is no covariance structure in the observation errors $\sigma_{obs}$).  At present, `mvgam` does not support multivariate observation models. But this feature will be added in future versions. However the underlying process model is multivariate, and there is a lot going on here. This component has a Vector Autoregressive part, where the process mean at time $t$ $(\mu_{process[t]})$ is a vector that evolves as a function of where the vector-valued process model was at time $t-1$. The $VAR$ matrix captures these dynamics with self-dependencies on the diagonal and possibly asymmetric cross-dependencies on the off-diagonals, while also incorporating the nonlinear smooth functions that capture seasonality for each series. The contemporaneous process errors are modeled by $\Sigma_{process}$, which can be constrained so that process errors are independent (i.e. setting the off-diagonals to 0) or can be fully parameterized using a Cholesky decomposition (using `Stan`'s $LKJcorr$ distribution to place a prior on the strength of inter-species correlations). For those that are interested in the inner-workings, `mvgam` makes use of a recent breakthrough by [Sarah Heaps to enforce stationarity of Bayesian VAR processes](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648). This is advantageous as we often don't expect forecast variance to increase without bound forever into the future, but many estimated VARs tend to behave this way. 
+Here you can see that there are no terms in the observation model apart from the underlying process model. But we could easily add covariates into the observation model if we felt that they could explain some of the systematic observation errors. We also assume independent observation processes (there is no covariance structure in the observation errors $\sigma_{obs}$).  At present, `mvgam` does not support multivariate observation models. But this feature will be added in future versions. However the underlying process model is multivariate, and there is a lot going on here. This component has a Vector Autoregressive part, where the process mean at time $t$ $(\mu_{process[t]})$ is a vector that evolves as a function of where the vector-valued process model was at time $t-1$. The $A$ matrix captures these dynamics with self-dependencies on the diagonal and possibly asymmetric cross-dependencies on the off-diagonals, while also incorporating the nonlinear smooth functions that capture seasonality for each series. The contemporaneous process errors are modeled by $\Sigma_{process}$, which can be constrained so that process errors are independent (i.e. setting the off-diagonals to 0) or can be fully parameterized using a Cholesky decomposition (using `Stan`'s $LKJcorr$ distribution to place a prior on the strength of inter-species correlations). For those that are interested in the inner-workings, `mvgam` makes use of a recent breakthrough by [Sarah Heaps to enforce stationarity of Bayesian VAR processes](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648). This is advantageous as we often don't expect forecast variance to increase without bound forever into the future, but many estimated VARs tend to behave this way. 
 
 <br>
 Ok that was a lot to take in. Let's fit some models to try and inspect what is going on and what they assume. But first, we need to update `mvgam`'s default priors for the observation and process errors. By default, `mvgam` uses a fairly wide Student-T prior on these parameters to avoid being overly informative. But our observations are z-scored and so we do not expect very large process or observation errors. However, we also do not expect very small observation errors either as we know these measurements are not perfect. So let's update the priors for these parameters. In doing so, you will get to see how the formula for the latent process (i.e. trend) model is used in `mvgam`:
@@ -407,6 +403,21 @@ rownames(median_correlations) <- colnames(median_correlations) <- levels(plankto
 round(median_correlations, 2)
 ```
 
+### Impulse response functions
+Because Vector Autoregressions can capture complex lagged dependencies, it is often difficult to understand how the member time series are thought to interact with one another. A method that is commonly used to directly test for possible interactions is to compute an [Impulse Response Function](https://www.mathworks.com/help/econ/varm.irf.html) (IRF). If $h$ represents the simulated forecast horizon, an IRF asks how each of the remaining series might respond over times $(t+1):h$ if a focal series is given an innovation "shock" at time $t = 0$. `mvgam` can compute Generalized and Orthogonalized IRFs from models that included latent VAR dynamics. We simply feed the fitted model to the `irf()` function and then use the S3 `plot()` function to view the estimated responses. By default, `irf()` will compute IRFs by separately imposing positive shocks of one standard deviation to each series in the VAR process. Here we compute Generalized IRFs over a horizon of 12 timesteps:
+```{r}
+irfs <- irf(varcor_mod, h = 12)
+```
+
+Plot the expected responses of the remaining series to a positive shock for series 3 (Greens)
+```{r}
+plot(irfs, series = 3)
+```
+
+This series of plots makes it clear that some of the other series would be expected to show both instantaneous responses to a shock for the Greens (due to their correlated process errors) as well as delayed and nonlinear responses over time (due to the complex lagged dependence structure captured by the $A$ matrix). This hopefully makes it clear why IRFs are an important tool in the analysis of multivariate autoregressive models.
+
+### Comparing forecast scores
+
 But which model is better? We can compute the variogram score for out of sample forecasts to get a sense of which model does a better job of capturing the dependence structure in the true evaluation set:
 ```{r}
 # create forecast objects for each model
@@ -439,10 +450,12 @@ plot(diff_scores, pch = 16, cex = 1.25, col = 'darkred',
 abline(h = 0, lty = 'dashed')
 ```
 
-The models tend to provide similar forecasts, though the correlated error model does slightly better overall. We would probably need to use a more extensive rolling forecast evaluation exercise if we felt like we needed to only choose one for production. `mvgam` offers some utilities for doing this (i.e. see `?lfo_cv` for guidance).
+The models tend to provide similar forecasts, though the correlated error model does slightly better overall. We would probably need to use a more extensive rolling forecast evaluation exercise if we felt like we needed to only choose one for production. `mvgam` offers some utilities for doing this (i.e. see `?lfo_cv` for guidance). Alternatively, we could use forecasts from *both* models by creating an evenly-weighted ensemble forecast distribution. This capability is available using the `ensemble()` function in `mvgam` (see `?ensemble` for guidance).
 
-### Further reading
+## Further reading
 The following papers and resources offer a lot of useful material about multivariate State-Space models and how they can be applied in practice:
+  
+Auger‐Méthé, Marie, et al. ["A guide to state–space modeling of ecological time series.](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/ecm.1470)" *Ecological Monographs* 91.4 (2021): e01470.
   
 Heaps, Sarah E. "[Enforcing stationarity through the prior in vector autoregressions.](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648)" *Journal of Computational and Graphical Statistics* 32.1 (2023): 74-83.
   
@@ -451,8 +464,6 @@ Hannaford, Naomi E., et al. "[A sparse Bayesian hierarchical vector autoregressi
 Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. "[MARSS: multivariate autoregressive state-space models for analyzing time-series data.](https://journal.r-project.org/archive/2012/RJ-2012-002/index.html)" *R Journal*. 4.1 (2012): 11.
   
 Ward, Eric J., et al. "[Inferring spatial structure from time‐series data: using multivariate state‐space models to detect metapopulation structure of California sea lions in the Gulf of California, Mexico.](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/j.1365-2664.2009.01745.x)" *Journal of Applied Ecology* 47.1 (2010): 47-56.
-  
-Auger‐Méthé, Marie, et al. ["A guide to state–space modeling of ecological time series.](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/ecm.1470)" *Ecological Monographs* 91.4 (2021): e01470.
 
 ## Interested in contributing?
 I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au)
