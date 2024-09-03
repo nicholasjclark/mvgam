@@ -18,8 +18,6 @@
 \method{rhat}{mvgam}(x, pars = NULL, ...)
 
 \method{neff_ratio}{mvgam}(object, pars = NULL, ...)
-
-\method{neff_ratio}{mvgam}(object, pars = NULL, ...)
 }
 \arguments{
 \item{object, x}{A \code{mvgam} object.}

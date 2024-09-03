@@ -2,9 +2,7 @@
 #'
 #' Display conditional effects of one or more numeric and/or categorical
 #' predictors in `mvgam` models, including two-way interaction effects.
-#' @importFrom brms conditional_effects
 #' @importFrom ggplot2 scale_colour_discrete scale_fill_discrete theme_classic
-#' @importFrom marginaleffects plot_predictions
 #' @importFrom graphics plot
 #' @importFrom grDevices devAskNewPage
 #' @inheritParams brms::conditional_effects.brmsfit
@@ -218,6 +216,10 @@ conditional_effects.mvgam = function(x,
   class(out) <- 'mvgam_conditional_effects'
   return(out)
 }
+
+#' @export
+#' @importFrom brms conditional_effects
+brms::conditional_effects
 
 #' @rdname conditional_effects.mvgam
 #' @export

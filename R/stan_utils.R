@@ -41,6 +41,9 @@ print.mvgammodel = function(x, ...){
 
 #' @export
 #' @importFrom brms stancode
+brms::stancode
+
+#' @export
 #' @param ... ignored
 #' @rdname code
 stancode.mvgam_prefit = function(object, ...){
@@ -57,6 +60,9 @@ stancode.mvgam = function(object, ...){
 
 #' @export
 #' @importFrom brms standata
+brms::standata
+
+#' @export
 #' @param ... ignored
 #' @rdname code
 standata.mvgam_prefit = function(object, ...){

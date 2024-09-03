@@ -4,6 +4,7 @@
 * Added `standata.mvgam_prefit`, `stancode.mvgam` and `stancode.mvgam_prefit` methods for better alignment with 'brms' workflows
 * Added 'gratia' to *Enhancements* to allow popular methods such as `draw()` to be used for 'mvgam' models if 'gratia' is already installed
 * Added an `ensemble.mvgam_forecast` method to generate evenly weighted combinations of probabilistic forecast distributions
+* Added an `irf.mvgam` method to compute Generalized and Orthogonalized Impulse Response Functions (IRFs) from models fit with Vector Autoregressive dynamics
 
 ## Deprecations
 * The `drift` argument has been deprecated. It is now recommended for users to include parametric fixed effects of "time" in their respective GAM formulae to capture any expected drift effects

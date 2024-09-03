@@ -1254,6 +1254,22 @@ get_mvgam_priors = function(formula,
   return(out)
 }
 
+#' @export
+#' @importFrom brms prior
+brms::prior
+
+#' @export
+#' @importFrom brms prior_
+brms::prior_
+
+#' @export
+#' @importFrom brms set_prior
+brms::set_prior
+
+#' @export
+#' @importFrom brms prior_string
+brms::prior_string
+
 #' Use informative scale and intercept priors following brms example
 #' @importFrom stats mad qcauchy setNames
 #' @importFrom brms logm1 prior_string get_prior

@@ -46,6 +46,7 @@ extensive documentation for the \code{mgcv} package.
 \code{\link[mgcv]{jagam}},
 \code{\link[mgcv]{gam}},
 \code{\link[mgcv]{s}},
+\code{\link[brms]{gp}},
 \code{\link[stats]{formula}}
 }
 \author{

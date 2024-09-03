@@ -772,7 +772,7 @@ ppc.mvgam = function(object, newdata, data_test, series = 1, type = 'hist',
 #' predictions are generated for the original observations used for the model fit.
 #' @param ... Further arguments passed to \code{\link{predict.mvgam}}
 #'   as well as to the PPC function specified in \code{type}.
-#' @inheritParams prepare_predictions.brmsfit
+#' @inheritParams brms::prepare_predictions.brmsfit
 #'
 #' @return A ggplot object that can be further
 #'  customized using the \pkg{ggplot2} package.

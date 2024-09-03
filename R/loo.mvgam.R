@@ -144,6 +144,14 @@ loo_compare.mvgam <- function(x, ...,
   loo_compare(loos)
 }
 
+#' @export
+#' @importFrom loo loo
+loo::loo
+
+#' @export
+#' @importFrom loo loo_compare
+loo::loo_compare
+
 #'@noRd
 split_mod_dots = function (x, ..., model_names = NULL, other = TRUE) {
 
