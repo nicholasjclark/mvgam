@@ -110,7 +110,7 @@ mod <- mvgam(y ~ series,
              family = gaussian(),
              share_obs_params = TRUE,
              data = simdat$data_train,
-             silent = 1)
+             silent = 2)
 
 # Calulate stability metrics for this system
 metrics <- stability(mod)
