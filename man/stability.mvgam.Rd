@@ -7,7 +7,7 @@
 \usage{
 stability(object, ...)
 
-\method{stability}{mvgam}(object)
+\method{stability}{mvgam}(object, ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
@@ -17,7 +17,7 @@ that used a Vector Autoregressive latent process model (either as \code{VAR(cor 
 \item{...}{ignored}
 }
 \value{
-An \code{data.frame} containing posterior draws for each of the above stability metrics.
+A \code{data.frame} containing posterior draws for each of the above stability metrics.
 }
 \description{
 Compute reactivity, return rates and contributions of interactions to
@@ -58,9 +58,16 @@ matrix:
 \deqn{
     [2~det(A) (A^{-1})^T] \quad
     }
-\item \code{prop_cov}: Sensitivity of \eqn{\Sigma_{\infty}} to intra-series error correlations
+\item \code{prop_cov_offdiag}: Sensitivity of \eqn{\Sigma_{\infty}} to inter-series error correlations
 (i.e. how important are off-diagonal covariances in \eqn{\Sigma} for shaping
 \eqn{\Sigma_{\infty}}?), calculated as the relative magnitude of the \emph{off-diagonals} in
+the partial derivative matrix:
+\deqn{
+    [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] \quad
+    }
+\item \code{prop_cov_diag}: Sensitivity of \eqn{\Sigma_{\infty}} to intra-series error variances
+(i.e. how important are diagonal variances in \eqn{\Sigma} for shaping
+\eqn{\Sigma_{\infty}}?), calculated as the relative magnitude of the \emph{diagonals} in
 the partial derivative matrix:
 \deqn{
     [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] \quad
@@ -96,13 +103,14 @@ simdat <- sim_mvgam(family = gaussian(),
                     prop_trend = 1)
 plot_mvgam_series(data = simdat$data_train, series = 'all')
 
-# Fit a model that uses a latent VAR(1)
-mod <- mvgam(y ~ -1,
-             trend_formula = ~ 1,
+# Fit a State-Space VAR(1)
+mod <- mvgam(y ~ series,
+             trend_formula = ~ -1,
              trend_model = VAR(cor = TRUE),
              family = gaussian(),
+             share_obs_params = TRUE,
              data = simdat$data_train,
-             silent = 2)
+             silent = 1)
 
 # Calulate stability metrics for this system
 metrics <- stability(mod)
@@ -110,30 +118,61 @@ metrics <- stability(mod)
 # Proportion of stationary forecast distribution
 # attributable to lagged interactions
 hist(metrics$prop_int,
-  xlim = c(0, 1),
-  xlab = 'Prop_int',
-  main = '',
-  col = '#B97C7C',
-  border = 'white')
+     xlim = c(0, 1),
+     xlab = 'Prop_int',
+     main = '',
+     col = '#B97C7C',
+     border = 'white')
 
-# Proportion of stationary forecast distribution
-# attributable to correlated process errors
-hist(metrics$prop_env,
-  xlim = c(0, 1),
-  xlab = 'Prop_env',
-  main = '',
-  col = '#B97C7C',
-  border = 'white')
+# Within this contribution of interactions, how important
+# are inter-series interactions (offdiagonals of the A matrix) vs
+# intra-series density dependence (diagonals of the A matrix)?
+layout(matrix(1:2, nrow = 2))
+hist(metrics$prop_int_offdiag,
+     xlim = c(0, 1),
+     xlab = '',
+     main = 'Inter-series interactions',
+     col = '#B97C7C',
+     border = 'white')
+
+hist(metrics$prop_int_diag,
+     xlim = c(0, 1),
+     xlab = 'Contribution to interaction effect',
+     main = 'Intra-series interactions (density dependence)',
+     col = 'darkblue',
+     border = 'white')
+layout(1)
+
+# How important are inter-series error covariances
+# (offdiagonals of the Sigma matrix) vs
+# intra-series variances (diagonals of the Sigma matrix) for explaining
+# the variance of the stationary forecast distribution?
+layout(matrix(1:2, nrow = 2))
+hist(metrics$prop_cov_offdiag,
+     xlim = c(0, 1),
+     xlab = '',
+     main = 'Inter-series covariances',
+     col = '#B97C7C',
+     border = 'white')
+
+hist(metrics$prop_cov_diag,
+     xlim = c(0, 1),
+     xlab = 'Contribution to forecast variance',
+     main = 'Intra-series variances',
+     col = 'darkblue',
+     border = 'white')
+layout(1)
 
 # Reactivity, i.e. degree to which the system moves
 # away from a stable equilibrium following a perturbation
+# (values > 1 suggest a more reactive, less stable system)
 hist(metrics$reactivity,
-  main = '',
-  xlab = 'Reactivity',
-  col = '#B97C7C',
-  border = 'white',
-  xlim = c(-1*max(abs(metrics$reactivity)),
-          max(abs(metrics$reactivity))))
+     main = '',
+     xlab = 'Reactivity',
+     col = '#B97C7C',
+     border = 'white',
+     xlim = c(-1*max(abs(metrics$reactivity)),
+              max(abs(metrics$reactivity))))
 abline(v = 0, lwd = 2.5)
 }
 }
@@ -143,7 +182,7 @@ Estimating community stability and ecological interactions from time-series data
 Ecological Monographs. 73, 301-330.
 }
 \seealso{
-\code{\link{VAR}}
+\code{\link{VAR}},\code{\link{irf}}
 }
 \author{
 Nicholas J Clark

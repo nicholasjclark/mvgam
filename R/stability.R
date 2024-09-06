@@ -42,9 +42,16 @@
 #'     \deqn{
 #'     [2~det(A) (A^{-1})^T] \quad
 #'     }
-#'   \item `prop_cov`: Sensitivity of \eqn{\Sigma_{\infty}} to intra-series error correlations
+#'   \item `prop_cov_offdiag`: Sensitivity of \eqn{\Sigma_{\infty}} to inter-series error correlations
 #'    (i.e. how important are off-diagonal covariances in \eqn{\Sigma} for shaping
 #'    \eqn{\Sigma_{\infty}}?), calculated as the relative magnitude of the *off-diagonals* in
+#'    the partial derivative matrix:
+#'     \deqn{
+#'     [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] \quad
+#'     }
+#'   \item `prop_cov_diag`: Sensitivity of \eqn{\Sigma_{\infty}} to intra-series error variances
+#'    (i.e. how important are diagonal variances in \eqn{\Sigma} for shaping
+#'    \eqn{\Sigma_{\infty}}?), calculated as the relative magnitude of the *diagonals* in
 #'    the partial derivative matrix:
 #'     \deqn{
 #'     [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] \quad
@@ -70,12 +77,12 @@
 #'    }
 #'    Again, lower values suggest greater stability
 #'   }
-#'@return An \code{data.frame} containing posterior draws for each of the above stability metrics.
+#'@return A \code{data.frame} containing posterior draws for each of the above stability metrics.
 #'@references AR Ives, B Dennis, KL Cottingham & SR Carpenter (2003).
 #'Estimating community stability and ecological interactions from time-series data.
 #'Ecological Monographs. 73, 301-330.
 #'@author Nicholas J Clark
-#'@seealso \code{\link{VAR}}
+#'@seealso \code{\link{VAR}},\code{\link{irf}}
 #' @examples
 #' \donttest{
 #' # Simulate some time series that follow a latent VAR(1) process
@@ -85,13 +92,14 @@
 #'                     prop_trend = 1)
 #' plot_mvgam_series(data = simdat$data_train, series = 'all')
 #'
-#' # Fit a model that uses a latent VAR(1)
-#' mod <- mvgam(y ~ -1,
-#'              trend_formula = ~ 1,
+#' # Fit a State-Space VAR(1)
+#' mod <- mvgam(y ~ series,
+#'              trend_formula = ~ -1,
 #'              trend_model = VAR(cor = TRUE),
 #'              family = gaussian(),
+#'              share_obs_params = TRUE,
 #'              data = simdat$data_train,
-#'              silent = 2)
+#'              silent = 1)
 #'
 #' # Calulate stability metrics for this system
 #' metrics <- stability(mod)
@@ -99,30 +107,61 @@
 #' # Proportion of stationary forecast distribution
 #' # attributable to lagged interactions
 #' hist(metrics$prop_int,
-#'   xlim = c(0, 1),
-#'   xlab = 'Prop_int',
-#'   main = '',
-#'   col = '#B97C7C',
-#'   border = 'white')
+#'      xlim = c(0, 1),
+#'      xlab = 'Prop_int',
+#'      main = '',
+#'      col = '#B97C7C',
+#'      border = 'white')
 #'
-#' # Proportion of stationary forecast distribution
-#' # attributable to correlated process errors
-#' hist(metrics$prop_env,
-#'   xlim = c(0, 1),
-#'   xlab = 'Prop_env',
-#'   main = '',
-#'   col = '#B97C7C',
-#'   border = 'white')
+#' # Within this contribution of interactions, how important
+#' # are inter-series interactions (offdiagonals of the A matrix) vs
+#' # intra-series density dependence (diagonals of the A matrix)?
+#' layout(matrix(1:2, nrow = 2))
+#' hist(metrics$prop_int_offdiag,
+#'      xlim = c(0, 1),
+#'      xlab = '',
+#'      main = 'Inter-series interactions',
+#'      col = '#B97C7C',
+#'      border = 'white')
+#'
+#' hist(metrics$prop_int_diag,
+#'      xlim = c(0, 1),
+#'      xlab = 'Contribution to interaction effect',
+#'      main = 'Intra-series interactions (density dependence)',
+#'      col = 'darkblue',
+#'      border = 'white')
+#' layout(1)
+#'
+#' # How important are inter-series error covariances
+#' # (offdiagonals of the Sigma matrix) vs
+#' # intra-series variances (diagonals of the Sigma matrix) for explaining
+#' # the variance of the stationary forecast distribution?
+#' layout(matrix(1:2, nrow = 2))
+#' hist(metrics$prop_cov_offdiag,
+#'      xlim = c(0, 1),
+#'      xlab = '',
+#'      main = 'Inter-series covariances',
+#'      col = '#B97C7C',
+#'      border = 'white')
+#'
+#' hist(metrics$prop_cov_diag,
+#'      xlim = c(0, 1),
+#'      xlab = 'Contribution to forecast variance',
+#'      main = 'Intra-series variances',
+#'      col = 'darkblue',
+#'      border = 'white')
+#' layout(1)
 #'
 #' # Reactivity, i.e. degree to which the system moves
 #' # away from a stable equilibrium following a perturbation
+#' # (values > 1 suggest a more reactive, less stable system)
 #' hist(metrics$reactivity,
-#'   main = '',
-#'   xlab = 'Reactivity',
-#'   col = '#B97C7C',
-#'   border = 'white',
-#'   xlim = c(-1*max(abs(metrics$reactivity)),
-#'           max(abs(metrics$reactivity))))
+#'      main = '',
+#'      xlab = 'Reactivity',
+#'      col = '#B97C7C',
+#'      border = 'white',
+#'      xlim = c(-1*max(abs(metrics$reactivity)),
+#'               max(abs(metrics$reactivity))))
 #' abline(v = 0, lwd = 2.5)
 #' }
 #'@export
@@ -133,7 +172,7 @@ stability <- function(object, ...){
 #'@rdname stability.mvgam
 #'@method stability mvgam
 #'@export
-stability.mvgam = function(object){
+stability.mvgam = function(object, ...){
 
   # Check trend_model
   trend_model <- attr(object$model_data, 'trend_model')
@@ -172,14 +211,19 @@ stability.mvgam = function(object){
       # We can take partial derivatives to determine which elements of
       # Sigma_inf contribute most to rates of change in the
       # proportion of Sigma_inf that is due to process error
+      # Thanks to Mark Scheuerell for providing inspirational code
+      # https://github.com/mdscheuerell/safs-quant-sem-2022/blob/main/lwa_analysis.R
       int_env <- det(Sigma_inf) * t(solve(Sigma_inf))
 
       # Proportion of inter-series covariance to
       # to overall environmental variation contribution (i.e. how important are
       # correlated errors for controlling the shape of the stationary forecast
       # distribution?)
-      dat <- data.frame(prop_cov = mean(abs(int_env[lower.tri(int_env)])) /
+      dat <- data.frame(prop_cov_offdiag = mean(abs(int_env[lower.tri(int_env)])) /
                           (mean(abs(diag(int_env))) + mean(abs(int_env[lower.tri(int_env)]))))
+
+      # Proportion of error variances to stationary forecast distribution
+      dat$prop_cov_diag <- 1 - dat$prop_cov_offdiag
 
       # Proportion of volume of Sigma_inf attributable to series interactions,
       # measuring the degree to which interactions increase
