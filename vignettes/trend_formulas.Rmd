@@ -9,14 +9,16 @@ vignette: >
   %\VignetteIndexEntry{State-Space models in mvgam}
   %\VignetteEngine{knitr::rmarkdown}
   \usepackage[utf8]{inputenc}
+params:
+  EVAL: !r identical(tolower(Sys.getenv("NOT_CRAN")), "true")
 ---
 ```{r, echo = FALSE} 
-NOT_CRAN <- identical(tolower(Sys.getenv("NOT_CRAN")), "true")
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  purl = NOT_CRAN,
-  eval = NOT_CRAN
+  message = FALSE,
+  warning = FALSE,
+  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
 )
 ```
 
@@ -459,7 +461,7 @@ Auger‐Méthé, Marie, et al. ["A guide to state–space modeling of ecological
   
 Heaps, Sarah E. "[Enforcing stationarity through the prior in vector autoregressions.](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648)" *Journal of Computational and Graphical Statistics* 32.1 (2023): 74-83.
   
-Hannaford, Naomi E., et al. "[A sparse Bayesian hierarchical vector autoregressive model for microbial dynamics in a wastewater treatment plant.](https://www.sciencedirect.com/science/article/pii/S0167947322002390)" *Computational Statistics & Data Analysis* 179 (2023): 107659.
+Hannaford, Naomi E., et al. "[A sparse Bayesian hierarchical vector autoregressive model for microbial dynamics in a wastewater treatment plant.](https://doi.org/10.1016/j.csda.2022.107659)" *Computational Statistics & Data Analysis* 179 (2023): 107659.
   
 Holmes, Elizabeth E., Eric J. Ward, and Wills Kellie. "[MARSS: multivariate autoregressive state-space models for analyzing time-series data.](https://journal.r-project.org/archive/2012/RJ-2012-002/index.html)" *R Journal*. 4.1 (2012): 11.
   

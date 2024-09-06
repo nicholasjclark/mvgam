@@ -1,10 +1,13 @@
-## ----echo = FALSE-------------------------------------------------------------
-NOT_CRAN <- identical(tolower(Sys.getenv("NOT_CRAN")), "true")
+params <-
+list(EVAL = TRUE)
+
+## ---- echo = FALSE------------------------------------------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  purl = NOT_CRAN,
-  eval = NOT_CRAN
+  message = FALSE,
+  warning = FALSE,
+  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
 )
 
 
@@ -30,7 +33,7 @@ beta_temp <- mvgam:::sim_gp(rnorm(1),
                             h = N) + 0.5
 
 
-## ----fig.alt = "Simulating time-varying effects in mvgam and R"---------------
+## ---- fig.alt = "Simulating time-varying effects in mvgam and R"--------------
 plot(beta_temp, type = 'l', lwd = 3, 
      bty = 'l', xlab = 'Time', ylab = 'Coefficient',
      col = 'darkred')
@@ -41,7 +44,7 @@ box(bty = 'l', lwd = 2)
 temp <- rnorm(N, sd = 1)
 
 
-## ----fig.alt = "Simulating time-varying effects in mvgam and R"---------------
+## ---- fig.alt = "Simulating time-varying effects in mvgam and R"--------------
 out <- rnorm(N, mean = 4 + beta_temp * temp,
              sd = 0.25)
 time <- seq_along(temp)
@@ -57,14 +60,14 @@ data_train <- data[1:190,]
 data_test <- data[191:200,]
 
 
-## ----include=FALSE------------------------------------------------------------
+## ---- include=FALSE-----------------------------------------------------------
 mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
              family = gaussian(),
              data = data_train,
              silent = 2)
 
 
-## ----eval=FALSE---------------------------------------------------------------
+## ---- eval=FALSE--------------------------------------------------------------
 ## mod <- mvgam(out ~ dynamic(temp, rho = 8, stationary = TRUE, k = 40),
 ##              family = gaussian(),
 ##              data = data_train,
@@ -249,7 +252,7 @@ sum(lfo_mod0$elpds)
 sum(lfo_mod1$elpds)
 
 
-## ----fig.alt = "Comparing forecast skill for dynamic beta regression models in mvgam and R"----
+## ---- fig.alt = "Comparing forecast skill for dynamic beta regression models in mvgam and R"----
 plot(x = 1:length(lfo_mod0$elpds) + 30,
      y = lfo_mod0$elpds - lfo_mod1$elpds,
      ylab = 'ELPDmod0 - ELPDmod1',

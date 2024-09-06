@@ -9,14 +9,16 @@ vignette: >
   %\VignetteIndexEntry{Forecasting and forecast evaluation in mvgam}
   %\VignetteEngine{knitr::rmarkdown}
   \usepackage[utf8]{inputenc}
+params:
+  EVAL: !r identical(tolower(Sys.getenv("NOT_CRAN")), "true")
 ---
 ```{r, echo = FALSE} 
-NOT_CRAN <- identical(tolower(Sys.getenv("NOT_CRAN")), "true")
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  purl = NOT_CRAN,
-  eval = NOT_CRAN
+  message = FALSE,
+  warning = FALSE,
+  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
 )
 ```
 

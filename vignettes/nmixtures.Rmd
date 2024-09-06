@@ -9,14 +9,16 @@ vignette: >
   %\VignetteIndexEntry{N-mixtures in mvgam}
   %\VignetteEngine{knitr::rmarkdown}
   \usepackage[utf8]{inputenc}
+params:
+  EVAL: !r identical(tolower(Sys.getenv("NOT_CRAN")), "true")
 ---
 ```{r, echo = FALSE} 
-NOT_CRAN <- identical(tolower(Sys.getenv("NOT_CRAN")), "true")
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  purl = NOT_CRAN,
-  eval = NOT_CRAN
+  message = FALSE,
+  warning = FALSE,
+  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
 )
 ```
 
@@ -302,7 +304,7 @@ We can see that estimates for both species have correctly captured the true temp
 
 ## Example 2: a larger survey with possible nonlinear effects
 
-Now for another example with a larger dataset. We will use data from [Jeff Doser's simulation example from the wonderful `spAbundance` package](https://www.jeffdoser.com/files/spabundance-web/articles/nmixturemodels){target="_blank"}. The simulated data include one continuous site-level covariate, one factor site-level covariate and two continuous sample-level covariates. This example will allow us to examine how we can include possibly nonlinear effects in the latent process and detection probability models.
+Now for another example with a larger dataset. We will use data from [Jeff Doser's simulation example from the wonderful `spAbundance` package](https://doserlab.com/files/spabundance-web/articles/nmixturemodels){target="_blank"}. The simulated data include one continuous site-level covariate, one factor site-level covariate and two continuous sample-level covariates. This example will allow us to examine how we can include possibly nonlinear effects in the latent process and detection probability models.
   
 Download the data and grab observations / covariate measurements for one species
 ```{r}
@@ -501,7 +503,7 @@ The following papers and resources offer useful material about N-mixture models 
   
 Guélat, Jérôme, and Kéry, Marc. “[Effects of Spatial Autocorrelation and Imperfect Detection on Species Distribution Models.](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.12983)” *Methods in Ecology and Evolution* 9 (2018): 1614–25.
   
-Kéry, Marc, and Royle Andrew J. "[Applied hierarchical modeling in ecology: Analysis of distribution, abundance and species richness in R and BUGS: Volume 2: Dynamic and advanced models](https://www.sciencedirect.com/book/9780128237687/applied-hierarchical-modeling-in-ecology-analysis-of-distribution-abundance-and-species-richness-in-r-and-bugs)". London, UK: Academic Press (2020).
+Kéry, Marc, and Royle Andrew J. "[Applied hierarchical modeling in ecology: Analysis of distribution, abundance and species richness in R and BUGS: Volume 2: Dynamic and advanced models](https://shop.elsevier.com/books/applied-hierarchical-modeling-in-ecology-analysis-of-distribution-abundance-and-species-richness-in-r-and-bugs/kery/978-0-12-809585-0)". London, UK: Academic Press (2020).
   
 Royle, Andrew J. "[N‐mixture models for estimating population size from spatially replicated counts.](https://onlinelibrary.wiley.com/doi/full/10.1111/j.0006-341X.2004.00142.x)" *Biometrics* 60.1 (2004): 108-115.
 

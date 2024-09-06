@@ -9,21 +9,23 @@ vignette: >
   %\VignetteIndexEntry{N-mixtures in mvgam}
   %\VignetteEngine{knitr::rmarkdown}
   \usepackage[utf8]{inputenc}
+params:
+  EVAL: !r identical(tolower(Sys.getenv("NOT_CRAN")), "true")
 ---
 ```{r, echo = FALSE} 
-NOT_CRAN <- identical(tolower(Sys.getenv("NOT_CRAN")), "true")
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  purl = NOT_CRAN,
-  eval = NOT_CRAN
+  message = FALSE,
+  warning = FALSE,
+  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
 )
 ```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE,
-  dpi = 150,
+  dpi = 100,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
@@ -229,7 +231,7 @@ plot(mod, type = 'smooths', trend_effects = TRUE)
 
 `marginaleffects` support allows for more useful prediction-based interrogations on different scales (though note that at the time of writing this Vignette, you must have the development version of `marginaleffects` installed for `nmix()` models to be supported; use `remotes::install_github('vincentarelbundock/marginaleffects')` to install). Objects that use family `nmix()` have a few additional prediction scales that can be used (i.e. `link`, `response`, `detection` or `latent_N`). For example, here are the estimated detection probabilities per species, which show that the model has done a nice job of estimating these parameters:
 ```{r}
-plot_predictions(mod, condition = 'species',
+marginaleffects::plot_predictions(mod, condition = 'species',
                  type = 'detection') +
   ylab('Pr(detection)') +
   ylim(c(0, 1)) +
@@ -302,7 +304,7 @@ We can see that estimates for both species have correctly captured the true temp
 
 ## Example 2: a larger survey with possible nonlinear effects
 
-Now for another example with a larger dataset. We will use data from [Jeff Doser's simulation example from the wonderful `spAbundance` package](https://www.jeffdoser.com/files/spabundance-web/articles/nmixturemodels){target="_blank"}. The simulated data include one continuous site-level covariate, one factor site-level covariate and two continuous sample-level covariates. This example will allow us to examine how we can include possibly nonlinear effects in the latent process and detection probability models.
+Now for another example with a larger dataset. We will use data from [Jeff Doser's simulation example from the wonderful `spAbundance` package](https://doserlab.com/files/spabundance-web/articles/nmixturemodels){target="_blank"}. The simulated data include one continuous site-level covariate, one factor site-level covariate and two continuous sample-level covariates. This example will allow us to examine how we can include possibly nonlinear effects in the latent process and detection probability models.
   
 Download the data and grab observations / covariate measurements for one species
 ```{r}
@@ -440,7 +442,7 @@ summary(mod, include_betas = FALSE)
 
 Again we can make use of `marginaleffects` support for interrogating the model through targeted predictions. First, we can inspect the estimated average detection probability
 ```{r}
-avg_predictions(mod, type = 'detection')
+marginaleffects::avg_predictions(mod, type = 'detection')
 ```
 
 Next investigate estimated effects of covariates on latent abundance using the `conditional_effects()` function and specifying `type = 'link'`; this will return plots on the expectation scale
@@ -485,8 +487,8 @@ More targeted predictions are also easy with `marginaleffects` support. For exam
 ```{r}
 fivenum_round = function(x)round(fivenum(x, na.rm = TRUE), 2)
 
-plot_predictions(mod, 
-                 newdata = datagrid(det_cov = unique,
+marginaleffects::plot_predictions(mod, 
+                 newdata = marginaleffects::datagrid(det_cov = unique,
                                     det_cov2 = fivenum_round),
                  by = c('det_cov', 'det_cov2'),
                  type = 'detection') +
@@ -501,7 +503,7 @@ The following papers and resources offer useful material about N-mixture models 
   
 Guélat, Jérôme, and Kéry, Marc. “[Effects of Spatial Autocorrelation and Imperfect Detection on Species Distribution Models.](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.12983)” *Methods in Ecology and Evolution* 9 (2018): 1614–25.
   
-Kéry, Marc, and Royle Andrew J. "[Applied hierarchical modeling in ecology: Analysis of distribution, abundance and species richness in R and BUGS: Volume 2: Dynamic and advanced models](https://www.sciencedirect.com/book/9780128237687/applied-hierarchical-modeling-in-ecology-analysis-of-distribution-abundance-and-species-richness-in-r-and-bugs)". London, UK: Academic Press (2020).
+Kéry, Marc, and Royle Andrew J. "[Applied hierarchical modeling in ecology: Analysis of distribution, abundance and species richness in R and BUGS: Volume 2: Dynamic and advanced models](https://shop.elsevier.com/books/applied-hierarchical-modeling-in-ecology-analysis-of-distribution-abundance-and-species-richness-in-r-and-bugs/kery/978-0-12-809585-0)". London, UK: Academic Press (2020).
   
 Royle, Andrew J. "[N‐mixture models for estimating population size from spatially replicated counts.](https://onlinelibrary.wiley.com/doi/full/10.1111/j.0006-341X.2004.00142.x)" *Biometrics* 60.1 (2004): 108-115.
 

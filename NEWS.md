@@ -1,4 +1,8 @@
-# mvgam 1.1.3 (development version; not yet on CRAN)
+# mvgam 1.1.4 (development version; not yet on CRAN)
+## New functionalities
+* Added a `stability.mvgam` method to compute stability metrics from models fit with Vector Autoregressive dynamics (#21)
+
+# mvgam 1.1.3
 ## New functionalities
 * Allow intercepts to be included in process models when `trend_formula` is supplied. This breaks the assumption that the process has to be zero-centred, adding more modelling flexibility but also potentially inducing nonidentifiabilities with respect to any observation model intercepts. Thoughtful priors are a must for these models
 * Added `standata.mvgam_prefit`, `stancode.mvgam` and `stancode.mvgam_prefit` methods for better alignment with 'brms' workflows

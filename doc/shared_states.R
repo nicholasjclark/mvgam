@@ -1,10 +1,13 @@
-## ----echo = FALSE-------------------------------------------------------------
-NOT_CRAN <- identical(tolower(Sys.getenv("NOT_CRAN")), "true")
+params <-
+list(EVAL = TRUE)
+
+## ---- echo = FALSE------------------------------------------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  purl = NOT_CRAN,
-  eval = NOT_CRAN
+  message = FALSE,
+  warning = FALSE,
+  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
 )
 
 
@@ -180,7 +183,7 @@ mod <- mvgam(formula =
              trend_formula =
                # formula for the latent signal, which can depend
                # nonlinearly on productivity
-               ~ s(productivity, k = 8),
+               ~ s(productivity, k = 8) - 1,
              
              trend_model =
                # in addition to productivity effects, the signal is
@@ -218,7 +221,7 @@ mod <- mvgam(formula =
 ##              trend_formula =
 ##                # formula for the latent signal, which can depend
 ##                # nonlinearly on productivity
-##                ~ s(productivity, k = 8),
+##                ~ s(productivity, k = 8) - 1,
 ## 
 ##              trend_model =
 ##                # in addition to productivity effects, the signal is

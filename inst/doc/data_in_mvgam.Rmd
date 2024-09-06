@@ -9,22 +9,23 @@ vignette: >
   %\VignetteIndexEntry{Formatting data for use in mvgam}
   %\VignetteEngine{knitr::rmarkdown}
   \usepackage[utf8]{inputenc}
+params:
+  EVAL: !r identical(tolower(Sys.getenv("NOT_CRAN")), "true")
 ---
-
 ```{r, echo = FALSE} 
-NOT_CRAN <- identical(tolower(Sys.getenv("NOT_CRAN")), "true")
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  purl = NOT_CRAN,
-  eval = NOT_CRAN
+  message = FALSE,
+  warning = FALSE,
+  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
 )
 ```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = TRUE,   
-  dpi = 150,
+  dpi = 100,
   fig.asp = 0.8,
   fig.width = 6,
   out.width = "60%",
@@ -66,7 +67,7 @@ summary(glm(y ~ series + time,
 ```
 
 ```{r}
-summary(gam(y ~ series + s(time, by = series),
+summary(mgcv::gam(y ~ series + s(time, by = series),
             data = simdat$data_train,
             family = poisson()))
 ```
@@ -82,7 +83,7 @@ gauss_dat
 
 A call to `gam` using the `mgcv` package leads to a model that actually fits (though it does give an unhelpful warning message):
 ```{r}
-gam(outcome ~ time,
+mgcv::gam(outcome ~ time,
     family = betar(),
     data = gauss_dat)
 ```

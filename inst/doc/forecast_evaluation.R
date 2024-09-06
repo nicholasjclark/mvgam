@@ -1,10 +1,13 @@
-## ----echo = FALSE-------------------------------------------------------------
-NOT_CRAN <- identical(tolower(Sys.getenv("NOT_CRAN")), "true")
+params <-
+list(EVAL = TRUE)
+
+## ---- echo = FALSE------------------------------------------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  purl = NOT_CRAN,
-  eval = NOT_CRAN
+  message = FALSE,
+  warning = FALSE,
+  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
 )
 
 
@@ -35,12 +38,12 @@ simdat <- sim_mvgam(T = 100,
 str(simdat)
 
 
-## ----fig.alt = "Plotting time series features for GAM models in mvgam"--------
+## ---- fig.alt = "Plotting time series features for GAM models in mvgam"-------
 plot_mvgam_series(data = simdat$data_train, 
                   series = 'all')
 
 
-## ----fig.alt = "Plotting time series features for GAM models in mvgam"--------
+## ---- fig.alt = "Plotting time series features for GAM models in mvgam"-------
 plot_mvgam_series(data = simdat$data_train, 
                   newdata = simdat$data_test,
                   series = 1)
@@ -67,7 +70,7 @@ mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 8) +
 summary(mod1, include_betas = FALSE)
 
 
-## ----fig.alt = "Plotting GAM smooth functions using mvgam"--------------------
+## ---- fig.alt = "Plotting GAM smooth functions using mvgam"-------------------
 conditional_effects(mod1, type = 'link')
 
 
@@ -96,15 +99,15 @@ mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) +
 summary(mod2, include_betas = FALSE)
 
 
-## ----fig.alt = "Summarising latent Gaussian Process parameters in mvgam"------
+## ---- fig.alt = "Summarising latent Gaussian Process parameters in mvgam"-----
 mcmc_plot(mod2, variable = c('alpha_gp'), regex = TRUE, type = 'areas')
 
 
-## ----fig.alt = "Summarising latent Gaussian Process parameters in mvgam"------
+## ---- fig.alt = "Summarising latent Gaussian Process parameters in mvgam"-----
 mcmc_plot(mod2, variable = c('rho_gp'), regex = TRUE, type = 'areas')
 
 
-## ----fig.alt = "Plotting latent Gaussian Process effects in mvgam and marginaleffects"----
+## ---- fig.alt = "Plotting latent Gaussian Process effects in mvgam and marginaleffects"----
 conditional_effects(mod2, type = 'link')
 
 
