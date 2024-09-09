@@ -22,6 +22,10 @@ expect_loo <- function(object, ...) {
   testthat::expect_true(is(object, "psis_loo"), ...)
 }
 
+expect_range <- function(object, lower = -Inf, upper = Inf, ...) {
+  testthat::expect_true(all(object >= lower & object <= upper), ...)
+}
+
 SM <- suppressMessages
 SW <- suppressWarnings
 

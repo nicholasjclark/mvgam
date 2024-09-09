@@ -35,6 +35,15 @@ test_that("residuals() gives correct dimensions", {
                               summary = FALSE)))
 })
 
+test_that("stability() gives correct outputs", {
+
+  metrics <- stability(mvgam:::mvgam_example3)
+  expect_range(metrics$prop_int_offdiag, lower = 0, upper = 1)
+  expect_range(metrics$prop_int_diag, lower = 0, upper = 1)
+  expect_range(metrics$prop_cov_offdiag, lower = 0, upper = 1)
+  expect_range(metrics$prop_cov_diag, lower = 0, upper = 1)
+})
+
 test_that("variable extraction works correctly", {
   expect_true(inherits(as.matrix(mvgam:::mvgam_example4,
                                  'A', regex = TRUE),
