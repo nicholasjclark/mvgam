@@ -39,7 +39,8 @@ generates a positive "shock" for a target process at time \code{t = 0} and then
 calculates how  each of the remaining processes in the latent VAR are expected
 to respond over the forecast horizon \code{h}. The function computes IRFs for all
 processes in the object and returns them in an array that can be plotted using
-the S3 \code{plot} function
+the S3 \code{plot} function. To inspect community-level metrics of stability using latent
+VAR processes, you can use the related \code{\link{stability}} function.
 }
 \examples{
 \donttest{
@@ -67,8 +68,13 @@ plot(irfs, series = 2)
 plot(irfs, series = 3)
 }
 }
+\references{
+PH Pesaran & Shin Yongcheol (1998).
+Generalized impulse response analysis in linear multivariate models.
+Economics Letters 58: 17–29.
+}
 \seealso{
-\code{\link{VAR}}, \code{\link{plot.mvgam_irf}}
+\code{\link{VAR}}, \code{\link{plot.mvgam_irf}}, \code{\link{stability}}
 }
 \author{
 Nicholas J Clark

@@ -36,12 +36,25 @@ test_that("residuals() gives correct dimensions", {
 })
 
 test_that("stability() gives correct outputs", {
-
   metrics <- stability(mvgam:::mvgam_example3)
   expect_range(metrics$prop_int_offdiag, lower = 0, upper = 1)
   expect_range(metrics$prop_int_diag, lower = 0, upper = 1)
   expect_range(metrics$prop_cov_offdiag, lower = 0, upper = 1)
   expect_range(metrics$prop_cov_diag, lower = 0, upper = 1)
+})
+
+test_that("irf() gives correct outputs", {
+  irfs <- irf(mvgam:::mvgam_example3, h = 12)
+  expect_true(length(irfs) == 30)
+  expect_true(NROW(irfs[[1]]$process_1) == 12)
+  expect_no_error(plot(irfs))
+
+  irfs <- irf(mvgam:::mvgam_example3,
+              h = 6,
+              cumulative = TRUE, orthogonal = TRUE)
+  expect_true(length(irfs) == 30)
+  expect_true(NROW(irfs[[1]]$process_1) == 6)
+  expect_no_error(plot(irfs))
 })
 
 test_that("variable extraction works correctly", {

@@ -19,11 +19,15 @@
 #'calculates how  each of the remaining processes in the latent VAR are expected
 #'to respond over the forecast horizon `h`. The function computes IRFs for all
 #'processes in the object and returns them in an array that can be plotted using
-#'the S3 `plot` function
+#'the S3 `plot` function. To inspect community-level metrics of stability using latent
+#'VAR processes, you can use the related \code{\link{stability}} function.
 #'@return An object of class \code{mvgam_irf} containing the posterior IRFs. This
 #'object can be used with the supplied S3 functions \code{plot}
 #'@author Nicholas J Clark
-#'@seealso \code{\link{VAR}}, \code{\link{plot.mvgam_irf}}
+#'@references PH Pesaran & Shin Yongcheol (1998).
+#'Generalized impulse response analysis in linear multivariate models.
+#'Economics Letters 58: 17–29.
+#'@seealso \code{\link{VAR}}, \code{\link{plot.mvgam_irf}}, \code{\link{stability}}
 #' @examples
 #' \donttest{
 #' # Simulate some time series that follow a latent VAR(1) process
@@ -71,6 +75,11 @@ irf.mvgam <- function(object,
   beta_vars <- mcmc_chains(object$model_output, 'A')
   sigmas <- mcmc_chains(object$model_output, 'Sigma')
   n_series <- object$n_lv
+
+  if(is.null(n_series)){
+    n_series <- nlevels(object$obs_data$series)
+  }
+
   all_irfs <- lapply(seq_len(NROW(beta_vars)), function(draw){
 
     # Get necessary VAR parameters into a simple list format

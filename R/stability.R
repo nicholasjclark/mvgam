@@ -29,28 +29,28 @@
 #'     \deqn{
 #'     det(A)^{2/p} \quad
 #'     }
-#'    \item `prop_int_offdiag`: Sensitivity of `prop_int` to intra-series
+#'    \item `prop_int_offdiag`: Sensitivity of `prop_int` to inter-series
 #'    interactions (i.e. how important are the off-diagonals of the autoregressive coefficient
 #'    matrix \eqn{A} for shaping `prop_int`?), calculated as the relative magnitude of the *off-diagonals* in
 #'    the partial derivative matrix:
 #'     \deqn{
 #'     [2~det(A) (A^{-1})^T] \quad
 #'     }
-#'    \item `prop_int_diag`: Sensitivity of `prop_int` to inter-series
+#'    \item `prop_int_diag`: Sensitivity of `prop_int` to intra-series
 #'    interactions (i.e. how important are the diagonals of the autoregressive coefficient matrix \eqn{A}
 #'    for shaping `prop_int`?), calculated as the relative magnitude of the *diagonals* in the partial derivative
 #'    matrix:
 #'     \deqn{
 #'     [2~det(A) (A^{-1})^T] \quad
 #'     }
-#'   \item `prop_cov_offdiag`: Sensitivity of \eqn{\Sigma_{\infty}} to intra-series error correlations
+#'   \item `prop_cov_offdiag`: Sensitivity of \eqn{\Sigma_{\infty}} to inter-series error correlations
 #'    (i.e. how important are off-diagonal covariances in \eqn{\Sigma} for shaping
 #'    \eqn{\Sigma_{\infty}}?), calculated as the relative magnitude of the *off-diagonals* in
 #'    the partial derivative matrix:
 #'     \deqn{
 #'     [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] \quad
 #'     }
-#'   \item `prop_cov_diag`: Sensitivity of \eqn{\Sigma_{\infty}} to inter-series error variances
+#'   \item `prop_cov_diag`: Sensitivity of \eqn{\Sigma_{\infty}} to error variances
 #'    (i.e. how important are diagonal variances in \eqn{\Sigma} for shaping
 #'    \eqn{\Sigma_{\infty}}?), calculated as the relative magnitude of the *diagonals* in
 #'    the partial derivative matrix:
@@ -58,8 +58,8 @@
 #'     [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] \quad
 #'     }
 #'    \item `reactivity`: A measure of the degree to which the system moves
-#'    away from a stable equilibrium following a perturbation
-#'    values `> 0` suggest the system is reactive, whereby a
+#'    away from a stable equilibrium following a perturbation.
+#'    Values `> 0` suggest the system is reactive, whereby a
 #'    perturbation of the system in one period can be amplified in the next period. If
 #'    \eqn{\sigma_{max}(A)} is the largest singular value of \eqn{A}, then reactivity is defined as:
 #'     \deqn{
@@ -78,9 +78,13 @@
 #'    }
 #'    Again, lower values suggest greater stability
 #'   }
-#' To more directly inspect possible interactions among the time series in a latent VAR process,
-#' you can inspect Generalized Orthogonalized Impulse Response Functions using the \code{\link{irf}} function.
-#'@return An \code{data.frame} containing posterior draws for each stability metric.
+#' Major advantages of using \pkg{mvgam} to compute these metrics are that well-calibrated uncertainties are
+#' available and that VAR processes are forced to be stationary. These properties make it simple and
+#' insightful to calculate and inspect aspects of both long-term and short-term stability.
+#' But it is also possible to more directly inspect possible interactions among the
+#' time series in a latent VAR process. To do so, you can calculate and plot
+#' Generalized or Orthogonalized Impulse Response Functions using the \code{\link{irf}} function.
+#'@return A \code{data.frame} containing posterior draws for each stability metric.
 #'@references AR Ives, B Dennis, KL Cottingham & SR Carpenter (2003).
 #'Estimating community stability and ecological interactions from time-series data.
 #'Ecological Monographs. 73, 301-330.
