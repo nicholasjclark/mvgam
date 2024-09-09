@@ -72,7 +72,7 @@ stationary forecast variance from
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">stability</span><span class="op">(</span><span class="va">object</span>, <span class="va">...</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># S3 method for mvgam</span></span>
-<span><span class="fu">stability</span><span class="op">(</span><span class="va">object</span>, <span class="va">...</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">stability</span><span class="op">(</span><span class="va">object</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -91,12 +91,13 @@ that used a Vector Autoregressive latent process model (either as <code>VAR(cor 
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>A <code>data.frame</code> containing posterior draws for each of the above stability metrics.</p>
+<p>An <code>data.frame</code> containing posterior draws for each stability metric.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>These measures of stability can be used to assess how systems respond to
-environmental perturbations. Using the formula for a latent VAR(1) as:
+    <p>These measures of stability can be used to assess how important inter-series
+dependencies are to the variability of a multivariate system and to ask how systems
+are expected to respond to environmental perturbations. Using the formula for a latent VAR(1) as:
 $$
 \mu_t \sim \text{MVNormal}(A(\mu_{t - 1}), \Sigma) \quad
 $$
@@ -107,8 +108,8 @@ interaction coefficients in \(A\) for explaining the shape of the stationary for
 $$
     det(A)^2 \quad
     $$</p></li>
-<li><p><code>prop_int_adj</code>: Same as <code>prop_int</code> but scaled by the number of series to facilitate
-direct comparisons among systems with different numbers of interacting variables \(p\):
+<li><p><code>prop_int_adj</code>: Same as <code>prop_int</code> but scaled by the number of series \(p\) to facilitate
+direct comparisons among systems with different numbers of interacting variables:
 $$
     det(A)^{2/p} \quad
     $$</p></li>
@@ -126,16 +127,9 @@ matrix:
 $$
     [2~det(A) (A^{-1})^T] \quad
     $$</p></li>
-<li><p><code>prop_cov_offdiag</code>: Sensitivity of \(\Sigma_{\infty}\) to inter-series error correlations
+<li><p><code>prop_cov</code>: Sensitivity of \(\Sigma_{\infty}\) to intra-series error correlations
 (i.e. how important are off-diagonal covariances in \(\Sigma\) for shaping
 \(\Sigma_{\infty}\)?), calculated as the relative magnitude of the <em>off-diagonals</em> in
-the partial derivative matrix:
-$$
-    [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] \quad
-    $$</p></li>
-<li><p><code>prop_cov_diag</code>: Sensitivity of \(\Sigma_{\infty}\) to intra-series error variances
-(i.e. how important are diagonal variances in \(\Sigma\) for shaping
-\(\Sigma_{\infty}\)?), calculated as the relative magnitude of the <em>diagonals</em> in
 the partial derivative matrix:
 $$
     [2~det(\Sigma_{\infty}) (\Sigma_{\infty}^{-1})^T] \quad
@@ -160,7 +154,9 @@ $$
    max(\lambda_{A \otimes{A}}) \quad
    $$
 Again, lower values suggest greater stability</p></li>
-</ul></div>
+</ul><p>To more directly inspect possible interactions among the time series in a latent VAR process,
+you can inspect Generalized Orthogonalized Impulse Response Functions using the <code><a href="irf.mvgam.html">irf</a></code> function.</p>
+    </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
     <p>AR Ives, B Dennis, KL Cottingham &amp; SR Carpenter (2003).
@@ -169,7 +165,7 @@ Ecological Monographs. 73, 301-330.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="RW.html">VAR</a></code>,<code><a href="irf.mvgam.html">irf</a></code></p></div>
+    <div class="dont-index"><p><code><a href="RW.html">VAR</a></code>, <code><a href="irf.mvgam.html">irf</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -187,14 +183,26 @@ Ecological Monographs. 73, 301-330.</p>
 <span class="r-in"><span><span class="fu"><a href="plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="stability.mvgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Fit a State-Space VAR(1)</span></span></span>
-<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">series</span>,</span></span>
-<span class="r-in"><span>             trend_formula <span class="op">=</span> <span class="op">~</span> <span class="op">-</span><span class="fl">1</span>,</span></span>
+<span class="r-in"><span><span class="co"># Fit a model that uses a latent VAR(1)</span></span></span>
+<span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="op">-</span><span class="fl">1</span>,</span></span>
+<span class="r-in"><span>             trend_formula <span class="op">=</span> <span class="op">~</span> <span class="fl">1</span>,</span></span>
 <span class="r-in"><span>             trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">VAR</a></span><span class="op">(</span>cor <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>             share_obs_params <span class="op">=</span> <span class="cn">TRUE</span>,</span></span>
 <span class="r-in"><span>             data <span class="op">=</span> <span class="va">simdat</span><span class="op">$</span><span class="va">data_train</span>,</span></span>
 <span class="r-in"><span>             silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpuihtV8/model-49f85c41daa.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Calulate stability metrics for this system</span></span></span>
 <span class="r-in"><span><span class="va">metrics</span> <span class="op">&lt;-</span> <span class="fu">stability</span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
@@ -202,66 +210,34 @@ Ecological Monographs. 73, 301-330.</p>
 <span class="r-in"><span><span class="co"># Proportion of stationary forecast distribution</span></span></span>
 <span class="r-in"><span><span class="co"># attributable to lagged interactions</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html" class="external-link">hist</a></span><span class="op">(</span><span class="va">metrics</span><span class="op">$</span><span class="va">prop_int</span>,</span></span>
-<span class="r-in"><span>     xlim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>     xlab <span class="op">=</span> <span class="st">'Prop_int'</span>,</span></span>
-<span class="r-in"><span>     main <span class="op">=</span> <span class="st">''</span>,</span></span>
-<span class="r-in"><span>     col <span class="op">=</span> <span class="st">'#B97C7C'</span>,</span></span>
-<span class="r-in"><span>     border <span class="op">=</span> <span class="st">'white'</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  xlim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  xlab <span class="op">=</span> <span class="st">'Prop_int'</span>,</span></span>
+<span class="r-in"><span>  main <span class="op">=</span> <span class="st">''</span>,</span></span>
+<span class="r-in"><span>  col <span class="op">=</span> <span class="st">'#B97C7C'</span>,</span></span>
+<span class="r-in"><span>  border <span class="op">=</span> <span class="st">'white'</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="stability.mvgam-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Within this contribution of interactions, how important</span></span></span>
-<span class="r-in"><span><span class="co"># are inter-series interactions (offdiagonals of the A matrix) vs</span></span></span>
-<span class="r-in"><span><span class="co"># intra-series density dependence (diagonals of the A matrix)?</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span>, nrow <span class="op">=</span> <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html" class="external-link">hist</a></span><span class="op">(</span><span class="va">metrics</span><span class="op">$</span><span class="va">prop_int_offdiag</span>,</span></span>
-<span class="r-in"><span>     xlim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>     xlab <span class="op">=</span> <span class="st">''</span>,</span></span>
-<span class="r-in"><span>     main <span class="op">=</span> <span class="st">'Inter-series interactions'</span>,</span></span>
-<span class="r-in"><span>     col <span class="op">=</span> <span class="st">'#B97C7C'</span>,</span></span>
-<span class="r-in"><span>     border <span class="op">=</span> <span class="st">'white'</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html" class="external-link">hist</a></span><span class="op">(</span><span class="va">metrics</span><span class="op">$</span><span class="va">prop_int_diag</span>,</span></span>
-<span class="r-in"><span>     xlim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>     xlab <span class="op">=</span> <span class="st">'Contribution to interaction effect'</span>,</span></span>
-<span class="r-in"><span>     main <span class="op">=</span> <span class="st">'Intra-series interactions (density dependence)'</span>,</span></span>
-<span class="r-in"><span>     col <span class="op">=</span> <span class="st">'darkblue'</span>,</span></span>
-<span class="r-in"><span>     border <span class="op">=</span> <span class="st">'white'</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="stability.mvgam-3.png" alt="" width="700" height="433"></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># How important are inter-series error covariances</span></span></span>
-<span class="r-in"><span><span class="co"># (offdiagonals of the Sigma matrix) vs</span></span></span>
-<span class="r-in"><span><span class="co"># intra-series variances (diagonals of the Sigma matrix) for explaining</span></span></span>
-<span class="r-in"><span><span class="co"># the variance of the stationary forecast distribution?</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span>, nrow <span class="op">=</span> <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html" class="external-link">hist</a></span><span class="op">(</span><span class="va">metrics</span><span class="op">$</span><span class="va">prop_cov_offdiag</span>,</span></span>
-<span class="r-in"><span>     xlim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>     xlab <span class="op">=</span> <span class="st">''</span>,</span></span>
-<span class="r-in"><span>     main <span class="op">=</span> <span class="st">'Inter-series covariances'</span>,</span></span>
-<span class="r-in"><span>     col <span class="op">=</span> <span class="st">'#B97C7C'</span>,</span></span>
-<span class="r-in"><span>     border <span class="op">=</span> <span class="st">'white'</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html" class="external-link">hist</a></span><span class="op">(</span><span class="va">metrics</span><span class="op">$</span><span class="va">prop_cov_diag</span>,</span></span>
-<span class="r-in"><span>     xlim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>     xlab <span class="op">=</span> <span class="st">'Contribution to forecast variance'</span>,</span></span>
-<span class="r-in"><span>     main <span class="op">=</span> <span class="st">'Intra-series variances'</span>,</span></span>
-<span class="r-in"><span>     col <span class="op">=</span> <span class="st">'darkblue'</span>,</span></span>
-<span class="r-in"><span>     border <span class="op">=</span> <span class="st">'white'</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="stability.mvgam-4.png" alt="" width="700" height="433"></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/layout.html" class="external-link">layout</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Proportion of stationary forecast distribution</span></span></span>
+<span class="r-in"><span><span class="co"># attributable to correlated process errors</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html" class="external-link">hist</a></span><span class="op">(</span><span class="va">metrics</span><span class="op">$</span><span class="va">prop_env</span>,</span></span>
+<span class="r-in"><span>  xlim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  xlab <span class="op">=</span> <span class="st">'Prop_env'</span>,</span></span>
+<span class="r-in"><span>  main <span class="op">=</span> <span class="st">''</span>,</span></span>
+<span class="r-in"><span>  col <span class="op">=</span> <span class="st">'#B97C7C'</span>,</span></span>
+<span class="r-in"><span>  border <span class="op">=</span> <span class="st">'white'</span><span class="op">)</span></span></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in hist.default(metrics$prop_env, xlim = c(0, 1), xlab = "Prop_env",     main = "", col = "#B97C7C", border = "white"):</span> 'x' must be numeric</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Reactivity, i.e. degree to which the system moves</span></span></span>
 <span class="r-in"><span><span class="co"># away from a stable equilibrium following a perturbation</span></span></span>
-<span class="r-in"><span><span class="co"># (values &gt; 1 suggest a more reactive, less stable system)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/hist.html" class="external-link">hist</a></span><span class="op">(</span><span class="va">metrics</span><span class="op">$</span><span class="va">reactivity</span>,</span></span>
-<span class="r-in"><span>     main <span class="op">=</span> <span class="st">''</span>,</span></span>
-<span class="r-in"><span>     xlab <span class="op">=</span> <span class="st">'Reactivity'</span>,</span></span>
-<span class="r-in"><span>     col <span class="op">=</span> <span class="st">'#B97C7C'</span>,</span></span>
-<span class="r-in"><span>     border <span class="op">=</span> <span class="st">'white'</span>,</span></span>
-<span class="r-in"><span>     xlim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">1</span><span class="op">*</span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">metrics</span><span class="op">$</span><span class="va">reactivity</span><span class="op">)</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">metrics</span><span class="op">$</span><span class="va">reactivity</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  main <span class="op">=</span> <span class="st">''</span>,</span></span>
+<span class="r-in"><span>  xlab <span class="op">=</span> <span class="st">'Reactivity'</span>,</span></span>
+<span class="r-in"><span>  col <span class="op">=</span> <span class="st">'#B97C7C'</span>,</span></span>
+<span class="r-in"><span>  border <span class="op">=</span> <span class="st">'white'</span>,</span></span>
+<span class="r-in"><span>  xlim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">-</span><span class="fl">1</span><span class="op">*</span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">metrics</span><span class="op">$</span><span class="va">reactivity</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>          <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">metrics</span><span class="op">$</span><span class="va">reactivity</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span>v <span class="op">=</span> <span class="fl">0</span>, lwd <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="stability.mvgam-5.png" alt="" width="700" height="433"></span>
+<span class="r-plt img"><img src="stability.mvgam-3.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>
