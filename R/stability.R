@@ -174,7 +174,7 @@ stability <- function(object, ...){
 #'@rdname stability.mvgam
 #'@method stability mvgam
 #'@export
-stability.mvgam = function(object){
+stability.mvgam = function(object, ...){
 
   # Check trend_model
   trend_model <- attr(object$model_data, 'trend_model')

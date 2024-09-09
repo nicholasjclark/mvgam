@@ -7,7 +7,7 @@
 \usage{
 stability(object, ...)
 
-\method{stability}{mvgam}(object)
+\method{stability}{mvgam}(object, ...)
 }
 \arguments{
 \item{object}{\code{list} object of class \code{mvgam} resulting from a call to \code{\link[=mvgam]{mvgam()}}
