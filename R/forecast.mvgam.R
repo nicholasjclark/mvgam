@@ -574,7 +574,7 @@ forecast.mvgam = function(object,
                                use_lv = object$use_lv,
                                fit_engine = object$fit_engine,
                                type = type,
-                               series_names = factor(unique(data_train$series),
+                               series_names = factor(levels(data_train$series),
                                                      levels = levels(data_train$series)),
                                train_observations = series_obs,
                                train_times = unique(data_train$index..time..index),
@@ -654,7 +654,8 @@ forecast_draws = function(object,
     Xp_trend <- trend_Xp_matrix(newdata = sort_data(data_test),
                                 trend_map = object$trend_map,
                                 series = series,
-                                mgcv_model = object$trend_mgcv_model)
+                                mgcv_model = object$trend_mgcv_model,
+                                forecast = TRUE)
 
     # For trend_formula models with autoregressive processes,
     # the process model operates as: AR * (process[t - 1] - mu[t-1]])
@@ -662,24 +663,26 @@ forecast_draws = function(object,
     # to correctly propagate the process model forward
     if(use_lv & attr(object$model_data, 'trend_model') != 'GP'){
       # Get the observed trend predictor matrix
-      Xp_trend_last <- trend_Xp_matrix(newdata = object$obs_data,
-                                       trend_map = object$trend_map,
-                                       series = series,
-                                       mgcv_model = object$trend_mgcv_model)
+      newdata <- trend_map_data_prep(object$obs_data,
+                                     object$trend_map,
+                                     forecast = TRUE)
+      Xp_trend_last <- predict(object$trend_mgcv_model,
+                               newdata = newdata,
+                               type = 'lpmatrix')
 
       # Ensure the last three values are used, in case the obs_data
       # was not supplied in order
-      data.frame(time = object$obs_data$index..time..index,
-                 series = object$obs_data$series,
-                 row_id = 1:length(object$obs_data$index..time..index)) %>%
+      data.frame(time = newdata$index..time..index,
+                 series = newdata$series,
+                 row_id = 1:length(newdata$index..time..index)) %>%
         dplyr::arrange(time, series) %>%
         dplyr::pull(row_id) -> sorted_inds
-
-      linpred_order <- vector(length = 3 * n_series)
-      last_rows <- tail(sort(sorted_inds), 3 * n_series)
-      for(i in seq_along(last_rows)){
-        linpred_order[i] <- which(sorted_inds == last_rows[i])
-      }
+      n_processes <- length(unique(object$trend_map$trend))
+      linpred_order <- tail(sorted_inds, 3 * n_processes)
+      # last_rows <- tail(sorted_inds, 3 * n_processes)
+      # for(i in seq_along(last_rows)){
+      #   linpred_order[i] <- which(sorted_inds == last_rows[i])
+      # }
 
       # Deal with any offsets
       if(!all(attr(Xp_trend_last, 'model.offset') == 0)){

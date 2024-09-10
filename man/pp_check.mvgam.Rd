@@ -56,11 +56,14 @@ A ggplot object that can be further
 customized using the \pkg{ggplot2} package.
 }
 \description{
-Perform posterior predictive checks with the help
+Perform unconditional posterior predictive checks with the help
 of the \pkg{bayesplot} package.
 }
 \details{
-For a detailed explanation of each of the ppc functions,
+Unlike the conditional posterior checks provided by \code{\link{ppc}},
+This function computes \emph{unconditional} posterior predictive checks (i.e. it generates
+predictions for fake data without considering the true observations associated with those
+fake data). For a detailed explanation of each of the ppc functions,
 see the \code{\link[bayesplot:PPC-overview]{PPC}}
 documentation of the \pkg{\link[bayesplot:bayesplot-package]{bayesplot}}
 package.
@@ -111,7 +114,7 @@ pp_check(mod, prefix = "ppd")
 
 }
 \seealso{
-\code{\link{ppc}} \code{\link{predict.mvgam}}
+\code{\link{ppc}}, \code{\link{predict.mvgam}}
 }
 \author{
 Nicholas J Clark

@@ -107,7 +107,6 @@ test_that("binomial() post-processing works", {
   expect_no_error(ppc(mod, type = 'pit'))
   expect_no_error(ppc(mod, type = 'cdf'))
   expect_no_error(ppc(mod, type = 'rootogram'))
-
   expect_no_error(plot(mod, type = 'residuals'))
 
   expect_no_error(plot_mvgam_series(object = mod))

@@ -3,7 +3,7 @@
 \name{ppc.mvgam}
 \alias{ppc.mvgam}
 \alias{ppc}
-\title{Plot mvgam posterior predictive checks for a specified series}
+\title{Plot mvgam conditional posterior predictive checks for a specified series}
 \usage{
 ppc(object, ...)
 
@@ -64,19 +64,20 @@ posterior predictions (for \code{type == 'density'} or \code{type == 'cdf'}) or 
 Integral Transform histogram (for \code{type == 'pit'}).
 }
 \description{
-Plot mvgam posterior predictive checks for a specified series
+Plot mvgam conditional posterior predictive checks for a specified series
 }
 \details{
-Posterior predictions are drawn from the fitted \code{mvgam} and compared against
+Conditional posterior predictions are drawn from the fitted \code{mvgam} and compared against
 the empirical distribution of the observed data for a specified series to help evaluate the model's
 ability to generate unbiased predictions. For all plots apart from \code{type = 'rootogram'}, posterior predictions
 can also be compared to out of sample observations as long as these observations were included as
 'data_test' in the original model fit and supplied here. Rootograms are currently only plotted using the
 'hanging' style.
 \cr
-Note that the predictions used for these plots are those that have been generated directly within
-the \code{mvgam()} model, so they can be misleading if the model included flexible dynamic trend components. For
-a broader range of posterior checks that are created using "new data" predictions, see
+Note that the predictions used for these plots are \emph{conditional on the observed data}, i.e. they
+are those predictions that have been generated directly within
+the \code{mvgam()} model. They can be misleading if the model included flexible dynamic trend components. For
+a broader range of posterior checks that are created using \emph{unconditional} "new data" predictions, see
 \code{\link{pp_check.mvgam}}
 }
 \examples{

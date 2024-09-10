@@ -42,3 +42,4 @@ gaus_data <- sim_mvgam(family = gaussian(),
                        mu = c(-1, 0, 1),
                        trend_rel = 0.5,
                        prop_missing = 0.2)
+

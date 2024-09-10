@@ -73,13 +73,10 @@ obs_Xp_matrix = function(newdata, mgcv_model){
   return(Xp)
 }
 
-
-#' Function to prepare trend linear predictor matrix, ensuring ordering and
-#' indexing is correct with respect to the model structure
+#' Function to prepare trend linear predictor matrix in the presence of a
+#' trend_map
 #' @noRd
-trend_Xp_matrix = function(newdata, trend_map, series = 'all',
-                           mgcv_model){
-
+trend_map_data_prep = function(newdata, trend_map, forecast = FALSE){
   trend_test <- newdata
   trend_indicators <- vector(length = length(trend_test$series))
   for(i in 1:length(trend_test$series)){
@@ -91,6 +88,44 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
                                              unique(trend_map$trend)))
   trend_test$series <- trend_indicators
   trend_test$y <- NULL
+
+  # Only keep one time observation per trend, in case this is a reduced dimensionality
+  # State-Space model (with a trend_map) and we are forecasting ahead
+  if(forecast){
+    data.frame(series = trend_test$series,
+               time = trend_test$index..time..index,
+               row_num = 1:length(trend_test$index..time..index)) %>%
+      dplyr::group_by(series, time) %>%
+      dplyr::slice_head(n = 1) %>%
+      dplyr::pull(row_num) -> inds_keep
+    inds_keep <- sort(inds_keep)
+
+    if(inherits(trend_test, 'list')){
+      trend_test <- lapply(trend_test, function(x){
+        if(is.matrix(x)){
+          matrix(x[inds_keep,], ncol = NCOL(x))
+        } else {
+          x[inds_keep]
+        }
+
+      })
+    } else {
+      trend_test <- trend_test[inds_keep, ]
+    }
+  }
+
+  return(trend_test)
+}
+
+#' Function to prepare trend linear predictor matrix, ensuring ordering and
+#' indexing is correct with respect to the model structure
+#' @noRd
+trend_Xp_matrix = function(newdata, trend_map, series = 'all',
+                           mgcv_model, forecast = FALSE){
+
+  trend_test <- trend_map_data_prep(newdata,
+                                    trend_map,
+                                    forecast = forecast)
 
   suppressWarnings(Xp_trend  <- try(predict(mgcv_model,
                                             newdata = trend_test,

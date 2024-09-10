@@ -152,10 +152,13 @@ mvgam_example1 <- mvgam(y ~ s(season, k = 5),
                         samples = 30,
                         chains = 1)
 
-# Univariate process with trend_formula and correlated process errors
+# Univariate process with trend_formula, trend_map and correlated process errors
+trend_map <- data.frame(series = unique(mvgam_examp_dat$data_train$series),
+                        trend = c(1,1,2))
 mvgam_example2 <- mvgam(y ~ 1,
                         trend_formula = ~ s(season, k = 5),
                         trend_model = RW(cor = TRUE),
+                        trend_map = trend_map,
                         family = gaussian(),
                         data = mvgam_examp_dat$data_train,
                         burnin = 300,
