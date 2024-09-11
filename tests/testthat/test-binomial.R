@@ -164,7 +164,8 @@ test_that("binomial() post-processing works", {
                   silent = 2))
   fc <- forecast(mod)
   expect_true(inherits(fc, 'mvgam_forecast'))
-  expect_no_error(plot_mvgam_uncertainty(mod))
+  expect_error(plot_mvgam_uncertainty(mod))
+  expect_error(stability(mod))
 })
 
 # All tests should apply to beta_binomial as well
