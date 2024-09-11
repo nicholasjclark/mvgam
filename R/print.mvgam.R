@@ -33,6 +33,7 @@ cat(paste0(family_links(object$family), '\n'))
 cat("\nTrend model:\n")
 if(inherits(object$trend_model, 'mvgam_trend')){
   print(object$trend_model$label)
+  cat('\n')
 } else {
   cat(paste0(object$trend_model, '\n'))
 }

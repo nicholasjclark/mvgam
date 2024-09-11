@@ -12,6 +12,15 @@
 #'This places the legend on the inside of the plot frame at the given location (if it is not "none").
 #'@param hide_xlabels \code{logical}. If \code{TRUE}, no xlabels are printed to allow the user to add custom labels using
 #'\code{axis} from base \code{R}
+#'@details The basic idea of this function is to compute forecasts by ignoring one of the
+#'two primary components in a correlated residual model (i.e. by either ignoring the
+#'linear predictor effects or by ignoring the residual dynamics). Some caution is required
+#'however, as this function was designed early in the \pkg{mvgam} development cycle and
+#'there are now many types of models that it cannot handle very well. For example,
+#'models with shared latent states, or any type of State-Space models that include terms
+#'in the `trend_formula`, will either fail or give nonsensical results. Improvements are
+#'in the works to provide a more general way to decompose forecast uncertainties, so
+#'please check back at a later date.
 #'@return A base \code{R} graphics plot
 #'@export
 plot_mvgam_uncertainty = function(object, series = 1, newdata,
@@ -21,6 +30,11 @@ plot_mvgam_uncertainty = function(object, series = 1, newdata,
   # Check arguments
   if (!(inherits(object, "mvgam"))) {
     stop('argument "object" must be of class "mvgam"')
+  }
+
+  if (!is.null(object$trend_call)){
+    stop('cannot yet plot uncertainty decompositions for models with trend_formulae',
+         call. = FALSE)
   }
 
   if(sign(series) != 1){

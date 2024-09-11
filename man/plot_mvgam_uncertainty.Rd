@@ -37,3 +37,14 @@ A base \code{R} graphics plot
 \description{
 Plot mvgam forecast uncertainty contributions for a specified series
 }
+\details{
+The basic idea of this function is to compute forecasts by ignoring one of the
+two primary components in a correlated residual model (i.e. by either ignoring the
+linear predictor effects or by ignoring the residual dynamics). Some caution is required
+however, as this function was designed early in the \pkg{mvgam} development cycle and
+there are now many types of models that it cannot handle very well. For example,
+models with shared latent states, or any type of State-Space models that include terms
+in the \code{trend_formula}, will either fail or give nonsensical results. Improvements are
+in the works to provide a more general way to decompose forecast uncertainties, so
+please check back at a later date.
+}

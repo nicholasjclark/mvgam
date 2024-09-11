@@ -110,6 +110,18 @@ This places the legend on the inside of the plot frame at the given location (if
 
 <p>A base <code>R</code> graphics plot</p>
     </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>The basic idea of this function is to compute forecasts by ignoring one of the
+two primary components in a correlated residual model (i.e. by either ignoring the
+linear predictor effects or by ignoring the residual dynamics). Some caution is required
+however, as this function was designed early in the <span class="pkg">mvgam</span> development cycle and
+there are now many types of models that it cannot handle very well. For example,
+models with shared latent states, or any type of State-Space models that include terms
+in the <code>trend_formula</code>, will either fail or give nonsensical results. Improvements are
+in the works to provide a more general way to decompose forecast uncertainties, so
+please check back at a later date.</p>
+    </div>
 
   </main><aside class="col-md-3"><nav id="toc"><h2>On this page</h2>
     </nav></aside></div>
