@@ -2,6 +2,10 @@
 ## New functionalities
 * Added a `stability.mvgam` method to compute stability metrics from models fit with Vector Autoregressive dynamics (#21)
 
+## Bug fixes
+* Fixed a minor bug in the way `trend_map` recognises levels of the `series` factor
+* Bug fix to ensure `lfo_cv` recognises the actual times in `time`, just in case the user supplies data that doesn't start at `t = 1`. Also updated documentation to better reflect this
+
 # mvgam 1.1.3
 ## New functionalities
 * Allow intercepts to be included in process models when `trend_formula` is supplied. This breaks the assumption that the process has to be zero-centred, adding more modelling flexibility but also potentially inducing nonidentifiabilities with respect to any observation model intercepts. Thoughtful priors are a must for these models
