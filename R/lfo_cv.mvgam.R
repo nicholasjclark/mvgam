@@ -8,10 +8,12 @@
 #''time' (numeric index of the time point for each observation).
 #'Any other variables to be included in the linear predictor of \code{formula} must also be present
 #'@param min_t Integer specifying the minimum training time required before making predictions
-#'from the data. Default is either `30`, or whatever training time allows for at least
-#'`10` lfo-cv calculations (i.e. `pmin(max(data$time) - 10, 30)`). This value is essentially
-#'arbitrary so it is highly recommended to change it to something that is more suitable to the
-#'data and models being evaluated
+#'from the data. Default is either the `30`th timepoint in the observational data,
+#'or whatever training time allows for at least
+#'`10` lfo-cv calculations, if possible.
+#'This value is essentially arbitrary so it is highly recommended to change it
+#'to something that is more suitable to the
+#'data and models being evaluated.
 #'@param fc_horizon Integer specifying the number of time steps ahead for evaluating forecasts
 #'@param pareto_k_threshold Proportion specifying the threshold over which the Pareto shape parameter
 #'is considered unstable, triggering a model refit. Default is `0.7`
@@ -139,11 +141,20 @@ lfo_cv.mvgam = function(object,
                                      trend_model = attr(object$model_data, 'trend_model'))
   }
   N <- max(all_data$index..time..index)
+  all_unique_times <- sort(unique(all_data$index..time..index))
 
-  # Default minimum training time is 30, or
+  # Default minimum training time is the 30th timepoint, or
   # whatever training time allows for at least 10 lfo_cv calculations
   if(missing(min_t)){
-    min_t <- pmin(N - 10 - fc_horizon, 30)
+    if(length(all_unique_times) > 30){
+      min_t <- pmin(max(1, N - 10 - fc_horizon), all_unique_times[30])
+    } else if(length(all_unique_times) < 30 & length(all_unique_times) > 20){
+      min_t <- pmin(max(1, N - 10 - fc_horizon), all_unique_times[20])
+    } else if(length(all_unique_times) < 20 & length(all_unique_times) > 10) {
+      min_t <- pmin(max(1, N - 10 - fc_horizon), all_unique_times[10])
+    } else {
+      min_t <- 1
+    }
   }
 
   if(min_t < 0){

@@ -567,7 +567,8 @@ validate_trend_restrictions = function(trend_model,
   if(!missing(trend_formula)){
     validate_trend_formula(trend_formula)
     if(missing(trend_map)){
-      trend_map <- data.frame(series = unique(data_train$series),
+      trend_map <- data.frame(series = factor(levels(data_train$series),
+                                              levels = levels(data_train$series)),
                               trend = 1:length(unique(data_train$series)))
     }
 

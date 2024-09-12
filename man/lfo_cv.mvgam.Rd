@@ -29,10 +29,12 @@ required by the GAM \code{formula}. Should include columns:
 Any other variables to be included in the linear predictor of \code{formula} must also be present}
 
 \item{min_t}{Integer specifying the minimum training time required before making predictions
-from the data. Default is either \code{30}, or whatever training time allows for at least
-\code{10} lfo-cv calculations (i.e. \code{pmin(max(data$time) - 10, 30)}). This value is essentially
-arbitrary so it is highly recommended to change it to something that is more suitable to the
-data and models being evaluated}
+from the data. Default is either the \code{30}th timepoint in the observational data,
+or whatever training time allows for at least
+\code{10} lfo-cv calculations, if possible.
+This value is essentially arbitrary so it is highly recommended to change it
+to something that is more suitable to the
+data and models being evaluated.}
 
 \item{fc_horizon}{Integer specifying the number of time steps ahead for evaluating forecasts}
 
