@@ -18,7 +18,7 @@ concordance=TRUE
 library(knitr)
 options(replace.assign=TRUE, width=50, digits=4)
 opts_knit[["set"]](progress=FALSE)
-library("ggplot2")
+library("ggplot2"); theme_set(theme_classic(base_family = 'serif'))
 library("mvgam")
 @
 
@@ -43,7 +43,7 @@ fc <- forecast(model, newdata = simdat$data_test)
 \begin{block}
 \noindent\makebox[\linewidth]{\rule{0.3\paperwidth}{0.2pt}}
 
-The \texttt{mvgam} package provides tools for fitting and interrogating univariate or multivariate time series models that can include nonlinear smooth functions of covariates, dynamic temporal processes and random effects. A wide variety of latent dynamic processes can be specified. The package also provides tools for interpreting effects, computing and scoring forecasts, as well as generating model code and data objects for further customisation. Models are fitted using \texttt{Stan} for full Bayesian inference.
+The \texttt{mvgam} package provides tools for fitting and interrogating univariate or multivariate State-Space time series models that can include nonlinear smooth functions of covariates, dynamic temporal processes and random effects. A wide variety of latent dynamic processes can be specified. The package also provides tools for interpreting effects, computing and scoring forecasts, as well as generating model code and data objects for further customisation. Models are fitted using \texttt{Stan} for full Bayesian inference.
 
 \end{block}
 
@@ -60,10 +60,10 @@ Usage: \texttt{\color{Orchid} mvgam(formula, trend\_formula, data, trend\_model,
 \texttt{\color{Orchid} data}: a \texttt{data.frame} or \texttt{list} containing the response variable(s) and optional predictor variables. See \href{https://nicholasjclark.github.io/mvgam/articles/data_in_mvgam.html}{the data formatting vignette} for guidance on data preparation
 
 \medskip
-\texttt{\color{Orchid} trend\_model}: optional latent dynamic process. Options include:
+\texttt{\color{Orchid} trend\_model}: optional latent dynamic process. Options include (among others):
 \begin{itemize}
 
-\item\texttt{\color{Orchid} None}: default, no dynamic trend
+\item\texttt{\color{Orchid} None}: default, no dynamic process
 
 \item\texttt{\color{Orchid} RW(ma = FALSE, cor = FALSE)}: random walk
 
@@ -126,7 +126,7 @@ model <- mvgam(formula = y ~ s(season, bs = 'cc'),
                trend_model = RW(), data = simdat$data_train)
 @
 
-Use \texttt{\color{Orchid} code(model)} to see the auto-generated \texttt{Stan} code
+Use \texttt{\color{Orchid} stancode(model)} to see the auto-generated \texttt{Stan} code
 
 \end{block}
 \end{column}
@@ -151,7 +151,7 @@ Use \texttt{\color{Orchid} code(model)} to see the auto-generated \texttt{Stan} 
 \texttt{\color{Orchid} fitted(model)}, \texttt{\color{Orchid} logLik(model)} and \texttt{\color{Orchid} residuals(model)}: posterior expectations, pointwise Log-Likelihoods and randomized quantile residuals
 
 \medskip
-\texttt{\color{Orchid} loo(model)} and \texttt{\color{Orchid} loo\_compare(model1, model2, ...)}: calculate approximate leave-one-out information criteria
+\texttt{\color{Orchid} loo(model)} and \texttt{\color{Orchid} loo\_compare(model1, model2, ...)}: calculate approximate leave-one-out information criteria for model comparisons
 
 \medskip
 \texttt{\color{Orchid} mcmc\_plot(model)}: visualize posterior summaries, pairs plots and a wide range of MCMC diagnostics using functionality from the \texttt{Bayesplot} package
@@ -161,30 +161,34 @@ mcmc_plot(model, variable = '(Intercept)', type = 'combo')
 @
 
 \medskip
-Use \texttt{\color{Orchid} as.data.frame(model)}, \texttt{\color{Orchid} as.matrix(model)}, or \texttt{\color{Orchid} as.array(model)} for posterior extraction. Use \texttt{\color{Orchid} variables(model)} to determine what parameters are available for extraction
+Use \texttt{\color{Orchid} as.data.frame(model)}, \texttt{\color{Orchid} as.matrix(model)}, or \texttt{\color{Orchid} as.array(model)} to extract posterior parameter estimates. Use \texttt{\color{Orchid} variables(model)} to determine what parameters are available for extraction
 
 \medskip
-The \texttt{S3} \texttt{\color{Orchid} plot()} function applied to models can visualise smooth functions (\texttt{\color{Orchid} type = 'smooths'}), random effects (\texttt{\color{Orchid} type = 're'}), posterior predictions and trend estimates (\texttt{\color{Orchid} type = 'forecast'} or \texttt{\color{Orchid} type = 'trend'}) uncertainty contributions (\texttt{\color{Orchid} type = 'uncertainty'}) or randomized quantile residual diagnostics (\texttt{\color{Orchid} type = 'residuals'}). Use \texttt{\color{Orchid} trend\_effects = TRUE} to visualise effects from any process model formulae
+The \texttt{S3} \texttt{\color{Orchid} plot()} function applied to models can visualise smooth functions (\texttt{\color{Orchid} type = 'smooths'}), random effects (\texttt{\color{Orchid} type = 're'}), conditional predictions and trend estimates (\texttt{\color{Orchid} type = 'forecast'} or \texttt{\color{Orchid} type = 'trend'}), uncertainty contributions (\texttt{\color{Orchid} type = 'uncertainty'}) or randomized quantile residual diagnostics (\texttt{\color{Orchid} type = 'residuals'}). Use \texttt{\color{Orchid} trend\_effects = TRUE} to visualise effects from any process model formulae
 
 \medskip
 \texttt{\color{Orchid} conditional\_effects(model)} gives useful conditional effect plots on either the response or the link scale
 
 \smallskip
 <<fig.width=4, fig.height=1.75, fig.align='center', warning=FALSE, echo=FALSE>>=
-conditional_effects(model)[[1]] + xlim(c(1, 12.1))
+conditional_effects(model)[[1]] +
+  xlim(c(1, 12.1)) +
+  theme_classic(base_size = 10,
+                base_family = 'serif')
 @
 
-For most \texttt{mvgam} models, functions from the \texttt{marginaleffects} package can be used for more targeted prediction-based inference. See \href{https://marginaleffects.com/}{The Marginal Effects Zoo} for guidance on computing and plotting predictions, slopes and comparisons
+For most \texttt{mvgam} models, functions from the \texttt{marginaleffects} package can be used for more targeted prediction-based inference. See \href{https://marginaleffects.com/}{The Marginal Effects Zoo} and \href{https://ecogambler.netlify.app/blog/interpreting-gams/}{How to interpret effects from GAMs} for guidance on inspecting predictions, slopes and comparisons
 <<fig.width=4, fig.height=1.75, fig.align='center', warning=FALSE, echo=FALSE>>=
-post_contrasts <- avg_comparisons(model,
+post_contrasts <- marginaleffects::avg_comparisons(model,
                                   variables = list(season = c(5, 11))) %>%
-  posteriordraws()
+  marginaleffects::posteriordraws()
 
 post_contrasts %>%
   ggplot(aes(x = draw)) +
   tidybayes::stat_halfeye(fill = "#C79999") +
   labs(x = "(season = 11) − (season = 5) posterior contrast", y = "Density") +
-  theme_classic()
+  theme_classic(base_size = 10,
+                base_family = 'serif')
 @
 
 \end{block}
@@ -207,12 +211,12 @@ post_contrasts %>%
 Use \texttt{\color{Orchid} predict(model)} with \texttt{\color{Orchid} newdata} to make predictions for inference purposes. Change the \texttt{\color{Orchid} type} argument for different types of predictions (link scale, expectation or response scale). Or use the \texttt{brms} package equivalents \texttt{\color{Orchid} posterior\_predict(model)}, \texttt{\color{Orchid} posterior\_linpred(model)} or \texttt{\color{Orchid} posterior\_epred(model)}. If generating forecasts for future timepoints, use the \texttt{\color{Orchid} forecast()} function (see below)
 
 \medskip
-Use \texttt{\color{Orchid} ppc(model)} to plot various kinds of posterior predictive checks to compare model predictions against true observations
+Use \texttt{\color{Orchid} ppc(model)} and \texttt{\color{Orchid} pp\_check(model)} to compute conditional or unconditional posterior predictive checks and compare model predictions against the true observations
 
 \medskip
 Extract in-sample posterior predictions with \texttt{\color{Orchid} hindcast(model)}. If validation data exist, generate forecast predictions with \texttt{\color{Orchid} forecast(model, newdata = newdata)}. As above, change the \texttt{\color{Orchid} type} argument for predictions on different scales. Both functions generate an object of class \texttt{mvgam\_forecast}, that can be plotted with an \texttt{S3} \texttt{\color{Orchid} plot()} function. See \href{https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html}{the forecasting vignette} for more details about how to produce forecasts.
 
-<<fig.width=5.4, fig.height=2.5, fig.align='center', warning=FALSE, results='hide',echo=FALSE>>=
+<<fig.width=5.4, fig.height=2.5, fig.align='center', warning=FALSE, message=FALSE, results='hide',echo=FALSE>>=
   par(family = "serif",
       las = 1,
       mar=c(3,3,2,2),
