@@ -69,7 +69,7 @@ fevd.mvgam <- function(object,
   validate_pos_integer(h)
   trend_model <- attr(object$model_data, 'trend_model')
   if(!trend_model %in% c('VAR', 'VARcor', 'VAR1', 'VAR1cor')){
-    stop('Only VAR(1) models currently supported for calculating IRFs',
+    stop('Only VAR(1) models currently supported for calculating FEVDs',
          call. = FALSE)
   }
   beta_vars <- mcmc_chains(object$model_output, 'A')
@@ -107,32 +107,36 @@ fevd.mvgam <- function(object,
 #' Forecast error variance decomposition
 #' @noRd
 gen_fevd <- function(x, h = 6, ...){
-
-    K <- x$K
-    ynames <- paste0('process_', 1:K)
-    msey <- var_fecov(x, h = h)
-    Phi <- var_phi(x, h = h)
-    mse <- matrix(NA, nrow = h, ncol = K)
-    Omega <- array(0, dim = c(h, K, K))
-    for(i in 1 : h){
-      mse[i, ] <- diag(msey[, , i])
-      temp <- matrix(0, K, K)
-      for(j in 1 : i){
-        temp <- temp + Phi[ , , j]^2
-      }
-      temp <- temp / mse[i, ]
-      for(j in 1 : K){
-        Omega[i, ,j] <- temp[j, ]
+  K <- x$K
+  ynames <- paste0('process_', 1:K)
+  msey <- var_fecov(x, h = h)
+  Psi <- var_psi(x, h = h)
+  mse <- matrix(NA, nrow = h, ncol = K)
+  Omega <- array(0, dim = c(h, K, K))
+  for(i in 1 : h){
+    mse[i, ] <- diag(msey[, , i])
+    temp <- matrix(0, K, K)
+    for(l in 1 : K){
+      for(m in 1 : K){
+        for(j in 1 : i){
+          temp[l, m] <- temp[l, m] + Psi[l , m, j]^2
+        }
       }
     }
-    result <- list()
-    for(i in 1 : K){
-      result[[i]] <- matrix(Omega[, , i], nrow = h, ncol = K)
-      colnames(result[[i]]) <- ynames
+    temp <- temp / mse[i, ]
+    for(j in 1 : K){
+      Omega[i, ,j] <- temp[j, ]
     }
-    names(result) <- ynames
-    return(result)
   }
+  result <- list()
+  for(i in 1 : K){
+    result[[i]] <- matrix(Omega[, , i], nrow = h, ncol = K)
+    colnames(result[[i]]) <- ynames
+  }
+  names(result) <- ynames
+  return(result)
+}
+
 
 #' Forecast error covariance matrix
 #' @noRd

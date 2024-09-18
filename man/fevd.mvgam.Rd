@@ -65,7 +65,7 @@ mod <- mvgam(y ~ -1,
 # Calulate forecast error variance decompositions for each series
 fevds <- fevd(mod, h = 12)
 
-# Plot them
+# Plot median contributions to forecast error variance
 plot(fevds)
 }
 }

@@ -7,7 +7,7 @@ This function takes an \code{mvgam_fevd} object and produces
 a plot of the posterior median contributions to forecast variance for each series
 in the fitted Vector Autoregression}
 \usage{
-\method{plot}{mvgam_fevd}(x, ..)
+\method{plot}{mvgam_fevd}(x, ...)
 }
 \arguments{
 \item{x}{\code{list} object of class \code{mvgam_fevd}. See \code{\link[=fevd]{fevd()}}}
