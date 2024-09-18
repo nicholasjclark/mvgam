@@ -57,6 +57,13 @@ test_that("irf() gives correct outputs", {
   expect_no_error(plot(irfs))
 })
 
+test_that("fevd() gives correct outputs", {
+  fevds <- fevd(mvgam:::mvgam_example3, h = 12)
+  expect_true(length(fevds) == 30)
+  expect_true(NROW(fevds[[1]]$process_1) == 12)
+  expect_no_error(plot(fevds))
+})
+
 test_that("variable extraction works correctly", {
   expect_true(inherits(as.matrix(mvgam:::mvgam_example4,
                                  'A', regex = TRUE),

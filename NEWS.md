@@ -1,6 +1,7 @@
 # mvgam 1.1.4 (development version; not yet on CRAN)
 ## New functionalities
 * Added a `stability.mvgam` method to compute stability metrics from models fit with Vector Autoregressive dynamics (#21)
+* Added a `fevd.mvgam` method to compute forecast error variance decompositions from models fit with Vector Autoregressive dynamics
 
 ## Bug fixes
 * Fixed a minor bug in the way `trend_map` recognises levels of the `series` factor

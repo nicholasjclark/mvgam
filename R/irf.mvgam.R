@@ -217,22 +217,3 @@ var_psi = function(x, h=10){
   }
   return(Psi)
 }
-
-#' Forecast error decomposition
-#' @noRd
-var_fecov = function(x, h) {
-  sigma_u <- x$Sigma
-  sigma_yh <- array(NA, dim = c(x$K, x$K, h))
-  sigma_yh[, , 1] <- sigma_u
-  Phi <- var_phi(x, h = h)
-  if (h > 1) {
-    for (i in 2:h) {
-      temp <- matrix(0, nrow = x$K, ncol = x$K)
-      for (j in 2:i) {
-        temp <- temp + Phi[, , j] %*% sigma_u %*% t(Phi[, , j])
-      }
-      sigma_yh[, , i] <- temp + sigma_yh[, , 1]
-    }
-  }
-  return(sigma_yh)
-}
