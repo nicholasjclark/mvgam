@@ -66,17 +66,6 @@ plot.mvgam_irf = function(x, series = 1, ...){
   } else { ppp <- 1; oldpar <- par()}
 
   for(x in 1:n_plots){
-    if(x == series){
-      plot(x = 1:h, y = 1:h, type = "n", bty = 'L',
-           ylim = c(-2, 2),
-           yaxt = 'n',
-           xaxt = 'n',
-           ylab = '',
-           xlab = '')
-      abline(h = 0, lwd = 2.5)
-      box(bty = 'l', lwd = 2)
-
-    } else {
       responses <- do.call(rbind, lapply(seq_along(impulse_responses), function(j){
         impulse_responses[[j]][[1]][,x]
       }))
@@ -104,12 +93,14 @@ plot.mvgam_irf = function(x, series = 1, ...){
       abline(h = 0, lwd = 3, col = 'white')
       abline(h = 0, lwd = 2.5)
       box(bty = 'L', lwd = 2)
-    }
 
-    if(x != series){
-      axis(1, cex.axis = 1, tck = -0.05)
-      title(paste0('process_', series, ' -> process_', x), line = 0)
-    }
+    axis(1, cex.axis = 1, tck = -0.05)
+    title(paste0('process_', series, ' -> process_', x), line = 0)
+
+    # if(x != series){
+    #   axis(1, cex.axis = 1, tck = -0.05)
+    #   title(paste0('process_', series, ' -> process_', x), line = 0)
+    # }
 
   }
   layout(1)
