@@ -188,7 +188,7 @@ Estimating community stability and ecological interactions from time-series data
 Ecological Monographs. 73, 301-330.
 }
 \seealso{
-\code{\link{VAR}}, \code{\link{irf}}
+\code{\link{VAR}}, \code{\link{irf}}, \code{\link{fevd}}
 }
 \author{
 Nicholas J Clark

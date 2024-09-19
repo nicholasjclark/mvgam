@@ -27,7 +27,8 @@
 #'@references PH Pesaran & Shin Yongcheol (1998).
 #'Generalized impulse response analysis in linear multivariate models.
 #'Economics Letters 58: 17–29.
-#'@seealso \code{\link{VAR}}, \code{\link{plot.mvgam_irf}}, \code{\link{stability}}
+#'@seealso \code{\link{VAR}}, \code{\link{plot.mvgam_irf}}, \code{\link{stability}},
+#'\code{\link{fevd}}
 #' @examples
 #' \donttest{
 #' # Simulate some time series that follow a latent VAR(1) process

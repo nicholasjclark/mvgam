@@ -89,7 +89,7 @@
 #'Estimating community stability and ecological interactions from time-series data.
 #'Ecological Monographs. 73, 301-330.
 #'@author Nicholas J Clark
-#'@seealso \code{\link{VAR}}, \code{\link{irf}}
+#'@seealso \code{\link{VAR}}, \code{\link{irf}}, \code{\link{fevd}}
 #' @examples
 #' \donttest{
 #' # Simulate some time series that follow a latent VAR(1) process

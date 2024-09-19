@@ -74,7 +74,8 @@ Generalized impulse response analysis in linear multivariate models.
 Economics Letters 58: 17–29.
 }
 \seealso{
-\code{\link{VAR}}, \code{\link{plot.mvgam_irf}}, \code{\link{stability}}
+\code{\link{VAR}}, \code{\link{plot.mvgam_irf}}, \code{\link{stability}},
+\code{\link{fevd}}
 }
 \author{
 Nicholas J Clark

@@ -31,7 +31,7 @@
 #'@author Nicholas J Clark
 #'@references Lütkepohl, H (2006).
 #'New Introduction to Multiple Time Series Analysis. Springer, New York.
-#'@seealso \code{\link{VAR}}, \code{\link{plot.mvgam_irf}}, \code{\link{stability}}
+#'@seealso \code{\link{VAR}}, \code{\link{irf}}, \code{\link{stability}}
 #' @examples
 #' \donttest{
 #' # Simulate some time series that follow a latent VAR(1) process
