@@ -13,6 +13,23 @@
 #' @param p A non-negative integer specifying the autoregressive (AR) order.
 #' Default is \code{1}. Cannot currently be larger than \code{3} for `AR` terms,
 #' and cannot be anything other than `1` for continuous time AR (`CAR`) terms
+#' @param gr An optional grouping variable, which must be a `factor` in the supplied `data`,
+#'  for setting up hierarchical residual correlation structures. If specified,
+#'  this will automatically set `cor = TRUE` and set up a model where the
+#'  residual correlations for a specific level of `gr` are modelled hierarchically:
+#'  \eqn{\Omega_{group} = p\Omega_{global} + (1 - p)\Omega_{group, local}},
+#'  where \eqn{\Omega_{global}} is a *global* correlation
+#'  matrix, \eqn{\Omega_{group, local}} is a *local deviation* correlation matrix
+#'  and \eqn{p} is a weighting parameter
+#'  controlling how strongly the local correlation matrix \eqn{\Omega_{group}} is shrunk towards the global
+#'  correlation matrix \eqn{\Omega_{global}}. If `gr` is supplied then `subgr` *must* also be supplied
+#' @param subgr A subgrouping `factor` variable specifying which element in `data` represents the
+#' different time series that are measured in each level of `gr`. Models that use the hierarchical correlations
+#' *should not* include a `series` element in `data`. Rather, this element will be created internally based
+#' on the supplied variables for `gr` and `subgr`. For example, if you are modelling
+#' temporal counts for a group of `species` across three different geographical regions, labelled as `region`,
+#' then you should specify `gr = region` and `subgr = species`. Internally, `mvgam()` will create
+#' the `series` element for the data using something like: `series = as.factor(paste0(group, '_', subgroup))`
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \code{mvgam}
 #' @rdname RW
@@ -80,25 +97,69 @@
 #'plot(mod, type = 'residuals', series = 2)
 #'}
 #' @export
-RW = function(ma = FALSE, cor = FALSE){
+RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
+
+  # Validate the supplied groupings and correlation argument
+  gr <- deparse0(substitute(gr))
+  subgr <- deparse0(substitute(subgr))
+  if(gr != 'NA'){
+    if(subgr == 'NA'){
+      stop('argument "subgr" must be supplied if "gr" is also supplied',
+           call. = FALSE)
+    }
+  }
+
+  if(subgr != 'NA'){
+    if(gr == 'NA'){
+      stop('argument "gr" must be supplied if "subgr" is also supplied',
+           call. = FALSE)
+    } else {
+      cor <- TRUE
+    }
+  }
+
   out <- structure(list(trend_model = 'RW',
                         ma = ma,
                         cor = cor,
+                        gr = gr,
+                        subgr = subgr,
                         label = match.call()),
                    class = 'mvgam_trend')
 }
 
 #' @rdname RW
 #' @export
-AR = function(p = 1, ma = FALSE, cor = FALSE){
+AR = function(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
   validate_pos_integer(p)
   if(p > 3){
     stop("Argument 'p' must be <= 3",
          call. = FALSE)
   }
+
+  # Validate the supplied groupings and correlation argument
+  gr <- deparse0(substitute(gr))
+  subgr <- deparse0(substitute(subgr))
+  if(gr != 'NA'){
+    if(subgr == 'NA'){
+      stop('argument "subgr" must be supplied if "gr" is also supplied',
+           call. = FALSE)
+    }
+  }
+
+  if(subgr != 'NA'){
+    if(gr == 'NA'){
+      stop('argument "gr" must be supplied if "subgr" is also supplied',
+           call. = FALSE)
+    } else {
+      cor <- TRUE
+    }
+  }
+
   out <- structure(list(trend_model = paste0('AR', p),
                         ma = ma,
                         cor = cor,
+                        gr = gr,
+                        subgr = subgr,
                         label = match.call()),
                    class = 'mvgam_trend')
 }
@@ -120,10 +181,34 @@ CAR = function(p = 1){
 
 #' @rdname RW
 #' @export
-VAR = function(ma = FALSE, cor = FALSE){
+VAR = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
+
+  # Validate the supplied groupings and correlation argument
+  gr <- deparse0(substitute(gr))
+  subgr <- deparse0(substitute(subgr))
+  if(gr != 'NA'){
+    if(subgr == 'NA'){
+      stop('argument "subgr" must be supplied if "gr" is also supplied',
+           call. = FALSE)
+    }
+  }
+
+  if(subgr != 'NA'){
+    if(gr == 'NA'){
+      stop('argument "gr" must be supplied if "subgr" is also supplied',
+           call. = FALSE)
+    } else {
+      cor <- TRUE
+    }
+  }
+
   out <- structure(list(trend_model = 'VAR',
                         ma = ma,
                         cor = cor,
+                        gr = gr,
+                        subgr = subgr,
                         label = match.call()),
                    class = 'mvgam_trend')
 }
+
+

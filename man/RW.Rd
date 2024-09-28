@@ -7,13 +7,13 @@
 \alias{VAR}
 \title{Specify autoregressive dynamic processes}
 \usage{
-RW(ma = FALSE, cor = FALSE)
+RW(ma = FALSE, cor = FALSE, gr = NA, subgr = NA)
 
-AR(p = 1, ma = FALSE, cor = FALSE)
+AR(p = 1, ma = FALSE, cor = FALSE, gr = NA, subgr = NA)
 
 CAR(p = 1)
 
-VAR(ma = FALSE, cor = FALSE)
+VAR(ma = FALSE, cor = FALSE, gr = NA, subgr = NA)
 }
 \arguments{
 \item{ma}{\code{Logical} Include moving average terms of order \code{1}?
@@ -23,6 +23,25 @@ Default is \code{FALSE}.}
 multivariate normal process model? If \code{TRUE} and if \code{n_series > 1}
 in the supplied data, a fully structured covariance matrix will be estimated
 for the process errors. Default is \code{FALSE}.}
+
+\item{gr}{An optional grouping variable, which must be a \code{factor} in the supplied \code{data},
+for setting up hierarchical residual correlation structures. If specified,
+this will automatically set \code{cor = TRUE} and set up a model where the
+residual correlations for a specific level of \code{gr} are modelled hierarchically:
+\eqn{\Omega_{group} = p\Omega_{global} + (1 - p)\Omega_{group, local}},
+where \eqn{\Omega_{global}} is a \emph{global} correlation
+matrix, \eqn{\Omega_{group, local}} is a \emph{local deviation} correlation matrix
+and \eqn{p} is a weighting parameter
+controlling how strongly the local correlation matrix \eqn{\Omega_{group}} is shrunk towards the global
+correlation matrix \eqn{\Omega_{global}}. If \code{gr} is supplied then \code{subgr} \emph{must} also be supplied}
+
+\item{subgr}{A subgrouping \code{factor} variable specifying which element in \code{data} represents the
+different time series that are measured in each level of \code{gr}. Models that use the hierarchical correlations
+\emph{should not} include a \code{series} element in \code{data}. Rather, this element will be created internally based
+on the supplied variables for \code{gr} and \code{subgr}. For example, if you are modelling
+temporal counts for a group of \code{species} across three different geographical regions, labelled as \code{region},
+then you should specify \code{gr = region} and \code{subgr = species}. Internally, \code{mvgam()} will create
+the \code{series} element for the data using something like: \code{series = as.factor(paste0(group, '_', subgroup))}}
 
 \item{p}{A non-negative integer specifying the autoregressive (AR) order.
 Default is \code{1}. Cannot currently be larger than \code{3} for \code{AR} terms,

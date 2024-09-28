@@ -138,12 +138,17 @@ as_one_integer <- function(x, allow_na = FALSE) {
 }
 
 #'@noRd
-deparse0 = function (x, max_char = NULL, ...) {
-  out <- paste(deparse(x, ...), sep = "", collapse = "")
+deparse0 <- function (x, max_char = NULL, ...) {
+  out <- collapse(deparse(x, ...))
   if (isTRUE(max_char > 0)) {
     out <- substr(out, 1L, max_char)
   }
   out
+}
+
+#'@noRd
+collapse <- function(..., sep = "") {
+    paste(..., sep = sep, collapse = "")
 }
 
 #'@noRd
@@ -251,9 +256,15 @@ validate_trend_model = function(trend_model, drift = FALSE, noncentred = FALSE){
   if(inherits(trend_model, 'mvgam_trend')){
     ma_term <- if(trend_model$ma){ 'MA' } else { NULL }
     cor_term <- if(trend_model$cor){ 'cor' } else { NULL }
+    if(trend_model$gr != 'NA'){
+      gr_term <- 'hier'
+    } else {
+      gr_term <- NULL
+    }
     trend_model <- paste0(trend_model$trend_model,
                           trend_model$p,
                           ma_term,
+                          gr_term,
                           cor_term)
   }
 
@@ -342,6 +353,32 @@ validate_trend_formula = function(formula){
          call. = FALSE)
   }
 
+}
+
+#'@noRd
+validate_gr_subgr = function(gr, subgr, cor){
+  gr <- deparse0(substitute(gr))
+  subgr <- deparse0(substitute(subgr))
+
+  if(gr != 'NA'){
+    if(subgr == 'NA'){
+      stop('argument "subgr" must be supplied if "gr" is also supplied',
+           call. = FALSE)
+    }
+  }
+
+  if(subgr != 'NA'){
+    if(gr == 'NA'){
+      stop('argument "gr" must be supplied if "subgr" is also supplied',
+           call. = FALSE)
+    } else {
+      cor <- TRUE
+    }
+  }
+
+  list(.group = gr,
+       .subgroup = subgr,
+       .cor = cor)
 }
 
 #'@noRd
@@ -806,4 +843,16 @@ find_stan = function(){
            call. = FALSE)
     }
   }
+}
+
+#'@noRd
+as_one_character <- function(x, allow_na = FALSE) {
+  s <- substitute(x)
+  x <- as.character(x)
+  if (length(x) != 1L || anyNA(x) && !allow_na) {
+    s <- deparse0(s, max_char = 100L)
+    stop("Cannot coerce '", s, "' to a single character value.",
+         call. = FALSE)
+  }
+  x
 }

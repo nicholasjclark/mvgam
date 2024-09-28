@@ -27,24 +27,30 @@
 #'\item 'RW'
 #'\item 'RWMA'
 #'\item 'RWcor'
+#'\item 'RWhiercor'
 #'\item 'RWMAcor'
 #'\item 'AR1'
 #'\item 'AR1MA'
 #'\item 'AR1cor'
+#'\item 'AR1hiercor'
 #'\item 'AR1MAcor'
 #'\item 'AR2'
 #'\item 'AR2MA'
 #'\item 'AR2cor'
+#'\item 'AR2hiercor'
 #'\item 'AR2MAcor'
 #'\item 'AR3'
 #'\item 'AR3MA'
 #'\item 'AR3cor'
+#'\item 'AR3hiercor'
 #'\item 'AR3MAcor'
 #'\item 'CAR1'
 #'\item 'VAR'
 #'\item 'VARcor'
+#'\item 'VARhiercor'
 #'\item 'VAR1' (same as 'VAR')
 #'\item 'VAR1cor' (same as 'VARcor')
+#'\item 'VAR1hiercor' (same as 'VARhiercor')
 #'\item 'VARMA'
 #'\item 'VARMAcor'
 #'\item 'VARMA1,1cor'
@@ -86,25 +92,31 @@ trend_model_choices = function(){
   c("RW",
     "RWMA",
     "RWcor",
+    "RWhiercor",
     "RWMAcor",
     "GP",
     'AR1',
     'AR1MA',
     'AR1cor',
+    'AR1hiercor',
     'AR1MAcor',
     'AR2',
     'AR2MA',
     'AR2cor',
+    'AR2hiercor',
     'AR2MAcor',
     'AR3',
     'AR3MA',
     'AR3cor',
+    'AR3hiercor',
     'AR3MAcor',
     'CAR1',
     'VAR',
     'VARcor',
+    'VARhiercor',
     'VAR1',
     'VAR1cor',
+    'VAR1hiercor',
     'VARMA',
     'VARMAcor',
     'VARMA1,1cor',
