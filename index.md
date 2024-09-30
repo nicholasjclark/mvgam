@@ -10,11 +10,10 @@
 The goal of `mvgam` is to use a Bayesian framework to estimate
 parameters of Dynamic Generalized Additive Models (DGAMs) for time
 series with dynamic trend components. The package provides an interface
-to fit Bayesian DGAMs using either `JAGS` or `Stan` as the backend, but
-note that users are strongly encouraged to opt for `Stan` over `JAGS`.
-The formula syntax is based on that of the package `mgcv` to provide a
-familiar GAM modelling interface. The motivation for the package and
-some of its primary objectives are described in detail by [Clark & Wells
+to fit Bayesian DGAMs using `Stan` as the backend. The formula syntax is
+based on that of the package `mgcv` to provide a familiar GAM modelling
+interface. The motivation for the package and some of its primary
+objectives are described in detail by [Clark & Wells
 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974)
 (published in *Methods in Ecology and Evolution*). An introduction to
 the package and some worked examples are shown in this seminar:
@@ -27,21 +26,19 @@ Models</a>.
 Install the stable version from CRAN using: `install.packages('mvgam')`,
 or install the development version from `GitHub` using:
 `devtools::install_github("nicholasjclark/mvgam")`. Note that to
-actually condition models with MCMC sampling, either the `JAGS` software
-must be installed (along with the `R` packages `rjags` and `runjags`) or
-the `Stan` software must be installed (along with either `rstan` and/or
-`cmdstanr`). Only `rstan` is listed as a dependency of `mvgam` to ensure
-that installation is less difficult. If users wish to fit the models
-using `mvgam`, please refer to installation links for `JAGS`
-[here](https://sourceforge.net/projects/mcmc-jags/files/), for `Stan`
-with `rstan` [here](https://mc-stan.org/users/interfaces/rstan), or for
-`Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/). You will
-need a fairly recent version of `Stan` (preferably 2.29 or above) to
-ensure all the model syntax is recognized. We highly recommend you use
-`Cmdstan` through the `cmdstanr` interface as the backend. This is
-because `Cmdstan` is easier to install, is more up to date with new
-features, and uses less memory than `Rstan`. See [this documentation
-from the `Cmdstan` team for more
+actually condition models with MCMC sampling, the `Stan` software must
+be installed (along with either `rstan` and/or `cmdstanr`). Only `rstan`
+is listed as a dependency of `mvgam` to ensure that installation is less
+difficult. If users wish to fit the models using `mvgam`, please refer
+to installation links for `Stan` with `rstan`
+[here](https://mc-stan.org/users/interfaces/rstan), or for `Stan` with
+`cmdstandr` [here](https://mc-stan.org/cmdstanr/). You will need a
+fairly recent version of `Stan` (preferably 2.29 or above) to ensure all
+the model syntax is recognized. We highly recommend you use `Cmdstan`
+through the `cmdstanr` interface as the backend. This is because
+`Cmdstan` is easier to install, is more up to date with new features,
+and uses less memory than `Rstan`. See [this documentation from the
+`Cmdstan` team for more
 information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan).
 
 ## Introductory seminar
@@ -79,14 +76,11 @@ package can handle data for the following families:
   trials
 - `nmix()` for count data with imperfect detection (unknown number of
   trials)
-- `tweedie()` for overdispersed count data
 
-Note that only `poisson()`, `nb()`, and `tweedie()` are available if
-using `JAGS`. All families, apart from `tweedie()`, are supported if
-using `Stan`. See `??mvgam_families` for more information. Below is a
-simple example for simulating and modelling proportional data with
-`Beta` observations over a set of seasonal series with independent
-Gaussian Process dynamic trends:
+See `??mvgam_families` for more information. Below is a simple example
+for simulating and modelling proportional data with `Beta` observations
+over a set of seasonal series with independent Gaussian Process dynamic
+trends:
 
 ``` r
 data <- sim_mvgam(family = betar(),
@@ -161,6 +155,9 @@ DGAMs can be useful for working with time series data:
 - <a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
   target="_blank">Ecological Forecasting with Dynamic Generalized Additive
   Models</a>
+- <a href="https://ecogambler.netlify.app/blog/vector-autoregressions/"
+  target="_blank">State-Space Vector Autoregressions in
+  <code>mvgam</code></a>
 - <a href="https://ecogambler.netlify.app/blog/interpreting-gams/"
   target="_blank">How to interpret and report nonlinear effects from
   Generalized Additive Models</a>
@@ -175,12 +172,8 @@ DGAMs can be useful for working with time series data:
 
 The package can also be used to generate all necessary data structures,
 initial value functions and modelling code necessary to fit DGAMs using
-`Stan` or `JAGS`. This can be helpful if users wish to make changes to
-the model to better suit their own bespoke research / analysis goals.
-The following resources can be helpful to troubleshoot:
-
-- [Stan Discourse](https://discourse.mc-stan.org/)
-- [JAGS Discourse](https://sourceforge.net/projects/mcmc-jags/)
+`Stan`. This can be helpful if users wish to make changes to the model
+to better suit their own bespoke research / analysis goals.
 
 ## Interested in contributing?
 

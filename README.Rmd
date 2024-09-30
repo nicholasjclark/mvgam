@@ -36,6 +36,7 @@ A series of [vignettes cover data formatting, forecasting and several extended c
   
 * [Ecological Forecasting with Dynamic Generalized Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ){target="_blank"}
 * [Distributed lags (and hierarchical distributed lags) using `mgcv` and `mvgam`](https://ecogambler.netlify.app/blog/distributed-lags-mgcv/){target="_blank"}
+* [State-Space Vector Autoregressions in `mvgam`](https://ecogambler.netlify.app/blog/vector-autoregressions/){target="_blank"}
 * [Ecological Forecasting with Dynamic GAMs; a tutorial and detailed case study](https://www.youtube.com/watch?v=RwllLjgPUmM){target="_blank"}
 * [How to interpret and report nonlinear effects from Generalized Additive Models](https://ecogambler.netlify.app/blog/interpreting-gams/){target="_blank"}
 * [Phylogenetic smoothing using `mgcv`](https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/){target="_blank"}
@@ -43,7 +44,7 @@ A series of [vignettes cover data formatting, forecasting and several extended c
   
 ## Installation
 Install the stable version from `CRAN` using: `install.packages('mvgam')`, or install the development version from `GitHub` using:
-`devtools::install_github("nicholasjclark/mvgam")`. Note that to condition models on observed data, either `JAGS` (along with packages `rjags` and `runjags`) or `Stan` must be installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `JAGS` [here](https://sourceforge.net/projects/mcmc-jags/files/){target="_blank"}, for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}. You will need a fairly recent version of `Stan` to ensure all syntax is recognized. If you see warnings such as `variable "array" does not exist`, this is usually a sign that you need to update `Stan`. 
+`devtools::install_github("nicholasjclark/mvgam")`. Note that to condition models on observed data, `Stan` must be installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
 
 We highly recommend you use `Cmdstan` through the `cmdstanr` interface. This is because `Cmdstan` is easier to install, is more up to date with new features, and uses less memory than `rstan`. See [this documentation from the `Cmdstan` team for more information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan){target="_blank"}. 
 
@@ -54,17 +55,16 @@ When using `mvgam`, please cite the following:
 
 - Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. *Methods in Ecology and Evolution*. DOI: https://doi.org/10.1111/2041-210X.13974
 
-As `mvgam` acts as an interface to `Stan` and `JAGS`, please additionally cite whichever software you use for parameter estimation:
+As `mvgam` acts as an interface to `Stan`, please additionally cite:
 
 - Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B., Betancourt M.,
   Brubaker M., Guo J., Li P., and Riddell A. (2017). Stan: A probabilistic
   programming language. *Journal of Statistical Software*. 76(1).
   10.18637/jss.v076.i01
-- Plummer, M. (2013). JAGS: A program for analysis of Bayesian graphical models using Gibbs sampling.          *Proceedings of the 3rd International Workshop on Distributed Statistical Computing*. 124(125.10).
 
 `mvgam` relies on several other `R` packages and, of course, on `R` itself. To
 find out how to cite R and its packages, use the `citation` function. There are
-some features of `mvgam` which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines, which entirely rely on `mgcv`. The `rstan` and `cmdstanr` packages together with `Rcpp` makes `Stan` conveniently accessible in `R`, while the `rjags` and `runjags` packages together with the `coda` package make `JAGS` accessible in `R`. If you use some of these features, please also consider citing the related packages.
+some features of `mvgam` which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines, which rely on `mgcv` and `splines2`. The `rstan` and `cmdstanr` packages together with `Rcpp` makes `Stan` conveniently accessible in `R`. If you use some of these features, please also consider citing the related packages.
 
 ## Cheatsheet
 [![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
@@ -231,14 +231,13 @@ plot(lynx_mvgam, type = 'residuals')
 * `binomial()` for count data with known number of trials
 * `beta_binomial()` for overdispersed count data with known number of trials
 * `nmix()` for count data with imperfect detection (unknown number of trials)
-* `tweedie()` for overdispersed count data
   
-Note that only `poisson()`, `nb()`, and `tweedie()` are available if using `JAGS`. All families, apart from `tweedie()`, are supported if using `Stan`. See `??mvgam_families` for more information. Below is a simple example for simulating and modelling proportional data with `Beta` observations over a set of seasonal series with independent Gaussian Process dynamic trends:
+See `??mvgam_families` for more information. Below is a simple example for simulating and modelling proportional data with `Beta` observations over a set of seasonal series with independent Gaussian Process dynamic trends:
 ```{r beta_sim, message=FALSE, warning=FALSE, fig.width=6.5, fig.height=6.5, dpi=160}
 set.seed(100)
 data <- sim_mvgam(family = betar(),
                   T = 80,
-                  trend_model = 'GP',
+                  trend_model = GP(),
                   prop_trend = 0.5, 
                   seasonality = 'shared')
 plot_mvgam_series(data = data$data_train, series = 'all')
@@ -247,7 +246,7 @@ plot_mvgam_series(data = data$data_train, series = 'all')
 ```{r, include=FALSE}
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
                s(season, by = series, m = 1, k = 5),
-             trend_model = 'GP',
+             trend_model = GP(),
              data = data$data_train,
              newdata = data$data_test,
              family = betar())
@@ -256,7 +255,7 @@ mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
 ```{r, eval=FALSE}
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
                s(season, by = series, m = 1, k = 5),
-             trend_model = 'GP',
+             trend_model = GP(),
              data = data$data_train,
              newdata = data$data_test,
              family = betar())
@@ -285,10 +284,7 @@ for(i in 1:3){
 }
 ```
 
-There are many more extended uses of `mvgam`, including the ability to fit hierarchical GAMs that include dynamic coefficient models, dynamic factor and Vector Autoregressive processes. See the [package documentation](https://nicholasjclark.github.io/mvgam/){target="_blank"} for more details. The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan` or `JAGS`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The following resources can be helpful to troubleshoot:
-  
-* [Stan Discourse](https://discourse.mc-stan.org/){target="_blank"}
-* [JAGS Discourse](https://sourceforge.net/projects/mcmc-jags/){target="_blank"}
+There are many more extended uses of `mvgam`, including the ability to fit hierarchical State-Space GAMs that include dynamic coefficient models, dynamic factors and Vector Autoregressive processes. See the [package documentation](https://nicholasjclark.github.io/mvgam/){target="_blank"} for more details. The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The [Stan Discourse](https://discourse.mc-stan.org/){target="_blank"} is a helpful place to troubleshoot.
 
 ## License
 This project is licensed under an `MIT` open source license
