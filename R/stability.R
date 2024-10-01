@@ -188,10 +188,10 @@ stability.mvgam = function(object, ...){
   }
 
   # Take posterior draws of the interaction matrix
-  B_post <- as.matrix(object, variable = 'A', regex = TRUE)
+  B_post <- mcmc_chains(object$model_output, 'A')
 
   # Take posterior draws of Sigma
-  Sigma_post <- as.matrix(object, variable = 'Sigma', regex = TRUE)
+  Sigma_post <- mcmc_chains(object$model_output, 'Sigma')
 
   # Number of series in the VAR process
   n_series <- object$n_lv
@@ -204,13 +204,15 @@ stability.mvgam = function(object, ...){
 
     B <- matrix(B_post[i,],
                 nrow = n_series,
-                ncol = n_series)
+                ncol = n_series,
+                byrow = TRUE)
     p <- dim(B)[1]
 
     # If we want to get the variance of the stationary distribution (Sigma_inf)
     Sigma <- matrix(Sigma_post[i,],
                     nrow = n_series,
-                    ncol = n_series)
+                    ncol = n_series,
+                    byrow = TRUE)
     vecS_inf <- solve(diag(p * p) - kronecker(B, B)) %*% as.vector(Sigma)
     Sigma_inf <- matrix(vecS_inf, nrow = p)
 
