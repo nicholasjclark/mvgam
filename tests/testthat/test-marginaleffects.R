@@ -8,7 +8,7 @@ test_that("data_grid gives expected output structure", {
                       trend_model = GP(),
                       mu = 1.5)
 
-  out <- SW(data_grid(season = unique,
+  out <- SW(mvgam:::data_grid(season = unique,
                       year = mean,
                       newdata = simdat$data_test))
   expect_true(all(out$year == mean(simdat$data_test$year)))
@@ -18,11 +18,11 @@ test_that("data_grid gives expected output structure", {
       max(x, na.rm = TRUE) + 22.4,
       min(x, na.rm = TRUE) - 11.7)
   }
-  out <- data_grid(time = myfunc, newdata = simdat$data_test)
+  out <- mvgam:::data_grid(time = myfunc, newdata = simdat$data_test)
   expect_true(NROW(out) == 3)
 
   # A list example
-  out <- data_grid(season = fivenum,
+  out <- mvgam:::data_grid(season = fivenum,
                    year = mean,
                    newdata = mvgam:::mvgam_example5$obs_data)
   expect_true(all.equal(names(out), names(mvgam:::mvgam_example5$obs_data)))

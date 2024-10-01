@@ -5,6 +5,8 @@
 #'\itemize{
 #'   \item `None` (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 #'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+#'   \item `ZMVN()` (zero-mean correlated errors, useful for modelling time series where no
+#'   autoregressive terms are needed or for modelling data that are not sampled as time series)
 #'   \item `RW()`
 #'   \item `AR(p = 1, 2, or 3)`
 #'   \item `CAR(p = 1)`(continuous time autoregressive trends; only available in \code{Stan})
@@ -17,49 +19,10 @@
 #'measured in discrete, regularly spaced intervals (i.e. `c(1, 2, 3, ...)`). However you can
 #'use irregularly spaced intervals if using `trend_model = CAR(1)`, though note that any
 #'temporal intervals that are exactly `0` will be adjusted to a very small number
-#'(`1e-12`) to prevent sampling errors. For all trend types
-#'apart from `GP()`, `PW()`, and `CAR()`, moving average and/or correlated
+#'(`1e-12`) to prevent sampling errors. For all autoregressive trend types
+#'apart from `CAR()`, moving average and/or correlated
 #'process error terms can also be estimated (for example, `RW(cor = TRUE)` will set up a
-#'multivariate Random Walk if `data` contains `>1` series). Character strings can also be supplied
-#'instead of the various trend functions. The full list of possible models that are
-#'currently supported is:
-#'\itemize{
-#'\item 'RW'
-#'\item 'RWMA'
-#'\item 'RWcor'
-#'\item 'RWhiercor'
-#'\item 'RWMAcor'
-#'\item 'AR1'
-#'\item 'AR1MA'
-#'\item 'AR1cor'
-#'\item 'AR1hiercor'
-#'\item 'AR1MAcor'
-#'\item 'AR2'
-#'\item 'AR2MA'
-#'\item 'AR2cor'
-#'\item 'AR2hiercor'
-#'\item 'AR2MAcor'
-#'\item 'AR3'
-#'\item 'AR3MA'
-#'\item 'AR3cor'
-#'\item 'AR3hiercor'
-#'\item 'AR3MAcor'
-#'\item 'CAR1'
-#'\item 'VAR'
-#'\item 'VARcor'
-#'\item 'VARhiercor'
-#'\item 'VAR1' (same as 'VAR')
-#'\item 'VAR1cor' (same as 'VARcor')
-#'\item 'VAR1hiercor' (same as 'VARhiercor')
-#'\item 'VARMA'
-#'\item 'VARMAcor'
-#'\item 'VARMA1,1cor'
-#'\item 'PWlinear'
-#'\item 'PWlogistic'
-#'\item 'GP'
-#'\item 'None'
-#'}
-#'
+#'multivariate Random Walk if `data` contains `>1` series).
 #'
 #'Note that only `RW`, `AR1`, `AR2` and `AR3` are available if
 #'using `JAGS`. All trend models are supported if using `Stan`.
@@ -76,7 +39,7 @@
 #'by `Facebook`, where users can allow for changepoints to control the potential flexibility
 #'of the trend. See Taylor and Letham (2018) for details
 #'@seealso \code{\link{RW}}, \code{\link{AR}}, \code{\link{CAR}},
-#'\code{\link{VAR}}, \code{\link{PW}}, \code{\link{GP}}
+#'\code{\link{VAR}}, \code{\link{PW}}, \code{\link{GP}}, \code{\link{ZMVN}}
 #' @references Sarah E. Heaps (2022) Enforcing stationarity through the prior in Vector Autoregressions.
 #' Journal of Computational and Graphical Statistics. 32:1, 1-10.
 #'
@@ -122,6 +85,8 @@ trend_model_choices = function(){
     'VARMA1,1cor',
     'PWlinear',
     'PWlogistic',
+    'ZMVNcor',
+    'ZMVNhiercor',
     'None')
 }
 
@@ -139,30 +104,40 @@ ma_cor_additions = function(trend_model){
 
   if(trend_model == 'AR3MA') trend_model <- 'AR3'
 
-  if(trend_model %in% c('RWcor', 'RWMAcor')){
+  if(trend_model %in% c('RWcor', 'RWhiercor', 'RWMAcor')){
     add_cor <- TRUE
     trend_model <- 'RW'
   }
 
-  if(trend_model %in% c('AR1cor', 'AR1MAcor')){
+  if(trend_model %in% c('ZMVNcor', 'ZMVNhiercor')){
+    add_cor <- TRUE
+    trend_model <- 'ZMVN'
+  }
+
+  if(trend_model %in% c('AR1cor', 'AR1hiercor', 'AR1MAcor')){
     add_cor <- TRUE
     trend_model <- 'AR1'
   }
 
-  if(trend_model %in% c('AR2cor', 'AR2MAcor')){
+  if(trend_model %in% c('AR2cor', 'AR2hiercor', 'AR2MAcor')){
     add_cor <- TRUE
     trend_model <- 'AR2'
   }
 
-  if(trend_model %in% c('AR3cor', 'AR3MAcor')){
+  if(trend_model %in% c('AR3cor', 'AR3hiercor', 'AR3MAcor')){
     add_cor <- TRUE
     trend_model <- 'AR3'
   }
 
   if(trend_model == 'VAR1') use_var1 <- TRUE
 
-  if(trend_model %in% c('VAR1cor', 'VARMA1,1cor')){
+  if(trend_model %in% c('VAR1cor', 'VAR1hiercor', 'VARMA1,1cor')){
     use_var1cor <- TRUE
+
+    if(trend_model == 'VAR1hiercor'){
+      add_cor <- TRUE
+    }
+
     trend_model <- 'VAR1'
   }
 
@@ -688,25 +663,26 @@ trend_par_names = function(trend_model,
                            drift = FALSE){
 
   # Check arguments
-  trend_model <- validate_trend_model(trend_model, drift = drift)
+  trend_model <- validate_trend_model(trend_model, drift = drift,
+                                      warn = FALSE)
 
   if(use_lv){
-    if(trend_model == 'RW'){
+    if(grepl('RW', trend_model)){
       param <- c('trend', 'LV', 'penalty',
                  'lv_coefs', 'theta', 'Sigma', 'error')
     }
 
-    if(trend_model == 'AR1'){
+    if(grepl('AR1', trend_model)){
       param <- c('trend', 'ar1', 'LV', 'penalty',
                  'lv_coefs', 'theta', 'Sigma', 'error')
     }
 
-    if(trend_model == 'AR2'){
+    if(grepl('AR2', trend_model)){
       param <- c('trend', 'ar1', 'ar2', 'LV',
                  'penalty', 'lv_coefs', 'theta', 'Sigma', 'error')
     }
 
-    if(trend_model == 'AR3'){
+    if(grepl('AR3', trend_model)){
       param <- c('trend', 'ar1', 'ar2', 'ar3',
                  'LV', 'penalty', 'lv_coefs', 'theta',
                  'Sigma', 'error')
@@ -722,7 +698,7 @@ trend_par_names = function(trend_model,
                  'LV', 'lv_coefs', 'b_gp')
     }
 
-    if(trend_model == 'VAR1'){
+    if(grepl('VAR', trend_model)){
       param <- c('trend', 'A', 'Sigma',
                  'lv_coefs', 'LV', 'P_real', 'sigma',
                  'theta', 'error')
@@ -731,21 +707,21 @@ trend_par_names = function(trend_model,
   }
 
   if(!use_lv){
-    if(trend_model == 'RW'){
+    if(grepl('RW', trend_model)){
       param <- c('trend', 'tau', 'sigma', 'theta', 'Sigma', 'error')
     }
 
-    if(trend_model == 'AR1'){
+    if(grepl('AR1', trend_model)){
       param <- c('trend', 'tau', 'sigma', 'ar1',
                  'theta', 'Sigma', 'error')
     }
 
-    if(trend_model == 'AR2'){
+    if(grepl('AR2', trend_model)){
       param <- c('trend', 'tau', 'sigma', 'ar1', 'ar2',
                  'theta', 'Sigma', 'error')
     }
 
-    if(trend_model == 'AR3'){
+    if(grepl('AR3', trend_model)){
       param <- c('trend', 'tau', 'sigma', 'ar1', 'ar2',
                  'ar3', 'theta', 'Sigma', 'error')
     }
@@ -759,7 +735,7 @@ trend_par_names = function(trend_model,
       param <- c('trend', 'alpha_gp', 'rho_gp', 'b_gp')
     }
 
-    if(trend_model == 'VAR1'){
+    if(grepl('VAR', trend_model)){
       param <- c('trend', 'A', 'Sigma', 'P_real',
                  'sigma', 'theta', 'error')
     }
@@ -774,6 +750,10 @@ trend_par_names = function(trend_model,
     if(drift){
       param <- c(param, 'drift')
     }
+  }
+
+  if(grepl('hiercor', trend_model)){
+    param <- c(param, 'alpha_cor')
   }
 
   if(trend_model == 'None'){

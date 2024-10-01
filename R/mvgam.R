@@ -660,7 +660,7 @@ mvgam = function(formula,
   orig_data <- data_train
 
   # Validate trend_model
-  if(drift &  silent < 2L)
+  if(drift & silent < 2L)
     message('The "drift" argument is deprecated; use fixed effects of "time" instead')
   drift <- FALSE
   orig_trend_model <- trend_model
@@ -670,7 +670,7 @@ mvgam = function(formula,
 
   # Ensure series and time variables are present
   data_train <- validate_series_time(data_train, name = 'data',
-                                     trend_model = trend_model)
+                                     trend_model = orig_trend_model)
 
   # Validate the formula to convert any dynamic() terms
   formula <- interpret_mvgam(formula,
@@ -706,7 +706,7 @@ mvgam = function(formula,
                                   family = family,
                                   use_lv = use_lv,
                                   n_lv = n_lv,
-                                  trend_model = trend_model,
+                                  trend_model = orig_trend_model,
                                   trend_map = trend_map,
                                   drift = drift,
                                   warnings = TRUE,
@@ -716,11 +716,11 @@ mvgam = function(formula,
 
   # Ensure series and time variables are present
   data_train <- validate_series_time(data_train, name = 'data',
-                                     trend_model = trend_model)
+                                     trend_model = orig_trend_model)
   if(!missing(data_test)){
     data_test <- validate_series_time(data_test,
                                       name = 'newdata',
-                                      trend_model = trend_model)
+                                      trend_model = orig_trend_model)
     if(trend_model == 'CAR1'){
       data_test$index..time..index <- data_test$index..time..index +
         max(data_train$index..time..index)
@@ -812,7 +812,7 @@ mvgam = function(formula,
                                     family = family,
                                     use_lv = use_lv,
                                     n_lv = n_lv,
-                                    trend_model = trend_model,
+                                    trend_model = orig_trend_model,
                                     trend_map = trend_map,
                                     drift = drift,
                                     knots = knots)
@@ -1659,7 +1659,7 @@ mvgam = function(formula,
       vectorised$model_file <- add_MaCor(vectorised$model_file,
                                          add_ma = add_ma,
                                          add_cor = add_cor,
-                                         trend_model = trend_model)
+                                         trend_model = orig_trend_model)
     }
 
     # Add updates for an N-mixture model

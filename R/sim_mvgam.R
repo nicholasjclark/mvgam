@@ -75,7 +75,7 @@ sim_mvgam = function(T = 100,
                      seasonality = 'shared',
                      use_lv = FALSE,
                      n_lv = 0,
-                     trend_model = 'RW',
+                     trend_model = RW(),
                      drift = FALSE,
                      prop_trend = 0.2,
                      trend_rel,
@@ -103,7 +103,8 @@ sim_mvgam = function(T = 100,
                                        "Gamma"))
 
   # Validate the trend arguments
-  trend_model <- validate_trend_model(trend_model, drift = drift)
+  trend_model <- validate_trend_model(trend_model, drift = drift,
+                                      warn = FALSE)
   if(trend_model %in% c('VAR1', 'VAR1cor')){
     use_lv <- FALSE
   }

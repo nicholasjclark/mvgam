@@ -11,7 +11,13 @@ add_MaCor = function(model_file,
                      trend_model = 'VAR1',
                      drift = FALSE){
 
-  if(trend_model %in% c('RW', 'AR1', 'AR2', 'AR3')){
+  if(inherits(trend_model, 'mvgam_trend')){
+    trend_char <- ma_cor_additions(validate_trend_model(trend_model))$trend_model
+  } else {
+    trend_char <- trend_model
+  }
+
+  if(trend_char %in% c('RW', 'AR1', 'AR2', 'AR3')){
 
     if(any(grepl('ytimes_trend', model_file))){
       remove_trendmus <- FALSE
@@ -141,7 +147,7 @@ add_MaCor = function(model_file,
                })
 
       if(add_cor){
-        if(trend_model %in% c('AR1', 'RW')){
+        if(trend_char %in% c('AR1', 'RW')){
           if(any(grep('// derived latent states',
                       model_file, fixed = TRUE))){
             to_modify <- grep('// derived latent states',
@@ -168,7 +174,7 @@ add_MaCor = function(model_file,
                    'LV[i] = ',
                    if(drift){ 'drift * (i - 1) + '} else {NULL},
                    'trend_mus[ytimes_trend[i, 1:n_lv]] + ',
-                   if(trend_model == 'AR1'){ 'ar1 .* '} else {NULL},
+                   if(trend_char == 'AR1'){ 'ar1 .* '} else {NULL},
                    '(LV[i - 1] - trend_mus[ytimes_trend[i - 1, 1:n_lv]])',
                    if(add_ma){
                      '+ epsilon[i] + error[i];\n'
@@ -178,7 +184,7 @@ add_MaCor = function(model_file,
                    '}\n')
         }
 
-        if(trend_model == 'AR2'){
+        if(trend_char == 'AR2'){
           if(any(grep('// derived latent states',
                       model_file, fixed = TRUE))){
             to_modify <- grep('// derived latent states',
@@ -227,7 +233,7 @@ add_MaCor = function(model_file,
                    '}\n')
         }
 
-        if(trend_model == 'AR3'){
+        if(trend_char == 'AR3'){
           if(any(grep('// derived latent states',
                       model_file, fixed = TRUE))){
             to_modify <- grep('// derived latent states',
@@ -289,7 +295,7 @@ add_MaCor = function(model_file,
         }
 
       } else {
-        if(trend_model %in% c('AR1', 'RW')){
+        if(trend_char %in% c('AR1', 'RW')){
           if(any(grep('// derived latent states',
                       model_file, fixed = TRUE))){
             to_modify <- grep('// derived latent states',
@@ -311,13 +317,13 @@ add_MaCor = function(model_file,
                    'LV[i, j] = ',
                    if(drift){ 'drift[j] * (i - 1) + '} else {NULL},
                    'trend_mus[ytimes_trend[i, j]] + ',
-                   if(trend_model == 'AR1'){ 'ar1[j] * '} else {NULL},
+                   if(trend_char == 'AR1'){ 'ar1[j] * '} else {NULL},
                    '(LV[i - 1, j] - trend_mus[ytimes_trend[i - 1, j]]) + ',
                    'epsilon[i, j] + error[i, j];\n',
                    '}\n}')
         }
 
-        if(trend_model == 'AR2'){
+        if(trend_char == 'AR2'){
           if(any(grep('// derived latent states',
                       model_file, fixed = TRUE))){
             to_modify <- grep('// derived latent states',
@@ -351,7 +357,7 @@ add_MaCor = function(model_file,
                    '}\n}')
         }
 
-        if(trend_model == 'AR3'){
+        if(trend_char == 'AR3'){
           if(any(grep('// derived latent states',
                       model_file, fixed = TRUE))){
             to_modify <- grep('// derived latent states',
@@ -426,7 +432,7 @@ add_MaCor = function(model_file,
                })
 
       if(add_cor){
-        if(trend_model %in% c('AR1', 'RW')){
+        if(trend_char %in% c('AR1', 'RW')){
           if(any(grepl('= mu_raw[',
                       model_file, fixed = TRUE))){
             insert_line <- max(grep('= mu_raw[',
@@ -456,7 +462,7 @@ add_MaCor = function(model_file,
                    },
                    'trend_raw[i] = ',
                    if(drift){ 'drift * (i - 1) + '} else {NULL},
-                   if(trend_model == 'AR1'){ 'ar1 .* '} else {NULL},
+                   if(trend_char == 'AR1'){ 'ar1 .* '} else {NULL},
                    'trend_raw[i - 1] + ',
                    if(add_ma){
                      'epsilon[i] + error[i];\n'
@@ -466,7 +472,7 @@ add_MaCor = function(model_file,
                    '}\n')
         }
 
-        if(trend_model == 'AR2'){
+        if(trend_char == 'AR2'){
           if(any(grepl('= mu_raw[',
                        model_file, fixed = TRUE))){
             insert_line <- max(grep('= mu_raw[',
@@ -515,7 +521,7 @@ add_MaCor = function(model_file,
                    '}\n')
         }
 
-        if(trend_model == 'AR3'){
+        if(trend_char == 'AR3'){
           if(any(grepl('= mu_raw[',
                        model_file, fixed = TRUE))){
             insert_line <- max(grep('= mu_raw[',
@@ -576,7 +582,7 @@ add_MaCor = function(model_file,
         }
 
       } else {
-        if(trend_model %in% c('AR1', 'RW')){
+        if(trend_char %in% c('AR1', 'RW')){
           if(any(grepl('= mu_raw[',
                        model_file, fixed = TRUE))){
             insert_line <- max(grep('= mu_raw[',
@@ -598,13 +604,13 @@ add_MaCor = function(model_file,
                    '// full ARMA process\n',
                    'trend[i, j] = ',
                    if(drift){ 'drift[j] * (i - 1) + '} else {NULL},
-                   if(trend_model == 'AR1'){ 'ar1[j] * '} else {NULL},
+                   if(trend_char == 'AR1'){ 'ar1[j] * '} else {NULL},
                    'trend[i - 1, j] + ',
                    'epsilon[i, j] + error[i, j];\n',
                    '}\n}')
         }
 
-        if(trend_model == 'AR2'){
+        if(trend_char == 'AR2'){
           if(any(grepl('= mu_raw[',
                        model_file, fixed = TRUE))){
             insert_line <- max(grep('= mu_raw[',
@@ -637,7 +643,7 @@ add_MaCor = function(model_file,
                    '}\n}')
         }
 
-        if(trend_model == 'AR3'){
+        if(trend_char == 'AR3'){
           if(any(grepl('= mu_raw[',
                        model_file, fixed = TRUE))){
             insert_line <- max(grep('= mu_raw[',
@@ -816,7 +822,7 @@ add_MaCor = function(model_file,
     model_file <- readLines(textConnection(model_file), n = -1)
   }
 
-  if(trend_model == 'VAR1'){
+  if(grepl('VAR', trend_char)){
     # Only ma can be added for VAR models currently
     # Replace the reverse mapping function with the MA representation
     start <- grep('/* Function to perform the reverse mapping*/',
@@ -1183,5 +1189,52 @@ add_MaCor = function(model_file,
     model_file <- readLines(textConnection(model_file), n = -1)
   }
 
+  # Now do any rearrangements needed for hierarchical correlations
+  if(grepl('hiercor', validate_trend_model(trend_model))){
+
+    # Add the function to calculate a convex combination of correlation matrices
+    if(any(grepl('functions {', model_file, fixed = TRUE))){
+      model_file[grep('functions {', model_file, fixed = TRUE)] <-
+        paste0('functions {\n',
+               '/* Function to compute a partially pooled correlation matrix */\n',
+               '/* https://discourse.mc-stan.org/t/hierarchical-prior-for-partial-pooling-on-correlation-matrices*/\n',
+               'matrix combine_cholesky(matrix global_chol_cor, matrix local_chol_cor, real alpha){',
+               'int dim = rows(local_chol_cor);\n',
+               'matrix[dim, dim] global_cor = multiply_lower_tri_self_transpose(global_chol_cor);\n',
+               'matrix[dim, dim] local_cor = multiply_lower_tri_self_transpose(local_chol_cor);\n',
+               'matrix[dim, dim] combined_chol_cor;\n',
+               'combined_chol_cor = cholesky_decompose((1 - alpha) * global_cor +\n',
+               '                                       (alpha) * local_cor);\n',
+               'return(combined_chol_cor);\n',
+               '}\n')
+
+    } else {
+      model_file[grep('Stan model code', model_file)] <-
+        paste0('// Stan model code generated by package mvgam\n',
+               'functions {\n',
+               '/* Function to compute a partially pooled correlation matrix */\n',
+               '/* https://discourse.mc-stan.org/t/hierarchical-prior-for-partial-pooling-on-correlation-matrices*/\n',
+               'matrix combine_cholesky(matrix global_chol_cor, matrix local_chol_cor, real alpha){',
+               'int dim = rows(local_chol_cor);\n',
+               'matrix[dim, dim] global_cor = multiply_lower_tri_self_transpose(global_chol_cor);\n',
+               'matrix[dim, dim] local_cor = multiply_lower_tri_self_transpose(local_chol_cor);\n',
+               'matrix[dim, dim] combined_chol_cor;\n',
+               'combined_chol_cor = cholesky_decompose((1 - alpha) * global_cor +\n',
+               '                                       (alpha) * local_cor);\n',
+               'return(combined_chol_cor);\n',
+               '}\n}\n')
+    }
+    model_file <- readLines(textConnection(model_file), n = -1)
+
+    # Add group information to data block
+    model_file[grep('int<lower=0> n_series;', model_file, fixed = TRUE)] <-
+      paste0("int<lower=0> n_groups; // number of groups (correlations apply within grouping levels)\n",
+             "int<lower=0> n_subgroups; // number of subgroups (units whose errors will be correlated)\n",
+             "int<lower=0> n_series; // total number of unique series (n_groups * n_subgroups)\n",
+             "array[n_groups, n_subgroups] int<lower=1> group_inds; // indices of group membership")
+    model_file <- readLines(textConnection(model_file), n = -1)
+
+
+  }
   return(model_file)
 }

@@ -198,7 +198,12 @@
                                                          'shape_vec',
                                                          'phi_inv',
                                                          'lv_coefs_raw',
-                                                         'L_Sigma'),
+                                                         'L_Sigma',
+                                                         'L_Omega',
+                                                         'L_Sigma_group',
+                                                         'L_deviation_group',
+                                                         'L_Omega_group',
+                                                         'sub_error'),
                                              algorithm = algorithm)
   }
 

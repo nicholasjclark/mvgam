@@ -43,8 +43,7 @@ plot_mvgam_resids = function(object, series = 1,
 
   if(!missing("newdata")){
     data_test <- validate_series_time(newdata,
-                                      trend_model = attr(object$model_data,
-                                                         'trend_model'))
+                                      trend_model = object$trend_model)
   }
 
 # Plotting colours
@@ -58,8 +57,7 @@ c_dark_highlight <- c("#7C0000")
 
 # Prediction indices for the particular series
 data_train <- validate_series_time(object$obs_data,
-                                   trend_model = attr(object$model_data,
-                                                      'trend_model'))
+                                   trend_model = object$trend_model)
 ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
             length.out = NCOL(object$ytimes) + 1)
 starts <- ends + 1

@@ -53,6 +53,14 @@ marginaleffects::datagrid
 #' @importFrom marginaleffects hypotheses
 marginaleffects::hypotheses
 
+#' @export
+#' @importFrom marginaleffects get_predict
+marginaleffects::get_predict
+
+#' @export
+#' @importFrom insight get_data
+insight::get_data
+
 #' Functions needed for working with marginaleffects
 #' @rdname mvgam_marginaleffects
 #' @export
@@ -125,7 +133,6 @@ get_predict.mvgam <- function(model, newdata,
   attr(out, "posterior_draws") <- t(preds)
   return(out)
 }
-
 
 #' Functions needed for getting data / objects with insight
 #' @rdname mvgam_marginaleffects

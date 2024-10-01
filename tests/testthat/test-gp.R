@@ -110,7 +110,7 @@ test_that("gp for process models working properly", {
                  year:season,
                data = beta_data$data_train,
                family = betar(),
-               trend_model = 'AR1',
+               trend_model = AR(),
                run_model = FALSE)
 
   # Model file should have prior lines for gp terms

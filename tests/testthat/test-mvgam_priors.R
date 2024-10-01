@@ -16,7 +16,7 @@ skip_on_cran()
 
 test_that("get_mvgam_priors works for a variety of ma and cor trends", {
   priors <- get_mvgam_priors(y ~ s(season, k = 7),
-                             trend_model = 'RW',
+                             trend_model = RW(),
                              family = gaussian(),
                              data = mvgam:::mvgam_examp_dat$data_train)
   expect_true(inherits(priors, 'data.frame'))
@@ -65,7 +65,7 @@ test_that("get_mvgam_priors finds all classes for which priors can be specified"
 
 test_that("family must be correctly specified", {
   expect_error(get_mvgam_priors(y ~ s(season),
-                                trend_model = 'AR1',
+                                trend_model = AR(),
                                 data = beta_data$data_train,
                                 family = 'besta'),
                'family not recognized')
@@ -80,13 +80,13 @@ test_that("trend_model must be correctly specified", {
 
 test_that("response variable must follow family-specific restrictions", {
   expect_error(get_mvgam_priors(y ~ s(season),
-                            trend_model = 'AR1',
+                            trend_model = AR(),
                             data = gaus_data$data_train,
                             family = lognormal()),
                'Values <= 0 not allowed for lognormal responses')
 
   expect_error(get_mvgam_priors(y ~ s(season),
-                                trend_model = 'AR1',
+                                trend_model = AR(),
                                 data = gaus_data$data_train,
                                 family = poisson()),
                'Values < 0 not allowed for count family responses')
@@ -95,7 +95,7 @@ test_that("response variable must follow family-specific restrictions", {
 test_that("default intercept prior should match brms implementation", {
   simdat <- sim_mvgam(family = gaussian(), mu = 500)
   def_prior <- get_mvgam_priors(y ~ s(season),
-                                trend_model = 'AR1',
+                                trend_model = AR(),
                                 data = simdat$data_train,
                                 family = gaussian())$prior[1]
 
@@ -105,7 +105,7 @@ test_that("default intercept prior should match brms implementation", {
 
   # Now try Student
   def_prior <- get_mvgam_priors(y ~ s(season),
-                                trend_model = 'AR1',
+                                trend_model = AR(),
                                 data = simdat$data_train,
                                 family = student_t())$prior[1]
 
@@ -116,7 +116,7 @@ test_that("default intercept prior should match brms implementation", {
   # Now Poisson
   simdat <- sim_mvgam(family = poisson(), mu = 0)
   def_prior <- get_mvgam_priors(y ~ s(season),
-                                trend_model = 'AR1',
+                                trend_model = AR(),
                                 data = simdat$data_train,
                                 family = poisson())$prior[1]
 
@@ -127,7 +127,7 @@ test_that("default intercept prior should match brms implementation", {
   # Now Beta
   simdat <- sim_mvgam(family = betar(), mu = 0)
   def_prior <- get_mvgam_priors(y ~ s(season),
-                                trend_model = 'AR1',
+                                trend_model = AR(),
                                 data = simdat$data_train,
                                 family = betar())$prior[1]
 
@@ -138,7 +138,7 @@ test_that("default intercept prior should match brms implementation", {
   # Now Negative Binomial
   simdat <- sim_mvgam(family = nb(), mu = 0)
   def_prior <- get_mvgam_priors(y ~ s(season),
-                                trend_model = 'AR1',
+                                trend_model = AR(),
                                 data = simdat$data_train,
                                 family = nb())$prior[1]
 
@@ -150,12 +150,12 @@ test_that("default intercept prior should match brms implementation", {
 test_that("specified priors appear in the Stan code", {
 
   priors <- get_mvgam_priors(formula = y ~ s(season, bs = 'cc'),
-                             trend_model = 'GP',
+                             trend_model = GP(),
                              data = beta_data$data_train,
                              family = betar())
   priors$prior[3] <- "alpha_gp ~ normal(-1, 0.75);"
   stancode <- mvgam(y ~ s(season, bs = 'cc'),
-                    trend_model = 'GP',
+                    trend_model = GP(),
                     data = beta_data$data_train,
                     family = betar(),
                     priors = priors,
@@ -166,7 +166,7 @@ test_that("specified priors appear in the Stan code", {
   # Now the same using brms functionality; this time use a bound as well
   priors <- prior(normal(-1, 0.75), class = alpha_gp, ub = 1)
   stancode <- mvgam(y ~ s(season, bs = 'cc'),
-                    trend_model = 'GP',
+                    trend_model = GP(),
                     data = beta_data$data_train,
                     family = betar(),
                     priors = priors,
@@ -182,7 +182,7 @@ test_that("specified trend_formula priors appear in the Stan code", {
   priors <- get_mvgam_priors(formula = y ~ 1,
                              trend_formula = ~ s(season, bs = 'cc') +
                                year,
-                             trend_model = 'AR1',
+                             trend_model = AR(),
                              data = beta_data$data_train,
                              family = betar())
   priors$prior[5] <- "year_trend ~ uniform(-2, 1);"
@@ -190,7 +190,7 @@ test_that("specified trend_formula priors appear in the Stan code", {
   stancode <- mvgam(formula = y ~ 1,
                     trend_formula = ~ s(season, bs = 'cc') +
                       year,
-                    trend_model = 'AR1',
+                    trend_model = AR(),
                     data = beta_data$data_train,
                     family = betar(),
                     priors = priors,
@@ -203,12 +203,12 @@ test_that("specified trend_formula priors appear in the Stan code", {
 test_that("priors on parametric effects behave correctly", {
 
   priors <- get_mvgam_priors(formula = y ~ s(season, bs = 'cc'),
-                             trend_model = 'GP',
+                             trend_model = GP(),
                              data = beta_data$data_train,
                              family = betar())
   priors$prior[1] <- "(Intercept) ~ normal(-1, 0.75);"
   stancode <- mvgam(y ~ s(season, bs = 'cc'),
-                    trend_model = 'GP',
+                    trend_model = GP(),
                     data = beta_data$data_train,
                     family = betar(),
                     priors = priors,
@@ -219,7 +219,7 @@ test_that("priors on parametric effects behave correctly", {
   # Now the same using brms functionality
   priors <- prior(normal(-1, 0.75), class = Intercept)
   stancode <- mvgam(formula = y ~ s(season, bs = 'cc'),
-                    trend_model = 'GP',
+                    trend_model = GP(),
                     data = beta_data$data_train,
                     family = betar(),
                     priors = priors,
@@ -230,7 +230,7 @@ test_that("priors on parametric effects behave correctly", {
   # Bounds not allowed on parametric effect priors yet
   priors <- prior(normal(-1, 0.75), class = `Intercept`, lb = 0)
   expect_warning(mvgam(formula = y ~ s(season, bs = 'cc'),
-                       trend_model = 'GP',
+                       trend_model = GP(),
                        data = beta_data$data_train,
                        family = betar(),
                        priors = priors,
@@ -250,7 +250,7 @@ test_that("priors on gp() effects work properly", {
 
   mod <- mvgam(formula = y ~ gp(time, by = series, scale = FALSE),
                trend_formula = ~ gp(season, scale = FALSE),
-               trend_model = 'AR1',
+               trend_model = AR(),
                data = dat$data_train,
                run_model = FALSE,
                priors = priors)

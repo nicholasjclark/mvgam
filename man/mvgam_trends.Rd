@@ -11,6 +11,8 @@ Supported mvgam trend models
 \itemize{
 \item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+\item \code{ZMVN()} (zero-mean correlated errors, useful for modelling time series where no
+autoregressive terms are needed or for modelling data that are not sampled as time series)
 \item \code{RW()}
 \item \verb{AR(p = 1, 2, or 3)}
 \item \code{CAR(p = 1)}(continuous time autoregressive trends; only available in \code{Stan})
@@ -23,42 +25,10 @@ For most dynamic trend types available in \code{mvgam} (see argument \code{trend
 measured in discrete, regularly spaced intervals (i.e. \code{c(1, 2, 3, ...)}). However you can
 use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though note that any
 temporal intervals that are exactly \code{0} will be adjusted to a very small number
-(\code{1e-12}) to prevent sampling errors. For all trend types
-apart from \code{GP()}, \code{PW()}, and \code{CAR()}, moving average and/or correlated
+(\code{1e-12}) to prevent sampling errors. For all autoregressive trend types
+apart from \code{CAR()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
-multivariate Random Walk if \code{data} contains \verb{>1} series). Character strings can also be supplied
-instead of the various trend functions. The full list of possible models that are
-currently supported is:
-\itemize{
-\item 'RW'
-\item 'RWMA'
-\item 'RWcor'
-\item 'RWMAcor'
-\item 'AR1'
-\item 'AR1MA'
-\item 'AR1cor'
-\item 'AR1MAcor'
-\item 'AR2'
-\item 'AR2MA'
-\item 'AR2cor'
-\item 'AR2MAcor'
-\item 'AR3'
-\item 'AR3MA'
-\item 'AR3cor'
-\item 'AR3MAcor'
-\item 'CAR1'
-\item 'VAR'
-\item 'VARcor'
-\item 'VAR1' (same as 'VAR')
-\item 'VAR1cor' (same as 'VARcor')
-\item 'VARMA'
-\item 'VARMAcor'
-\item 'VARMA1,1cor'
-\item 'PWlinear'
-\item 'PWlogistic'
-\item 'GP'
-\item 'None'
-}
+multivariate Random Walk if \code{data} contains \verb{>1} series).
 
 Note that only \code{RW}, \code{AR1}, \code{AR2} and \code{AR3} are available if
 using \code{JAGS}. All trend models are supported if using \code{Stan}.
@@ -84,5 +54,5 @@ The American Statistician 72.1, 37-45.
 }
 \seealso{
 \code{\link{RW}}, \code{\link{AR}}, \code{\link{CAR}},
-\code{\link{VAR}}, \code{\link{PW}}, \code{\link{GP}}
+\code{\link{VAR}}, \code{\link{PW}}, \code{\link{GP}}, \code{\link{ZMVN}}
 }

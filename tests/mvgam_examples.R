@@ -145,12 +145,13 @@ mvgam_examp_dat <- list(data_train =
 
 # Univariate process without trend_formula
 mvgam_example1 <- mvgam(y ~ s(season, k = 5),
-                        trend_model = 'RW',
+                        trend_model = RW(),
                         family = gaussian(),
                         data = mvgam_examp_dat$data_train,
                         burnin = 300,
                         samples = 30,
-                        chains = 1)
+                        chains = 1,
+                        backend = 'rstan')
 
 # Univariate process with trend_formula, trend_map and correlated process errors
 trend_map <- data.frame(series = unique(mvgam_examp_dat$data_train$series),
@@ -163,16 +164,18 @@ mvgam_example2 <- mvgam(y ~ 1,
                         data = mvgam_examp_dat$data_train,
                         burnin = 300,
                         samples = 30,
-                        chains = 1)
+                        chains = 1,
+                        backend = 'rstan')
 
 # Multivariate process without trend_formula
 mvgam_example3 <- mvgam(y ~ s(season, k = 5),
-                        trend_model = 'VAR1cor',
+                        trend_model = VAR(cor = TRUE),
                         family = gaussian(),
                         data = mvgam_examp_dat$data_train,
                         burnin = 300,
                         samples = 30,
-                        chains = 1)
+                        chains = 1,
+                        backend = 'rstan')
 
 # Multivariate process with trend_formula and moving averages
 mvgam_example4 <- mvgam(y ~ series,
@@ -182,7 +185,8 @@ mvgam_example4 <- mvgam(y ~ series,
                         data = mvgam_examp_dat$data_train,
                         burnin = 300,
                         samples = 30,
-                        chains = 1)
+                        chains = 1,
+                        backend = 'rstan')
 
 # GP dynamic factors (use list format to ensure it works in tests)
 list_data <- list()
@@ -198,7 +202,8 @@ mvgam_example5 <- mvgam(y ~ series + s(season, k = 5),
                         data = list_data,
                         burnin = 300,
                         samples = 30,
-                        chains = 1)
+                        chains = 1,
+                        backend = 'rstan')
 
 # Save examples as internal data
 usethis::use_data(
