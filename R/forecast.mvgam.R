@@ -595,6 +595,7 @@ forecast_draws = function(object,
   validate_pos_integer(n_cores)
   data_test <- validate_series_time(data_test, name = 'newdata',
                                     trend_model = object$trend_model)
+  data_test <- sort_data(data_test)
   n_series <- NCOL(object$ytimes)
   use_lv <- object$use_lv
 
@@ -965,7 +966,7 @@ forecast_draws = function(object,
             Xpmat <- Xp[which(as.numeric(data_test$series) == series),]
             latent_lambdas <- exp(trend_states[, series])
             pred_betas <- betas
-            cap <- data_test$cap[which(as.numeric(object$obs_data$series) == series)]
+            cap <- data_test$cap[which(as.numeric(data_test$series) == series)]
           } else {
             Xpmat <- cbind(Xp[which(as.numeric(data_test$series) == series),],
                            trend_states[, series])

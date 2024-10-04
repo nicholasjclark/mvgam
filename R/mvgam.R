@@ -1656,10 +1656,15 @@ mvgam = function(formula,
     # Add any correlated error or moving average processes; this comes after
     # priors as currently there is no option to change priors on these parameters
     if(add_ma | add_cor){
-      vectorised$model_file <- add_MaCor(vectorised$model_file,
+      MaCor_additions <- add_MaCor(model_file = vectorised$model_file,
+                                         model_data = vectorised$model_data,
+                                         data_train = data_train,
+                                         data_test = data_test,
                                          add_ma = add_ma,
                                          add_cor = add_cor,
                                          trend_model = orig_trend_model)
+      vectorised$model_file <- MaCor_additions$model_file
+      vectorised$model_data <- MaCor_additions$model_data
     }
 
     # Add updates for an N-mixture model

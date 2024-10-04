@@ -28,12 +28,15 @@ for the process errors. Default is \code{FALSE}.}
 for setting up hierarchical residual correlation structures. If specified,
 this will automatically set \code{cor = TRUE} and set up a model where the
 residual correlations for a specific level of \code{gr} are modelled hierarchically:
-\eqn{\Omega_{group} = p\Omega_{global} + (1 - p)\Omega_{group, local}},
+\eqn{\Omega_{group} = \alpha_{cor}\Omega_{global} + (1 - \alpha_{cor})\Omega_{group, local}},
 where \eqn{\Omega_{global}} is a \emph{global} correlation
 matrix, \eqn{\Omega_{group, local}} is a \emph{local deviation} correlation matrix
-and \eqn{p} is a weighting parameter
-controlling how strongly the local correlation matrix \eqn{\Omega_{group}} is shrunk towards the global
-correlation matrix \eqn{\Omega_{global}}. If \code{gr} is supplied then \code{subgr} \emph{must} also be supplied}
+and \eqn{\alpha_{cor}} is a weighting parameter
+controlling how strongly the local correlation matrix \eqn{\Omega_{group}}
+is shrunk towards the global
+correlation matrix \eqn{\Omega_{global}} (larger values of \eqn{\alpha_{cor}} indicate
+a greater degree of shrinkage, i.e. a greater degree of partial pooling).
+If \code{gr} is supplied then \code{subgr} \emph{must} also be supplied}
 
 \item{subgr}{A subgrouping \code{factor} variable specifying which element in \code{data} represents the
 different time series. Defaults to \code{series}, but note that

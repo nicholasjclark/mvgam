@@ -6,6 +6,9 @@
 #' extracted in the same way
 #' @noRd
 add_MaCor = function(model_file,
+                     model_data,
+                     data_train,
+                     data_test,
                      add_ma = FALSE,
                      add_cor = FALSE,
                      trend_model = 'VAR1',
@@ -822,7 +825,7 @@ add_MaCor = function(model_file,
     model_file <- readLines(textConnection(model_file), n = -1)
   }
 
-  if(grepl('VAR', trend_char)){
+  if(grepl('VAR', trend_char) & add_ma){
     # Only ma can be added for VAR models currently
     # Replace the reverse mapping function with the MA representation
     start <- grep('/* Function to perform the reverse mapping*/',
@@ -1203,8 +1206,8 @@ add_MaCor = function(model_file,
                'matrix[dim, dim] global_cor = multiply_lower_tri_self_transpose(global_chol_cor);\n',
                'matrix[dim, dim] local_cor = multiply_lower_tri_self_transpose(local_chol_cor);\n',
                'matrix[dim, dim] combined_chol_cor;\n',
-               'combined_chol_cor = cholesky_decompose((1 - alpha) * global_cor +\n',
-               '                                       (alpha) * local_cor);\n',
+               'combined_chol_cor = cholesky_decompose(alpha * global_cor +\n',
+               '                                       (1 - alpha) * local_cor);\n',
                'return(combined_chol_cor);\n',
                '}\n')
 
@@ -1219,8 +1222,8 @@ add_MaCor = function(model_file,
                'matrix[dim, dim] global_cor = multiply_lower_tri_self_transpose(global_chol_cor);\n',
                'matrix[dim, dim] local_cor = multiply_lower_tri_self_transpose(local_chol_cor);\n',
                'matrix[dim, dim] combined_chol_cor;\n',
-               'combined_chol_cor = cholesky_decompose((1 - alpha) * global_cor +\n',
-               '                                       (alpha) * local_cor);\n',
+               'combined_chol_cor = cholesky_decompose(alpha * global_cor +\n',
+               '                                       (1 - alpha) * local_cor);\n',
                'return(combined_chol_cor);\n',
                '}\n}\n')
     }
@@ -1234,7 +1237,369 @@ add_MaCor = function(model_file,
              "array[n_groups, n_subgroups] int<lower=1> group_inds; // indices of group membership")
     model_file <- readLines(textConnection(model_file), n = -1)
 
+    #### Changes for VAR models ####
+    if(grepl('VAR', trend_char)){
+      if(any(grepl("cholesky_factor_corr[n_lv] L_Omega;", model_file,
+                fixed = TRUE))){
+        use_lv <- TRUE
+      } else {
+        use_lv <- FALSE
+      }
+      #### Parameters ####
+      # Need arrays of cholesky factors and partial autocorrelation matrices
+      if(use_lv){
+        # Changes for State-Space models
+        model_file[grep("cholesky_factor_corr[n_lv] L_Omega;",
+                        model_file, fixed = TRUE)] <-
+          paste0('cholesky_factor_corr[n_subgroups] L_Omega_global;\n',
+                 'array[n_groups] cholesky_factor_corr[n_subgroups] L_deviation_group;\n',
+                 'real<lower=0,upper=1> alpha_cor;')
+        model_file[grep("matrix[n_lv, n_lv] P_real;",
+                        model_file, fixed = TRUE)] <-
+          paste0('array[n_groups] matrix[n_subgroups, n_subgroups] P_real_group;')
+
+      } else {
+
+        # Changes for non State-Space models
+        model_file[grep("cholesky_factor_corr[n_series] L_Omega;",
+                        model_file, fixed = TRUE)] <-
+          paste0('cholesky_factor_corr[n_subgroups] L_Omega_global;\n',
+                 'array[n_groups] cholesky_factor_corr[n_subgroups] L_deviation_group;\n',
+                 'real<lower=0,upper=1> alpha_cor;')
+        model_file[grep("matrix[n_series, n_series] P_real;",
+                        model_file, fixed = TRUE)] <-
+          paste0('array[n_groups] matrix[n_subgroups, n_subgroups] P_real_group;')
+      }
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      #### Transformed parameters ####
+      # Need arrays of autocorrelation matrices, Gamma and Sigma matrices
+      if(use_lv){
+        # Changes for State-Space models
+        model_file[grep("matrix[n_lv, n_lv] A;",
+                        model_file, fixed = TRUE)] <-
+          paste0('array[n_groups] matrix[n_subgroups, n_subgroups] A_group;\n',
+                 'matrix[n_lv, n_lv] A;')
+        model_file[grep("cov_matrix[n_lv] Sigma;",
+                        model_file, fixed = TRUE)] <-
+          paste0('array[n_groups] cov_matrix[n_subgroups] Sigma_group;\n',
+                 "matrix[n_lv, n_lv] Sigma;")
+        model_file[grep("cov_matrix[n_lv] Gamma;",
+                        model_file, fixed = TRUE)] <-
+          paste0('array[n_groups] cov_matrix[n_subgroups] Gamma_group;\n',
+                 "matrix[n_lv, n_lv] Gamma;")
+        model_file <- model_file[-grep('Sigma = multiply_lower_tri_self_transpose(L_Sigma);',
+                                       model_file, fixed = TRUE)]
+        model_file[grep("L_Sigma = diag_pre_multiply(sigma, L_Omega);",
+                        model_file, fixed = TRUE)] <-
+          paste0('// derived group-level VAR covariance matrices\n',
+                 'array[n_groups] cholesky_factor_corr[n_subgroups] L_Omega_group;\n',
+                 'array[n_groups] matrix[n_subgroups, n_subgroups] L_Sigma_group;\n',
+                 'for (g in 1 : n_groups){\n',
+                 'L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g], alpha_cor);\n',
+                 'L_Sigma_group[g] = diag_pre_multiply(sigma[group_inds[g]], L_Omega_group[g]);\n',
+                 'Sigma_group[g] = multiply_lower_tri_self_transpose(L_Sigma_group[g]);\n',
+                 '}\n')
+        starts <- grep("// stationary VAR reparameterisation",
+                       model_file, fixed = TRUE) + 1
+        ends <- grep("// stationary VAR reparameterisation",
+                     model_file, fixed = TRUE) + 8
+        model_file <- model_file[-(starts:ends)]
+        model_file[grep("// stationary VAR reparameterisation",
+                        model_file, fixed = TRUE)] <-
+          paste0('// stationary VAR reparameterisation\n',
+                 '{\n',
+                 "array[1] matrix[n_subgroups, n_subgroups] P;\n",
+                 "array[2, 1] matrix[n_subgroups, n_subgroups] phiGamma;\n",
+                 'for (g in 1 : n_groups){\n',
+                 "P[1] = P_realtoP(P_real_group[g]);\n",
+                 "phiGamma = rev_mapping(P, Sigma_group[g]);\n",
+                 "A_group[g] = phiGamma[1, 1];\n",
+                 "Gamma_group[g] = phiGamma[2, 1];\n",
+                 "}\n\n",
+                 "// computed (full) VAR matrices\n",
+                 'Sigma = rep_matrix(0, n_lv, n_lv);\n',
+                 'Gamma = rep_matrix(0, n_lv, n_lv);\n',
+                 'A = rep_matrix(0, n_lv, n_lv);\n',
+                 'for (g in 1 : n_groups){\n',
+                 'Sigma[group_inds[g], group_inds[g]] = multiply_lower_tri_self_transpose(L_Sigma_group[g]);\n',
+                 'Gamma[group_inds[g], group_inds[g]] = Gamma_group[g];\n',
+                 'A[group_inds[g], group_inds[g]] = A_group[g];\n',
+                 '}\n',
+                 'L_Sigma = cholesky_decompose(Sigma);\n',
+                 "}\n\n")
+
+      } else {
+
+        # Changes for non State-Space models
+        model_file[grep("matrix[n_series, n_series] A;",
+                        model_file, fixed = TRUE)] <-
+          paste0('array[n_groups] matrix[n_subgroups, n_subgroups] A_group;\n',
+                 'matrix[n_series, n_series] A;')
+        model_file[grep("cov_matrix[n_series] Sigma;",
+                        model_file, fixed = TRUE)] <-
+          paste0('array[n_groups] cov_matrix[n_subgroups] Sigma_group;\n',
+                 "matrix[n_series, n_series] Sigma;")
+        model_file[grep("cov_matrix[n_series] Gamma;",
+                        model_file, fixed = TRUE)] <-
+          paste0('array[n_groups] cov_matrix[n_subgroups] Gamma_group;\n',
+                 'matrix[n_series, n_series] Gamma;')
+        model_file <- model_file[-grep('Sigma = multiply_lower_tri_self_transpose(L_Sigma);',
+                                       model_file, fixed = TRUE)]
+        model_file[grep("L_Sigma = diag_pre_multiply(sigma, L_Omega);",
+                        model_file, fixed = TRUE)] <-
+          paste0('// derived group-level VAR covariance matrices\n',
+                 'array[n_groups] cholesky_factor_corr[n_subgroups] L_Omega_group;\n',
+                 'array[n_groups] matrix[n_subgroups, n_subgroups] L_Sigma_group;\n',
+                 'for (g in 1 : n_groups){\n',
+                 'L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g], alpha_cor);\n',
+                 'L_Sigma_group[g] = diag_pre_multiply(sigma[group_inds[g]], L_Omega_group[g]);\n',
+                 'Sigma_group[g] = multiply_lower_tri_self_transpose(L_Sigma_group[g]);\n',
+                 '}\n')
+        starts <- grep("// stationary VAR reparameterisation",
+                       model_file, fixed = TRUE) + 1
+        ends <- grep("// stationary VAR reparameterisation",
+                     model_file, fixed = TRUE) + 8
+        model_file <- model_file[-(starts:ends)]
+        model_file[grep("// stationary VAR reparameterisation",
+                        model_file, fixed = TRUE)] <-
+          paste0('// stationary VAR reparameterisation\n',
+                 '{\n',
+                 "array[1] matrix[n_subgroups, n_subgroups] P;\n",
+                 "array[2, 1] matrix[n_subgroups, n_subgroups] phiGamma;\n",
+                 'for (g in 1 : n_groups){\n',
+                 "P[1] = P_realtoP(P_real_group[g]);\n",
+                 "phiGamma = rev_mapping(P, Sigma_group[g]);\n",
+                 "A_group[g] = phiGamma[1, 1];\n",
+                 "Gamma_group[g] = phiGamma[2, 1];\n",
+                 "}\n\n",
+                 "// computed (full) VAR matrices\n",
+                 'Sigma = rep_matrix(0, n_series, n_series);\n',
+                 'Gamma = rep_matrix(0, n_series, n_series);\n',
+                 'A = rep_matrix(0, n_series, n_series);\n',
+                 'for (g in 1 : n_groups){\n',
+                 'Sigma[group_inds[g], group_inds[g]] = multiply_lower_tri_self_transpose(L_Sigma_group[g]);\n',
+                 'A[group_inds[g], group_inds[g]] = A_group[g];\n',
+                 'Gamma[group_inds[g], group_inds[g]] = Gamma_group[g];\n',
+                 '}\n',
+                 'L_Sigma = cholesky_decompose(Sigma);\n',
+                 "}\n\n")
+      }
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      #### Model ####
+      model_file[grep("L_Omega ~ lkj_corr_cholesky(2);",
+                      model_file, fixed = TRUE)] <-
+        paste0('alpha_cor ~ beta(3, 2);\n',
+               'L_Omega_global ~ lkj_corr_cholesky(1);\n',
+               'for (g in 1 : n_groups){\n',
+               'L_deviation_group[g] ~ lkj_corr_cholesky(6);\n',
+               '}')
+      starts <- grep("// unconstrained partial autocorrelations",
+                     model_file, fixed = TRUE) + 1
+      ends <- grep("// unconstrained partial autocorrelations",
+                   model_file, fixed = TRUE) + 6
+      model_file <- model_file[-(starts:ends)]
+      model_file[grep("// unconstrained partial autocorrelations",
+                      model_file, fixed = TRUE)] <-
+        paste0('for (g in 1 : n_groups){\n',
+               'diagonal(P_real_group[g]) ~ normal(Pmu[1], 1 / sqrt(Pomega[1]));\n',
+               'for (i in 1:n_subgroups) {\n',
+               'for (j in 1:n_subgroups) {\n',
+               'if(i != j) P_real_group[g, i, j] ~ normal(Pmu[2], 1 / sqrt(Pomega[2]));\n',
+               '}\n}\n}')
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+    }
+
+    if(grepl('ZMVN', trend_char)){
+      #### Zero-mean multinormals ####
+
+    } else {
+      #### Random walk and AR models ####
+      if(any(grepl("vector[n_lv] trend_zeros", model_file,
+                   fixed = TRUE))){
+        use_lv <- TRUE
+      } else {
+        use_lv <- FALSE
+      }
+
+      #### Transformed data ####
+      if(use_lv){
+        model_file[grep("vector[n_lv] trend_zeros = rep_vector(0.0, n_lv);",
+                        model_file, fixed = TRUE)] <-
+          paste0('vector[n_subgroups] trend_zeros = rep_vector(0.0, n_subgroups);')
+      } else {
+        model_file[grep("vector[n_series] trend_zeros = rep_vector(0.0, n_series);",
+                        model_file, fixed = TRUE)] <-
+          paste0('vector[n_subgroups] trend_zeros = rep_vector(0.0, n_subgroups);')
+      }
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      #### Parameters ####
+      if(use_lv){
+        model_file <- model_file[-grep('cholesky_factor_corr[n_lv] L_Omega;',
+                                       model_file, fixed = TRUE)]
+        model_file <- model_file[-grep('// dynamic error parameters',
+                                       model_file, fixed = TRUE)]
+        model_file <- model_file[-grep("vector[n_lv] error[n];",
+                                       model_file, fixed = TRUE)]
+        model_file[grep("vector<lower=0>[n_lv] sigma;",
+                        model_file, fixed = TRUE)] <-
+          paste0('vector<lower=0>[n_lv] sigma;\n',
+                 '\n\n',
+                 '// correlation params and dynamic error parameters per group\n',
+                 'cholesky_factor_corr[n_subgroups] L_Omega_global;\n',
+                 'array[n_groups] cholesky_factor_corr[n_subgroups] L_deviation_group;',
+                 'real<lower=0,upper=1> alpha_cor;\n',
+                 'array[n] matrix[n_groups, n_subgroups] sub_error;')
+      } else {
+        model_file <- model_file[-grep('cholesky_factor_corr[n_series] L_Omega;',
+                                       model_file, fixed = TRUE)]
+        model_file <- model_file[-grep('// dynamic error parameters',
+                                       model_file, fixed = TRUE)]
+        model_file <- model_file[-grep("vector[n_series] error[n];",
+                                       model_file, fixed = TRUE)]
+        model_file[grep("vector<lower=0>[n_series] sigma;",
+                        model_file, fixed = TRUE)] <-
+          paste0('vector<lower=0>[n_series] sigma;\n',
+                 '\n\n',
+                 '// correlation params and dynamic error parameters per group\n',
+                 'cholesky_factor_corr[n_subgroups] L_Omega_global;\n',
+                 'array[n_groups] cholesky_factor_corr[n_subgroups] L_deviation_group;',
+                 'real<lower=0,upper=1> alpha_cor;\n',
+                 'array[n] matrix[n_groups, n_subgroups] sub_error;')
+      }
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      #### Transformed parameters ####
+      if(use_lv){
+        model_file <- model_file[-grep('// computed error covariance matrix',
+                                       model_file, fixed = TRUE)]
+        model_file <- model_file[-grep('cov_matrix[n_lv] Sigma;',
+                                       model_file, fixed = TRUE)]
+        model_file <- model_file[-grep('matrix[n_lv, n_lv] L_Sigma;',
+                                       model_file, fixed = TRUE)]
+        model_file <- model_file[-grep('L_Sigma = diag_pre_multiply(sigma, L_Omega);',
+                                       model_file, fixed = TRUE)]
+        model_file <- model_file[-grep('Sigma = multiply_lower_tri_self_transpose(L_Sigma);',
+                                       model_file, fixed = TRUE)]
+        model_file[grep("// LKJ form of covariance matrix",
+                        model_file, fixed = TRUE)] <-
+          paste0('// reconstructed correlated errors\n',
+                 'array[n] vector[n_lv] error;\n',
+                 'array[n_groups] cholesky_factor_corr[n_subgroups] L_Omega_group;\n',
+                 '\n',
+                 '// LKJ forms of covariance matrices\n',
+                 'array[n_groups] matrix[n_subgroups, n_subgroups] L_Sigma_group;')
+        model_file[grep("// derived latent states",
+                        model_file, fixed = TRUE)] <-
+          paste0('// derived error correlation and covariance matrices\n',
+                 'for (g in 1 : n_groups){\n',
+                 'L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g], alpha_cor);\n',
+                 'L_Sigma_group[g] = diag_pre_multiply(sigma[group_inds[g]], L_Omega_group[g]);\n',
+                 '}\n',
+
+                 '// derived correlated errors\n',
+                 'for (i in 1 : n){\n',
+                 "error[i] = to_vector(sub_error[i]');\n",
+                 '}\n',
+                 '// derived latent states')
+
+      } else {
+        model_file <- model_file[-grep('// computed error covariance matrix',
+                                       model_file, fixed = TRUE)]
+        model_file <- model_file[-grep('cov_matrix[n_series] Sigma;',
+                                       model_file, fixed = TRUE)]
+        model_file <- model_file[-grep('matrix[n_series, n_series] L_Sigma;',
+                                       model_file, fixed = TRUE)]
+        model_file <- model_file[-grep('L_Sigma = diag_pre_multiply(sigma, L_Omega);',
+                                       model_file, fixed = TRUE)]
+        model_file <- model_file[-grep('Sigma = multiply_lower_tri_self_transpose(L_Sigma);',
+                                       model_file, fixed = TRUE)]
+        model_file[grep("// LKJ form of covariance matrix",
+                        model_file, fixed = TRUE)] <-
+          paste0('// reconstructed correlated errors\n',
+                 'array[n] vector[n_series] error;\n',
+                 'array[n_groups] cholesky_factor_corr[n_subgroups] L_Omega_group;\n',
+                 '\n',
+                 '// LKJ forms of covariance matrices\n',
+                 'array[n_groups] matrix[n_subgroups, n_subgroups] L_Sigma_group;')
+        model_file[grep("// derived latent states",
+                        model_file, fixed = TRUE)] <-
+          paste0('// derived error correlation and covariance matrices\n',
+                 'for (g in 1 : n_groups){\n',
+                 'L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g], alpha_cor);\n',
+                 'L_Sigma_group[g] = diag_pre_multiply(sigma[group_inds[g]], L_Omega_group[g]);\n',
+                 '}\n',
+
+                 '// derived correlated errors\n',
+                 'for (i in 1 : n){\n',
+                 "error[i] = to_vector(sub_error[i]');\n",
+                 '}\n',
+                 '// derived latent states')
+      }
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      #### Model ####
+      starts <- grep("// contemporaneous errors",
+                     model_file, fixed = TRUE) + 1
+      ends <- grep("// contemporaneous errors",
+                   model_file, fixed = TRUE) + 4
+      model_file <- model_file[-(starts:ends)]
+      model_file[grep("// contemporaneous errors",
+                      model_file, fixed = TRUE)] <-
+        paste0('// hierarchical process error correlations\n',
+               'alpha_cor ~ beta(3, 2);\n',
+               'L_Omega_global ~ lkj_corr_cholesky(1);\n',
+               'for (g in 1 : n_groups){\n',
+               'L_deviation_group[g] ~ lkj_corr_cholesky(6);\n',
+               '}\n',
+               '\n',
+               '// contemporaneous errors\n',
+               'for (i in 1 : n) {\n',
+               'for (g in 1 : n_groups){\n',
+               'to_vector(sub_error[i, g]) ~ multi_normal_cholesky(trend_zeros, L_Sigma_group[g]);\n',
+               '}\n',
+               '}')
+      model_file <- readLines(textConnection(model_file), n = -1)
+
+      #### Generated quantities ####
+      if(use_lv){
+        model_file[grep("// posterior predictions",
+                        model_file, fixed = TRUE)] <-
+          paste0('// computed (full) error covariance matrix\n',
+                 'matrix[n_lv, n_lv]  Sigma;\n',
+                 'Sigma = rep_matrix(0, n_lv, n_lv);\n',
+                 'for (g in 1 : n_groups){\n',
+                 'Sigma[group_inds[g], group_inds[g]] = multiply_lower_tri_self_transpose(L_Sigma_group[g]);\n',
+                 '}\n',
+                 '\n',
+                 '// posterior predictions')
+      } else {
+        model_file[grep("// posterior predictions",
+                        model_file, fixed = TRUE)] <-
+          paste0('// computed (full) error covariance matrix\n',
+                 'matrix[n_series, n_series]  Sigma;\n',
+                 'Sigma = rep_matrix(0, n_series, n_series);\n',
+                 'for (g in 1 : n_groups){\n',
+                 'Sigma[group_inds[g], group_inds[g]] = multiply_lower_tri_self_transpose(L_Sigma_group[g]);\n',
+                 '}\n',
+                 '\n',
+                 '// posterior predictions')
+      }
+      model_file <- readLines(textConnection(model_file), n = -1)
+    }
+
+    #### Add grouping information to model_data ####
+    model_data$group_inds <- matrix(1:nlevels(data_train$series),
+                                    nrow = nlevels(data_train[[trend_model$gr]]),
+                                    ncol = nlevels(data_train[[trend_model$subgr]]),
+                                    byrow = TRUE)
+    model_data$n_groups <- nlevels(data_train[[trend_model$gr]])
+    model_data$n_subgroups <- nlevels(data_train[[trend_model$subgr]])
 
   }
-  return(model_file)
+  return(list(model_file = model_file,
+              model_data = model_data))
 }

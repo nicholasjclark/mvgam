@@ -14,7 +14,7 @@ validate_series_time = function(data,
   }
 
   # Validate any grouping structure and update the data accordingly
-  data <- mvgam:::validate_series_groups(data = data,
+  data <- validate_series_groups(data = data,
                                  trend_model = trend_model,
                                  name = name)
 
@@ -76,6 +76,13 @@ validate_series_time = function(data,
       }
     }
   }
+
+  # Add an identifier so post-processing functions know
+  # what the original supplied data ordering was; this is needed
+  # for ensuring that functions such as fitted() and
+  # residuals() return objects that match the original order that
+  # the user supplied, if no newdata are given
+  data$index..orig..order <- 1:length(data$time)
 
   # Add a new 'time' variable that will be useful for rearranging data for
   # modeling, in case 'time' is also supplied as a covariate or if this is

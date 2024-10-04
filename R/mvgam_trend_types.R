@@ -17,12 +17,15 @@
 #'  for setting up hierarchical residual correlation structures. If specified,
 #'  this will automatically set `cor = TRUE` and set up a model where the
 #'  residual correlations for a specific level of `gr` are modelled hierarchically:
-#'  \eqn{\Omega_{group} = p\Omega_{global} + (1 - p)\Omega_{group, local}},
+#'  \eqn{\Omega_{group} = \alpha_{cor}\Omega_{global} + (1 - \alpha_{cor})\Omega_{group, local}},
 #'  where \eqn{\Omega_{global}} is a *global* correlation
 #'  matrix, \eqn{\Omega_{group, local}} is a *local deviation* correlation matrix
-#'  and \eqn{p} is a weighting parameter
-#'  controlling how strongly the local correlation matrix \eqn{\Omega_{group}} is shrunk towards the global
-#'  correlation matrix \eqn{\Omega_{global}}. If `gr` is supplied then `subgr` *must* also be supplied
+#'  and \eqn{\alpha_{cor}} is a weighting parameter
+#'  controlling how strongly the local correlation matrix \eqn{\Omega_{group}}
+#'  is shrunk towards the global
+#'  correlation matrix \eqn{\Omega_{global}} (larger values of \eqn{\alpha_{cor}} indicate
+#'  a greater degree of shrinkage, i.e. a greater degree of partial pooling).
+#'  If `gr` is supplied then `subgr` *must* also be supplied
 #' @param subgr A subgrouping `factor` variable specifying which element in `data` represents the
 #' different time series. Defaults to `series`, but note that
 #' models that use the hierarchical correlations, where the `subgr` time series are measured in each level of `gr`,
