@@ -1410,185 +1410,185 @@ add_MaCor = function(model_file,
                '}\n}\n}')
       model_file <- readLines(textConnection(model_file), n = -1)
 
-    }
-
-    if(grepl('ZMVN', trend_char)){
-      #### Zero-mean multinormals ####
-
     } else {
-      #### Random walk and AR models ####
-      if(any(grepl("vector[n_lv] trend_zeros", model_file,
-                   fixed = TRUE))){
-        use_lv <- TRUE
-      } else {
-        use_lv <- FALSE
-      }
+      if(grepl('ZMVN', trend_char)){
+        #### Zero-mean multinormals ####
 
-      #### Transformed data ####
-      if(use_lv){
-        model_file[grep("vector[n_lv] trend_zeros = rep_vector(0.0, n_lv);",
-                        model_file, fixed = TRUE)] <-
-          paste0('vector[n_subgroups] trend_zeros = rep_vector(0.0, n_subgroups);')
       } else {
-        model_file[grep("vector[n_series] trend_zeros = rep_vector(0.0, n_series);",
-                        model_file, fixed = TRUE)] <-
-          paste0('vector[n_subgroups] trend_zeros = rep_vector(0.0, n_subgroups);')
-      }
-      model_file <- readLines(textConnection(model_file), n = -1)
+        #### Random walk and AR models ####
+        if(any(grepl("vector[n_lv] trend_zeros", model_file,
+                     fixed = TRUE))){
+          use_lv <- TRUE
+        } else {
+          use_lv <- FALSE
+        }
 
-      #### Parameters ####
-      if(use_lv){
-        model_file <- model_file[-grep('cholesky_factor_corr[n_lv] L_Omega;',
-                                       model_file, fixed = TRUE)]
-        model_file <- model_file[-grep('// dynamic error parameters',
-                                       model_file, fixed = TRUE)]
-        model_file <- model_file[-grep("vector[n_lv] error[n];",
-                                       model_file, fixed = TRUE)]
-        model_file[grep("vector<lower=0>[n_lv] sigma;",
-                        model_file, fixed = TRUE)] <-
-          paste0('vector<lower=0>[n_lv] sigma;\n',
-                 '\n\n',
-                 '// correlation params and dynamic error parameters per group\n',
-                 'cholesky_factor_corr[n_subgroups] L_Omega_global;\n',
-                 'array[n_groups] cholesky_factor_corr[n_subgroups] L_deviation_group;',
-                 'real<lower=0,upper=1> alpha_cor;\n',
-                 'array[n] matrix[n_groups, n_subgroups] sub_error;')
-      } else {
-        model_file <- model_file[-grep('cholesky_factor_corr[n_series] L_Omega;',
-                                       model_file, fixed = TRUE)]
-        model_file <- model_file[-grep('// dynamic error parameters',
-                                       model_file, fixed = TRUE)]
-        model_file <- model_file[-grep("vector[n_series] error[n];",
-                                       model_file, fixed = TRUE)]
-        model_file[grep("vector<lower=0>[n_series] sigma;",
-                        model_file, fixed = TRUE)] <-
-          paste0('vector<lower=0>[n_series] sigma;\n',
-                 '\n\n',
-                 '// correlation params and dynamic error parameters per group\n',
-                 'cholesky_factor_corr[n_subgroups] L_Omega_global;\n',
-                 'array[n_groups] cholesky_factor_corr[n_subgroups] L_deviation_group;',
-                 'real<lower=0,upper=1> alpha_cor;\n',
-                 'array[n] matrix[n_groups, n_subgroups] sub_error;')
-      }
-      model_file <- readLines(textConnection(model_file), n = -1)
+        #### Transformed data ####
+        if(use_lv){
+          model_file[grep("vector[n_lv] trend_zeros = rep_vector(0.0, n_lv);",
+                          model_file, fixed = TRUE)] <-
+            paste0('vector[n_subgroups] trend_zeros = rep_vector(0.0, n_subgroups);')
+        } else {
+          model_file[grep("vector[n_series] trend_zeros = rep_vector(0.0, n_series);",
+                          model_file, fixed = TRUE)] <-
+            paste0('vector[n_subgroups] trend_zeros = rep_vector(0.0, n_subgroups);')
+        }
+        model_file <- readLines(textConnection(model_file), n = -1)
 
-      #### Transformed parameters ####
-      if(use_lv){
-        model_file <- model_file[-grep('// computed error covariance matrix',
-                                       model_file, fixed = TRUE)]
-        model_file <- model_file[-grep('cov_matrix[n_lv] Sigma;',
-                                       model_file, fixed = TRUE)]
-        model_file <- model_file[-grep('matrix[n_lv, n_lv] L_Sigma;',
-                                       model_file, fixed = TRUE)]
-        model_file <- model_file[-grep('L_Sigma = diag_pre_multiply(sigma, L_Omega);',
-                                       model_file, fixed = TRUE)]
-        model_file <- model_file[-grep('Sigma = multiply_lower_tri_self_transpose(L_Sigma);',
-                                       model_file, fixed = TRUE)]
-        model_file[grep("// LKJ form of covariance matrix",
+        #### Parameters ####
+        if(use_lv){
+          model_file <- model_file[-grep('cholesky_factor_corr[n_lv] L_Omega;',
+                                         model_file, fixed = TRUE)]
+          model_file <- model_file[-grep('// dynamic error parameters',
+                                         model_file, fixed = TRUE)]
+          model_file <- model_file[-grep("vector[n_lv] error[n];",
+                                         model_file, fixed = TRUE)]
+          model_file[grep("vector<lower=0>[n_lv] sigma;",
+                          model_file, fixed = TRUE)] <-
+            paste0('vector<lower=0>[n_lv] sigma;\n',
+                   '\n\n',
+                   '// correlation params and dynamic error parameters per group\n',
+                   'cholesky_factor_corr[n_subgroups] L_Omega_global;\n',
+                   'array[n_groups] cholesky_factor_corr[n_subgroups] L_deviation_group;',
+                   'real<lower=0,upper=1> alpha_cor;\n',
+                   'array[n] matrix[n_groups, n_subgroups] sub_error;')
+        } else {
+          model_file <- model_file[-grep('cholesky_factor_corr[n_series] L_Omega;',
+                                         model_file, fixed = TRUE)]
+          model_file <- model_file[-grep('// dynamic error parameters',
+                                         model_file, fixed = TRUE)]
+          model_file <- model_file[-grep("vector[n_series] error[n];",
+                                         model_file, fixed = TRUE)]
+          model_file[grep("vector<lower=0>[n_series] sigma;",
+                          model_file, fixed = TRUE)] <-
+            paste0('vector<lower=0>[n_series] sigma;\n',
+                   '\n\n',
+                   '// correlation params and dynamic error parameters per group\n',
+                   'cholesky_factor_corr[n_subgroups] L_Omega_global;\n',
+                   'array[n_groups] cholesky_factor_corr[n_subgroups] L_deviation_group;',
+                   'real<lower=0,upper=1> alpha_cor;\n',
+                   'array[n] matrix[n_groups, n_subgroups] sub_error;')
+        }
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        #### Transformed parameters ####
+        if(use_lv){
+          model_file <- model_file[-grep('// computed error covariance matrix',
+                                         model_file, fixed = TRUE)]
+          model_file <- model_file[-grep('cov_matrix[n_lv] Sigma;',
+                                         model_file, fixed = TRUE)]
+          model_file <- model_file[-grep('matrix[n_lv, n_lv] L_Sigma;',
+                                         model_file, fixed = TRUE)]
+          model_file <- model_file[-grep('L_Sigma = diag_pre_multiply(sigma, L_Omega);',
+                                         model_file, fixed = TRUE)]
+          model_file <- model_file[-grep('Sigma = multiply_lower_tri_self_transpose(L_Sigma);',
+                                         model_file, fixed = TRUE)]
+          model_file[grep("// LKJ form of covariance matrix",
+                          model_file, fixed = TRUE)] <-
+            paste0('// reconstructed correlated errors\n',
+                   'array[n] vector[n_lv] error;\n',
+                   'array[n_groups] cholesky_factor_corr[n_subgroups] L_Omega_group;\n',
+                   '\n',
+                   '// LKJ forms of covariance matrices\n',
+                   'array[n_groups] matrix[n_subgroups, n_subgroups] L_Sigma_group;')
+          model_file[grep("// derived latent states",
+                          model_file, fixed = TRUE)] <-
+            paste0('// derived error correlation and covariance matrices\n',
+                   'for (g in 1 : n_groups){\n',
+                   'L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g], alpha_cor);\n',
+                   'L_Sigma_group[g] = diag_pre_multiply(sigma[group_inds[g]], L_Omega_group[g]);\n',
+                   '}\n',
+
+                   '// derived correlated errors\n',
+                   'for (i in 1 : n){\n',
+                   "error[i] = to_vector(sub_error[i]');\n",
+                   '}\n',
+                   '// derived latent states')
+
+        } else {
+          model_file <- model_file[-grep('// computed error covariance matrix',
+                                         model_file, fixed = TRUE)]
+          model_file <- model_file[-grep('cov_matrix[n_series] Sigma;',
+                                         model_file, fixed = TRUE)]
+          model_file <- model_file[-grep('matrix[n_series, n_series] L_Sigma;',
+                                         model_file, fixed = TRUE)]
+          model_file <- model_file[-grep('L_Sigma = diag_pre_multiply(sigma, L_Omega);',
+                                         model_file, fixed = TRUE)]
+          model_file <- model_file[-grep('Sigma = multiply_lower_tri_self_transpose(L_Sigma);',
+                                         model_file, fixed = TRUE)]
+          model_file[grep("// LKJ form of covariance matrix",
+                          model_file, fixed = TRUE)] <-
+            paste0('// reconstructed correlated errors\n',
+                   'array[n] vector[n_series] error;\n',
+                   'array[n_groups] cholesky_factor_corr[n_subgroups] L_Omega_group;\n',
+                   '\n',
+                   '// LKJ forms of covariance matrices\n',
+                   'array[n_groups] matrix[n_subgroups, n_subgroups] L_Sigma_group;')
+          model_file[grep("// derived latent states",
+                          model_file, fixed = TRUE)] <-
+            paste0('// derived error correlation and covariance matrices\n',
+                   'for (g in 1 : n_groups){\n',
+                   'L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g], alpha_cor);\n',
+                   'L_Sigma_group[g] = diag_pre_multiply(sigma[group_inds[g]], L_Omega_group[g]);\n',
+                   '}\n',
+
+                   '// derived correlated errors\n',
+                   'for (i in 1 : n){\n',
+                   "error[i] = to_vector(sub_error[i]');\n",
+                   '}\n',
+                   '// derived latent states')
+        }
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        #### Model ####
+        starts <- grep("// contemporaneous errors",
+                       model_file, fixed = TRUE) + 1
+        ends <- grep("// contemporaneous errors",
+                     model_file, fixed = TRUE) + 4
+        model_file <- model_file[-(starts:ends)]
+        model_file[grep("// contemporaneous errors",
                         model_file, fixed = TRUE)] <-
-          paste0('// reconstructed correlated errors\n',
-                 'array[n] vector[n_lv] error;\n',
-                 'array[n_groups] cholesky_factor_corr[n_subgroups] L_Omega_group;\n',
-                 '\n',
-                 '// LKJ forms of covariance matrices\n',
-                 'array[n_groups] matrix[n_subgroups, n_subgroups] L_Sigma_group;')
-        model_file[grep("// derived latent states",
-                        model_file, fixed = TRUE)] <-
-          paste0('// derived error correlation and covariance matrices\n',
+          paste0('// hierarchical process error correlations\n',
+                 'alpha_cor ~ beta(3, 2);\n',
+                 'L_Omega_global ~ lkj_corr_cholesky(1);\n',
                  'for (g in 1 : n_groups){\n',
-                 'L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g], alpha_cor);\n',
-                 'L_Sigma_group[g] = diag_pre_multiply(sigma[group_inds[g]], L_Omega_group[g]);\n',
-                 '}\n',
-
-                 '// derived correlated errors\n',
-                 'for (i in 1 : n){\n',
-                 "error[i] = to_vector(sub_error[i]');\n",
-                 '}\n',
-                 '// derived latent states')
-
-      } else {
-        model_file <- model_file[-grep('// computed error covariance matrix',
-                                       model_file, fixed = TRUE)]
-        model_file <- model_file[-grep('cov_matrix[n_series] Sigma;',
-                                       model_file, fixed = TRUE)]
-        model_file <- model_file[-grep('matrix[n_series, n_series] L_Sigma;',
-                                       model_file, fixed = TRUE)]
-        model_file <- model_file[-grep('L_Sigma = diag_pre_multiply(sigma, L_Omega);',
-                                       model_file, fixed = TRUE)]
-        model_file <- model_file[-grep('Sigma = multiply_lower_tri_self_transpose(L_Sigma);',
-                                       model_file, fixed = TRUE)]
-        model_file[grep("// LKJ form of covariance matrix",
-                        model_file, fixed = TRUE)] <-
-          paste0('// reconstructed correlated errors\n',
-                 'array[n] vector[n_series] error;\n',
-                 'array[n_groups] cholesky_factor_corr[n_subgroups] L_Omega_group;\n',
-                 '\n',
-                 '// LKJ forms of covariance matrices\n',
-                 'array[n_groups] matrix[n_subgroups, n_subgroups] L_Sigma_group;')
-        model_file[grep("// derived latent states",
-                        model_file, fixed = TRUE)] <-
-          paste0('// derived error correlation and covariance matrices\n',
-                 'for (g in 1 : n_groups){\n',
-                 'L_Omega_group[g] = combine_cholesky(L_Omega_global, L_deviation_group[g], alpha_cor);\n',
-                 'L_Sigma_group[g] = diag_pre_multiply(sigma[group_inds[g]], L_Omega_group[g]);\n',
-                 '}\n',
-
-                 '// derived correlated errors\n',
-                 'for (i in 1 : n){\n',
-                 "error[i] = to_vector(sub_error[i]');\n",
-                 '}\n',
-                 '// derived latent states')
-      }
-      model_file <- readLines(textConnection(model_file), n = -1)
-
-      #### Model ####
-      starts <- grep("// contemporaneous errors",
-                     model_file, fixed = TRUE) + 1
-      ends <- grep("// contemporaneous errors",
-                   model_file, fixed = TRUE) + 4
-      model_file <- model_file[-(starts:ends)]
-      model_file[grep("// contemporaneous errors",
-                      model_file, fixed = TRUE)] <-
-        paste0('// hierarchical process error correlations\n',
-               'alpha_cor ~ beta(3, 2);\n',
-               'L_Omega_global ~ lkj_corr_cholesky(1);\n',
-               'for (g in 1 : n_groups){\n',
-               'L_deviation_group[g] ~ lkj_corr_cholesky(6);\n',
-               '}\n',
-               '\n',
-               '// contemporaneous errors\n',
-               'for (i in 1 : n) {\n',
-               'for (g in 1 : n_groups){\n',
-               'to_vector(sub_error[i, g]) ~ multi_normal_cholesky(trend_zeros, L_Sigma_group[g]);\n',
-               '}\n',
-               '}')
-      model_file <- readLines(textConnection(model_file), n = -1)
-
-      #### Generated quantities ####
-      if(use_lv){
-        model_file[grep("// posterior predictions",
-                        model_file, fixed = TRUE)] <-
-          paste0('// computed (full) error covariance matrix\n',
-                 'matrix[n_lv, n_lv]  Sigma;\n',
-                 'Sigma = rep_matrix(0, n_lv, n_lv);\n',
-                 'for (g in 1 : n_groups){\n',
-                 'Sigma[group_inds[g], group_inds[g]] = multiply_lower_tri_self_transpose(L_Sigma_group[g]);\n',
+                 'L_deviation_group[g] ~ lkj_corr_cholesky(6);\n',
                  '}\n',
                  '\n',
-                 '// posterior predictions')
-      } else {
-        model_file[grep("// posterior predictions",
-                        model_file, fixed = TRUE)] <-
-          paste0('// computed (full) error covariance matrix\n',
-                 'matrix[n_series, n_series]  Sigma;\n',
-                 'Sigma = rep_matrix(0, n_series, n_series);\n',
+                 '// contemporaneous errors\n',
+                 'for (i in 1 : n) {\n',
                  'for (g in 1 : n_groups){\n',
-                 'Sigma[group_inds[g], group_inds[g]] = multiply_lower_tri_self_transpose(L_Sigma_group[g]);\n',
+                 'to_vector(sub_error[i, g]) ~ multi_normal_cholesky(trend_zeros, L_Sigma_group[g]);\n',
                  '}\n',
-                 '\n',
-                 '// posterior predictions')
+                 '}')
+        model_file <- readLines(textConnection(model_file), n = -1)
+
+        #### Generated quantities ####
+        if(use_lv){
+          model_file[grep("// posterior predictions",
+                          model_file, fixed = TRUE)] <-
+            paste0('// computed (full) error covariance matrix\n',
+                   'matrix[n_lv, n_lv]  Sigma;\n',
+                   'Sigma = rep_matrix(0, n_lv, n_lv);\n',
+                   'for (g in 1 : n_groups){\n',
+                   'Sigma[group_inds[g], group_inds[g]] = multiply_lower_tri_self_transpose(L_Sigma_group[g]);\n',
+                   '}\n',
+                   '\n',
+                   '// posterior predictions')
+        } else {
+          model_file[grep("// posterior predictions",
+                          model_file, fixed = TRUE)] <-
+            paste0('// computed (full) error covariance matrix\n',
+                   'matrix[n_series, n_series]  Sigma;\n',
+                   'Sigma = rep_matrix(0, n_series, n_series);\n',
+                   'for (g in 1 : n_groups){\n',
+                   'Sigma[group_inds[g], group_inds[g]] = multiply_lower_tri_self_transpose(L_Sigma_group[g]);\n',
+                   '}\n',
+                   '\n',
+                   '// posterior predictions')
+        }
+        model_file <- readLines(textConnection(model_file), n = -1)
       }
-      model_file <- readLines(textConnection(model_file), n = -1)
     }
 
     #### Add grouping information to model_data ####
