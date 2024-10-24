@@ -3,21 +3,33 @@
 
 <img src="man/figures/mvgam_logo.png" width = 120 alt="mvgam R package logo"/>[<img src="https://raw.githubusercontent.com/stan-dev/logos/master/logo_tm.png" align="right" width=120 alt="Stan Logo"/>](https://mc-stan.org/)
 
-# *mvgam*
+# mvgam
+
+> **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
 
 [![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
 [![Test
 status](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml)
 [![Coverage
 status](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
+[![Documentation](https://img.shields.io/badge/documentation-mvgam-orange.svg?colorB=E91E63)](https://nicholasjclark.github.io/mvgam/)
 [![CRAN
 Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org/package=mvgam)
 [![CRAN
 Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
-The goal of `mvgam` is to fit Bayesian Dynamic Generalized Additive
-Models to time series data. The motivation for the package is described
-in <a
+The goal of `mvgam` is to fit Bayesian (Dynamic) Generalized Additive
+Models. This package constructs State-Space models that can include
+highly flexible nonlinear predictor effects for both process and
+observation components by leveraging functionalities from the impressive
+<a href="https://paulbuerkner.com/brms/"
+target="_blank"><code>brms</code></a> and
+<a href="https://cran.r-project.org/web/packages/mgcv/index.html"
+target="_blank"><code>mgcv</code></a> packages. This allows `mvgam` to
+fit a wide range of models, including hierarchical ecological models
+such as N-mixture or Joint Species Distribution models, as well as
+univariate and multivariate time series models with imperfect detection.
+The original motivation for the package is described in <a
 href="https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974"
 target="_blank">Clark &amp; Wells 2022</a> (published in *Methods in
 Ecology and Evolution*), with additional inspiration on the use of
@@ -226,28 +238,28 @@ summary(lynx_mvgam)
 #> 
 #> GAM coefficient (beta) estimates:
 #>                2.5%   50%  97.5% Rhat n_eff
-#> (Intercept)   6.400  6.60  6.900 1.00   910
-#> s(season).1  -0.640 -0.13  0.360 1.00  1169
-#> s(season).2   0.760  1.40  1.900 1.01   850
-#> s(season).3   1.300  1.90  2.500 1.01   953
-#> s(season).4  -0.018  0.55  1.200 1.00  1102
-#> s(season).5  -1.300 -0.70 -0.069 1.00  1019
-#> s(season).6  -1.200 -0.56  0.093 1.00  1011
-#> s(season).7   0.039  0.73  1.400 1.00  1006
-#> s(season).8   0.580  1.40  2.200 1.00  1041
-#> s(season).9  -0.360  0.23  0.820 1.00   735
-#> s(season).10 -1.400 -0.88 -0.380 1.00   908
+#> (Intercept)   6.400  6.60  6.900 1.00   821
+#> s(season).1  -0.640 -0.12  0.390 1.00  1356
+#> s(season).2   0.780  1.30  1.900 1.00  1241
+#> s(season).3   1.300  1.90  2.500 1.00   889
+#> s(season).4  -0.062  0.53  1.200 1.00  1119
+#> s(season).5  -1.300 -0.72 -0.099 1.01  1113
+#> s(season).6  -1.300 -0.57  0.092 1.00  1101
+#> s(season).7   0.023  0.70  1.400 1.00  1355
+#> s(season).8   0.640  1.40  2.100 1.01  1111
+#> s(season).9  -0.370  0.21  0.830 1.01   847
+#> s(season).10 -1.400 -0.87 -0.370 1.00  1108
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value    
-#> s(season) 9.99     10   48.3  <2e-16 ***
+#> s(season) 9.97     10   48.8  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend parameter AR estimates:
 #>          2.5%  50% 97.5% Rhat n_eff
-#> ar1[1]   0.60 0.83  0.98    1   592
-#> sigma[1] 0.39 0.48  0.60    1   855
+#> ar1[1]   0.61 0.83  0.99 1.01   666
+#> sigma[1] 0.38 0.48  0.60 1.00   688
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -256,7 +268,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Mon Sep 30 3:06:32 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Thu Oct 24 1:32:39 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -393,7 +405,7 @@ series (testing and training)
 ``` r
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 #> Out of sample DRPS:
-#> 2398.60613875
+#> 2470.51814475
 ```
 
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -554,7 +566,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Mon Sep 30 3:07:18 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Thu Oct 24 1:33:28 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
