@@ -48,3 +48,18 @@ Set up latent correlated multivariate Gaussian residual processes
 in \pkg{mvgam}. This function does not evaluate it's arguments –
 it exists purely to help set up a model with particular error processes.
 }
+\examples{
+\dontrun{
+# Simulate couonts of four species over ten sampling locations
+site_dat <- data.frame(site = rep(1:10, 4),
+                      species = as.factor(sort(rep(letters[1:4], 10))),
+                      y = c(NA, rpois(39, 3)))
+head(site_dat)
+
+# Set up a multivariate residual model, where 'site' represents the
+# unit of analysis
+trend_model <- ZMVN(unit = site, subgr = species)
+trend_model
+}
+
+}

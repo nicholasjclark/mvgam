@@ -37,7 +37,7 @@
 #'@param trend_knots As for `knots` above, this is an optional \code{list} of knot values for smooth
 #'functions within the `trend_formula`
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
-#'required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:
+#'required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
 #'#'\itemize{
 #'   \item`series` (a \code{factor} index of the series IDs; the number of levels should be identical
 #'   to the number of unique series labels (i.e. `n_series = length(levels(data$series))`))
@@ -48,11 +48,17 @@
 #'temporal intervals that are exactly `0` will be adjusted to a very small number
 #'(`1e-12`) to prevent sampling errors. See an example of `CAR()` trends in \code{\link{CAR}}
 #'   }
-#'Should also include any other variables to be included in the linear predictor of \code{formula}
+#'Note however that there are special cases where these identifiers are not needed. For
+#'example, models with hierarchical temporal correlation processes (e.g. `AR(gr = region, subgr = species)`)
+#'should NOT include a `series` identifier, as this will be constructed internally (see
+#'\code{\link{mvgam_trends}} and \code{\link{AR}} for details). `mvgam` can also fit models that do not
+#'include a `time` variable if there are no temporal dynamic structures included (i.e. `trend_model = 'None'` or
+#'`trend_model = ZMVN()`). `data` should also include any other variables to be included in
+#'the linear predictor of \code{formula}
 #'@param data_train Deprecated. Still works in place of \code{data} but users are recommended to use
 #'\code{data} instead for more seamless integration into `R` workflows
-#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least `series` and `time`
-#'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
+#'@param newdata Optional \code{dataframe} or \code{list} of test data containing the same variables
+#'as in `data`. If included, the
 #'observations in variable \code{y} will be set to \code{NA} when fitting the model so that posterior
 #'simulations can be obtained
 #'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
@@ -1005,7 +1011,8 @@ mvgam = function(formula,
                                 use_lv = use_lv,
                                 trend_model = if(trend_model %in%
                                                  c('RW', 'VAR1',
-                                                   'PWlinear', 'PWlogistic')){'RW'} else {trend_model},
+                                                   'PWlinear', 'PWlogistic',
+                                                   'ZMVN')){'RW'} else {trend_model},
                                 drift = drift)
 
   # Use informative priors based on the fitted mgcv model to speed convergence
@@ -1387,9 +1394,11 @@ mvgam = function(formula,
     # Add necessary trend structure
     base_stan_model <- add_trend_lines(model_file = base_stan_model,
                                        stan = TRUE,
-                                       trend_model = if(trend_model %in% c('RW', 'VAR1',
+                                       trend_model = if(trend_model %in% c('RW',
+                                                                           'VAR1',
                                                                            'PWlinear',
-                                                                           'PWlogistic')){'RW'} else {trend_model},
+                                                                           'PWlogistic',
+                                                                           'ZMVN')){'RW'} else {trend_model},
                                        use_lv = use_lv,
                                        drift = drift)
 
@@ -1482,7 +1491,7 @@ mvgam = function(formula,
       vectorised$model_file <- trend_map_setup$model_file
       vectorised$model_data <- trend_map_setup$model_data
 
-      if(trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
+      if(trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1', 'ZMVN')){
         param <- unique(c(param, 'trend', 'sigma'))
       }
 

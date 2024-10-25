@@ -22,7 +22,9 @@
 #'(`1e-12`) to prevent sampling errors. For all autoregressive trend types
 #'apart from `CAR()`, moving average and/or correlated
 #'process error terms can also be estimated (for example, `RW(cor = TRUE)` will set up a
-#'multivariate Random Walk if `data` contains `>1` series).
+#'multivariate Random Walk if `data` contains `>1` series). Hierarchical process error correlations
+#'can also be handled if the data contain relevant observation units that are nested into
+#'relevant grouping and subgrouping levels (i.e. using `AR(gr = region, subgr = species)`)
 #'
 #'Note that only `RW`, `AR1`, `AR2` and `AR3` are available if
 #'using `JAGS`. All trend models are supported if using `Stan`.
@@ -85,6 +87,7 @@ trend_model_choices = function(){
     'VARMA1,1cor',
     'PWlinear',
     'PWlogistic',
+    'ZMVN',
     'ZMVNcor',
     'ZMVNhiercor',
     'None')
@@ -756,7 +759,7 @@ trend_par_names = function(trend_model,
     param <- c(param, 'alpha_cor')
   }
 
-  if(trend_model == 'None'){
+  if(trend_model %in% c('None', 'ZMVN')){
     param <- NULL
   }
 

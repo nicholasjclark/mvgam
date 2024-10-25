@@ -47,7 +47,7 @@ for both the observation mode (captured by \code{formula}) and the process model
 Users are recommended to drop one of these using the \code{- 1} convention in the formula right hand side.}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
-required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:
+required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
 #'\itemize{
 \item\code{series} (a \code{factor} index of the series IDs; the number of levels should be identical
 to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
@@ -58,10 +58,16 @@ use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though no
 temporal intervals that are exactly \code{0} will be adjusted to a very small number
 (\code{1e-12}) to prevent sampling errors. See an example of \code{CAR()} trends in \code{\link{CAR}}
 }
-Should also include any other variables to be included in the linear predictor of \code{formula}}
+Note however that there are special cases where these identifiers are not needed. For
+example, models with hierarchical temporal correlation processes (e.g. \code{AR(gr = region, subgr = species)})
+should NOT include a \code{series} identifier, as this will be constructed internally (see
+\code{\link{mvgam_trends}} and \code{\link{AR}} for details). \code{mvgam} can also fit models that do not
+include a \code{time} variable if there are no temporal dynamic structures included (i.e. \code{trend_model = 'None'} or
+\code{trend_model = ZMVN()}). \code{data} should also include any other variables to be included in
+the linear predictor of \code{formula}}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least \code{series} and \code{time}
-in addition to any other variables included in the linear predictor of \code{formula}. If included, the
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same variables
+as in \code{data}. If included, the
 observations in variable \code{y} will be set to \code{NA} when fitting the model so that posterior
 simulations can be obtained}
 

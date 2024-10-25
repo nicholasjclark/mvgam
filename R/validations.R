@@ -771,8 +771,8 @@ validate_trend_restrictions = function(trend_model,
                               trend = 1:length(unique(data_train$series)))
     }
 
-    if(!trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'CAR1')){
-      stop('only None, RW, AR1, AR2, AR3, CAR1 and VAR trends currently supported for trend predictor models',
+    if(!trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'CAR1', 'ZMVN')){
+      stop('only None, ZMVN, RW, AR1, AR2, AR3, CAR1 and VAR trends currently supported for trend predictor models',
            call. = FALSE)
     }
   }

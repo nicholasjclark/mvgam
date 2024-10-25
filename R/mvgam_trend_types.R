@@ -101,6 +101,56 @@
 #'plot(mod, type = 'trend', series = 2)
 #'plot(mod, type = 'residuals', series = 1)
 #'plot(mod, type = 'residuals', series = 2)
+#'
+#'# Now an example illustrating hierarchical dynamics
+#'set.seed(123)
+#'# Simulate three species monitored in three different
+#'# regions, where dynamics can potentially vary across regions
+#'simdat1 <- sim_mvgam(trend_model = VAR(cor = TRUE),
+#'                     prop_trend = 0.95,
+#'                     n_series = 3,
+#'                     mu = c(1, 2, 3))
+#'simdat2 <- sim_mvgam(trend_model = VAR(cor = TRUE),
+#'                     prop_trend = 0.95,
+#'                     n_series = 3,
+#'                     mu = c(1, 2, 3))
+#'simdat3 <- sim_mvgam(trend_model = VAR(cor = TRUE),
+#'                     prop_trend = 0.95,
+#'                     n_series = 3,
+#'                     mu = c(1, 2, 3))
+#'
+#'# Set up the data but DO NOT include 'series'
+#'all_dat <- rbind(simdat1$data_train %>%
+#'                   dplyr::mutate(region = 'qld'),
+#'                 simdat2$data_train %>%
+#'                   dplyr::mutate(region = 'nsw'),
+#'                 simdat3$data_train %>%
+#'                   dplyr::mutate(region = 'vic')) %>%
+#' dplyr::mutate(species = gsub('series', 'species', series),
+#'               species = as.factor(species),
+#'               region = as.factor(region)) %>%
+#' dplyr::arrange(series, time) %>%
+#' dplyr::select(-series)
+#'
+#'# Check priors for a hierarchical AR1 model
+#'get_mvgam_priors(formula = y ~ species,
+#'                 trend_model = AR(gr = region, subgr = species),
+#'                 data = all_dat)
+#'
+#'# Fit the model
+#'mod <- mvgam(formula = y ~ species,
+#'             trend_model = AR(gr = region, subgr = species),
+#'             data = all_dat)
+#'
+#'# Check standard outputs
+#'summary(mod)
+#'conditional_effects(mod, type = 'link')
+#'
+#'# Inspect posterior estimates for process error and the
+#'# correlation weighting parameter
+#'mcmc_plot(mod, variable = 'Sigma', regex = TRUE,
+#'          type = 'hist')
+#'mcmc_plot(mod, variable = 'alpha_cor', type = 'hist')
 #'}
 #' @export
 RW = function(ma = FALSE, cor = FALSE, gr = NA, subgr = NA){
@@ -433,6 +483,20 @@ PW = function(n_changepoints = 10,
 #' the `series` element for the data using something like: `series = as.factor(paste0(group, '_', subgroup))`
 #' @return An object of class \code{mvgam_trend}, which contains a list of
 #' arguments to be interpreted by the parsing functions in \pkg{mvgam}
+#' @examples
+#'\dontrun{
+#'# Simulate counts of four species over ten sampling locations
+#'site_dat <- data.frame(site = rep(1:10, 4),
+#'                       species = as.factor(sort(rep(letters[1:4], 10))),
+#'                       y = c(NA, rpois(39, 3)))
+#'head(site_dat)
+#'
+#'# Set up a correlated residual (i.e. Joint Species Distribution) model,
+#'# where 'site' represents the unit of analysis
+#'trend_model <- ZMVN(unit = site, subgr = species)
+#'trend_model
+#'}
+#'
 #' @export
 ZMVN = function(unit = time, gr = NA, subgr = series){
 

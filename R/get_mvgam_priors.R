@@ -701,9 +701,7 @@ get_mvgam_priors = function(formula,
     }
 
     # Extract information on priors for trend components
-    if(trend_model == 'None'){
-      trend_df <- NULL
-    }
+    trend_df <- NULL
 
     if(trend_model %in% c('PWlinear', 'PWlogistic')){
       # Need to fix this as a next priority

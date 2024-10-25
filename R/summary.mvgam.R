@@ -643,6 +643,15 @@ if(!object$use_lv){
   }
 }
 
+if(grepl('hiercor', validate_trend_model(object$trend_model))){
+  cat("\nHierarchical correlation weighting parameter (alpha_cor) estimates:\n")
+  print(suppressWarnings(mcmc_summary(object$model_output, 'alpha_cor',
+                                      digits = digits,
+                                      variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder')))[,c(3:7)])
+
+
+}
+
 if(!is.null(object$trend_call)){
   if(include_betas){
     cat("\nGAM process model coefficient (beta) estimates:\n")

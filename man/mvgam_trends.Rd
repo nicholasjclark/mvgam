@@ -28,7 +28,9 @@ temporal intervals that are exactly \code{0} will be adjusted to a very small nu
 (\code{1e-12}) to prevent sampling errors. For all autoregressive trend types
 apart from \code{CAR()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
-multivariate Random Walk if \code{data} contains \verb{>1} series).
+multivariate Random Walk if \code{data} contains \verb{>1} series). Hierarchical process error correlations
+can also be handled if the data contain relevant observation units that are nested into
+relevant grouping and subgrouping levels (i.e. using \code{AR(gr = region, subgr = species)})
 
 Note that only \code{RW}, \code{AR1}, \code{AR2} and \code{AR3} are available if
 using \code{JAGS}. All trend models are supported if using \code{Stan}.

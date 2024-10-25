@@ -125,5 +125,55 @@ plot(mod, type = 'trend', series = 1)
 plot(mod, type = 'trend', series = 2)
 plot(mod, type = 'residuals', series = 1)
 plot(mod, type = 'residuals', series = 2)
+
+# Now an example illustrating hierarchical dynamics
+set.seed(123)
+# Simulate three species monitored in three different
+# regions, where dynamics can potentially vary across regions
+simdat1 <- sim_mvgam(trend_model = VAR(cor = TRUE),
+                    prop_trend = 0.95,
+                    n_series = 3,
+                    mu = c(1, 2, 3))
+simdat2 <- sim_mvgam(trend_model = VAR(cor = TRUE),
+                    prop_trend = 0.95,
+                    n_series = 3,
+                    mu = c(1, 2, 3))
+simdat3 <- sim_mvgam(trend_model = VAR(cor = TRUE),
+                    prop_trend = 0.95,
+                    n_series = 3,
+                    mu = c(1, 2, 3))
+
+# Set up the data but DO NOT include 'series'
+all_dat <- rbind(simdat1$data_train \%>\%
+                  dplyr::mutate(region = 'qld'),
+                simdat2$data_train \%>\%
+                  dplyr::mutate(region = 'nsw'),
+                simdat3$data_train \%>\%
+                  dplyr::mutate(region = 'vic')) \%>\%
+dplyr::mutate(species = gsub('series', 'species', series),
+              species = as.factor(species),
+              region = as.factor(region)) \%>\%
+dplyr::arrange(series, time) \%>\%
+dplyr::select(-series)
+
+# Check priors for a hierarchical AR1 model
+get_mvgam_priors(formula = y ~ species,
+                trend_model = AR(gr = region, subgr = species),
+                data = all_dat)
+
+# Fit the model
+mod <- mvgam(formula = y ~ species,
+            trend_model = AR(gr = region, subgr = species),
+            data = all_dat)
+
+# Check standard outputs
+summary(mod)
+conditional_effects(mod, type = 'link')
+
+# Inspect posterior estimates for process error and the
+# correlation weighting parameter
+mcmc_plot(mod, variable = 'Sigma', regex = TRUE,
+         type = 'hist')
+mcmc_plot(mod, variable = 'alpha_cor', type = 'hist')
 }
 }
