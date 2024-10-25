@@ -32,6 +32,7 @@ jobs:
         with:
           dependencies: NA
           extra-packages: |
+              BH
               knitr
               extraDistr
               lubridate
