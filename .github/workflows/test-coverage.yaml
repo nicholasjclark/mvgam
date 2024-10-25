@@ -33,6 +33,7 @@ jobs:
           dependencies: NA
           extra-packages: |
               BH
+              RcppEigen
               knitr
               extraDistr
               lubridate
