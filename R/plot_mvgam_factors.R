@@ -28,7 +28,7 @@
 #'plot_mvgam_factors(mod)
 #'}
 #'@export
-plot_mvgam_factors = function(object, plot = TRUE){
+plot_mvgam_factors = function(object, plot = TRUE) {
 
   # Check arguments
   if (!(inherits(object, "mvgam"))) {
@@ -47,6 +47,7 @@ plot_mvgam_factors = function(object, plot = TRUE){
   starts <- c(1, starts[-c(1, object$n_lv + 1)])
   ends <- ends[-1]
   probs <- c(0.05, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.95)
+  probs <- c(0.2, 0.4, 0.6, 0.9)
 
   # Set up plot environment
   if(plot){
@@ -68,62 +69,57 @@ plot_mvgam_factors = function(object, plot = TRUE){
     }
   }
 
-  # Loop across each lv and calculate probability that the lv was dropped
-  lv_estimates <- do.call(rbind, lapply(1:object$n_lv, function(x){
+  lv_estimates <- lapply(1:object$n_lv,
+                         \(x) {
 
-    if(object$fit_engine == 'stan'){
-      inds_lv <- seq(x, dim(mcmc_chains(object$model_output, 'LV'))[2], by = object$n_lv)
-      preds <- mcmc_chains(object$model_output, 'LV')[,inds_lv]
-    } else {
-      preds <- mcmc_chains(object$model_output, 'LV')[,starts[x]:ends[x]]
-    }
+                           if(object$fit_engine == 'stan'){
+                             inds_lv <- seq(x, dim(mcmc_chains(object$model_output, 'LV'))[2], by = object$n_lv)
+                             preds <- mcmc_chains(object$model_output, 'LV')[,inds_lv]
+                           } else {
+                             preds <- mcmc_chains(object$model_output, 'LV')[,starts[x]:ends[x]]
+                           }
 
-    # Keep only the in-sample observations for testing against the null of white noise
-    preds <- preds[,1:(length(object$obs_data$y) / NCOL(object$ytimes))]
+                           # Keep only the in-sample observations for testing against the null of white noise
+                           preds <- preds[,1:(length(object$obs_data$y) / NCOL(object$ytimes))]
+                           n_draw <- nrow(preds)
+                           n_obs <- ncol(preds)
+                           factor_name <- paste0("Factor ", x)
 
-    cred <- sapply(1:NCOL(preds),
-                   function(n) quantile(preds[,n],
-                                        probs = probs))
-    # If plot = TRUE, plot the LVs
-    if(plot){
-      preds_last <- preds[1,]
-      ylim <- range(cred)
-      ylab <- paste0('Factor ', x)
-      pred_vals <- seq(1:length(preds_last))
-      plot(1, type = "n", bty = 'L',
-           xlab = 'Time',
-           ylab = ylab,
-           xlim = c(0, length(preds_last)),
-           ylim = ylim)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[1,], rev(cred[9,])),
-              col = c_light, border = NA)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[2,], rev(cred[8,])),
-              col = c_light_highlight, border = NA)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[3,], rev(cred[7,])),
-              col = c_mid, border = NA)
-      polygon(c(pred_vals, rev(pred_vals)), c(cred[4,], rev(cred[6,])),
-              col = c_mid_highlight, border = NA)
-      lines(pred_vals, cred[5,], col = c_dark, lwd = 2.5)
-      box(bty = 'L', lwd = 2)
+                           if (plot) {
+                             library(ggplot2)
+                             fig <- data.frame(preds = c(preds),
+                                               obs = rep(1:n_obs, each = n_draw),
+                                               .draw = rep(1:n_draw, n_obs)) |>
+                               ggplot(aes(obs, preds)) +
+                               ggdist::stat_lineribbon(point_interval = ggdist::median_qi,
+                                                       .width = probs,
+                                                       colour = c_dark,
+                                                       show.legend = FALSE) +
+                               scale_fill_manual(values = c(c_light, c_light_highlight, c_mid, c_mid_highlight)) +
+                               scale_x_continuous(expand = c(0, 0)) +
+                               scale_y_continuous(expand = c(0, 0)) +
+                               labs(x = "Time",
+                                    y = factor_name)
+                           }
 
-    }
-
-    # Calculate second derivatives of empirical medians and upper / lower intervals;
-    # factors with small second derivatives are moving in roughly a straight line and not
-    # likely contributing much (or at all) to the latent trend estimates
-    meds <- cred[5,]
-    uppers <- cred[8,]
-    lowers <- cred[2,]
-    data.frame('Contribution' = sum(abs(diff(diff(meds)) +
-                                          diff(diff(uppers)) +
-                                          diff(diff(lowers)))))
-  }))
-
-  rownames(lv_estimates) <- paste0('Factor', 1:object$n_lv)
-
-  if(plot){
-    layout(1)
-  }
-
-  lv_estimates / sum(lv_estimates)
+                           # Calculate second derivatives of empirical medians and upper / lower intervals;
+                           # factors with small second derivatives are moving in roughly a straight line and not
+                           # likely contributing much (or at all) to the latent trend estimates
+                           meds <- apply(preds, 2, median)
+                           uppers <- apply(preds, 2, \(p) quantile(p, 0.8))
+                           lowers <- apply(preds, 2, \(p) quantile(p, 0.2))
+                           contribution <- data.frame('Contribution' = sum(abs(diff(diff(meds)) +
+                                                                                 diff(diff(uppers)) +
+                                                                                 diff(diff(lowers)))),
+                                                      row.names = factor_name)
+                           if (plot) {
+                             list(fig = fig, contribution = contribution)
+                           } else {
+                             list(contribution = contribution)
+                           }
+                         })
+  if (plot)
+    lapply(lv_estimates, \(x) print(x$fig))
+  contributions <- do.call(rbind, lapply(lv_estimates, \(x) x$contribution))
+  contributions / sum(contributions)
 }
