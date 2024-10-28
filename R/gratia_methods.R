@@ -338,12 +338,12 @@ eval_smoothDothilbertDotsmooth = function(smooth,
     n = n, n_3d = n_3d, n_4d = n_4d,
     id = which_smooth(
       model,
-      gratia::smooth_label(smooth)
+      smooth_label(smooth)
     )
   )
 
   # by variables
-  by_var <- gratia::by_variable(smooth)
+  by_var <- by_variable(smooth)
   if (by_var == "NA") {
     by_var <- NA_character_
   }
@@ -353,7 +353,6 @@ eval_smoothDothilbertDotsmooth = function(smooth,
   by <- unlist(purrr::map(gp_att_table, 'by'))
   level <- unlist(purrr::map(gp_att_table, 'level'))
   gp_covariate <- smooth$term
-  by <- smooth$by
   level <- ifelse(is.null(smooth$by.level), NA, smooth$by.level)
   k <- unlist(purrr::map(gp_att_table, 'k'))
   scale <- unlist(purrr::map(gp_att_table, 'scale'))
@@ -365,17 +364,17 @@ eval_smoothDothilbertDotsmooth = function(smooth,
   # Which GP term are we plotting?
   if(!is.na(level)){
     gp_select <- which(unlist(purrr::map(gp_att_table, 'covariate')) == gp_covariate &
-                         unlist(purrr::map(gp_att_table, 'by')) == by &
+                         which(by %in% by_var) &
                          unlist(purrr::map(gp_att_table, 'level')) == level)
   } else {
     gp_select <- which(unlist(purrr::map(gp_att_table, 'covariate')) == gp_covariate &
-                         unlist(purrr::map(gp_att_table, 'by')) == by)
+                         which(by %in% by_var))
   }
 
   # Compute eigenfunctions for this GP term
   X <- prep_eigenfunctions(data = data,
                            covariate = gp_covariate,
-                           by = by,
+                           by = by_var,
                            level = level,
                            k = k[gp_select],
                            boundary = boundary[gp_select],
@@ -430,6 +429,7 @@ eval_smoothDothilbertDotsmooth = function(smooth,
 
   ## identify which vars are needed for this smooth...
   keep_vars <- c(smooth$term, smooth$by)
+  keep_vars <- keep_vars[!keep_vars %in% 'NA']
 
   ## ... then keep only those vars
   data <- dplyr::select(data, dplyr::all_of(keep_vars))

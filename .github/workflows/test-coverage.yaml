@@ -32,6 +32,8 @@ jobs:
         with:
           dependencies: NA
           extra-packages: |
+              BH
+              RcppEigen
               knitr
               extraDistr
               lubridate

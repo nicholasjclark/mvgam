@@ -198,6 +198,7 @@ plot_mvgam_series(data = model_data, y = 'survival')
 mod0 <- mvgam(formula = survival ~ 1,
              trend_model = AR(),
              noncentred = TRUE,
+             priors = prior(normal(-3.5, 0.5), class = Intercept),
              family = betar(),
              data = model_data,
              silent = 2)
@@ -205,11 +206,12 @@ mod0 <- mvgam(formula = survival ~ 1,
 
 ```{r eval = FALSE}
 mod0 <- mvgam(formula = survival ~ 1,
-             trend_model = AR(),
-             noncentred = TRUE,
-             family = betar(),
-             data = model_data,
-             silent = 2)
+              trend_model = AR(),
+              noncentred = TRUE,
+              priors = prior(normal(-3.5, 0.5), class = Intercept),
+              family = betar(),
+              data = model_data,
+              silent = 2)
 ```
 
 The summary of this model shows good behaviour of the Hamiltonian Monte Carlo sampler and provides useful summaries on the Beta observation model parameters:
@@ -226,9 +228,10 @@ plot(mod0, type = 'trend')
 Now we can increase the complexity of our model by constructing and fitting a State-Space model with a time-varying effect of the coastal upwelling index in addition to the autoregressive dynamics. We again use a Beta observation model to capture the restrictions of our proportional observations, but this time will include a `dynamic()` effect of `CUI.apr` in the latent process model. We do not specify the $\rho$ parameter, instead opting to estimate it using a Hilbert space approximate GP:
 ```{r include=FALSE}
 mod1 <- mvgam(formula = survival ~ 1,
-              trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE),
+              trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE) - 1,
               trend_model = AR(),
               noncentred = TRUE,
+              priors = prior(normal(-3.5, 0.5), class = Intercept),
               family = betar(),
               data = model_data,
               adapt_delta = 0.99,
@@ -237,9 +240,10 @@ mod1 <- mvgam(formula = survival ~ 1,
 
 ```{r eval=FALSE}
 mod1 <- mvgam(formula = survival ~ 1,
-              trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE),
+              trend_formula = ~ dynamic(CUI.apr, k = 25, scale = FALSE) - 1,
               trend_model = AR(),
               noncentred = TRUE,
+              priors = prior(normal(-3.5, 0.5), class = Intercept),
               family = betar(),
               data = model_data,
               silent = 2)

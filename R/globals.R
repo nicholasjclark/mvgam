@@ -17,4 +17,6 @@ utils::globalVariables(c("y", "year", "smooth_vals", "smooth_num",
                          "name", "needed", "nmix_trendmap", "orig_formula",
                          "trial", "use_var1", "use_var1cor", "xcols_drop",
                          "time_lag", "dis_time", "maxt", "orig_rows",
-                         "matches", "time.", "file_name", ".data"))
+                         "matches", "time.", "file_name", ".data",
+                         "horizon", "target", "Series", "evd", "mean_evd",
+                         "total_evd"))

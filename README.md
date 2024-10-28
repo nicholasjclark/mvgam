@@ -3,21 +3,33 @@
 
 <img src="man/figures/mvgam_logo.png" width = 120 alt="mvgam R package logo"/>[<img src="https://raw.githubusercontent.com/stan-dev/logos/master/logo_tm.png" align="right" width=120 alt="Stan Logo"/>](https://mc-stan.org/)
 
-# *mvgam*
+# mvgam
+
+> **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
 
 [![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
 [![Test
 status](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml)
 [![Coverage
 status](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
+[![Documentation](https://img.shields.io/badge/documentation-mvgam-orange.svg?colorB=E91E63)](https://nicholasjclark.github.io/mvgam/)
 [![CRAN
 Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org/package=mvgam)
 [![CRAN
 Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
-The goal of `mvgam` is to fit Bayesian Dynamic Generalized Additive
-Models to time series data. The motivation for the package is described
-in <a
+The goal of `mvgam` is to fit Bayesian (Dynamic) Generalized Additive
+Models. This package constructs State-Space models that can include
+highly flexible nonlinear predictor effects for both process and
+observation components by leveraging functionalities from the impressive
+<a href="https://paulbuerkner.com/brms/"
+target="_blank"><code>brms</code></a> and
+<a href="https://cran.r-project.org/web/packages/mgcv/index.html"
+target="_blank"><code>mgcv</code></a> packages. This allows `mvgam` to
+fit a wide range of models, including hierarchical ecological models
+such as N-mixture or Joint Species Distribution models, as well as
+univariate and multivariate time series models with imperfect detection.
+The original motivation for the package is described in <a
 href="https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974"
 target="_blank">Clark &amp; Wells 2022</a> (published in *Methods in
 Ecology and Evolution*), with additional inspiration on the use of
@@ -26,8 +38,8 @@ Bayesian probabilistic modelling coming from
 Betancourt</a>,
 <a href="https://www.bu.edu/earth/profiles/michael-dietze/"
 target="_blank">Michael Dietze</a> and
-<a href="https://emilybfox.su.domains/" target="_blank">Emily Fox</a>,
-among many others.
+<a href="https://www.durham.ac.uk/staff/sarah-e-heaps/"
+target="_blank">Sarah Heaps</a>, among many others.
 
 ## Resources
 
@@ -42,6 +54,9 @@ been compiled:
 - <a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/"
   target="_blank">Distributed lags (and hierarchical distributed lags)
   using <code>mgcv</code> and <code>mvgam</code></a>
+- <a href="https://ecogambler.netlify.app/blog/vector-autoregressions/"
+  target="_blank">State-Space Vector Autoregressions in
+  <code>mvgam</code></a>
 - <a href="https://www.youtube.com/watch?v=RwllLjgPUmM"
   target="_blank">Ecological Forecasting with Dynamic GAMs; a tutorial and
   detailed case study</a>
@@ -59,18 +74,12 @@ been compiled:
 Install the stable version from `CRAN` using:
 `install.packages('mvgam')`, or install the development version from
 `GitHub` using: `devtools::install_github("nicholasjclark/mvgam")`. Note
-that to condition models on observed data, either `JAGS` (along with
-packages `rjags` and `runjags`) or `Stan` must be installed (along with
-either `rstan` and/or `cmdstanr`). Please refer to installation links
-for `JAGS` <a href="https://sourceforge.net/projects/mcmc-jags/files/"
-target="_blank">here</a>, for `Stan` with `rstan`
+that to condition models on observed data, `Stan` must be installed
+(along with either `rstan` and/or `cmdstanr`). Please refer to
+installation links for `Stan` with `rstan`
 <a href="https://mc-stan.org/users/interfaces/rstan"
 target="_blank">here</a>, or for `Stan` with `cmdstandr`
-<a href="https://mc-stan.org/cmdstanr/" target="_blank">here</a>. You
-will need a fairly recent version of `Stan` to ensure all syntax is
-recognized. If you see warnings such as
-`variable "array" does not exist`, this is usually a sign that you need
-to update `Stan`.
+<a href="https://mc-stan.org/cmdstanr/" target="_blank">here</a>.
 
 We highly recommend you use `Cmdstan` through the `cmdstanr` interface.
 This is because `Cmdstan` is easier to install, is more up to date with
@@ -93,27 +102,21 @@ When using `mvgam`, please cite the following:
   (DGAMs) for forecasting discrete ecological time series. *Methods in
   Ecology and Evolution*. DOI: <https://doi.org/10.1111/2041-210X.13974>
 
-As `mvgam` acts as an interface to `Stan` and `JAGS`, please
-additionally cite whichever software you use for parameter estimation:
+As `mvgam` acts as an interface to `Stan`, please additionally cite:
 
 - Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B.,
   Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017).
   Stan: A probabilistic programming language. *Journal of Statistical
   Software*. 76(1). 10.18637/jss.v076.i01
-- Plummer, M. (2013). JAGS: A program for analysis of Bayesian graphical
-  models using Gibbs sampling. *Proceedings of the 3rd International
-  Workshop on Distributed Statistical Computing*. 124(125.10).
 
 `mvgam` relies on several other `R` packages and, of course, on `R`
 itself. To find out how to cite R and its packages, use the `citation`
 function. There are some features of `mvgam` which specifically rely on
 certain packages. The most important of these is the generation of data
-necessary to estimate smoothing splines, which entirely rely on `mgcv`.
-The `rstan` and `cmdstanr` packages together with `Rcpp` makes `Stan`
-conveniently accessible in `R`, while the `rjags` and `runjags` packages
-together with the `coda` package make `JAGS` accessible in `R`. If you
-use some of these features, please also consider citing the related
-packages.
+necessary to estimate smoothing splines, which rely on `mgcv` and
+`splines2`. The `rstan` and `cmdstanr` packages together with `Rcpp`
+makes `Stan` conveniently accessible in `R`. If you use some of these
+features, please also consider citing the related packages.
 
 ## Cheatsheet
 
@@ -235,28 +238,28 @@ summary(lynx_mvgam)
 #> 
 #> GAM coefficient (beta) estimates:
 #>                2.5%   50%  97.5% Rhat n_eff
-#> (Intercept)   6.400  6.60  6.900 1.00   961
-#> s(season).1  -0.650 -0.14  0.380 1.00   984
-#> s(season).2   0.730  1.30  1.900 1.00  1113
-#> s(season).3   1.300  1.90  2.500 1.00   727
-#> s(season).4  -0.054  0.53  1.100 1.00   727
-#> s(season).5  -1.300 -0.70 -0.069 1.00   919
-#> s(season).6  -1.200 -0.55  0.170 1.00  1012
-#> s(season).7   0.012  0.73  1.400 1.00  1134
-#> s(season).8   0.600  1.40  2.100 1.01   756
-#> s(season).9  -0.410  0.22  0.810 1.00   710
-#> s(season).10 -1.400 -0.87 -0.350 1.00  1164
+#> (Intercept)   6.400  6.60  6.900 1.00   821
+#> s(season).1  -0.640 -0.12  0.390 1.00  1356
+#> s(season).2   0.780  1.30  1.900 1.00  1241
+#> s(season).3   1.300  1.90  2.500 1.00   889
+#> s(season).4  -0.062  0.53  1.200 1.00  1119
+#> s(season).5  -1.300 -0.72 -0.099 1.01  1113
+#> s(season).6  -1.300 -0.57  0.092 1.00  1101
+#> s(season).7   0.023  0.70  1.400 1.00  1355
+#> s(season).8   0.640  1.40  2.100 1.01  1111
+#> s(season).9  -0.370  0.21  0.830 1.01   847
+#> s(season).10 -1.400 -0.87 -0.370 1.00  1108
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value    
-#> s(season) 9.95     10   53.4  <2e-16 ***
+#> s(season) 9.97     10   48.8  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend parameter AR estimates:
 #>          2.5%  50% 97.5% Rhat n_eff
-#> ar1[1]   0.59 0.83  0.99 1.00   519
-#> sigma[1] 0.38 0.48  0.60 1.01   485
+#> ar1[1]   0.61 0.83  0.99 1.01   666
+#> sigma[1] 0.38 0.48  0.60 1.00   688
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -265,7 +268,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Sep 03 1:56:36 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Thu Oct 24 1:32:39 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -370,7 +373,6 @@ partial effects of smooths on the link scale
 ``` r
 require(gratia)
 #> Loading required package: gratia
-#> Warning: package 'gratia' was built under R version 4.2.3
 #> 
 #> Attaching package: 'gratia'
 #> The following object is masked from 'package:mvgam':
@@ -403,7 +405,7 @@ series (testing and training)
 ``` r
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 #> Out of sample DRPS:
-#> 2356.32008125
+#> 2470.51814475
 ```
 
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -469,20 +471,17 @@ families. Currently, the package can handle data for the following:
   trials
 - `nmix()` for count data with imperfect detection (unknown number of
   trials)
-- `tweedie()` for overdispersed count data
 
-Note that only `poisson()`, `nb()`, and `tweedie()` are available if
-using `JAGS`. All families, apart from `tweedie()`, are supported if
-using `Stan`. See `??mvgam_families` for more information. Below is a
-simple example for simulating and modelling proportional data with
-`Beta` observations over a set of seasonal series with independent
-Gaussian Process dynamic trends:
+See `??mvgam_families` for more information. Below is a simple example
+for simulating and modelling proportional data with `Beta` observations
+over a set of seasonal series with independent Gaussian Process dynamic
+trends:
 
 ``` r
 set.seed(100)
 data <- sim_mvgam(family = betar(),
                   T = 80,
-                  trend_model = 'GP',
+                  trend_model = GP(),
                   prop_trend = 0.5, 
                   seasonality = 'shared')
 plot_mvgam_series(data = data$data_train, series = 'all')
@@ -493,7 +492,7 @@ plot_mvgam_series(data = data$data_train, series = 'all')
 ``` r
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
                s(season, by = series, m = 1, k = 5),
-             trend_model = 'GP',
+             trend_model = GP(),
              data = data$data_train,
              newdata = data$data_test,
              family = betar())
@@ -517,7 +516,7 @@ summary(mod, include_betas = FALSE)
 #> logit
 #> 
 #> Trend model:
-#> GP
+#> GP()
 #> 
 #> N series:
 #> 3 
@@ -533,41 +532,41 @@ summary(mod, include_betas = FALSE)
 #> 
 #> Observation precision parameter estimates:
 #>        2.5% 50% 97.5% Rhat n_eff
-#> phi[1]  5.4 8.3    12    1  2019
-#> phi[2]  5.7 8.7    13    1  1795
-#> phi[3]  5.5 8.4    12    1  1680
+#> phi[1]  5.4 8.3    12    1  1248
+#> phi[2]  5.7 8.6    13    1  1312
+#> phi[3]  5.6 8.5    12    1  1724
 #> 
 #> GAM coefficient (beta) estimates:
-#>              2.5%  50% 97.5% Rhat n_eff
-#> (Intercept) -0.18 0.19  0.45 1.01   757
+#>             2.5%  50% 97.5% Rhat n_eff
+#> (Intercept) -0.2 0.19  0.46 1.01   566
 #> 
 #> Approximate significance of GAM smooths:
 #>                            edf Ref.df Chi.sq p-value    
-#> s(season)                4.231      5  28.89 2.6e-06 ***
-#> s(season):seriesseries_1 0.687      4   0.69    0.98    
-#> s(season):seriesseries_2 0.664      4   0.60    0.99    
-#> s(season):seriesseries_3 1.286      4   1.39    0.82    
+#> s(season)                3.872      5  29.63 1.6e-05 ***
+#> s(season):seriesseries_1 0.615      4   0.77    0.98    
+#> s(season):seriesseries_2 1.012      4   0.30    0.99    
+#> s(season):seriesseries_3 1.106      4   1.54    0.81    
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
-#>             2.5%  50% 97.5% Rhat n_eff
-#> alpha_gp[1] 0.06 0.41  0.96 1.00   823
-#> alpha_gp[2] 0.38 0.73  1.30 1.00  1073
-#> alpha_gp[3] 0.15 0.45  0.98 1.00   903
-#> rho_gp[1]   1.10 3.90 14.00 1.01   302
-#> rho_gp[2]   1.70 7.00 32.00 1.01   364
-#> rho_gp[3]   1.30 4.80 22.00 1.01   373
+#>              2.5%  50% 97.5% Rhat n_eff
+#> alpha_gp[1] 0.051 0.41  0.92 1.01   525
+#> alpha_gp[2] 0.360 0.72  1.20 1.00   946
+#> alpha_gp[3] 0.150 0.46  1.00 1.00   659
+#> rho_gp[1]   1.100 3.80 15.00 1.01   370
+#> rho_gp[2]   1.900 7.80 37.00 1.01   365
+#> rho_gp[3]   1.400 5.10 21.00 1.00   645
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
-#> 18 of 2000 iterations ended with a divergence (0.9%)
+#> 12 of 2000 iterations ended with a divergence (0.6%)
 #>  *Try running with larger adapt_delta to remove the divergences
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Sep 03 1:57:57 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Thu Oct 24 1:33:28 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -585,20 +584,16 @@ for(i in 1:3){
 <img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />
 
 There are many more extended uses of `mvgam`, including the ability to
-fit hierarchical GAMs that include dynamic coefficient models, dynamic
-factor and Vector Autoregressive processes. See the
+fit hierarchical State-Space GAMs that include dynamic coefficient
+models, dynamic factors and Vector Autoregressive processes. See the
 <a href="https://nicholasjclark.github.io/mvgam/"
 target="_blank">package documentation</a> for more details. The package
 can also be used to generate all necessary data structures, initial
-value functions and modelling code necessary to fit DGAMs using `Stan`
-or `JAGS`. This can be helpful if users wish to make changes to the
-model to better suit their own bespoke research / analysis goals. The
-following resources can be helpful to troubleshoot:
-
-- <a href="https://discourse.mc-stan.org/" target="_blank">Stan
-  Discourse</a>
-- <a href="https://sourceforge.net/projects/mcmc-jags/"
-  target="_blank">JAGS Discourse</a>
+value functions and modelling code necessary to fit DGAMs using `Stan`.
+This can be helpful if users wish to make changes to the model to better
+suit their own bespoke research / analysis goals. The
+<a href="https://discourse.mc-stan.org/" target="_blank">Stan
+Discourse</a> is a helpful place to troubleshoot.
 
 ## License
 
