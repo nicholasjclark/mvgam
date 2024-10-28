@@ -2,8 +2,8 @@
 #'@importFrom stats predict
 #'@inheritParams brms::fitted.brmsfit
 #'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
-#'@param newdata Optional \code{dataframe} or \code{list} of test data containing the
-#'variables included in the linear predictor of \code{formula}. If not supplied,
+#'@param newdata Optional \code{dataframe} or \code{list} of test data containing the same variables
+#'that were included in the original `data` used to fit the model. If not supplied,
 #'predictions are generated for the original observations used for the model fit.
 #'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
 #'\code{newdata} instead for more seamless integration into `R` workflows
@@ -162,7 +162,9 @@ predict.mvgam = function(object,
                             mgcv_model = object$trend_mgcv_model)
 
       # Extract process error estimates
-      if(attr(object$model_data, 'trend_model') %in% c('None', 'RW','AR1','AR2','AR3','CAR1')){
+      if(attr(object$model_data, 'trend_model') %in%
+         c('None', 'RW', 'AR1', 'AR2',
+           'AR3', 'CAR1', 'ZMVN')){
         if(object$family == 'nmix'){
           family_pars <- list(sigma_obs = .Machine$double.eps)
         } else {
@@ -269,7 +271,7 @@ predict.mvgam = function(object,
       if(!object$use_lv){
 
         if(attr(object$model_data, 'trend_model') %in%
-           c('RW','AR1','AR2','AR3','VAR1','CAR1')){
+           c('RW','AR1','AR2','AR3','VAR1','CAR1','ZMVN')){
           family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
                                                       'sigma'))
         }

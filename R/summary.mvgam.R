@@ -56,7 +56,7 @@ summary.mvgam = function(object,
                                      conservative = trend_model == 'None')
 
     if(!is.null(object$trend_call)){
-      object$trend_mgcv_model <- compute_edf(object$trend_mgcv_model,
+      object$trend_mgcv_model <- mvgam:::compute_edf(object$trend_mgcv_model,
                                              object,
                                              'rho_trend',
                                              'sigma_raw_trend')
@@ -641,6 +641,15 @@ if(!object$use_lv){
 
     }
   }
+}
+
+if(grepl('hiercor', validate_trend_model(object$trend_model))){
+  cat("\nHierarchical correlation weighting parameter (alpha_cor) estimates:\n")
+  print(suppressWarnings(mcmc_summary(object$model_output, 'alpha_cor',
+                                      digits = digits,
+                                      variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder')))[,c(3:7)])
+
+
 }
 
 if(!is.null(object$trend_call)){

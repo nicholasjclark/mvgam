@@ -2,7 +2,7 @@ context("mvgam")
 
 test_that("family must be correctly specified", {
   expect_error(mod <- mvgam(y ~ s(season),
-                            trend_model = 'AR1',
+                            trend_model = AR(),
                             data = beta_data$data_train,
                             family = 'besta',
                             run_model = FALSE),
@@ -11,7 +11,7 @@ test_that("family must be correctly specified", {
 
 test_that("response variable must be specified", {
   expect_error(mod <- mvgam( ~ s(season),
-                             trend_model = 'AR1',
+                             trend_model = AR(),
                              data = beta_data$data_train,
                              family = betar(),
                              run_model = FALSE),
@@ -42,14 +42,14 @@ test_that("id to link smooths not allowed yet", {
 
 test_that("response variable must follow family-specific restrictions", {
   expect_error(mod <- mvgam(y ~ s(season),
-                            trend_model = 'AR1',
+                            trend_model = AR(),
                             data = gaus_data$data_train,
                             family = lognormal(),
                             run_model = FALSE),
                'Values <= 0 not allowed for lognormal responses')
 
   expect_error(mod <- mvgam(y ~ s(season),
-                            trend_model = 'AR1',
+                            trend_model = AR(),
                             data = gaus_data$data_train,
                             family = poisson(),
                             run_model = FALSE),
@@ -57,11 +57,11 @@ test_that("response variable must follow family-specific restrictions", {
 })
 
 test_that("trend_model must be correctly specified", {
-  expect_error(mod <- mvgam(y ~ s(season),
+  expect_error(SW(mod <- mvgam(y ~ s(season),
                             trend_model = 'AR11',
                             data = beta_data$data_train,
                             family = betar(),
-                            run_model = FALSE))
+                            run_model = FALSE)))
 })
 
 test_that("outcome variable must be present in data", {
@@ -78,7 +78,7 @@ test_that("outcome variable must be present in data", {
 test_that("series levels must match unique entries in series", {
   levels(beta_data$data_train$series) <- paste0('series_', 1:6)
   expect_error(mvgam(y ~ s(season),
-                     trend_model = 'GP',
+                     trend_model = GP(),
                      data = beta_data$data_train,
                      newdata = beta_data$data_test,
                      family = betar(),
@@ -90,7 +90,7 @@ test_that("missing values not allowed in predictors", {
   simdat <- sim_mvgam()
   simdat$data_train$season[4] <- NA
   expect_error(mvgam(y ~ s(season),
-                     trend_model = 'GP',
+                     trend_model = GP(),
                      data = simdat$data_train,
                      newdata = simdat$data_test,
                      run_model = FALSE))
@@ -108,7 +108,7 @@ test_that("all series must have observations for all unique timepoints", {
   data <- sim_mvgam()
   data$data_train <- data$data_train[-2,]
   expect_error(mod <- mvgam(y ~ s(season),
-                            trend_model = 'AR1',
+                            trend_model = AR(),
                             data = data$data_train,
                             family = poisson(),
                             run_model = FALSE),
@@ -117,7 +117,7 @@ test_that("all series must have observations for all unique timepoints", {
   data <- sim_mvgam()
   data$data_test <- data$data_test[-2,]
   expect_error(mod <- mvgam(y ~ s(season),
-                            trend_model = 'AR1',
+                            trend_model = AR(),
                             data = data$data_train,
                             newdata = data$data_test,
                             family = poisson(),
@@ -144,7 +144,7 @@ test_that("JAGS setups should work", {
 # JAGS setup should work, whether installed or not
   simdat <- sim_mvgam()
   mod <- mvgam(y ~ s(season),
-               trend_model = 'RW',
+               trend_model = RW(),
                data = simdat$data_train,
                family = poisson(),
                use_stan = FALSE,
@@ -153,7 +153,7 @@ test_that("JAGS setups should work", {
   expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
-               trend_model = 'AR1',
+               trend_model = AR(),
                data = simdat$data_train,
                family = poisson(),
                use_stan = FALSE,
@@ -162,7 +162,7 @@ test_that("JAGS setups should work", {
   expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
-               trend_model = 'AR2',
+               trend_model = AR(p = 2),
                data = simdat$data_train,
                family = poisson(),
                use_stan = FALSE,
@@ -171,7 +171,7 @@ test_that("JAGS setups should work", {
   expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
-               trend_model = 'AR1',
+               trend_model = AR(),
                data = simdat$data_train,
                family = nb(),
                use_stan = FALSE,
@@ -180,7 +180,7 @@ test_that("JAGS setups should work", {
   expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
-               trend_model = 'AR3',
+               trend_model = AR(p = 3),
                data = simdat$data_train,
                family = nb(),
                use_stan = FALSE,
@@ -189,7 +189,7 @@ test_that("JAGS setups should work", {
   expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
-               trend_model = 'AR1',
+               trend_model = AR(),
                data = simdat$data_train,
                family = tweedie(),
                use_stan = FALSE,
@@ -198,7 +198,7 @@ test_that("JAGS setups should work", {
   expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
-               trend_model = 'AR3',
+               trend_model = AR(p = 3),
                data = simdat$data_train,
                family = tweedie(),
                use_stan = FALSE,
@@ -213,7 +213,7 @@ test_that("JAGS setups should work", {
                                         use_stan = FALSE),
                        'data.frame'))
   mod <- mvgam(y ~ s(season),
-               trend_model = 'RW',
+               trend_model = RW(),
                data = simdat$data_train,
                family = tweedie(),
                use_stan = FALSE,
@@ -459,7 +459,7 @@ test_that("median coefs should be stored in the mgcv object", {
 
 test_that("empty obs formula is allowed, even if no trend_formula", {
   mod <- mvgam(formula = y ~ -1,
-               trend_model = 'AR1',
+               trend_model = AR(),
                data_train = gaus_data$data_train,
                family = gaussian(),
                run_model = FALSE)
@@ -469,7 +469,7 @@ test_that("empty obs formula is allowed, even if no trend_formula", {
 test_that("empty obs formula allowed if trend_formula supplied", {
   mod <- mvgam(formula = y ~ -1,
                trend_formula = ~ s(season),
-               trend_model = 'AR1',
+               trend_model = AR(),
                data = gaus_data$data_train,
                family = gaussian(),
                run_model = FALSE)
@@ -626,7 +626,7 @@ test_that("trend_map is behaving propoerly", {
                           trend = c(1,1,2))
   mod_map <- mvgam(y ~ s(season, bs = 'cc'),
                    trend_map = trend_map,
-                   trend_model = 'AR1',
+                   trend_model = AR(),
                    data = mod_data,
                    run_model = FALSE)
 
@@ -639,7 +639,7 @@ test_that("trend_map is behaving propoerly", {
                           trend = c(1,1,2))
   expect_error(mvgam(y ~ s(season, bs = 'cc'),
                 trend_map = trend_map,
-                trend_model = 'AR1',
+                trend_model = AR(),
                 data = mod_data,
                 run_model = FALSE),
                'Argument "trend_map" must have an entry for every unique time series in "data"',
@@ -669,7 +669,7 @@ test_that("trend_formula setup is working properly", {
   mod_data <- sim$data_train
   mod_map <- mvgam(y ~ s(series, bs = 're'),
                    trend_formula = ~ s(season, bs = 'cc'),
-                   trend_model = 'AR1',
+                   trend_model = AR(),
                    data = mod_data,
                    run_model = FALSE)
   expect_true(identical(mod_map$model_data$Z,
@@ -686,7 +686,7 @@ test_that("trend_formula setup is working properly", {
   expect_error(mvgam(y ~ 1,
                      trend_formula = 1 ~ s(series, bs = 're') +
                        s(season, bs = 'cc'),
-                     trend_model = 'AR1',
+                     trend_model = AR(),
                      data = mod_data,
                      run_model = FALSE),
                'Argument "trend_formula" should not have a left-hand side',
@@ -694,7 +694,7 @@ test_that("trend_formula setup is working properly", {
 
   expect_error(mvgam(y ~ 1,
                      trend_formula = ~ s(series, bs = 're') + s(season, bs = 'cc'),
-                     trend_model = 'AR1',
+                     trend_model = AR(),
                      data = mod_data,
                      run_model = FALSE),
                'Argument "trend_formula" should not have the identifier "series" in it.\nUse "trend" instead for varying effects',
@@ -746,7 +746,7 @@ test_that("parametric effect priors correctly incorporated in models", {
 
   # Observation formula; complex trend
   mod <- mvgam(y ~ s(season) + series:x1 + series:x2 + series:x3,
-               trend_model = 'VARMA',
+               trend_model = VAR(ma = TRUE),
                data = mod_data$data_train,
                family = gaussian(),
                run_model = FALSE)
@@ -765,7 +765,7 @@ test_that("parametric effect priors correctly incorporated in models", {
 
   priors <- get_mvgam_priors(y ~ s(season) + series:x1 +
                                series:x2 + series:x3,
-                             trend_model = 'VARMA',
+                             trend_model = VAR(ma = TRUE),
                              data = mod_data$data_train,
                              family = gaussian())
   expect_true(any(grepl('seriesseries_1:x2',
@@ -777,7 +777,7 @@ test_that("parametric effect priors correctly incorporated in models", {
   mod <- mvgam(y ~ 1,
                trend_formula = ~ s(season) + trend:x1 +
                  trend:x2 + trend:x3,
-               trend_model = 'RW',
+               trend_model = RW(),
                data = mod_data$data_train,
                family = gaussian(),
                run_model = FALSE)
@@ -795,7 +795,7 @@ test_that("parametric effect priors correctly incorporated in models", {
   priors <- get_mvgam_priors(y ~ 1,
                              trend_formula = ~ s(season) + trend:x1 +
                                trend:x2 + trend:x3,
-                             trend_model = 'RW',
+                             trend_model = RW(),
                              data = mod_data$data_train,
                              family = gaussian())
   expect_true(any(grepl('trendtrend1:x1_trend',
@@ -806,7 +806,7 @@ test_that("parametric effect priors correctly incorporated in models", {
   # Trend formula; VARMA
   mod <- mvgam(y ~ 1,
                trend_formula = ~ s(season) + trend:x1 + trend:x2 + trend:x3,
-               trend_model = 'VARMA',
+               trend_model = VAR(ma = TRUE),
                data = mod_data$data_train,
                family = gaussian(),
                run_model = FALSE,
@@ -824,7 +824,7 @@ test_that("parametric effect priors correctly incorporated in models", {
 
   priors <- get_mvgam_priors(y ~ 1,
                              trend_formula = ~ s(season) + trend:x1 + trend:x2 + trend:x3,
-                             trend_model = 'RW',
+                             trend_model = RW(),
                              data = mod_data$data_train,
                              family = gaussian())
   expect_true(any(grepl('trendtrend1:x1_trend',

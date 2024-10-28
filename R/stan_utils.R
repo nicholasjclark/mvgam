@@ -1148,7 +1148,7 @@ vectorise_stan_lik = function(model_file,
     family <- 'poisson'
   }
 
-  if(use_lv & trend_model == 'None'){
+  if(use_lv & trend_model %in% c('None', 'ZMVN')){
     trend_model <- 'RW'
   }
 
@@ -2220,6 +2220,7 @@ trend_map_mods = function(model_file,
                           data_train,
                           ytimes){
 
+  if(trend_model == 'ZMVN') trend_model <- 'RW'
 if(trend_model != 'VAR1'){
   # Model code should be modified to remove any priors and modelling for the
   # latent variable coefficients and sign corrections
@@ -2438,6 +2439,7 @@ add_trend_predictors = function(trend_formula,
                                 drift = FALSE){
 
   #### Creating the trend mvgam model file and data structures ####
+  if(trend_model == 'ZMVN') trend_model <- 'RW'
   # Replace any terms labelled 'trend' with 'series' for creating the necessary
   # structures
   trend_formula <- formula(paste(gsub('trend', 'series',

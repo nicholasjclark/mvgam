@@ -1,8 +1,25 @@
 #'Argument validation functions
 #'@param data Data to be validated (list or dataframe)
 #'@noRd
-validate_series_time = function(data, name = 'data',
+validate_series_time = function(data,
+                                name = 'data',
                                 trend_model){
+
+  # First validation requires the full trend_model object
+  if(!inherits(trend_model, 'mvgam_trend')){
+    trend_model <- list(trend_model = trend_model,
+                        unit = 'time',
+                        gr = 'NA',
+                        subgr = 'series')
+  }
+
+  # Validate any grouping structure and update the data accordingly
+  data <- validate_series_groups(data = data,
+                                 trend_model = trend_model,
+                                 name = name)
+
+  # Now we only need the character trend_model string
+  trend_model <- trend_model$trend_model
 
   # Series label must be present as a factor and
   # must contain a time variable
@@ -60,6 +77,13 @@ validate_series_time = function(data, name = 'data',
     }
   }
 
+  # Add an identifier so post-processing functions know
+  # what the original supplied data ordering was; this is needed
+  # for ensuring that functions such as fitted() and
+  # residuals() return objects that match the original order that
+  # the user supplied, if no newdata are given
+  data$index..orig..order <- 1:length(data$time)
+
   # Add a new 'time' variable that will be useful for rearranging data for
   # modeling, in case 'time' is also supplied as a covariate or if this is
   # a continuous time model (CAR1)
@@ -113,6 +137,128 @@ validate_series_time = function(data, name = 'data',
   return(data)
 }
 
+# Function to ensure units of analysis, groups and subgroups are arranged
+# and formatted properly for mvgam processing and modelling
+#'@noRd
+validate_series_groups = function(data, trend_model, name = 'data'){
+
+  # Checks only needed if trend_model isn't 'None'
+  if(trend_model$trend_model != 'None'){
+
+    # Check that unit and subgr exist in data and are the correct type
+    if(is.null(trend_model$gr)) trend_model$gr <- 'NA'
+    if(is.null(trend_model$unit)) trend_model$unit <- 'time'
+    if(is.null(trend_model$subgr)) trend_model$subgr <- 'series'
+
+    if(trend_model$gr == 'NA' &
+       trend_model$unit == 'time' &
+       trend_model$subgr == 'series'){
+
+      if(!'series' %in% names(data)){
+        data$series <- factor('series1')
+      }
+
+      if(!'time' %in% names(data)){
+        if(trend_model$trend_model %in% c('ZMVNcor',
+                                          'ZMVNhiercor')){
+          # Add a time indicator if missing
+          data.frame(series = data$series) %>%
+            dplyr::group_by(series) %>%
+            dplyr::mutate(time = dplyr::row_number()) %>%
+            dplyr::pull(time) -> times
+          data$time <- times
+        } else {
+          stop(name, " does not contain a 'time' variable",
+               call. = FALSE)
+        }
+      }
+    }
+    validate_var_exists(data = data,
+                        variable = trend_model$unit,
+                        type = 'num/int',
+                        name = name,
+                        trend_char = trend_model$trend_model)
+
+    validate_var_exists(data = data,
+                        variable = trend_model$subgr,
+                        type = 'factor',
+                        name = name,
+                        trend_char = trend_model$trend_model)
+
+    # If gr is supplied, check it exists and is the correct type
+    if(trend_model$gr != 'NA'){
+      validate_var_exists(data = data,
+                          variable = trend_model$gr,
+                          type = 'factor',
+                          name = name,
+                          trend_char = trend_model$trend_model)
+      if(trend_model$subgr == 'series'){
+        stop('argument "subgr" cannot be set to "series" if "gr" is also supplied',
+             call. = FALSE)
+      }
+
+      # Add necessary 'time' variable
+      gr_dat <- data.frame(time = data[[trend_model$unit]],
+                           gr = data[[trend_model$gr]],
+                           subgr = data[[trend_model$subgr]])
+
+      # Check that each level of gr contains all possible levels of subgr
+      if(stats::var(gr_dat %>%
+                    dplyr::group_by(gr) %>%
+                    dplyr::summarise(tot_subgrs = length(unique(subgr))) %>%
+                    dplyr::ungroup() %>%
+                    dplyr::pull(tot_subgrs)) != 0){
+        stop(paste0('Some levels of "', trend_model$gr, '" do not contain all\n',
+                    'unique levels of "', trend_model$subgr, '"',
+                    " in ", name),
+             call. = FALSE)
+      }
+      gr_dat %>%
+        dplyr::mutate(series = interaction(gr, subgr, drop = TRUE, sep = '_',
+                                           lex.order = TRUE)) -> gr_dat
+    } else {
+      gr_dat <- data.frame(time = data[[trend_model$unit]],
+                           subgr = data[[trend_model$subgr]]) %>%
+        dplyr::mutate(series = as.factor(subgr))
+    }
+
+    # Add the possibly new 'series' and 'time' variables to
+    # the data and return
+    data$series <- gr_dat$series
+    data$time <- gr_dat$time
+  }
+
+  return(data)
+}
+
+#'@noRd
+validate_var_exists = function(data,
+                               variable,
+                               type = 'factor',
+                               name = 'data',
+                               trend_char){
+  if(trend_char != 'None'){
+    if(!exists(variable, data)){
+      stop(paste0('Variable "', variable, '" not found in ', name),
+           call. = FALSE)
+    }
+
+    if(type == 'num/int'){
+      if(!is.numeric(data[[variable]])){
+        stop(paste0('Variable "', variable, '" must be either numeric or integer type'),
+             call. = FALSE)
+      }
+    }
+
+    if(type == 'factor'){
+      if(!is.factor(data[[variable]])){
+        stop(paste0('Variable "', variable, '" must be a factor type'),
+             call. = FALSE)
+      }
+    }
+  }
+}
+
 #'@noRd
 as_one_logical = function (x, allow_na = FALSE) {
   s <- substitute(x)
@@ -138,12 +284,17 @@ as_one_integer <- function(x, allow_na = FALSE) {
 }
 
 #'@noRd
-deparse0 = function (x, max_char = NULL, ...) {
-  out <- paste(deparse(x, ...), sep = "", collapse = "")
+deparse0 <- function (x, max_char = NULL, ...) {
+  out <- collapse(deparse(x, ...))
   if (isTRUE(max_char > 0)) {
     out <- substr(out, 1L, max_char)
   }
   out
+}
+
+#'@noRd
+collapse <- function(..., sep = "") {
+    paste(..., sep = sep, collapse = "")
 }
 
 #'@noRd
@@ -198,8 +349,10 @@ validate_family = function(family, use_stan = TRUE){
          call. = FALSE)
 
   if(family$family %in% c('binomial', 'beta_binomial'))
-    rlang::warn(paste0("Binomial and Beta-binomial families require cbind(n_successes, n_trials)\nin the formula left-hand side. Do not use cbind(n_successes, n_failures)!"),
-                       .frequency = "once", .frequency_id = '1')
+    rlang::warn(paste0("Binomial and Beta-binomial families require cbind(n_successes, n_trials)\n",
+                       "in the formula left-hand side. Do not use cbind(n_successes, n_failures)!"),
+                .frequency = "once",
+                .frequency_id = 'cbind_binomials')
   return(family)
 }
 
@@ -247,14 +400,31 @@ validate_family_restrictions = function(response, family){
 }
 
 #'@noRd
-validate_trend_model = function(trend_model, drift = FALSE, noncentred = FALSE){
+validate_trend_model = function(trend_model,
+                                drift = FALSE,
+                                noncentred = FALSE,
+                                warn = TRUE){
   if(inherits(trend_model, 'mvgam_trend')){
     ma_term <- if(trend_model$ma){ 'MA' } else { NULL }
     cor_term <- if(trend_model$cor){ 'cor' } else { NULL }
+    if(is.null(trend_model$gr)) trend_model$gr <- 'NA'
+    if(trend_model$gr != 'NA'){
+      gr_term <- 'hier'
+    } else {
+      gr_term <- NULL
+    }
     trend_model <- paste0(trend_model$trend_model,
                           trend_model$p,
                           ma_term,
+                          gr_term,
                           cor_term)
+  } else {
+    if(trend_model != 'None' & warn){
+      rlang::warn(paste0("Supplying trend_model as a character string is deprecated\n",
+                         "Please use the dedicated functions (i.e. RW() or ZMVN()) instead"),
+                  .frequency = "once",
+                  .frequency_id = 'trend_characters')
+    }
   }
 
   trend_model <- match.arg(arg = trend_model,
@@ -266,11 +436,14 @@ validate_trend_model = function(trend_model, drift = FALSE, noncentred = FALSE){
   if(trend_model == 'VARcor'){
     trend_model <- 'VAR1cor'
   }
+  if(trend_model == 'VARhiercor'){
+    trend_model <- 'VAR1hiercor'
+  }
   if(trend_model %in% c('VARMA', 'VARMAcor')){
     trend_model <- 'VARMA1,1cor'
   }
 
-  if(!trend_model %in% c('None', 'RW','AR1', 'AR2', 'AR3', 'CAR1') & noncentred){
+  if(!trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1') & noncentred){
     message('Non-centering of trends currently not available for this model')
   }
 
@@ -342,6 +515,32 @@ validate_trend_formula = function(formula){
          call. = FALSE)
   }
 
+}
+
+#'@noRd
+validate_gr_subgr = function(gr, subgr, cor){
+  gr <- deparse0(substitute(gr))
+  subgr <- deparse0(substitute(subgr))
+
+  if(gr != 'NA'){
+    if(subgr == 'NA'){
+      stop('argument "subgr" must be supplied if "gr" is also supplied',
+           call. = FALSE)
+    }
+  }
+
+  if(subgr != 'NA'){
+    if(gr == 'NA'){
+      stop('argument "gr" must be supplied if "subgr" is also supplied',
+           call. = FALSE)
+    } else {
+      cor <- TRUE
+    }
+  }
+
+  list(.group = gr,
+       .subgroup = subgr,
+       .cor = cor)
 }
 
 #'@noRd
@@ -572,8 +771,8 @@ validate_trend_restrictions = function(trend_model,
                               trend = 1:length(unique(data_train$series)))
     }
 
-    if(!trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'CAR1')){
-      stop('only None, RW, AR1, AR2, AR3, CAR1 and VAR trends currently supported for trend predictor models',
+    if(!trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'VAR1', 'CAR1', 'ZMVN')){
+      stop('only None, ZMVN, RW, AR1, AR2, AR3, CAR1 and VAR trends currently supported for trend predictor models',
            call. = FALSE)
     }
   }
@@ -806,4 +1005,16 @@ find_stan = function(){
            call. = FALSE)
     }
   }
+}
+
+#'@noRd
+as_one_character <- function(x, allow_na = FALSE) {
+  s <- substitute(x)
+  x <- as.character(x)
+  if (length(x) != 1L || anyNA(x) && !allow_na) {
+    s <- deparse0(s, max_char = 100L)
+    stop("Cannot coerce '", s, "' to a single character value.",
+         call. = FALSE)
+  }
+  x
 }

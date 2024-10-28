@@ -179,11 +179,12 @@ get_mvgam_priors = function(formula,
   orig_trend_model <- trend_model
   trend_model <- validate_trend_model(orig_trend_model,
                                       drift = drift,
-                                      noncentred = FALSE)
+                                      noncentred = FALSE,
+                                      warn = FALSE)
 
   # Ensure series and time variables are present
   data_train <- validate_series_time(data_train, name = 'data',
-                                     trend_model = trend_model)
+                                     trend_model = orig_trend_model)
 
   # Validate the formula to convert any dynamic() terms
   formula <- interpret_mvgam(formula, N = max(data_train$time),
@@ -240,7 +241,11 @@ get_mvgam_priors = function(formula,
                                  family = family,
                                  use_lv = FALSE,
                                  use_stan = TRUE,
-                                 trend_model = trend_model,
+                                 trend_model = if(trend_model == 'None'){
+                                   RW()
+                                 } else {
+                                   orig_trend_model
+                                 },
                                  trend_map = trend_map,
                                  drift = drift,
                                  knots = knots)
@@ -696,9 +701,7 @@ get_mvgam_priors = function(formula,
     }
 
     # Extract information on priors for trend components
-    if(trend_model == 'None'){
-      trend_df <- NULL
-    }
+    trend_df <- NULL
 
     if(trend_model %in% c('PWlinear', 'PWlogistic')){
       # Need to fix this as a next priority
@@ -765,7 +768,23 @@ get_mvgam_priors = function(formula,
                                    example_change = 'num_gp_basis = 12;'))
     }
 
-    if(trend_model == 'RW'){
+    if(trend_model %in% c('ZMVN', 'ZMVNhiercor')){
+      trend_df <- data.frame(param_name = c(paste0('vector<lower=0>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] sigma;')),
+                             param_length = ifelse(use_lv,
+                                                   n_lv,
+                                                   length(unique(data_train$series))),
+                             param_info = c('residual sd'),
+                             prior = c('sigma ~ exponential(2);'),
+                             example_change = c(
+                               paste0('sigma ~ exponential(',
+                                      round(runif(min = 0.01, max = 1, n = 1), 2),
+                                      ');'
+                               )))
+    }
+
+    if(trend_model %in% c('RW', 'RWcor', 'RWhiercor')){
       if(use_stan){
         trend_df <- data.frame(param_name = c(paste0('vector<lower=0>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),
@@ -841,7 +860,7 @@ get_mvgam_priors = function(formula,
                                                       "hs[2] = 0.1;")))
     }
 
-    if(trend_model %in% c('VAR1cor', 'VARMA1,1cor')){
+    if(trend_model %in% c('VAR1cor', 'VARhiercor', 'VARMA1,1cor')){
       trend_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma;'),
                              param_length = c(length(unique(data_train$series))),
                              param_info = c('trend sd'),
@@ -917,7 +936,7 @@ get_mvgam_priors = function(formula,
                              )))
     }
 
-    if(trend_model == 'AR1'){
+    if(trend_model %in% c('AR1', 'AR1cor', 'AR1hiercor')){
       if(use_stan){
         trend_df <- data.frame(param_name = c(paste0('vector<lower=-1,upper=1>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),
@@ -972,7 +991,7 @@ get_mvgam_priors = function(formula,
 
     }
 
-    if(trend_model == 'AR2'){
+    if(trend_model %in% c('AR2', 'AR2cor', 'AR2hiercor')){
       if(use_stan){
         trend_df <- data.frame(param_name = c(paste0('vector<lower=-1,upper=1>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),
@@ -1051,7 +1070,7 @@ get_mvgam_priors = function(formula,
 
     }
 
-    if(trend_model == 'AR3'){
+    if(trend_model %in% c('AR3', 'AR3cor', 'AR3hiercor')){
       if(use_stan){
         trend_df <- data.frame(param_name = c(paste0('vector<lower=-1,upper=1>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),

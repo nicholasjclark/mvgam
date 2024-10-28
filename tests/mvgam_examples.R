@@ -145,7 +145,7 @@ mvgam_examp_dat <- list(data_train =
 
 # Univariate process without trend_formula
 mvgam_example1 <- mvgam(y ~ s(season, k = 5),
-                        trend_model = 'RW',
+                        trend_model = RW(),
                         family = gaussian(),
                         data = mvgam_examp_dat$data_train,
                         burnin = 300,
@@ -169,7 +169,7 @@ mvgam_example2 <- mvgam(y ~ 1,
 
 # Multivariate process without trend_formula
 mvgam_example3 <- mvgam(y ~ s(season, k = 5),
-                        trend_model = 'VAR1cor',
+                        trend_model = VAR(cor = TRUE),
                         family = gaussian(),
                         data = mvgam_examp_dat$data_train,
                         burnin = 300,

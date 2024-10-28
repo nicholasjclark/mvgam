@@ -4,8 +4,8 @@
 #'@importFrom stats predict
 #'@importFrom rlang missing_arg
 #'@inheritParams predict.mvgam
-#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
-#'in addition to any other variables included in the linear predictor of the original \code{formula}. If included, the
+#'@param newdata Optional \code{dataframe} or \code{list} of test data containing the same variables
+#'that were included in the original `data` used to fit the model. If included, the
 #'covariate information in \code{newdata} will be used to generate forecasts from the fitted model equations. If
 #'this same \code{newdata} was originally included in the call to \code{mvgam}, then forecasts have already been
 #'produced by the generative model and these will simply be extracted and plotted. However if no \code{newdata} was
@@ -85,19 +85,16 @@ forecast.mvgam = function(object,
                                             "trend", "expected",
                                             "detection", "latent_N"))
   data_train <- validate_series_time(object$obs_data,
-                                     trend_model = attr(object$model_data,
-                                                        'trend_model'))
+                                     trend_model = object$trend_model)
   n_series <- NCOL(object$ytimes)
 
   # Check whether a forecast has already been computed
   forecasts_exist <- FALSE
   if(!is.null(object$test_data) && !missing(data_test)){
     object$test_data <- validate_series_time(object$test_data,
-                                             trend_model = attr(object$model_data,
-                                                                'trend_model'))
+                                             trend_model = object$trend_model)
     data_test <- validate_series_time(data_test,
-                                      trend_model = attr(object$model_data,
-                                                         'trend_model'))
+                                      trend_model = object$trend_model)
     if(max(data_test$index..time..index) <=
        max(object$test_data$index..time..index)){
       forecasts_exist <- TRUE
@@ -129,8 +126,7 @@ forecast.mvgam = function(object,
 
   if(is.null(object$test_data)){
     data_test <- validate_series_time(data_test, name = 'newdata',
-                                      trend_model = attr(object$model_data,
-                                                         'trend_model'))
+                                      trend_model = object$trend_model)
     data.frame(series = object$obs_data$series,
                time = object$obs_data$time) %>%
       dplyr::group_by(series) %>%
@@ -180,8 +176,7 @@ forecast.mvgam = function(object,
         data_test$y <- rep(NA, NROW(data_test))
       }
       data_test <- validate_series_time(data_test, name = 'newdata',
-                                        trend_model = attr(object$model_data,
-                                                           'trend_model'))
+                                        trend_model = object$trend_model)
     }
 
     # Generate draw-specific forecasts
@@ -203,8 +198,7 @@ forecast.mvgam = function(object,
 
     # Extract hindcasts
     data_train <- validate_series_time(object$obs_data,
-                                       trend_model = attr(object$model_data,
-                                                          'trend_model'))
+                                       trend_model = object$trend_model)
     ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
                 length.out = NCOL(object$ytimes) + 1)
     starts <- ends + 1
@@ -336,14 +330,12 @@ forecast.mvgam = function(object,
   } else {
     # If forecasts already exist, simply extract them
     data_test <- validate_series_time(object$test_data,
-                                      trend_model = attr(object$model_data,
-                                                         'trend_model'))
+                                      trend_model = object$trend_model)
     last_train <- max(object$obs_data$index..time..index) -
       (min(object$obs_data$index..time..index) - 1)
 
     data_train <- validate_series_time(object$obs_data,
-                                       trend_model = attr(object$model_data,
-                                                          'trend_model'))
+                                       trend_model = object$trend_model)
     ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
                 length.out = NCOL(object$ytimes) + 1)
     starts <- ends + 1
@@ -602,7 +594,8 @@ forecast_draws = function(object,
   # Check arguments
   validate_pos_integer(n_cores)
   data_test <- validate_series_time(data_test, name = 'newdata',
-                                    trend_model = attr(object$model_data, 'trend_model'))
+                                    trend_model = object$trend_model)
+  data_test <- sort_data(data_test)
   n_series <- NCOL(object$ytimes)
   use_lv <- object$use_lv
 
@@ -679,10 +672,6 @@ forecast_draws = function(object,
         dplyr::pull(row_id) -> sorted_inds
       n_processes <- length(unique(object$trend_map$trend))
       linpred_order <- tail(sorted_inds, 3 * n_processes)
-      # last_rows <- tail(sorted_inds, 3 * n_processes)
-      # for(i in seq_along(last_rows)){
-      #   linpred_order[i] <- which(sorted_inds == last_rows[i])
-      # }
 
       # Deal with any offsets
       if(!all(attr(Xp_trend_last, 'model.offset') == 0)){
@@ -973,7 +962,7 @@ forecast_draws = function(object,
             Xpmat <- Xp[which(as.numeric(data_test$series) == series),]
             latent_lambdas <- exp(trend_states[, series])
             pred_betas <- betas
-            cap <- data_test$cap[which(as.numeric(object$obs_data$series) == series)]
+            cap <- data_test$cap[which(as.numeric(data_test$series) == series)]
           } else {
             Xpmat <- cbind(Xp[which(as.numeric(data_test$series) == series),],
                            trend_states[, series])

@@ -22,8 +22,8 @@
 If \code{TRUE}, draws of the transformed linear predictor,
 i.e. the conditional expectation, are returned.}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the
-variables included in the linear predictor of \code{formula}. If not supplied,
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same variables
+that were included in the original \code{data} used to fit the model. If not supplied,
 predictions are generated for the original observations used for the model fit.}
 
 \item{ndraws}{Positive \code{integer} indicating how many posterior draws should be used.

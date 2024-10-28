@@ -50,7 +50,8 @@ test_that("dynamic to gp Hilbert is working properly", {
 test_that("rho argument must be positive numeric", {
   data = data.frame(out = rnorm(100),
                     temp = rnorm(100),
-                    time = 1:100)
+                    time = 1:100,
+                    series = as.factor('series1'))
   expect_error(mod <- mvgam(formula = out ~ dynamic(temp, rho = -1),
                             data = data,
                             family = gaussian(),
@@ -62,7 +63,8 @@ test_that("rho argument must be positive numeric", {
 test_that("rho argument cannot be larger than N - 1", {
   data = data.frame(out = rnorm(100),
                     temp = rnorm(100),
-                    time = 1:100)
+                    time = 1:100,
+                    series = as.factor('series1'))
   expect_error(mod <- mvgam(formula = out ~ dynamic(temp, rho = 110),
                             data = data,
                             family = gaussian(),
@@ -81,7 +83,7 @@ test_that("dynamic to spline works for trend_formulas", {
   beta_data$data_train$random <- rnorm(NROW(beta_data$data_train))
   mod <- mvgam(y ~ dynamic(random, rho = 5),
                trend_formula = ~ dynamic(random, rho = 15),
-               trend_model = 'RW',
+               trend_model = RW(),
                data = beta_data$data_train,
                family = betar(),
                run_model = FALSE)
@@ -96,7 +98,7 @@ test_that("dynamic to Hilbert works for trend_formulas", {
   beta_data$data_train$random <- rnorm(NROW(beta_data$data_train))
   mod <- mvgam(y ~ dynamic(random),
                trend_formula = ~ dynamic(random, k = 22),
-               trend_model = 'RW',
+               trend_model = RW(),
                data = beta_data$data_train,
                family = betar(),
                run_model = FALSE)

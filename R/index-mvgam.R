@@ -146,21 +146,37 @@ variables.mvgam = function(x, ...){
   }
 
   # Trend dynamics parameters
-  if(any(grepl(paste(c('sigma', 'alpha_gp',
+  if(any(grepl(paste(c('sigma',
+                       'alpha_gp',
                        'rho_gp',
-                       'ar1', 'ar2',
-                       'ar3', 'A',
-                       'Sigma', 'error', 'theta',
-                       'k_trend', 'delta_trend', 'm_trend'), collapse = '|'),
+                       'ar1',
+                       'ar2',
+                       'ar3',
+                       'A',
+                       'Sigma',
+                       'error',
+                       'alpha_cor',
+                       'theta',
+                       'k_trend',
+                       'delta_trend',
+                       'm_trend'), collapse = '|'),
                parnames) &
          !grepl('sigma_obs', parnames, fixed = TRUE) &
          !grepl('sigma_raw', parnames, fixed = TRUE))){
-    trend_pars <- grepl(paste(c('sigma', 'alpha_gp',
+    trend_pars <- grepl(paste(c('sigma',
+                                'alpha_gp',
                                 'rho_gp',
-                                'ar1', 'ar2',
-                                'ar3', 'A',
-                                'Sigma', 'error', 'theta',
-                                'k_trend', 'delta_trend', 'm_trend'), collapse = '|'),
+                                'ar1',
+                                'ar2',
+                                'ar3',
+                                'A',
+                                'Sigma',
+                                'error',
+                                'alpha_cor',
+                                'theta',
+                                'k_trend',
+                                'delta_trend',
+                                'm_trend'), collapse = '|'),
                         parnames) &
       !grepl('sigma_obs', parnames, fixed = TRUE) &
       !grepl('sigma_raw', parnames, fixed = TRUE)

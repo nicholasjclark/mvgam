@@ -99,6 +99,33 @@ test_that("logistic caps should be included in the correct order", {
                     dplyr::filter(series == 'series2') %>%
                     dplyr::arrange(time) %>%
                     dplyr::pull(cap)))))
+
+  # Should also work for list data
+  df_list <- list(series = df$series,
+                  time = df$time,
+                  cap = df$cap,
+                  y = df$y,
+                  fake = df$fake)
+
+  mod <- mvgam(formula = y ~ 0,
+               data = df_list,
+               trend_model = PW(growth = 'logistic',
+                                n_changepoints = 10),
+               family = poisson(),
+               run_model = FALSE,
+               return_model_data = TRUE)
+
+  # caps should now be logged and in a matrix [1:n_timepoints, 1:n_series]
+  expect_true(all(mod$model_data$cap ==
+                    log(cbind(df %>%
+                                dplyr::filter(series == 'series1') %>%
+                                dplyr::arrange(time) %>%
+                                dplyr::pull(cap),
+                              df %>%
+                                dplyr::filter(series == 'series2') %>%
+                                dplyr::arrange(time) %>%
+                                dplyr::pull(cap)))))
+
 })
 
 test_that("piecewise models fit and forecast without error", {

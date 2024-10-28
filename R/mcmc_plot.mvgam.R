@@ -69,7 +69,7 @@ mcmc_plot.mvgam = function(object,
     regex <- FALSE
   }
 
-  # Form arguments
+  # Formal arguments
   mcmc_fun <- get(paste0("mcmc_", type), asNamespace("bayesplot"))
   mcmc_arg_names <- names(formals(mcmc_fun))
   mcmc_args <- list(...)
