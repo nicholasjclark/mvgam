@@ -162,7 +162,9 @@ predict.mvgam = function(object,
                             mgcv_model = object$trend_mgcv_model)
 
       # Extract process error estimates
-      if(attr(object$model_data, 'trend_model') %in% c('None', 'RW','AR1','AR2','AR3','CAR1')){
+      if(attr(object$model_data, 'trend_model') %in%
+         c('None', 'RW', 'AR1', 'AR2',
+           'AR3', 'CAR1', 'ZMVN')){
         if(object$family == 'nmix'){
           family_pars <- list(sigma_obs = .Machine$double.eps)
         } else {
@@ -269,7 +271,7 @@ predict.mvgam = function(object,
       if(!object$use_lv){
 
         if(attr(object$model_data, 'trend_model') %in%
-           c('RW','AR1','AR2','AR3','VAR1','CAR1')){
+           c('RW','AR1','AR2','AR3','VAR1','CAR1','ZMVN')){
           family_pars <- list(sigma_obs = mcmc_chains(object$model_output,
                                                       'sigma'))
         }

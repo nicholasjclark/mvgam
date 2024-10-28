@@ -494,7 +494,55 @@ PW = function(n_changepoints = 10,
 #'# Set up a correlated residual (i.e. Joint Species Distribution) model,
 #'# where 'site' represents the unit of analysis
 #'trend_model <- ZMVN(unit = site, subgr = species)
-#'trend_model
+#'mod <- mvgam(y ~ species,
+#'             trend_model = ZMVN(unit = site,
+#'                                subgr = species),
+#'             data = site_dat,
+#'             chains = 2,
+#'             silent = 2)
+#'
+#'# Inspect the estimated species-species residual covariances
+#'mcmc_plot(mod, variable = 'Sigma', regex = TRUE, type = 'hist')
+#'
+#'# A hierarchical correlation example; set up correlated counts
+#'# for three species across two sampling locations
+#'Sigma <- matrix(c(1, -0.4, 0.5,
+#'                  -0.4, 1, 0.3,
+#'                  0.5, 0.3, 1),
+#'                byrow = TRUE,
+#'                nrow = 3)
+#'                Sigma
+#'
+#'make_site_dat = function(...){
+#'  errors <- mgcv::rmvn(n = 30,
+#'                       mu = c(0.6, 0.8, 1.8),
+#'                       V = Sigma)
+#'  site_dat <- do.call(rbind, lapply(1:3, function(spec){
+#'    data.frame(y = rpois(30,
+#'                         lambda = exp(errors[, spec])),
+#'               species = paste0('species',
+#'                                spec),
+#'               site = 1:30)
+#' }))
+#' site_dat
+#'}
+#'
+#'site_dat <- rbind(make_site_dat() %>%
+#'                    dplyr::mutate(group = 'group1'),
+#'                  make_site_dat() %>%
+#'                    dplyr::mutate(group = 'group2')) %>%
+#'    dplyr::mutate(species = as.factor(species),
+#'                  group = as.factor(group))
+#'
+#'# Fit the hierarchical correlated residual model
+#'mod <- mvgam(y ~ species,
+#'             trend_model = ZMVN(unit = site,
+#'                                gr = group,
+#'                                subgr = species),
+#'             data = site_dat)
+#'
+#'# Inspect the estimated species-species residual covariances
+#'mcmc_plot(mod, variable = 'Sigma', regex = TRUE, type = 'hist')
 #'}
 #'
 #' @export

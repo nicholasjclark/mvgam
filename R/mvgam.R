@@ -112,6 +112,7 @@
 #'\itemize{
 #'   \item `None` (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 #'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+#'   \item `ZMVN` or `ZMVN()` (Zero-Mean Multivariate Normal; only available in \code{Stan})
 #'   \item `'RW'` or `RW()`
 #'   \item `'AR1'` or `AR(p = 1)`
 #'   \item `'AR2'` or `AR(p = 2)`
@@ -122,9 +123,11 @@
 #'   \item `'GP'` or `GP()` (Gaussian Process with squared exponential kernel;
 #'only available in \code{Stan})}
 #'
-#'For all trend types apart from `GP()`, `CAR()` and `PW()`, moving average and/or correlated
+#'For all trend types apart from `ZMVN()`, `GP()`, `CAR()` and `PW()`, moving average and/or correlated
 #'process error terms can also be estimated (for example, `RW(cor = TRUE)` will set up a
-#'multivariate Random Walk if `n_series > 1`). See [mvgam_trends] for more details
+#'multivariate Random Walk if `n_series > 1`). It is also possible for many multivariate trends
+#'to estimate hierarchical correlations if the data are structured among levels of
+#'a relevant grouping factor. See [mvgam_trends] for more details and see [ZMVN] for an example.
 #'@param trend_map Optional `data.frame` specifying which series should depend on which latent
 #'trends. Useful for allowing multiple series to depend on the same latent trend process, but with
 #'different observation processes. If supplied, a latent factor model is set up by setting
@@ -251,7 +254,7 @@
 #'\code{\link{mvgam_families}}.
 #'\cr
 #'\cr
-#'*Trend models*: Details of latent trend dynamic models supported by \pkg{mvgam} can be found in
+#'*Trend models*: Details of latent error process models supported by \pkg{mvgam} can be found in
 #'\code{\link{mvgam_trends}}.
 #'\cr
 #'\cr

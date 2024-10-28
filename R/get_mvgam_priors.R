@@ -768,6 +768,22 @@ get_mvgam_priors = function(formula,
                                    example_change = 'num_gp_basis = 12;'))
     }
 
+    if(trend_model %in% c('ZMVN', 'ZMVNhiercor')){
+      trend_df <- data.frame(param_name = c(paste0('vector<lower=0>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] sigma;')),
+                             param_length = ifelse(use_lv,
+                                                   n_lv,
+                                                   length(unique(data_train$series))),
+                             param_info = c('residual sd'),
+                             prior = c('sigma ~ exponential(2);'),
+                             example_change = c(
+                               paste0('sigma ~ exponential(',
+                                      round(runif(min = 0.01, max = 1, n = 1), 2),
+                                      ');'
+                               )))
+    }
+
     if(trend_model %in% c('RW', 'RWcor', 'RWhiercor')){
       if(use_stan){
         trend_df <- data.frame(param_name = c(paste0('vector<lower=0>[',

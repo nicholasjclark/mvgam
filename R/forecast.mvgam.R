@@ -672,10 +672,6 @@ forecast_draws = function(object,
         dplyr::pull(row_id) -> sorted_inds
       n_processes <- length(unique(object$trend_map$trend))
       linpred_order <- tail(sorted_inds, 3 * n_processes)
-      # last_rows <- tail(sorted_inds, 3 * n_processes)
-      # for(i in seq_along(last_rows)){
-      #   linpred_order[i] <- which(sorted_inds == last_rows[i])
-      # }
 
       # Deal with any offsets
       if(!all(attr(Xp_trend_last, 'model.offset') == 0)){

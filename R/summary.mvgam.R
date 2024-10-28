@@ -56,7 +56,7 @@ summary.mvgam = function(object,
                                      conservative = trend_model == 'None')
 
     if(!is.null(object$trend_call)){
-      object$trend_mgcv_model <- compute_edf(object$trend_mgcv_model,
+      object$trend_mgcv_model <- mvgam:::compute_edf(object$trend_mgcv_model,
                                              object,
                                              'rho_trend',
                                              'sigma_raw_trend')

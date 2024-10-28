@@ -670,6 +670,11 @@ trend_par_names = function(trend_model,
                                       warn = FALSE)
 
   if(use_lv){
+    if(grepl('ZMVN', trend_model)){
+      param <- c('trend', 'LV', 'penalty',
+                 'lv_coefs', 'theta', 'Sigma', 'error')
+    }
+
     if(grepl('RW', trend_model)){
       param <- c('trend', 'LV', 'penalty',
                  'lv_coefs', 'theta', 'Sigma', 'error')
@@ -710,6 +715,10 @@ trend_par_names = function(trend_model,
   }
 
   if(!use_lv){
+    if(grepl('ZMVN', trend_model)){
+      param <- c('trend', 'tau', 'sigma', 'theta', 'Sigma', 'error')
+    }
+
     if(grepl('RW', trend_model)){
       param <- c('trend', 'tau', 'sigma', 'theta', 'Sigma', 'error')
     }
@@ -759,7 +768,7 @@ trend_par_names = function(trend_model,
     param <- c(param, 'alpha_cor')
   }
 
-  if(trend_model %in% c('None', 'ZMVN')){
+  if(trend_model == 'None'){
     param <- NULL
   }
 
@@ -830,7 +839,7 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
   # Latent trend loadings for dynamic factor models
   if(object$use_lv){
     if(attr(object$model_data, 'trend_model') %in% c('RW', 'AR1', 'AR2', 'AR3',
-                                                     'CAR1')){
+                                                     'CAR1', 'ZMVN')){
       # Just due to legacy reasons from working in JAGS, the simulation
       # functions use precision (tau) rather than SD (sigma)
       out$tau <- mcmc_chains(object$model_output, 'penalty')
@@ -1032,6 +1041,10 @@ extract_trend_pars = function(object, keep_all_estimates = TRUE,
 
   }
 
+  if(attr(object$model_data, 'trend_model') == 'ZMVN'){
+    out$ar1 <- rep(0, NROW(out$Sigma))
+  }
+
   # Return list of extracted posterior parameter samples
   out
 }
@@ -1186,7 +1199,11 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                        byrow = TRUE)
         ar1 <- rlang::missing_arg()
       } else if('ar1' %in% names(trend_pars)){
-        ar1 <- trend_pars$ar1
+        if(trend_pars$ar1[1] == 0){
+          ar1 <- rep(0, length(trend_pars$last_lvs))
+        } else {
+          ar1 <- trend_pars$ar1
+        }
         Amat <- rlang::missing_arg()
       } else {
         ar1 <- rep(1, length(trend_pars$last_lvs))
@@ -1326,7 +1343,11 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
                        byrow = TRUE)
         ar1 <- rlang::missing_arg()
       } else if('ar1' %in% names(trend_pars)){
-        ar1 <- trend_pars$ar1
+        if(trend_pars$ar1[1] == 0){
+          ar1 <- rep(0, length(trend_pars$last_lvs))
+        } else {
+          ar1 <- trend_pars$ar1
+        }
         Amat <- rlang::missing_arg()
       } else {
         ar1 <- rep(1, length(trend_pars$last_lvs))

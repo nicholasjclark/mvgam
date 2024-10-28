@@ -173,6 +173,7 @@ See examples for details}
 \itemize{
 \item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+\item \code{ZMVN} or \code{ZMVN()} (Zero-Mean Multivariate Normal; only available in \code{Stan})
 \item \code{'RW'} or \code{RW()}
 \item \code{'AR1'} or \code{AR(p = 1)}
 \item \code{'AR2'} or \code{AR(p = 2)}
@@ -183,9 +184,11 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all trend types apart from \code{GP()}, \code{CAR()} and \code{PW()}, moving average and/or correlated
+For all trend types apart from \code{ZMVN()}, \code{GP()}, \code{CAR()} and \code{PW()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
-multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
+multivariate Random Walk if \code{n_series > 1}). It is also possible for many multivariate trends
+to estimate hierarchical correlations if the data are structured among levels of
+a relevant grouping factor. See \link{mvgam_trends} for more details and see \link{ZMVN} for an example.}
 
 \item{drift}{Deprecated. If you wish to estimate drift parameters, include parametric fixed effects
 of 'time' in your formulae instead.}
@@ -343,7 +346,7 @@ are non-identifiable (as in piecewise trends, see examples below)
 \code{\link{mvgam_families}}.
 \cr
 \cr
-\emph{Trend models}: Details of latent trend dynamic models supported by \pkg{mvgam} can be found in
+\emph{Trend models}: Details of latent error process models supported by \pkg{mvgam} can be found in
 \code{\link{mvgam_trends}}.
 \cr
 \cr

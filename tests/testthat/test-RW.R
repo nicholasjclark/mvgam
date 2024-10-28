@@ -182,7 +182,20 @@ test_that("hierarchical cors are set up correctly", {
                         mod$model_file, fixed = TRUE)))
 })
 
-test_that("Each subgroup must exist within each unig for ZMVN", {
+test_that("site variable must be numeric for ZMVN", {
+  site_dat <- data.frame(site = as.character(rep(1:10, 4)),
+                         species = as.factor(c(sort(rep(letters[1:4], 9)),
+                                               'q', 'q', 'q', 'q')),
+                         y = rpois(40, 3))
+
+  trend_model <- ZMVN(unit = site, subgr = species)
+  expect_error(mvgam:::validate_series_time(data = site_dat,
+                                            trend_model = trend_model),
+               'Variable "site" must be either numeric or integer type')
+
+})
+
+test_that("Each subgroup must exist within each site for ZMVN", {
   site_dat <- data.frame(site = rep(1:10, 4),
                          species = as.factor(c(sort(rep(letters[1:4], 9)),
                                                'q', 'q', 'q', 'q')),
@@ -201,6 +214,28 @@ test_that("Each subgroup must exist within each unig for ZMVN", {
   trend_model <- ZMVN(unit = site, subgr = species)
   expect_no_error(mvgam:::validate_series_time(data = site_dat,
                                             trend_model = trend_model))
+
+  mod <- mvgam(formula = y ~ species,
+               trend_model = ZMVN(unit = site, subgr = species),
+               data = site_dat,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('trend_raw[i] ~ multi_normal_cholesky(trend_zeros, L_Sigma);',
+                        mod$model_file, fixed = TRUE)))
+  expect_true(any(grepl('L_Sigma = diag_pre_multiply(sigma, L_Omega);',
+                        mod$model_file, fixed = TRUE)))
+
+
+  mod <- mvgam(formula = y ~ -1,
+               trend_formula = ~ species,
+               trend_model = ZMVN(unit = site, subgr = species),
+               data = site_dat,
+               run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('LV_raw[i] ~ multi_normal_cholesky(trend_mus[ytimes_trend[i, 1 : n_lv]]',
+                        mod$model_file, fixed = TRUE)))
+  expect_true(any(grepl('L_Sigma = diag_pre_multiply(sigma, L_Omega);',
+                        mod$model_file, fixed = TRUE)))
 })
 
 
