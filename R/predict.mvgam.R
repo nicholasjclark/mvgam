@@ -106,10 +106,16 @@ predict.mvgam = function(object,
 
   # newdata needs to have a 'series' indicator in it for integrating
   # over the trend uncertainties
-  if(!'series' %in% names(newdata)){
-    newdata$series <- factor(rep(levels(object$obs_data$series)[1],
-                                 length(newdata[[1]])),
-                             levels = levels(object$obs_data$series))
+  if(inherits(object, 'jsdgam')){
+    newdata <- mvgam:::validate_series_time(data = newdata,
+                                    trend_model = attr(object$model_data, 'prepped_trend_model'),
+                                    check_levels = FALSE,
+                                    check_times = FALSE)
+  } else {
+    newdata <- validate_series_time(data = newdata,
+                                    trend_model = attr(object$model_data, 'trend_model'),
+                                    check_levels = FALSE,
+                                    check_times = FALSE)
   }
 
   type <- match.arg(arg = type, choices = c("link",
@@ -151,8 +157,8 @@ predict.mvgam = function(object,
 
 
     # If a linear predictor was supplied for the latent process models, calculate
-    # predictions by assuming the trend is stationary (this is basically what brms)
-    # does when predicting for autocor() models
+    # predictions by assuming the trend is stationary (this is basically what brms
+    # does when predicting for autocor() models)
     if(!is.null(object$trend_call)){
 
       # Linear predictor matrix for the latent process models
@@ -215,21 +221,61 @@ predict.mvgam = function(object,
       })
       names(family_extracts) <- names(family_pars)
 
-      # Pre-multiply the linear predictors
-      all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
-                                                  function(row) Xp %*% row +
-                                                    attr(Xp, 'model.offset')))))
-      attr(all_linpreds, 'model.offset') <- 0
-
       # Trend stationary predictions
       if(!process_error){
         family_extracts <- list(sigma_obs = .Machine$double.eps)
       }
-      trend_predictions <- mvgam_predict(family = 'gaussian',
-                                         Xp = all_linpreds,
-                                         type = 'response',
-                                         betas = 1,
-                                         family_pars = family_extracts)
+      if(inherits(object, 'jsdgam')){
+        # JSDMs should generate one set of predictions per latent variable and then
+        # create a weighted set of predictions based on the loading estimates
+        lv_coefs <- mcmc_chains(object$model_output, 'lv_coefs')
+        n_draws <- dim(mcmc_chains(object$model_output, 'b'))[1]
+        series_ind <- as.numeric(newdata$series)
+        all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
+                                                    function(row) Xp %*% row +
+                                                      attr(Xp, 'model.offset')))))
+        attr(all_linpreds, 'model.offset') <- 0
+        trend_predictions_raw <- lapply(1:object$n_lv, function(x){
+          pred_vec <- mvgam_predict(family = 'gaussian',
+                                           Xp = all_linpreds,
+                                           type = 'response',
+                                           betas = 1,
+                                           family_pars = family_extracts)
+          matrix(pred_vec, nrow = NROW(betas))
+        })
+
+        # Create weighted set of predictions using the loadings
+        weighted_mat = function(pred_matrices,
+                                weights,
+                                index = 1){
+          as.vector(unlist(lapply(pred_matrices, '[', index)) %*% weights)
+        }
+
+        trend_predictions <- matrix(NA, nrow = n_draws,
+                                    ncol = length(newdata[[1]]))
+        for(i in 1:n_draws){
+          for(x in 1:length(newdata[[1]])){
+            trend_predictions[i, x] <- weighted_mat(trend_predictions_raw,
+                                                    matrix(lv_coefs[i,],
+                                                           nrow = object$n_lv)[,series_ind[x]],
+                                                    i)
+          }
+        }
+        trend_predictions <- as.vector(trend_predictions)
+
+      } else {
+        # Pre-multiply the linear predictors
+        all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
+                                                    function(row) Xp %*% row +
+                                                      attr(Xp, 'model.offset')))))
+        attr(all_linpreds, 'model.offset') <- 0
+        trend_predictions <- mvgam_predict(family = 'gaussian',
+                                           Xp = all_linpreds,
+                                           type = 'response',
+                                           betas = 1,
+                                           family_pars = family_extracts)
+      }
+
 
     } else if(attr(object$model_data, 'trend_model') != 'None' & process_error){
       # If no linear predictor for the trends but a dynamic trend model was used,

@@ -348,7 +348,7 @@ if(object$use_lv){
           } else {
             trend_model <- object$trend_model
           }
-          if(trend_model == 'None' & object$family == 'nmix'){
+          if(trend_model == 'None' & object$family == 'nmix' | inherits(object, 'jsdgam')){
 
           } else {
             cat("\nProcess error parameter estimates:\n")

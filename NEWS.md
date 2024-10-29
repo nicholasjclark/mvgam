@@ -1,10 +1,9 @@
 # mvgam 1.1.4 (development version; not yet on CRAN)
 ## New functionalities
-* Added a `stability.mvgam` method to compute stability metrics from models fit with Vector Autoregressive dynamics (#21)
+* Added a `stability.mvgam` method to compute stability metrics from models fit with Vector Autoregressive dynamics (#21 and #76)
 * Added functionality to estimate hierarchical error correlations when using multivariate latent process models and when the data are nested among levels of a relevant grouping factor (#75); see `?mvgam::AR` for an example
 * Added `ZMVN()` error models for estimating Zero-Mean Multivariate Normal errors; convenient for working with non time-series data where latent residuals are expected to be correlated (such as when fitting Joint Species Distribution Models); see `?mvgam::ZMVN` for examples
-=======
-* Added a `fevd.mvgam` method to compute forecast error variance decompositions from models fit with Vector Autoregressive dynamics
+* Added a `fevd.mvgam` method to compute forecast error variance decompositions from models fit with Vector Autoregressive dynamics (#21 and #76)
 
 ## Bug fixes
 * Fixed a minor bug in the way `trend_map` recognises levels of the `series` factor

@@ -24,7 +24,7 @@
 #' str(sdata)
 #'
 code = function(object){
-  if(!class(object) %in% c('mvgam', 'mvgam_prefit')){
+  if(!inherits(object, c('mvgam', 'mvgam_prefit'))){
     stop('argument "object" must be of class "mvgam" or "mvgam_prefit"')
   }
 
@@ -3388,6 +3388,13 @@ check_n_eff <- function(fit, quiet=FALSE, fit_summary) {
   if(any(grep('LV', rownames(fit_summary)))){
     fit_summary <- fit_summary[-grep('LV', rownames(fit_summary)), ]
     fit_summary <- fit_summary[-grep('lv_coefs', rownames(fit_summary)), ]
+
+    if(any(grepl('L[', rownames(fit_summary), fixed = TRUE))){
+      fit_summary <- fit_summary[-grep('L[', rownames(fit_summary), fixed = TRUE), ]
+    }
+    if(any(grepl('LV_raw[', rownames(fit_summary), fixed = TRUE))){
+      fit_summary <- fit_summary[-grep('LV_raw[', rownames(fit_summary), fixed = TRUE), ]
+    }
   }
   N <- dim(fit_summary)[[1]]
 
@@ -3423,7 +3430,15 @@ check_rhat <- function(fit, quiet=FALSE, fit_summary) {
   if(any(grep('LV', rownames(fit_summary)))){
     fit_summary <- fit_summary[-grep('LV', rownames(fit_summary)), ]
     fit_summary <- fit_summary[-grep('lv_coefs', rownames(fit_summary)), ]
+
+    if(any(grepl('L[', rownames(fit_summary), fixed = TRUE))){
+      fit_summary <- fit_summary[-grep('L[', rownames(fit_summary), fixed = TRUE), ]
+    }
+    if(any(grepl('LV_raw[', rownames(fit_summary), fixed = TRUE))){
+      fit_summary <- fit_summary[-grep('LV_raw[', rownames(fit_summary), fixed = TRUE), ]
+    }
   }
+
   N <- dim(fit_summary)[[1]]
 
   no_warning <- TRUE
