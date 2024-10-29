@@ -1,3 +1,40 @@
+# Prep trend for jsdgam
+prep_jsdgam_trend = function(data, unit, subgr){
+
+  unit <- mvgam:::deparse0(substitute(unit))
+  subgr <- mvgam:::deparse0(substitute(subgr))
+  mvgam:::validate_var_exists(data = data,
+                              variable = unit,
+                              type = 'num/int',
+                              name = 'data',
+                              trend_char = 'ZMVN')
+  mvgam:::validate_var_exists(data = data,
+                              variable = subgr,
+                              type = 'factor',
+                              name = 'data',
+                              trend_char = 'ZMVN')
+  out <- structure(list(trend_model = 'ZMVN',
+                        ma = FALSE,
+                        cor = TRUE,
+                        unit = unit,
+                        gr = "NA",
+                        subgr = subgr,
+                        label = NULL),
+                   class = 'mvgam_trend')
+}
+
+
+prep_jsdgam_trendmap = function(data, n_lv){
+  if(n_lv > nlevels(data$series)){
+    stop('Number of factors must be <= number of levels in subgr',
+         call. = FALSE)
+  }
+  data.frame(trend = rep(1:n_lv,
+                         nlevels(data$series))[1:nlevels(data$series)],
+             series = factor(levels(data$series),
+                             levels = levels(data$series)))
+}
+
 # Set up a State-Space model using trend_formula
 jsdgam = function(formula,
                   factor_formula = ~ -1,
@@ -335,3 +372,45 @@ jsdgam = function(formula,
 
   return(out)
 }
+
+#To use
+# library(mvgam)
+# library(mvabund)
+# data(spider)
+# spiderdat <- do.call(rbind,
+#                      lapply(1:NCOL(spider$abund),
+#                             function(spec){
+#                               cbind(data.frame(abundance = spider$abund[ , spec],
+#                                                taxon = colnames(spider$abund)[spec],
+#                                                site = 1:NROW(spider$abund)),
+#                                     spider$x)
+#                             })) %>%
+#   dplyr::mutate(taxon = as.factor(taxon))
+# dplyr::glimpse(spiderdat)
+#
+# test <- jsdgam(formula = abundance ~
+#                  taxon +
+#                  soil.dry +
+#                  herb.layer,
+#                factor_formula = ~ -1,
+#                data = spiderdat,
+#                unit = site,
+#                subgr = taxon,
+#                n_lv = 4,
+#                family = poisson(),
+#                burnin = 200,
+#                samples = 200,
+#                priors = prior(std_normal(), class = b))
+# model.frame(test)
+# predictions(test)
+# insight::find_predictors(test)
+#
+# predict(test, newdata = marginaleffects::datagrid(model = test, site = 1))
+#
+# conditional_effects(test, type = 'link')
+# code(test)
+# summary(test)
+# get_predict(test)
+#
+# hcs <- hindcast(test)
+# plot(hcs, series = 2)
