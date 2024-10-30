@@ -26,9 +26,8 @@ knitr::opts_chunk$set(
 > **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
 
 [![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
-[![Test status](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml)
 [![Coverage status](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
-[![Documentation](https://img.shields.io/badge/documentation-mvgam-orange.svg?colorB=E91E63)](https://nicholasjclark.github.io/mvgam/)
+[![Documentation](https://img.shields.io/badge/documentation-mvgam-orange.svg?colorB=brightgreen)](https://nicholasjclark.github.io/mvgam/)
 [![CRAN Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org/package=mvgam)
 [![CRAN Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
@@ -56,14 +55,11 @@ When using any software please make sure to appropriately acknowledge the hard w
 
 When using `mvgam`, please cite the following:
 
-- Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. *Methods in Ecology and Evolution*. DOI: https://doi.org/10.1111/2041-210X.13974
+> Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. *Methods in Ecology and Evolution*. DOI: https://doi.org/10.1111/2041-210X.13974
 
 As `mvgam` acts as an interface to `Stan`, please additionally cite:
 
-- Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B., Betancourt M.,
-  Brubaker M., Guo J., Li P., and Riddell A. (2017). Stan: A probabilistic
-  programming language. *Journal of Statistical Software*. 76(1).
-  10.18637/jss.v076.i01
+> Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B., Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017). Stan: A probabilistic programming language. *Journal of Statistical Software*. 76(1). DOI: https://doi.org/10.18637/jss.v076.i01
 
 `mvgam` relies on several other `R` packages and, of course, on `R` itself. To
 find out how to cite R and its packages, use the `citation` function. There are
@@ -102,7 +98,7 @@ plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'),
 lynx_full$season <- (lynx_full$year%%19) + 1
 ```
 
-For `mvgam` models, we need an indicator of the series name as a `factor` (if the column `series` is missing, this will be added automatically by assuming that all observations are from a single time series). A `time` column is needed to index time
+For most `mvgam` models, we need an indicator of the series name as a `factor`. A `time` column is also needed for most models to index time (but note that these variables are not necessarily needed for other models supported by `mvgam`, such as [Joint Species Distribution Models](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html))
 ```{r}
 lynx_full$time <- 1:NROW(lynx_full)
 lynx_full$series <- factor('series1')
