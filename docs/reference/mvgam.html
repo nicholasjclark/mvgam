@@ -22,7 +22,7 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.4</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -129,7 +129,7 @@ compared with posterior predictive checks, forecast comparisons and leave-one-ou
     <dl><dt>formula</dt>
 <dd><p>A <code>character</code> string specifying the GAM observation model formula. These are exactly like the formula
 for a GLM except that smooth terms, <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, as well as time-varying
-<code><a href="dynamic.html">dynamic()</a></code> terms, can be added to the right hand side
+<code><a href="dynamic.html">dynamic()</a></code> terms and nonparametric <code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp()</a></code> terms, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors
 (or linear functionals of these). In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>formula</code> is used to
 set up a linear predictor for the detection probability. Details of the formula syntax used by <span class="pkg">mvgam</span>
@@ -153,7 +153,7 @@ Users are recommended to drop one of these using the <code>- 1</code> convention
 
 <dt>knots</dt>
 <dd><p>An optional <code>list</code> containing user specified knot values to be used for basis construction.
-For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
+For most bases the user simply supplies the knots to be used, which must match up with the <code>k</code> value supplied
 (note that the number of knots is not always just <code>k</code>). Different terms can use different numbers of knots,
 unless they share a covariate</p></dd>
 
@@ -165,8 +165,7 @@ functions within the <code>trend_formula</code></p></dd>
 
 <dt>data</dt>
 <dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable and covariates
-required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Should include columns:
-#'</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of levels should be identical
+required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Most models should include columns:</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of levels should be identical
 to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))</p></li>
 <li><p><code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).
 For most dynamic trend types available in <code>mvgam</code> (see argument <code>trend_model</code>), time should be
@@ -174,7 +173,13 @@ measured in discrete, regularly spaced intervals (i.e. <code>c(1, 2, 3, ...)</co
 use irregularly spaced intervals if using <code>trend_model = CAR(1)</code>, though note that any
 temporal intervals that are exactly <code>0</code> will be adjusted to a very small number
 (<code>1e-12</code>) to prevent sampling errors. See an example of <code><a href="RW.html">CAR()</a></code> trends in <code><a href="RW.html">CAR</a></code></p></li>
-</ul><p>Should also include any other variables to be included in the linear predictor of <code>formula</code></p></dd>
+</ul><p>Note however that there are special cases where these identifiers are not needed. For
+example, models with hierarchical temporal correlation processes (e.g. <code>AR(gr = region, subgr = species)</code>)
+should NOT include a <code>series</code> identifier, as this will be constructed internally (see
+<code><a href="mvgam_trends.html">mvgam_trends</a></code> and <code><a href="RW.html">AR</a></code> for details). <code>mvgam</code> can also fit models that do not
+include a <code>time</code> variable if there are no temporal dynamic structures included (i.e. <code>trend_model = 'None'</code> or
+<code>trend_model = ZMVN()</code>). <code>data</code> should also include any other variables to be included in
+the linear predictor of <code>formula</code></p></dd>
 
 
 <dt>data_train</dt>
@@ -183,8 +188,8 @@ temporal intervals that are exactly <code>0</code> will be adjusted to a very sm
 
 
 <dt>newdata</dt>
-<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing at least <code>series</code> and <code>time</code>
-in addition to any other variables included in the linear predictor of <code>formula</code>. If included, the
+<dd><p>Optional <code>dataframe</code> or <code>list</code> of test data containing the same variables
+as in <code>data</code>. If included, the
 observations in variable <code>y</code> will be set to <code>NA</code> when fitting the model so that posterior
 simulations can be obtained</p></dd>
 
@@ -273,6 +278,7 @@ See examples for details</p></dd>
 <dt>trend_model</dt>
 <dd><p><code>character</code> or  <code>function</code> specifying the time series dynamics for the latent trend. Options are:</p><ul><li><p><code>None</code> (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 and the observation process is the only source of error; similarly to what is estimated by <code><a href="https://rdrr.io/pkg/mgcv/man/gam.html" class="external-link">gam</a></code>)</p></li>
+<li><p><code>ZMVN</code> or <code><a href="ZMVN.html">ZMVN()</a></code> (Zero-Mean Multivariate Normal; only available in <code>Stan</code>)</p></li>
 <li><p><code>'RW'</code> or <code><a href="RW.html">RW()</a></code></p></li>
 <li><p><code>'AR1'</code> or <code>AR(p = 1)</code></p></li>
 <li><p><code>'AR2'</code> or <code>AR(p = 2)</code></p></li>
@@ -282,9 +288,11 @@ and the observation process is the only source of error; similarly to what is es
 <li><p><code>'PWlogistic</code>, <code>'PWlinear'</code> or <code><a href="piecewise_trends.html">PW()</a></code> (only available in <code>Stan</code>)</p></li>
 <li><p><code>'GP'</code> or <code><a href="GP.html">GP()</a></code> (Gaussian Process with squared exponential kernel;
 only available in <code>Stan</code>)</p></li>
-</ul><p>For all trend types apart from <code><a href="GP.html">GP()</a></code>, <code><a href="RW.html">CAR()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
+</ul><p>For all trend types apart from <code><a href="ZMVN.html">ZMVN()</a></code>, <code><a href="GP.html">GP()</a></code>, <code><a href="RW.html">CAR()</a></code> and <code><a href="piecewise_trends.html">PW()</a></code>, moving average and/or correlated
 process error terms can also be estimated (for example, <code>RW(cor = TRUE)</code> will set up a
-multivariate Random Walk if <code>n_series &gt; 1</code>). See <a href="mvgam_trends.html">mvgam_trends</a> for more details</p></dd>
+multivariate Random Walk if <code>n_series &gt; 1</code>). It is also possible for many multivariate trends
+to estimate hierarchical correlations if the data are structured among levels of
+a relevant grouping factor. See <a href="mvgam_trends.html">mvgam_trends</a> for more details and see <a href="ZMVN.html">ZMVN</a> for an example.</p></dd>
 
 
 <dt>drift</dt>
@@ -476,7 +484,7 @@ the variation in the dynamic trend controls the average expectation, and/or wher
 are non-identifiable (as in piecewise trends, see examples below)
 <br><br><em>Families and link functions</em>: Details of families supported by <span class="pkg">mvgam</span> can be found in
 <code><a href="mvgam_families.html">mvgam_families</a></code>.
-<br><br><em>Trend models</em>: Details of latent trend dynamic models supported by <span class="pkg">mvgam</span> can be found in
+<br><br><em>Trend models</em>: Details of latent error process models supported by <span class="pkg">mvgam</span> can be found in
 <code><a href="mvgam_trends.html">mvgam_trends</a></code>.
 <br><br><em>Priors</em>: Default priors for intercepts and any scale parameters are generated
 using the same practice as <span class="pkg">brms</span>. Prior distributions for most important model parameters can be
@@ -548,7 +556,7 @@ and use <code><a href="summary.mvgam.html">summary.mvgam</a></code>, <code><a hr
 <li><p>6. Update the model as needed and use <code><a href="loo.mvgam.html">loo_compare.mvgam</a></code> for in-sample model comparisons, or alternatively
 use <code><a href="forecast.mvgam.html">forecast.mvgam</a></code> and <code><a href="score.mvgam_forecast.html">score.mvgam_forecast</a></code> to compare models based on out-of-sample forecasts (see the <a href="https://nicholasjclark.github.io/mvgam/articles/forecast_evaluation.html">forecast evaluation vignette</a> for guidance)</p></li>
 <li><p>7. When satisfied with the model structure, use <code><a href="predict.mvgam.html">predict.mvgam</a></code>,
-<code><a href="https://marginaleffects.com/man/plot_predictions.html" class="external-link">plot_predictions</a></code> and/or <code><a href="https://marginaleffects.com/man/plot_slopes.html" class="external-link">plot_slopes</a></code> for
+<code><a href="https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html" class="external-link">plot_predictions</a></code> and/or <code><a href="https://rdrr.io/pkg/marginaleffects/man/plot_slopes.html" class="external-link">plot_slopes</a></code> for
 more targeted inferences (see <a href="https://ecogambler.netlify.app/blog/interpreting-gams/" class="external-link">"How to interpret and report nonlinear effects from Generalized Additive Models"</a> for some guidance on interpreting GAMs)</p></li>
 </ul></div>
     <div class="section level2">
@@ -738,7 +746,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpuihtV8/model-49f843d074b8.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmp2bnpq5/model-3cd048a27de0.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
@@ -762,28 +770,28 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.9 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.9 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.9 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.9 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 1.0 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 1.2 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Extract the model summary</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x00000251dde37b70&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001b48de84448&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -836,7 +844,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 12 (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Mon Sep 09 10:40:46 AM 2024.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Wed Oct 30 3:09:16 PM 2024.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
@@ -862,14 +870,17 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> List of 16</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ call              :Class 'formula'  language y ~ s(season, bs = "cc", k = 6)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x00000251dde37b70&gt; </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   .. ..- attr(*, ".Environment")=&lt;environment: 0x000001b48de84448&gt; </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_call        : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family            : chr "poisson"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ family_pars       : NULL</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  $ trend_model       :List of 7</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ trend_model: chr "AR1"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ ma         : logi FALSE</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ cor        : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ unit       : chr "time"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ gr         : chr "NA"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ subgr      : chr "series"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ label      : language AR()</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   ..- attr(*, "class")= chr "mvgam_trend"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ drift             : logi FALSE</span>
@@ -901,13 +912,13 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : NULL</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   .. .. ..$ : chr [1:60] "ypred[1,3]" "ypred[2,3]" "ypred[3,3]" "ypred[4,3]" ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ forecasts         :List of 3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:1000, 1:20] 3 14 6 10 5 8 12 6 11 21 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:1000, 1:20] 4 10 10 39 13 20 12 20 8 11 ...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:1000, 1:20] 10 9 38 65 10 9 17 41 5 4 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_1: int [1:1000, 1:20] 5 3 0 21 4 9 10 9 10 9 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_2: int [1:1000, 1:20] 1 3 4 23 4 6 11 7 18 13 ...</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   ..$ series_3: int [1:1000, 1:20] 5 20 6 4 21 13 7 26 24 5 ...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr "mvgam_forecast"</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fc</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Out of sample DRPS:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> 55.27413</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> 55.198255</span>
 <span class="r-plt img"><img src="mvgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot the estimated seasonal smooth function</span></span></span>
@@ -932,7 +943,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Removed 19 rows containing missing values or values outside the scale range</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> (`geom_point()`).</span>
 <span class="r-plt img"><img src="mvgam-11.png" alt="" width="700" height="433"></span>
-<span class="r-in"><span><span class="fu"><a href="https://marginaleffects.com/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod1</span>, condition <span class="op">=</span> <span class="st">'season'</span>, points <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod1</span>, condition <span class="op">=</span> <span class="st">'season'</span>, points <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span></span></span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Removed 19 rows containing missing values or values outside the scale range</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> (`geom_point()`).</span>
 <span class="r-plt img"><img src="mvgam-12.png" alt="" width="700" height="433"></span>
@@ -1012,7 +1023,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpuihtV8/model-49f8137a4fb3.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmp2bnpq5/model-3cd02ffc2afc.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
@@ -1024,24 +1035,24 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 1.0 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 1.1 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
@@ -1049,8 +1060,8 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 2.0 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.5 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 2.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.6 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 2.2 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># The mapping matrix is now supplied as data to the model in the 'Z' element</span></span></span>
@@ -1212,7 +1223,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpuihtV8/model-49f868403df2.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmp2bnpq5/model-3cd02a5f713a.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
@@ -1228,28 +1239,28 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.8 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.7 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.7 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.8 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.9 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
@@ -1257,7 +1268,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> out ~ gp(time, by = temp, c = 5/4, k = 40, scale = FALSE)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x00000251dde37b70&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001b48de84448&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> gaussian</span>
@@ -1342,7 +1353,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 12 (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Mon Sep 09 10:42:03 AM 2024.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Wed Oct 30 3:10:33 PM 2024.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
@@ -1388,7 +1399,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpuihtV8/model-49f85c546b04.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmp2bnpq5/model-3cd069b136c.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
@@ -1410,8 +1421,8 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
@@ -1420,13 +1431,13 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 3.9 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 3.7 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 4.2 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 4.1 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 4.0 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 4.3 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 3.9 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 4.2 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the model file to see the modification to the linear predictor</span></span></span>
@@ -1610,7 +1621,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpuihtV8/model-49f849e13761.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/Rtmp2bnpq5/model-3cd0368e4f93.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
@@ -1621,30 +1632,30 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 1.0 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 1.1 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 1.1 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.1 seconds.</span>
@@ -1653,7 +1664,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, ntrials) ~ series + s(x, by = series)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x00000251dde37b70&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001b48de84448&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
@@ -1713,7 +1724,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 12 (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Mon Sep 09 10:43:01 AM 2024.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Wed Oct 30 3:11:36 PM 2024.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>

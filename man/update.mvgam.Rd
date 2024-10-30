@@ -48,7 +48,7 @@ Users are recommended to drop one of these using the \code{- 1} convention in th
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
-#'\itemize{
+\itemize{
 \item\code{series} (a \code{factor} index of the series IDs; the number of levels should be identical
 to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
 \item\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).

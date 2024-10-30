@@ -107,13 +107,13 @@ predict.mvgam = function(object,
   # newdata needs to have a 'series' indicator in it for integrating
   # over the trend uncertainties
   if(inherits(object, 'jsdgam')){
-    newdata <- mvgam:::validate_series_time(data = newdata,
+    newdata <- validate_series_time(data = newdata,
                                     trend_model = attr(object$model_data, 'prepped_trend_model'),
                                     check_levels = FALSE,
                                     check_times = FALSE)
   } else {
     newdata <- validate_series_time(data = newdata,
-                                    trend_model = attr(object$model_data, 'trend_model'),
+                                    trend_model = object$trend_model,
                                     check_levels = FALSE,
                                     check_times = FALSE)
   }
@@ -237,28 +237,34 @@ predict.mvgam = function(object,
         attr(all_linpreds, 'model.offset') <- 0
         trend_predictions_raw <- lapply(1:object$n_lv, function(x){
           pred_vec <- mvgam_predict(family = 'gaussian',
-                                           Xp = all_linpreds,
-                                           type = 'response',
-                                           betas = 1,
-                                           family_pars = family_extracts)
+                                    Xp = all_linpreds,
+                                    type = 'response',
+                                    betas = 1,
+                                    family_pars = family_extracts)
           matrix(pred_vec, nrow = NROW(betas))
         })
 
         # Create weighted set of predictions using the loadings
         weighted_mat = function(pred_matrices,
                                 weights,
-                                index = 1){
-          as.vector(unlist(lapply(pred_matrices, '[', index)) %*% weights)
+                                draw = 1,
+                                obs = 1){
+          lv_draws <- unlist(lapply(pred_matrices,
+                                    function(x) x[draw, obs]),
+                             use.names = FALSE)
+          as.vector(lv_draws %*% weights)
         }
 
         trend_predictions <- matrix(NA, nrow = n_draws,
                                     ncol = length(newdata[[1]]))
+        n_lv <- object$n_lv
         for(i in 1:n_draws){
           for(x in 1:length(newdata[[1]])){
             trend_predictions[i, x] <- weighted_mat(trend_predictions_raw,
                                                     matrix(lv_coefs[i,],
-                                                           nrow = object$n_lv)[,series_ind[x]],
-                                                    i)
+                                                           nrow = n_lv)[,series_ind[x]],
+                                                    draw = i,
+                                                    obs = x)
           }
         }
         trend_predictions <- as.vector(trend_predictions)

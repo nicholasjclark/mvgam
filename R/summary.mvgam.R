@@ -55,8 +55,8 @@ summary.mvgam = function(object,
                                      'sigma_raw',
                                      conservative = trend_model == 'None')
 
-    if(!is.null(object$trend_call)){
-      object$trend_mgcv_model <- mvgam:::compute_edf(object$trend_mgcv_model,
+    if(!is.null(object$trend_call) & !inherits(object, 'jsdgam')){
+      object$trend_mgcv_model <- compute_edf(object$trend_mgcv_model,
                                              object,
                                              'rho_trend',
                                              'sigma_raw_trend')
@@ -652,7 +652,7 @@ if(grepl('hiercor', validate_trend_model(object$trend_model))){
 
 }
 
-if(!is.null(object$trend_call)){
+if(!is.null(object$trend_call) & !inherits(object, 'jsdgam')){
   if(include_betas){
     cat("\nGAM process model coefficient (beta) estimates:\n")
     coef_names <- paste0(names(object$trend_mgcv_model$coefficients), '_trend')
@@ -763,8 +763,14 @@ if(!is.null(object$trend_call)){
 
 if(object$fit_engine == 'stan' & object$algorithm == 'sampling'){
   cat('\nStan MCMC diagnostics:\n')
+  if(inherits(object, 'jsdgam')){
+    ignore_b_trend <- TRUE
+  } else {
+    ignore_b_trend <- FALSE
+  }
   check_all_diagnostics(object$model_output,
-                        max_treedepth = object$max_treedepth)
+                        max_treedepth = object$max_treedepth,
+                        ignore_b_trend = ignore_b_trend)
 
   sampler <- attr(object$model_output@sim$samples[[1]], "args")$sampler_t
   cat("\nSamples were drawn using ", sampler, " at ", object$model_output@date, ".\n",

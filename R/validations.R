@@ -210,16 +210,20 @@ validate_series_groups = function(data, trend_model, name = 'data'){
                            subgr = data[[trend_model$subgr]])
 
       # Check that each level of gr contains all possible levels of subgr
-      if(stats::var(gr_dat %>%
-                    dplyr::group_by(gr) %>%
-                    dplyr::summarise(tot_subgrs = length(unique(subgr))) %>%
-                    dplyr::ungroup() %>%
-                    dplyr::pull(tot_subgrs)) != 0){
-        stop(paste0('Some levels of "', trend_model$gr, '" do not contain all\n',
-                    'unique levels of "', trend_model$subgr, '"',
-                    " in ", name),
-             call. = FALSE)
+      gr_total_levels <- gr_dat %>%
+        dplyr::group_by(gr) %>%
+        dplyr::summarise(tot_subgrs = length(unique(subgr))) %>%
+        dplyr::ungroup() %>%
+        dplyr::pull(tot_subgrs)
+      if(length(gr_total_levels) > 1){
+        if(stats::var(gr_total_levels) != 0){
+          stop(paste0('Some levels of "', trend_model$gr, '" do not contain all\n',
+                      'unique levels of "', trend_model$subgr, '"',
+                      " in ", name),
+               call. = FALSE)
+        }
       }
+
       gr_dat %>%
         dplyr::mutate(series = interaction(gr, subgr, drop = TRUE, sep = '_',
                                            lex.order = TRUE)) -> gr_dat

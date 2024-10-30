@@ -84,17 +84,24 @@ forecast.mvgam = function(object,
   type <- match.arg(arg = type, choices = c("link", "response",
                                             "trend", "expected",
                                             "detection", "latent_N"))
+
+  if(inherits(object, 'jsdgam')){
+    orig_trend_model <- attr(object$model_data, 'prepped_trend_model')
+  } else {
+    orig_trend_model <- object$trend_model
+  }
+
   data_train <- validate_series_time(object$obs_data,
-                                     trend_model = object$trend_model)
+                                     trend_model = orig_trend_model)
   n_series <- NCOL(object$ytimes)
 
   # Check whether a forecast has already been computed
   forecasts_exist <- FALSE
   if(!is.null(object$test_data) && !missing(data_test)){
     object$test_data <- validate_series_time(object$test_data,
-                                             trend_model = object$trend_model)
+                                             trend_model = orig_trend_model)
     data_test <- validate_series_time(data_test,
-                                      trend_model = object$trend_model)
+                                      trend_model = orig_trend_model)
     if(max(data_test$index..time..index) <=
        max(object$test_data$index..time..index)){
       forecasts_exist <- TRUE
@@ -126,7 +133,7 @@ forecast.mvgam = function(object,
 
   if(is.null(object$test_data)){
     data_test <- validate_series_time(data_test, name = 'newdata',
-                                      trend_model = object$trend_model)
+                                      trend_model = orig_trend_model)
     data.frame(series = object$obs_data$series,
                time = object$obs_data$time) %>%
       dplyr::group_by(series) %>%
@@ -176,7 +183,7 @@ forecast.mvgam = function(object,
         data_test$y <- rep(NA, NROW(data_test))
       }
       data_test <- validate_series_time(data_test, name = 'newdata',
-                                        trend_model = object$trend_model)
+                                        trend_model = orig_trend_model)
     }
 
     # Generate draw-specific forecasts
@@ -198,7 +205,7 @@ forecast.mvgam = function(object,
 
     # Extract hindcasts
     data_train <- validate_series_time(object$obs_data,
-                                       trend_model = object$trend_model)
+                                       trend_model = orig_trend_model)
     ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
                 length.out = NCOL(object$ytimes) + 1)
     starts <- ends + 1
@@ -330,12 +337,12 @@ forecast.mvgam = function(object,
   } else {
     # If forecasts already exist, simply extract them
     data_test <- validate_series_time(object$test_data,
-                                      trend_model = object$trend_model)
+                                      trend_model = orig_trend_model)
     last_train <- max(object$obs_data$index..time..index) -
       (min(object$obs_data$index..time..index) - 1)
 
     data_train <- validate_series_time(object$obs_data,
-                                       trend_model = object$trend_model)
+                                       trend_model = orig_trend_model)
     ends <- seq(0, dim(mcmc_chains(object$model_output, 'ypred'))[2],
                 length.out = NCOL(object$ytimes) + 1)
     starts <- ends + 1
@@ -593,8 +600,13 @@ forecast_draws = function(object,
 
   # Check arguments
   validate_pos_integer(n_cores)
+  if(inherits(object, 'jsdgam')){
+    orig_trend_model <- attr(object$model_data, 'prepped_trend_model')
+  } else {
+    orig_trend_model <- object$trend_model
+  }
   data_test <- validate_series_time(data_test, name = 'newdata',
-                                    trend_model = object$trend_model)
+                                    trend_model = orig_trend_model)
   data_test <- sort_data(data_test)
   n_series <- NCOL(object$ytimes)
   use_lv <- object$use_lv
@@ -695,7 +707,7 @@ forecast_draws = function(object,
 
   # No need to compute in parallel if there was no trend model
   nmix_notrend <- FALSE
-  if(!inherits(object$trend_model, 'mvgam_trend') &
+  if(!inherits(orig_trend_model, 'mvgam_trend') &
      object$family == 'nmix'){
     nmix_notrend <- TRUE
   }

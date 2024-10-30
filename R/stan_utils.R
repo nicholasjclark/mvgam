@@ -3380,7 +3380,7 @@ check_energy <- function(fit, quiet=FALSE, sampler_params) {
 #' @param quiet Logical (verbose or not?)
 #' @details Utility function written by Michael Betancourt (https://betanalpha.github.io/)
 #' @noRd
-check_n_eff <- function(fit, quiet=FALSE, fit_summary) {
+check_n_eff <- function(fit, quiet=FALSE, fit_summary, ignore_b_trend = FALSE) {
   if(missing(fit_summary)){
     fit_summary <- rstan::summary(fit, probs = c(0.5))$summary
   }
@@ -3396,6 +3396,16 @@ check_n_eff <- function(fit, quiet=FALSE, fit_summary) {
       fit_summary <- fit_summary[-grep('LV_raw[', rownames(fit_summary), fixed = TRUE), ]
     }
   }
+
+  if(ignore_b_trend){
+    if(any(grepl('b_trend[', rownames(fit_summary), fixed = TRUE))){
+      fit_summary <- fit_summary[-grep('b_trend[', rownames(fit_summary), fixed = TRUE), ]
+    }
+    if(any(grepl('trend_mus[', rownames(fit_summary), fixed = TRUE))){
+      fit_summary <- fit_summary[-grep('trend_mus[', rownames(fit_summary), fixed = TRUE), ]
+    }
+  }
+
   N <- dim(fit_summary)[[1]]
 
   iter <- dim(rstan::extract(fit)[[1]])[[1]]
@@ -3422,7 +3432,7 @@ check_n_eff <- function(fit, quiet=FALSE, fit_summary) {
 #' @param quiet Logical (verbose or not?)
 #' @details Utility function written by Michael Betancourt (https://betanalpha.github.io/)
 #' @noRd
-check_rhat <- function(fit, quiet=FALSE, fit_summary) {
+check_rhat <- function(fit, quiet=FALSE, fit_summary, ignore_b_trend = FALSE) {
   if(missing(fit_summary)){
     fit_summary <- rstan::summary(fit, probs = c(0.5))$summary
   }
@@ -3436,6 +3446,15 @@ check_rhat <- function(fit, quiet=FALSE, fit_summary) {
     }
     if(any(grepl('LV_raw[', rownames(fit_summary), fixed = TRUE))){
       fit_summary <- fit_summary[-grep('LV_raw[', rownames(fit_summary), fixed = TRUE), ]
+    }
+  }
+
+  if(ignore_b_trend){
+    if(any(grepl('b_trend[', rownames(fit_summary), fixed = TRUE))){
+      fit_summary <- fit_summary[-grep('b_trend[', rownames(fit_summary), fixed = TRUE), ]
+    }
+    if(any(grepl('trend_mus[', rownames(fit_summary), fixed = TRUE))){
+      fit_summary <- fit_summary[-grep('trend_mus[', rownames(fit_summary), fixed = TRUE), ]
     }
   }
 
@@ -3462,11 +3481,11 @@ check_rhat <- function(fit, quiet=FALSE, fit_summary) {
 #' @param quiet Logical (verbose or not?)
 #' @details Utility function written by Michael Betancourt (https://betanalpha.github.io/)
 #' @noRd
-check_all_diagnostics <- function(fit, max_treedepth = 10) {
+check_all_diagnostics <- function(fit, max_treedepth = 10, ignore_b_trend = FALSE) {
   sampler_params <- rstan::get_sampler_params(fit, inc_warmup=FALSE)
   fit_summary <- rstan::summary(fit, probs = c(0.5))$summary
-  check_n_eff(fit, fit_summary = fit_summary)
-  check_rhat(fit, fit_summary = fit_summary)
+  check_n_eff(fit, fit_summary = fit_summary, ignore_b_trend = ignore_b_trend)
+  check_rhat(fit, fit_summary = fit_summary, ignore_b_trend = ignore_b_trend)
   check_div(fit, sampler_params = sampler_params)
   check_treedepth(fit, max_depth = max_treedepth,
                   sampler_params = sampler_params)

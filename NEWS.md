@@ -1,9 +1,10 @@
 # mvgam 1.1.4 (development version; not yet on CRAN)
 ## New functionalities
-* Added a `stability.mvgam` method to compute stability metrics from models fit with Vector Autoregressive dynamics (#21 and #76)
+* Added function `jsdgam()` to estimate Joint Species Distribution Models in which both the latent factors and the observation model components can include any of mvgam's complex linear predictor effects. See `?mvgam::jsdgam` for details
+* Added a `stability.mvgam()` method to compute stability metrics from models fit with Vector Autoregressive dynamics (#21 and #76)
 * Added functionality to estimate hierarchical error correlations when using multivariate latent process models and when the data are nested among levels of a relevant grouping factor (#75); see `?mvgam::AR` for an example
 * Added `ZMVN()` error models for estimating Zero-Mean Multivariate Normal errors; convenient for working with non time-series data where latent residuals are expected to be correlated (such as when fitting Joint Species Distribution Models); see `?mvgam::ZMVN` for examples
-* Added a `fevd.mvgam` method to compute forecast error variance decompositions from models fit with Vector Autoregressive dynamics (#21 and #76)
+* Added a `fevd.mvgam()` method to compute forecast error variance decompositions from models fit with Vector Autoregressive dynamics (#21 and #76)
 
 ## Bug fixes
 * Fixed a minor bug in the way `trend_map` recognises levels of the `series` factor
@@ -14,8 +15,8 @@
 * Allow intercepts to be included in process models when `trend_formula` is supplied. This breaks the assumption that the process has to be zero-centred, adding more modelling flexibility but also potentially inducing nonidentifiabilities with respect to any observation model intercepts. Thoughtful priors are a must for these models
 * Added `standata.mvgam_prefit`, `stancode.mvgam` and `stancode.mvgam_prefit` methods for better alignment with 'brms' workflows
 * Added 'gratia' to *Enhancements* to allow popular methods such as `draw()` to be used for 'mvgam' models if 'gratia' is already installed
-* Added an `ensemble.mvgam_forecast` method to generate evenly weighted combinations of probabilistic forecast distributions
-* Added an `irf.mvgam` method to compute Generalized and Orthogonalized Impulse Response Functions (IRFs) from models fit with Vector Autoregressive dynamics
+* Added an `ensemble.mvgam_forecast()` method to generate evenly weighted combinations of probabilistic forecast distributions
+* Added an `irf.mvgam()` method to compute Generalized and Orthogonalized Impulse Response Functions (IRFs) from models fit with Vector Autoregressive dynamics
 
 ## Deprecations
 * The `drift` argument has been deprecated. It is now recommended for users to include parametric fixed effects of "time" in their respective GAM formulae to capture any expected drift effects

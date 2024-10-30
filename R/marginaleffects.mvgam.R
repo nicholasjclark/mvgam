@@ -374,7 +374,7 @@ find_predictors.mvgam = function(x, effects = c('fixed',
 
   # Any other required variables, needed for grouped models
   if(!inherits(attr(x$model_data, 'trend_model'), 'mvgam_trend')){
-    trend_model <- list(trend_model = trend_model,
+    trend_model <- list(trend_model = attr(x$model_data, 'trend_model'),
                         unit = 'time',
                         gr = 'NA',
                         subgr = 'series')
@@ -449,6 +449,36 @@ find_predictors.mvgam_prefit = function(x, effects = c('fixed',
     } else {
       preds$conditional <- c(preds$conditional, 'cap')
     }
+  }
+
+  # Any other required variables, needed for grouped models
+  if(!inherits(attr(x$model_data, 'trend_model'), 'mvgam_trend')){
+    trend_model <- list(trend_model = attr(x$model_data, 'trend_model'),
+                        unit = 'time',
+                        gr = 'NA',
+                        subgr = 'series')
+  } else {
+    trend_model <- attr(x$model_data, 'trend_model')
+  }
+  other_vars <- c(trend_model$unit,
+                  trend_model$gr,
+                  trend_model$subgr)
+  if(!is.null(attr(x$model_data, 'prepped_trend_model'))){
+    prepped_model <- attr(x$model_data, 'prepped_trend_model')
+    other_vars <- c(other_vars,
+                    c(prepped_model$unit,
+                      prepped_model$gr,
+                      prepped_model$subgr))
+  }
+
+  if(flatten){
+    other_vars <- setdiff(unique(other_vars),
+                          c('NA', preds))
+    preds <- c(preds, other_vars)
+  } else {
+    other_vars <- setdiff(unique(other_vars),
+                          c('NA', preds$conditional))
+    preds$conditional <- c(preds$conditional, other_vars)
   }
 
   return(preds)
