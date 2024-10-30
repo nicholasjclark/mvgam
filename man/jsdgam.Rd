@@ -86,6 +86,27 @@ of trials
 \item\code{beta_binomial()} as for \code{binomial()} but allows for overdispersion}
 Default is \code{poisson()}. See \code{\link{mvgam_families}} for more details}
 
+\item{unit}{The unquoted name of the variable that represents the unit of analysis in \code{data} over
+which latent residuals should be correlated. This variable should be either a
+\code{numeric} or \code{integer} variable in the supplied \code{data}.
+Defaults to \code{time} to be consistent with other functionalities
+in \pkg{mvgam}, though note that the data need not be time series in this case. See examples below
+for further details and explanations}
+
+\item{subgr}{A subgrouping \code{factor} variable specifying which element in \code{data} represents the
+different observational units. Defaults to \code{series} to be consistent with other functionalities
+in \pkg{mvgam}, though note that the data need not be time series in this case.
+But note that models that use the hierarchical correlations (by supplying a value for \code{gr})
+\emph{should not} include a \code{series} element in \code{data}. Rather, this element will be created internally based
+on the supplied variables for \code{gr} and \code{subgr}. For example, if you are modelling
+counts for a group of species (labelled as \code{species} in the data) across sampling sites
+(labelled as \code{site} in the data) in three
+different geographical regions (labelled as \code{region}), and you would like the residuals to be correlated
+within regions, then you should specify
+\code{unit = site},  \code{gr = region}, and \code{subgr = species}. Internally, \code{mvgam()} will appropriately order
+the data by \code{unit} (in this case, by \code{site}) and create
+the \code{series} element for the data using something like: \code{series = as.factor(paste0(group, '_', subgroup))}}
+
 \item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family}
 has additional family-specific observation parameters (e.g. variance components in
 \code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or \code{betar()}),
@@ -352,7 +373,7 @@ loo(mod)
 }
 }
 \seealso{
-\code{\link[mgcv]{mvgam}}
+\link{mvgam}
 }
 \author{
 Nicholas J Clark

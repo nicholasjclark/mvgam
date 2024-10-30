@@ -8,6 +8,7 @@
 #'\pkg{mvgam} can handle)
 #'
 #'@inheritParams mvgam
+#'@inheritParams ZMVN
 #'@param factor_formula A \code{character} string specifying the linear predictor
 #'effects for the latent factors. These are exactly like the formula
 #'for a GLM except that smooth terms, `s()`, `te()`, `ti()`, `t2()`, as well as time-varying
@@ -45,7 +46,7 @@
 #'pooled and any latent, unmodelled residual associations can also be learned. In \pkg{mvgam}, both of
 #'these effects can be modelled with the full power of latent factor Hierarchical GAMs, providing unmatched
 #'flexibility to model full communities of species
-#'@seealso \code{\link[mgcv]{mvgam}}
+#'@seealso [mvgam]
 #'@return A \code{list} object of classes \code{jsdgam} and \code{mvgam} containing model output,
 #'the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
