@@ -23,7 +23,7 @@ get_mvgam_priors(
 \arguments{
 \item{formula}{A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
 for a GLM except that smooth terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying
-\code{dynamic()} terms, can be added to the right hand side
+\code{dynamic()} terms and nonparametric \code{gp()} terms, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors
 (or linear functionals of these). In \code{nmix()} family models, the \code{formula} is used to
 set up a linear predictor for the detection probability. Details of the formula syntax used by \pkg{mvgam}
@@ -44,7 +44,7 @@ Users are recommended to drop one of these using the \code{- 1} convention in th
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
-#'\itemize{
+\itemize{
 \item\code{series} (a \code{factor} index of the series IDs; the number of levels should be identical
 to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
 \item\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
@@ -91,7 +91,7 @@ Default is \code{poisson()}.
 See \code{\link{mvgam_families}} for more details}
 
 \item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
-For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
+For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied
 (note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
 unless they share a covariate}
 

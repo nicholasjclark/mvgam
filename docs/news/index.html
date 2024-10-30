@@ -10,7 +10,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.4</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -60,8 +60,11 @@
 <h2 class="pkg-version" data-toc-text="1.1.4" id="mvgam-114-development-version-not-yet-on-cran">mvgam 1.1.4 (development version; not yet on CRAN)<a class="anchor" aria-label="anchor" href="#mvgam-114-development-version-not-yet-on-cran"></a></h2>
 <div class="section level3">
 <h3 id="new-functionalities-1-1-4">New functionalities<a class="anchor" aria-label="anchor" href="#new-functionalities-1-1-4"></a></h3>
-<ul><li>Added a <code>stability.mvgam</code> method to compute stability metrics from models fit with Vector Autoregressive dynamics (<a href="https://github.com/nicholasjclark/mvgam/issues/21" class="external-link">#21</a>)</li>
-<li>Added a <code>fevd.mvgam</code> method to compute forecast error variance decompositions from models fit with Vector Autoregressive dynamics</li>
+<ul><li>Added function <code><a href="../reference/jsdgam.html">jsdgam()</a></code> to estimate Joint Species Distribution Models in which both the latent factors and the observation model components can include any of mvgam’s complex linear predictor effects. See <code><a href="../reference/jsdgam.html">?mvgam::jsdgam</a></code> for details</li>
+<li>Added a <code><a href="../reference/stability.mvgam.html">stability.mvgam()</a></code> method to compute stability metrics from models fit with Vector Autoregressive dynamics (<a href="https://github.com/nicholasjclark/mvgam/issues/21" class="external-link">#21</a> and <a href="https://github.com/nicholasjclark/mvgam/issues/76" class="external-link">#76</a>)</li>
+<li>Added functionality to estimate hierarchical error correlations when using multivariate latent process models and when the data are nested among levels of a relevant grouping factor (<a href="https://github.com/nicholasjclark/mvgam/issues/75" class="external-link">#75</a>); see <code><a href="../reference/RW.html">?mvgam::AR</a></code> for an example</li>
+<li>Added <code><a href="../reference/ZMVN.html">ZMVN()</a></code> error models for estimating Zero-Mean Multivariate Normal errors; convenient for working with non time-series data where latent residuals are expected to be correlated (such as when fitting Joint Species Distribution Models); see <code><a href="../reference/ZMVN.html">?mvgam::ZMVN</a></code> for examples</li>
+<li>Added a <code><a href="../reference/fevd.mvgam.html">fevd.mvgam()</a></code> method to compute forecast error variance decompositions from models fit with Vector Autoregressive dynamics (<a href="https://github.com/nicholasjclark/mvgam/issues/21" class="external-link">#21</a> and <a href="https://github.com/nicholasjclark/mvgam/issues/76" class="external-link">#76</a>)</li>
 </ul></div>
 <div class="section level3">
 <h3 id="bug-fixes-1-1-4">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-1-4"></a></h3>
@@ -76,8 +79,8 @@
 <ul><li>Allow intercepts to be included in process models when <code>trend_formula</code> is supplied. This breaks the assumption that the process has to be zero-centred, adding more modelling flexibility but also potentially inducing nonidentifiabilities with respect to any observation model intercepts. Thoughtful priors are a must for these models</li>
 <li>Added <code>standata.mvgam_prefit</code>, <code>stancode.mvgam</code> and <code>stancode.mvgam_prefit</code> methods for better alignment with ‘brms’ workflows</li>
 <li>Added ‘gratia’ to <em>Enhancements</em> to allow popular methods such as <code>draw()</code> to be used for ‘mvgam’ models if ‘gratia’ is already installed</li>
-<li>Added an <code>ensemble.mvgam_forecast</code> method to generate evenly weighted combinations of probabilistic forecast distributions</li>
-<li>Added an <code>irf.mvgam</code> method to compute Generalized and Orthogonalized Impulse Response Functions (IRFs) from models fit with Vector Autoregressive dynamics</li>
+<li>Added an <code><a href="../reference/ensemble.mvgam_forecast.html">ensemble.mvgam_forecast()</a></code> method to generate evenly weighted combinations of probabilistic forecast distributions</li>
+<li>Added an <code><a href="../reference/irf.mvgam.html">irf.mvgam()</a></code> method to compute Generalized and Orthogonalized Impulse Response Functions (IRFs) from models fit with Vector Autoregressive dynamics</li>
 </ul></div>
 <div class="section level3">
 <h3 id="deprecations-1-1-3">Deprecations<a class="anchor" aria-label="anchor" href="#deprecations-1-1-3"></a></h3>

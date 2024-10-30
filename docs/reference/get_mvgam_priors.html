@@ -88,7 +88,11 @@ changed for a given <code>mvgam</code> model, as well listing their default dist
     <dl><dt>formula</dt>
 <dd><p>A <code>character</code> string specifying the GAM observation model formula. These are exactly like the formula
 for a GLM except that smooth terms, <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, as well as time-varying
+<<<<<<< HEAD
+<code><a href="dynamic.html">dynamic()</a></code> terms and nonparametric <code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp()</a></code> terms, can be added to the right hand side
+=======
 <code><a href="dynamic.html">dynamic()</a></code> terms, can be added to the right hand side
+>>>>>>> 79e31b766e09ac39e22b93cb199f3eb4fda5e08f
 to specify that the linear predictor depends on smooth functions of predictors
 (or linear functionals of these). In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>formula</code> is used to
 set up a linear predictor for the detection probability. Details of the formula syntax used by <span class="pkg">mvgam</span>
@@ -112,8 +116,12 @@ Users are recommended to drop one of these using the <code>- 1</code> convention
 
 <dt>data</dt>
 <dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable and covariates
+<<<<<<< HEAD
+required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Most models should include columns:</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of levels should be identical
+=======
 required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Most models should include columns:
 #'</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of levels should be identical
+>>>>>>> 79e31b766e09ac39e22b93cb199f3eb4fda5e08f
 to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))</p></li>
 <li><p><code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).
 For most dynamic trend types available in <code>mvgam</code> (see argument <code>trend_model</code>), time should be
@@ -162,7 +170,7 @@ See <code><a href="mvgam_families.html">mvgam_families</a></code> for more detai
 
 <dt>knots</dt>
 <dd><p>An optional <code>list</code> containing user specified knot values to be used for basis construction.
-For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
+For most bases the user simply supplies the knots to be used, which must match up with the <code>k</code> value supplied
 (note that the number of knots is not always just <code>k</code>). Different terms can use different numbers of knots,
 unless they share a covariate</p></dd>
 
@@ -442,6 +450,15 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
+<<<<<<< HEAD
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.53);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2    mu_raw ~ normal(0.3, 0.11);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.34);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.87, 0.84);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(0.56, 0.76);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.88);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.81, 0.92);             NA             NA</span>
+=======
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.27);             NA             NA</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2   mu_raw ~ normal(0.58, 0.14);             NA             NA</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.42);             NA             NA</span>
@@ -449,6 +466,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 5     ar2 ~ normal(-0.92, 0.63);             NA             NA</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.32);             NA             NA</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.36, 0.79);             NA             NA</span>
+>>>>>>> 79e31b766e09ac39e22b93cb199f3eb4fda5e08f
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>

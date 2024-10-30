@@ -3,7 +3,9 @@
 #'@noRd
 validate_series_time = function(data,
                                 name = 'data',
-                                trend_model){
+                                trend_model,
+                                check_levels = TRUE,
+                                check_times = TRUE){
 
   # First validation requires the full trend_model object
   if(!inherits(trend_model, 'mvgam_trend')){
@@ -104,34 +106,39 @@ validate_series_time = function(data,
       data$index..time..index <- times
   }
 
-  # Series factor must have all unique levels present
-  if(!all(levels(data$series) %in% unique(data$series))){
-    stop(paste0('Mismatch between factor levels of "series" and unique values of "series"',
-                '\n',
-                'Use\n  `setdiff(levels(data$series), unique(data$series))` \nand',
-                '\n',
-                '  `intersect(levels(data$series), unique(data$series))`\nfor guidance'),
-         call. = FALSE)
+  # Series factor must have all unique levels present if this is a
+  # forecast check
+  if(check_levels){
+    if(!all(levels(data$series) %in% unique(data$series))){
+      stop(paste0('Mismatch between factor levels of "series" and unique values of "series"',
+                  '\n',
+                  'Use\n  `setdiff(levels(data$series), unique(data$series))` \nand',
+                  '\n',
+                  '  `intersect(levels(data$series), unique(data$series))`\nfor guidance'),
+           call. = FALSE)
+    }
   }
 
   # Ensure each series has an observation, even if NA, for each
   # unique timepoint (only for trend models that require discrete time with
   # regularly spaced sampling intervals)
-  all_times_avail = function(time, min_time, max_time){
-    identical(as.numeric(sort(time)),
-              as.numeric(seq.int(from = min_time, to = max_time)))
-  }
-  min_time <- as.numeric(min(data$index..time..index))
-  max_time <- as.numeric(max(data$index..time..index))
-  data.frame(series = data$series,
-             time = data$index..time..index) %>%
-    dplyr::group_by(series) %>%
-    dplyr::summarise(all_there = all_times_avail(time,
-                                                 min_time,
-                                                 max_time)) -> checked_times
-  if(any(checked_times$all_there == FALSE)){
-    stop("One or more series in ", name, " is missing observations for one or more timepoints",
-         call. = FALSE)
+  if(check_times){
+    all_times_avail = function(time, min_time, max_time){
+      identical(as.numeric(sort(time)),
+                as.numeric(seq.int(from = min_time, to = max_time)))
+    }
+    min_time <- as.numeric(min(data$index..time..index))
+    max_time <- as.numeric(max(data$index..time..index))
+    data.frame(series = data$series,
+               time = data$index..time..index) %>%
+      dplyr::group_by(series) %>%
+      dplyr::summarise(all_there = all_times_avail(time,
+                                                   min_time,
+                                                   max_time)) -> checked_times
+    if(any(checked_times$all_there == FALSE)){
+      stop("One or more series in ", name, " is missing observations for one or more timepoints",
+           call. = FALSE)
+    }
   }
 
   return(data)
@@ -203,16 +210,20 @@ validate_series_groups = function(data, trend_model, name = 'data'){
                            subgr = data[[trend_model$subgr]])
 
       # Check that each level of gr contains all possible levels of subgr
-      if(stats::var(gr_dat %>%
-                    dplyr::group_by(gr) %>%
-                    dplyr::summarise(tot_subgrs = length(unique(subgr))) %>%
-                    dplyr::ungroup() %>%
-                    dplyr::pull(tot_subgrs)) != 0){
-        stop(paste0('Some levels of "', trend_model$gr, '" do not contain all\n',
-                    'unique levels of "', trend_model$subgr, '"',
-                    " in ", name),
-             call. = FALSE)
+      gr_total_levels <- gr_dat %>%
+        dplyr::group_by(gr) %>%
+        dplyr::summarise(tot_subgrs = length(unique(subgr))) %>%
+        dplyr::ungroup() %>%
+        dplyr::pull(tot_subgrs)
+      if(length(gr_total_levels) > 1){
+        if(stats::var(gr_total_levels) != 0){
+          stop(paste0('Some levels of "', trend_model$gr, '" do not contain all\n',
+                      'unique levels of "', trend_model$subgr, '"',
+                      " in ", name),
+               call. = FALSE)
+        }
       }
+
       gr_dat %>%
         dplyr::mutate(series = interaction(gr, subgr, drop = TRUE, sep = '_',
                                            lex.order = TRUE)) -> gr_dat
@@ -257,6 +268,11 @@ validate_var_exists = function(data,
       }
     }
   }
+}
+
+#'@noRd
+deparse_variable = function(...){
+  deparse0(substitute(...))
 }
 
 #'@noRd

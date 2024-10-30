@@ -61,5 +61,5 @@ jobs:
         shell: Rscript {0}
 
       - name: Test coverage
-        run: covr::codecov()
+        run: covr::codecov(line_exclusions = "R/stan_utils.R")
         shell: Rscript {0}

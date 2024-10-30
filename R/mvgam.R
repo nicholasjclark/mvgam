@@ -13,7 +13,7 @@
 #'@importFrom rlang missing_arg
 #'@param formula A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
 #'for a GLM except that smooth terms, `s()`, `te()`, `ti()`, `t2()`, as well as time-varying
-#'`dynamic()` terms, can be added to the right hand side
+#'`dynamic()` terms and nonparametric `gp()` terms, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors
 #'(or linear functionals of these). In `nmix()` family models, the `formula` is used to
 #'set up a linear predictor for the detection probability. Details of the formula syntax used by \pkg{mvgam}
@@ -31,14 +31,14 @@
 #'for both the observation mode (captured by `formula`) and the process model (captured by `trend_formula`).
 #'Users are recommended to drop one of these using the `- 1` convention in the formula right hand side.
 #'@param knots An optional \code{list} containing user specified knot values to be used for basis construction.
-#'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
+#'For most bases the user simply supplies the knots to be used, which must match up with the `k` value supplied
 #'(note that the number of knots is not always just `k`). Different terms can use different numbers of knots,
 #'unless they share a covariate
 #'@param trend_knots As for `knots` above, this is an optional \code{list} of knot values for smooth
 #'functions within the `trend_formula`
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
-#'#'\itemize{
+#'\itemize{
 #'   \item`series` (a \code{factor} index of the series IDs; the number of levels should be identical
 #'   to the number of unique series labels (i.e. `n_series = length(levels(data$series))`))
 #'   \item`time` (\code{numeric} or \code{integer} index of the time point for each observation).
