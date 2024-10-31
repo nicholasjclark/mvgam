@@ -4,6 +4,8 @@
 #'changed for a given `mvgam` model, as well listing their default distributions
 #'
 #'@inheritParams mvgam
+#'@param factor_formula Can be supplied instead `trend_formula` to match syntax from
+#'[jsdgam]
 #'@details Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and
 #'altered. To make alterations, change the contents of the `prior` column and supplying this
 #'\code{data.frame} to the `mvgam` function using the argument `priors`. If using `Stan` as the backend,
@@ -151,6 +153,7 @@
 #'@export
 get_mvgam_priors = function(formula,
                             trend_formula,
+                            factor_formula,
                             data,
                             data_train,
                             family = 'poisson',
@@ -171,6 +174,14 @@ get_mvgam_priors = function(formula,
     data_train <- data
   }
   orig_data <- data_train
+
+  # Set trend_formula
+  if(!missing(factor_formula)){
+    if(!missing(trend_formula)){
+      warning('Both "trend_formula" and "factor_formula" supplied\nUsing "factor_formula" as default')
+    }
+    trend_formula <- factor_formula
+  }
 
   # Validate the trend arguments
   if(drift)

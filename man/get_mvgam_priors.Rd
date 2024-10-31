@@ -7,6 +7,7 @@
 get_mvgam_priors(
   formula,
   trend_formula,
+  factor_formula,
   data,
   data_train,
   family = "poisson",
@@ -41,6 +42,9 @@ In \code{nmix()} family models, the \code{trend_formula} is used to set up a lin
 latent abundance. Be aware that it can be very challenging to simultaneously estimate intercept parameters
 for both the observation mode (captured by \code{formula}) and the process model (captured by \code{trend_formula}).
 Users are recommended to drop one of these using the \code{- 1} convention in the formula right hand side.}
+
+\item{factor_formula}{Can be supplied instead \code{trend_formula} to match syntax from
+\link{jsdgam}}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:

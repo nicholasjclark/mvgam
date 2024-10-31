@@ -193,15 +193,15 @@ other stochastic elements that are not currently available in \code{mvgam}.
 Default is \code{FALSE} to reduce
 the size of the returned object, unless \code{run_model == FALSE}}
 
-\item{...}{Other arguments to pass to \code{\link[=mvgam]{mvgam()}}}
+\item{...}{Other arguments to pass to \link{mvgam}}
 }
 \value{
-A \code{list} object of classes \code{jsdgam} and \code{mvgam} containing model output,
+A \code{list} object of class \code{mvgam} containing model output,
 the text representation of the model file,
 the mgcv model output (for easily generating simulations at
 unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
 for other functions in the package. See \code{\link{mvgam-class}} for details.
-Use \code{methods(class = "mvgam")} and \code{methods(class = "jsdgam")} for an overview on available methods
+Use \code{methods(class = "mvgam")} for an overview on available methods
 }
 \description{
 This function sets up a Joint Species Distribution Model whereby the residual associations among
@@ -216,7 +216,10 @@ Joint Species Distribution Models allow for responses of multiple species to be
 learned hierarchically, whereby responses to environmental variables in \code{formula} can be partially
 pooled and any latent, unmodelled residual associations can also be learned. In \pkg{mvgam}, both of
 these effects can be modelled with the full power of latent factor Hierarchical GAMs, providing unmatched
-flexibility to model full communities of species
+flexibility to model full communities of species. When calling \link{jsdgam}, an initial State-Space model using
+\code{trend = 'None'} is set up and then modified to include the latent factors and their linear predictors.
+Consequently, you can inspect priors for these models using \link{get_mvgam_priors} by supplying the relevant
+\code{formula}, \code{factor_formula}, \code{data} and \code{family} arguments and using \code{trend = 'None'}
 }
 \examples{
 \dontrun{
@@ -316,10 +319,27 @@ ggplot(dat, aes(x = lat, y = lon, col = log(count + 1))) +
   viridis::scale_color_viridis() +
   theme_classic()
 
+# Inspect default priors for the underlying model
+priors <- get_mvgam_priors(formula = count ~
+                            # Environmental model includes species-level intercepts
+                            # and random slopes for a linear effect of temperature
+                            species +
+                            s(species, bs = 're', by = temperature),
+
+                          # Each factor estimates a different nonlinear spatial process, using
+                          # 'by = trend' as in other mvgam State-Space models
+                          factor_formula = ~ te(lat, lon, k = 5, by = trend) - 1,
+
+                          # The data
+                          data = dat,
+
+                          # Poisson observations
+                          family = poisson())
+
 # Fit a JSDM that estimates a hierarchical temperature responses
 # and that uses three latent spatial factors
 mod <- jsdgam(formula = count ~
-                # Environmental model includes species-level interecepts
+                # Environmental model includes species-level intercepts
                 # and random slopes for a linear effect of temperature
                 species +
                 s(species, bs = 're', by = temperature),
@@ -371,6 +391,13 @@ pp_check(mod, type = "ecdf_overlay_grouped",
          group = "species", ndraws = 50)
 loo(mod)
 }
+}
+\references{
+Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
+Methods in Ecology and Evolution. 14:3, 771-784.
+David I Warton, F Guillaume Blanchet, Robert B O’Hara, Otso Ovaskainen, Sara Taskinen, Steven C
+Walker & Francis KC Hui (2015). So many variables: joint modeling in community ecology.
+Trends in Ecology & Evolution 30:12, 766-779.
 }
 \seealso{
 \link{mvgam}

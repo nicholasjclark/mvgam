@@ -39,20 +39,28 @@
 #'   of trials
 #'   \item`beta_binomial()` as for `binomial()` but allows for overdispersion}
 #'Default is `poisson()`. See \code{\link{mvgam_families}} for more details
-#'@param ... Other arguments to pass to [mvgam()]
+#'@param ... Other arguments to pass to [mvgam]
 #'@author Nicholas J Clark
 #'@details Joint Species Distribution Models allow for responses of multiple species to be
 #'learned hierarchically, whereby responses to environmental variables in `formula` can be partially
 #'pooled and any latent, unmodelled residual associations can also be learned. In \pkg{mvgam}, both of
 #'these effects can be modelled with the full power of latent factor Hierarchical GAMs, providing unmatched
-#'flexibility to model full communities of species
+#'flexibility to model full communities of species. When calling [jsdgam], an initial State-Space model using
+#'`trend = 'None'` is set up and then modified to include the latent factors and their linear predictors.
+#'Consequently, you can inspect priors for these models using [get_mvgam_priors] by supplying the relevant
+#'`formula`, `factor_formula`, `data` and `family` arguments and using `trend = 'None'`
 #'@seealso [mvgam]
-#'@return A \code{list} object of classes \code{jsdgam} and \code{mvgam} containing model output,
+#'@references Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
+#'Methods in Ecology and Evolution. 14:3, 771-784.
+#'David I Warton, F Guillaume Blanchet, Robert B O’Hara, Otso Ovaskainen, Sara Taskinen, Steven C
+#'Walker & Francis KC Hui (2015). So many variables: joint modeling in community ecology.
+#'Trends in Ecology & Evolution 30:12, 766-779.
+#'@return A \code{list} object of class \code{mvgam} containing model output,
 #'the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
 #'unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
 #'for other functions in the package. See \code{\link{mvgam-class}} for details.
-#'Use `methods(class = "mvgam")` and `methods(class = "jsdgam")` for an overview on available methods
+#'Use `methods(class = "mvgam")` for an overview on available methods
 #'@examples
 #'\dontrun{
 #' # Simulate latent count data for 500 spatial locations and 10 species
@@ -151,10 +159,28 @@
 #'   viridis::scale_color_viridis() +
 #'   theme_classic()
 #'
+#' # Inspect default priors for the underlying model
+#' priors <- get_mvgam_priors(formula = count ~
+#'                             # Environmental model includes species-level intercepts
+#'                             # and random slopes for a linear effect of temperature
+#'                             species +
+#'                             s(species, bs = 're', by = temperature),
+#'
+#'                           # Each factor estimates a different nonlinear spatial process, using
+#'                           # 'by = trend' as in other mvgam State-Space models
+#'                           factor_formula = ~ te(lat, lon, k = 5, by = trend) - 1,
+#'
+#'                           # The data
+#'                           data = dat,
+#'
+#'                           # Poisson observations
+#'                           family = poisson())
+#' priors
+#'
 #' # Fit a JSDM that estimates a hierarchical temperature responses
 #' # and that uses three latent spatial factors
 #' mod <- jsdgam(formula = count ~
-#'                 # Environmental model includes species-level interecepts
+#'                 # Environmental model includes species-level intercepts
 #'                 # and random slopes for a linear effect of temperature
 #'                 species +
 #'                 s(species, bs = 're', by = temperature),
@@ -163,6 +189,9 @@
 #'               # 'by = trend' as in other mvgam State-Space models
 #'               factor_formula = ~ te(lat, lon, k = 5, by = trend) - 1,
 #'               n_lv = 3,
+#'
+#'               # Change default priors for fixed effect betas to standard normal
+#'               priors = prior(std_normal(), class = b),
 #'
 #'               # The data and the grouping variables
 #'               data = dat,

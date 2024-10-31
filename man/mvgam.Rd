@@ -707,7 +707,7 @@ Methods in Ecology and Evolution. 14:3, 771-784.
 }
 \seealso{
 \code{\link[mgcv]{jagam}}, \code{\link[mgcv]{gam}}, \code{\link[mgcv]{gam.models}},
-\code{\link{get_mvgam_priors}}
+\code{\link{get_mvgam_priors}}, \code{\link{jsdgam}}
 }
 \author{
 Nicholas J Clark
