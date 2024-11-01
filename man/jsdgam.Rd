@@ -316,7 +316,6 @@ ggplot(dat, aes(x = count)) +
 ggplot(dat, aes(x = lat, y = lon, col = log(count + 1))) +
   geom_point(size = 2.25) +
   facet_wrap(~ species, scales = 'free') +
-  viridis::scale_color_viridis() +
   theme_classic()
 
 # Inspect default priors for the underlying model
@@ -386,11 +385,7 @@ med_loadings <- matrix(apply(as.matrix(mod$model_output, 'lv_coefs'),
 cormat <- cov2cor(tcrossprod(med_loadings))
 rownames(cormat) <- colnames(cormat) <- levels(dat$species)
 
-# Plot it using corrplot (if installed)
-if(requireNamespace('corrplot', quietly = TRUE)){
-  corrplot::corrplot(cormat, type = 'lower', tl.col = 'black',
-                     tl.srt = 45)
-}
+round(cormat, 2)
 
 # Posterior predictive checks and ELPD-LOO can ascertain model fit
 pp_check(mod, type = "ecdf_overlay_grouped",
@@ -415,7 +410,6 @@ newdata$log_count <- preds[,1]
 ggplot(newdata, aes(x = lat, y = lon, col = log_count)) +
   geom_point(size = 1.5) +
   facet_wrap(~ species, scales = 'free') +
-  viridis::scale_color_viridis() +
   theme_classic()
 }
 }
