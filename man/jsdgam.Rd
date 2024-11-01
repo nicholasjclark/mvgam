@@ -335,6 +335,7 @@ priors <- get_mvgam_priors(formula = count ~
 
                           # Poisson observations
                           family = poisson())
+priors
 
 # Fit a JSDM that estimates a hierarchical temperature responses
 # and that uses three latent spatial factors
@@ -348,6 +349,9 @@ mod <- jsdgam(formula = count ~
               # 'by = trend' as in other mvgam State-Space models
               factor_formula = ~ te(lat, lon, k = 5, by = trend) - 1,
               n_lv = 3,
+
+              # Change default priors for fixed effect betas to standard normal
+              priors = prior(std_normal(), class = b),
 
               # The data and the grouping variables
               data = dat,

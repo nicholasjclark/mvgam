@@ -8,3 +8,4 @@ Meta
 /Meta/
 desktop.ini
 ^cran-comments\.md$
+^\.gcda$

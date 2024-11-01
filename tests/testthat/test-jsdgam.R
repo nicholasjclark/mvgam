@@ -410,6 +410,22 @@ test_that("unit must be a numeric / integer in data", {
                'Variable "site" must be either numeric or integer type')
 })
 
+test_that("n_lv must be <= number of subgroups", {
+  expect_error(jsdgam(formula = abundance ~
+                        # Environmental model includes species-level interecepts
+                        # and random slopes for a linear effect of reflection
+                        s(taxon, bs = 're') +
+                        s(taxon, bs = 're', by = reflection),
+                      # Each factor estimates a different, possibly nonlinear effect of soil.dry
+                      factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
+                      data = spiderdat,
+                      unit = site,
+                      subgr = taxon,
+                      n_lv = 15,
+                      family = nb()),
+               'Number of factors must be <= number of levels in subgr')
+})
+
 test_that("knots must be a list", {
   expect_error(jsdgam(formula = abundance ~
                   # Environmental model includes species-level interecepts
@@ -429,7 +445,6 @@ test_that("knots must be a list", {
                 family = nb(),
                 run_model = FALSE),
                'all "knot" arguments must be supplied as lists')
-
 })
 
 test_that("errors about knot lengths should be propagated from mgcv", {
