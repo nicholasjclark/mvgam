@@ -277,20 +277,12 @@ jsdgam = function(formula,
   model_file <- model_file[-grep("matrix[n_series, n_lv] Z; // matrix mapping series to latent states",
                                  model_file, fixed = TRUE)]
 
-  # Update transformed data
-  if(any(grepl('transformed data {', model_file, fixed = TRUE))){
-    model_file[grep('transformed data {', model_file, fixed = TRUE)] <-
-      paste0('transformed data {\n',
-             '// Ensures identifiability of the model - no rotation of factors\n',
-             'int<lower=1> M;\n',
-             'M = n_lv * (n_series - n_lv) + n_lv * (n_lv - 1) / 2 + n_lv;')
-  } else {
-    model_file[grep('parameters {', model_file, fixed = TRUE)[1]] <-
-      paste0('// Ensures identifiability of the model - no rotation of factors\n',
-             'int<lower=1> M;\n',
-             'M = n_lv * (n_series - n_lv) + n_lv * (n_lv - 1) / 2 + n_lv;',
-             '}\nparameters {')
-  }
+  # Add M to data block
+  model_file[grep('int<lower=0> n_lv; // number of dynamic factors',
+                  model_file, fixed = TRUE)] <- paste0(
+                    'int<lower=0> n_lv; // number of dynamic factors\n',
+                    'int<lower=0> M; // number of nonzero factor loadings'
+                  )
   model_file <- readLines(textConnection(model_file), n = -1)
 
   # Update parameters
@@ -373,6 +365,10 @@ jsdgam = function(formula,
   # Remove Z from model_data as it is no longer needed
   model_data <- mod$model_data
   model_data$Z <- NULL
+
+  # Add M to model_data
+  n_series <- NCOL(model_data$ytimes)
+  model_data$M <- n_lv * (n_series - n_lv) + n_lv * (n_lv - 1) / 2 + n_lv
 
   #### Autoformat the Stan code ####
   if(requireNamespace('cmdstanr', quietly = TRUE) & backend == 'cmdstanr'){
