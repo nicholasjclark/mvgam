@@ -21,4 +21,4 @@
 ^tests/testthat/Rplots\.pdf$
 ^tests/local$
 ^memcheck\.R$
-*.gcda
+^src\.gcda$

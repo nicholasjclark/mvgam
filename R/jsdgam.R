@@ -62,7 +62,7 @@
 #'for other functions in the package. See \code{\link{mvgam-class}} for details.
 #'Use `methods(class = "mvgam")` for an overview on available methods
 #'@examples
-#'\dontrun{
+#'\donttest{
 #' # Simulate latent count data for 500 spatial locations and 10 species
 #' set.seed(0)
 #' N_points <- 500
@@ -175,10 +175,10 @@
 #'
 #'                           # Poisson observations
 #'                           family = poisson())
-#' priors
+#' head(priors)
 #'
 #' # Fit a JSDM that estimates a hierarchical temperature responses
-#' # and that uses three latent spatial factors
+#' # and that uses four latent spatial factors
 #' mod <- jsdgam(formula = count ~
 #'                 # Environmental model includes species-level intercepts
 #'                 # and random slopes for a linear effect of temperature
@@ -188,7 +188,7 @@
 #'               # Each factor estimates a different nonlinear spatial process, using
 #'               # 'by = trend' as in other mvgam State-Space models
 #'               factor_formula = ~ te(lat, lon, k = 5, by = trend) - 1,
-#'               n_lv = 3,
+#'               n_lv = 4,
 #'
 #'               # Change default priors for fixed effect betas to standard normal
 #'               priors = prior(std_normal(), class = b),
@@ -199,7 +199,9 @@
 #'               subgr = species,
 #'
 #'               # Poisson observations
-#'               family = poisson())
+#'               family = poisson(),
+#'               chains = 2,
+#'               silent = 2)
 #'
 #' # Plot species-level intercept estimates
 #' plot_predictions(mod, condition = 'species',
@@ -209,18 +211,18 @@
 #' plot_predictions(mod, condition = c('temperature', 'species', 'species'),
 #'                  type = 'link')
 #'
-#' # Plotting species' average geographical predictions against the observed
-#' # data gives some idea of whether more flexibility in the spatial process
-#' # may be needed
-#' plot_predictions(mod, condition = c('lat', 'species', 'species'),
-#'                  points = 0.5)
-#' plot_predictions(mod, condition = c('lon', 'species', 'species'),
-#'                  points = 0.5)
+#' # Plot posterior median estimates of the latent spatial factors
+#' plot(mod, type = 'smooths', trend_effects = TRUE)
+#'
+#' # Or using gratia, if you have it installed
+#' if(requireNamespace('gratia', quietly = TRUE)){
+#'   gratia::draw(mod, trend_effects = TRUE)
+#' }
 #'
 #' # Calculate (median) residual spatial correlations
 #' med_loadings <- matrix(apply(as.matrix(mod$model_output, 'lv_coefs'),
 #'                              2, median),
-#'                        nrow = N_species, ncol = 3)
+#'                        nrow = N_species, ncol = 4)
 #' cormat <- cov2cor(tcrossprod(med_loadings))
 #' rownames(cormat) <- colnames(cormat) <- levels(dat$species)
 #'
@@ -232,8 +234,29 @@
 #'
 #' # Posterior predictive checks and ELPD-LOO can ascertain model fit
 #' pp_check(mod, type = "ecdf_overlay_grouped",
-#'          group = "species", ndraws = 50)
+#'          group = "species", ndraws = 100)
 #' loo(mod)
+#'
+#' # Forecast log(counts) for entire region (site value doesn't matter as long
+#' # as each spatial location has a different and unique site identifier);
+#' # note this calculation takes a few minutes because of the need to calculate
+#' # draws from the stochastic latent factors
+#' newdata <- st_process %>%
+#'                    dplyr::mutate(species = factor(species,
+#'                                                   levels = paste0('species_',
+#'                                                                   1:N_species))) %>%
+#'                    dplyr::group_by(lat, lon) %>%
+#'                    dplyr::mutate(site = dplyr::cur_group_id()) %>%
+#'                    dplyr::ungroup()
+#' preds <- predict(mod, newdata = newdata)
+#'
+#' # Plot the median log(count) predictions on a grid
+#' newdata$log_count <- preds[,1]
+#' ggplot(newdata, aes(x = lat, y = lon, col = log_count)) +
+#'   geom_point(size = 1.5) +
+#'   facet_wrap(~ species, scales = 'free') +
+#'   viridis::scale_color_viridis() +
+#'   theme_classic()
 #'}
 #'@export
 jsdgam = function(formula,
