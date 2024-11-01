@@ -11,38 +11,14 @@ mvgam_setup <- function(formula,
                         maxit = 5) {
 
   if(missing(knots)){
-    # Initialise the GAM for a few iterations to ensure it all works without error
-    # suppressWarnings(mgcv::gam(formula(formula),
-    #                            data = dat,
-    #                            family = family,
-    #                            optimizer = c('outer', 'nlm'),
-    #                            control = list(maxit = 1,
-    #                                           epsilon = 1e20,
-    #                                           rank.tol = 1,
-    #                                           mgcv.tol = 1e20,
-    #                                           mgcv.half = 1,
-    #                                           nlm = list(iterlim = 1)),
-    #                            drop.unused.levels = FALSE,
-    #                            na.action = na.fail,
-    #                            select = TRUE))
     init_gam(formula(formula),
              data = dat,
              family = family)
   } else {
-    # suppressWarnings(mgcv::gam(formula(formula),
-    #                            data = dat,
-    #                            family = family,
-    #                            knots = knots,
-    #                            optimizer = c('outer', 'nlm'),
-    #                            control = list(maxit = 1,
-    #                                           epsilon = 1e20,
-    #                                           rank.tol = 1,
-    #                                           mgcv.tol = 1e20,
-    #                                           mgcv.half = 1,
-    #                                           nlm = list(iterlim = 1)),
-    #                            drop.unused.levels = FALSE,
-    #                            na.action = na.fail,
-    #                            select = TRUE))
+    if(!is.list(knots)){
+      stop('all "knot" arguments must be supplied as lists',
+           call. = FALSE)
+    }
     init_gam(formula(formula),
              data = dat,
              family = family,

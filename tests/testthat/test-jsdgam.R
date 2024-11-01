@@ -1,5 +1,6 @@
 context("jsdgam")
 
+# Reconstruct the spider data from mvabund
 spiderdat <- structure(list(abundance = c(25L, 0L, 15L, 2L, 1L, 0L, 2L, 0L,
                                           1L, 3L, 15L, 16L, 3L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 7L, 17L,
                                           11L, 9L, 3L, 29L, 15L, 10L, 2L, 20L, 6L, 20L, 6L, 7L, 11L, 1L,
@@ -48,8 +49,10 @@ spiderdat <- structure(list(abundance = c(25L, 0L, 15L, 2L, 1L, 0L, 2L, 0L,
                                                 12L, 12L, 12L, 12L, 12L, 12L, 12L, 12L, 12L, 12L, 12L, 12L, 12L,
                                                 12L, 12L, 12L, 12L, 12L, 12L, 12L, 12L, 12L, 12L, 12L, 12L),
                                               levels = c("Alopacce",
-                                                         "Alopcune", "Alopfabr", "Arctlute", "Arctperi", "Auloalbi", "Pardlugu",
-                                                         "Pardmont", "Pardnigr", "Pardpull", "Trocterr", "Zoraspin"), class = "factor"),
+                                                         "Alopcune", "Alopfabr", "Arctlute",
+                                                         "Arctperi", "Auloalbi", "Pardlugu",
+                                                         "Pardmont", "Pardnigr", "Pardpull",
+                                                         "Trocterr", "Zoraspin"), class = "factor"),
                             site = c(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L, 11L, 12L,
                                      13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L, 21L, 22L, 23L, 24L,
                                      25L, 26L, 27L, 28L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
@@ -338,4 +341,159 @@ test_that("response variable must be specified", {
                               n_lv = 3,
                               family = nb()),
                'Not sure how to deal with this response variable specification')
+})
+
+test_that("unit must exist in data", {
+  expect_error(jsdgam(formula = abundance ~
+           # Environmental model includes species-level interecepts
+           # and random slopes for a linear effect of reflection
+           s(taxon, bs = 're') +
+           s(taxon, bs = 're', by = reflection),
+         # Each factor estimates a different, possibly nonlinear effect of soil.dry
+         factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
+         data = spiderdat,
+         unit = banana,
+         subgr = taxon,
+         n_lv = 3,
+         family = nb()),
+         'Variable "banana" not found in data')
+})
+
+
+test_that("subgr must exist in data", {
+  expect_error(jsdgam(formula = abundance ~
+                        # Environmental model includes species-level interecepts
+                        # and random slopes for a linear effect of reflection
+                        s(taxon, bs = 're') +
+                        s(taxon, bs = 're', by = reflection),
+                      # Each factor estimates a different, possibly nonlinear effect of soil.dry
+                      factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
+                      data = spiderdat,
+                      unit = site,
+                      subgr = banana,
+                      n_lv = 3,
+                      family = nb()),
+               'Variable "banana" not found in data')
+})
+
+test_that("subgr must be a factor in data", {
+  spiderdat$taxon <- as.numeric(spiderdat$taxon)
+  expect_error(jsdgam(formula = abundance ~
+                        # Environmental model includes species-level interecepts
+                        # and random slopes for a linear effect of reflection
+                        s(taxon, bs = 're') +
+                        s(taxon, bs = 're', by = reflection),
+                      # Each factor estimates a different, possibly nonlinear effect of soil.dry
+                      factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
+                      data = spiderdat,
+                      unit = site,
+                      subgr = taxon,
+                      n_lv = 3,
+                      family = nb()),
+               'Variable "taxon" must be a factor type')
+})
+
+test_that("unit must be a numeric / integer in data", {
+  spiderdat$site <- as.factor(spiderdat$site)
+  expect_error(jsdgam(formula = abundance ~
+                        # Environmental model includes species-level interecepts
+                        # and random slopes for a linear effect of reflection
+                        s(taxon, bs = 're') +
+                        s(taxon, bs = 're', by = reflection),
+                      # Each factor estimates a different, possibly nonlinear effect of soil.dry
+                      factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
+                      data = spiderdat,
+                      unit = site,
+                      subgr = taxon,
+                      n_lv = 3,
+                      family = nb()),
+               'Variable "site" must be either numeric or integer type')
+})
+
+test_that("knots must be a list", {
+  expect_error(jsdgam(formula = abundance ~
+                  # Environmental model includes species-level interecepts
+                  # and random slopes for a linear effect of reflection
+                  s(taxon, bs = 're') +
+                  s(taxon, bs = 're', by = reflection),
+                # Each factor estimates a different, possibly nonlinear effect of soil.dry
+                factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
+                # supplying knots as a vector should fail
+                factor_knots = seq(min(spiderdat$soil.dry),
+                                                   max(spiderdat$soil.dry),
+                                                   length.out = 4),
+                data = spiderdat,
+                unit = site,
+                subgr = taxon,
+                n_lv = 3,
+                family = nb(),
+                run_model = FALSE),
+               'all "knot" arguments must be supplied as lists')
+
+})
+
+test_that("errors about knot lengths should be propagated from mgcv", {
+  expect_error(jsdgam(formula = abundance ~
+                        # Environmental model includes species-level interecepts
+                        # and random slopes for a linear effect of reflection
+                        s(taxon, bs = 're') +
+                        s(taxon, bs = 're', by = reflection),
+                      # Each factor estimates a different, possibly nonlinear effect of soil.dry
+                      factor_formula = ~ s(soil.dry, k = 5, by = trend, bs = 'cr') - 1,
+                      # knot length should be 5 for this CR basis
+                      factor_knots = list(soil.dry = seq(min(spiderdat$soil.dry),
+                                         max(spiderdat$soil.dry),
+                                         length.out = 4)),
+                      data = spiderdat,
+                      unit = site,
+                      subgr = taxon,
+                      n_lv = 3,
+                      family = nb(),
+                      run_model = FALSE),
+               'number of supplied knots != k for a cr smooth')
+
+})
+
+test_that("get_mvgam_priors accepts factor_formula", {
+  expect_no_error(get_mvgam_priors(formula = abundance ~
+                        # Environmental model includes species-level intercepts
+                        # and random slopes for a linear effect of reflection
+                        s(taxon, bs = 're') +
+                        s(taxon, bs = 're', by = reflection),
+                      # Each factor estimates a different, possibly nonlinear effect of soil.dry
+                      factor_formula = ~ s(soil.dry, k = 5, by = trend, bs = 'cr') - 1,
+                      data = spiderdat,
+                   trend_model = 'None'))
+})
+
+# Skip the next test as it should actually initiate the model, and may take a few seconds
+skip_on_cran()
+test_that("jsdgam should initiate correctly", {
+  mod <- jsdgam(formula = abundance ~
+                  # Environmental model includes species-level interecepts
+                  # and random slopes for a linear effect of reflection
+                  s(taxon, bs = 're') +
+                  s(taxon, bs = 're', by = reflection),
+                # Each factor estimates a different, possibly nonlinear effect of soil.dry
+                factor_formula = ~ s(soil.dry, k = 5, bs = 'cr', by = trend) - 1,
+                # supplying knots should also work if k matches length(knots)
+                factor_knots = list(soil.dry = seq(min(spiderdat$soil.dry),
+                                                   max(spiderdat$soil.dry),
+                                   length.out = 5)),
+                data = spiderdat,
+                unit = site,
+                subgr = taxon,
+                n_lv = 3,
+                family = nb(),
+                run_model = FALSE)
+  expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(any(grepl('// raw latent factors (with linear predictors)',
+                        mod$model_file, fixed = TRUE)))
+  expect_true(any(grepl('matrix[n_series, n_lv] lv_coefs = rep_matrix(0, n_series, n_lv);',
+                        mod$model_file, fixed = TRUE)))
+  expect_true(attr(mod$model_data, 'trend_model') == 'None')
+  expect_true(inherits(attr(mod$model_data, 'prepped_trend_model'),
+                       'mvgam_trend'))
+  expect_true(attr(mod$model_data, 'prepped_trend_model')$subgr == 'taxon')
+  expect_true(attr(mod$model_data, 'prepped_trend_model')$trend_model == 'ZMVN')
 })
