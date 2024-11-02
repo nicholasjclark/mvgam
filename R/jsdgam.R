@@ -26,7 +26,7 @@
 #'unless they share a covariate
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
 #'required by the GAM \code{formula} and \code{factor_formula} objects
-#'@param family \code{family} specifying the exponential observation family for the series. Currently supported
+#'@param family \code{family} specifying the observation family for the outcomes. Currently supported
 #'families are:
 #'\itemize{
 #'   \item`gaussian()` for real-valued data
@@ -42,11 +42,17 @@
 #'   of trials
 #'   \item`beta_binomial()` as for `binomial()` but allows for overdispersion}
 #'Default is `poisson()`. See \code{\link{mvgam_families}} for more details
-#' @param species An unquoted string representing the `factor` variable that indexes
-#' the different outcome variables in `data` (usually `'species'` in a JSDM).
+#' @param species The unquoted name of the `factor` variable that indexes
+#' the different response units in `data` (usually `'species'` in a JSDM).
 #' Defaults to `series` to be consistent with other `mvgam` models
-#'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
-#'Cannot be `n_species`. Defaults arbitrarily to `2`
+#'@param n_lv \code{integer} the number of latent factors to use for modelling
+#'residual associations.
+#'Cannot be `< n_species`. Defaults arbitrarily to `1`
+#'@param threads \code{integer} Experimental option to use multithreading for within-chain
+#'parallelisation in \code{Stan}. We recommend its use only if you are experienced with
+#'\code{Stan}'s `reduce_sum` function and have a slow running model that cannot be sped
+#'up by any other means. Currently works for all families when using \code{Cmdstan}
+#'as the backend
 #'@param ... Other arguments to pass to [mvgam]
 #'@author Nicholas J Clark
 #'@details Joint Species Distribution Models allow for responses of multiple species to be
@@ -60,17 +66,18 @@
 #'
 #' In a JSDGAM, the expectation of response \eqn{Y_{ij}} is modelled with
 #'
-#' \deqn{g(\mu_{ij}) = X_i'\beta + u_i'\theta_j,}
+#' \deqn{g(\mu_{ij}) = X_i\beta + u_i\theta_j,}
 #'
 #' where \eqn{g(.)} is a known link function,
-#' \eqn{X_i'} is a design matrix of linear predictors (with associated \eqn{\beta} coefficients),
-#' \eqn{u_i} are \eqn{n_{lv}}-variate latent factors
+#' \eqn{X} is a design matrix of linear predictors (with associated \eqn{\beta} coefficients),
+#' \eqn{u} are \eqn{n_{lv}}-variate latent factors
 #' (\eqn{n_{lv}}<<\eqn{n_{species}}) and
 #' \eqn{\theta_j} are species-specific loadings on the latent factors, respectively. The design matrix
 #' \eqn{X} and \eqn{\beta} coefficients are constructed and modelled using `formula` and can contain
 #' any of `mvgam`'s predictor effects, including random intercepts and slopes, multidimensional penalized
 #' smooths, GP effects etc... The factor loadings \eqn{\theta_j} are constrained for identifiability but can
-#' be used to reconstruct an estimate of the species' residual variance-covariance matrix (see the example below
+#' be used to reconstruct an estimate of the species' residual variance-covariance matrix
+#' using \eqn{\theta \theta'} (see the example below
 #' for an illustration of this). The latent factors are further modelled using:
 #'\deqn{
 #'u_i \sim \text{Normal}(Q_i\beta_{factor}, 1) \quad
@@ -82,6 +89,7 @@
 #'@seealso [mvgam]
 #'@references Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 #'Methods in Ecology and Evolution. 14:3, 771-784.
+#'
 #'David I Warton, F Guillaume Blanchet, Robert B O’Hara, Otso Ovaskainen, Sara Taskinen, Steven C
 #'Walker & Francis KC Hui (2015). So many variables: joint modeling in community ecology.
 #'Trends in Ecology & Evolution 30:12, 766-779.
@@ -105,12 +113,11 @@
 #' temperature <- rnorm(N_points)
 #' betas <- runif(N_species, -0.5, 0.5)
 #'
-#' # Simulate background spatial points uniformly over a space
+#' # Simulate points uniformly over a space
 #' lon <- runif(N_points, min = 150, max = 155)
 #' lat <- runif(N_points, min = -20, max = -19)
 #'
-#' # Set up spatial basis functions as a tensor product of lat and lon;
-#' # keep this number small so there are noticeable spatiotemporal 'clusters'
+#' # Set up spatial basis functions as a tensor product of lat and lon
 #' sm <- mgcv::smoothCon(mgcv::te(lon, lat, k = 5),
 #'                       data = data.frame(lon, lat),
 #'                       knots = NULL)[[1]]
@@ -147,11 +154,11 @@
 #' base_field <- mgcv::rmvn(1, mu = rep(0, NCOL(Sigma)), V = Sigma)
 #' for(t in 1:N_species){
 #'   corOmega <- (cov2cor(Sigma) * 0.7) +
-#'                       (0.3 * cov2cor(random_Sigma(N = NCOL(des_mat))))
+#'                  (0.3 * cov2cor(random_Sigma(N = NCOL(des_mat))))
 #'   basis_coefs[t, ] <- mgcv::rmvn(1, mu = rep(0, NCOL(Sigma)), V = corOmega)
 #' }
 #'
-#' # Simulate the latent spatiotemporal processes
+#' # Simulate the latent spatial processes
 #' st_process <- do.call(rbind, lapply(seq_len(N_species), function(t){
 #'   data.frame(lat = lat,
 #'              lon = lon,
@@ -188,7 +195,7 @@
 #'   facet_wrap(~ species, scales = 'free') +
 #'   theme_classic()
 #'
-#' # Inspect default priors for the underlying model
+#' # Inspect default priors for a joint species model with spatial factors
 #' priors <- get_mvgam_priors(formula = count ~
 #'                             # Environmental model includes species-level intercepts
 #'                             # and random slopes for a linear effect of temperature
@@ -206,7 +213,7 @@
 #'                           family = poisson())
 #' head(priors)
 #'
-#' # Fit a JSDM that estimates a hierarchical temperature responses
+#' # Fit a JSDM that estimates hierarchical temperature responses
 #' # and that uses four latent spatial factors
 #' mod <- jsdgam(formula = count ~
 #'                 # Environmental model includes species-level intercepts
@@ -255,7 +262,8 @@
 #' cormat <- cov2cor(tcrossprod(med_loadings))
 #' rownames(cormat) <- colnames(cormat) <- levels(dat$species)
 #'
-#' round(cormat, 2)
+#' # A quick and dirty correlation matrix plot
+#' image(cormat)
 #'
 #' # Posterior predictive checks and ELPD-LOO can ascertain model fit
 #' pp_check(mod, type = "ecdf_overlay_grouped",
@@ -294,7 +302,7 @@ jsdgam = function(formula,
                   species = series,
                   share_obs_params = FALSE,
                   priors,
-                  n_lv = 2,
+                  n_lv = 1,
                   chains = 4,
                   burnin = 500,
                   samples = 500,
