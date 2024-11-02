@@ -13,7 +13,7 @@ jsdgam(
   newdata,
   family = poisson(),
   unit = time,
-  subgr = series,
+  species = series,
   share_obs_params = FALSE,
   priors,
   n_lv = 2,
@@ -38,17 +38,13 @@ jsdgam(
 for a GLM except that smooth terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying
 \code{dynamic()} terms and nonparametric \code{gp()} terms, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors
-(or linear functionals of these). In \code{nmix()} family models, the \code{formula} is used to
-set up a linear predictor for the detection probability. Details of the formula syntax used by \pkg{mvgam}
+(or linear functionals of these). Details of the formula syntax used by \pkg{mvgam}
 can be found in \code{\link{mvgam_formulae}}}
 
 \item{factor_formula}{A \code{character} string specifying the linear predictor
-effects for the latent factors. These are exactly like the formula
-for a GLM except that smooth terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying
-\code{dynamic()} terms and nonparametric \code{gp()} terms, can be added to the right hand side
-to specify that the linear predictor depends on smooth functions of predictors
-(or linear functionals of these). Details of the formula syntax used by \pkg{mvgam}
-can be found in \code{\link{mvgam_formulae}}}
+effects for the latent factors. Use \code{by = trend} within calls to functional terms
+(i.e. \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, \code{dynamic()}, or \code{gp()}) to ensure that each factor
+captures a different axis of variation. See the example below as an illustration}
 
 \item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
 For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied
@@ -93,34 +89,24 @@ Defaults to \code{time} to be consistent with other functionalities
 in \pkg{mvgam}, though note that the data need not be time series in this case. See examples below
 for further details and explanations}
 
-\item{subgr}{A subgrouping \code{factor} variable specifying which element in \code{data} represents the
-different observational units. Defaults to \code{series} to be consistent with other functionalities
-in \pkg{mvgam}, though note that the data need not be time series in this case.
-But note that models that use the hierarchical correlations (by supplying a value for \code{gr})
-\emph{should not} include a \code{series} element in \code{data}. Rather, this element will be created internally based
-on the supplied variables for \code{gr} and \code{subgr}. For example, if you are modelling
-counts for a group of species (labelled as \code{species} in the data) across sampling sites
-(labelled as \code{site} in the data) in three
-different geographical regions (labelled as \code{region}), and you would like the residuals to be correlated
-within regions, then you should specify
-\code{unit = site},  \code{gr = region}, and \code{subgr = species}. Internally, \code{mvgam()} will appropriately order
-the data by \code{unit} (in this case, by \code{site}) and create
-the \code{series} element for the data using something like: \code{series = as.factor(paste0(group, '_', subgroup))}}
+\item{species}{An unquoted string representing the \code{factor} variable that indexes
+the different outcome variables in \code{data} (usually \code{'species'} in a JSDM).
+Defaults to \code{series} to be consistent with other \code{mvgam} models}
 
 \item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family}
 has additional family-specific observation parameters (e.g. variance components in
 \code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or \code{betar()}),
-these parameters will be shared across all series. This is handy if you have multiple
-time series that you believe share some properties, such as being from the same
-species over different spatial units. Default is \code{FALSE}.}
+these parameters will be shared across all outcome variables. This is handy if you have multiple
+outcomes (time series in most \code{mvgam} models) that you believe share some properties,
+such as being from the same species over different spatial units. Default is \code{FALSE}.}
 
 \item{priors}{An optional \code{data.frame} with prior
-definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
-class \code{brmsprior} (see. \code{\link[brms]{prior}} for details). See \link{get_mvgam_priors} and
-'Details' for more information on changing default prior distributions}
+definitions (in JAGS or Stan syntax) or, preferentially, If using Stan, a vector containing
+objects of class \code{brmsprior} (see. \code{\link[brms]{prior}} for details).
+See \link{get_mvgam_priors} and Details' for more information on changing default prior distributions}
 
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
-Cannot be \code{> n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
+Cannot be \code{n_species}. Defaults arbitrarily to \code{2}}
 
 \item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
 if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
@@ -199,7 +185,7 @@ the size of the returned object, unless \code{run_model == FALSE}}
 A \code{list} object of class \code{mvgam} containing model output,
 the text representation of the model file,
 the mgcv model output (for easily generating simulations at
-unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
+unsampled covariate values), Dunn-Smyth residuals for each species and key information needed
 for other functions in the package. See \code{\link{mvgam-class}} for details.
 Use \code{methods(class = "mvgam")} for an overview on available methods
 }
@@ -219,7 +205,29 @@ these effects can be modelled with the full power of latent factor Hierarchical 
 flexibility to model full communities of species. When calling \link{jsdgam}, an initial State-Space model using
 \code{trend = 'None'} is set up and then modified to include the latent factors and their linear predictors.
 Consequently, you can inspect priors for these models using \link{get_mvgam_priors} by supplying the relevant
-\code{formula}, \code{factor_formula}, \code{data} and \code{family} arguments and using \code{trend = 'None'}
+\code{formula}, \code{factor_formula}, \code{data} and \code{family} arguments and keeping the default \code{trend = 'None'}.
+
+In a JSDGAM, the expectation of response \eqn{Y_{ij}} is modelled with
+
+\deqn{g(\mu_{ij}) = X_i'\beta + u_i'\theta_j,}
+
+where \eqn{g(.)} is a known link function,
+\eqn{X_i'} is a design matrix of linear predictors (with associated \eqn{\beta} coefficients),
+\eqn{u_i} are \eqn{n_{lv}}-variate latent factors
+(\eqn{n_{lv}}<<\eqn{n_{species}}) and
+\eqn{\theta_j} are species-specific loadings on the latent factors, respectively. The design matrix
+\eqn{X} and \eqn{\beta} coefficients are constructed and modelled using \code{formula} and can contain
+any of \code{mvgam}'s predictor effects, including random intercepts and slopes, multidimensional penalized
+smooths, GP effects etc... The factor loadings \eqn{\theta_j} are constrained for identifiability but can
+be used to reconstruct an estimate of the species' residual variance-covariance matrix (see the example below
+for an illustration of this). The latent factors are further modelled using:
+\deqn{
+u_i \sim \text{Normal}(Q_i\beta_{factor}, 1) \quad
+}
+where the second design matrix \eqn{Q} and associated \eqn{\beta_{factor}} coefficients are
+constructed and modelled using \code{factor_formula}. Again, the effects that make up this linear
+predictor can contain any of \code{mvgam}'s allowed predictor effects, providing enormous flexibility for
+modelling species' communities.
 }
 \examples{
 \donttest{
@@ -355,7 +363,7 @@ mod <- jsdgam(formula = count ~
               # The data and the grouping variables
               data = dat,
               unit = site,
-              subgr = species,
+              species = species,
 
               # Poisson observations
               family = poisson(),

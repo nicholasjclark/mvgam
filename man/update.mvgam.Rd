@@ -137,14 +137,14 @@ See \code{\link{mvgam_families}} for more details}
 \item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family}
 has additional family-specific observation parameters (e.g. variance components in
 \code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or \code{betar()}),
-these parameters will be shared across all series. This is handy if you have multiple
-time series that you believe share some properties, such as being from the same
-species over different spatial units. Default is \code{FALSE}.}
+these parameters will be shared across all outcome variables. This is handy if you have multiple
+outcomes (time series in most \code{mvgam} models) that you believe share some properties,
+such as being from the same species over different spatial units. Default is \code{FALSE}.}
 
 \item{priors}{An optional \code{data.frame} with prior
-definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
-class \code{brmsprior} (see. \code{\link[brms]{prior}} for details). See \link{get_mvgam_priors} and
-'Details' for more information on changing default prior distributions}
+definitions (in JAGS or Stan syntax) or, preferentially, If using Stan, a vector containing
+objects of class \code{brmsprior} (see. \code{\link[brms]{prior}} for details).
+See \link{get_mvgam_priors} and Details' for more information on changing default prior distributions}
 
 \item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
 if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}

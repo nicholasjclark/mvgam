@@ -321,7 +321,7 @@ test_that("family must be correctly specified", {
                               factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
                               data = spiderdat,
                               unit = site,
-                              subgr = taxon,
+                              species = taxon,
                               n_lv = 3,
                               family = 'banana'),
                'family not recognized')
@@ -337,7 +337,7 @@ test_that("response variable must be specified", {
                               factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
                               data = spiderdat,
                               unit = site,
-                              subgr = taxon,
+                              species = taxon,
                               n_lv = 3,
                               family = nb()),
                'Not sure how to deal with this response variable specification')
@@ -353,14 +353,14 @@ test_that("unit must exist in data", {
          factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
          data = spiderdat,
          unit = banana,
-         subgr = taxon,
+         species = taxon,
          n_lv = 3,
          family = nb()),
          'Variable "banana" not found in data')
 })
 
 
-test_that("subgr must exist in data", {
+test_that("species must exist in data", {
   expect_error(jsdgam(formula = abundance ~
                         # Environmental model includes species-level interecepts
                         # and random slopes for a linear effect of reflection
@@ -370,13 +370,13 @@ test_that("subgr must exist in data", {
                       factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
                       data = spiderdat,
                       unit = site,
-                      subgr = banana,
+                      species = banana,
                       n_lv = 3,
                       family = nb()),
                'Variable "banana" not found in data')
 })
 
-test_that("subgr must be a factor in data", {
+test_that("species must be a factor in data", {
   spiderdat$taxon <- as.numeric(spiderdat$taxon)
   expect_error(jsdgam(formula = abundance ~
                         # Environmental model includes species-level interecepts
@@ -387,7 +387,7 @@ test_that("subgr must be a factor in data", {
                       factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
                       data = spiderdat,
                       unit = site,
-                      subgr = taxon,
+                      species = taxon,
                       n_lv = 3,
                       family = nb()),
                'Variable "taxon" must be a factor type')
@@ -404,13 +404,13 @@ test_that("unit must be a numeric / integer in data", {
                       factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
                       data = spiderdat,
                       unit = site,
-                      subgr = taxon,
+                      species = taxon,
                       n_lv = 3,
                       family = nb()),
                'Variable "site" must be either numeric or integer type')
 })
 
-test_that("n_lv must be <= number of subgroups", {
+test_that("n_lv must be <= number of species", {
   expect_error(jsdgam(formula = abundance ~
                         # Environmental model includes species-level interecepts
                         # and random slopes for a linear effect of reflection
@@ -420,10 +420,10 @@ test_that("n_lv must be <= number of subgroups", {
                       factor_formula = ~ s(soil.dry, k = 5, by = trend) - 1,
                       data = spiderdat,
                       unit = site,
-                      subgr = taxon,
+                      species = taxon,
                       n_lv = 15,
                       family = nb()),
-               'Number of factors must be <= number of levels in subgr')
+               'Number of factors must be <= number of levels in species')
 })
 
 test_that("knots must be a list", {
@@ -440,7 +440,7 @@ test_that("knots must be a list", {
                                                    length.out = 4),
                 data = spiderdat,
                 unit = site,
-                subgr = taxon,
+                species = taxon,
                 n_lv = 3,
                 family = nb(),
                 run_model = FALSE),
@@ -461,7 +461,7 @@ test_that("errors about knot lengths should be propagated from mgcv", {
                                          length.out = 4)),
                       data = spiderdat,
                       unit = site,
-                      subgr = taxon,
+                      species = taxon,
                       n_lv = 3,
                       family = nb(),
                       run_model = FALSE),
@@ -497,7 +497,7 @@ test_that("jsdgam should initiate correctly", {
                                    length.out = 5)),
                 data = spiderdat,
                 unit = site,
-                subgr = taxon,
+                species = taxon,
                 n_lv = 3,
                 family = nb(),
                 run_model = FALSE)

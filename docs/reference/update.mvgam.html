@@ -212,16 +212,16 @@ See <code><a href="mvgam_families.html">mvgam_families</a></code> for more detai
 <dd><p><code>logical</code>. If <code>TRUE</code> and the <code>family</code>
 has additional family-specific observation parameters (e.g. variance components in
 <code><a href="mvgam_families.html">student_t()</a></code> or <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>, or dispersion parameters in <code><a href="mvgam_families.html">nb()</a></code> or <code><a href="mvgam_families.html">betar()</a></code>),
-these parameters will be shared across all series. This is handy if you have multiple
-time series that you believe share some properties, such as being from the same
-species over different spatial units. Default is <code>FALSE</code>.</p></dd>
+these parameters will be shared across all outcome variables. This is handy if you have multiple
+outcomes (time series in most <code>mvgam</code> models) that you believe share some properties,
+such as being from the same species over different spatial units. Default is <code>FALSE</code>.</p></dd>
 
 
 <dt>priors</dt>
 <dd><p>An optional <code>data.frame</code> with prior
-definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
-class <code>brmsprior</code> (see. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code> for details). See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and
-'Details' for more information on changing default prior distributions</p></dd>
+definitions (in JAGS or Stan syntax) or, preferentially, If using Stan, a vector containing
+objects of class <code>brmsprior</code> (see. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code> for details).
+See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and Details' for more information on changing default prior distributions</p></dd>
 
 
 <dt>chains</dt>
@@ -298,22 +298,35 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpSm0PAw/model-167fc5c134cd2.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
@@ -323,19 +336,19 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.3 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.3 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.4 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.6 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x00000220a4ce1640&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001b214d3f240&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -359,27 +372,27 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>              2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept) -0.84 -0.46 -0.11    1   472</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -1.30 -0.53  0.04    1   578</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2 -2.00 -1.20 -0.45    1   566</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3 -2.30 -1.40 -0.56    1   566</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4 -1.90 -1.10 -0.31    1   759</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5 -0.97 -0.32  0.39    1   618</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6 -0.45  0.14  0.73    1   588</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7 -0.05  0.56  1.10    1   756</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8  0.72  1.20  1.70    1   512</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%   50%  97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  0.550  0.75  0.930    1   859</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -0.890 -0.48 -0.094    1   860</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2 -0.730 -0.24  0.230    1   804</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3  0.002  0.41  0.820    1   908</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4  0.390  0.76  1.100    1   701</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5  0.370  0.72  1.100    1   776</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6  0.310  0.71  1.100    1   849</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7  0.190  0.61  1.000    1   787</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8 -0.530 -0.13  0.240    1   530</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 3.69      8   55.4   9e-05 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 4.69      8   23.5 0.00064 ***</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Latent trend parameter AR estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           2.5%  50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   -0.84 0.17  0.91    1   646</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.01 0.21  0.62    1   257</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           2.5%   50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   -0.99 -0.50  0.21 1.01   250</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.22  0.43  0.70 1.00   341</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
@@ -388,7 +401,7 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 12 (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Fri Nov 01 3:31:30 PM 2024.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Sat Nov 02 2:13:11 PM 2024.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
@@ -407,7 +420,7 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpARA4r4/model-1333c71b95a48.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpSm0PAw/model-167fc357d2ff8.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
@@ -418,26 +431,26 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.4 seconds.</span>
@@ -445,12 +458,12 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.4 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.6 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">updated_mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> y ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x00000220a4ce1640&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001b214d3f240&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> poisson</span>
@@ -474,28 +487,28 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%   50%  97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept) -0.850 -0.46 -0.160    1   736</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -1.200 -0.52  0.055    1   996</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2 -2.000 -1.20 -0.440    1   845</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3 -2.300 -1.40 -0.620    1   710</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4 -1.900 -1.10 -0.360    1   845</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5 -0.960 -0.32  0.350    1   842</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6 -0.480  0.13  0.780    1   974</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7 -0.058  0.56  1.100    1   687</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8  0.720  1.20  1.800    1   637</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%   50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  0.560  0.76  0.94    1   665</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -0.900 -0.48 -0.12    1   844</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2 -0.740 -0.23  0.23    1   699</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3  0.012  0.40  0.80    1   647</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4  0.390  0.76  1.20    1   458</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5  0.300  0.70  1.10    1   607</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6  0.290  0.71  1.10    1   623</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7  0.250  0.62  1.10    1   585</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8 -0.520 -0.12  0.25    1   758</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 4.11      8   55.5   1e-04 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 4.24      8   25.3  0.0082 **</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Latent trend AR parameter estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            2.5%   50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   -0.900 0.096  0.94    1   951</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar2[1]   -0.930 0.042  0.95    1   884</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.014 0.170  0.52    1   377</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           2.5%   50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   -0.96 -0.50  0.19 1.01   216</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar2[1]   -0.64  0.23  0.94 1.02   156</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.21  0.39  0.65 1.00   312</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
@@ -504,7 +517,7 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 12 (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Fri Nov 01 3:32:00 PM 2024.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Sat Nov 02 2:13:56 PM 2024.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>
@@ -528,7 +541,7 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpARA4r4/model-1333c4af798e.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpSm0PAw/model-167fc7bf96e.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
@@ -555,23 +568,23 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 0.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 0.4 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 0.4 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.5 seconds.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 0.6 seconds.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">updated_mod</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM formula:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> cbind(y, trials) ~ s(season, bs = "cc")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x00000220a4ce1640&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> &lt;environment: 0x000001b214d3f240&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Family:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> binomial</span>
@@ -595,27 +608,27 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> GAM coefficient (beta) estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>              2.5%   50%   97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept) -3.80 -3.40 -3.1000 1.00   620</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -1.30 -0.54  0.0071 1.00   544</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2 -2.00 -1.20 -0.4600 1.00   558</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3 -2.30 -1.40 -0.5600 1.01   364</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4 -1.90 -1.10 -0.3400 1.01   576</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5 -1.00 -0.29  0.4300 1.00   637</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6 -0.50  0.14  0.7800 1.00   776</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7 -0.08  0.55  1.2000 1.00   894</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8  0.64  1.30  1.8000 1.01   199</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>               2.5%   50%  97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept) -2.800 -2.50 -2.400 1.00   447</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).1 -0.930 -0.52 -0.099 1.00   632</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).2 -0.740 -0.25  0.240 1.00   626</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).3 -0.031  0.43  0.900 1.00   480</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).4  0.430  0.85  1.300 1.01   341</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).5  0.380  0.81  1.200 1.00   453</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).6  0.360  0.79  1.200 1.00   749</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).7  0.200  0.63  1.200 1.00   456</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season).8 -0.620 -0.14  0.230 1.01   441</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Approximate significance of GAM smooths:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 3.59      8   59.7 0.00013 ***</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            edf Ref.df Chi.sq p-value   </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> s(season) 4.32      8   28.9  0.0045 **</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ---</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Latent trend parameter AR estimates:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            2.5%  50% 97.5% Rhat n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   -0.880 0.18  0.95 1.01   543</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.011 0.25  0.69 1.02   220</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           2.5%   50% 97.5% Rhat n_eff</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> ar1[1]   -0.95 -0.48 0.039 1.00   254</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> sigma[1]  0.33  0.56 0.830 1.01   233</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Stan MCMC diagnostics:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> n_eff / iter looks reasonable for all parameters</span>
@@ -624,7 +637,7 @@ Use <code>methods(class = "mvgam")</code> for an overview on available methods.<
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0 of 1000 iterations saturated the maximum tree depth of 12 (0%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> E-FMI indicated no pathological behavior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Fri Nov 01 3:32:28 PM 2024.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Samples were drawn using NUTS(diag_e) at Sat Nov 02 2:14:41 PM 2024.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> For each parameter, n_eff is a crude measure of effective sample size,</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> and Rhat is the potential scale reduction factor on split MCMC chains</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (at convergence, Rhat = 1)</span>

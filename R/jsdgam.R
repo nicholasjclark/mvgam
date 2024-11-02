@@ -9,13 +9,16 @@
 #'
 #'@inheritParams mvgam
 #'@inheritParams ZMVN
-#'@param factor_formula A \code{character} string specifying the linear predictor
-#'effects for the latent factors. These are exactly like the formula
+#'@param formula A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
 #'for a GLM except that smooth terms, `s()`, `te()`, `ti()`, `t2()`, as well as time-varying
 #'`dynamic()` terms and nonparametric `gp()` terms, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors
 #'(or linear functionals of these). Details of the formula syntax used by \pkg{mvgam}
 #'can be found in \code{\link{mvgam_formulae}}
+#'@param factor_formula A \code{character} string specifying the linear predictor
+#'effects for the latent factors. Use `by = trend` within calls to functional terms
+#'(i.e. `s()`, `te()`, `ti()`, `t2()`, `dynamic()`, or `gp()`) to ensure that each factor
+#'captures a different axis of variation. See the example below as an illustration
 #'@param factor_knots An optional \code{list} containing user specified knot values to
 #' be used for basis construction of any smooth terms in `factor_formula`.
 #'For most bases the user simply supplies the knots to be used, which must match up with the `k` value supplied
@@ -39,6 +42,11 @@
 #'   of trials
 #'   \item`beta_binomial()` as for `binomial()` but allows for overdispersion}
 #'Default is `poisson()`. See \code{\link{mvgam_families}} for more details
+#' @param species An unquoted string representing the `factor` variable that indexes
+#' the different outcome variables in `data` (usually `'species'` in a JSDM).
+#' Defaults to `series` to be consistent with other `mvgam` models
+#'@param n_lv \code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
+#'Cannot be `n_species`. Defaults arbitrarily to `2`
 #'@param ... Other arguments to pass to [mvgam]
 #'@author Nicholas J Clark
 #'@details Joint Species Distribution Models allow for responses of multiple species to be
@@ -48,7 +56,29 @@
 #'flexibility to model full communities of species. When calling [jsdgam], an initial State-Space model using
 #'`trend = 'None'` is set up and then modified to include the latent factors and their linear predictors.
 #'Consequently, you can inspect priors for these models using [get_mvgam_priors] by supplying the relevant
-#'`formula`, `factor_formula`, `data` and `family` arguments and using `trend = 'None'`
+#'`formula`, `factor_formula`, `data` and `family` arguments and keeping the default `trend = 'None'`.
+#'
+#' In a JSDGAM, the expectation of response \eqn{Y_{ij}} is modelled with
+#'
+#' \deqn{g(\mu_{ij}) = X_i'\beta + u_i'\theta_j,}
+#'
+#' where \eqn{g(.)} is a known link function,
+#' \eqn{X_i'} is a design matrix of linear predictors (with associated \eqn{\beta} coefficients),
+#' \eqn{u_i} are \eqn{n_{lv}}-variate latent factors
+#' (\eqn{n_{lv}}<<\eqn{n_{species}}) and
+#' \eqn{\theta_j} are species-specific loadings on the latent factors, respectively. The design matrix
+#' \eqn{X} and \eqn{\beta} coefficients are constructed and modelled using `formula` and can contain
+#' any of `mvgam`'s predictor effects, including random intercepts and slopes, multidimensional penalized
+#' smooths, GP effects etc... The factor loadings \eqn{\theta_j} are constrained for identifiability but can
+#' be used to reconstruct an estimate of the species' residual variance-covariance matrix (see the example below
+#' for an illustration of this). The latent factors are further modelled using:
+#'\deqn{
+#'u_i \sim \text{Normal}(Q_i\beta_{factor}, 1) \quad
+#'}
+#'where the second design matrix \eqn{Q} and associated \eqn{\beta_{factor}} coefficients are
+#'constructed and modelled using `factor_formula`. Again, the effects that make up this linear
+#'predictor can contain any of `mvgam`'s allowed predictor effects, providing enormous flexibility for
+#'modelling species' communities.
 #'@seealso [mvgam]
 #'@references Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 #'Methods in Ecology and Evolution. 14:3, 771-784.
@@ -58,7 +88,7 @@
 #'@return A \code{list} object of class \code{mvgam} containing model output,
 #'the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
-#'unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
+#'unsampled covariate values), Dunn-Smyth residuals for each species and key information needed
 #'for other functions in the package. See \code{\link{mvgam-class}} for details.
 #'Use `methods(class = "mvgam")` for an overview on available methods
 #'@examples
@@ -195,7 +225,7 @@
 #'               # The data and the grouping variables
 #'               data = dat,
 #'               unit = site,
-#'               subgr = species,
+#'               species = species,
 #'
 #'               # Poisson observations
 #'               family = poisson(),
@@ -261,7 +291,7 @@ jsdgam = function(formula,
                   newdata,
                   family = poisson(),
                   unit = time,
-                  subgr = series,
+                  species = series,
                   share_obs_params = FALSE,
                   priors,
                   n_lv = 2,
@@ -286,7 +316,7 @@ jsdgam = function(formula,
   # Prep the trend so that the data can be structured in the usual
   # mvgam fashion (with 'time' and 'series' variables)
   unit <- deparse0(substitute(unit))
-  subgr <- deparse0(substitute(subgr))
+  subgr <- deparse0(substitute(species))
   prepped_trend <- prep_jsdgam_trend(unit = unit,
                                      subgr = subgr,
                                      data = data)
@@ -617,7 +647,7 @@ prep_jsdgam_trend = function(data, unit, subgr){
 #' @noRd
 prep_jsdgam_trendmap = function(data, n_lv){
   if(n_lv > nlevels(data$series)){
-    stop('Number of factors must be <= number of levels in subgr',
+    stop('Number of factors must be <= number of levels in species',
          call. = FALSE)
   }
   data.frame(trend = rep(1:n_lv,

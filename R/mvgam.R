@@ -100,9 +100,9 @@
 #'@param share_obs_params \code{logical}. If \code{TRUE} and the \code{family}
 #'has additional family-specific observation parameters (e.g. variance components in
 #'`student_t()` or `gaussian()`, or dispersion parameters in `nb()` or `betar()`),
-#'these parameters will be shared across all series. This is handy if you have multiple
-#'time series that you believe share some properties, such as being from the same
-#'species over different spatial units. Default is \code{FALSE}.
+#'these parameters will be shared across all outcome variables. This is handy if you have multiple
+#'outcomes (time series in most `mvgam` models) that you believe share some properties,
+#'such as being from the same species over different spatial units. Default is \code{FALSE}.
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. Only available for
 #'`RW()`, `AR()` and `GP()` trend models. Defaults to \code{FALSE}
@@ -167,9 +167,9 @@
 #'up by any other means. Only available for some families(`poisson()`, `nb()`, `gaussian()`) and
 #'when using \code{Cmdstan} as the backend
 #'@param priors An optional \code{data.frame} with prior
-#'definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
-#'class `brmsprior` (see. \code{\link[brms]{prior}} for details). See [get_mvgam_priors] and
-#''Details' for more information on changing default prior distributions
+#'definitions (in JAGS or Stan syntax) or, preferentially, If using Stan, a vector containing
+#' objects of class `brmsprior` (see. \code{\link[brms]{prior}} for details).
+#' See [get_mvgam_priors] and Details' for more information on changing default prior distributions
 #'@param refit Logical indicating whether this is a refit, called using [update.mvgam]. Users should leave
 #'as `FALSE`
 #'@param lfo Logical indicating whether this is part of a call to [lfo_cv.mvgam]. Returns a

@@ -87,7 +87,7 @@ observation model can also be highly flexible (including all smooth, GP and othe
 <span>  <span class="va">newdata</span>,</span>
 <span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  unit <span class="op">=</span> <span class="va">time</span>,</span>
-<span>  subgr <span class="op">=</span> <span class="va">series</span>,</span>
+<span>  species <span class="op">=</span> <span class="va">series</span>,</span>
 <span>  share_obs_params <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">priors</span>,</span>
 <span>  n_lv <span class="op">=</span> <span class="fl">2</span>,</span>
@@ -115,19 +115,15 @@ observation model can also be highly flexible (including all smooth, GP and othe
 for a GLM except that smooth terms, <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, as well as time-varying
 <code><a href="dynamic.html">dynamic()</a></code> terms and nonparametric <code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp()</a></code> terms, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors
-(or linear functionals of these). In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>formula</code> is used to
-set up a linear predictor for the detection probability. Details of the formula syntax used by <span class="pkg">mvgam</span>
+(or linear functionals of these). Details of the formula syntax used by <span class="pkg">mvgam</span>
 can be found in <code><a href="mvgam_formulae.html">mvgam_formulae</a></code></p></dd>
 
 
 <dt>factor_formula</dt>
 <dd><p>A <code>character</code> string specifying the linear predictor
-effects for the latent factors. These are exactly like the formula
-for a GLM except that smooth terms, <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, as well as time-varying
-<code><a href="dynamic.html">dynamic()</a></code> terms and nonparametric <code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp()</a></code> terms, can be added to the right hand side
-to specify that the linear predictor depends on smooth functions of predictors
-(or linear functionals of these). Details of the formula syntax used by <span class="pkg">mvgam</span>
-can be found in <code><a href="mvgam_formulae.html">mvgam_formulae</a></code></p></dd>
+effects for the latent factors. Use <code>by = trend</code> within calls to functional terms
+(i.e. <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, <code><a href="dynamic.html">dynamic()</a></code>, or <code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp()</a></code>) to ensure that each factor
+captures a different axis of variation. See the example below as an illustration</p></dd>
 
 
 <dt>knots</dt>
@@ -183,41 +179,31 @@ in <span class="pkg">mvgam</span>, though note that the data need not be time se
 for further details and explanations</p></dd>
 
 
-<dt>subgr</dt>
-<dd><p>A subgrouping <code>factor</code> variable specifying which element in <code>data</code> represents the
-different observational units. Defaults to <code>series</code> to be consistent with other functionalities
-in <span class="pkg">mvgam</span>, though note that the data need not be time series in this case.
-But note that models that use the hierarchical correlations (by supplying a value for <code>gr</code>)
-<em>should not</em> include a <code>series</code> element in <code>data</code>. Rather, this element will be created internally based
-on the supplied variables for <code>gr</code> and <code>subgr</code>. For example, if you are modelling
-counts for a group of species (labelled as <code>species</code> in the data) across sampling sites
-(labelled as <code>site</code> in the data) in three
-different geographical regions (labelled as <code>region</code>), and you would like the residuals to be correlated
-within regions, then you should specify
-<code>unit = site</code>,  <code>gr = region</code>, and <code>subgr = species</code>. Internally, <code><a href="mvgam.html">mvgam()</a></code> will appropriately order
-the data by <code>unit</code> (in this case, by <code>site</code>) and create
-the <code>series</code> element for the data using something like: <code>series = as.factor(paste0(group, '_', subgroup))</code></p></dd>
+<dt>species</dt>
+<dd><p>An unquoted string representing the <code>factor</code> variable that indexes
+the different outcome variables in <code>data</code> (usually <code>'species'</code> in a JSDM).
+Defaults to <code>series</code> to be consistent with other <code>mvgam</code> models</p></dd>
 
 
 <dt>share_obs_params</dt>
 <dd><p><code>logical</code>. If <code>TRUE</code> and the <code>family</code>
 has additional family-specific observation parameters (e.g. variance components in
 <code><a href="mvgam_families.html">student_t()</a></code> or <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code>, or dispersion parameters in <code><a href="mvgam_families.html">nb()</a></code> or <code><a href="mvgam_families.html">betar()</a></code>),
-these parameters will be shared across all series. This is handy if you have multiple
-time series that you believe share some properties, such as being from the same
-species over different spatial units. Default is <code>FALSE</code>.</p></dd>
+these parameters will be shared across all outcome variables. This is handy if you have multiple
+outcomes (time series in most <code>mvgam</code> models) that you believe share some properties,
+such as being from the same species over different spatial units. Default is <code>FALSE</code>.</p></dd>
 
 
 <dt>priors</dt>
 <dd><p>An optional <code>data.frame</code> with prior
-definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
-class <code>brmsprior</code> (see. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code> for details). See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and
-'Details' for more information on changing default prior distributions</p></dd>
+definitions (in JAGS or Stan syntax) or, preferentially, If using Stan, a vector containing
+objects of class <code>brmsprior</code> (see. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code> for details).
+See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and Details' for more information on changing default prior distributions</p></dd>
 
 
 <dt>n_lv</dt>
 <dd><p><code>integer</code> the number of latent dynamic factors to use if <code>use_lv == TRUE</code>.
-Cannot be <code>&gt; n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
+Cannot be <code>n_species</code>. Defaults arbitrarily to <code>2</code></p></dd>
 
 
 <dt>chains</dt>
@@ -328,7 +314,7 @@ the size of the returned object, unless <code>run_model == FALSE</code></p></dd>
 <p>A <code>list</code> object of class <code>mvgam</code> containing model output,
 the text representation of the model file,
 the mgcv model output (for easily generating simulations at
-unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
+unsampled covariate values), Dunn-Smyth residuals for each species and key information needed
 for other functions in the package. See <code><a href="mvgam-class.html">mvgam-class</a></code> for details.
 Use <code>methods(class = "mvgam")</code> for an overview on available methods</p>
     </div>
@@ -341,7 +327,26 @@ these effects can be modelled with the full power of latent factor Hierarchical 
 flexibility to model full communities of species. When calling jsdgam, an initial State-Space model using
 <code>trend = 'None'</code> is set up and then modified to include the latent factors and their linear predictors.
 Consequently, you can inspect priors for these models using <a href="get_mvgam_priors.html">get_mvgam_priors</a> by supplying the relevant
-<code>formula</code>, <code>factor_formula</code>, <code>data</code> and <code>family</code> arguments and using <code>trend = 'None'</code></p>
+<code>formula</code>, <code>factor_formula</code>, <code>data</code> and <code>family</code> arguments and keeping the default <code>trend = 'None'</code>.</p>
+<p>In a JSDGAM, the expectation of response \(Y_{ij}\) is modelled with</p>
+<p>$$g(\mu_{ij}) = X_i'\beta + u_i'\theta_j,$$</p>
+<p>where \(g(.)\) is a known link function,
+\(X_i'\) is a design matrix of linear predictors (with associated \(\beta\) coefficients),
+\(u_i\) are \(n_{lv}\)-variate latent factors
+(\(n_{lv}\)&lt;&lt;\(n_{species}\)) and
+\(\theta_j\) are species-specific loadings on the latent factors, respectively. The design matrix
+\(X\) and \(\beta\) coefficients are constructed and modelled using <code>formula</code> and can contain
+any of <code>mvgam</code>'s predictor effects, including random intercepts and slopes, multidimensional penalized
+smooths, GP effects etc... The factor loadings \(\theta_j\) are constrained for identifiability but can
+be used to reconstruct an estimate of the species' residual variance-covariance matrix (see the example below
+for an illustration of this). The latent factors are further modelled using:
+$$
+u_i \sim \text{Normal}(Q_i\beta_{factor}, 1) \quad
+$$
+where the second design matrix \(Q\) and associated \(\beta_{factor}\) coefficients are
+constructed and modelled using <code>factor_formula</code>. Again, the effects that make up this linear
+predictor can contain any of <code>mvgam</code>'s allowed predictor effects, providing enormous flexibility for
+modelling species' communities.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
@@ -450,7 +455,6 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># View the count distributions for each species</span></span></span>
 <span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>package ‘ggplot2’ was built under R version 4.3.3</span>
 <span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">dat</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">count</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_histogram.html" class="external-link">geom_histogram</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">species</span>, scales <span class="op">=</span> <span class="st">'free'</span><span class="op">)</span></span></span>
@@ -521,7 +525,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span>              <span class="co"># The data and the grouping variables</span></span></span>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span>,</span></span>
 <span class="r-in"><span>              unit <span class="op">=</span> <span class="va">site</span>,</span></span>
-<span class="r-in"><span>              subgr <span class="op">=</span> <span class="va">species</span>,</span></span>
+<span class="r-in"><span>              species <span class="op">=</span> <span class="va">species</span>,</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>              <span class="co"># Poisson observations</span></span></span>
 <span class="r-in"><span>              family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
@@ -534,7 +538,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpWsdp7k/model-521078b22309.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpsDr2XI/model-d73c513b78b6.hpp:2:</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
