@@ -53,6 +53,7 @@ jobs:
               lubridate
               wrswoR
               tweedie
+              corpcor
               splines2
               scoringRules
               matrixStats

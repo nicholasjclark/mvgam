@@ -80,7 +80,7 @@ precision but still be correlated, which can be interpreted as saying that two s
 directly associated, but they are still correlated \emph{through} other species. In other words, they
 are conditionally independent given the other species. It is important that the precision matrix
 does not exhibit the exact same properties of the correlation e.g., the diagonal elements are
-not equal to 1. Nevertheless, relatively larger values of precision imply a stronger
+not equal to 1. Nevertheless, relatively larger values of precision may imply stronger
 direct relationships between two species.
 
 In addition to the residual correlation and precision matrices, the median or mean point estimator
