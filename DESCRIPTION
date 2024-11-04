@@ -43,6 +43,7 @@ Suggests:
     tweedie,
     splines2,
     extraDistr,
+    corpcor,
     wrswoR,
     xts,
     lubridate,

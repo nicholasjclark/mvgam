@@ -2,17 +2,41 @@
 % Please edit documentation in R/update.mvgam.R
 \name{update.mvgam}
 \alias{update.mvgam}
+\alias{update.jsdgam}
 \title{Update an existing \code{mvgam} object}
 \usage{
 \method{update}{mvgam}(
   object,
   formula,
   trend_formula,
+  knots,
+  trend_knots,
   data,
   newdata,
   trend_model,
   trend_map,
   use_lv,
+  n_lv,
+  family,
+  share_obs_params,
+  priors,
+  chains,
+  burnin,
+  samples,
+  threads,
+  algorithm,
+  lfo = FALSE,
+  ...
+)
+
+\method{update}{jsdgam}(
+  object,
+  formula,
+  factor_formula,
+  knots,
+  factor_knots,
+  data,
+  newdata,
   n_lv,
   family,
   share_obs_params,
@@ -45,6 +69,14 @@ In \code{nmix()} family models, the \code{trend_formula} is used to set up a lin
 latent abundance. Be aware that it can be very challenging to simultaneously estimate intercept parameters
 for both the observation mode (captured by \code{formula}) and the process model (captured by \code{trend_formula}).
 Users are recommended to drop one of these using the \code{- 1} convention in the formula right hand side.}
+
+\item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
+For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied
+(note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
+unless they share a covariate}
+
+\item{trend_knots}{As for \code{knots} above, this is an optional \code{list} of knot values for smooth
+functions within the \code{trend_formula}}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
@@ -181,9 +213,23 @@ lighter version of the model with no residuals and fewer monitored parameters to
 post-processing. But other downstream functions will not work properly, so users should always
 leave this set as \code{FALSE}}
 
-\item{...}{Other arguments to be passed to \code{\link{mvgam}}}
+\item{...}{Other arguments to be passed to \code{\link{mvgam}} or \code{\link{jsdgam}}}
+
+\item{factor_formula}{Optional new \code{formula} object for the factor linear predictors}
+
+\item{factor_knots}{An optional \code{list} containing user specified knot values to
+be used for basis construction of any smooth terms in \code{factor_formula}.
+For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied
+(note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
+unless they share a covariate}
 }
 \value{
+A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
+the mgcv model output (for easily generating simulations at
+unsampled covariate values), Dunn-Smyth residuals for each outcome variable and key information needed
+for other functions in the package. See \code{\link{mvgam-class}} for details.
+Use \code{methods(class = "mvgam")} for an overview on available methods.
+
 A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
 the mgcv model output (for easily generating simulations at
 unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
@@ -222,4 +268,7 @@ updated_mod <- update(mod,
 summary(updated_mod)
 conditional_effects(updated_mod, type = 'link')
 }
+}
+\author{
+Nicholas J Clark
 }

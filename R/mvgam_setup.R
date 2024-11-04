@@ -11,19 +11,22 @@ mvgam_setup <- function(formula,
                         maxit = 5) {
 
   if(missing(knots)){
-    init_gam(formula(formula),
-             data = dat,
-             family = family)
+    out <- init_gam(formula(formula),
+                    data = dat,
+                    family = family)
+    attr(out, 'knots') <- NULL
   } else {
     if(!is.list(knots)){
       stop('all "knot" arguments must be supplied as lists',
            call. = FALSE)
     }
-    init_gam(formula(formula),
-             data = dat,
-             family = family,
-             knots = knots)
+    out <- init_gam(formula(formula),
+                    data = dat,
+                    family = family,
+                    knots = knots)
+    attr(out, 'knots') <- knots
   }
+  out
 }
 
 #' Generic JAGAM setup function

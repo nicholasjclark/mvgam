@@ -196,9 +196,9 @@ such as being from the same species over different spatial units. Default is <co
 
 <dt>priors</dt>
 <dd><p>An optional <code>data.frame</code> with prior
-definitions (in JAGS or Stan syntax) or, preferentially, If using Stan, a vector containing
+definitions (in Stan syntax) or, preferentially, a vector containing
 objects of class <code>brmsprior</code> (see. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code> for details).
-See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and Details' for more information on changing default prior distributions</p></dd>
+See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and for more information on changing default prior distributions</p></dd>
 
 
 <dt>n_lv</dt>
@@ -340,8 +340,8 @@ Consequently, you can inspect priors for these models using <a href="get_mvgam_p
 any of <code>mvgam</code>'s predictor effects, including random intercepts and slopes, multidimensional penalized
 smooths, GP effects etc... The factor loadings \(\theta_j\) are constrained for identifiability but can
 be used to reconstruct an estimate of the species' residual variance-covariance matrix
-using \(\theta \theta'\) (see the example below
-for an illustration of this). The latent factors are further modelled using:
+using \(\Theta \Theta'\) (see the example below and <code><a href="residual_cor.jsdgam.html">residual_cor()</a></code> for details).
+The latent factors are further modelled using:
 $$
 u_i \sim \text{Normal}(Q_i\beta_{factor}, 1) \quad
 $$
@@ -353,14 +353,15 @@ modelling species' communities.</p>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
     <p>Nicholas J Clark &amp; Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
-Methods in Ecology and Evolution. 14:3, 771-784.</p>
-<p>David I Warton, F Guillaume Blanchet, Robert B O’Hara, Otso Ovaskainen, Sara Taskinen, Steven C
+Methods in Ecology and Evolution. 14:3, 771-784.
+<br><br>
+David I Warton, F Guillaume Blanchet, Robert B O’Hara, Otso Ovaskainen, Sara Taskinen, Steven C
 Walker &amp; Francis KC Hui (2015). So many variables: joint modeling in community ecology.
 Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><a href="mvgam.html">mvgam</a></p></div>
+    <div class="dont-index"><p><code><a href="mvgam.html">mvgam()</a></code>, <code><a href="residual_cor.jsdgam.html">residual_cor()</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -456,7 +457,6 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># View the count distributions for each species</span></span></span>
 <span class="r-in"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>package ‘ggplot2’ was built under R version 4.3.3</span>
 <span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">dat</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">count</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_histogram.html" class="external-link">geom_histogram</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">species</span>, scales <span class="op">=</span> <span class="st">'free'</span><span class="op">)</span></span></span>
@@ -533,19 +533,6 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span>              family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>              silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpWM8hW3/model-f8bc3f925043.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot species-level intercept estimates</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span></span>
@@ -567,15 +554,36 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-plt img"><img src="jsdgam-6.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Calculate (median) residual spatial correlations</span></span></span>
-<span class="r-in"><span><span class="va">med_loadings</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/apply.html" class="external-link">apply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">mod</span><span class="op">$</span><span class="va">model_output</span>, <span class="st">'lv_coefs'</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                             <span class="fl">2</span>, <span class="va">median</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                       nrow <span class="op">=</span> <span class="va">N_species</span>, ncol <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">cormat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cov2cor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/crossprod.html" class="external-link">tcrossprod</a></span><span class="op">(</span><span class="va">med_loadings</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">cormat</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">cormat</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/levels.html" class="external-link">levels</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">species</span><span class="op">)</span></span></span>
-<span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># A quick and dirty correlation matrix plot</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/image.html" class="external-link">image</a></span><span class="op">(</span><span class="va">cormat</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># Calculate residual spatial correlations</span></span></span>
+<span class="r-in"><span><span class="va">post_cors</span> <span class="op">&lt;-</span> <span class="fu"><a href="residual_cor.jsdgam.html">residual_cor</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="index-mvgam.html">names</a></span><span class="op">(</span><span class="va">post_cors</span><span class="op">)</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [1] "cor"        "cor_lower"  "cor_upper"  "sig_cor"    "cov"       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  [6] "prec"       "prec_lower" "prec_upper" "sig_prec"   "trace"     </span>
+<span class="r-in"><span><span class="co"># Look at lower and upper credible interval estimates for</span></span></span>
+<span class="r-in"><span><span class="co"># some of the estimated correlations</span></span></span>
+<span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            species_1   species_2  species_3 species_4  species_5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1 1.00000000  0.09346475  0.6393271  0.547931  0.1366726</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 0.09346475  1.00000000 -0.3318063 -0.413929 -0.2074599</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3 0.63932709 -0.33180627  1.0000000  0.682426  0.1883235</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4 0.54793102 -0.41392901  0.6824260  1.000000 -0.3718930</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 0.13667259 -0.20745989  0.1883235 -0.371893  1.0000000</span>
+<span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor_upper</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           species_1   species_2 species_3   species_4 species_5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1 1.0000000 0.525394676 0.9352867 0.893813412 0.6375748</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 0.5253947 1.000000000 0.2078931 0.004141424 0.1750635</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3 0.9352867 0.207893140 1.0000000 0.908985880 0.6385363</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4 0.8938134 0.004141424 0.9089859 1.000000000 0.1948296</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 0.6375748 0.175063548 0.6385363 0.194829567 1.0000000</span>
+<span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor_lower</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            species_1  species_2  species_3  species_4  species_5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000 -0.4361362  0.2168760  0.1650564 -0.2549159</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 -0.4361362  1.0000000 -0.7445722 -0.7369653 -0.6293579</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.2168760 -0.7445722  1.0000000  0.2784607 -0.2226831</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.1650564 -0.7369653  0.2784607  1.0000000 -0.7276900</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.2549159 -0.6293579 -0.2226831 -0.7276900  1.0000000</span>
+<span class="r-in"><span><span class="co"># A quick and dirty plot of the posterior median correlations</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/image.html" class="external-link">image</a></span><span class="op">(</span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="jsdgam-7.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Posterior predictive checks and ELPD-LOO can ascertain model fit</span></span></span>
@@ -588,18 +596,18 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 600 log-likelihood matrix</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate   SE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo  -1942.0 41.6</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo       351.5 23.9</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> looic      3884.0 83.1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo  -1953.6 42.3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo       367.6 25.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> looic      3907.1 84.5</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Monte Carlo SE of elpd_loo is NA.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Pareto k diagnostic values:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                          Count Pct.    Min. n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.5]   (good)     292   48.7%   81        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  (0.5, 0.7]   (ok)       171   28.5%   32        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.7, 1]   (bad)      109   18.2%   14        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    (1, Inf)   (very bad)  28    4.7%   2         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.5]   (good)     279   46.5%   10        </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  (0.5, 0.7]   (ok)       174   29.0%   2         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.7, 1]   (bad)      118   19.7%   1         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    (1, Inf)   (very bad)  29    4.8%   1         </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Forecast log(counts) for entire region (site value doesn't matter as long</span></span></span>

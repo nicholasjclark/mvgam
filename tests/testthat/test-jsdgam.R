@@ -313,7 +313,7 @@ spiderdat <- structure(list(abundance = c(25L, 0L, 15L, 2L, 1L, 0L, 2L, 0L,
 
 test_that("family must be correctly specified", {
   expect_error(mod <- jsdgam(formula = abundance ~
-                                # Environmental model includes species-level interecepts
+                                # Environmental model includes species-level intercepts
                                 # and random slopes for a linear effect of reflection
                                 s(taxon, bs = 're') +
                                 s(taxon, bs = 're', by = reflection),
@@ -329,7 +329,7 @@ test_that("family must be correctly specified", {
 
 test_that("response variable must be specified", {
   expect_error(jsdgam(formula =  ~
-                                # Environmental model includes species-level interecepts
+                                # Environmental model includes species-level intercepts
                                 # and random slopes for a linear effect of reflection
                                 s(taxon, bs = 're') +
                                 s(taxon, bs = 're', by = reflection),
@@ -345,7 +345,7 @@ test_that("response variable must be specified", {
 
 test_that("unit must exist in data", {
   expect_error(jsdgam(formula = abundance ~
-           # Environmental model includes species-level interecepts
+           # Environmental model includes species-level intercepts
            # and random slopes for a linear effect of reflection
            s(taxon, bs = 're') +
            s(taxon, bs = 're', by = reflection),
@@ -362,7 +362,7 @@ test_that("unit must exist in data", {
 
 test_that("species must exist in data", {
   expect_error(jsdgam(formula = abundance ~
-                        # Environmental model includes species-level interecepts
+                        # Environmental model includes species-level intercepts
                         # and random slopes for a linear effect of reflection
                         s(taxon, bs = 're') +
                         s(taxon, bs = 're', by = reflection),
@@ -379,7 +379,7 @@ test_that("species must exist in data", {
 test_that("species must be a factor in data", {
   spiderdat$taxon <- as.numeric(spiderdat$taxon)
   expect_error(jsdgam(formula = abundance ~
-                        # Environmental model includes species-level interecepts
+                        # Environmental model includes species-level intercepts
                         # and random slopes for a linear effect of reflection
                         s(taxon, bs = 're') +
                         s(taxon, bs = 're', by = reflection),
@@ -396,7 +396,7 @@ test_that("species must be a factor in data", {
 test_that("unit must be a numeric / integer in data", {
   spiderdat$site <- as.factor(spiderdat$site)
   expect_error(jsdgam(formula = abundance ~
-                        # Environmental model includes species-level interecepts
+                        # Environmental model includes species-level intercepts
                         # and random slopes for a linear effect of reflection
                         s(taxon, bs = 're') +
                         s(taxon, bs = 're', by = reflection),
@@ -412,7 +412,7 @@ test_that("unit must be a numeric / integer in data", {
 
 test_that("n_lv must be <= number of species", {
   expect_error(jsdgam(formula = abundance ~
-                        # Environmental model includes species-level interecepts
+                        # Environmental model includes species-level intercepts
                         # and random slopes for a linear effect of reflection
                         s(taxon, bs = 're') +
                         s(taxon, bs = 're', by = reflection),
@@ -428,7 +428,7 @@ test_that("n_lv must be <= number of species", {
 
 test_that("knots must be a list", {
   expect_error(jsdgam(formula = abundance ~
-                  # Environmental model includes species-level interecepts
+                  # Environmental model includes species-level intercepts
                   # and random slopes for a linear effect of reflection
                   s(taxon, bs = 're') +
                   s(taxon, bs = 're', by = reflection),
@@ -449,7 +449,7 @@ test_that("knots must be a list", {
 
 test_that("errors about knot lengths should be propagated from mgcv", {
   expect_error(jsdgam(formula = abundance ~
-                        # Environmental model includes species-level interecepts
+                        # Environmental model includes species-level intercepts
                         # and random slopes for a linear effect of reflection
                         s(taxon, bs = 're') +
                         s(taxon, bs = 're', by = reflection),
@@ -485,7 +485,7 @@ test_that("get_mvgam_priors accepts factor_formula", {
 skip_on_cran()
 test_that("jsdgam should initiate correctly", {
   mod <- jsdgam(formula = abundance ~
-                  # Environmental model includes species-level interecepts
+                  # Environmental model includes species-level intercepts
                   # and random slopes for a linear effect of reflection
                   s(taxon, bs = 're') +
                   s(taxon, bs = 're', by = reflection),
@@ -502,6 +502,11 @@ test_that("jsdgam should initiate correctly", {
                 family = nb(),
                 run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
+  expect_true(identical(attr(mod$trend_mgcv_model, 'knots'),
+                        list(soil.dry = seq(min(spiderdat$soil.dry),
+                                            max(spiderdat$soil.dry),
+                                            length.out = 5))))
+  expect_true(is.null(attr(mod$mgcv_model, 'knots')))
   expect_true(any(grepl('// raw latent factors (with linear predictors)',
                         mod$model_file, fixed = TRUE)))
   expect_true(any(grepl('matrix[n_series, n_lv] lv_coefs = rep_matrix(0, n_series, n_lv);',
@@ -511,4 +516,39 @@ test_that("jsdgam should initiate correctly", {
                        'mvgam_trend'))
   expect_true(attr(mod$model_data, 'prepped_trend_model')$subgr == 'taxon')
   expect_true(attr(mod$model_data, 'prepped_trend_model')$trend_model == 'ZMVN')
+})
+
+test_that("jsdgam post-processing works correctly", {
+  # Run a short one to ensure post-processing and update work correctly
+  mod <- SM(jsdgam(formula = abundance ~
+                     # Environmental model includes species-level intercepts
+                     # and random slopes for a linear effect of reflection
+                     s(taxon, bs = 're') +
+                     s(taxon, bs = 're', by = reflection),
+                   # Each factor estimates a different, possibly nonlinear effect of soil.dry
+                   factor_formula = ~ s(soil.dry, k = 5, bs = 'cr', by = trend) - 1,
+                   # supplying knots should also work if k matches length(knots)
+                   factor_knots = list(soil.dry = seq(min(spiderdat$soil.dry),
+                                                      max(spiderdat$soil.dry),
+                                                      length.out = 5)),
+                   data = spiderdat %>%
+                     dplyr::filter(site < 7),
+                   unit = site,
+                   species = taxon,
+                   n_lv = 2,
+                   family = nb(),
+                   run_model = TRUE,
+                   chains = 2,
+                   silent = 2))
+  expect_true(inherits(mod, 'jsdgam'))
+
+  # Calculate residual correlations to ensure it works
+  post_cors <- residual_cor(mod, summary = FALSE)
+  expect_equal(dim(post_cors$all_cormat)[1], 1000L)
+  expect_equal(dim(post_cors$all_cormat)[2], nlevels(spiderdat$taxon))
+  expect_true(all(post_cors$all_cormat <= 1))
+  expect_true(all(post_cors$all_cormat >= -1))
+
+  post_cors <- residual_cor(mod, summary = TRUE)
+  expect_equal(dim(post_cors$cor)[1], nlevels(spiderdat$taxon))
 })

@@ -53,6 +53,10 @@
 #'\code{Stan}'s `reduce_sum` function and have a slow running model that cannot be sped
 #'up by any other means. Currently works for all families when using \code{Cmdstan}
 #'as the backend
+#'@param priors An optional \code{data.frame} with prior
+#'definitions (in Stan syntax) or, preferentially, a vector containing
+#' objects of class `brmsprior` (see. \code{\link[brms]{prior}} for details).
+#' See [get_mvgam_priors] and for more information on changing default prior distributions
 #'@param ... Other arguments to pass to [mvgam]
 #'@author Nicholas J Clark
 #'@details Joint Species Distribution Models allow for responses of multiple species to be
@@ -77,8 +81,8 @@
 #' any of `mvgam`'s predictor effects, including random intercepts and slopes, multidimensional penalized
 #' smooths, GP effects etc... The factor loadings \eqn{\theta_j} are constrained for identifiability but can
 #' be used to reconstruct an estimate of the species' residual variance-covariance matrix
-#' using \eqn{\theta \theta'} (see the example below
-#' for an illustration of this). The latent factors are further modelled using:
+#' using \eqn{\Theta \Theta'} (see the example below and [residual_cor()] for details).
+#' The latent factors are further modelled using:
 #'\deqn{
 #'u_i \sim \text{Normal}(Q_i\beta_{factor}, 1) \quad
 #'}
@@ -86,10 +90,11 @@
 #'constructed and modelled using `factor_formula`. Again, the effects that make up this linear
 #'predictor can contain any of `mvgam`'s allowed predictor effects, providing enormous flexibility for
 #'modelling species' communities.
-#'@seealso [mvgam]
+#'@seealso [mvgam()], [residual_cor()]
 #'@references Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 #'Methods in Ecology and Evolution. 14:3, 771-784.
-#'
+#' \cr
+#' \cr
 #'David I Warton, F Guillaume Blanchet, Robert B O’Hara, Otso Ovaskainen, Sara Taskinen, Steven C
 #'Walker & Francis KC Hui (2015). So many variables: joint modeling in community ecology.
 #'Trends in Ecology & Evolution 30:12, 766-779.
@@ -255,15 +260,18 @@
 #'   gratia::draw(mod, trend_effects = TRUE)
 #' }
 #'
-#' # Calculate (median) residual spatial correlations
-#' med_loadings <- matrix(apply(as.matrix(mod$model_output, 'lv_coefs'),
-#'                              2, median),
-#'                        nrow = N_species, ncol = 4)
-#' cormat <- cov2cor(tcrossprod(med_loadings))
-#' rownames(cormat) <- colnames(cormat) <- levels(dat$species)
-#'
-#' # A quick and dirty correlation matrix plot
-#' image(cormat)
+#' # Calculate residual spatial correlations
+#' post_cors <- residual_cor(mod)
+#' names(post_cors)
+
+#' # Look at lower and upper credible interval estimates for
+#' # some of the estimated correlations
+#' post_cors$cor[1:5, 1:5]
+#' post_cors$cor_upper[1:5, 1:5]
+#' post_cors$cor_lower[1:5, 1:5]
+
+#' # A quick and dirty plot of the posterior median correlations
+#' image(post_cors$cor)
 #'
 #' # Posterior predictive checks and ELPD-LOO can ascertain model fit
 #' pp_check(mod, type = "ecdf_overlay_grouped",
