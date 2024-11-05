@@ -534,6 +534,7 @@ get_mvgam_priors = function(formula,
     # Check for gp() terms
     if(!is.null(gp_terms)){
       gp_additions <- make_gp_additions(gp_details = gp_details,
+                                        orig_formula = orig_formula,
                                         data = data_train,
                                         newdata = NULL,
                                         model_data = list(X = t(predict(ss_gam, type = 'lpmatrix'))),

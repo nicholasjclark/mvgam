@@ -10,8 +10,8 @@
   x,
   effects = NULL,
   type = "response",
-  points = TRUE,
-  rug = TRUE,
+  points = FALSE,
+  rug = FALSE,
   ...
 )
 

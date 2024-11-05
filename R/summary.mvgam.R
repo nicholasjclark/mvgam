@@ -273,20 +273,25 @@ if(all(is.na(object$sp_names))){
 if(!is.null(attr(object$mgcv_model, 'gp_att_table'))){
   gp_names <- unlist(purrr::map(attr(object$mgcv_model, 'gp_att_table'), 'name'))
   alpha_params <- gsub(':', 'by', gsub(')', '_',
-                       gsub('(', '_', paste0('alpha_', gp_names),
+                       gsub('(', '_', paste0('alpha_', clean_gpnames(gp_names)),
                             fixed = TRUE), fixed = TRUE))
+
   alpha_summary <- mcmc_summary(object$model_output, alpha_params,
                          ISB = TRUE, digits = digits,
-                         variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder'))[,c(3:7)]
+                         variational = object$algorithm %in% c('fullrank',
+                                                               'meanfield', 'laplace',
+                                                               'pathfinder'))[,c(3:7)]
 
   rownames(alpha_summary) <- paste0('alpha_', gp_names)
 
   rho_params <- gsub(':', 'by', gsub(')', '_',
-                                       gsub('(', '_', paste0('rho_', gp_names),
+                                       gsub('(', '_', paste0('rho_', clean_gpnames(gp_names)),
                                             fixed = TRUE), fixed = TRUE))
   rho_summary <- mcmc_summary(object$model_output, rho_params,
                                 ISB = TRUE, digits = digits,
-                                variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder'))[,c(3:7)]
+                                variational = object$algorithm %in% c('fullrank',
+                                                                      'meanfield', 'laplace',
+                                                                      'pathfinder'))[,c(3:7)]
   rownames(rho_summary) <- paste0('rho_', gp_names)
 
   if(!is.null(object$trend_call)){
@@ -716,22 +721,24 @@ if(!is.null(object$trend_call) & !inherits(object, 'jsdgam')){
     gp_names <- clean_gpnames(unlist(purrr::map(attr(object$trend_mgcv_model,
                                                      'gp_att_table'), 'name')))
     alpha_params <- gsub('series', 'trend', gsub('gp_', 'gp_trend_', gsub(':', 'by', gsub(')', '_',
-                                         gsub('(', '_', paste0('alpha_', gp_names),
+                                         gsub('(', '_', paste0('alpha_', clean_gp_names(gp_names)),
                                               fixed = TRUE), fixed = TRUE))))
     alpha_summary <- mcmc_summary(object$model_output, alpha_params,
                                   ISB = TRUE, digits = digits,
                                   variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder'))[,c(3:7)]
 
-    rownames(alpha_summary) <- paste0(gsub('series', 'trend', paste0('alpha_', gp_names)),
+    rownames(alpha_summary) <- paste0(gsub('series', 'trend',
+                                           paste0('alpha_', clean_gp_names(gp_names))),
                                       '_trend')
 
     rho_params <- gsub('series', 'trend', gsub('gp_', 'gp_trend_', gsub(':', 'by', gsub(')', '_',
-                                       gsub('(', '_', paste0('rho_', gp_names),
+                                       gsub('(', '_', paste0('rho_', clean_gp_names(gp_names)),
                                             fixed = TRUE), fixed = TRUE))))
     rho_summary <- mcmc_summary(object$model_output, rho_params,
                                 ISB = TRUE, digits = digits,
-                                variational = object$algorithm %in% c('fullrank', 'meanfield', 'laplace', 'pathfinder'))[,c(3:7)]
-    rownames(rho_summary) <- paste0(gsub('series', 'trend', paste0('rho_', gp_names)),
+                                variational = object$algorithm %in% c('fullrank',
+                                                                      'meanfield', 'laplace', 'pathfinder'))[,c(3:7)]
+    rownames(rho_summary) <- paste0(gsub('series', 'trend', paste0('rho_', clean_gp_names(gp_names))),
                                     '_trend')
 
     cat("\nGAM process model gp term marginal deviation (alpha) and length scale (rho) estimates:\n")
