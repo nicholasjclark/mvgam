@@ -102,7 +102,7 @@ make_gp_additions = function(gp_details,
       covariate_name <- paste0(covariate_name, gp_details$level[x])
     }
     orig_name <- if(gp_details$dim[x] > 1L){
-      paste0('te(', gp_details$gp_covariates[x], ')', byname)
+      paste0('ti(', gp_details$gp_covariates[x], ')', byname)
     } else {
       paste0('s(', gp_details$gp_covariates[x], ')', byname)
     }
@@ -166,8 +166,8 @@ make_gp_additions = function(gp_details,
     label <- attr(terms(formula(mgcv_model)), 'term.labels')[x]
     s_attributes <- eval(rlang::parse_expr(label))
     if(s_attributes$by != 'NA'){
-      if(grepl('te(', label, fixed = TRUE)){
-        coef_name <- paste0('te(', paste(s_attributes$term,
+      if(grepl('ti(', label, fixed = TRUE)){
+        coef_name <- paste0('ti(', paste(s_attributes$term,
                                          collapse = ','),
                             '):', s_attributes$by)
       } else {
@@ -175,8 +175,8 @@ make_gp_additions = function(gp_details,
       }
 
     } else {
-      if(grepl('te(', label, fixed = TRUE)){
-        coef_name <- paste0('te(', paste(s_attributes$term,
+      if(grepl('ti(', label, fixed = TRUE)){
+        coef_name <- paste0('ti(', paste(s_attributes$term,
                                          collapse = ','),
                             ')')
       } else {
@@ -185,8 +185,8 @@ make_gp_additions = function(gp_details,
     }
     which_replace <- grep(coef_name, names(coef(mgcv_model)), fixed = TRUE)
     names(mgcv_model$coefficients)[which_replace] <-
-      if(grepl('te(', label, fixed = TRUE)){
-        gsub('te(', 'gp(', names(mgcv_model$coefficients)[which_replace],
+      if(grepl('ti(', label, fixed = TRUE)){
+        gsub('ti(', 'gp(', names(mgcv_model$coefficients)[which_replace],
              fixed = TRUE)
       } else {
         gsub('s(', 'gp(', names(mgcv_model$coefficients)[which_replace],
@@ -243,7 +243,7 @@ make_gp_additions = function(gp_details,
     if(mgcv_model$smooth[[i]]$label %in%
        gsub('gp(', 's(', gsub(' ', '', gp_assign$label[i]), fixed = TRUE) ||
        mgcv_model$smooth[[i]]$label %in%
-       gsub('gp(', 'te(', gsub(' ', '', gp_assign$label[i]), fixed = TRUE) &
+       gsub('gp(', 'ti(', gsub(' ', '', gp_assign$label[i]), fixed = TRUE) &
        mgcv_model$smooth[[i]]$first.para %in% gp_assign$first.para){
       mgcv_model$smooth[[i]]$gp_term <- TRUE
       class(mgcv_model$smooth[[i]]) <- c(class(mgcv_model$smooth[[i]])[1], 'hilbert.smooth', 'mgcv.smooth')
@@ -258,7 +258,7 @@ make_gp_additions = function(gp_details,
     gp_names_new <- vector()
     for(i in seq_along(gp_names)){
       if(any(grepl(',', gp_names[i]))){
-        gp_names_new[i] <- gsub(' ', '', gsub('gp(', 'te(', gp_names[i], fixed = TRUE))
+        gp_names_new[i] <- gsub(' ', '', gsub('gp(', 'ti(', gp_names[i], fixed = TRUE))
       } else {
         gp_names_new[i] <- gsub('gp(', 's(', gp_names[i], fixed = TRUE)
       }
@@ -268,7 +268,7 @@ make_gp_additions = function(gp_details,
     for(i in seq_along(gp_names_new)){
       rhos_change[[i]] <- grep(gp_names_new[i], rho_names, fixed = TRUE)
     }
-    rho_names[c(unique(unlist(rhos_change)))] <- gsub('s\\(|te\\(', 'gp(',
+    rho_names[c(unique(unlist(rhos_change)))] <- gsub('s\\(|ti\\(', 'gp(',
                                                       rho_names[c(unique(unlist(rhos_change)))])
   } else {
     rho_names <- NULL
@@ -358,30 +358,57 @@ gp_to_s <- function(formula, data, family){
   s_terms <- vector()
   for(i in 1:NROW(gp_details)){
     if(!is.na(gp_details$by[i])){
-      s_terms[i] <- paste0(
-        if(gp_details$dim[i] < 2L){
-          's('} else {
-            'te('
-          },
-        gp_details$gp_covariates[i],
-        ', by = ',
-        gp_details$by[i],
-        ', k = ',
-        if(gp_details$dim[i] < 2L){
-          gp_details$k[i] + 1 } else {
-            gp_details$k[i]
-          },')')
+      if(is.factor(data[[gp_details$by[i]]])){
+        # For terms with factor by variables, constraints are in place
+        # we either need one additional
+        # value for k (for unidimensionsal terms) or must use mc = 0 for all
+        # marginals in a ti call (for multidimensional terms)
+        s_terms[i] <- paste0(
+          if(gp_details$dim[i] < 2L){
+            's('} else {
+              'ti('
+            },
+          gp_details$gp_covariates[i],
+          ', k = ',
+          if(gp_details$dim[i] > 1L){
+            paste0(gp_details$k[i],
+                   ', mc = c(',
+                   paste(rep(0, gp_details$dim[i]), collapse = ', '),
+                   ')')} else {
+                     gp_details$k[i] + 1
+                   },')')
+      } else {
+        # No constraints are used when numeric by variables are in smooths,
+        # so number of coefficients will match those from the brms gp
+        s_terms[i] <- paste0(
+          if(gp_details$dim[i] < 2L){
+            's('} else {
+              'ti('
+            },
+          gp_details$gp_covariates[i],
+          ', by = ',
+          gp_details$by[i],
+          ', k = ',
+          gp_details$k[i], ')')
+      }
+
     } else {
+      # For terms with no by-variable, we either need one additional
+      # value for k (for unidimensionsal terms) or must use mc = 0 for all
+      # marginals in a ti call (for multidimensional terms)
       s_terms[i] <- paste0(
         if(gp_details$dim[i] < 2L){
           's('} else {
-            'te('
+            'ti('
           },
         gp_details$gp_covariates[i],
         ', k = ',
-        if(gp_details$dim[i] < 2L){
-          gp_details$k[i] + 1 } else {
-            gp_details$k[i]
+        if(gp_details$dim[i] > 1L){
+          paste0(gp_details$k[i],
+                 ', mc = c(',
+                 paste(rep(0, gp_details$dim[i]), collapse = ', '),
+                 ')')} else {
+            gp_details$k[i] + 1
           },')')
     }
 
@@ -861,7 +888,7 @@ add_gp_model_file = function(model_file, model_data, mgcv_model, gp_additions){
 
     model_file[grep(paste0('// prior for ', s_name, '...'),
          model_file, fixed = TRUE)] <-
-      gsub('s\\(|te\\(', 'gp(', model_file[grep(paste0('// prior for ', s_name, '...'),
+      gsub('s\\(|ti\\(', 'gp(', model_file[grep(paste0('// prior for ', s_name, '...'),
                                         model_file, fixed = TRUE)])
 
     rho_prior_lines <- paste(
