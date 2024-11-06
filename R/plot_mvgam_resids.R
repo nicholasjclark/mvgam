@@ -193,72 +193,51 @@ plot_mvgam_resids = function(object, series = 1,
   }
 
   # plot predictions and residuals (commented out code is my first attempt per draw...)
-  library(ggplot2)
-  library(patchwork)
-  # preds <- hindcast(object, type = 'expected')$hindcasts[[series]]
-  # resids <- object$resids[[series]]
-  # n_draw <- dim(preds)[[1]]
-  # n_obs <- dim(preds)[[2]]
-  # draws <- sample(1:n_draw, min(150, n_draw),
-  #                 replace = FALSE)
-  # fvr <- data.frame(preds = c(preds),
-  #            resids = c(resids),
-  #            obs = rep(1:n_obs, n_draw),
-  #            .draw = rep(1:n_draw, each = n_obs)) %>%
-  #   dplyr::filter(.draw %in% draws) |>
-  #   ggplot(aes(preds, resids)) +
-  #   geom_point(shape = 16, alpha = 0.2) +
-  #   geom_smooth(method = "gam", colour = "#7C000060", fill = "#7C000040") +
-  #   labs(title = "Resids vs Fitted",
-  #        x = "DS residuals",
-  #        y = "Fitted values")
   median_resids <- apply(object$resids[[series]], 2, median)
   fvr_plot <- data.frame(preds =  apply(hindcast(object, type = 'expected')$hindcasts[[series]], 2, median),
                          resids = median_resids) |>
-    ggplot(aes(preds, resids)) +
-    geom_point(shape = 16, alpha = 2/3) +
-    geom_smooth(method = "gam", formula = y ~ s(x, bs = "cs"), colour = "#7C000060", fill = "#7C000040") +
-    labs(title = "Resids vs Fitted",
-         x = "DS residuals",
-         y = "Fitted values")
+    ggplot2::ggplot(ggplot2::aes(preds, resids)) +
+    ggplot2::geom_point(shape = 16, alpha = 2/3) +
+    ggplot2::geom_smooth(method = "gam", formula = y ~ s(x, bs = "cs"), colour = "#7C000060", fill = "#7C000040") +
+    ggplot2::labs(title = "Resids vs Fitted",
+                  x = "DS residuals",
+                  y = "Fitted values")
 
   # Q-Q plot
   qq_plot <- data.frame(resids = median_resids) |>
-    ggplot(aes(sample = resids)) +
-    stat_qq(shape = 16, alpha = 2/3) +
-    stat_qq_line(colour = c_dark) +
-    labs(title = "Normal Q-Q Plot",
-         x = "Theoretical Quantiles",
-         y = "Sample Quantiles")
+    ggplot2::ggplot(ggplot2::aes(sample = resids)) +
+    ggplot2::stat_qq(shape = 16, alpha = 2/3) +
+    ggplot2::stat_qq_line(colour = c_dark) +
+    ggplot2::labs(title = "Normal Q-Q Plot",
+                  x = "Theoretical Quantiles",
+                  y = "Sample Quantiles")
 
   # ACF plot
-  acf_resids <- acf(median_resids, plot = F, na.action = na.pass)
+  acf_resids <- acf(median_resids, plot = FALSE, na.action = na.pass)
   acf_plot <- data.frame(acf = acf_resids$acf[,,1],
                          lag = acf_resids$lag[,1,1]) |>
     dplyr::filter(lag > 0) |>
-    ggplot(aes(x = lag, y = 0, yend = acf)) +
-    geom_hline(yintercept = c(-1, 1) * qnorm((1 + 0.95) / 2) / sqrt(acf_resids$n.used),
-               linetype = "dashed") +
-    geom_segment(colour = c_dark) +
-    labs(title = "ACF",
-         x = "Lag",
-         y = "Autocorrelation")
-
+    ggplot2::ggplot(ggplot2::aes(x = lag, y = 0, yend = acf)) +
+    ggplot2::geom_hline(yintercept = c(-1, 1) * qnorm((1 + 0.95) / 2) / sqrt(acf_resids$n.used),
+                        linetype = "dashed") +
+    ggplot2::geom_segment(colour = c_dark) +
+    ggplot2::labs(title = "ACF",
+                  x = "Lag",
+                  y = "Autocorrelation")
 
   # PACF plot
-  pacf_resids <- pacf(median_resids, plot = F, na.action = na.pass)
+  pacf_resids <- pacf(median_resids, plot = FALSE, na.action = na.pass)
   pacf_plot <- data.frame(pacf = pacf_resids$acf[,,1],
                           lag = pacf_resids$lag[,1,1]) |>
     dplyr::filter(lag > 0) |>
-    ggplot(aes(x = lag, y = 0, yend = pacf)) +
-    geom_hline(yintercept = c(-1, 1) * qnorm((1 + 0.95) / 2) / sqrt(pacf_resids$n.used),
-               linetype = "dashed") +
-    geom_segment(colour = c_dark) +
-    labs(title = "pACF",
-         x = "Lag",
-         y = "Autocorrelation")
+    ggplot2::ggplot(ggplot2::aes(x = lag, y = 0, yend = pacf)) +
+    ggplot2::geom_hline(yintercept = c(-1, 1) * qnorm((1 + 0.95) / 2) / sqrt(pacf_resids$n.used),
+                        linetype = "dashed") +
+    ggplot2::geom_segment(colour = c_dark) +
+    ggplot2::labs(title = "pACF",
+                  x = "Lag",
+                  y = "Autocorrelation")
 
   # return
-  suppressWarnings(print((fvr_plot | qq_plot) / (acf_plot | pacf_plot)))
+  patchwork::wrap_plots(fvr_plot, qq_plot, acf_plot, pacf_plot, ncol = 2, nrow = 2, byrow = T)
 }
-

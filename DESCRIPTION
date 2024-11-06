@@ -31,7 +31,8 @@ Imports:
     dplyr,
     magrittr,
     Matrix,
-    rlang
+    rlang,
+    patchwork (>= 1.3.0)
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)

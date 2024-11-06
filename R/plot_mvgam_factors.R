@@ -86,20 +86,19 @@ plot_mvgam_factors = function(object, plot = TRUE) {
                            factor_name <- paste0("Factor ", x)
 
                            if (plot) {
-                             library(ggplot2)
                              fig <- data.frame(preds = c(preds),
                                                obs = rep(1:n_obs, each = n_draw),
                                                .draw = rep(1:n_draw, n_obs)) |>
-                               ggplot(aes(obs, preds)) +
+                               ggplot2::ggplot(ggplot2::aes(obs, preds)) +
                                ggdist::stat_lineribbon(point_interval = ggdist::median_qi,
                                                        .width = probs,
                                                        colour = c_dark,
                                                        show.legend = FALSE) +
-                               scale_fill_manual(values = c(c_light, c_light_highlight, c_mid, c_mid_highlight)) +
-                               scale_x_continuous(expand = c(0, 0)) +
-                               scale_y_continuous(expand = c(0, 0)) +
-                               labs(x = "Time",
-                                    y = factor_name)
+                               ggplot2::scale_fill_manual(values = c(c_light, c_light_highlight, c_mid, c_mid_highlight)) +
+                               ggplot2::scale_x_continuous(expand = c(0, 0)) +
+                               ggplot2::scale_y_continuous(expand = c(0, 0)) +
+                               ggplot2::labs(x = "Time",
+                                             y = factor_name)
                            }
 
                            # Calculate second derivatives of empirical medians and upper / lower intervals;
