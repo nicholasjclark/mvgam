@@ -46,7 +46,7 @@ make_gp_additions = function(gp_details,
   brms_fake_df <- data.frame(.fake_gp_y = rnorm(length(data[[1]])),
                              series = data$series,
                              time = data$index..time..index)
-  for(i in 1:length(terms_needed)){
+  for(i in seq_along(terms_needed)){
     brms_fake_df <- cbind(brms_fake_df, data[[terms_needed[i]]])
   }
   colnames(brms_fake_df) <- c('.fake_gp_y',
@@ -57,7 +57,7 @@ make_gp_additions = function(gp_details,
     brms_fake_df_new <- data.frame(.fake_gp_y = rnorm(length(newdata[[1]])),
                                    series = newdata$series,
                                    time = newdata$index..time..index)
-    for(i in 1:length(terms_needed)){
+    for(i in seq_along(terms_needed)){
       brms_fake_df_new <- cbind(brms_fake_df_new, data[[terms_needed[i]]])
     }
     colnames(brms_fake_df_new) <- c('.fake_gp_y',
@@ -208,8 +208,9 @@ make_gp_additions = function(gp_details,
 
   # Add coefficient indices to attribute table and to Stan data
   for(covariate in seq_along(gp_att_table)){
-    coef_indices <- which(grepl(paste0(gsub(' ' , '', gsub("([()])","\\\\\\1",
-                                                           gp_att_table[[covariate]]$name),
+    coef_indices <- which(grepl(paste0(gsub(' ' , '',
+                                            gsub("([()])","\\\\\\1",
+                                                 gp_att_table[[covariate]]$name),
                                             '\\.+[0-9]')),
                                 names(coef(mgcv_model)), fixed = FALSE) &
                             !grepl(paste0(gp_att_table[[covariate]]$name,':'),
@@ -246,7 +247,8 @@ make_gp_additions = function(gp_details,
        gsub('gp(', 'ti(', gsub(' ', '', gp_assign$label[i]), fixed = TRUE) &
        mgcv_model$smooth[[i]]$first.para %in% gp_assign$first.para){
       mgcv_model$smooth[[i]]$gp_term <- TRUE
-      class(mgcv_model$smooth[[i]]) <- c(class(mgcv_model$smooth[[i]])[1], 'hilbert.smooth', 'mgcv.smooth')
+      class(mgcv_model$smooth[[i]]) <- c(class(mgcv_model$smooth[[i]])[1],
+                                         'hilbert.smooth', 'mgcv.smooth')
     } else {
       mgcv_model$smooth[[i]]$gp_term <- FALSE
     }
@@ -316,7 +318,7 @@ eigenfunc_list = function(stan_data,
         sorted_by <- mock_df[[by[x]]]
         full_eigens <- matrix(0, nrow = length(sorted_by),
                               ncol = NCOL(eigenfuncs[[x]]))
-        full_eigens[(1:length(sorted_by))[
+        full_eigens[(seq_along(sorted_by))[
           sorted_by == level[x]],] <- eigenfuncs[[x]]
       } else {
         full_eigens <- eigenfuncs[[x]]
@@ -809,7 +811,8 @@ prep_gp_covariate = function(data,
   # Items to add to Stan data
   # Number of basis functions
   covariate_name <- clean_gpnames(covariate_name)
-  data_lines <- paste0('int<lower=1> k_', covariate_name, '; // basis functions for approximate gp\n')
+  data_lines <- paste0('int<lower=1> k_', covariate_name,
+                       '; // basis functions for approximate gp\n')
   append_dat <- list(k = k)
   names(append_dat) <- paste0('k_', covariate_name, '')
 
@@ -854,10 +857,13 @@ clean_gpnames = function(gp_names){
 
 #' Update a Stan file with GP information
 #' @noRd
-add_gp_model_file = function(model_file, model_data, mgcv_model, gp_additions){
+add_gp_model_file = function(model_file, model_data,
+                             mgcv_model, gp_additions){
 
-  rho_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_rho'), use.names = FALSE)
-  alpha_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_alpha'), use.names = FALSE)
+  rho_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_rho'),
+                       use.names = FALSE)
+  alpha_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_alpha'),
+                         use.names = FALSE)
 
   # Add data lines
   model_file[grep('int<lower=0> ytimes[n, n_series];',
@@ -869,11 +875,16 @@ add_gp_model_file = function(model_file, model_data, mgcv_model, gp_additions){
   model_file <- readLines(textConnection(model_file), n = -1)
 
   # Replace the multi_normal_prec lines with the relevant spd function
-  gp_kernels <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'kernel'), use.names = FALSE)
-  gp_names <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'name'), use.names = FALSE)
-  gp_isos <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'iso'), use.names = FALSE)
-  gp_dims <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'dim'), use.names = FALSE)
-  orig_names <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'orig_name'), use.names = FALSE)
+  gp_kernels <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'kernel'),
+                       use.names = FALSE)
+  gp_names <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'name'),
+                     use.names = FALSE)
+  gp_isos <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'iso'),
+                    use.names = FALSE)
+  gp_dims <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'dim'),
+                    use.names = FALSE)
+  orig_names <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'orig_name'),
+                       use.names = FALSE)
   gp_names_clean <- clean_gpnames(gp_names)
   s_to_remove <- list()
   for(i in seq_along(gp_names)){

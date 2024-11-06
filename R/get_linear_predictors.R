@@ -1,4 +1,5 @@
 #' Function to prepare observation model linear predictor matrix
+#' @importFrom brms brmsterms
 #' @noRd
 obs_Xp_matrix = function(newdata, mgcv_model){
   suppressWarnings(Xp  <- try(predict(mgcv_model,
@@ -35,7 +36,7 @@ obs_Xp_matrix = function(newdata, mgcv_model){
 
     # Compute the gp() eigenfunctions for newdata using the supplied brms_mock object
     # Requires a dataframe of all relevant variables for the gp effects
-    mock_terms <- brmsterms(attr(mgcv_model, 'brms_mock')$formula)
+    mock_terms <- brms::brmsterms(attr(mgcv_model, 'brms_mock')$formula)
     terms_needed <- unique(all.vars(mock_terms$formula)[-1])
     newdata_mock <- data.frame(newdata[[terms_needed[1]]])
     if(length(terms_needed) > 1L){
@@ -161,7 +162,7 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
 
     # Compute the gp() eigenfunctions for newdata using the supplied brms_mock object
     # Requires a dataframe of all relevant variables for the gp effects
-    mock_terms <- brmsterms(attr(mgcv_model, 'brms_mock')$formula)
+    mock_terms <- brms::brmsterms(attr(mgcv_model, 'brms_mock')$formula)
     terms_needed <- unique(all.vars(mock_terms$formula)[-1])
     newdata_mock <- data.frame(newdata[[terms_needed[1]]])
     if(length(terms_needed) > 1L){

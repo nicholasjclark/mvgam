@@ -339,19 +339,19 @@ eval_smoothDothilbertDotsmooth = function(smooth,
     n = n, n_3d = n_3d, n_4d = n_4d,
     id = which_smooth(
       model,
-      smooth_label(smooth)
+      gratia::smooth_label(smooth)
     )
   )
 
   # by variables
-  by_var <- by_variable(smooth)
+  by_var <- gratia::by_variable(smooth)
   if (by_var == "NA") {
     by_var <- NA_character_
   }
 
   # Compute the gp() eigenfunctions for newdata using the supplied brms_mock object
   # Requires a dataframe of all relevant variables for the gp effects
-  mock_terms <- brmsterms(attr(model, 'brms_mock')$formula)
+  mock_terms <- brms::brmsterms(attr(model, 'brms_mock')$formula)
   terms_needed <- unique(all.vars(mock_terms$formula)[-1])
 
   # Only use actual values of those covariates needed for this smooth
@@ -384,8 +384,10 @@ eval_smoothDothilbertDotsmooth = function(smooth,
 
   # Extract GP attributes
   gp_att_table <- attr(model, 'gp_att_table')
-  bys <- unlist(purrr::map(gp_att_table, 'by'), use.names = FALSE)
-  lvls <- unlist(purrr::map(gp_att_table, 'level'), use.names = FALSE)
+  bys <- unlist(purrr::map(gp_att_table, 'by'),
+                use.names = FALSE)
+  lvls <- unlist(purrr::map(gp_att_table, 'level'),
+                 use.names = FALSE)
 
   # Extract eigenfunctions for each gp effect
   eigenfuncs <- eigenfunc_list(stan_data = brms_mock_data,
