@@ -494,8 +494,12 @@ get_gp_attributes = function(formula, data, family = gaussian()){
                   },
                   ', k = ',
                   gp_attributes[[x]]$k,
-                  ', iso = ',
+                  ', cov = "',
+                  gp_attributes[[x]]$cov,
+                  '", iso = ',
                   gp_attributes[[x]]$iso,
+                  ', scale = ',
+                  gp_attributes[[x]]$scale,
                   ', c = ',
                   gp_attributes[[x]]$c[1],
                   ', gr = FALSE, cmc = TRUE)')
@@ -631,6 +635,11 @@ add_gp_model_file = function(model_file, model_data,
     rho_prior_lines <- paste(
       paste0('rho_',
              gp_names_clean[i],
+             if(!gp_isos[i]){
+               '[1]'
+             } else {
+               NULL
+             },
              '[',
              if(gp_isos[i]){
                1
@@ -792,7 +801,7 @@ add_gp_spd_funs = function(model_file, kernel){
   if(kernel %in% c('exponential', 'matern12')){
     if(!any(grepl('/* Spectral density of an exponential Gaussian process',
                   model_file, fixed = TRUE))){
-      fun_lines <- paste0('/* Spectral density function of a Gaussian process with exponential kernel\n',
+      fun_lines <- paste0('/* Spectral density of an exponential Gaussian process\n',
                           '* also known as the Matern 1/2 kernel\n',
                           '* Args:\n',
                           '*   x: array of numeric values of dimension NB x D\n',

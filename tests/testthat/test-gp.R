@@ -4,7 +4,7 @@ skip_on_cran()
 
 test_that("gp_to_s is working properly for unidimensional gps", {
   # All true gp() terms should be changed to s() with k = k+1
-  formula <- y ~ s(series) + gp(banana, k = 3) +
+  formula <- y ~ s(series) + gp(banana, k = 3, scale = FALSE) +
     infect:you + gp(hardcourt, k = 3)
   dat <- data.frame(y = rnorm(10),
                     series = rnorm(10),
@@ -13,9 +13,24 @@ test_that("gp_to_s is working properly for unidimensional gps", {
                     you = rnorm(10),
                     hardcourt = rnorm(10),
                     gp = rnorm(10))
-  SW(mvgam:::gp_to_s(formula,
-                     data = dat,
-                     family = gaussian()))
+
+  # Check that the brms_mock formula is correctly remade
+  gp_atts <- mvgam:::get_gp_attributes(formula,
+                  data = dat,
+                  family = gaussian())
+
+  # scale should be passed; gr is always false and cmc is always true
+  expect_true(identical(
+    attr(terms(attr(gp_atts, 'gp_formula')),
+         'term.labels')[1],
+    "gp(banana, k = 3, cov = \"exp_quad\", iso = TRUE, scale = FALSE, c = 1.25, gr = FALSE, cmc = TRUE)")
+    )
+
+  expect_true(identical(
+    attr(terms(attr(gp_atts, 'gp_formula')),
+         'term.labels')[2],
+    "gp(hardcourt, k = 3, cov = \"exp_quad\", iso = TRUE, scale = TRUE, c = 1.25, gr = FALSE, cmc = TRUE)")
+  )
 
   expect_equal(attr(terms(mvgam:::gp_to_s(formula,
                                           data = dat,
@@ -42,7 +57,8 @@ test_that("gp_to_s is working properly for unidimensional gps", {
 
 test_that("gp_to_s is working properly for multidimensional gps", {
   # All true gp() terms should be changed to s() with k = k+1
-  formula <- y ~ s(series) + gp(banana, hardcourt, k = 3) +
+  formula <- y ~ s(series) + gp(banana, hardcourt, k = 3, iso = FALSE,
+                                c = 1.33, cov = 'matern52') +
     infect:you
   dat <- data.frame(y = rnorm(10),
                     series = rnorm(10),
@@ -51,6 +67,15 @@ test_that("gp_to_s is working properly for multidimensional gps", {
                     you = rnorm(10),
                     hardcourt = rnorm(10),
                     gp = rnorm(10))
+  gp_atts <- mvgam:::get_gp_attributes(formula,
+                                       data = dat,
+                                       family = gaussian())
+
+  expect_true(identical(
+    attr(terms(attr(gp_atts, 'gp_formula')),
+         'term.labels')[1],
+    "gp(banana, hardcourt, k = 3, cov = \"matern52\", iso = FALSE, scale = TRUE, c = 1.33, gr = FALSE, cmc = TRUE)")
+  )
 
   expect_equal(attr(terms(mvgam:::gp_to_s(formula,
                                           data = dat,
@@ -67,11 +92,17 @@ test_that("gp_to_s is working properly for multidimensional gps", {
 test_that("unidimensional gp for observation models working properly", {
   gaus_data$data_train$y[is.na(gaus_data$data_train$y)] <- 0
   mod <- mvgam(formula = y ~ s(series, bs = 're') +
-                 gp(time, by = series, k = 10, c = 5/4) +
+                 gp(time, by = series, k = 10, c = 5/4,
+                    cov = 'exponential') +
                  year:season,
                data = gaus_data$data_train,
                family = gaussian(),
                run_model = FALSE)
+
+  expect_true(
+    any(grepl('b[b_idx_gp_time_byseriesseries_3] = sqrt(spd_gp_exponential(l_gp_time_byseriesseries_3',
+              mod$model_file, fixed = TRUE))
+  )
 
   # Gp data structures should be in the model_data
   expect_true("l_gp_time_byseriesseries_1" %in% names(mod$model_data))
@@ -116,10 +147,15 @@ test_that("unidimensional gp for observation models working properly", {
 test_that("multidimensional gp for observation models working properly", {
   gaus_data$data_train$y[is.na(gaus_data$data_train$y)] <- 0
   mod <- mvgam(y ~ s(series, bs = 're') +
-                 gp(time, year, k = 4),
+                 gp(time, year, k = 4, cov = 'matern32'),
                data = gaus_data$data_train,
                family = gaussian(),
                run_model = FALSE)
+
+  expect_true(
+    any(grepl('b[b_idx_gp_timeby_year_] = sqrt(spd_gp_matern32(l_gp_timeby_year_',
+              mod$model_file, fixed = TRUE))
+  )
 
   # Gp data structures should be in the model_data
   expect_true("l_gp_timeby_year_" %in% names(mod$model_data))
