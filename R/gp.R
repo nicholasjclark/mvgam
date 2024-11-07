@@ -1,3 +1,28 @@
+#' Re-label gp terms inside an mgcv gam object for nicer plotting
+#' @noRd
+relabel_gps = function(mgcv_model){
+  if(length(mgcv_model$smooth) > 0L){
+    # Get classes of all smooths
+    smooth_classes <- purrr::map(mgcv_model$smooth,
+                                 class)
+
+    # Check for gp() terms
+    for(x in seq_along(smooth_classes)){
+      if(any(smooth_classes[[x]] %in% 'hilbert.smooth')){
+        mgcv_model$smooth[[x]]$label <-
+          gsub('s\\(|ti\\(', 'gp(',
+               mgcv_model$smooth[[x]]$label)
+      }
+    }
+  }
+  return(mgcv_model)
+}
+
+#' @noRd
+seq_cols <- function(x) {
+  seq_len(NCOL(x))
+}
+
 #' Make gp() attributes table and necessary stan lines
 #' @importFrom brms brm standata
 #' @noRd
@@ -43,6 +68,7 @@ make_gp_additions = function(gp_details,
   terms_needed <- unique(c(unlist(strsplit(gp_details$gp_covariates, ", |\\n")),
                            unlist(strsplit(gp_details$by, ", |\\n"))))
   terms_needed <- terms_needed[!is.na(terms_needed)]
+  terms_needed <- terms_needed[!terms_needed %in% c('series', 'time')]
   brms_fake_df <- data.frame(.fake_gp_y = rnorm(length(data[[1]])),
                              series = data$series,
                              time = data$index..time..index)
@@ -71,8 +97,8 @@ make_gp_additions = function(gp_details,
     dplyr::arrange(time, series)
 
   # Build the gp formula to pass to the mock brms
-  gp_formula <- reformulate(attr(terms(orig_formula),
-                                 'term.labels')[gp_terms],
+  gp_formula <- reformulate(attr(terms(attr(gp_details, 'gp_formula')),
+                                 'term.labels'),
                             '.fake_gp_y')
   brms_mock <- brms::brm(gp_formula,
                          data = brms_fake_df,
@@ -371,6 +397,8 @@ gp_to_s <- function(formula, data, family){
               'ti('
             },
           gp_details$gp_covariates[i],
+          ', by = ',
+          gp_details$by[i],
           ', k = ',
           if(gp_details$dim[i] > 1L){
             paste0(gp_details$k[i],
@@ -434,17 +462,52 @@ get_gp_attributes = function(formula, data, family = gaussian()){
     eval(rlang::parse_expr(gp_terms[x]))
   })
 
-  gp_isos <- unlist(purrr::map(gp_attributes, 'iso'), use.names = FALSE)
-  gp_kernels <- unlist(purrr::map(gp_attributes, 'cov'), use.names = FALSE)
-  gp_cmcs <- unlist(purrr::map(gp_attributes, 'cmc'), use.names = FALSE)
+  gp_isos <- unlist(purrr::map(gp_attributes, 'iso'),
+                    use.names = FALSE)
+  gp_kernels <- unlist(purrr::map(gp_attributes, 'cov'),
+                       use.names = FALSE)
+  gp_cmcs <- unlist(purrr::map(gp_attributes, 'cmc'),
+                    use.names = FALSE)
   if(any(gp_cmcs == FALSE)){
-    stop('gp effects with cmc = FALSE are not currently supported by mvgam',
-         call. = FALSE)
+    rlang::warn(paste0("gp effects in mvgam cannot yet handle contrast coding\n",
+                       "resetting all instances of 'cmc = FALSE' to 'cmc = TRUE'"),
+                .frequency = "once",
+                .frequency_id = 'gp_cmcs')
   }
+  gp_grs <- unlist(purrr::map(gp_attributes, 'gr'),
+                   use.names = FALSE)
+  if(any(gp_grs == TRUE)){
+    rlang::warn(paste0("gp effects in mvgam cannot yet handle autogrouping\n",
+                       "resetting all instances of 'gr = TRUE' to 'gr = FALSE'"),
+                .frequency = "once",
+                .frequency_id = 'gp_grs')
+  }
+
+  newgp_terms <- unlist(lapply(seq_along(gp_terms), function(x){
+    lbl <- paste0('gp(',
+                  paste(gp_attributes[[x]]$term, collapse = ', '),
+                  if(gp_attributes[[x]]$by != 'NA'){
+                    paste0(', by = ',
+                           gp_attributes[[x]]$by)
+                  } else {
+                    NULL
+                  },
+                  ', k = ',
+                  gp_attributes[[x]]$k,
+                  ', iso = ',
+                  gp_attributes[[x]]$iso,
+                  ', c = ',
+                  gp_attributes[[x]]$c[1],
+                  ', gr = FALSE, cmc = TRUE)')
+
+  }), use.names = FALSE)
+
+  gp_formula <- reformulate(newgp_terms,
+                            rlang::f_lhs(formula))
 
   gp_def_priors <- do.call(rbind, lapply(seq_along(gp_terms), function(x){
     def_gp_prior <- suppressWarnings(brms::get_prior(
-      reformulate(gp_terms[x],
+      reformulate(newgp_terms[x],
                   rlang::f_lhs(formula)),
       family = family_to_brmsfam(family),
       data = data))
@@ -480,358 +543,21 @@ get_gp_attributes = function(formula, data, family = gaussian()){
     by[by == 'NA'] <- NA
   }
 
+  ret_dat <- data.frame(gp_covariates,
+                        dim = gp_dims,
+                        kernel = gp_kernels,
+                        iso = gp_isos,
+                        k = k,
+                        by,
+                        level = NA,
+                        def_alpha = gp_def_priors$def_alpha,
+                        def_rho = gp_def_priors$def_rho)
+  attr(ret_dat, 'gp_formula') <- gp_formula
+
   # Return as a data.frame
-  return(data.frame(gp_covariates,
-                    dim = gp_dims,
-                    kernel = gp_kernels,
-                    iso = gp_isos,
-                    k = k,
-                    by,
-                    level = NA,
-                    def_alpha = gp_def_priors$def_alpha,
-                    def_rho = gp_def_priors$def_rho))
+  return(ret_dat)
 }
 
-
-#' Evaluate Laplacian eigenfunction for a given GP basis function
-#' @noRd
-phi = function(boundary, m, centred_covariate) {
-  1 / sqrt(boundary) * sin((m * pi)/(2 * boundary) *
-                             (centred_covariate + boundary))
-}
-
-#' Evaluate eigenvalues for a given GP basis function
-#' @noRd
-lambda = function(boundary, m) {
-  ((m * pi)/(2 * boundary))^2
-}
-
-#' Spectral density squared exponential Gaussian Process kernel
-#' @noRd
-spd = function(alpha_gp, rho_gp, eigenvalues) {
-  (alpha_gp^2) * sqrt(2 * pi) * rho_gp *
-    exp(-0.5 * (rho_gp^2) * (eigenvalues^2))
-}
-
-#' @noRd
-sim_hilbert_gp = function(alpha_gp,
-                          rho_gp,
-                          b_gp,
-                          last_trends,
-                          fc_times,
-                          train_times,
-                          mean_train_times){
-
-  num_gp_basis <- length(b_gp)
-
-  # Get vector of eigenvalues of covariance matrix
-  eigenvalues <- vector()
-  for(m in 1:num_gp_basis){
-    eigenvalues[m] <- lambda(boundary = (5.0/4) *
-                               (max(train_times) - min(train_times)),
-                             m = m)
-  }
-
-  # Get vector of eigenfunctions
-  eigenfunctions <- matrix(NA, nrow = length(fc_times),
-                           ncol = num_gp_basis)
-  for(m in 1:num_gp_basis){
-    eigenfunctions[, m] <- phi(boundary = (5.0/4) *
-                                 (max(train_times) - min(train_times)),
-                               m = m,
-                               centred_covariate = fc_times - mean_train_times)
-  }
-
-  # Compute diagonal of covariance matrix
-  diag_SPD <- sqrt(spd(alpha_gp = alpha_gp,
-                       rho_gp = rho_gp,
-                       sqrt(eigenvalues)))
-
-  # Compute GP trend forecast
-  as.vector((diag_SPD * b_gp) %*% t(eigenfunctions))
-}
-
-#' @noRd
-seq_cols <- function(x) {
-  seq_len(NCOL(x))
-}
-
-#' Compute the mth eigen function of an approximate GP
-#' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L289
-#' @noRd
-eigen_fun_cov_exp_quad <- function(x, m, L) {
-  x <- as.matrix(x)
-  D <- ncol(x)
-  stopifnot(length(m) == D, length(L) == D)
-  out <- vector("list", D)
-  for (i in seq_cols(x)) {
-    out[[i]] <- 1 / sqrt(L[i]) *
-      sin((m[i] * pi) / (2 * L[i]) * (x[, i] + L[i]))
-  }
-  Reduce("*", out)
-}
-
-#' Compute squared differences
-#' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L241
-#' @param x vector or matrix
-#' @param x_new optional vector of matrix with the same ncol as x
-#' @return an nrow(x) times nrow(x_new) matrix
-#' @details if matrices are passed results are summed over the columns
-#' @noRd
-diff_quad <- function(x, x_new = NULL) {
-  x <- as.matrix(x)
-  if (is.null(x_new)) {
-    x_new <- x
-  } else {
-    x_new <- as.matrix(x_new)
-  }
-  .diff_quad <- function(x1, x2) (x1 - x2)^2
-  out <- 0
-  for (i in seq_cols(x)) {
-    out <- out + outer(x[, i], x_new[, i], .diff_quad)
-  }
-  out
-}
-
-#' Extended range of input data for which predictions should be made
-#' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L301
-#' @noRd
-choose_L <- function(x, c) {
-  if (!length(x)) {
-    range <- 1
-  } else {
-    range <- max(1, max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
-  }
-  c * range
-}
-
-#' Mean-center and scale the particular covariate of interest
-#' so that the maximum Euclidean distance between any two points is 1
-#' @noRd
-scale_cov <- function(data, covariate, by, level,
-                      mean, max_dist){
-  Xgp <- data[[covariate]]
-  if(!is.na(by) &
-     !is.na(level)){
-      Xgp <- data[[covariate]][data[[by]] == level]
-   }
-
-  # Compute max Euclidean distance if not supplied
-  if(is.na(max_dist)){
-    Xgp_max_dist <- sqrt(max(diff_quad(Xgp)))
-  } else {
-    Xgp_max_dist <- max_dist
-  }
-
-  # Scale
-  Xgp <- Xgp / Xgp_max_dist
-
-  # Compute mean if not supplied (after scaling)
-  if(is.na(mean)){
-    Xgp_mean <- mean(Xgp, na.rm = TRUE)
-  } else {
-    Xgp_mean <- mean
-  }
-
-  # Center
-  Xgp <- Xgp - Xgp_mean
-
-  return(list(Xgp = Xgp,
-              Xgp_mean = Xgp_mean,
-              Xgp_max_dist = Xgp_max_dist))
-}
-
-#' Prep GP eigenfunctions
-#' @noRd
-prep_eigenfunctions = function(data,
-                               covariate,
-                               by = NA,
-                               level = NA,
-                               k,
-                               boundary,
-                               mean = NA,
-                               max_dist = NA,
-                               scale = TRUE,
-                               L,
-                               initial_setup = FALSE){
-
-  # Extract and scale covariate (scale set to FALSE if this is a prediction
-  # step so that we can scale by the original training covariate values supplied
-  # in mean and max_dist)
-  covariate_cent <- scale_cov(data = data,
-                              covariate = covariate,
-                              by = by,
-                              level = level,
-                              mean = mean,
-                              max_dist = max_dist)$Xgp
-
-  # Construct matrix of eigenfunctions
-  eigenfunctions <- matrix(NA, nrow = length(covariate_cent),
-                           ncol = k)
-  if(missing(L)){
-    L <- choose_L(covariate_cent, boundary)
-  }
-
-  for(m in 1:k){
-    eigenfunctions[, m] <- eigen_fun_cov_exp_quad(x = matrix(covariate_cent),
-                                                  m = m,
-                                                  L = L)
-  }
-
-  # Multiply eigenfunctions by the 'by' variable if one is supplied
-  if(!is.na(by)){
-    if(!is.na(level)){
-      # no multiplying needed as this is a factor by variable,
-      # but we need to pad the eigenfunctions with zeros
-      # for the observations where the by is a different level;
-      # the design matrix is always sorted by time and then by series
-      # in mvgam
-      if(initial_setup){
-        sorted_by <- data.frame(time = data$time,
-                                series = data$series,
-                                byvar = data[[by]]) %>%
-          dplyr::arrange(time, series) %>%
-          dplyr::pull(byvar)
-      } else {
-        sorted_by <- data[[by]]
-      }
-
-      full_eigens <- matrix(0, nrow = length(data[[by]]),
-                            ncol = NCOL(eigenfunctions))
-      full_eigens[(1:length(data[[by]]))[
-        sorted_by == level],] <- eigenfunctions
-      eigenfunctions <- full_eigens
-    } else {
-      eigenfunctions <- eigenfunctions * data[[by]]
-    }
-  }
-  eigenfunctions
-}
-
-#' Prep Hilbert Basis GP covariates
-#' @noRd
-prep_gp_covariate = function(data,
-                             response,
-                             covariate,
-                             by = NA,
-                             level = NA,
-                             scale = TRUE,
-                             boundary = 5.0/4,
-                             k = 20,
-                             family = gaussian()){
-
-  # Get default gp param priors from a call to brms::get_prior()
-  def_gp_prior <- suppressWarnings(brms::get_prior(formula(paste0(response,
-                                                                  ' ~ gp(', covariate,
-                                                 ifelse(is.na(by), ', ',
-                                                        paste0(', by = ', by, ', ')),
-                                                 'k = ', k,
-                                                 ', scale = ',
-                                                 scale,
-                                                 ', c = ',
-                                                 boundary,
-                                                 ')')), data = data,
-                                                 family = family))
-  def_gp_prior <- def_gp_prior[def_gp_prior$prior != '',]
-  def_rho <- def_gp_prior$prior[min(which(def_gp_prior$class == 'lscale'))]
-  if(def_rho == ''){
-    def_rho <- 'inv_gamma(1.5, 5);'
-  }
-  def_alpha <- def_gp_prior$prior[min(which(def_gp_prior$class == 'sdgp'))]
-  if(def_alpha == ''){
-    def_alpha<- 'student_t(3, 0, 2.5);'
-  }
-
-  # Prepare the covariate
-  if(scale){
-    max_dist <- NA
-  } else {
-    max_dist <- 1
-  }
-
-  covariate_cent <- scale_cov(data = data,
-                              covariate = covariate,
-                              by = by,
-                              mean = NA,
-                              max_dist = max_dist,
-                              level = level)
-
-  covariate_mean <- covariate_cent$Xgp_mean
-  covariate_max_dist <- covariate_cent$Xgp_max_dist
-  covariate_cent <- covariate_cent$Xgp
-
-  # Construct vector of eigenvalues for GP covariance matrix; the
-  # same eigenvalues are always used in prediction, so we only need to
-  # create them when prepping the data. They will need to be included in
-  # the Stan data list
-  L <- choose_L(covariate_cent, boundary)
-  eigenvalues <- vector()
-  for(m in 1:k){
-    eigenvalues[m] <- sqrt(lambda(boundary = L,
-                                     m = m))
-  }
-
-  # Construct matrix of eigenfunctions; this will change depending on the values
-  # of the covariate, so it needs to be computed and included as data but also needs
-  # to be computed to make predictions
-  eigenfunctions <- prep_eigenfunctions(data = data,
-                                        covariate = covariate,
-                                        by = by,
-                                        level = level,
-                                        L = L,
-                                        k = k,
-                                        boundary = boundary,
-                                        mean = covariate_mean,
-                                        max_dist = covariate_max_dist,
-                                        scale = scale,
-                                        initial_setup = TRUE)
-
-  # Make attributes table using a cleaned version of the covariate
-  # name to ensure there are no illegal characters in the Stan code
-  byname <- ifelse(is.na(by), '', paste0(':', by))
-  covariate_name <- paste0('gp(', covariate, ')', byname)
-  if(!is.na(level)){
-    covariate_name <- paste0(covariate_name, level)
-  }
-  att_table <- list(effect = 'gp',
-                    name = covariate_name,
-                    covariate = covariate,
-                    by = by,
-                    level = level,
-                    k = k,
-                    boundary = boundary,
-                    L = L,
-                    scale = scale,
-                    def_rho = def_rho,
-                    def_alpha = def_alpha,
-                    mean = covariate_mean,
-                    max_dist = covariate_max_dist,
-                    eigenvalues = eigenvalues)
-
-  # Items to add to Stan data
-  # Number of basis functions
-  covariate_name <- clean_gpnames(covariate_name)
-  data_lines <- paste0('int<lower=1> k_', covariate_name,
-                       '; // basis functions for approximate gp\n')
-  append_dat <- list(k = k)
-  names(append_dat) <- paste0('k_', covariate_name, '')
-
-  # Approximate GP eigenvalues
-  data_lines <- paste0(data_lines, paste0(
-    'vector[',
-    'k_', covariate_name,
-    '] l_', covariate_name, '; // approximate gp eigenvalues\n'),
-    collapse = '\n')
-  append_dat2 <- list(slambda = eigenvalues)
-  names(append_dat2) <- paste0('l_', covariate_name, '')
-  append_dat <- append(append_dat, append_dat2)
-
-  # Return necessary objects in a list
-  list(att_table = att_table,
-       data_lines = data_lines,
-       data_append = append_dat,
-       eigenfunctions = eigenfunctions)
-}
 
 #' Clean GP names so no illegal characters are used in Stan code
 #' @noRd
@@ -1203,3 +929,343 @@ add_gp_spd_funs = function(model_file, kernel){
 
   model_file <- readLines(textConnection(model_file), n = -1)
 }
+
+#### Old gp() prepping functions; these are now redundant because
+# brms is used to evaluate gp() effects and produce the relevant
+# eigenfunctions / eigenvalues, but keeping the functions here for
+# now in case they are needed for later work ####
+
+#' #' Evaluate Laplacian eigenfunction for a given GP basis function
+#' #' @noRd
+#' phi = function(boundary, m, centred_covariate) {
+#'   1 / sqrt(boundary) * sin((m * pi)/(2 * boundary) *
+#'                              (centred_covariate + boundary))
+#' }
+#'
+#' #' Evaluate eigenvalues for a given GP basis function
+#' #' @noRd
+#' lambda = function(boundary, m) {
+#'   ((m * pi)/(2 * boundary))^2
+#' }
+#'
+#' #' Spectral density squared exponential Gaussian Process kernel
+#' #' @noRd
+#' spd = function(alpha_gp, rho_gp, eigenvalues) {
+#'   (alpha_gp^2) * sqrt(2 * pi) * rho_gp *
+#'     exp(-0.5 * (rho_gp^2) * (eigenvalues^2))
+#' }
+#'
+#' #' @noRd
+#' sim_hilbert_gp = function(alpha_gp,
+#'                           rho_gp,
+#'                           b_gp,
+#'                           last_trends,
+#'                           fc_times,
+#'                           train_times,
+#'                           mean_train_times){
+#'
+#'   num_gp_basis <- length(b_gp)
+#'
+#'   # Get vector of eigenvalues of covariance matrix
+#'   eigenvalues <- vector()
+#'   for(m in 1:num_gp_basis){
+#'     eigenvalues[m] <- lambda(boundary = (5.0/4) *
+#'                                (max(train_times) - min(train_times)),
+#'                              m = m)
+#'   }
+#'
+#'   # Get vector of eigenfunctions
+#'   eigenfunctions <- matrix(NA, nrow = length(fc_times),
+#'                            ncol = num_gp_basis)
+#'   for(m in 1:num_gp_basis){
+#'     eigenfunctions[, m] <- phi(boundary = (5.0/4) *
+#'                                  (max(train_times) - min(train_times)),
+#'                                m = m,
+#'                                centred_covariate = fc_times - mean_train_times)
+#'   }
+#'
+#'   # Compute diagonal of covariance matrix
+#'   diag_SPD <- sqrt(spd(alpha_gp = alpha_gp,
+#'                        rho_gp = rho_gp,
+#'                        sqrt(eigenvalues)))
+#'
+#'   # Compute GP trend forecast
+#'   as.vector((diag_SPD * b_gp) %*% t(eigenfunctions))
+#' }
+
+#' #' Compute the mth eigen function of an approximate GP
+#' #' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L289
+#' #' @noRd
+#' eigen_fun_cov_exp_quad <- function(x, m, L) {
+#'   x <- as.matrix(x)
+#'   D <- ncol(x)
+#'   stopifnot(length(m) == D, length(L) == D)
+#'   out <- vector("list", D)
+#'   for (i in seq_cols(x)) {
+#'     out[[i]] <- 1 / sqrt(L[i]) *
+#'       sin((m[i] * pi) / (2 * L[i]) * (x[, i] + L[i]))
+#'   }
+#'   Reduce("*", out)
+#' }
+
+#' #' Compute squared differences
+#' #' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L241
+#' #' @param x vector or matrix
+#' #' @param x_new optional vector of matrix with the same ncol as x
+#' #' @return an nrow(x) times nrow(x_new) matrix
+#' #' @details if matrices are passed results are summed over the columns
+#' #' @noRd
+#' diff_quad <- function(x, x_new = NULL) {
+#'   x <- as.matrix(x)
+#'   if (is.null(x_new)) {
+#'     x_new <- x
+#'   } else {
+#'     x_new <- as.matrix(x_new)
+#'   }
+#'   .diff_quad <- function(x1, x2) (x1 - x2)^2
+#'   out <- 0
+#'   for (i in seq_cols(x)) {
+#'     out <- out + outer(x[, i], x_new[, i], .diff_quad)
+#'   }
+#'   out
+#' }
+
+#' #' Extended range of input data for which predictions should be made
+#' #' Credit to Paul Burkner from brms: https://github.com/paul-buerkner/brms/R/formula-gp.R#L301
+#' #' @noRd
+#' choose_L <- function(x, c) {
+#'   if (!length(x)) {
+#'     range <- 1
+#'   } else {
+#'     range <- max(1, max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+#'   }
+#'   c * range
+#' }
+
+#' #' Mean-center and scale the particular covariate of interest
+#' #' so that the maximum Euclidean distance between any two points is 1
+#' #' @noRd
+#' scale_cov <- function(data, covariate, by, level,
+#'                       mean, max_dist){
+#'   Xgp <- data[[covariate]]
+#'   if(!is.na(by) &
+#'      !is.na(level)){
+#'       Xgp <- data[[covariate]][data[[by]] == level]
+#'    }
+#'
+#'   # Compute max Euclidean distance if not supplied
+#'   if(is.na(max_dist)){
+#'     Xgp_max_dist <- sqrt(max(diff_quad(Xgp)))
+#'   } else {
+#'     Xgp_max_dist <- max_dist
+#'   }
+#'
+#'   # Scale
+#'   Xgp <- Xgp / Xgp_max_dist
+#'
+#'   # Compute mean if not supplied (after scaling)
+#'   if(is.na(mean)){
+#'     Xgp_mean <- mean(Xgp, na.rm = TRUE)
+#'   } else {
+#'     Xgp_mean <- mean
+#'   }
+#'
+#'   # Center
+#'   Xgp <- Xgp - Xgp_mean
+#'
+#'   return(list(Xgp = Xgp,
+#'               Xgp_mean = Xgp_mean,
+#'               Xgp_max_dist = Xgp_max_dist))
+#' }
+#'
+#' #' Prep GP eigenfunctions
+#' #' @noRd
+#' prep_eigenfunctions = function(data,
+#'                                covariate,
+#'                                by = NA,
+#'                                level = NA,
+#'                                k,
+#'                                boundary,
+#'                                mean = NA,
+#'                                max_dist = NA,
+#'                                scale = TRUE,
+#'                                L,
+#'                                initial_setup = FALSE){
+#'
+#'   # Extract and scale covariate (scale set to FALSE if this is a prediction
+#'   # step so that we can scale by the original training covariate values supplied
+#'   # in mean and max_dist)
+#'   covariate_cent <- scale_cov(data = data,
+#'                               covariate = covariate,
+#'                               by = by,
+#'                               level = level,
+#'                               mean = mean,
+#'                               max_dist = max_dist)$Xgp
+#'
+#'   # Construct matrix of eigenfunctions
+#'   eigenfunctions <- matrix(NA, nrow = length(covariate_cent),
+#'                            ncol = k)
+#'   if(missing(L)){
+#'     L <- choose_L(covariate_cent, boundary)
+#'   }
+#'
+#'   for(m in 1:k){
+#'     eigenfunctions[, m] <- eigen_fun_cov_exp_quad(x = matrix(covariate_cent),
+#'                                                   m = m,
+#'                                                   L = L)
+#'   }
+#'
+#'   # Multiply eigenfunctions by the 'by' variable if one is supplied
+#'   if(!is.na(by)){
+#'     if(!is.na(level)){
+#'       # no multiplying needed as this is a factor by variable,
+#'       # but we need to pad the eigenfunctions with zeros
+#'       # for the observations where the by is a different level;
+#'       # the design matrix is always sorted by time and then by series
+#'       # in mvgam
+#'       if(initial_setup){
+#'         sorted_by <- data.frame(time = data$time,
+#'                                 series = data$series,
+#'                                 byvar = data[[by]]) %>%
+#'           dplyr::arrange(time, series) %>%
+#'           dplyr::pull(byvar)
+#'       } else {
+#'         sorted_by <- data[[by]]
+#'       }
+#'
+#'       full_eigens <- matrix(0, nrow = length(data[[by]]),
+#'                             ncol = NCOL(eigenfunctions))
+#'       full_eigens[(1:length(data[[by]]))[
+#'         sorted_by == level],] <- eigenfunctions
+#'       eigenfunctions <- full_eigens
+#'     } else {
+#'       eigenfunctions <- eigenfunctions * data[[by]]
+#'     }
+#'   }
+#'   eigenfunctions
+#' }
+#'
+#' #' Prep Hilbert Basis GP covariates
+#' #' @noRd
+#' prep_gp_covariate = function(data,
+#'                              response,
+#'                              covariate,
+#'                              by = NA,
+#'                              level = NA,
+#'                              scale = TRUE,
+#'                              boundary = 5.0/4,
+#'                              k = 20,
+#'                              family = gaussian()){
+#'
+#'   # Get default gp param priors from a call to brms::get_prior()
+#'   def_gp_prior <- suppressWarnings(brms::get_prior(formula(paste0(response,
+#'                                                                   ' ~ gp(', covariate,
+#'                                                  ifelse(is.na(by), ', ',
+#'                                                         paste0(', by = ', by, ', ')),
+#'                                                  'k = ', k,
+#'                                                  ', scale = ',
+#'                                                  scale,
+#'                                                  ', c = ',
+#'                                                  boundary,
+#'                                                  ')')), data = data,
+#'                                                  family = family))
+#'   def_gp_prior <- def_gp_prior[def_gp_prior$prior != '',]
+#'   def_rho <- def_gp_prior$prior[min(which(def_gp_prior$class == 'lscale'))]
+#'   if(def_rho == ''){
+#'     def_rho <- 'inv_gamma(1.5, 5);'
+#'   }
+#'   def_alpha <- def_gp_prior$prior[min(which(def_gp_prior$class == 'sdgp'))]
+#'   if(def_alpha == ''){
+#'     def_alpha<- 'student_t(3, 0, 2.5);'
+#'   }
+#'
+#'   # Prepare the covariate
+#'   if(scale){
+#'     max_dist <- NA
+#'   } else {
+#'     max_dist <- 1
+#'   }
+#'
+#'   covariate_cent <- scale_cov(data = data,
+#'                               covariate = covariate,
+#'                               by = by,
+#'                               mean = NA,
+#'                               max_dist = max_dist,
+#'                               level = level)
+#'
+#'   covariate_mean <- covariate_cent$Xgp_mean
+#'   covariate_max_dist <- covariate_cent$Xgp_max_dist
+#'   covariate_cent <- covariate_cent$Xgp
+#'
+#'   # Construct vector of eigenvalues for GP covariance matrix; the
+#'   # same eigenvalues are always used in prediction, so we only need to
+#'   # create them when prepping the data. They will need to be included in
+#'   # the Stan data list
+#'   L <- choose_L(covariate_cent, boundary)
+#'   eigenvalues <- vector()
+#'   for(m in 1:k){
+#'     eigenvalues[m] <- sqrt(lambda(boundary = L,
+#'                                      m = m))
+#'   }
+#'
+#'   # Construct matrix of eigenfunctions; this will change depending on the values
+#'   # of the covariate, so it needs to be computed and included as data but also needs
+#'   # to be computed to make predictions
+#'   eigenfunctions <- prep_eigenfunctions(data = data,
+#'                                         covariate = covariate,
+#'                                         by = by,
+#'                                         level = level,
+#'                                         L = L,
+#'                                         k = k,
+#'                                         boundary = boundary,
+#'                                         mean = covariate_mean,
+#'                                         max_dist = covariate_max_dist,
+#'                                         scale = scale,
+#'                                         initial_setup = TRUE)
+#'
+#'   # Make attributes table using a cleaned version of the covariate
+#'   # name to ensure there are no illegal characters in the Stan code
+#'   byname <- ifelse(is.na(by), '', paste0(':', by))
+#'   covariate_name <- paste0('gp(', covariate, ')', byname)
+#'   if(!is.na(level)){
+#'     covariate_name <- paste0(covariate_name, level)
+#'   }
+#'   att_table <- list(effect = 'gp',
+#'                     name = covariate_name,
+#'                     covariate = covariate,
+#'                     by = by,
+#'                     level = level,
+#'                     k = k,
+#'                     boundary = boundary,
+#'                     L = L,
+#'                     scale = scale,
+#'                     def_rho = def_rho,
+#'                     def_alpha = def_alpha,
+#'                     mean = covariate_mean,
+#'                     max_dist = covariate_max_dist,
+#'                     eigenvalues = eigenvalues)
+#'
+#'   # Items to add to Stan data
+#'   # Number of basis functions
+#'   covariate_name <- clean_gpnames(covariate_name)
+#'   data_lines <- paste0('int<lower=1> k_', covariate_name,
+#'                        '; // basis functions for approximate gp\n')
+#'   append_dat <- list(k = k)
+#'   names(append_dat) <- paste0('k_', covariate_name, '')
+#'
+#'   # Approximate GP eigenvalues
+#'   data_lines <- paste0(data_lines, paste0(
+#'     'vector[',
+#'     'k_', covariate_name,
+#'     '] l_', covariate_name, '; // approximate gp eigenvalues\n'),
+#'     collapse = '\n')
+#'   append_dat2 <- list(slambda = eigenvalues)
+#'   names(append_dat2) <- paste0('l_', covariate_name, '')
+#'   append_dat <- append(append_dat, append_dat2)
+#'
+#'   # Return necessary objects in a list
+#'   list(att_table = att_table,
+#'        data_lines = data_lines,
+#'        data_append = append_dat,
+#'        eigenfunctions = eigenfunctions)
+#' }

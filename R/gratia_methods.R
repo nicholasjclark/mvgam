@@ -221,6 +221,7 @@ NULL
       stop('no trend_formula exists so there are no trend-level terms to plot')
     }
 
+    object$trend_mgcv_model <- relabel_gps(object$trend_mgcv_model)
     object$trend_mgcv_model$call$data <- NULL
     object$trend_mgcv_model$cmX <- object$trend_mgcv_model$coefficients
     sm_plots <- gratia::draw(object = object$trend_mgcv_model,
@@ -267,6 +268,7 @@ NULL
                              envir = envir,
                              ...)
   } else {
+    object$mgcv_model <- relabel_gps(object$mgcv_model)
     object$mgcv_model$call$data <- NULL
     object$mgcv_model$cmX <- object$mgcv_model$coefficients
     sm_plots <- gratia::draw(object = object$mgcv_model,
@@ -398,7 +400,7 @@ eval_smoothDothilbertDotsmooth = function(smooth,
   # Which GP term are we plotting?
   gp_covariate <- smooth$term
   level <- ifelse(is.null(smooth$by.level), NA, smooth$by.level)
-  gp_names <- gsub(' ', '', unlist(purrr::map(gp_att_table, 'orig_name')))
+  gp_names <- gsub(' ', '', unlist(purrr::map(gp_att_table, 'name')))
   if(!is.na(level)){
     gp_select <- which(gp_names == smooth$label &
                          unlist(purrr::map(gp_att_table, 'level')) == level)

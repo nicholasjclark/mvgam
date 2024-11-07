@@ -901,7 +901,6 @@ check_gp_terms = function(formula, data_train, family){
   orig_formula <- gp_terms <- gp_details <- NULL
   if(any(grepl('gp(', attr(terms(formula), 'term.labels'), fixed = TRUE))){
 
-    # Check that there are no multidimensional gp terms
     formula <- interpret_mvgam(formula, N = max(data_train$time),
                                family = family)
     orig_formula <- formula
