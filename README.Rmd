@@ -289,4 +289,5 @@ There are many more extended uses of `mvgam`, including the ability to fit hiera
 This project is licensed under an `MIT` open source license
 
 ## Interested in contributing?
-I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au)
+I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au). Other contributions are also very welcome, but please see [The Contributor Instructions](https://github.com/nicholasjclark/mvgam/blob/main/.github/CONTRIBUTING.md) for general guidelines. Note that
+by participating in this project you agree to abide by the terms of its [Contributor Code of Conduct](https://dplyr.tidyverse.org/CODE_OF_CONDUCT).

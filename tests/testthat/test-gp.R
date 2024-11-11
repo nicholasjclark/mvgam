@@ -99,7 +99,7 @@ test_that("unidimensional gp for observation models working properly", {
                run_model = FALSE)
 
   expect_true(
-    any(grepl('b[b_idx_gp_time_byseriesseries_3] = sqrt(spd_gp_exponential(l_gp_time_byseriesseries_3',
+    any(grepl('b[b_idx_gp_time_byseriesseries_3] = sqrt(spd_gp_exp_quad(l_gp_time_byseriesseries_3',
               mod$model_file, fixed = TRUE))
   )
 
