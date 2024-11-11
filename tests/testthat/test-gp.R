@@ -92,8 +92,7 @@ test_that("gp_to_s is working properly for multidimensional gps", {
 test_that("unidimensional gp for observation models working properly", {
   gaus_data$data_train$y[is.na(gaus_data$data_train$y)] <- 0
   mod <- mvgam(formula = y ~ s(series, bs = 're') +
-                 gp(time, by = series, k = 10, c = 5/4,
-                    cov = 'exponential') +
+                 gp(time, by = series, k = 10, c = 5/4) +
                  year:season,
                data = gaus_data$data_train,
                family = gaussian(),

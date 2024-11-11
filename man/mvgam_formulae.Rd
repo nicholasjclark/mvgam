@@ -22,16 +22,16 @@ are non-identifiable.
 \cr
 The formulae supplied to \code{\link{mvgam}} are exactly like those supplied to
 \code{\link{glm}} except that smooth terms,
-\code{\link[mgcv]{s()}},
-\code{\link[mgcv]{te()}},
-\code{\link[mgcv]{ti()}} and
-\code{\link[mgcv]{t2()}},
-time-varying effects using \code{\link{dynamic()}},
+\code{\link[mgcv]{s}},
+\code{\link[mgcv]{te}},
+\code{\link[mgcv]{ti}} and
+\code{\link[mgcv]{t2}},
+time-varying effects using \code{\link{dynamic}},
 monotonically increasing (using \code{s(x, bs = 'moi')})
 or decreasing splines (using \code{s(x, bs = 'mod')};
 see \code{\link{smooth.construct.moi.smooth.spec}} for
 details), as well as
-Gaussian Process functions using \code{\link[brms]{gp()}},
+Gaussian Process functions using \code{\link[brms]{gp}},
 can be added to the right hand side (and \code{.} is not supported in \code{mvgam} formulae).
 \cr
 \cr

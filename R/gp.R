@@ -84,7 +84,7 @@ make_gp_additions = function(gp_details,
                                    series = newdata$series,
                                    time = newdata$index..time..index)
     for(i in seq_along(terms_needed)){
-      brms_fake_df_new <- cbind(brms_fake_df_new, data[[terms_needed[i]]])
+      brms_fake_df_new <- cbind(brms_fake_df_new, newdata[[terms_needed[i]]])
     }
     colnames(brms_fake_df_new) <- c('.fake_gp_y',
                                     'series',
@@ -348,7 +348,9 @@ eigenfunc_list = function(stan_data,
         full_eigens[(seq_along(sorted_by))[
           sorted_by == level[x]],] <- eigenfuncs[[x]]
       } else {
-        full_eigens <- eigenfuncs[[x]]
+        # Numeric by variables should be multiplied by the
+        # spectral eigenfunctions
+        full_eigens <- eigenfuncs[[x]] * mock_df[[by[x]]]
       }
     } else {
       full_eigens <- eigenfuncs[[x]]
