@@ -128,7 +128,7 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
                                     trend_map,
                                     forecast = forecast)
 
-  suppressWarnings(Xp_trend  <- try(predict(mgcv_model,
+  suppressWarnings(Xp_trend <- try(predict(mgcv_model,
                                             newdata = trend_test,
                                             type = 'lpmatrix'),
                                     silent = TRUE))
@@ -164,11 +164,11 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
     # Requires a dataframe of all relevant variables for the gp effects
     mock_terms <- brms::brmsterms(attr(mgcv_model, 'brms_mock')$formula)
     terms_needed <- unique(all.vars(mock_terms$formula)[-1])
-    newdata_mock <- data.frame(newdata[[terms_needed[1]]])
+    newdata_mock <- data.frame(trend_test[[terms_needed[1]]])
     if(length(terms_needed) > 1L){
       for(i in 2:length(terms_needed)){
         newdata_mock <- cbind(newdata_mock,
-                              data.frame(newdata[[terms_needed[i]]]))
+                              data.frame(trend_test[[terms_needed[i]]]))
       }
     }
     colnames(newdata_mock) <- terms_needed

@@ -10,7 +10,9 @@ get_mvgam_priors(
   factor_formula,
   data,
   data_train,
-  family = "poisson",
+  family = poisson(),
+  unit = time,
+  species = series,
   knots,
   trend_knots,
   use_lv = FALSE,
@@ -93,6 +95,17 @@ See \code{\link{mvgam_families}} for an example of how to use this family}
 Note that only \code{nb()} and \code{poisson()} are available if using \code{JAGS} as the backend.
 Default is \code{poisson()}.
 See \code{\link{mvgam_families}} for more details}
+
+\item{unit}{The unquoted name of the variable that represents the unit of analysis in \code{data} over
+which latent residuals should be correlated. This variable should be either a
+\code{numeric} or \code{integer} variable in the supplied \code{data}.
+Defaults to \code{time} to be consistent with other functionalities
+in \pkg{mvgam}, though note that the data need not be time series in this case. See examples below
+for further details and explanations}
+
+\item{species}{The unquoted name of the \code{factor} variable that indexes
+the different response units in \code{data} (usually \code{'species'} in a JSDM).
+Defaults to \code{series} to be consistent with other \code{mvgam} models}
 
 \item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
 For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied

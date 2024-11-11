@@ -146,6 +146,7 @@ make_gp_additions = function(gp_details,
                       level = gp_details$level[x],
                       k = k_gps[[x]],
                       def_rho = gp_details$def_rho[x],
+                      def_rho_2 = gp_details$def_rho_2[x],
                       def_alpha = gp_details$def_alpha[x],
                       eigenvalues = eigenvals[[x]])
 
@@ -516,16 +517,23 @@ get_gp_attributes = function(formula, data, family = gaussian()){
       family = family_to_brmsfam(family),
       data = data))
     def_gp_prior <- def_gp_prior[def_gp_prior$prior != '',]
-    def_rho <- def_gp_prior$prior[min(which(def_gp_prior$class == 'lscale'))]
-    if(def_rho == ''){
-      def_rho <- 'inv_gamma(1.5, 5);'
-    }
+    def_rho <- def_gp_prior$prior[which(def_gp_prior$class == 'lscale')]
     def_alpha <- def_gp_prior$prior[min(which(def_gp_prior$class == 'sdgp'))]
     if(def_alpha == ''){
       def_alpha <- 'student_t(3, 0, 2.5);'
     }
-    data.frame(def_rho = def_rho,
-               def_alpha = def_alpha)
+    if(length(def_rho) > 1L){
+      def_rho_2 <- def_rho[2]
+      def_rho <- def_rho[1]
+      out <- data.frame(def_rho = def_rho,
+                        def_rho_2 = def_rho_2,
+                            def_alpha = def_alpha)
+    } else {
+      out <- data.frame(def_rho = def_rho,
+                        def_rho_2 = NA,
+                        def_alpha = def_alpha)
+    }
+    out
   }))
 
   # Extract information necessary to construct the GP terms
@@ -555,7 +563,8 @@ get_gp_attributes = function(formula, data, family = gaussian()){
                         by,
                         level = NA,
                         def_alpha = gp_def_priors$def_alpha,
-                        def_rho = gp_def_priors$def_rho)
+                        def_rho = gp_def_priors$def_rho,
+                        def_rho_2 = gp_def_priors$def_rho_2)
   attr(ret_dat, 'gp_formula') <- gp_formula
 
   # Return as a data.frame
@@ -591,6 +600,8 @@ add_gp_model_file = function(model_file, model_data,
                              mgcv_model, gp_additions){
 
   rho_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_rho'),
+                       use.names = FALSE)
+  rho_2_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_rho_2'),
                        use.names = FALSE)
   alpha_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_alpha'),
                          use.names = FALSE)
@@ -648,7 +659,11 @@ add_gp_model_file = function(model_file, model_data,
                },
              ']',
              ' ~ ',
-             rho_priors[i],
+             if(gp_isos[i]){
+               rho_priors[i]
+             } else {
+               c(rho_priors[i], rho_2_priors[i])
+             },
              ';\n'),
              collapse = '\n'
       )

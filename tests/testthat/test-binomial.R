@@ -266,7 +266,7 @@ test_that("bernoulli() behaves appropriately", {
 
   # Also with a trend_formula
   mod <- mvgam(y ~ series,
-               trend_formula = ~ gp(x, by = trend, c = 5/4),
+               trend_formula = ~ gp(x, by = trend, c = 5/4, k = 5),
                trend_model = AR(),
                family = bernoulli(),
                data = dat_train,

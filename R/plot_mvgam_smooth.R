@@ -317,7 +317,7 @@ plot_mvgam_smooth = function(object,
 
       if(gp_term){
         object2$mgcv_model$smooth[[smooth_int]]$label <-
-          gsub('s\\(|te\\(', 'gp(',
+          gsub('s\\(|ti\\(', 'gp(',
                object2$mgcv_model$smooth[[smooth_int]]$label)
         # Check if this is a factor by variable
         is_fac <- is.factor(object2$obs_data[[object2$mgcv_model$smooth[[smooth_int]]$by]])

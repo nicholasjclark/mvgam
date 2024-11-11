@@ -77,7 +77,7 @@ test_that("VARMAs are set up correctly", {
                         varma$model_file, fixed = TRUE)))
 
   varma <- mvgam(y ~ s(series, bs = 're'),
-                 trend_formula = ~ gp(time, by = trend, c = 5/4),
+                 trend_formula = ~ gp(time, by = trend, c = 5/4, k = 15),
                  trend_model = VAR(ma = TRUE),
                  data = gaus_data$data_train,
                  family = gaussian(),

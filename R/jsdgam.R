@@ -47,7 +47,7 @@
 #' Defaults to `series` to be consistent with other `mvgam` models
 #'@param n_lv \code{integer} the number of latent factors to use for modelling
 #'residual associations.
-#'Cannot be `< n_species`. Defaults arbitrarily to `1`
+#'Cannot be `> n_species`. Defaults arbitrarily to `2`
 #'@param threads \code{integer} Experimental option to use multithreading for within-chain
 #'parallelisation in \code{Stan}. We recommend its use only if you are experienced with
 #'\code{Stan}'s `reduce_sum` function and have a slow running model that cannot be sped
@@ -198,6 +198,7 @@
 #' ggplot(dat, aes(x = lat, y = lon, col = log(count + 1))) +
 #'   geom_point(size = 2.25) +
 #'   facet_wrap(~ species, scales = 'free') +
+#'   scale_color_viridis_c() +
 #'   theme_classic()
 #'
 #' # Inspect default priors for a joint species model with spatial factors
@@ -209,10 +210,13 @@
 #'
 #'                           # Each factor estimates a different nonlinear spatial process, using
 #'                           # 'by = trend' as in other mvgam State-Space models
-#'                           factor_formula = ~ te(lat, lon, k = 5, by = trend) - 1,
+#'                           factor_formula = ~ gp(lat, lon, k = 6, by = trend) - 1,
+#'                           n_lv = 4,
 #'
-#'                           # The data
+#'                           # The data and grouping variables
 #'                           data = dat,
+#'                           unit = site,
+#'                           species = species,
 #'
 #'                           # Poisson observations
 #'                           family = poisson())
@@ -228,7 +232,7 @@
 #'
 #'               # Each factor estimates a different nonlinear spatial process, using
 #'               # 'by = trend' as in other mvgam State-Space models
-#'               factor_formula = ~ te(lat, lon, k = 5, by = trend) - 1,
+#'               factor_formula = ~ gp(lat, lon, k = 6, by = trend) - 1,
 #'               n_lv = 4,
 #'
 #'               # Change default priors for fixed effect betas to standard normal
@@ -274,7 +278,7 @@
 #' image(post_cors$cor)
 #'
 #' # Posterior predictive checks and ELPD-LOO can ascertain model fit
-#' pp_check(mod, type = "ecdf_overlay_grouped",
+#' pp_check(mod, type = "pit_ecdf_grouped",
 #'          group = "species", ndraws = 100)
 #' loo(mod)
 #'
@@ -296,6 +300,7 @@
 #' ggplot(newdata, aes(x = lat, y = lon, col = log_count)) +
 #'   geom_point(size = 1.5) +
 #'   facet_wrap(~ species, scales = 'free') +
+#'   scale_color_viridis_c() +
 #'   theme_classic()
 #'}
 #'@export
@@ -310,7 +315,7 @@ jsdgam = function(formula,
                   species = series,
                   share_obs_params = FALSE,
                   priors,
-                  n_lv = 1,
+                  n_lv = 2,
                   chains = 4,
                   burnin = 500,
                   samples = 500,
