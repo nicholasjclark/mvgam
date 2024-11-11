@@ -471,14 +471,17 @@ test_that("errors about knot lengths should be propagated from mgcv", {
 
 test_that("get_mvgam_priors accepts factor_formula", {
   expect_no_error(get_mvgam_priors(formula = abundance ~
-                        # Environmental model includes species-level intercepts
-                        # and random slopes for a linear effect of reflection
-                        s(taxon, bs = 're') +
-                        s(taxon, bs = 're', by = reflection),
-                      # Each factor estimates a different, possibly nonlinear effect of soil.dry
-                      factor_formula = ~ s(soil.dry, k = 5, by = trend, bs = 'cr') - 1,
-                      data = spiderdat,
-                   trend_model = 'None'))
+                                     # Environmental model includes species-level intercepts
+                                     # and random slopes for a linear effect of reflection
+                                     s(taxon, bs = 're') +
+                                     s(taxon, bs = 're', by = reflection),
+                                   # Each factor estimates a different, possibly nonlinear effect of soil.dry
+                                   factor_formula = ~ s(soil.dry, k = 5, by = trend, bs = 'cr') - 1,
+                                   data = spiderdat,
+                                   unit = site,
+                                   species = taxon,
+                                   n_lv = 3,
+                                   trend_model = 'None'))
 })
 
 # Skip the next test as it should actually initiate the model, and may take a few seconds

@@ -221,6 +221,7 @@ NULL
       stop('no trend_formula exists so there are no trend-level terms to plot')
     }
 
+    object$trend_mgcv_model <- relabel_gps(object$trend_mgcv_model)
     object$trend_mgcv_model$call$data <- NULL
     object$trend_mgcv_model$cmX <- object$trend_mgcv_model$coefficients
     sm_plots <- gratia::draw(object = object$trend_mgcv_model,
@@ -267,6 +268,7 @@ NULL
                              envir = envir,
                              ...)
   } else {
+    object$mgcv_model <- relabel_gps(object$mgcv_model)
     object$mgcv_model$call$data <- NULL
     object$mgcv_model$cmX <- object$mgcv_model$coefficients
     sm_plots <- gratia::draw(object = object$mgcv_model,
@@ -332,56 +334,83 @@ eval_smoothDothilbertDotsmooth = function(smooth,
   insight::check_if_installed("gratia")
   model$cmX <- model$coefficients
 
+
   # deal with data if supplied
   data <- process_user_data_for_eval(
     data = data, model = model,
     n = n, n_3d = n_3d, n_4d = n_4d,
     id = which_smooth(
       model,
-      smooth_label(smooth)
+      gratia::smooth_label(smooth)
     )
   )
 
   # by variables
-  by_var <- by_variable(smooth)
+  by_var <- gratia::by_variable(smooth)
   if (by_var == "NA") {
     by_var <- NA_character_
   }
 
+  # Compute the gp() eigenfunctions for newdata using the supplied brms_mock object
+  # Requires a dataframe of all relevant variables for the gp effects
+  mock_terms <- brms::brmsterms(attr(model, 'brms_mock')$formula)
+  terms_needed <- unique(all.vars(mock_terms$formula)[-1])
+
+  # Only use actual values of those covariates needed for this smooth
+  terms_smooth <- intersect(terms_needed, colnames(data))
+  newdata_mock <- data.frame(data[[terms_smooth[1]]])
+  if(length(terms_smooth) > 1L){
+    for(i in 2:length(terms_smooth)){
+      newdata_mock <- cbind(newdata_mock,
+                            data.frame(data[[terms_smooth[i]]]))
+    }
+  }
+  colnames(newdata_mock) <- terms_smooth
+  newdata_mock$.fake_gp_y <- rnorm(NROW(newdata_mock))
+
+  # Fill in other covariates as fixed values from the original data
+  other_terms <- setdiff(terms_needed, colnames(data))
+  if(length(other_terms) > 0){
+    newdata_mock <- cbind(newdata_mock,
+                          do.call(cbind, lapply(seq_along(other_terms), function(x){
+                            df <- data.frame(var = rep(model$model[[other_terms[x]]][1],
+                                                       NROW(newdata_mock)))
+                            colnames(df) <- other_terms[x]
+                            df
+                          })))
+  }
+
+  brms_mock_data <- brms::standata(attr(model, 'brms_mock'),
+                                   newdata = newdata_mock,
+                                   internal = TRUE)
+
   # Extract GP attributes
   gp_att_table <- attr(model, 'gp_att_table')
-  by <- unlist(purrr::map(gp_att_table, 'by'))
-  level <- unlist(purrr::map(gp_att_table, 'level'))
-  gp_covariate <- smooth$term
-  level <- ifelse(is.null(smooth$by.level), NA, smooth$by.level)
-  k <- unlist(purrr::map(gp_att_table, 'k'))
-  scale <- unlist(purrr::map(gp_att_table, 'scale'))
-  mean <- unlist(purrr::map(gp_att_table, 'mean'))
-  max_dist <- unlist(purrr::map(gp_att_table, 'max_dist'))
-  boundary <- unlist(purrr::map(gp_att_table, 'boundary'))
-  L <- unlist(purrr::map(gp_att_table, 'L'))
+  bys <- unlist(purrr::map(gp_att_table, 'by'),
+                use.names = FALSE)
+  lvls <- unlist(purrr::map(gp_att_table, 'level'),
+                 use.names = FALSE)
+
+  # Extract eigenfunctions for each gp effect
+  eigenfuncs <- eigenfunc_list(stan_data = brms_mock_data,
+                               mock_df = newdata_mock,
+                               by = bys,
+                               level = lvls)
 
   # Which GP term are we plotting?
+  gp_covariate <- smooth$term
+  level <- ifelse(is.null(smooth$by.level), NA, smooth$by.level)
+  gp_names <- gsub(' ', '', unlist(purrr::map(gp_att_table, 'name')))
   if(!is.na(level)){
-    gp_select <- which(unlist(purrr::map(gp_att_table, 'covariate')) == gp_covariate &
-                         which(by %in% by_var) &
+    gp_select <- which(gp_names == smooth$label &
                          unlist(purrr::map(gp_att_table, 'level')) == level)
   } else {
-    gp_select <- which(unlist(purrr::map(gp_att_table, 'covariate')) == gp_covariate &
-                         which(by %in% by_var))
+    gp_select <- which(gp_names == smooth$label &
+                         which(bys %in% by_var))
   }
 
   # Compute eigenfunctions for this GP term
-  X <- prep_eigenfunctions(data = data,
-                           covariate = gp_covariate,
-                           by = by_var,
-                           level = level,
-                           k = k[gp_select],
-                           boundary = boundary[gp_select],
-                           L = L[gp_select],
-                           mean = mean[gp_select],
-                           scale = scale[gp_select],
-                           max_dist = max_dist[gp_select])
+  X <- eigenfuncs[[gp_select]]
 
   # Extract mean coefficients
   start <- purrr::map(gp_att_table, 'first_coef')[[gp_select]]

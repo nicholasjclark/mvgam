@@ -1441,24 +1441,17 @@ mvgam = function(formula,
     # Include any GP term updates
     if(!is.null(gp_terms)){
       gp_additions <- make_gp_additions(gp_details = gp_details,
+                                        orig_formula = orig_formula,
                                         data = data_train,
                                         newdata = data_test,
                                         model_data = stan_objects$model_data,
                                         mgcv_model = ss_gam,
                                         gp_terms = gp_terms,
-                                        family = family)
+                                        family = family,
+                                        rho_names = rho_names)
       stan_objects$model_data <- gp_additions$model_data
       ss_gam <- gp_additions$mgcv_model
-
-      gp_names <- unlist(purrr::map(gp_additions$gp_att_table, 'name'))
-      gp_names <- gsub('gp(', 's(', gp_names, fixed = TRUE)
-      rhos_change <- list()
-      for(i in seq_along(gp_names)){
-        rhos_change[[i]] <- grep(gp_names[i], rho_names, fixed = TRUE)
-      }
-      rho_names[c(unique(unlist(rhos_change)))] <- gsub('s(', 'gp(',
-                                                      rho_names[c(unique(unlist(rhos_change)))],
-                                                      fixed = TRUE)
+      rho_names <- gp_additions$rho_names
     }
 
     # Vectorise likelihoods

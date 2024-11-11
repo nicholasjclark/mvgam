@@ -163,8 +163,8 @@ test_that("specified priors appear in the Stan code", {
   expect_true(expect_match2(gsub(' ', '', stancode),
                             'alpha_gp~normal(-1,0.75);'))
 
-  # Now the same using brms functionality; this time use a bound as well
-  priors <- prior(normal(-1, 0.75), class = alpha_gp, ub = 1)
+  # Now the same using brms functionality
+  priors <- prior(normal(-1, 0.75), class = alpha_gp)
   stancode <- mvgam(y ~ s(season, bs = 'cc'),
                     trend_model = GP(),
                     data = beta_data$data_train,
@@ -174,7 +174,7 @@ test_that("specified priors appear in the Stan code", {
   expect_true(expect_match2(stancode,
                             'alpha_gp ~ normal(-1, 0.75);'))
   expect_true(expect_match2(gsub(' ', '', stancode),
-                            'vector<lower=0,upper=1>[n_series]alpha_gp;'))
+                            'vector<lower=0>[n_series]alpha_gp;'))
 })
 
 test_that("specified trend_formula priors appear in the Stan code", {
@@ -245,11 +245,24 @@ test_that("priors on gp() effects work properly", {
                   class = `alpha_gp(time):seriesseries_1`,
                   ub = 1),
               prior(normal(5, 1.3),
-                    class = `rho_gp_trend(season)`,
+                    class = `rho_gp_trend(season)[1]`,
                     ub = 50))
 
-  mod <- mvgam(formula = y ~ gp(time, by = series, scale = FALSE),
-               trend_formula = ~ gp(season, scale = FALSE),
+  expect_warning(mvgam(formula = y ~ gp(time, by = series, scale = FALSE, k = 10),
+                       trend_formula = ~ gp(season, scale = FALSE, k = 10),
+                       trend_model = AR(),
+                       data = dat$data_train,
+                       run_model = FALSE,
+                       priors = priors),
+                 'bounds cannot currently be changed for gp parameters')
+
+  priors <- c(prior(normal(0, 0.5),
+                    class = `alpha_gp(time):seriesseries_1`),
+              prior(normal(5, 1.3),
+                    class = `rho_gp_trend(season)[1]`))
+
+  mod <- mvgam(formula = y ~ gp(time, by = series, scale = FALSE, k = 10),
+               trend_formula = ~ gp(season, scale = FALSE, k = 10),
                trend_model = AR(),
                data = dat$data_train,
                run_model = FALSE,
@@ -258,12 +271,33 @@ test_that("priors on gp() effects work properly", {
   # Observation model priors working
   expect_true(any(grepl('alpha_gp_time_byseriesseries_1~normal(0,0.5);',
                         gsub(' ', '', mod$model_file), fixed = TRUE)))
-  expect_true(any(grepl('real<lower=0,upper=1>alpha_gp_time_byseriesseries_1;',
-            gsub(' ', '', mod$model_file), fixed = TRUE)))
 
   # Process model priors working
-  expect_true(any(grepl('rho_gp_trend_season_~normal(5,1.3);',
+  expect_true(any(grepl('rho_gp_trend_season_[1]~normal(5,1.3);',
                         gsub(' ', '', mod$model_file), fixed = TRUE)))
-  expect_true(any(grepl('real<lower=0,upper=50>rho_gp_trend_season_;',
+
+  # A quick test of multidimensional gp priors
+  dat <- mgcv::gamSim(1, n = 30, scale = 2)
+
+  mod <- mvgam(y ~ gp(x1, x2,
+                       cov = "matern32",
+                       k = 10,
+                       iso = FALSE,
+                       scale = FALSE),
+                data = dat,
+                family = gaussian(),
+                priors = c(prior(exponential(2.5),
+                                 class = `alpha_gp(x1, x2)`),
+                           prior(normal(0.5, 1),
+                                 class = `rho_gp(x1, x2)[1][1]`),
+                           prior(normal(0.75, 2),
+                                 class = `rho_gp(x1, x2)[1][2]`)),
+                run_model = FALSE)
+
+  expect_true(any(grepl('alpha_gp_x1by_x2_~exponential(2.5);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('rho_gp_x1by_x2_[1][1]~normal(0.5,1);',
+                        gsub(' ', '', mod$model_file), fixed = TRUE)))
+  expect_true(any(grepl('rho_gp_x1by_x2_[1][2]~normal(0.75,2);',
                         gsub(' ', '', mod$model_file), fixed = TRUE)))
 })

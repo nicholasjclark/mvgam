@@ -108,13 +108,13 @@ test_that("dynamic to Hilbert works for trend_formulas", {
   # Model file should have prior lines for observationgp terms
   expect_true(any(grepl('// prior for gp(time):random...',
                         mod$model_file, fixed = TRUE)))
-  expect_true(any(grepl("b[b_idx_gp_time_byrandom] = sqrt(spd_cov_exp_quad(",
+  expect_true(any(grepl("b[b_idx_gp_time_byrandom] = sqrt(spd_gp_exp_quad(",
                         mod$model_file, fixed = TRUE)))
 
   # Model file should have prior lines for trend gp terms
   expect_true(any(grepl('// prior for gp(time):random_trend...',
                         mod$model_file, fixed = TRUE)))
-  expect_true(any(grepl("b_trend[b_trend_idx_gp_time_byrandom] = sqrt(spd_cov_exp_quad(",
+  expect_true(any(grepl("b_trend[b_trend_idx_gp_time_byrandom] = sqrt(spd_gp_exp_quad(",
                         mod$model_file, fixed = TRUE)))
 
   # Observation-level Gp data structures should be in the model_data

@@ -1,4 +1,5 @@
 #' Function to prepare observation model linear predictor matrix
+#' @importFrom brms brmsterms
 #' @noRd
 obs_Xp_matrix = function(newdata, mgcv_model){
   suppressWarnings(Xp  <- try(predict(mgcv_model,
@@ -32,41 +33,41 @@ obs_Xp_matrix = function(newdata, mgcv_model){
   # Check for any gp() terms and update the design matrix
   # accordingly
   if(!is.null(attr(mgcv_model, 'gp_att_table'))){
-    # Compute the eigenfunctions from the supplied attribute table,
-    # and add them to the Xp matrix
+
+    # Compute the gp() eigenfunctions for newdata using the supplied brms_mock object
+    # Requires a dataframe of all relevant variables for the gp effects
+    mock_terms <- brms::brmsterms(attr(mgcv_model, 'brms_mock')$formula)
+    terms_needed <- unique(all.vars(mock_terms$formula)[-1])
+    newdata_mock <- data.frame(newdata[[terms_needed[1]]])
+    if(length(terms_needed) > 1L){
+      for(i in 2:length(terms_needed)){
+        newdata_mock <- cbind(newdata_mock,
+                              data.frame(newdata[[terms_needed[i]]]))
+      }
+    }
+    colnames(newdata_mock) <- terms_needed
+    newdata_mock$.fake_gp_y <- rnorm(NROW(newdata_mock))
+    brms_mock_data <- brms::standata(attr(mgcv_model, 'brms_mock'),
+                                     newdata = newdata_mock,
+                                     internal = TRUE)
 
     # Extract GP attributes
     gp_att_table <- attr(mgcv_model, 'gp_att_table')
-    gp_covariates <- unlist(purrr::map(gp_att_table, 'covariate'))
-    by <- unlist(purrr::map(gp_att_table, 'by'))
-    level <- unlist(purrr::map(gp_att_table, 'level'))
-    k <- unlist(purrr::map(gp_att_table, 'k'))
-    scale <- unlist(purrr::map(gp_att_table, 'scale'))
-    mean <- unlist(purrr::map(gp_att_table, 'mean'))
-    max_dist <- unlist(purrr::map(gp_att_table, 'max_dist'))
-    boundary <- unlist(purrr::map(gp_att_table, 'boundary'))
-    L <- unlist(purrr::map(gp_att_table, 'L'))
+    bys <- unlist(purrr::map(gp_att_table, 'by'), use.names = FALSE)
+    lvls <- unlist(purrr::map(gp_att_table, 'level'), use.names = FALSE)
 
-    # Compute eigenfunctions
-    test_eigenfunctions <- lapply(seq_along(gp_covariates), function(x){
-      prep_eigenfunctions(data = newdata,
-                          covariate = gp_covariates[x],
-                          by = by[x],
-                          level = level[x],
-                          k = k[x],
-                          boundary = boundary[x],
-                          L = L[x],
-                          mean = mean[x],
-                          scale = scale[x],
-                          max_dist = max_dist[x])
-    })
+    # Extract eigenfunctions for each gp effect
+    eigenfuncs <- eigenfunc_list(stan_data = brms_mock_data,
+                                 mock_df = newdata_mock,
+                                 by = bys,
+                                 level = lvls)
 
     # Find indices to replace in the design matrix and replace with
     # the computed eigenfunctions
     starts <- purrr::map(gp_att_table, 'first_coef')
     ends <- purrr::map(gp_att_table, 'last_coef')
     for(i in seq_along(starts)){
-      Xp[,c(starts[[i]]:ends[[i]])] <- test_eigenfunctions[[i]]
+      Xp[,c(starts[[i]]:ends[[i]])] <- eigenfuncs[[i]]
     }
   }
 
@@ -127,7 +128,7 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
                                     trend_map,
                                     forecast = forecast)
 
-  suppressWarnings(Xp_trend  <- try(predict(mgcv_model,
+  suppressWarnings(Xp_trend <- try(predict(mgcv_model,
                                             newdata = trend_test,
                                             type = 'lpmatrix'),
                                     silent = TRUE))
@@ -158,41 +159,41 @@ trend_Xp_matrix = function(newdata, trend_map, series = 'all',
   # Check for any gp() terms and update the design matrix
   # accordingly
   if(!is.null(attr(mgcv_model, 'gp_att_table'))){
-    # Compute the eigenfunctions from the supplied attribute table,
-    # and add them to the Xp matrix
+
+    # Compute the gp() eigenfunctions for newdata using the supplied brms_mock object
+    # Requires a dataframe of all relevant variables for the gp effects
+    mock_terms <- brms::brmsterms(attr(mgcv_model, 'brms_mock')$formula)
+    terms_needed <- unique(all.vars(mock_terms$formula)[-1])
+    newdata_mock <- data.frame(trend_test[[terms_needed[1]]])
+    if(length(terms_needed) > 1L){
+      for(i in 2:length(terms_needed)){
+        newdata_mock <- cbind(newdata_mock,
+                              data.frame(trend_test[[terms_needed[i]]]))
+      }
+    }
+    colnames(newdata_mock) <- terms_needed
+    newdata_mock$.fake_gp_y <- rnorm(NROW(newdata_mock))
+    brms_mock_data <- brms::standata(attr(mgcv_model, 'brms_mock'),
+                                     newdata = newdata_mock,
+                                     internal = TRUE)
 
     # Extract GP attributes
     gp_att_table <- attr(mgcv_model, 'gp_att_table')
-    gp_covariates <- unlist(purrr::map(gp_att_table, 'covariate'))
-    by <- unlist(purrr::map(gp_att_table, 'by'))
-    level <- unlist(purrr::map(gp_att_table, 'level'))
-    k <- unlist(purrr::map(gp_att_table, 'k'))
-    scale <- unlist(purrr::map(gp_att_table, 'scale'))
-    mean <- unlist(purrr::map(gp_att_table, 'mean'))
-    max_dist <- unlist(purrr::map(gp_att_table, 'max_dist'))
-    boundary <- unlist(purrr::map(gp_att_table, 'boundary'))
-    L <- unlist(purrr::map(gp_att_table, 'L'))
+    bys <- unlist(purrr::map(gp_att_table, 'by'), use.names = FALSE)
+    lvls <- unlist(purrr::map(gp_att_table, 'level'), use.names = FALSE)
 
-    # Compute eigenfunctions
-    test_eigenfunctions <- lapply(seq_along(gp_covariates), function(x){
-      prep_eigenfunctions(data = trend_test,
-                          covariate = gp_covariates[x],
-                          by = by[x],
-                          level = level[x],
-                          k = k[x],
-                          boundary = boundary[x],
-                          L = L[x],
-                          mean = mean[x],
-                          scale = scale[x],
-                          max_dist = max_dist[x])
-    })
+    # Extract eigenfunctions for each gp effect
+    eigenfuncs <- eigenfunc_list(stan_data = brms_mock_data,
+                                 mock_df = newdata_mock,
+                                 by = bys,
+                                 level = lvls)
 
     # Find indices to replace in the design matrix and replace with
     # the computed eigenfunctions
     starts <- purrr::map(gp_att_table, 'first_coef')
     ends <- purrr::map(gp_att_table, 'last_coef')
     for(i in seq_along(starts)){
-      Xp_trend[,c(starts[[i]]:ends[[i]])] <- test_eigenfunctions[[i]]
+      Xp_trend[,c(starts[[i]]:ends[[i]])] <- eigenfuncs[[i]]
     }
   }
 

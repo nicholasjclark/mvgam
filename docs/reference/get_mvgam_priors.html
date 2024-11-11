@@ -72,7 +72,9 @@ changed for a given <code>mvgam</code> model, as well listing their default dist
 <span>  <span class="va">factor_formula</span>,</span>
 <span>  <span class="va">data</span>,</span>
 <span>  <span class="va">data_train</span>,</span>
-<span>  family <span class="op">=</span> <span class="st">"poisson"</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  unit <span class="op">=</span> <span class="va">time</span>,</span>
+<span>  species <span class="op">=</span> <span class="va">series</span>,</span>
 <span>  <span class="va">knots</span>,</span>
 <span>  <span class="va">trend_knots</span>,</span>
 <span>  use_lv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -89,7 +91,7 @@ changed for a given <code>mvgam</code> model, as well listing their default dist
     <dl><dt>formula</dt>
 <dd><p>A <code>character</code> string specifying the GAM observation model formula. These are exactly like the formula
 for a GLM except that smooth terms, <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, as well as time-varying
-<code><a href="dynamic.html">dynamic()</a></code> terms and nonparametric <code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp()</a></code> terms, can be added to the right hand side
+<code><a href="dynamic.html">dynamic()</a></code> terms and nonparametric <code><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp()</a></code> terms, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors
 (or linear functionals of these). In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>formula</code> is used to
 set up a linear predictor for the detection probability. Details of the formula syntax used by <span class="pkg">mvgam</span>
@@ -163,6 +165,21 @@ See <code><a href="mvgam_families.html">mvgam_families</a></code> for an example
 </ul><p>Note that only <code><a href="mvgam_families.html">nb()</a></code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> are available if using <code>JAGS</code> as the backend.
 Default is <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>.
 See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
+
+
+<dt>unit</dt>
+<dd><p>The unquoted name of the variable that represents the unit of analysis in <code>data</code> over
+which latent residuals should be correlated. This variable should be either a
+<code>numeric</code> or <code>integer</code> variable in the supplied <code>data</code>.
+Defaults to <code>time</code> to be consistent with other functionalities
+in <span class="pkg">mvgam</span>, though note that the data need not be time series in this case. See examples below
+for further details and explanations</p></dd>
+
+
+<dt>species</dt>
+<dd><p>The unquoted name of the <code>factor</code> variable that indexes
+the different response units in <code>data</code> (usually <code>'species'</code> in a JSDM).
+Defaults to <code>series</code> to be consistent with other <code>mvgam</code> models</p></dd>
 
 
 <dt>knots</dt>
@@ -249,7 +266,7 @@ users can also modify the parameter bounds by modifying the <code>new_lowerbound
 This will be necessary if using restrictive distributions on some parameters, such as a Beta distribution
 for the trend sd parameters for example (Beta only has support on  <code>(0,1)</code>), so the upperbound cannot
 be above <code>1</code>. Another option is to make use of the prior modification functions in <code>brms</code>
-(i.e. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code>) to change prior distributions and bounds (just use the name of the parameter that
+(i.e. <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></code>) to change prior distributions and bounds (just use the name of the parameter that
 you'd like to change as the <code>class</code> argument; see examples below)</p>
     </div>
     <div class="section level2">
@@ -262,7 +279,7 @@ example)</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="mvgam.html">mvgam</a></code>, <code><a href="mvgam_formulae.html">mvgam_formulae</a></code>, <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code></p></div>
+    <div class="dont-index"><p><code><a href="mvgam.html">mvgam</a></code>, <code><a href="mvgam_formulae.html">mvgam_formulae</a></code>, <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -447,13 +464,13 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.65);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2      mu_raw ~ normal(0.92, 1);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.57);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(-0.96, 0.9);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5       ar2 ~ normal(0.5, 0.48);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.45);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.71, 0.14);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.55);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(-0.64, 0.64);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.45);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.76, 0.29);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5      ar2 ~ normal(-0.19, 0.8);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.93);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.89, 0.89);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>
@@ -614,9 +631,9 @@ example)</p>
 <span class="r-in"><span><span class="co"># The same can be done using 'brms' functions; here we will also change the ar1 prior</span></span></span>
 <span class="r-in"><span><span class="co"># and put some bounds on the ar coefficients to enforce stationarity; we set the</span></span></span>
 <span class="r-in"><span><span class="co"># prior using the 'class' argument in all brms prior functions</span></span></span>
-<span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">mu_raw</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">ar1</span>, lb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, ub <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">ar2</span>, lb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, ub <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">mu_raw</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">ar1</span>, lb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, ub <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">ar2</span>, lb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, ub <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">brmsprior</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             prior  class coef group resp dpar nlpar   lb   ub source</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  normal(0.2, 0.5) mu_raw                            &lt;NA&gt; &lt;NA&gt;   user</span>
@@ -1031,8 +1048,8 @@ example)</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Likewise using 'brms' utilities (note that you can use</span></span></span>
 <span class="r-in"><span><span class="co"># Intercept rather than `(Intercept)`) to change priors on the intercept</span></span></span>
-<span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">cov</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">cov</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">brmsprior</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             prior     class coef group resp dpar nlpar   lb   ub source</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  normal(0.2, 0.5)       cov                            &lt;NA&gt; &lt;NA&gt;   user</span>
@@ -1145,7 +1162,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Gu &amp; Wahba 4 term additive model</span>
 <span class="r-in"><span><span class="va">dat</span><span class="op">$</span><span class="va">time</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NROW</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x0</span> <span class="op">+</span> <span class="va">x1</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x2</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x3</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            priors <span class="op">=</span> <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.75</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'b'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>            priors <span class="op">=</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.75</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'b'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            data <span class="op">=</span> <span class="va">dat</span>,</span></span>
 <span class="r-in"><span>            family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
