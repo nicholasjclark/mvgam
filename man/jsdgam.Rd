@@ -328,17 +328,16 @@ ggplot(dat, aes(x = lat, y = lon, col = log(count + 1))) +
   scale_color_viridis_c() +
   theme_classic()
 
-# Inspect default priors for a joint species model with spatial factors
+# Inspect default priors for a joint species model with three spatial factors
 priors <- get_mvgam_priors(formula = count ~
-                            # Environmental model includes species-level intercepts
-                            # and random slopes for a linear effect of temperature
-                            species +
+                            # Environmental model includes random slopes for
+                            # a linear effect of temperature
                             s(species, bs = 're', by = temperature),
 
                           # Each factor estimates a different nonlinear spatial process, using
                           # 'by = trend' as in other mvgam State-Space models
                           factor_formula = ~ gp(lat, lon, k = 6, by = trend) - 1,
-                          n_lv = 4,
+                          n_lv = 3,
 
                           # The data and grouping variables
                           data = dat,
@@ -350,20 +349,27 @@ priors <- get_mvgam_priors(formula = count ~
 head(priors)
 
 # Fit a JSDM that estimates hierarchical temperature responses
-# and that uses four latent spatial factors
+# and that uses three latent spatial factors
 mod <- jsdgam(formula = count ~
-                # Environmental model includes species-level intercepts
-                # and random slopes for a linear effect of temperature
-                species +
+                # Environmental model includes random slopes for a
+                # linear effect of temperature
                 s(species, bs = 're', by = temperature),
 
               # Each factor estimates a different nonlinear spatial process, using
               # 'by = trend' as in other mvgam State-Space models
               factor_formula = ~ gp(lat, lon, k = 6, by = trend) - 1,
-              n_lv = 4,
+              n_lv = 3,
 
-              # Change default priors for fixed effect betas to standard normal
-              priors = prior(std_normal(), class = b),
+              # Change default priors for fixed random effect variances and
+              # factor P marginal deviations to standard normal
+              priors = c(prior(std_normal(),
+                               class = sigma_raw),
+                         prior(std_normal(),
+                               class = `alpha_gp_trend(lat, lon):trendtrend1`),
+                         prior(std_normal(),
+                               class = `alpha_gp_trend(lat, lon):trendtrend2`),
+                         prior(std_normal(),
+                               class = `alpha_gp_trend(lat, lon):trendtrend3`)),
 
               # The data and the grouping variables
               data = dat,

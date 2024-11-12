@@ -100,8 +100,7 @@ conditional_effects(mod1, type = 'link')
 Before showing how to produce and evaluate forecasts, we will fit a second model to these data so the two models can be compared. This model is equivalent to the above, except we now use Gaussian Processes to model series-specific dynamics. This makes use of the `gp()` function from `brms`, which can fit Hilbert space approximate GPs. See `?brms::gp` for more details.
 ```{r include=FALSE}
 mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) + 
-                gp(time, by = series, c = 5/4, k = 20,
-                   scale = FALSE),
+                gp(time, by = series, c = 5/4, k = 20),
               knots = list(season = c(0.5, 12.5)),
               trend_model = 'None',
               data = simdat$data_train,
@@ -111,8 +110,7 @@ mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) +
 
 ```{r eval=FALSE}
 mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) + 
-                gp(time, by = series, c = 5/4, k = 20,
-                   scale = FALSE),
+                gp(time, by = series, c = 5/4, k = 20),
               knots = list(season = c(0.5, 12.5)),
               trend_model = 'None',
               data = simdat$data_train,
@@ -168,8 +166,7 @@ Clearly the two models do not produce equivalent forecasts. We will come back to
 The second way we can produce forecasts in `mvgam` is to feed the testing data directly to the `mvgam()` function as `newdata`. This will include the testing data as missing observations so that they are automatically predicted from the posterior predictive distribution using the `generated quantities` block in `Stan`. As an example, we can refit `mod2` but include the testing data for automatic forecasts:
 ```{r include=FALSE}
 mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) + 
-                gp(time, by = series, c = 5/4, k = 20,
-                   scale = FALSE),
+                gp(time, by = series, c = 5/4, k = 20),
               knots = list(season = c(0.5, 12.5)),
               trend_model = 'None',
               data = simdat$data_train,
@@ -180,8 +177,7 @@ mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) +
 
 ```{r eval=FALSE}
 mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) + 
-                gp(time, by = series, c = 5/4, k = 20,
-                   scale = FALSE),
+                gp(time, by = series, c = 5/4, k = 20),
               knots = list(season = c(0.5, 12.5)),
               trend_model = 'None',
               data = simdat$data_train,
