@@ -929,45 +929,24 @@ gp_param_summary = function(object,
 
   # Determine which parameters to extract
   if(trend_effects){
-    alpha_params <- gsub('series',
-                         'trend',
-                         gsub('gp_',
-                              'gp_trend_',
-                              gsub(':',
-                                   'by',
-                                   gsub(')',
-                                        '_',
-                                        gsub('(', '_', paste0('alpha_', gp_names),
-                                             fixed = TRUE),
-                                        fixed = TRUE))))
-    rho_params <- gsub('series',
-                       'trend',
-                       gsub('gp_',
-                            'gp_trend_',
-                            gsub(':', 'by',
-                                 gsub(')',
-                                      '_',
-                                      gsub('(', '_', paste0('rho_', gp_names),
-                                           fixed = TRUE), fixed = TRUE))))
+
+    alpha_params <- gsub('gp_',
+                         'gp_trend_',
+                         gsub('series',
+                              'trend',
+                              paste0('alpha_', clean_gpnames(gp_names)),
+                              fixed = TRUE),
+                         fixed = TRUE)
+    rho_params <- gsub('gp_',
+                       'gp_trend_',
+                       gsub('series',
+                            'trend',
+                            paste0('rho_', clean_gpnames(gp_names)),
+                            fixed = TRUE),
+                       fixed = TRUE)
   } else {
-    alpha_params <- gsub(':',
-                         'by', gsub(')',
-                                    '_',
-                                    gsub('(',
-                                         '_',
-                                         paste0('alpha_',
-                                                clean_gpnames(gp_names)),
-                                         fixed = TRUE),
-                                    fixed = TRUE))
-    rho_params <- gsub(':',
-                         'by', gsub(')',
-                                    '_',
-                                    gsub('(',
-                                         '_',
-                                         paste0('rho_',
-                                                clean_gpnames(gp_names)),
-                                         fixed = TRUE),
-                                    fixed = TRUE))
+    alpha_params <- paste0('alpha_', clean_gpnames(gp_names))
+    rho_params <- paste0('rho_', clean_gpnames(gp_names))
   }
 
   # Create summary tables

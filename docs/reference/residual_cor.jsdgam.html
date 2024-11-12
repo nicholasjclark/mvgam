@@ -107,27 +107,50 @@ function. Only used if <code>summary</code> is <code>TRUE</code>.</p></dd>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     
 
-<p>If <code>summary = TRUE</code>, a <code>list</code> with the following components:</p><ul><li><p>cor, cor_lower, cor_upper: A set of \(p \times p\) correlation matrices,
+<p>If <code>summary = TRUE</code>, a <code>list</code> with the following components:</p>
+<dl><dt>cor, cor_lower, cor_upper</dt>
+<dd><p>A set of \(p \times p\) correlation matrices,
 containing either the posterior median or mean estimate, plus lower and upper limits
-of the corresponding credible intervals supplied to <code>probs</code></p></li>
-<li><p>sig_cor: A \(p \times p\) correlation matrix containing only those correlations whose credible
-interval does not contain zero. All other correlations are set to zero</p></li>
-<li><p>prec, prec_lower, prec_upper: A set of \(p \times p\) precision matrices,
+of the corresponding credible intervals supplied to <code>probs</code></p></dd>
+
+<dt>sig_cor</dt>
+<dd><p>A \(p \times p\) correlation matrix containing only those correlations whose credible
+interval does not contain zero. All other correlations are set to zero</p></dd>
+
+<dt>prec, prec_lower, prec_upper</dt>
+<dd><p>A set of \(p \times p\) precision matrices,
 containing either the posterior median or mean estimate, plus lower and upper limits
-of the corresponding credible intervals supplied to <code>probs</code></p></li>
-<li><p>sig_prec: A \(p \times p\) precision matrix containing only those precisions whose credible
-interval does not contain zero. All other precisions are set to zero</p></li>
-<li><p>cov: A \(p \times p\) posterior median or mean covariance matrix</p></li>
-<li><p>trace: The median/mean point estimator of the trace (sum of the diagonal elements)
-of the residual covariance matrix <code>cov</code></p></li>
-</ul><p>If <code>summary = FALSE</code>, this function returns a <code>list</code> containing the following components:</p><ul><li><p>all_cormat: A \(n_{draws} \times p \times p\) <code>array</code> of posterior
-residual correlation matrix draws</p></li>
-<li><p>all_covmat: A \(n_{draws} \times p \times p\) <code>array</code> of posterior
-residual covariance matrix draws</p></li>
-<li><p>all_presmat: A \(n_{draws} \times p \times p\) <code>array</code> of posterior
-residual precision matrix draws</p></li>
-<li><p>all_trace: A \(n_{draws}\) <code>vector</code> of posterior covariance trace draws</p></li>
-</ul></div>
+of the corresponding credible intervals supplied to <code>probs</code></p></dd>
+
+<dt>sig_prec</dt>
+<dd><p>A \(p \times p\) precision matrix containing only those precisions whose credible
+interval does not contain zero. All other precisions are set to zero</p></dd>
+
+<dt>cov</dt>
+<dd><p>A \(p \times p\) posterior median or mean covariance matrix</p></dd>
+
+<dt>trace</dt>
+<dd><p>The median/mean point estimator of the trace (sum of the diagonal elements)
+of the residual covariance matrix <code>cov</code></p></dd>
+
+
+</dl><p>If <code>summary = FALSE</code>, this function returns a <code>list</code> containing the following components:</p>
+<dl><dt>all_cormat</dt>
+<dd><p>A \(n_{draws} \times p \times p\) <code>array</code> of posterior
+residual correlation matrix draws</p></dd>
+
+<dt>all_covmat</dt>
+<dd><p>A \(n_{draws} \times p \times p\) <code>array</code> of posterior
+residual covariance matrix draws</p></dd>
+
+<dt>all_presmat</dt>
+<dd><p>A \(n_{draws} \times p \times p\) <code>array</code> of posterior
+residual precision matrix draws</p></dd>
+
+<dt>all_trace</dt>
+<dd><p>A \(n_{draws}\) <code>vector</code> of posterior covariance trace draws</p></dd>
+
+</dl></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Hui (2016) provides an excellent description of the quantities that this function calculates, so this passage
