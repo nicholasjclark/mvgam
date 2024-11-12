@@ -574,7 +574,7 @@ plot(beta_temp)
 # Simulate a covariate called 'temp'
 temp <- rnorm(N, sd = 1)
 
-# Simulate the Gaussian observation process
+# Simulate some noisy Gaussian observations
 out <- rnorm(N, mean = 4 + beta_temp * temp,
              sd = 0.5)
 
