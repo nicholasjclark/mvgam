@@ -19,8 +19,8 @@
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the
-variables included in the linear predictor of \code{formula}. If not supplied,
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same variables
+that were included in the original \code{data} used to fit the model. If not supplied,
 predictions are generated for the original observations used for the model fit.}
 
 \item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use

@@ -6,6 +6,7 @@
 #'
 #' @inheritParams brms::residuals.brmsfit
 #' @param object An object of class `mvgam`
+#' @param ... ignored
 #' @details This method gives residuals as Dunn-Smyth (randomized quantile) residuals. Any
 #' observations that were missing (i.e. `NA`) in the original data will have missing values
 #' in the residuals

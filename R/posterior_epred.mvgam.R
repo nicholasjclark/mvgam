@@ -294,6 +294,14 @@ fitted.mvgam <- function(object, process_error = TRUE,
                   "linear" = "link")
   preds <- .mvgam_fitted(object = object, type = type)
 
+  # Preserve original data ordering
+  data.frame(time = object$obs_data$index..time..index,
+             order = object$obs_data$index..orig..order,
+             series = object$obs_data$series) %>%
+    dplyr::arrange(time, series) %>%
+    dplyr::pull(order) -> orig_order
+  preds <- preds[ , order(orig_order)]
+
   if(summary){
     Qupper <- apply(preds, 2, quantile, probs = max(probs), na.rm = TRUE)
     Qlower <- apply(preds, 2, quantile, probs = min(probs), na.rm = TRUE)

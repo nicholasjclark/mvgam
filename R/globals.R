@@ -19,4 +19,6 @@ utils::globalVariables(c("y", "year", "smooth_vals", "smooth_num",
                          "time_lag", "dis_time", "maxt", "orig_rows",
                          "matches", "time.", "file_name", ".data",
                          "horizon", "target", "Series", "evd", "mean_evd",
-                         "total_evd"))
+                         "total_evd", "smooth_label", "by_variable",
+                         "gr", "tot_subgrs", "subgr", "lambda",
+                         "level", "sim_hilbert_gp", "trend_model"))

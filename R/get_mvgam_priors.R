@@ -4,6 +4,9 @@
 #'changed for a given `mvgam` model, as well listing their default distributions
 #'
 #'@inheritParams mvgam
+#'@inheritParams jsdgam
+#'@param factor_formula Can be supplied instead `trend_formula` to match syntax from
+#'[jsdgam]
 #'@details Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and
 #'altered. To make alterations, change the contents of the `prior` column and supplying this
 #'\code{data.frame} to the `mvgam` function using the argument `priors`. If using `Stan` as the backend,
@@ -151,9 +154,12 @@
 #'@export
 get_mvgam_priors = function(formula,
                             trend_formula,
+                            factor_formula,
                             data,
                             data_train,
-                            family = 'poisson',
+                            family = poisson(),
+                            unit = time,
+                            species = series,
                             knots,
                             trend_knots,
                             use_lv = FALSE,
@@ -172,6 +178,27 @@ get_mvgam_priors = function(formula,
   }
   orig_data <- data_train
 
+  # Set trend_formula
+  if(!missing(factor_formula)){
+    if(missing(n_lv)){
+      n_lv <- 2
+    }
+    validate_pos_integer(n_lv)
+    unit <- deparse0(substitute(unit))
+    subgr <- deparse0(substitute(species))
+    prepped_trend <- prep_jsdgam_trend(unit = unit,
+                                       subgr = subgr,
+                                       data = data)
+    trend_model <- 'None'
+    data_train <- validate_series_time(data = data,
+                                       trend_model = prepped_trend)
+    trend_map <- prep_jsdgam_trendmap(data_train, n_lv)
+    if(!missing(trend_formula)){
+      warning('Both "trend_formula" and "factor_formula" supplied\nUsing "factor_formula" as default')
+    }
+    trend_formula <- factor_formula
+  }
+
   # Validate the trend arguments
   if(drift)
     message('The "drift" argument is deprecated; use fixed effects of "time" instead')
@@ -179,11 +206,12 @@ get_mvgam_priors = function(formula,
   orig_trend_model <- trend_model
   trend_model <- validate_trend_model(orig_trend_model,
                                       drift = drift,
-                                      noncentred = FALSE)
+                                      noncentred = FALSE,
+                                      warn = FALSE)
 
   # Ensure series and time variables are present
   data_train <- validate_series_time(data_train, name = 'data',
-                                     trend_model = trend_model)
+                                     trend_model = orig_trend_model)
 
   # Validate the formula to convert any dynamic() terms
   formula <- interpret_mvgam(formula, N = max(data_train$time),
@@ -235,12 +263,16 @@ get_mvgam_priors = function(formula,
     if(trend_model == 'None') trend_model <- 'RW'
     validate_trend_formula(trend_formula)
     prior_df <- get_mvgam_priors(formula = orig_formula,
-                                 data = data,
-                                 data_train = data_train,
+                                 data = data_train,
+                                 #data_train = data_train,
                                  family = family,
                                  use_lv = FALSE,
                                  use_stan = TRUE,
-                                 trend_model = trend_model,
+                                 trend_model = if(trend_model == 'None'){
+                                   RW()
+                                 } else {
+                                   orig_trend_model
+                                 },
                                  trend_map = trend_map,
                                  drift = drift,
                                  knots = knots)
@@ -518,17 +550,55 @@ get_mvgam_priors = function(formula,
     # Check for gp() terms
     if(!is.null(gp_terms)){
       gp_additions <- make_gp_additions(gp_details = gp_details,
+                                        orig_formula = orig_formula,
                                         data = data_train,
                                         newdata = NULL,
                                         model_data = list(X = t(predict(ss_gam, type = 'lpmatrix'))),
                                         mgcv_model = ss_gam,
                                         gp_terms = gp_terms,
                                         family = family)
-      gp_names <- unlist(purrr::map(gp_additions$gp_att_table, 'name'))
+      gp_names <- unlist(purrr::map(gp_additions$gp_att_table, 'name'),
+                         use.names = FALSE)
+      gp_isos <- unlist(purrr::map(gp_additions$gp_att_table, 'iso'),
+                         use.names = FALSE)
+      abbv_names <- vector(mode = 'list', length = length(gp_names))
+      full_names <- vector(mode = 'list', length = length(gp_names))
+      for(i in seq_len(length(gp_names))){
+        if(gp_isos[i]){
+          abbv_names[[i]] <- gp_names[i]
+          full_names[[i]] <- paste0(gp_names[i],
+                                    '[1]')
+        } else {
+          abbv_names[[i]] <- paste0(gp_names[i],
+                                    '[1][',
+                                    1:2,
+                                    ']')
+          full_names[[i]] <- paste0(gp_names[i],
+                                    '[1][',
+                                    1:2,
+                                    ']')
+        }
+      }
+      full_names <- unlist(full_names, use.names = FALSE)
+      abbv_names <- unlist(abbv_names, use.names = FALSE)
       alpha_priors <- unlist(purrr::map(gp_additions$gp_att_table,
-                                        'def_alpha'))
+                                        'def_alpha'),
+                             use.names = FALSE)
       rho_priors <- unlist(purrr::map(gp_additions$gp_att_table,
-                                        'def_rho'))
+                                        'def_rho'),
+                           use.names = FALSE)
+      rho_2_priors <- unlist(purrr::map(gp_additions$gp_att_table,
+                                      'def_rho_2'),
+                           use.names = FALSE)
+      full_priors <- vector(mode = 'list', length = length(gp_names))
+      for(i in seq_len(length(gp_names))){
+        if(gp_isos[i]){
+          full_priors[[i]] <- rho_priors[i]
+        } else {
+          full_priors[[i]] <- c(rho_priors[i], rho_2_priors[i])
+        }
+      }
+      full_priors <- unlist(full_priors, use.names = FALSE)
       smooth_labs <- smooth_labs %>%
         dplyr::filter(!label %in%
                         gsub('gp(', 's(', gp_names, fixed = TRUE))
@@ -544,14 +614,14 @@ get_mvgam_priors = function(formula,
                                                   round(runif(length(gp_names), 0.5, 1), 2),
                                                   ');'))
       rho_df <- data.frame(param_name = paste0('real<lower=0> rho_',
-                                                 gp_names, ';'),
-                             param_length = 1,
-                             param_info = paste(gp_names,
+                                               abbv_names, ';'),
+                           param_length = 1,
+                             param_info = paste(abbv_names,
                                                 'length scale'),
-                             prior = paste0('rho_', gp_names, ' ~ ', rho_priors, ';'),
-                             example_change = paste0('rho_', gp_names, ' ~ ',
+                           prior = paste0('rho_', full_names, ' ~ ', full_priors, ';'),
+                             example_change = paste0('rho_', full_names, ' ~ ',
                                                      'normal(0, ',
-                                                     round(runif(length(gp_names), 1, 10), 2),
+                                                     round(runif(length(full_names), 0.5, 1), 2),
                                                      ');'))
       gp_df <- rbind(alpha_df, rho_df)
     } else {
@@ -696,9 +766,7 @@ get_mvgam_priors = function(formula,
     }
 
     # Extract information on priors for trend components
-    if(trend_model == 'None'){
-      trend_df <- NULL
-    }
+    trend_df <- NULL
 
     if(trend_model %in% c('PWlinear', 'PWlogistic')){
       # Need to fix this as a next priority
@@ -765,7 +833,23 @@ get_mvgam_priors = function(formula,
                                    example_change = 'num_gp_basis = 12;'))
     }
 
-    if(trend_model == 'RW'){
+    if(trend_model %in% c('ZMVN', 'ZMVNhiercor')){
+      trend_df <- data.frame(param_name = c(paste0('vector<lower=0>[',
+                                                   ifelse(use_lv, 'n_lv', 'n_series'),
+                                                   '] sigma;')),
+                             param_length = ifelse(use_lv,
+                                                   n_lv,
+                                                   length(unique(data_train$series))),
+                             param_info = c('residual sd'),
+                             prior = c('sigma ~ exponential(2);'),
+                             example_change = c(
+                               paste0('sigma ~ exponential(',
+                                      round(runif(min = 0.01, max = 1, n = 1), 2),
+                                      ');'
+                               )))
+    }
+
+    if(trend_model %in% c('RW', 'RWcor', 'RWhiercor')){
       if(use_stan){
         trend_df <- data.frame(param_name = c(paste0('vector<lower=0>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),
@@ -841,7 +925,7 @@ get_mvgam_priors = function(formula,
                                                       "hs[2] = 0.1;")))
     }
 
-    if(trend_model %in% c('VAR1cor', 'VARMA1,1cor')){
+    if(trend_model %in% c('VAR1cor', 'VARhiercor', 'VARMA1,1cor')){
       trend_df <- data.frame(param_name = c('vector<lower=0>[n_series] sigma;'),
                              param_length = c(length(unique(data_train$series))),
                              param_info = c('trend sd'),
@@ -917,7 +1001,7 @@ get_mvgam_priors = function(formula,
                              )))
     }
 
-    if(trend_model == 'AR1'){
+    if(trend_model %in% c('AR1', 'AR1cor', 'AR1hiercor')){
       if(use_stan){
         trend_df <- data.frame(param_name = c(paste0('vector<lower=-1,upper=1>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),
@@ -972,7 +1056,7 @@ get_mvgam_priors = function(formula,
 
     }
 
-    if(trend_model == 'AR2'){
+    if(trend_model %in% c('AR2', 'AR2cor', 'AR2hiercor')){
       if(use_stan){
         trend_df <- data.frame(param_name = c(paste0('vector<lower=-1,upper=1>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),
@@ -1051,7 +1135,7 @@ get_mvgam_priors = function(formula,
 
     }
 
-    if(trend_model == 'AR3'){
+    if(trend_model %in% c('AR3', 'AR3cor', 'AR3hiercor')){
       if(use_stan){
         trend_df <- data.frame(param_name = c(paste0('vector<lower=-1,upper=1>[',
                                                      ifelse(use_lv, 'n_lv', 'n_series'),

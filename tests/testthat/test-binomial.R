@@ -34,7 +34,7 @@ dat_test <- dat %>%
 
 test_that("cbind() syntax required for binomial()", {
   # Initial warning should be issued when calling binomial or beta-binomial
-  expect_warning(mvgam(cbind(y, ntrials) ~ s(series, bs = 're') +
+  expect_warning(mvgam(formula = cbind(y, ntrials) ~ s(series, bs = 're') +
                    gp(x, by = series, c = 5/4, k = 5),
                  family = binomial(),
                  data = dat_train,
@@ -266,7 +266,7 @@ test_that("bernoulli() behaves appropriately", {
 
   # Also with a trend_formula
   mod <- mvgam(y ~ series,
-               trend_formula = ~ gp(x, by = trend, c = 5/4),
+               trend_formula = ~ gp(x, by = trend, c = 5/4, k = 5),
                trend_model = AR(),
                family = bernoulli(),
                data = dat_train,

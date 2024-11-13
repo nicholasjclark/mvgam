@@ -139,7 +139,6 @@ as.array.mvgam = function(x,
 }
 
 #' @rdname mvgam_draws
-#' @importFrom posterior as_draws
 #' @method as_draws mvgam
 #' @export
 as_draws.mvgam <- function(x, variable = NULL, regex = FALSE,
@@ -172,8 +171,11 @@ as_draws.mvgam <- function(x, variable = NULL, regex = FALSE,
   return(post)
 }
 
+#' @export
+#' @importFrom posterior as_draws
+posterior::as_draws
+
 #' @rdname mvgam_draws
-#' @importFrom posterior as_draws_matrix
 #' @method as_draws_matrix mvgam
 #' @export
 as_draws_matrix.mvgam <- function(x, variable = NULL, regex = FALSE,
@@ -205,8 +207,11 @@ as_draws_matrix.mvgam <- function(x, variable = NULL, regex = FALSE,
   return(post)
 }
 
+#' @export
+#' @importFrom posterior as_draws_matrix
+posterior::as_draws_matrix
+
 #' @rdname mvgam_draws
-#' @importFrom posterior as_draws_df
 #' @method as_draws_df mvgam
 #' @export
 as_draws_df.mvgam <- function(x, variable = NULL, regex = FALSE,
@@ -238,8 +243,11 @@ as_draws_df.mvgam <- function(x, variable = NULL, regex = FALSE,
   return(post)
 }
 
+#' @export
+#' @importFrom posterior as_draws_df
+posterior::as_draws_df
+
 #' @rdname mvgam_draws
-#' @importFrom posterior as_draws_array
 #' @method as_draws_array mvgam
 #' @export
 as_draws_array.mvgam <- function(x, variable = NULL, regex = FALSE,
@@ -271,8 +279,11 @@ as_draws_array.mvgam <- function(x, variable = NULL, regex = FALSE,
   return(post)
 }
 
+#' @export
+#' @importFrom posterior as_draws_array
+posterior::as_draws_array
+
 #' @rdname mvgam_draws
-#' @importFrom posterior as_draws_list
 #' @method as_draws_list mvgam
 #' @export
 as_draws_list.mvgam <- function(x, variable = NULL, regex = FALSE,
@@ -306,8 +317,11 @@ as_draws_list.mvgam <- function(x, variable = NULL, regex = FALSE,
   return(post)
 }
 
+#' @export
+#' @importFrom posterior as_draws_list
+posterior::as_draws_list
+
 #' @rdname mvgam_draws
-#' @importFrom posterior as_draws_rvars
 #' @method as_draws_rvars mvgam
 #' @export
 as_draws_rvars.mvgam <- function(x, variable = NULL, regex = FALSE,
@@ -331,6 +345,10 @@ as_draws_rvars.mvgam <- function(x, variable = NULL, regex = FALSE,
                         ...)
   return(post)
 }
+
+#' @export
+#' @importFrom posterior as_draws_rvars
+posterior::as_draws_rvars
 
 #'@noRd
 validate_variables = function(x, variable, regex = FALSE){

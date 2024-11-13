@@ -194,6 +194,8 @@ test_that("nmix() post-processing works", {
     silent = 2))
 
   expect_no_error(capture_output(summary(mod)))
+  expect_no_error(capture_output(plot(mod, type = 'pterms')))
+  expect_no_error(capture_output(plot(mod, type = 'pterms', trend_effects = TRUE)))
   expect_no_error(capture_output(print(mod)))
   expect_true(inherits(hindcast(mod), 'mvgam_forecast'))
   expect_true(inherits(hindcast(mod,

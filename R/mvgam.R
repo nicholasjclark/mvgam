@@ -13,7 +13,7 @@
 #'@importFrom rlang missing_arg
 #'@param formula A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
 #'for a GLM except that smooth terms, `s()`, `te()`, `ti()`, `t2()`, as well as time-varying
-#'`dynamic()` terms, can be added to the right hand side
+#'`dynamic()` terms and nonparametric `gp()` terms, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors
 #'(or linear functionals of these). In `nmix()` family models, the `formula` is used to
 #'set up a linear predictor for the detection probability. Details of the formula syntax used by \pkg{mvgam}
@@ -31,14 +31,14 @@
 #'for both the observation mode (captured by `formula`) and the process model (captured by `trend_formula`).
 #'Users are recommended to drop one of these using the `- 1` convention in the formula right hand side.
 #'@param knots An optional \code{list} containing user specified knot values to be used for basis construction.
-#'For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
+#'For most bases the user simply supplies the knots to be used, which must match up with the `k` value supplied
 #'(note that the number of knots is not always just `k`). Different terms can use different numbers of knots,
 #'unless they share a covariate
 #'@param trend_knots As for `knots` above, this is an optional \code{list} of knot values for smooth
 #'functions within the `trend_formula`
 #'@param data A \code{dataframe} or \code{list} containing the model response variable and covariates
-#'required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:
-#'#'\itemize{
+#'required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
+#'\itemize{
 #'   \item`series` (a \code{factor} index of the series IDs; the number of levels should be identical
 #'   to the number of unique series labels (i.e. `n_series = length(levels(data$series))`))
 #'   \item`time` (\code{numeric} or \code{integer} index of the time point for each observation).
@@ -48,11 +48,17 @@
 #'temporal intervals that are exactly `0` will be adjusted to a very small number
 #'(`1e-12`) to prevent sampling errors. See an example of `CAR()` trends in \code{\link{CAR}}
 #'   }
-#'Should also include any other variables to be included in the linear predictor of \code{formula}
+#'Note however that there are special cases where these identifiers are not needed. For
+#'example, models with hierarchical temporal correlation processes (e.g. `AR(gr = region, subgr = species)`)
+#'should NOT include a `series` identifier, as this will be constructed internally (see
+#'\code{\link{mvgam_trends}} and \code{\link{AR}} for details). `mvgam` can also fit models that do not
+#'include a `time` variable if there are no temporal dynamic structures included (i.e. `trend_model = 'None'` or
+#'`trend_model = ZMVN()`). `data` should also include any other variables to be included in
+#'the linear predictor of \code{formula}
 #'@param data_train Deprecated. Still works in place of \code{data} but users are recommended to use
 #'\code{data} instead for more seamless integration into `R` workflows
-#'@param newdata Optional \code{dataframe} or \code{list} of test data containing at least `series` and `time`
-#'in addition to any other variables included in the linear predictor of \code{formula}. If included, the
+#'@param newdata Optional \code{dataframe} or \code{list} of test data containing the same variables
+#'as in `data`. If included, the
 #'observations in variable \code{y} will be set to \code{NA} when fitting the model so that posterior
 #'simulations can be obtained
 #'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
@@ -94,9 +100,9 @@
 #'@param share_obs_params \code{logical}. If \code{TRUE} and the \code{family}
 #'has additional family-specific observation parameters (e.g. variance components in
 #'`student_t()` or `gaussian()`, or dispersion parameters in `nb()` or `betar()`),
-#'these parameters will be shared across all series. This is handy if you have multiple
-#'time series that you believe share some properties, such as being from the same
-#'species over different spatial units. Default is \code{FALSE}.
+#'these parameters will be shared across all outcome variables. This is handy if you have multiple
+#'outcomes (time series in most `mvgam` models) that you believe share some properties,
+#'such as being from the same species over different spatial units. Default is \code{FALSE}.
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
 #'latent trends in a reduced dimension format. Only available for
 #'`RW()`, `AR()` and `GP()` trend models. Defaults to \code{FALSE}
@@ -106,6 +112,7 @@
 #'\itemize{
 #'   \item `None` (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 #'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+#'   \item `ZMVN` or `ZMVN()` (Zero-Mean Multivariate Normal; only available in \code{Stan})
 #'   \item `'RW'` or `RW()`
 #'   \item `'AR1'` or `AR(p = 1)`
 #'   \item `'AR2'` or `AR(p = 2)`
@@ -116,9 +123,11 @@
 #'   \item `'GP'` or `GP()` (Gaussian Process with squared exponential kernel;
 #'only available in \code{Stan})}
 #'
-#'For all trend types apart from `GP()`, `CAR()` and `PW()`, moving average and/or correlated
+#'For all trend types apart from `ZMVN()`, `GP()`, `CAR()` and `PW()`, moving average and/or correlated
 #'process error terms can also be estimated (for example, `RW(cor = TRUE)` will set up a
-#'multivariate Random Walk if `n_series > 1`). See [mvgam_trends] for more details
+#'multivariate Random Walk if `n_series > 1`). It is also possible for many multivariate trends
+#'to estimate hierarchical correlations if the data are structured among levels of
+#'a relevant grouping factor. See [mvgam_trends] for more details and see [ZMVN] for an example.
 #'@param trend_map Optional `data.frame` specifying which series should depend on which latent
 #'trends. Useful for allowing multiple series to depend on the same latent trend process, but with
 #'different observation processes. If supplied, a latent factor model is set up by setting
@@ -155,12 +164,12 @@
 #'@param threads \code{integer} Experimental option to use multithreading for within-chain
 #'parallelisation in \code{Stan}. We recommend its use only if you are experienced with
 #'\code{Stan}'s `reduce_sum` function and have a slow running model that cannot be sped
-#'up by any other means. Only available for some families(`poisson()`, `nb()`, `gaussian()`) and
+#'up by any other means. Currently works for all families apart from `nmix()` and
 #'when using \code{Cmdstan} as the backend
 #'@param priors An optional \code{data.frame} with prior
-#'definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
-#'class `brmsprior` (see. \code{\link[brms]{prior}} for details). See [get_mvgam_priors] and
-#''Details' for more information on changing default prior distributions
+#'definitions (in JAGS or Stan syntax) or, preferentially, If using Stan, a vector containing
+#' objects of class `brmsprior` (see. \code{\link[brms]{prior}} for details).
+#' See [get_mvgam_priors] and Details' for more information on changing default prior distributions
 #'@param refit Logical indicating whether this is a refit, called using [update.mvgam]. Users should leave
 #'as `FALSE`
 #'@param lfo Logical indicating whether this is part of a call to [lfo_cv.mvgam]. Returns a
@@ -199,7 +208,7 @@
 #'   variables defined in Stan's \code{parameters} block should be saved
 #'   (default is \code{FALSE}).
 #'@param max_treedepth positive integer placing a cap on the number of simulation steps evaluated during each iteration when
-#'`use_stan == TRUE`. Default is `12`. Increasing this value can sometimes help with exploration of complex
+#'`use_stan == TRUE`. Default is `10`. Increasing this value can sometimes help with exploration of complex
 #'posterior geometries, but it is rarely fruitful to go above a `max_treedepth` of `14`
 #'@param adapt_delta positive numeric between `0` and `1` defining the target average proposal acceptance probability
 #'during Stan's adaptation period, if `use_stan == TRUE`. Default is `0.8`. In general you should not need to change adapt_delta
@@ -245,7 +254,7 @@
 #'\code{\link{mvgam_families}}.
 #'\cr
 #'\cr
-#'*Trend models*: Details of latent trend dynamic models supported by \pkg{mvgam} can be found in
+#'*Trend models*: Details of latent error process models supported by \pkg{mvgam} can be found in
 #'\code{\link{mvgam_trends}}.
 #'\cr
 #'\cr
@@ -340,7 +349,7 @@
 #'@references Nicholas J Clark & Konstans Wells (2020). Dynamic generalised additive models (DGAMs) for forecasting discrete ecological time series.
 #'Methods in Ecology and Evolution. 14:3, 771-784.
 #'@seealso \code{\link[mgcv]{jagam}}, \code{\link[mgcv]{gam}}, \code{\link[mgcv]{gam.models}},
-#'\code{\link{get_mvgam_priors}}
+#'\code{\link{get_mvgam_priors}}, \code{\link{jsdgam}}
 #'@return A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
 #'the mgcv model output (for easily generating simulations at
 #'unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
@@ -483,7 +492,7 @@
 #' # Simulate a covariate called 'temp'
 #' temp <- rnorm(N, sd = 1)
 #'
-#' # Simulate the Gaussian observation process
+#' # Simulate some noisy Gaussian observations
 #' out <- rnorm(N, mean = 4 + beta_temp * temp,
 #'              sd = 0.5)
 #'
@@ -645,8 +654,8 @@ mvgam = function(formula,
                  algorithm = getOption("brms.algorithm", "sampling"),
                  autoformat = TRUE,
                  save_all_pars = FALSE,
-                 max_treedepth = 12,
-                 adapt_delta = 0.85,
+                 max_treedepth = 10,
+                 adapt_delta = 0.8,
                  silent = 1,
                  jags_path,
                  ...){
@@ -660,7 +669,7 @@ mvgam = function(formula,
   orig_data <- data_train
 
   # Validate trend_model
-  if(drift &  silent < 2L)
+  if(drift & silent < 2L)
     message('The "drift" argument is deprecated; use fixed effects of "time" instead')
   drift <- FALSE
   orig_trend_model <- trend_model
@@ -670,7 +679,7 @@ mvgam = function(formula,
 
   # Ensure series and time variables are present
   data_train <- validate_series_time(data_train, name = 'data',
-                                     trend_model = trend_model)
+                                     trend_model = orig_trend_model)
 
   # Validate the formula to convert any dynamic() terms
   formula <- interpret_mvgam(formula,
@@ -706,7 +715,7 @@ mvgam = function(formula,
                                   family = family,
                                   use_lv = use_lv,
                                   n_lv = n_lv,
-                                  trend_model = trend_model,
+                                  trend_model = orig_trend_model,
                                   trend_map = trend_map,
                                   drift = drift,
                                   warnings = TRUE,
@@ -716,11 +725,11 @@ mvgam = function(formula,
 
   # Ensure series and time variables are present
   data_train <- validate_series_time(data_train, name = 'data',
-                                     trend_model = trend_model)
+                                     trend_model = orig_trend_model)
   if(!missing(data_test)){
     data_test <- validate_series_time(data_test,
                                       name = 'newdata',
-                                      trend_model = trend_model)
+                                      trend_model = orig_trend_model)
     if(trend_model == 'CAR1'){
       data_test$index..time..index <- data_test$index..time..index +
         max(data_train$index..time..index)
@@ -812,7 +821,7 @@ mvgam = function(formula,
                                     family = family,
                                     use_lv = use_lv,
                                     n_lv = n_lv,
-                                    trend_model = trend_model,
+                                    trend_model = orig_trend_model,
                                     trend_map = trend_map,
                                     drift = drift,
                                     knots = knots)
@@ -1005,7 +1014,8 @@ mvgam = function(formula,
                                 use_lv = use_lv,
                                 trend_model = if(trend_model %in%
                                                  c('RW', 'VAR1',
-                                                   'PWlinear', 'PWlogistic')){'RW'} else {trend_model},
+                                                   'PWlinear', 'PWlogistic',
+                                                   'ZMVN')){'RW'} else {trend_model},
                                 drift = drift)
 
   # Use informative priors based on the fitted mgcv model to speed convergence
@@ -1387,9 +1397,11 @@ mvgam = function(formula,
     # Add necessary trend structure
     base_stan_model <- add_trend_lines(model_file = base_stan_model,
                                        stan = TRUE,
-                                       trend_model = if(trend_model %in% c('RW', 'VAR1',
+                                       trend_model = if(trend_model %in% c('RW',
+                                                                           'VAR1',
                                                                            'PWlinear',
-                                                                           'PWlogistic')){'RW'} else {trend_model},
+                                                                           'PWlogistic',
+                                                                           'ZMVN')){'RW'} else {trend_model},
                                        use_lv = use_lv,
                                        drift = drift)
 
@@ -1429,24 +1441,17 @@ mvgam = function(formula,
     # Include any GP term updates
     if(!is.null(gp_terms)){
       gp_additions <- make_gp_additions(gp_details = gp_details,
+                                        orig_formula = orig_formula,
                                         data = data_train,
                                         newdata = data_test,
                                         model_data = stan_objects$model_data,
                                         mgcv_model = ss_gam,
                                         gp_terms = gp_terms,
-                                        family = family)
+                                        family = family,
+                                        rho_names = rho_names)
       stan_objects$model_data <- gp_additions$model_data
       ss_gam <- gp_additions$mgcv_model
-
-      gp_names <- unlist(purrr::map(gp_additions$gp_att_table, 'name'))
-      gp_names <- gsub('gp(', 's(', gp_names, fixed = TRUE)
-      rhos_change <- list()
-      for(i in seq_along(gp_names)){
-        rhos_change[[i]] <- grep(gp_names[i], rho_names, fixed = TRUE)
-      }
-      rho_names[c(unique(unlist(rhos_change)))] <- gsub('s(', 'gp(',
-                                                      rho_names[c(unique(unlist(rhos_change)))],
-                                                      fixed = TRUE)
+      rho_names <- gp_additions$rho_names
     }
 
     # Vectorise likelihoods
@@ -1482,7 +1487,7 @@ mvgam = function(formula,
       vectorised$model_file <- trend_map_setup$model_file
       vectorised$model_data <- trend_map_setup$model_data
 
-      if(trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1')){
+      if(trend_model %in% c('None', 'RW', 'AR1', 'AR2', 'AR3', 'CAR1', 'ZMVN')){
         param <- unique(c(param, 'trend', 'sigma'))
       }
 
@@ -1656,10 +1661,15 @@ mvgam = function(formula,
     # Add any correlated error or moving average processes; this comes after
     # priors as currently there is no option to change priors on these parameters
     if(add_ma | add_cor){
-      vectorised$model_file <- add_MaCor(vectorised$model_file,
+      MaCor_additions <- add_MaCor(model_file = vectorised$model_file,
+                                         model_data = vectorised$model_data,
+                                         data_train = data_train,
+                                         data_test = data_test,
                                          add_ma = add_ma,
                                          add_cor = add_cor,
-                                         trend_model = trend_model)
+                                         trend_model = orig_trend_model)
+      vectorised$model_file <- MaCor_additions$model_file
+      vectorised$model_data <- MaCor_additions$model_data
     }
 
     # Add updates for an N-mixture model

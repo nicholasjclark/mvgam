@@ -43,8 +43,7 @@ plot_mvgam_resids = function(object, series = 1,
 
   if(!missing("newdata")){
     data_test <- validate_series_time(newdata,
-                                      trend_model = attr(object$model_data,
-                                                         'trend_model'))
+                                      trend_model = object$trend_model)
   }
 
   # Plotting colours
@@ -80,6 +79,7 @@ plot_mvgam_resids = function(object, series = 1,
                            dplyr::distinct() %>%
                            dplyr::arrange(time) %>%
                            dplyr::pull(y))
+
   } else {
     obs_length <- length(data_train %>%
                            dplyr::filter(series == !!(levels(data_train$series)[series])) %>%

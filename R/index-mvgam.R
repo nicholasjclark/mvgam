@@ -48,10 +48,13 @@ variables.mvgam = function(x, ...){
   # Linear predictor parameters
   observation_linpreds <- data.frame(orig_name = parnames[grepl('mus[',
                                                                 parnames,
-                                                                fixed = TRUE)],
+                                                                fixed = TRUE) &
+                                                            !grepl('trend_mus[',
+                                                                  parnames,
+                                                                  fixed = TRUE)],
                                      alias = NA)
 
-  if(!is.null(x$trend_call)){
+  if(!is.null(x$trend_call) & !inherits(x, 'jsdgam')){
     trend_linpreds <- data.frame(orig_name = parnames[grepl('trend_mus[',
                                                                   parnames,
                                                                   fixed = TRUE)],
@@ -71,7 +74,7 @@ variables.mvgam = function(x, ...){
   mgcv_names <- names(coef(x$mgcv_model))
   observation_betas <- data.frame(orig_name = b_names, alias = mgcv_names)
 
-  if(!is.null(x$trend_call)){
+  if(!is.null(x$trend_call) & !inherits(x, 'jsdgam')){
     b_names <- colnames(mcmc_chains(x$model_output, 'b_trend'))
     mgcv_names <- gsub('series', 'trend',
                        paste0(names(coef(x$trend_mgcv_model)), '_trend'))
@@ -97,7 +100,7 @@ variables.mvgam = function(x, ...){
   }
 
   trend_re_params <- NULL
-  if(!is.null(x$trend_call)){
+  if(!is.null(x$trend_call) & !inherits(x, 'jsdgam')){
     if(any(unlist(purrr::map(x$trend_mgcv_model$smooth, inherits, 'random.effect')))){
       re_labs <- unlist(lapply(purrr::map(x$trend_mgcv_model$smooth, 'term'),
                                paste, collapse = ','))[
@@ -125,7 +128,7 @@ variables.mvgam = function(x, ...){
     observation_smoothpars <- NULL
   }
 
-  if(any(grepl('rho_trend[', parnames, fixed = TRUE))){
+  if(any(grepl('rho_trend[', parnames, fixed = TRUE)) & !inherits(x, 'jsdgam')){
     trend_smoothpars <- data.frame(orig_name = parnames[grepl('rho_trend[',
                                                                     parnames,
                                                                     fixed = TRUE)],
@@ -136,7 +139,8 @@ variables.mvgam = function(x, ...){
 
   # Trend state parameters
   if(any(grepl('trend[', parnames, fixed = TRUE) &
-           !grepl('_trend[', parnames, fixed = TRUE))){
+           !grepl('_trend[', parnames, fixed = TRUE)) &
+     !inherits(x, 'jsdgam')){
     trend_states <- grepl('trend[', parnames, fixed = TRUE) &
       !grepl('_trend[', parnames, fixed = TRUE)
     trends <- data.frame(orig_name = parnames[trend_states],
@@ -146,21 +150,37 @@ variables.mvgam = function(x, ...){
   }
 
   # Trend dynamics parameters
-  if(any(grepl(paste(c('sigma', 'alpha_gp',
+  if(any(grepl(paste(c('sigma',
+                       'alpha_gp',
                        'rho_gp',
-                       'ar1', 'ar2',
-                       'ar3', 'A',
-                       'Sigma', 'error', 'theta',
-                       'k_trend', 'delta_trend', 'm_trend'), collapse = '|'),
+                       'ar1',
+                       'ar2',
+                       'ar3',
+                       'A',
+                       'Sigma',
+                       'error',
+                       'alpha_cor',
+                       'theta',
+                       'k_trend',
+                       'delta_trend',
+                       'm_trend'), collapse = '|'),
                parnames) &
          !grepl('sigma_obs', parnames, fixed = TRUE) &
          !grepl('sigma_raw', parnames, fixed = TRUE))){
-    trend_pars <- grepl(paste(c('sigma', 'alpha_gp',
+    trend_pars <- grepl(paste(c('sigma',
+                                'alpha_gp',
                                 'rho_gp',
-                                'ar1', 'ar2',
-                                'ar3', 'A',
-                                'Sigma', 'error', 'theta',
-                                'k_trend', 'delta_trend', 'm_trend'), collapse = '|'),
+                                'ar1',
+                                'ar2',
+                                'ar3',
+                                'A',
+                                'Sigma',
+                                'error',
+                                'alpha_cor',
+                                'theta',
+                                'k_trend',
+                                'delta_trend',
+                                'm_trend'), collapse = '|'),
                         parnames) &
       !grepl('sigma_obs', parnames, fixed = TRUE) &
       !grepl('sigma_raw', parnames, fixed = TRUE)

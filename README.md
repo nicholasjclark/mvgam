@@ -3,21 +3,31 @@
 
 <img src="man/figures/mvgam_logo.png" width = 120 alt="mvgam R package logo"/>[<img src="https://raw.githubusercontent.com/stan-dev/logos/master/logo_tm.png" align="right" width=120 alt="Stan Logo"/>](https://mc-stan.org/)
 
-# *mvgam*
+# mvgam
+
+> **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
 
 [![R-CMD-check](https://github.com/nicholasjclark/mvgam/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/)
-[![Test
-status](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml/badge.svg)](https://github.com/nicholasjclark/mvgam/actions/workflows/test-coverage.yaml)
 [![Coverage
 status](https://codecov.io/gh/nicholasjclark/mvgam/graph/badge.svg?token=RCJ2B7S0BL)](https://app.codecov.io/gh/nicholasjclark/mvgam)
+[![Documentation](https://img.shields.io/badge/documentation-mvgam-orange.svg?colorB=brightgreen)](https://nicholasjclark.github.io/mvgam/)
 [![CRAN
 Version](https://www.r-pkg.org/badges/version/mvgam)](https://cran.r-project.org/package=mvgam)
 [![CRAN
 Downloads](https://cranlogs.r-pkg.org/badges/grand-total/mvgam?color=brightgreen)](https://cran.r-project.org/package=mvgam)
 
-The goal of `mvgam` is to fit Bayesian Dynamic Generalized Additive
-Models to time series data. The motivation for the package is described
-in <a
+The goal of `mvgam` is to fit Bayesian (Dynamic) Generalized Additive
+Models. This package constructs State-Space models that can include
+highly flexible nonlinear predictor effects for both process and
+observation components by leveraging functionalities from the impressive
+<a href="https://paulbuerkner.com/brms/"
+target="_blank"><code>brms</code></a> and
+<a href="https://cran.r-project.org/web/packages/mgcv/index.html"
+target="_blank"><code>mgcv</code></a> packages. This allows `mvgam` to
+fit a wide range of models, including hierarchical ecological models
+such as N-mixture or Joint Species Distribution models, as well as
+univariate and multivariate time series models with imperfect detection.
+The original motivation for the package is described in <a
 href="https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974"
 target="_blank">Clark &amp; Wells 2022</a> (published in *Methods in
 Ecology and Evolution*), with additional inspiration on the use of
@@ -86,16 +96,16 @@ that you rely on for your research.
 
 When using `mvgam`, please cite the following:
 
-- Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models
-  (DGAMs) for forecasting discrete ecological time series. *Methods in
-  Ecology and Evolution*. DOI: <https://doi.org/10.1111/2041-210X.13974>
+> Clark, N.J. and Wells, K. (2022). Dynamic Generalized Additive Models
+> (DGAMs) for forecasting discrete ecological time series. *Methods in
+> Ecology and Evolution*. DOI: <https://doi.org/10.1111/2041-210X.13974>
 
 As `mvgam` acts as an interface to `Stan`, please additionally cite:
 
-- Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B.,
-  Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017).
-  Stan: A probabilistic programming language. *Journal of Statistical
-  Software*. 76(1). 10.18637/jss.v076.i01
+> Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B.,
+> Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017).
+> Stan: A probabilistic programming language. *Journal of Statistical
+> Software*. 76(1). DOI: <https://doi.org/10.18637/jss.v076.i01>
 
 `mvgam` relies on several other `R` packages and, of course, on `R`
 itself. To find out how to cite R and its packages, use the `citation`
@@ -152,10 +162,11 @@ plot(stl(ts(lynx_full$population, frequency = 19), s.window = 'periodic'),
 lynx_full$season <- (lynx_full$year%%19) + 1
 ```
 
-For `mvgam` models, we need an indicator of the series name as a
-`factor` (if the column `series` is missing, this will be added
-automatically by assuming that all observations are from a single time
-series). A `time` column is needed to index time
+For most `mvgam` models, we need an indicator of the series name as a
+`factor`. A `time` column is also needed for most models to index time
+(but note that these variables are not necessarily needed for other
+models supported by `mvgam`, such as [Joint Species Distribution
+Models](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html))
 
 ``` r
 lynx_full$time <- 1:NROW(lynx_full)
@@ -212,6 +223,7 @@ summary(lynx_mvgam)
 #> Trend model:
 #> AR(p = 1)
 #> 
+#> 
 #> N series:
 #> 1 
 #> 
@@ -226,28 +238,28 @@ summary(lynx_mvgam)
 #> 
 #> GAM coefficient (beta) estimates:
 #>                2.5%   50%  97.5% Rhat n_eff
-#> (Intercept)   6.400  6.60  6.900 1.00   910
-#> s(season).1  -0.640 -0.13  0.360 1.00  1169
-#> s(season).2   0.760  1.40  1.900 1.01   850
-#> s(season).3   1.300  1.90  2.500 1.01   953
-#> s(season).4  -0.018  0.55  1.200 1.00  1102
-#> s(season).5  -1.300 -0.70 -0.069 1.00  1019
-#> s(season).6  -1.200 -0.56  0.093 1.00  1011
-#> s(season).7   0.039  0.73  1.400 1.00  1006
-#> s(season).8   0.580  1.40  2.200 1.00  1041
-#> s(season).9  -0.360  0.23  0.820 1.00   735
-#> s(season).10 -1.400 -0.88 -0.380 1.00   908
+#> (Intercept)   6.400  6.60  6.900    1   942
+#> s(season).1  -0.640 -0.13  0.400    1  1123
+#> s(season).2   0.710  1.30  1.900    1   998
+#> s(season).3   1.300  1.90  2.500    1   912
+#> s(season).4  -0.045  0.52  1.200    1   856
+#> s(season).5  -1.300 -0.70 -0.034    1   933
+#> s(season).6  -1.200 -0.54  0.150    1  1147
+#> s(season).7   0.062  0.73  1.500    1   928
+#> s(season).8   0.610  1.40  2.100    1  1016
+#> s(season).9  -0.370  0.21  0.820    1   936
+#> s(season).10 -1.400 -0.87 -0.360    1  1117
 #> 
 #> Approximate significance of GAM smooths:
-#>            edf Ref.df Chi.sq p-value    
-#> s(season) 9.99     10   48.3  <2e-16 ***
+#>           edf Ref.df Chi.sq p-value    
+#> s(season) 9.9     10   64.4 1.7e-05 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend parameter AR estimates:
 #>          2.5%  50% 97.5% Rhat n_eff
-#> ar1[1]   0.60 0.83  0.98    1   592
-#> sigma[1] 0.39 0.48  0.60    1   855
+#> ar1[1]   0.60 0.83  0.98 1.01   643
+#> sigma[1] 0.39 0.48  0.62 1.00   821
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -256,7 +268,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Mon Sep 30 3:06:32 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Tue Nov 12 10:11:54 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -392,11 +404,12 @@ series (testing and training)
 
 ``` r
 plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
-#> Out of sample DRPS:
-#> 2398.60613875
 ```
 
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
+
+    #> Out of sample DRPS:
+    #> 2384.82381825
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -506,6 +519,7 @@ summary(mod, include_betas = FALSE)
 #> Trend model:
 #> GP()
 #> 
+#> 
 #> N series:
 #> 3 
 #> 
@@ -554,7 +568,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Mon Sep 30 3:07:18 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Tue Nov 12 10:12:39 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -592,4 +606,9 @@ This project is licensed under an `MIT` open source license
 I’m actively seeking PhD students and other researchers to work in the
 areas of ecological forecasting, multivariate model evaluation and
 development of `mvgam`. Please reach out if you are interested
-(n.clark’at’uq.edu.au)
+(n.clark’at’uq.edu.au). Other contributions are also very welcome, but
+please see [The Contributor
+Instructions](https://github.com/nicholasjclark/mvgam/blob/master/.github/CONTRIBUTING.md)
+for general guidelines. Note that by participating in this project you
+agree to abide by the terms of its [Contributor Code of
+Conduct](https://dplyr.tidyverse.org/CODE_OF_CONDUCT).

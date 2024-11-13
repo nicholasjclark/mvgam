@@ -185,10 +185,10 @@ smooth.construct.moi.smooth.spec <- function(object, data, knots){
 
   # Generate basis functions
   i_spline_basis <- splines2::iSpline(x,
-                            knots = k,
-                            degree = nk,
-                            Boundary.knots = boundary,
-                            intercept = TRUE)
+                                      knots = k,
+                                      degree = nk,
+                                      Boundary.knots = boundary,
+                                      intercept = TRUE)
 
   nbasis <- dim(i_spline_basis)[2]
 

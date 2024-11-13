@@ -2,17 +2,41 @@
 % Please edit documentation in R/update.mvgam.R
 \name{update.mvgam}
 \alias{update.mvgam}
+\alias{update.jsdgam}
 \title{Update an existing \code{mvgam} object}
 \usage{
 \method{update}{mvgam}(
   object,
   formula,
   trend_formula,
+  knots,
+  trend_knots,
   data,
   newdata,
   trend_model,
   trend_map,
   use_lv,
+  n_lv,
+  family,
+  share_obs_params,
+  priors,
+  chains,
+  burnin,
+  samples,
+  threads,
+  algorithm,
+  lfo = FALSE,
+  ...
+)
+
+\method{update}{jsdgam}(
+  object,
+  formula,
+  factor_formula,
+  knots,
+  factor_knots,
+  data,
+  newdata,
   n_lv,
   family,
   share_obs_params,
@@ -46,9 +70,17 @@ latent abundance. Be aware that it can be very challenging to simultaneously est
 for both the observation mode (captured by \code{formula}) and the process model (captured by \code{trend_formula}).
 Users are recommended to drop one of these using the \code{- 1} convention in the formula right hand side.}
 
+\item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
+For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied
+(note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
+unless they share a covariate}
+
+\item{trend_knots}{As for \code{knots} above, this is an optional \code{list} of knot values for smooth
+functions within the \code{trend_formula}}
+
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
-required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:
-#'\itemize{
+required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
+\itemize{
 \item\code{series} (a \code{factor} index of the series IDs; the number of levels should be identical
 to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
 \item\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
@@ -58,10 +90,16 @@ use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though no
 temporal intervals that are exactly \code{0} will be adjusted to a very small number
 (\code{1e-12}) to prevent sampling errors. See an example of \code{CAR()} trends in \code{\link{CAR}}
 }
-Should also include any other variables to be included in the linear predictor of \code{formula}}
+Note however that there are special cases where these identifiers are not needed. For
+example, models with hierarchical temporal correlation processes (e.g. \code{AR(gr = region, subgr = species)})
+should NOT include a \code{series} identifier, as this will be constructed internally (see
+\code{\link{mvgam_trends}} and \code{\link{AR}} for details). \code{mvgam} can also fit models that do not
+include a \code{time} variable if there are no temporal dynamic structures included (i.e. \code{trend_model = 'None'} or
+\code{trend_model = ZMVN()}). \code{data} should also include any other variables to be included in
+the linear predictor of \code{formula}}
 
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least \code{series} and \code{time}
-in addition to any other variables included in the linear predictor of \code{formula}. If included, the
+\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing the same variables
+as in \code{data}. If included, the
 observations in variable \code{y} will be set to \code{NA} when fitting the model so that posterior
 simulations can be obtained}
 
@@ -69,6 +107,7 @@ simulations can be obtained}
 \itemize{
 \item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+\item \code{ZMVN} or \code{ZMVN()} (Zero-Mean Multivariate Normal; only available in \code{Stan})
 \item \code{'RW'} or \code{RW()}
 \item \code{'AR1'} or \code{AR(p = 1)}
 \item \code{'AR2'} or \code{AR(p = 2)}
@@ -79,9 +118,11 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all trend types apart from \code{GP()}, \code{CAR()} and \code{PW()}, moving average and/or correlated
+For all trend types apart from \code{ZMVN()}, \code{GP()}, \code{CAR()} and \code{PW()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
-multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
+multivariate Random Walk if \code{n_series > 1}). It is also possible for many multivariate trends
+to estimate hierarchical correlations if the data are structured among levels of
+a relevant grouping factor. See \link{mvgam_trends} for more details and see \link{ZMVN} for an example.}
 
 \item{trend_map}{Optional \code{data.frame} specifying which series should depend on which latent
 trends. Useful for allowing multiple series to depend on the same latent trend process, but with
@@ -128,14 +169,14 @@ See \code{\link{mvgam_families}} for more details}
 \item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family}
 has additional family-specific observation parameters (e.g. variance components in
 \code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or \code{betar()}),
-these parameters will be shared across all series. This is handy if you have multiple
-time series that you believe share some properties, such as being from the same
-species over different spatial units. Default is \code{FALSE}.}
+these parameters will be shared across all outcome variables. This is handy if you have multiple
+outcomes (time series in most \code{mvgam} models) that you believe share some properties,
+such as being from the same species over different spatial units. Default is \code{FALSE}.}
 
 \item{priors}{An optional \code{data.frame} with prior
-definitions (in JAGS or Stan syntax). if using Stan, this can also be an object of
-class \code{brmsprior} (see. \code{\link[brms]{prior}} for details). See \link{get_mvgam_priors} and
-'Details' for more information on changing default prior distributions}
+definitions (in JAGS or Stan syntax) or, preferentially, If using Stan, a vector containing
+objects of class \code{brmsprior} (see. \code{\link[brms]{prior}} for details).
+See \link{get_mvgam_priors} and Details' for more information on changing default prior distributions}
 
 \item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
 if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
@@ -150,7 +191,7 @@ sampling the posterior distribution}
 \item{threads}{\code{integer} Experimental option to use multithreading for within-chain
 parallelisation in \code{Stan}. We recommend its use only if you are experienced with
 \code{Stan}'s \code{reduce_sum} function and have a slow running model that cannot be sped
-up by any other means. Only available for some families(\code{poisson()}, \code{nb()}, \code{gaussian()}) and
+up by any other means. Currently works for all families apart from \code{nmix()} and
 when using \code{Cmdstan} as the backend}
 
 \item{algorithm}{Character string naming the estimation approach to use.
@@ -172,9 +213,23 @@ lighter version of the model with no residuals and fewer monitored parameters to
 post-processing. But other downstream functions will not work properly, so users should always
 leave this set as \code{FALSE}}
 
-\item{...}{Other arguments to be passed to \code{\link{mvgam}}}
+\item{...}{Other arguments to be passed to \code{\link{mvgam}} or \code{\link{jsdgam}}}
+
+\item{factor_formula}{Optional new \code{formula} object for the factor linear predictors}
+
+\item{factor_knots}{An optional \code{list} containing user specified knot values to
+be used for basis construction of any smooth terms in \code{factor_formula}.
+For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied
+(note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
+unless they share a covariate}
 }
 \value{
+A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
+the mgcv model output (for easily generating simulations at
+unsampled covariate values), Dunn-Smyth residuals for each outcome variable and key information needed
+for other functions in the package. See \code{\link{mvgam-class}} for details.
+Use \code{methods(class = "mvgam")} for an overview on available methods.
+
 A \code{list} object of class \code{mvgam} containing model output, the text representation of the model file,
 the mgcv model output (for easily generating simulations at
 unsampled covariate values), Dunn-Smyth residuals for each series and key information needed
@@ -213,4 +268,7 @@ updated_mod <- update(mod,
 summary(updated_mod)
 conditional_effects(updated_mod, type = 'link')
 }
+}
+\author{
+Nicholas J Clark
 }

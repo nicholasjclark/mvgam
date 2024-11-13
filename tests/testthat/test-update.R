@@ -40,3 +40,24 @@ test_that("update() working correctly", {
                         gsub(' ', '', mod$model_file), fixed = TRUE)))
 })
 
+test_that("update() passes original knots correctly", {
+  # Simulate some data and fit a Poisson AR1 model
+  simdat <- sim_mvgam(n_series = 1, trend_model = AR())
+  mod <- SM(mvgam(y ~ s(season, bs = 'cc'),
+               knots = list(season = c(0.5, 12.5)),
+               trend_model = AR(),
+               noncentred = TRUE,
+               data = simdat$data_train,
+               chains = 2,
+               silent = 2))
+  expect_true(identical(attr(mod$mgcv_model, 'knots'),
+                        list(season = c(0.5, 12.5))))
+
+  # Update to an AR2 model
+  updated_mod <- update(mod,
+                        trend_model = AR(p = 2),
+                        noncentred = TRUE,
+                        run_model = FALSE)
+  expect_true(identical(attr(updated_mod$mgcv_model, 'knots'),
+                        list(season = c(0.5, 12.5))))
+})

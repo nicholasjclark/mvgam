@@ -29,24 +29,29 @@ cat(paste0(object$family, '\n'))
 cat("\nLink function:\n")
 cat(paste0(family_links(object$family), '\n'))
 
-
-cat("\nTrend model:\n")
-if(inherits(object$trend_model, 'mvgam_trend')){
-  print(object$trend_model$label)
-  cat('\n')
-} else {
-  cat(paste0(object$trend_model, '\n'))
+if(!inherits(object, 'jsdgam')){
+  cat("\nTrend model:\n")
+  if(inherits(object$trend_model, 'mvgam_trend')){
+    print(object$trend_model$label)
+    cat('\n')
+  } else {
+    cat(paste0(object$trend_model, '\n'))
+  }
 }
 
 if(object$use_lv){
-  cat("N latent factors:\n")
+  cat("\nN latent factors:\n")
   cat(object$n_lv, '\n')
 
 }
 
-cat('\nN series:\n')
-cat(NCOL(object$ytimes), '\n')
-
+if(inherits(object, 'jsdgam')){
+  cat('\nN species:\n')
+  cat(NCOL(object$ytimes), '\n')
+} else {
+  cat('\nN series:\n')
+  cat(NCOL(object$ytimes), '\n')
+}
 
 if(!is.null(object$upper_bounds)){
   cat('\nUpper bounds:\n')
@@ -54,9 +59,13 @@ if(!is.null(object$upper_bounds)){
 
 }
 
-cat('\nN timepoints:\n')
-cat(NROW(object$ytimes), '\n')
-
+if(inherits(object, 'jsdgam')){
+  cat('\nN sites:\n')
+  cat(NROW(object$ytimes), '\n')
+} else {
+  cat('\nN timepoints:\n')
+  cat(NROW(object$ytimes), '\n')
+}
 
 if(object$fit_engine == 'jags'){
   cat('\nStatus:\n')

@@ -7,9 +7,12 @@
 get_mvgam_priors(
   formula,
   trend_formula,
+  factor_formula,
   data,
   data_train,
-  family = "poisson",
+  family = poisson(),
+  unit = time,
+  species = series,
   knots,
   trend_knots,
   use_lv = FALSE,
@@ -23,7 +26,7 @@ get_mvgam_priors(
 \arguments{
 \item{formula}{A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
 for a GLM except that smooth terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying
-\code{dynamic()} terms, can be added to the right hand side
+\code{dynamic()} terms and nonparametric \code{gp()} terms, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors
 (or linear functionals of these). In \code{nmix()} family models, the \code{formula} is used to
 set up a linear predictor for the detection probability. Details of the formula syntax used by \pkg{mvgam}
@@ -42,9 +45,12 @@ latent abundance. Be aware that it can be very challenging to simultaneously est
 for both the observation mode (captured by \code{formula}) and the process model (captured by \code{trend_formula}).
 Users are recommended to drop one of these using the \code{- 1} convention in the formula right hand side.}
 
+\item{factor_formula}{Can be supplied instead \code{trend_formula} to match syntax from
+\link{jsdgam}}
+
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
-required by the GAM \code{formula} and optional \code{trend_formula}. Should include columns:
-#'\itemize{
+required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
+\itemize{
 \item\code{series} (a \code{factor} index of the series IDs; the number of levels should be identical
 to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
 \item\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
@@ -54,7 +60,13 @@ use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though no
 temporal intervals that are exactly \code{0} will be adjusted to a very small number
 (\code{1e-12}) to prevent sampling errors. See an example of \code{CAR()} trends in \code{\link{CAR}}
 }
-Should also include any other variables to be included in the linear predictor of \code{formula}}
+Note however that there are special cases where these identifiers are not needed. For
+example, models with hierarchical temporal correlation processes (e.g. \code{AR(gr = region, subgr = species)})
+should NOT include a \code{series} identifier, as this will be constructed internally (see
+\code{\link{mvgam_trends}} and \code{\link{AR}} for details). \code{mvgam} can also fit models that do not
+include a \code{time} variable if there are no temporal dynamic structures included (i.e. \code{trend_model = 'None'} or
+\code{trend_model = ZMVN()}). \code{data} should also include any other variables to be included in
+the linear predictor of \code{formula}}
 
 \item{data_train}{Deprecated. Still works in place of \code{data} but users are recommended to use
 \code{data} instead for more seamless integration into \code{R} workflows}
@@ -84,8 +96,19 @@ Note that only \code{nb()} and \code{poisson()} are available if using \code{JAG
 Default is \code{poisson()}.
 See \code{\link{mvgam_families}} for more details}
 
+\item{unit}{The unquoted name of the variable that represents the unit of analysis in \code{data} over
+which latent residuals should be correlated. This variable should be either a
+\code{numeric} or \code{integer} variable in the supplied \code{data}.
+Defaults to \code{time} to be consistent with other functionalities
+in \pkg{mvgam}, though note that the data need not be time series in this case. See examples below
+for further details and explanations}
+
+\item{species}{The unquoted name of the \code{factor} variable that indexes
+the different response units in \code{data} (usually \code{'species'} in a JSDM).
+Defaults to \code{series} to be consistent with other \code{mvgam} models}
+
 \item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
-For most bases the user simply supplies the knots to be used, which must match up with the k value supplied
+For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied
 (note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
 unless they share a covariate}
 
@@ -108,6 +131,7 @@ there are many more options when using \code{Stan} vs \code{JAGS}}
 \itemize{
 \item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
 and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+\item \code{ZMVN} or \code{ZMVN()} (Zero-Mean Multivariate Normal; only available in \code{Stan})
 \item \code{'RW'} or \code{RW()}
 \item \code{'AR1'} or \code{AR(p = 1)}
 \item \code{'AR2'} or \code{AR(p = 2)}
@@ -118,9 +142,11 @@ and the observation process is the only source of error; similarly to what is es
 \item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
 only available in \code{Stan})}
 
-For all trend types apart from \code{GP()}, \code{CAR()} and \code{PW()}, moving average and/or correlated
+For all trend types apart from \code{ZMVN()}, \code{GP()}, \code{CAR()} and \code{PW()}, moving average and/or correlated
 process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
-multivariate Random Walk if \code{n_series > 1}). See \link{mvgam_trends} for more details}
+multivariate Random Walk if \code{n_series > 1}). It is also possible for many multivariate trends
+to estimate hierarchical correlations if the data are structured among levels of
+a relevant grouping factor. See \link{mvgam_trends} for more details and see \link{ZMVN} for an example.}
 
 \item{trend_map}{Optional \code{data.frame} specifying which series should depend on which latent
 trends. Useful for allowing multiple series to depend on the same latent trend process, but with

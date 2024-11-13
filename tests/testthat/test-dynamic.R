@@ -50,7 +50,8 @@ test_that("dynamic to gp Hilbert is working properly", {
 test_that("rho argument must be positive numeric", {
   data = data.frame(out = rnorm(100),
                     temp = rnorm(100),
-                    time = 1:100)
+                    time = 1:100,
+                    series = as.factor('series1'))
   expect_error(mod <- mvgam(formula = out ~ dynamic(temp, rho = -1),
                             data = data,
                             family = gaussian(),
@@ -62,7 +63,8 @@ test_that("rho argument must be positive numeric", {
 test_that("rho argument cannot be larger than N - 1", {
   data = data.frame(out = rnorm(100),
                     temp = rnorm(100),
-                    time = 1:100)
+                    time = 1:100,
+                    series = as.factor('series1'))
   expect_error(mod <- mvgam(formula = out ~ dynamic(temp, rho = 110),
                             data = data,
                             family = gaussian(),
@@ -81,7 +83,7 @@ test_that("dynamic to spline works for trend_formulas", {
   beta_data$data_train$random <- rnorm(NROW(beta_data$data_train))
   mod <- mvgam(y ~ dynamic(random, rho = 5),
                trend_formula = ~ dynamic(random, rho = 15),
-               trend_model = 'RW',
+               trend_model = RW(),
                data = beta_data$data_train,
                family = betar(),
                run_model = FALSE)
@@ -96,7 +98,7 @@ test_that("dynamic to Hilbert works for trend_formulas", {
   beta_data$data_train$random <- rnorm(NROW(beta_data$data_train))
   mod <- mvgam(y ~ dynamic(random),
                trend_formula = ~ dynamic(random, k = 22),
-               trend_model = 'RW',
+               trend_model = RW(),
                data = beta_data$data_train,
                family = betar(),
                run_model = FALSE)
@@ -106,13 +108,13 @@ test_that("dynamic to Hilbert works for trend_formulas", {
   # Model file should have prior lines for observationgp terms
   expect_true(any(grepl('// prior for gp(time):random...',
                         mod$model_file, fixed = TRUE)))
-  expect_true(any(grepl("b[b_idx_gp_time_byrandom] = sqrt(spd_cov_exp_quad(",
+  expect_true(any(grepl("b[b_idx_gp_time_byrandom] = sqrt(spd_gp_exp_quad(",
                         mod$model_file, fixed = TRUE)))
 
   # Model file should have prior lines for trend gp terms
   expect_true(any(grepl('// prior for gp(time):random_trend...',
                         mod$model_file, fixed = TRUE)))
-  expect_true(any(grepl("b_trend[b_trend_idx_gp_time_byrandom] = sqrt(spd_cov_exp_quad(",
+  expect_true(any(grepl("b_trend[b_trend_idx_gp_time_byrandom] = sqrt(spd_gp_exp_quad(",
                         mod$model_file, fixed = TRUE)))
 
   # Observation-level Gp data structures should be in the model_data
