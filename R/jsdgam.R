@@ -329,8 +329,8 @@ jsdgam = function(formula,
                   parallel = TRUE,
                   threads = 1,
                   silent = 1,
-                  max_treedepth = 12,
-                  adapt_delta = 0.85,
+                  max_treedepth = 10,
+                  adapt_delta = 0.8,
                   backend = getOption("brms.backend", "cmdstanr"),
                   algorithm = getOption("brms.algorithm", "sampling"),
                   run_model = TRUE,
@@ -384,7 +384,7 @@ jsdgam = function(formula,
   model_file[grep('int<lower=0> n_lv; // number of dynamic factors',
                   model_file, fixed = TRUE)] <- paste0(
                     'int<lower=0> n_lv; // number of dynamic factors\n',
-                    'int<lower=0> M; // number of nonzero factor loadings'
+                    'int<lower=0> M; // number of nonzero lower-triangular factor loadings'
                   )
   model_file <- readLines(textConnection(model_file), n = -1)
 
@@ -396,8 +396,10 @@ jsdgam = function(formula,
   model_file[grep("matrix[n, n_lv] LV_raw;",
                   model_file, fixed = TRUE)] <- paste0(
                     "matrix[n, n_lv] LV_raw;\n\n",
-                    "// factor lower triangle loading coefficients\n",
-                    "vector[M] L;")
+                    "// factor lower triangle loadings\n",
+                    "vector[M] L_lower;\n",
+                    "// factor diagonal loadings\n",
+                    "vector<lower=0>[n_lv] L_diag;")
   model_file <- readLines(textConnection(model_file), n = -1)
 
   # Update transformed parameters
@@ -424,17 +426,19 @@ jsdgam = function(formula,
                     "trend_mus = X_trend * b_trend;\n\n",
                     "// constraints allow identifiability of loadings\n",
                     "{\n",
-                    "int index;\n",
-                    "index = 0;\n",
-                    "for (j in 1 : n_lv) {\n",
-                    "for (i in j : n_series) {\n",
-                    "index = index + 1;\n",
-                    "lv_coefs[i, j] = L[index];\n",
+                    "int idx;\n",
+                    "idx = 0;\n",
+                    "for(j in 1 : n_lv) lv_coefs[j, j] = L_diag[j];\n",
+                    "for(j in 1 : n_lv) {\n",
+                    "for(k in (j + 1) : n_series) {\n",
+                    "idx = idx + 1;\n",
+                    "lv_coefs[k, j] = L_lower[idx];\n",
                     "}\n",
                     "}\n",
                     "}\n\n",
                     "// raw latent factors (with linear predictors)\n",
-                    "for (j in 1 : n_lv) {\n",                                                                                                       "for (i in 1 : n) {\n",
+                    "for (j in 1 : n_lv) {\n",
+                    "for (i in 1 : n) {\n",
                     "LV[i, j] = trend_mus[ytimes_trend[i, j]] + LV_raw[i, j];\n",
                     "}\n}\n")
 
@@ -448,8 +452,9 @@ jsdgam = function(formula,
   model_file <- model_file[-sigma_prior]
   model_file[grep("// priors for latent state SD parameters",
                   model_file, fixed = TRUE)] <- paste0(
-                    "// priors for factor loading coefficients\n",
-                    "L ~ std_normal();")
+                    "// priors for factors and loading coefficients\n",
+                    "L_lower ~ student_t(3, 0, 1);\n",
+                    "L_diag ~ student_t(3, 0, 1);")
   model_file <- readLines(textConnection(model_file), n = -1)
 
   # Update generated quantities
@@ -471,7 +476,7 @@ jsdgam = function(formula,
 
   # Add M to model_data
   n_series <- NCOL(model_data$ytimes)
-  model_data$M <- n_lv * (n_series - n_lv) + n_lv * (n_lv - 1) / 2 + n_lv
+  model_data$M <- n_lv * (n_series - n_lv) + n_lv * (n_lv - 1) / 2
 
   #### Autoformat the Stan code ####
   if(requireNamespace('cmdstanr', quietly = TRUE) & backend == 'cmdstanr'){

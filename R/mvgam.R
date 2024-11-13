@@ -208,7 +208,7 @@
 #'   variables defined in Stan's \code{parameters} block should be saved
 #'   (default is \code{FALSE}).
 #'@param max_treedepth positive integer placing a cap on the number of simulation steps evaluated during each iteration when
-#'`use_stan == TRUE`. Default is `12`. Increasing this value can sometimes help with exploration of complex
+#'`use_stan == TRUE`. Default is `10`. Increasing this value can sometimes help with exploration of complex
 #'posterior geometries, but it is rarely fruitful to go above a `max_treedepth` of `14`
 #'@param adapt_delta positive numeric between `0` and `1` defining the target average proposal acceptance probability
 #'during Stan's adaptation period, if `use_stan == TRUE`. Default is `0.8`. In general you should not need to change adapt_delta
@@ -654,8 +654,8 @@ mvgam = function(formula,
                  algorithm = getOption("brms.algorithm", "sampling"),
                  autoformat = TRUE,
                  save_all_pars = FALSE,
-                 max_treedepth = 12,
-                 adapt_delta = 0.85,
+                 max_treedepth = 10,
+                 adapt_delta = 0.8,
                  silent = 1,
                  jags_path,
                  ...){

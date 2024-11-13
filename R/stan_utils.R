@@ -3372,6 +3372,14 @@ check_n_eff <- function(fit, quiet=FALSE, fit_summary, ignore_b_trend = FALSE) {
       fit_summary <- fit_summary[-grep('L[',
                                        rownames(fit_summary), fixed = TRUE), ]
     }
+    if(any(grepl('L_diag[', rownames(fit_summary), fixed = TRUE))){
+      fit_summary <- fit_summary[-grep('L_diag[',
+                                       rownames(fit_summary), fixed = TRUE), ]
+    }
+    if(any(grepl('L_lower[', rownames(fit_summary), fixed = TRUE))){
+      fit_summary <- fit_summary[-grep('L_lower[',
+                                       rownames(fit_summary), fixed = TRUE), ]
+    }
     if(any(grepl('LV_raw[', rownames(fit_summary), fixed = TRUE))){
       fit_summary <- fit_summary[-grep('LV_raw[',
                                        rownames(fit_summary), fixed = TRUE), ]
@@ -3430,6 +3438,14 @@ check_rhat <- function(fit, quiet = FALSE, fit_summary, ignore_b_trend = FALSE) 
 
     if(any(grepl('L[', rownames(fit_summary), fixed = TRUE))){
       fit_summary <- fit_summary[-grep('L[',
+                                       rownames(fit_summary), fixed = TRUE), ]
+    }
+    if(any(grepl('L_diag[', rownames(fit_summary), fixed = TRUE))){
+      fit_summary <- fit_summary[-grep('L_diag[',
+                                       rownames(fit_summary), fixed = TRUE), ]
+    }
+    if(any(grepl('L_lower[', rownames(fit_summary), fixed = TRUE))){
+      fit_summary <- fit_summary[-grep('L_lower[',
                                        rownames(fit_summary), fixed = TRUE), ]
     }
     if(any(grepl('LV_raw[', rownames(fit_summary), fixed = TRUE))){
