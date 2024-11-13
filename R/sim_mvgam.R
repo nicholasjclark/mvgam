@@ -1,24 +1,29 @@
 #'Simulate a set of time series for mvgam modelling
 #'
 #'This function simulates sets of time series data for fitting a multivariate GAM that includes
-#'shared seasonality and dependence on state-space latent dynamic factors. Random dependencies among series, i.e.
-#'correlations in their long-term trends, are included in the form of correlated loadings on the latent dynamic factors
+#'shared seasonality and dependence on state-space latent dynamic factors. Random
+#'dependencies among series, i.e. correlations in their long-term trends, are included
+#'in the form of correlated loadings on the latent dynamic factors
 #'
-#'@importFrom stats rnorm rbeta rpois rlnorm rgamma cor cov2cor cov stl ts
+#'@importFrom stats rnorm rbeta rpois rlnorm rgamma cor cov2cor cov ts
 #'@importFrom brms lognormal
-#'@importFrom Matrix nearPD
 #'@param T \code{integer}. Number of observations (timepoints)
 #'@param n_series \code{integer}. Number of discrete time series
-#'@param seasonality \code{character}. Either \code{shared}, meaning that all series share the exact same seasonal pattern,
-#'or \code{hierarchical}, meaning that there is a global seasonality but each series' pattern can deviate slightly
+#'@param seasonality \code{character}. Either \code{shared}, meaning that
+#'all series share the exact same seasonal pattern,
+#'or \code{hierarchical}, meaning that there is a global seasonality but
+#'each series' pattern can deviate slightly
 #'@param use_lv \code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-#'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent latent trends for each series
+#'latent trends in a reduced dimension format. If \code{FALSE}, estimate independent
+#'latent trends for each series
 #'@param n_lv \code{integer}. Number of latent dynamic factors for generating the series' trends.
 #'Defaults to `0`, meaning that dynamics are estimated independently for each series
-#'@param trend_model \code{character} specifying the time series dynamics for the latent trend. Options are:
+#'@param trend_model \code{character} specifying the time series dynamics for the latent trend.
+#'Options are:
 #'\itemize{
-#'   \item `None` (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-#'and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+#'   \item `None` (no latent trend component; i.e. the GAM component is all that
+#'   contributes to the linear predictor, and the observation process is the only
+#'   source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
 #'   \item `RW` (random walk with possible drift)
 #'   \item `AR1` (with possible drift)
 #'   \item `AR2` (with possible drift)
@@ -27,10 +32,12 @@
 #'   \item `VAR1cor` (contemporaneously correlated VAR1)
 #'   \item `GP` (Gaussian Process with squared exponential kernel)} See [mvgam_trends] for more details
 #'@param drift \code{logical}, simulate a drift term for each trend
-#'@param prop_trend \code{numeric}. Relative importance of the trend for each series. Should be between \code{0} and \code{1}
+#'@param prop_trend \code{numeric}. Relative importance of the trend for each series.
+#'Should be between \code{0} and \code{1}
 #'@param trend_rel Deprecated. Use `prop_trend` instead
 #'@param freq \code{integer}. The seasonal frequency of the series
-#'@param family \code{family} specifying the exponential observation family for the series. Currently supported
+#'@param family \code{family} specifying the exponential observation family for the series.
+#'Currently supported
 #'families are: `nb()`, `poisson()`, `bernoulli()`, `tweedie()`, `gaussian()`,
 #'`betar()`, `lognormal()`, `student()` and `Gamma()`
 #'@param phi \code{vector} of dispersion parameters for the series
@@ -53,13 +60,18 @@
 #'series (i.e. `nu` for `student()`)
 #'If \code{length(nu) < n_series}, the first element of `nu` will
 #'be replicated `n_series` times. Defaults to \code{3}
-#'@param mu \code{vector} of location parameters for the series. If \code{length(mu) < n_series}, the first element of `mu` will
-#'be replicated `n_series` times. Defaults to small random values between `-0.5` and `0.5` on the link scale
-#'@param prop_missing \code{numeric} stating proportion of observations that are missing. Should be between
+#'@param mu \code{vector} of location parameters for the series.
+#'If \code{length(mu) < n_series}, the first element of `mu` will
+#'be replicated `n_series` times. Defaults to small random values
+#'between `-0.5` and `0.5` on the link scale
+#'@param prop_missing \code{numeric} stating proportion of observations that are missing.
+#'Should be between
 #'\code{0} and \code{0.8}, inclusive
-#'@param prop_train \code{numeric} stating the proportion of data to use for training. Should be between \code{0.2} and \code{1}
-#'@return A \code{list} object containing outputs needed for \code{\link{mvgam}}, including 'data_train' and 'data_test',
-#'as well as some additional information about the simulated seasonality and trend dependencies
+#'@param prop_train \code{numeric} stating the proportion of data to use for training.
+#'Should be between \code{0.2} and \code{1}
+#'@return A \code{list} object containing outputs needed for \code{\link{mvgam}},
+#'including 'data_train' and 'data_test', as well as some additional information
+#'about the simulated seasonality and trend dependencies
 #'@examples
 #'# Simulate series with observations bounded at 0 and 1 (Beta responses)
 #'sim_data <- sim_mvgam(family = betar(), trend_model = RW(), prop_trend = 0.6)
@@ -282,21 +294,6 @@ sim_mvgam = function(T = 100,
       if(trend_model == 'VAR1cor'){
         # Use the LKJ distribution to sample correlation matrices
         # with nice properties
-        lkj_corr <- function(n_series, eta = 0.8) {
-          alpha <- eta + (n_series - 2)/2
-          r12 <- 2 * rbeta(1, alpha, alpha) - 1
-          R <- matrix(0, n_series, n_series)
-          R[1,1] <- 1; R[1,2] <- r12; R[2,2] <- sqrt(1 - r12^2)
-          if(n_series > 2) for (m in 2:(n_series - 1)){
-            alpha <- alpha - 0.5
-            y <- rbeta(1, m / 2, alpha)
-            z <- rnorm(m, 0, 1)
-            z <- z / sqrt(crossprod(z)[1])
-            R[1:m,m+1] <- sqrt(y) * z
-            R[m+1,m+1] <- sqrt(1 - y)
-          }
-          return(crossprod(R))
-        }
         # Sample trend SD parameters and construct Sigma
         sigma <- runif(n_lv, 0.4, 1.2)
         Sigma <- outer(sigma, sigma) * lkj_corr(n_series = n_lv)
@@ -337,20 +334,9 @@ sim_mvgam = function(T = 100,
   }
 
   if(use_lv){
-    # Loadings on the trends for each series, with sparse but strong correlations
-    sparse = function(n){
-      x <- rep(0, n)
-      x[sample(seq(1, length(x)), ceiling(0.15*length(x)))] <-
-        sample(c(-0.75, -0.25, 0.25, 0.75), ceiling(0.15*length(x)), T)
-      x
-    }
-    corMat <- matrix(sparse(n_series ^ 2), n_series)
-    corMat[lower.tri(corMat)] = t(corMat)[lower.tri(corMat)]
-    diag(corMat) <- 1
-    stddev <- rep(1, n_series)
-    Sigma <- stddev %*% t(stddev) * corMat
+     Sigma <- random_Sigma(n_series)
     loadings <- as.matrix(matrix(mvnfast::rmvn(n = n_lv, mu = rep(0, n_series),
-                                     sigma = as.matrix(Matrix::nearPD(Sigma)$mat)),
+                                     sigma = Sigma),
                        ncol = n_series))
 
   } else {
@@ -359,9 +345,7 @@ sim_mvgam = function(T = 100,
   }
 
   # Simulate the global seasonal pattern
-  stl_season <- stl(smooth::sim.es(model = "ANA" ,frequency = freq, obs = T + 5,
-                               randomizer = "rnorm")$data, 'periodic')$time.series[,1]
-  glob_season <- as.vector(scale(zoo::rollmean(stl_season, k = 6, na.pad = F)))
+  glob_season <- periodic_gp(T, period = freq, rho = runif(1, 0.5, 1.2))
 
   # Simulate observed series as dependent on seasonality and trend
   obs_trends <- matrix(NA, nrow = T, ncol = n_series)
@@ -502,4 +486,77 @@ sim_mvgam = function(T = 100,
 
 return(out)
 
+}
+
+#' Simulate a fixed seasonal pattern
+#' @noRd
+sim_seasonal = function(T, freq = 12){
+  beta1 <- runif(1, 0.2, 0.6)
+  beta2 <- runif(1, -0.5, 0.5)
+  cov1 <- sin(2 * pi * (1:T) / freq)
+  cov2 <- cos(2 * pi * (1:T) / freq)
+  rnorm(T,
+        mean = beta1 * cov1 + beta2 * cov2,
+        sd = 0.1)
+}
+
+#' Simulate from a periodic GP
+#' @noRd
+periodic_gp <- function(T, period = 12, rho = 1){
+  time <- 1:T
+  cov_matrix = array(0, c(length(time), length(time)));
+  for(i in 1:length(time))  {
+    cov_matrix[i, i] = 1 + 0.00000001;
+    if (i < length(time)) {
+      for(j in (i+1):length(time)) {
+        covariance = exp(-2*(sin(pi * abs(time[i] - time[j]) / period)^2) / (rho ^ 2))
+        cov_matrix[i, j] = covariance
+        cov_matrix[j, i] = covariance
+      }
+    }
+  }
+  chol_cov <- t(chol(cov_matrix));
+  values <- as.vector(scale(chol_cov %*% rnorm(length(time))))
+  return(values)
+}
+
+#' Simulate from the LKJ distribution
+#' @noRd
+lkj_corr <- function(n_series, eta = 0.8) {
+  alpha <- eta + (n_series - 2) / 2
+  r12 <- 2 * rbeta(1, alpha, alpha) - 1
+  R <- matrix(0, n_series, n_series)
+  R[1, 1] <- 1; R[1, 2] <- r12
+  R[2, 2] <- sqrt(1 - r12 ^ 2)
+  if(n_series > 2) for (m in 2:(n_series - 1)){
+    alpha <- alpha - 0.5
+    y <- rbeta(1, m / 2, alpha)
+    z <- rnorm(m, 0, 1)
+    z <- z / sqrt(crossprod(z)[1])
+    R[1 : m, m + 1] <- sqrt(y) * z
+    R[m + 1, m + 1] <- sqrt(1 - y)
+  }
+  return(crossprod(R))
+}
+
+#' Generate a random covariance matrix
+#' @noRd
+random_Sigma = function(N){
+  L_Omega <- matrix(0, N, N);
+  L_Omega[1, 1] <- 1;
+  for (i in 2 : N) {
+    bound <- 1;
+    for (j in 1 : (i - 1)) {
+      is_sparse <- rbinom(1, 1, 0.6)
+      if(is_sparse){
+        L_Omega[i, j] <- runif(1, -0.05, 0.05);
+      } else {
+        L_Omega[i, j] <- runif(1, -sqrt(bound), sqrt(bound));
+      }
+      bound <- bound - L_Omega[i, j] ^ 2;
+    }
+    L_Omega[i, i] <- sqrt(bound);
+  }
+  Sigma <- L_Omega %*% t(L_Omega);
+  return(Sigma)
 }
