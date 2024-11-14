@@ -858,14 +858,21 @@ forecast_draws = function(object,
                                     'obs_uncertainty',
                                     'time_dis'),
                             envir = environment())
+
+    # Grab internal functions to export to each worker
+    funs_list <- c('extract_general_trend_pars',
+                   'linkfun',
+                   'forecast_trend',
+                   'extract_series_trend_pars',
+                   'mvgam_predict')
+    attr(funs_list, 'envir') <- as.environment(asNamespace("mvgam"))
+    attr(funs_list, 'mode') <- 'function'
+
     parallel::clusterExport(cl = cl,
-                            unclass(lsf.str(envir = asNamespace("mvgam"),
-                                            all = T)),
+                            funs_list,
                             envir = as.environment(asNamespace("mvgam")))
 
-    pbapply::pboptions(type = "none")
-
-    fc_preds <- pbapply::pblapply(seq_len(dim(betas)[1]), function(i){
+    fc_preds <- parallel::parLapply(cl = cl, seq_len(dim(betas)[1]), function(i){
       # Sample index
       samp_index <- i
 
@@ -1023,7 +1030,7 @@ forecast_draws = function(object,
         })
       }
       out
-    }, cl = cl)
+    })
     stopCluster(cl)
   }
 

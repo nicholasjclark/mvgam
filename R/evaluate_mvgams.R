@@ -340,8 +340,8 @@ roll_eval_mvgam = function(object,
   validate_pos_integer(fc_horizon)
 
   # Generate time variable from training data
-  if(class(object$obs_data)[1] == 'list'){
-    all_timepoints <- (data.frame(time = object$obs_data$time)  %>%
+  if(inherits(object$obs_data, 'list')){
+    all_timepoints <- (data.frame(time = object$obs_data$index..time..index) %>%
                          dplyr::select(time) %>%
                          dplyr::distinct() %>%
                          dplyr::arrange(time) %>%
@@ -350,9 +350,9 @@ roll_eval_mvgam = function(object,
 
   } else {
     all_timepoints <- (object$obs_data %>%
-                         dplyr::select(time) %>%
+                         dplyr::select(index..time..index) %>%
                          dplyr::distinct() %>%
-                         dplyr::arrange(time) %>%
+                         dplyr::arrange(index..time..index) %>%
                          dplyr::mutate(time = dplyr::row_number())) %>%
       dplyr::pull(time)
   }
@@ -393,14 +393,17 @@ roll_eval_mvgam = function(object,
   clusterEvalQ(cl, library(mgcv))
   clusterEvalQ(cl, library(rstan))
   clusterEvalQ(cl, library(dplyr))
-  clusterExport(cl = cl,
-                          unclass(lsf.str(envir = asNamespace("mvgam"),
-                                          all = T)),
-                          envir = as.environment(asNamespace("mvgam"))
-  )
 
-  pbapply::pboptions(type = "none")
-  evals <- pbapply::pblapply(evaluation_seq, function(timepoint){
+  # Grab internal functions to export to each worker
+  funs_list <- c('eval_mvgam')
+  attr(funs_list, 'envir') <- as.environment(asNamespace("mvgam"))
+  attr(funs_list, 'mode') <- 'function'
+
+  parallel::clusterExport(cl = cl,
+                          funs_list,
+                          envir = as.environment(asNamespace("mvgam")))
+
+  evals <- parallel::parLapply(cl = cl, evaluation_seq, function(timepoint){
     eval_mvgam(object = object,
                n_samples = n_samples,
                n_cores = 1,
@@ -409,8 +412,7 @@ roll_eval_mvgam = function(object,
                score = score,
                log = log,
                weights = weights)
-  },
-  cl = cl)
+  })
   stopCluster(cl)
 
   # Take sum of score at each evaluation point for multivariate models

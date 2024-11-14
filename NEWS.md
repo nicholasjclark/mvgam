@@ -8,6 +8,7 @@
 * Added a `fevd.mvgam()` method to compute forecast error variance decompositions from models fit with Vector Autoregressive dynamics (#21 and #76)
 
 ## Bug fixes
+* Not necessarily a "bug fix", but this update removes several dependencies to lighten installation and improve efficiency of the workflow (#93)
 * Fixed a minor bug in the way `trend_map` recognises levels of the `series` factor
 * Bug fix to ensure `lfo_cv` recognises the actual times in `time`, just in case the user supplies data that doesn't start at `t = 1`. Also updated documentation to better reflect this
 * Bug fix to ensure `update.mvgam` captures any `knots` or `trend_knots` arguments that were passed to the original model call
