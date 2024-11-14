@@ -186,11 +186,11 @@ lfo_cv.mvgam = function(object,
   }
 
   fit_past <- update(object,
-                    data = data_splits$data_train,
-                    newdata = data_splits$data_test,
-                    lfo = TRUE,
-                    noncentred = noncentred,
-                    silent = silent)
+                     data = data_splits$data_train,
+                     newdata = data_splits$data_test,
+                     lfo = TRUE,
+                     noncentred = noncentred,
+                     silent = silent)
 
   # Calculate log likelihoods of forecast observations for the next
   # fc_horizon ahead observations
@@ -265,10 +265,10 @@ lfo_cv.mvgam = function(object,
       approx_elpds[i + 1] <- log_sum_exp(lw + sum_rows(loglik_past[,fc_indices]))
     }
   }
-  return(structure(list(elpds = approx_elpds[(min_t + 1):N],
+  return(structure(list(elpds = approx_elpds[(min_t + 1):(N - fc_horizon)],
                         sum_ELPD = sum(approx_elpds, na.rm = TRUE),
-                        pareto_ks = ks,
-                        eval_timepoints = (min_t + 1):N,
+                        pareto_ks = ks[-1],
+                        eval_timepoints = (min_t + 1):(N - fc_horizon),
                         pareto_k_threshold = pareto_k_threshold),
                    class = 'mvgam_lfo'))
 }
