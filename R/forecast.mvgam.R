@@ -1,6 +1,5 @@
 #'@title Extract or compute hindcasts and forecasts for a fitted \code{mvgam} object
 #'@name forecast.mvgam
-#'@importFrom parallel clusterExport stopCluster setDefaultCluster
 #'@importFrom stats predict
 #'@importFrom rlang missing_arg
 #'@inheritParams predict.mvgam
@@ -14,7 +13,7 @@
 #'observation of series 1 in the original data and the first observation for series 1 in \code{newdata})
 #'@param data_test Deprecated. Still works in place of \code{newdata} but users are recommended to use
 #'\code{newdata} instead for more seamless integration into `R` workflows
-#'@param n_cores \code{integer} specifying number of cores for generating forecasts in parallel
+#'@param n_cores Deprecated. Parallel processing is no longer supported
 #'@param ... Ignored
 #'@details Posterior predictions are drawn from the fitted \code{mvgam} and used to simulate a forecast distribution
 #'@return An object of class \code{mvgam_forecast} containing hindcast and forecast distributions.
@@ -72,6 +71,9 @@ forecast.mvgam = function(object,
                           ...){
   # Check arguments
   validate_pos_integer(n_cores)
+  if(n_cores > 1L){
+    message('argument "n_cores" is deprecated')
+  }
 
   if(!missing("newdata")){
     data_test <- newdata
@@ -834,56 +836,8 @@ forecast_draws = function(object,
       }
     }
 
-    # Set up parallel environment for looping across posterior draws
-    # to compute h-step ahead forecasts
-    cl <- parallel::makePSOCKcluster(n_cores)
-    parallel::setDefaultCluster(cl)
-    parallel::clusterExport(NULL, c('family',
-                                    'family_pars',
-                                    'trials',
-                                    'trend_model',
-                                    'trend_pars',
-                                    'type',
-                                    'use_lv',
-                                    'betas',
-                                    'betas_trend',
-                                    'n_series',
-                                    'data_test',
-                                    'series',
-                                    'series_test',
-                                    'Xp',
-                                    'Xp_trend',
-                                    'fc_horizon',
-                                    'b_uncertainty',
-                                    'trend_uncertainty',
-                                    'obs_uncertainty',
-                                    'time_dis'),
-                            envir = environment())
-
-    # Grab internal functions to export to each worker
-    # funs_list <- c('extract_general_trend_pars',
-    #                'linkfun',
-    #                'forecast_trend',
-    #                'extract_series_trend_pars',
-    #                'mvgam_predict',
-    #                'prep_varma_params',
-    #                'sim_varma',
-    #                'validate_equaldims',
-    #                'varma_recursC',
-    #                'log_sum_exp')
-    # attr(funs_list, 'envir') <- as.environment(asNamespace("mvgam"))
-    # attr(funs_list, 'mode') <- 'function'
-    #
-    # parallel::clusterExport(cl = cl,
-    #                         funs_list,
-    #                         envir = as.environment(asNamespace("mvgam")))
-
-    parallel::clusterExport(cl = cl,
-                            unclass(lsf.str(envir = asNamespace("mvgam"),
-                                            all = TRUE)),
-                            envir = as.environment(asNamespace("mvgam")))
-
-    fc_preds <- parallel::parLapply(cl = cl, seq_len(dim(betas)[1]), function(i){
+    # Loop over draws and compute forecasts (in serial at the moment)
+    fc_preds <- lapply(seq_len(dim(betas)[1]), function(i){
       # Sample index
       samp_index <- i
 
@@ -1042,7 +996,6 @@ forecast_draws = function(object,
       }
       out
     })
-    stopCluster(cl)
   }
 
   return(fc_preds)

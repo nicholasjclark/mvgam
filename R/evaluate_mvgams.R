@@ -2,7 +2,6 @@
 #'
 #'@importFrom graphics barplot boxplot axis
 #'@importFrom stats quantile ecdf median predict
-#'@importFrom parallel clusterExport stopCluster setDefaultCluster clusterEvalQ
 #'@importFrom grDevices devAskNewPage
 #'@importFrom utils lsf.str
 #'@param object \code{list} object returned from \code{mvgam}
@@ -11,7 +10,7 @@
 #'@param eval_timepoint \code{integer} indexing the timepoint that represents our last 'observed'
 #'set of outcome data
 #'@param fc_horizon \code{integer} specifying the length of the forecast horizon for evaluating forecasts
-#'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
+#'@param n_cores Deprecated. Parallel processing is no longer supported
 #'@param score \code{character} specifying the type of ranked probability score to use for evaluation. Options are:
 #'`variogram`, `drps` or `crps`
 #'@param log \code{logical}. Should the forecasts and truths be logged prior to scoring?
@@ -136,7 +135,7 @@ eval_mvgam = function(object,
                       n_samples = 5000,
                       eval_timepoint = 3,
                       fc_horizon = 3,
-                      n_cores = 2,
+                      n_cores = 1,
                       score = 'drps',
                       log = FALSE,
                       weights){
@@ -154,6 +153,9 @@ eval_mvgam = function(object,
   validate_pos_integer(fc_horizon)
   validate_pos_integer(eval_timepoint)
   validate_pos_integer(n_cores)
+  if(n_cores > 1L){
+    message('argument "n_cores" is deprecated')
+  }
   validate_pos_integer(n_samples)
 
   if(eval_timepoint < 3){
@@ -312,7 +314,7 @@ eval_mvgam = function(object,
 #'@param n_evaluations \code{integer} specifying the total number of evaluations to perform
 #'(ignored if \code{evaluation_seq} is supplied)
 #'@param fc_horizon \code{integer} specifying the length of the forecast horizon for evaluating forecasts
-#'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
+#'@param n_cores Deprecated. Parallel processing is no longer supported
 #'@rdname evaluate_mvgams
 #'@export
 roll_eval_mvgam = function(object,
@@ -320,7 +322,7 @@ roll_eval_mvgam = function(object,
                            evaluation_seq,
                            n_samples = 5000,
                            fc_horizon = 3,
-                           n_cores = 2,
+                           n_cores = 1,
                            score = 'drps',
                            log = FALSE,
                            weights){
@@ -335,6 +337,9 @@ roll_eval_mvgam = function(object,
          call. = FALSE)
   }
   validate_pos_integer(n_cores)
+  if(n_cores > 1L){
+    message('argument "n_cores" is deprecated')
+  }
   validate_pos_integer(n_evaluations)
   validate_pos_integer(n_samples)
   validate_pos_integer(fc_horizon)
@@ -378,32 +383,7 @@ roll_eval_mvgam = function(object,
     weights <- rep(1, NCOL(object$ytimes))
   }
 
-  cl <- parallel::makePSOCKcluster(n_cores)
-  parallel::setDefaultCluster(cl)
-  clusterExport(NULL, c('all_timepoints',
-                        'evaluation_seq',
-                        'object',
-                        'n_samples',
-                        'fc_horizon',
-                        'eval_mvgam',
-                        'score',
-                        'log',
-                        'weights'),
-                envir = environment())
-  clusterEvalQ(cl, library(mgcv))
-  clusterEvalQ(cl, library(rstan))
-  clusterEvalQ(cl, library(dplyr))
-
-  # Grab internal functions to export to each worker
-  funs_list <- c('eval_mvgam')
-  attr(funs_list, 'envir') <- as.environment(asNamespace("mvgam"))
-  attr(funs_list, 'mode') <- 'function'
-
-  parallel::clusterExport(cl = cl,
-                          funs_list,
-                          envir = as.environment(asNamespace("mvgam")))
-
-  evals <- parallel::parLapply(cl = cl, evaluation_seq, function(timepoint){
+  evals <- lapply(evaluation_seq, function(timepoint){
     eval_mvgam(object = object,
                n_samples = n_samples,
                n_cores = 1,
@@ -413,7 +393,6 @@ roll_eval_mvgam = function(object,
                log = log,
                weights = weights)
   })
-  stopCluster(cl)
 
   # Take sum of score at each evaluation point for multivariate models
   sum_or_na = function(x){
@@ -491,7 +470,7 @@ roll_eval_mvgam = function(object,
 #'posterior distribution
 #'@param fc_horizon \code{integer} specifying the length of the forecast horizon for evaluating forecasts
 #'@param n_evaluations \code{integer} specifying the total number of evaluations to perform
-#'@param n_cores \code{integer} specifying number of cores for generating particle forecasts in parallel
+#'@param n_cores Deprecated. Parallel processing is no longer supported
 #'@rdname evaluate_mvgams
 #'@export
 compare_mvgams = function(model1,
@@ -499,7 +478,7 @@ compare_mvgams = function(model1,
                           n_samples = 1000,
                           fc_horizon = 3,
                           n_evaluations = 10,
-                          n_cores = 2,
+                          n_cores = 1,
                           score = 'drps',
                           log = FALSE,
                           weights){
@@ -526,6 +505,9 @@ compare_mvgams = function(model1,
   validate_pos_integer(n_evaluations)
   validate_pos_integer(fc_horizon)
   validate_pos_integer(n_cores)
+  if(n_cores > 1L){
+    message('argument "n_cores" is deprecated')
+  }
   validate_pos_integer(n_samples)
 
   # Evaluate the two models

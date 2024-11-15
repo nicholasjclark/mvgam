@@ -22,7 +22,6 @@ Imports:
     rstantools (>= 2.1.1),
     bayesplot (>= 1.5.0),
     ggplot2 (>= 2.0.0),
-    parallel,
     mvnfast,
     purrr,
     dplyr,

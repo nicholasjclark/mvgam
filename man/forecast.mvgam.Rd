@@ -26,7 +26,7 @@ observation of series 1 in the original data and the first observation for serie
 \item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
 \code{newdata} instead for more seamless integration into \code{R} workflows}
 
-\item{n_cores}{\code{integer} specifying number of cores for generating forecasts in parallel}
+\item{n_cores}{Deprecated. Parallel processing is no longer supported}
 
 \item{type}{When this has the value \code{link} (default) the linear predictor is
 calculated on the link scale.
