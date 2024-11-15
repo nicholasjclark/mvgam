@@ -70,7 +70,8 @@
 #'                newdata = dat$data_test,
 #'                burnin = 300,
 #'                samples = 300,
-#'                chains = 2)
+#'                chains = 2,
+#'                silent = 2)
 #'
 #'# Fit a less appropriate model
 #'mod_rw <- mvgam(y ~ s(season, bs = 'cc', k = 6),
@@ -80,7 +81,8 @@
 #'               newdata = dat$data_test,
 #'               burnin = 300,
 #'               samples = 300,
-#'               chains = 2)
+#'               chains = 2,
+#'               silent = 2)
 #'
 #'# Compare Discrete Ranked Probability Scores for the testing period
 #'fc_ar2 <- forecast(mod_ar2)
@@ -96,10 +98,12 @@
 #'# for estimating model parameters
 #'lfo_ar2 <- lfo_cv(mod_ar2,
 #'                  min_t = 40,
-#'                  fc_horizon = 3)
+#'                  fc_horizon = 3,
+#'                  silent = 2)
 #'lfo_rw <- lfo_cv(mod_rw,
 #'                 min_t = 40,
-#'                 fc_horizon = 3)
+#'                 fc_horizon = 3,
+#'                 silent = 2)
 #'
 #'# Plot Pareto-K values and ELPD estimates
 #'plot(lfo_ar2)

@@ -61,7 +61,8 @@ mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
             trend_model = AR(),
             noncentred = TRUE,
             data = simdat$data_train,
-            chains = 2)
+            chains = 2,
+            silent = 2)
 
 # Hindcasts on response scale
 hc <- hindcast(mod)

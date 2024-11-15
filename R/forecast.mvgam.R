@@ -34,7 +34,8 @@ forecast <- function(object, ...){
 #'             trend_model = AR(),
 #'             noncentred = TRUE,
 #'             data = simdat$data_train,
-#'             chains = 2)
+#'             chains = 2,
+#'             silent = 2)
 #'
 #' # Hindcasts on response scale
 #' hc <- hindcast(mod)
@@ -864,7 +865,8 @@ forecast_draws = function(object,
                    'linkfun',
                    'forecast_trend',
                    'extract_series_trend_pars',
-                   'mvgam_predict')
+                   'mvgam_predict',
+                   'prep_varma_params')
     attr(funs_list, 'envir') <- as.environment(asNamespace("mvgam"))
     attr(funs_list, 'mode') <- 'function'
 
