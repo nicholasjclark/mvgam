@@ -861,21 +861,26 @@ forecast_draws = function(object,
                             envir = environment())
 
     # Grab internal functions to export to each worker
-    funs_list <- c('extract_general_trend_pars',
-                   'linkfun',
-                   'forecast_trend',
-                   'extract_series_trend_pars',
-                   'mvgam_predict',
-                   'prep_varma_params',
-                   'sim_varma',
-                   'validate_equaldims',
-                   'varma_recursC',
-                   'log_sum_exp')
-    attr(funs_list, 'envir') <- as.environment(asNamespace("mvgam"))
-    attr(funs_list, 'mode') <- 'function'
+    # funs_list <- c('extract_general_trend_pars',
+    #                'linkfun',
+    #                'forecast_trend',
+    #                'extract_series_trend_pars',
+    #                'mvgam_predict',
+    #                'prep_varma_params',
+    #                'sim_varma',
+    #                'validate_equaldims',
+    #                'varma_recursC',
+    #                'log_sum_exp')
+    # attr(funs_list, 'envir') <- as.environment(asNamespace("mvgam"))
+    # attr(funs_list, 'mode') <- 'function'
+    #
+    # parallel::clusterExport(cl = cl,
+    #                         funs_list,
+    #                         envir = as.environment(asNamespace("mvgam")))
 
     parallel::clusterExport(cl = cl,
-                            funs_list,
+                            unclass(lsf.str(envir = asNamespace("mvgam"),
+                                            all = TRUE)),
                             envir = as.environment(asNamespace("mvgam")))
 
     fc_preds <- parallel::parLapply(cl = cl, seq_len(dim(betas)[1]), function(i){

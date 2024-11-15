@@ -360,7 +360,7 @@ sim_mvgam = function(T = 100,
         (obs_trends[,x] * trend_rel)
 
     } else {
-      yseason <- as.vector(scale(stl(ts(rnorm(T, glob_season, sd = 2),
+      yseason <- as.vector(scale(stats::stl(ts(rnorm(T, glob_season, sd = 2),
                                         frequency = freq), 'periodic')$time.series[,1]))
       dynamics <- (yseason * (1 - trend_rel)) +
         (obs_trends[,x] * trend_rel)

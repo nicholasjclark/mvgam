@@ -58,20 +58,20 @@ test_that("VARMAs are set up correctly", {
                  run_model = FALSE)
   expect_true(inherits(var, 'mvgam_prefit'))
 
-  var <- mvgam(y ~ s(series, bs = 're') +
+  var <- SW(mvgam(y ~ s(series, bs = 're') +
                  gp(time, c = 5/4, k = 20) - 1,
                trend_model = VAR(),
                data = gaus_data$data_train,
                family = gaussian(),
-               run_model = FALSE)
+               run_model = FALSE))
   expect_true(inherits(var, 'mvgam_prefit'))
 
-  varma <- mvgam(y ~ s(series, bs = 're') +
+  varma <- SW(mvgam(y ~ s(series, bs = 're') +
                    s(season, bs = 'cc') - 1,
                  trend_model = 'VARMA',
                  data = gaus_data$data_train,
                  family = gaussian(),
-                 run_model = FALSE)
+                 run_model = FALSE))
 
   expect_true(any(grepl('// unconstrained ma inverse partial autocorrelations',
                         varma$model_file, fixed = TRUE)))
