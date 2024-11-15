@@ -866,7 +866,8 @@ forecast_draws = function(object,
                    'forecast_trend',
                    'extract_series_trend_pars',
                    'mvgam_predict',
-                   'prep_varma_params')
+                   'prep_varma_params',
+                   'sim_varma')
     attr(funs_list, 'envir') <- as.environment(asNamespace("mvgam"))
     attr(funs_list, 'mode') <- 'function'
 
