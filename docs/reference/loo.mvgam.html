@@ -150,39 +150,15 @@ forecast evaluations for further scrutiny of models (see for example <code><a hr
 <span class="r-in"><span>             family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>             chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>             silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpqqsueL/model-19b8407b5d02.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in get_mvgam_priors(formula = formula, trend_formula = trend_formula,     data = data, family = family, use_lv = use_lv, n_lv = n_lv,     use_stan = TRUE, trend_model = trend_model, trend_map = trend_map,     drift = drift, knots = knots):</span> object 'silent' not found</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Inspect the model and calculate LOO</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="loo.mvgam-1.png" alt="" width="700" height="433"></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in conditional_effects(mod1):</span> object 'mod1' not found</span>
 <span class="r-in"><span><span class="va">mc.cores.def</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">'mc.cores'</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>mc.cores <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">mod1</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 300 log-likelihood matrix.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate   SE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo   -364.2 11.1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo         7.4  0.6</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> looic       728.4 22.1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE of elpd_loo is 0.1.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.7, 2.3]).</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> All Pareto k estimates are good (k &lt; 0.67).</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in loo(mod1):</span> object 'mod1' not found</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now fit a model with hierarchical seasonality</span></span></span>
 <span class="r-in"><span><span class="va">mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">mod1</span>,</span></span>
@@ -191,287 +167,39 @@ forecast evaluations for further scrutiny of models (see for example <code><a hr
 <span class="r-in"><span>              xt <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>bs <span class="op">=</span> <span class="st">'cc'</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>              silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpqqsueL/model-19b830efb18.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in update(mod1, formula = y ~ s(season, bs = "cc", k = 6) + s(season,     series, bs = "fs", xt = list(bs = "cc"), k = 4), chains = 2,     silent = 2):</span> object 'mod1' not found</span>
 <span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod2</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="loo.mvgam-2.png" alt="" width="700" height="433"></span>
-<span class="r-plt img"><img src="loo.mvgam-3.png" alt="" width="700" height="433"></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in conditional_effects(mod2):</span> object 'mod2' not found</span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">mod2</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 300 log-likelihood matrix.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate   SE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo   -309.7 11.4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo        13.3  1.1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> looic       619.5 22.8</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE of elpd_loo is 0.1.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.7, 1.3]).</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> All Pareto k estimates are good (k &lt; 0.67).</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in loo(mod2):</span> object 'mod2' not found</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Now add AR1 dynamic errors to mod2</span></span></span>
 <span class="r-in"><span><span class="va">mod3</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/update.html" class="external-link">update</a></span><span class="op">(</span><span class="va">mod2</span>,</span></span>
 <span class="r-in"><span>              trend_model <span class="op">=</span> <span class="fu"><a href="RW.html">AR</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>              silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpqqsueL/model-19b84ce92891.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in update(mod2, trend_model = AR(), chains = 2, silent = 2):</span> object 'mod2' not found</span>
 <span class="r-in"><span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod3</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="loo.mvgam-4.png" alt="" width="700" height="433"></span>
-<span class="r-plt img"><img src="loo.mvgam-5.png" alt="" width="700" height="433"></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in conditional_effects(mod3):</span> object 'mod3' not found</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">mod3</span>, type <span class="op">=</span> <span class="st">'trend'</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="loo.mvgam-6.png" alt="" width="700" height="433"></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in plot(mod3, type = "trend"):</span> object 'mod3' not found</span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">mod3</span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 300 log-likelihood matrix.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate   SE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo   -251.0  9.9</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo       163.6  7.1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> looic       502.0 19.9</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE of elpd_loo is NA.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.0, 0.0]).</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Pareto k diagnostic values:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                           Count Pct.    Min. ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     127   42.3%   1       </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)      160   53.3%   &lt;NA&gt;    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad)  13    4.3%   &lt;NA&gt;    </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in loo(mod3):</span> object 'mod3' not found</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compare models using LOO</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo_compare.html" class="external-link">loo_compare</a></span><span class="op">(</span><span class="va">mod1</span>, <span class="va">mod2</span>, <span class="va">mod3</span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      elpd_diff se_diff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> mod3    0.0       0.0 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> mod2  -58.7       4.8 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> mod1 -113.2       9.3 </span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in loo_compare(mod1, mod2, mod3):</span> object 'mod1' not found</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></span><span class="op">(</span>mc.cores <span class="op">=</span> <span class="va">mc.cores.def</span><span class="op">)</span></span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Compare forecast abilities using an expanding training window and</span></span></span>
 <span class="r-in"><span><span class="co"># forecasting ahead 1 timepoint from each window; the first window by includes</span></span></span>
 <span class="r-in"><span><span class="co"># the first 92 timepoints (of the 100 that were simulated)</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">mod2</span><span class="op">$</span><span class="va">obs_data</span><span class="op">$</span><span class="va">time</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 100</span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in eval(expr, envir, enclos):</span> object 'mod2' not found</span>
 <span class="r-in"><span><span class="va">lfo_mod2</span> <span class="op">&lt;-</span> <span class="fu"><a href="lfo_cv.mvgam.html">lfo_cv</a></span><span class="op">(</span><span class="va">mod2</span>, min_t <span class="op">=</span> <span class="fl">92</span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpqqsueL/model-19b824896df3.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 1.0 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 1.2 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 1.1 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 1.3 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in lfo_cv(mod2, min_t = 92):</span> object 'mod2' not found</span>
 <span class="r-in"><span><span class="va">lfo_mod3</span> <span class="op">&lt;-</span> <span class="fu"><a href="lfo_cv.mvgam.html">lfo_cv</a></span><span class="op">(</span><span class="va">mod3</span>, min_t <span class="op">=</span> <span class="fl">92</span><span class="op">)</span></span></span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpqqsueL/model-19b85d765643.hpp:2:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 6.6 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 11.1 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 8.8 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 11.1 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 7.0 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 7.9 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 7.4 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 7.9 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>model has repeated 1-d smooths of same variable.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Your model may benefit from using "noncentred = TRUE"</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Compiling Stan program using cmdstanr</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Start sampling</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Running MCMC with 2 parallel chains...</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration:   1 / 1000 [  0%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 100 / 1000 [ 10%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 200 / 1000 [ 20%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 300 / 1000 [ 30%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 400 / 1000 [ 40%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 1 finished in 8.8 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 500 / 1000 [ 50%]  (Warmup) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 501 / 1000 [ 50%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 600 / 1000 [ 60%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 700 / 1000 [ 70%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 800 / 1000 [ 80%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 900 / 1000 [ 90%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 Iteration: 1000 / 1000 [100%]  (Sampling) </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Chain 2 finished in 25.0 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Both chains finished successfully.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Mean chain execution time: 16.9 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Total execution time: 25.2 seconds.</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in lfo_cv(mod3, min_t = 92):</span> object 'mod3' not found</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Take the difference in forecast ELPDs; a model with higher ELPD is preferred,</span></span></span>
 <span class="r-in"><span><span class="co"># so negative values here indicate that mod3 gave better forecasts for a particular</span></span></span>
@@ -480,8 +208,9 @@ forecast evaluations for further scrutiny of models (see for example <code><a hr
 <span class="r-in"><span>    x <span class="op">=</span> <span class="va">lfo_mod2</span><span class="op">$</span><span class="va">eval_timepoints</span>, pch <span class="op">=</span> <span class="fl">16</span>,</span></span>
 <span class="r-in"><span>    ylab <span class="op">=</span> <span class="st">'ELPD_mod2 - ELPD_mod3'</span>,</span></span>
 <span class="r-in"><span>    xlab <span class="op">=</span> <span class="st">'Evaluation timepoint'</span><span class="op">)</span></span></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in plot(y = lfo_mod2$elpds - lfo_mod3$elpds, x = lfo_mod2$eval_timepoints,     pch = 16, ylab = "ELPD_mod2 - ELPD_mod3", xlab = "Evaluation timepoint"):</span> object 'lfo_mod2' not found</span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/abline.html" class="external-link">abline</a></span><span class="op">(</span>h <span class="op">=</span> <span class="fl">0</span>, lty <span class="op">=</span> <span class="st">'dashed'</span><span class="op">)</span></span></span>
-<span class="r-plt img"><img src="loo.mvgam-7.png" alt="" width="700" height="433"></span>
+<span class="r-err co"><span class="r-pr">#&gt;</span> <span class="error">Error in int_abline(a = a, b = b, h = h, v = v, untf = untf, ...):</span> plot.new has not been called yet</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

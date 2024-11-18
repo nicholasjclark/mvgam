@@ -17,6 +17,9 @@ jsdgam(
   share_obs_params = FALSE,
   priors,
   n_lv = 2,
+  backend = getOption("brms.backend", "cmdstanr"),
+  algorithm = getOption("brms.algorithm", "sampling"),
+  control = list(max_treedepth = 10, adapt_delta = 0.8),
   chains = 4,
   burnin = 500,
   samples = 500,
@@ -24,24 +27,20 @@ jsdgam(
   parallel = TRUE,
   threads = 1,
   silent = 1,
-  max_treedepth = 10,
-  adapt_delta = 0.8,
-  backend = getOption("brms.backend", "cmdstanr"),
-  algorithm = getOption("brms.algorithm", "sampling"),
   run_model = TRUE,
   return_model_data = FALSE,
   ...
 )
 }
 \arguments{
-\item{formula}{A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
+\item{formula}{A \code{formula} object specifying the GAM observation model formula. These are exactly like the formula
 for a GLM except that smooth terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying
-\code{dynamic()} terms and nonparametric \code{gp()} terms, can be added to the right hand side
+\code{dynamic()} terms, nonparametric \code{gp()} terms and offsets using \code{offset()}, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors
 (or linear functionals of these). Details of the formula syntax used by \pkg{mvgam}
 can be found in \code{\link{mvgam_formulae}}}
 
-\item{factor_formula}{A \code{character} string specifying the linear predictor
+\item{factor_formula}{A \code{formula} object specifying the linear predictor
 effects for the latent factors. Use \code{by = trend} within calls to functional terms
 (i.e. \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, \code{dynamic()}, or \code{gp()}) to ensure that each factor
 captures a different axis of variation. See the example below as an illustration}
@@ -109,6 +108,28 @@ See \link{get_mvgam_priors} and for more information on changing default prior d
 residual associations.
 Cannot be \verb{> n_species}. Defaults arbitrarily to \code{2}}
 
+\item{backend}{Character string naming the package to use as the backend for fitting
+the Stan model. Options are "cmdstanr" (the default) or "rstan". Can be set globally
+for the current R session via the \code{"brms.backend"} option (see \code{\link{options}}). Details on
+the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
+https://mc-stan.org/cmdstanr/, respectively}
+
+\item{algorithm}{Character string naming the estimation approach to use.
+Options are \code{"sampling"} for MCMC (the default), \code{"meanfield"} for
+variational inference with factorized normal distributions,
+\code{"fullrank"} for variational inference with a multivariate normal
+distribution, \code{"laplace"} for a Laplace approximation (only available
+when using cmdstanr as the backend) or \code{"pathfinder"} for the pathfinder
+algorithm (only currently available when using cmdstanr as the backend).
+Can be set globally for the current \R session via the
+\code{"brms.algorithm"} option (see \code{\link{options}}). Limited testing
+suggests that \code{"meanfield"} performs best out of the non-MCMC approximations for
+dynamic GAMs, possibly because of the difficulties estimating covariances among the
+many spline parameters and latent trend parameters. But rigorous testing has not
+been carried out}
+
+\item{control}{A named \code{list} for controlling the sampler's behaviour. Currently only accepts settings for}
+
 \item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
 if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}
 
@@ -137,38 +158,6 @@ messages of compiler and sampler are suppressed. If \code{2}, even more messages
 actual sampling progress is still printed. Set \code{refresh = 0} to turn this off as well. If using
 \code{backend = "rstan"} you can also set open_progress = FALSE to prevent opening additional
 progress bars.}
-
-\item{max_treedepth}{positive integer placing a cap on the number of simulation steps evaluated during each iteration when
-\code{use_stan == TRUE}. Default is \code{10}. Increasing this value can sometimes help with exploration of complex
-posterior geometries, but it is rarely fruitful to go above a \code{max_treedepth} of \code{14}}
-
-\item{adapt_delta}{positive numeric between \code{0} and \code{1} defining the target average proposal acceptance probability
-during Stan's adaptation period, if \code{use_stan == TRUE}. Default is \code{0.8}. In general you should not need to change adapt_delta
-unless you see a warning message about divergent transitions, in which case you can increase adapt_delta from the default
-to a value closer to \code{1} (e.g. from \code{0.95} to \code{0.99}, or from \code{0.99} to \code{0.999}, etc).
-The step size used by the numerical integrator is a function of \code{adapt_delta} in that increasing
-\code{adapt_delta} will result in a smaller step size and fewer divergences. Increasing \code{adapt_delta} will
-typically result in a slower sampler, but it will always lead to a more robust sampler}
-
-\item{backend}{Character string naming the package to use as the backend for fitting
-the Stan model (if \code{use_stan = TRUE}). Options are "cmdstanr" (the default) or "rstan". Can be set globally
-for the current R session via the \code{"brms.backend"} option (see \code{\link{options}}). Details on
-the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
-https://mc-stan.org/cmdstanr/, respectively}
-
-\item{algorithm}{Character string naming the estimation approach to use.
-Options are \code{"sampling"} for MCMC (the default), \code{"meanfield"} for
-variational inference with factorized normal distributions,
-\code{"fullrank"} for variational inference with a multivariate normal
-distribution, \code{"laplace"} for a Laplace approximation (only available
-when using cmdstanr as the backend) or \code{"pathfinder"} for the pathfinder
-algorithm (only currently available when using cmdstanr as the backend).
-Can be set globally for the current \R session via the
-\code{"brms.algorithm"} option (see \code{\link{options}}). Limited testing
-suggests that \code{"meanfield"} performs best out of the non-MCMC approximations for
-dynamic GAMs, possibly because of the difficulties estimating covariances among the
-many spline parameters and latent trend parameters. But rigorous testing has not
-been carried out}
 
 \item{run_model}{\code{logical}. If \code{FALSE}, the model is not fitted but instead the function will
 return the model file and the data / initial values that are needed to fit the model outside of \code{mvgam}}

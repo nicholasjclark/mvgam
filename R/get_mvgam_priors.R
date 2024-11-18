@@ -5,6 +5,7 @@
 #'
 #'@inheritParams mvgam
 #'@inheritParams jsdgam
+#'@param ... Not currently used
 #'@param factor_formula Can be supplied instead `trend_formula` to match syntax from
 #'[jsdgam]
 #'@details Users can supply a model formula, prior to fitting the model, so that default priors can be inspected and
@@ -155,23 +156,29 @@
 get_mvgam_priors = function(formula,
                             trend_formula,
                             factor_formula,
-                            data,
-                            data_train,
-                            family = poisson(),
-                            unit = time,
-                            species = series,
                             knots,
                             trend_knots,
+                            trend_model = 'None',
+                            family = poisson(),
+                            data,
+                            unit = time,
+                            species = series,
                             use_lv = FALSE,
                             n_lv,
-                            use_stan = TRUE,
-                            trend_model = 'None',
                             trend_map,
-                            drift = FALSE){
+                            ...){
 
   # Validate the data
-  if(missing("data") & missing("data_train")){
-    stop('Argument "data" is missing with no default')
+  dots <- list(...)
+  if(missing("data")){
+    if('data_train' %in% names(dots)){
+      message('argument "data_train" is deprecated; supply as "data" instead')
+      data <- dots$data_train
+      dots$data_train <- NULL
+    } else {
+      stop('Argument "data" is missing with no default',
+           call. = FALSE)
+    }
   }
   if(!missing("data")){
     data_train <- data
@@ -200,8 +207,10 @@ get_mvgam_priors = function(formula,
   }
 
   # Validate the trend arguments
-  if(drift)
+  if('drift' %in% names(dots)){
     message('The "drift" argument is deprecated; use fixed effects of "time" instead')
+    dots$drift <- NULL
+  }
   drift <- FALSE
   orig_trend_model <- trend_model
   trend_model <- validate_trend_model(orig_trend_model,
@@ -231,6 +240,7 @@ get_mvgam_priors = function(formula,
                                      refit = FALSE)
 
   # Validate the family argument
+  use_stan <- TRUE
   family <- validate_family(family, use_stan = use_stan)
   family_char <- match.arg(arg = family$family,
                            choices = family_char_choices())
@@ -264,17 +274,14 @@ get_mvgam_priors = function(formula,
     validate_trend_formula(trend_formula)
     prior_df <- get_mvgam_priors(formula = orig_formula,
                                  data = data_train,
-                                 #data_train = data_train,
                                  family = family,
                                  use_lv = FALSE,
-                                 use_stan = TRUE,
                                  trend_model = if(trend_model == 'None'){
                                    RW()
                                  } else {
                                    orig_trend_model
                                  },
                                  trend_map = trend_map,
-                                 drift = drift,
                                  knots = knots)
 
     # Replace any terms labelled 'trend' with 'series' for creating the necessary

@@ -8,31 +8,30 @@ get_mvgam_priors(
   formula,
   trend_formula,
   factor_formula,
-  data,
-  data_train,
-  family = poisson(),
-  unit = time,
-  species = series,
   knots,
   trend_knots,
+  trend_model = "None",
+  family = poisson(),
+  data,
+  unit = time,
+  species = series,
   use_lv = FALSE,
   n_lv,
-  use_stan = TRUE,
-  trend_model = "None",
   trend_map,
-  drift = FALSE
+  ...
 )
 }
 \arguments{
-\item{formula}{A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
+\item{formula}{A \code{formula} object specifying the GAM observation model formula. These are exactly like the formula
 for a GLM except that smooth terms, \code{s()}, \code{te()}, \code{ti()}, \code{t2()}, as well as time-varying
-\code{dynamic()} terms and nonparametric \code{gp()} terms, can be added to the right hand side
+\code{dynamic()} terms, nonparametric \code{gp()} terms and offsets using \code{offset()},
+can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors
 (or linear functionals of these). In \code{nmix()} family models, the \code{formula} is used to
 set up a linear predictor for the detection probability. Details of the formula syntax used by \pkg{mvgam}
 can be found in \code{\link{mvgam_formulae}}}
 
-\item{trend_formula}{An optional \code{character} string specifying the GAM process model formula. If
+\item{trend_formula}{An optional \code{formula} object specifying the GAM process model formula. If
 supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
 separately from the observation model. Should not have a response variable specified on the left-hand side
 of the formula (i.e. a valid option would be \code{~ season + s(year)}). Also note that you should not use
@@ -48,65 +47,6 @@ Users are recommended to drop one of these using the \code{- 1} convention in th
 \item{factor_formula}{Can be supplied instead \code{trend_formula} to match syntax from
 \link{jsdgam}}
 
-\item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
-required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
-\itemize{
-\item\code{series} (a \code{factor} index of the series IDs; the number of levels should be identical
-to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
-\item\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
-For most dynamic trend types available in \code{mvgam} (see argument \code{trend_model}), time should be
-measured in discrete, regularly spaced intervals (i.e. \code{c(1, 2, 3, ...)}). However you can
-use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though note that any
-temporal intervals that are exactly \code{0} will be adjusted to a very small number
-(\code{1e-12}) to prevent sampling errors. See an example of \code{CAR()} trends in \code{\link{CAR}}
-}
-Note however that there are special cases where these identifiers are not needed. For
-example, models with hierarchical temporal correlation processes (e.g. \code{AR(gr = region, subgr = species)})
-should NOT include a \code{series} identifier, as this will be constructed internally (see
-\code{\link{mvgam_trends}} and \code{\link{AR}} for details). \code{mvgam} can also fit models that do not
-include a \code{time} variable if there are no temporal dynamic structures included (i.e. \code{trend_model = 'None'} or
-\code{trend_model = ZMVN()}). \code{data} should also include any other variables to be included in
-the linear predictor of \code{formula}}
-
-\item{data_train}{Deprecated. Still works in place of \code{data} but users are recommended to use
-\code{data} instead for more seamless integration into \code{R} workflows}
-
-\item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
-families are:
-\itemize{
-\item\code{gaussian()} for real-valued data
-\item\code{betar()} for proportional data on \verb{(0,1)}
-\item\code{lognormal()} for non-negative real-valued data
-\item\code{student_t()} for real-valued data
-\item\code{Gamma()} for non-negative real-valued data
-\item\code{bernoulli()} for binary data
-\item\code{poisson()} for count data
-\item\code{nb()} for overdispersed count data
-\item\code{binomial()} for count data with imperfect detection when the number of trials is known;
-note that the \code{cbind()} function must be used to bind the discrete observations and the discrete number
-of trials
-\item\code{beta_binomial()} as for \code{binomial()} but allows for overdispersion
-\item\code{nmix()} for count data with imperfect detection when the number of trials
-is unknown and should be modeled via a State-Space N-Mixture model.
-The latent states are Poisson, capturing the 'true' latent
-abundance, while the observation process is Binomial to account for
-imperfect detection.
-See \code{\link{mvgam_families}} for an example of how to use this family}
-Note that only \code{nb()} and \code{poisson()} are available if using \code{JAGS} as the backend.
-Default is \code{poisson()}.
-See \code{\link{mvgam_families}} for more details}
-
-\item{unit}{The unquoted name of the variable that represents the unit of analysis in \code{data} over
-which latent residuals should be correlated. This variable should be either a
-\code{numeric} or \code{integer} variable in the supplied \code{data}.
-Defaults to \code{time} to be consistent with other functionalities
-in \pkg{mvgam}, though note that the data need not be time series in this case. See examples below
-for further details and explanations}
-
-\item{species}{The unquoted name of the \code{factor} variable that indexes
-the different response units in \code{data} (usually \code{'species'} in a JSDM).
-Defaults to \code{series} to be consistent with other \code{mvgam} models}
-
 \item{knots}{An optional \code{list} containing user specified knot values to be used for basis construction.
 For most bases the user simply supplies the knots to be used, which must match up with the \code{k} value supplied
 (note that the number of knots is not always just \code{k}). Different terms can use different numbers of knots,
@@ -114,18 +54,6 @@ unless they share a covariate}
 
 \item{trend_knots}{As for \code{knots} above, this is an optional \code{list} of knot values for smooth
 functions within the \code{trend_formula}}
-
-\item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. Only available for
-\code{RW()}, \code{AR()} and \code{GP()} trend models. Defaults to \code{FALSE}}
-
-\item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
-Cannot be \code{> n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
-
-\item{use_stan}{Logical. If \code{TRUE}, the model will be compiled and sampled using
-Hamiltonian Monte Carlo with a call to \code{\link[cmdstanr]{cmdstan_model}} or
-a call to \code{\link[rstan]{stan}}. Note that
-there are many more options when using \code{Stan} vs \code{JAGS}}
 
 \item{trend_model}{\code{character} or  \code{function} specifying the time series dynamics for the latent trend. Options are:
 \itemize{
@@ -148,6 +76,68 @@ multivariate Random Walk if \code{n_series > 1}). It is also possible for many m
 to estimate hierarchical correlations if the data are structured among levels of
 a relevant grouping factor. See \link{mvgam_trends} for more details and see \link{ZMVN} for an example.}
 
+\item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
+families are:
+\itemize{
+\item\code{gaussian()} for real-valued data
+\item\code{betar()} for proportional data on \verb{(0,1)}
+\item\code{lognormal()} for non-negative real-valued data
+\item\code{student_t()} for real-valued data
+\item\code{Gamma()} for non-negative real-valued data
+\item\code{bernoulli()} for binary data
+\item\code{poisson()} for count data
+\item\code{nb()} for overdispersed count data
+\item\code{binomial()} for count data with imperfect detection when the number of trials is known;
+note that the \code{cbind()} function must be used to bind the discrete observations and the discrete number
+of trials
+\item\code{beta_binomial()} as for \code{binomial()} but allows for overdispersion
+\item\code{nmix()} for count data with imperfect detection when the number of trials
+is unknown and should be modeled via a State-Space N-Mixture model.
+The latent states are Poisson, capturing the 'true' latent
+abundance, while the observation process is Binomial to account for
+imperfect detection.
+See \code{\link{mvgam_families}} for an example of how to use this family}
+Default is \code{poisson()}.
+See \code{\link{mvgam_families}} for more details}
+
+\item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
+required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
+\itemize{
+\item\code{series} (a \code{factor} index of the series IDs; the number of levels should be identical
+to the number of unique series labels (i.e. \code{n_series = length(levels(data$series))}))
+\item\code{time} (\code{numeric} or \code{integer} index of the time point for each observation).
+For most dynamic trend types available in \code{mvgam} (see argument \code{trend_model}), time should be
+measured in discrete, regularly spaced intervals (i.e. \code{c(1, 2, 3, ...)}). However you can
+use irregularly spaced intervals if using \code{trend_model = CAR(1)}, though note that any
+temporal intervals that are exactly \code{0} will be adjusted to a very small number
+(\code{1e-12}) to prevent sampling errors. See an example of \code{CAR()} trends in \code{\link{CAR}}
+}
+Note however that there are special cases where these identifiers are not needed. For
+example, models with hierarchical temporal correlation processes (e.g. \code{AR(gr = region, subgr = species)})
+should NOT include a \code{series} identifier, as this will be constructed internally (see
+\code{\link{mvgam_trends}} and \code{\link{AR}} for details). \code{mvgam} can also fit models that do not
+include a \code{time} variable if there are no temporal dynamic structures included (i.e. \code{trend_model = 'None'} or
+\code{trend_model = ZMVN()}). \code{data} should also include any other variables to be included in
+the linear predictor of \code{formula}}
+
+\item{unit}{The unquoted name of the variable that represents the unit of analysis in \code{data} over
+which latent residuals should be correlated. This variable should be either a
+\code{numeric} or \code{integer} variable in the supplied \code{data}.
+Defaults to \code{time} to be consistent with other functionalities
+in \pkg{mvgam}, though note that the data need not be time series in this case. See examples below
+for further details and explanations}
+
+\item{species}{The unquoted name of the \code{factor} variable that indexes
+the different response units in \code{data} (usually \code{'species'} in a JSDM).
+Defaults to \code{series} to be consistent with other \code{mvgam} models}
+
+\item{use_lv}{\code{logical}. If \code{TRUE}, use dynamic factors to estimate series'
+latent trends in a reduced dimension format. Only available for
+\code{RW()}, \code{AR()} and \code{GP()} trend models. Defaults to \code{FALSE}}
+
+\item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
+Cannot be \code{> n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
+
 \item{trend_map}{Optional \code{data.frame} specifying which series should depend on which latent
 trends. Useful for allowing multiple series to depend on the same latent trend process, but with
 different observation processes. If supplied, a latent factor model is set up by setting
@@ -158,8 +148,7 @@ data (names should perfectly match factor levels of the \code{series} variable i
 if this is supplied, the intercept parameter in the process model will NOT be automatically suppressed.
 See examples for details}
 
-\item{drift}{Deprecated. If you wish to estimate drift parameters, include parametric fixed effects
-of 'time' in your formulae instead.}
+\item{...}{Not currently used}
 }
 \value{
 either a \code{data.frame} containing the prior definitions (if any suitable

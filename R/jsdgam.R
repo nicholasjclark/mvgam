@@ -9,13 +9,13 @@
 #'
 #'@inheritParams mvgam
 #'@inheritParams ZMVN
-#'@param formula A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
+#'@param formula A \code{formula} object specifying the GAM observation model formula. These are exactly like the formula
 #'for a GLM except that smooth terms, `s()`, `te()`, `ti()`, `t2()`, as well as time-varying
-#'`dynamic()` terms and nonparametric `gp()` terms, can be added to the right hand side
+#'`dynamic()` terms, nonparametric `gp()` terms and offsets using `offset()`, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors
 #'(or linear functionals of these). Details of the formula syntax used by \pkg{mvgam}
 #'can be found in \code{\link{mvgam_formulae}}
-#'@param factor_formula A \code{character} string specifying the linear predictor
+#'@param factor_formula A \code{formula} object specifying the linear predictor
 #'effects for the latent factors. Use `by = trend` within calls to functional terms
 #'(i.e. `s()`, `te()`, `ti()`, `t2()`, `dynamic()`, or `gp()`) to ensure that each factor
 #'captures a different axis of variation. See the example below as an illustration
@@ -322,6 +322,10 @@ jsdgam = function(formula,
                   share_obs_params = FALSE,
                   priors,
                   n_lv = 2,
+                  backend = getOption("brms.backend", "cmdstanr"),
+                  algorithm = getOption("brms.algorithm", "sampling"),
+                  control = list(max_treedepth = 10,
+                                 adapt_delta = 0.8),
                   chains = 4,
                   burnin = 500,
                   samples = 500,
@@ -329,10 +333,6 @@ jsdgam = function(formula,
                   parallel = TRUE,
                   threads = 1,
                   silent = 1,
-                  max_treedepth = 10,
-                  adapt_delta = 0.8,
-                  backend = getOption("brms.backend", "cmdstanr"),
-                  algorithm = getOption("brms.algorithm", "sampling"),
                   run_model = TRUE,
                   return_model_data = FALSE,
                   ...){
@@ -545,8 +545,8 @@ jsdgam = function(formula,
                                             chains = chains,
                                             parallel = parallel,
                                             silent = silent,
-                                            max_treedepth = max_treedepth,
-                                            adapt_delta = adapt_delta,
+                                            max_treedepth = control$max_treedepth,
+                                            adapt_delta = control$adapt_delta,
                                             threads = threads,
                                             burnin = burnin,
                                             samples = samples,
@@ -564,8 +564,8 @@ jsdgam = function(formula,
                                          chains = chains,
                                          parallel = parallel,
                                          silent = silent,
-                                         max_treedepth = max_treedepth,
-                                         adapt_delta = adapt_delta,
+                                         max_treedepth = control$max_treedepth,
+                                         adapt_delta = control$adapt_delta,
                                          threads = threads,
                                          burnin = burnin,
                                          samples = samples,
@@ -642,8 +642,8 @@ jsdgam = function(formula,
                           fit_engine = 'stan',
                           backend = backend,
                           algorithm = algorithm,
-                          max_treedepth = max_treedepth,
-                          adapt_delta = adapt_delta),
+                          max_treedepth = control$max_treedepth,
+                          adapt_delta = control$adapt_delta),
                      class = c('mvgam', 'jsdgam'))
   }
 

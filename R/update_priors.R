@@ -292,10 +292,8 @@ adapt_brms_priors = function(priors,
                                 family = family,
                                 use_lv = use_lv,
                                 n_lv = n_lv,
-                                use_stan = TRUE,
                                 trend_model = trend_model,
                                 trend_map = trend_map,
-                                drift = drift,
                                 knots = knots)
 
   if(any(grepl('_gp', priors$class, fixed = TRUE) &

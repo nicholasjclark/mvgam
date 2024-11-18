@@ -188,19 +188,19 @@ test_that("JAGS setups should work", {
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(mod$drift == FALSE)
 
-  mod <- mvgam(y ~ s(season),
-               trend_model = AR(),
-               data = simdat$data_train,
-               family = tweedie(),
-               use_stan = FALSE,
-               run_model = FALSE)
-  expect_true(inherits(mod, 'mvgam_prefit'))
-  expect_true(mod$drift == FALSE)
+  # mod <- mvgam(y ~ s(season),
+  #              trend_model = AR(),
+  #              data = simdat$data_train,
+  #              family = tweedie(),
+  #              use_stan = FALSE,
+  #              run_model = FALSE)
+  # expect_true(inherits(mod, 'mvgam_prefit'))
+  # expect_true(mod$drift == FALSE)
 
   mod <- mvgam(y ~ s(season),
                trend_model = AR(p = 3),
                data = simdat$data_train,
-               family = tweedie(),
+               family = gaussian(),
                use_stan = FALSE,
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
@@ -209,13 +209,13 @@ test_that("JAGS setups should work", {
   expect_true(inherits(get_mvgam_priors(y ~ s(season),
                                         trend_model = 'RW',
                                         data = simdat$data_train,
-                                        family = tweedie(),
+                                        family = Gamma(),
                                         use_stan = FALSE),
                        'data.frame'))
   mod <- mvgam(y ~ s(season),
                trend_model = RW(),
                data = simdat$data_train,
-               family = tweedie(),
+               family = gaussian(),
                use_stan = FALSE,
                run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))

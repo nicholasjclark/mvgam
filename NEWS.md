@@ -7,6 +7,9 @@
 * Added `ZMVN()` error models for estimating Zero-Mean Multivariate Normal errors; convenient for working with non time-series data where latent residuals are expected to be correlated (such as when fitting Joint Species Distribution Models); see `?mvgam::ZMVN` for examples
 * Added a `fevd.mvgam()` method to compute forecast error variance decompositions from models fit with Vector Autoregressive dynamics (#21 and #76)
 
+## Deprecations
+* Arguments `use_stan`, `jags_path`, `data_train`, `data_test`, `adapt_delta`, `max_treedepth` and `drift` have been removed from primary functions to streamline documentation and reflect the package's mission to deprecate 'JAGS' as a suitable backend. Both `adapt_delta` and `max_treedepth` should now be supplied in a named `list()` to the new argument `control`
+
 ## Bug fixes
 * Not necessarily a "bug fix", but this update removes several dependencies to lighten installation and improve efficiency of the workflow (#93)
 * Fixed a minor bug in the way `trend_map` recognises levels of the `series` factor
