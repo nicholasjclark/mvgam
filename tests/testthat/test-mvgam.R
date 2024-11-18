@@ -209,7 +209,7 @@ test_that("JAGS setups should work", {
   expect_true(inherits(get_mvgam_priors(y ~ s(season),
                                         trend_model = 'RW',
                                         data = simdat$data_train,
-                                        family = Gamma(),
+                                        family = gaussian(),
                                         use_stan = FALSE),
                        'data.frame'))
   mod <- mvgam(y ~ s(season),

@@ -7,19 +7,28 @@
 
 **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
 
-The goal of `mvgam` is to use a Bayesian framework to estimate
-parameters of Dynamic Generalized Additive Models (DGAMs) for time
-series with dynamic trend components. The package provides an interface
-to fit Bayesian DGAMs using `Stan` as the backend. The formula syntax is
-based on that of the package `mgcv` to provide a familiar GAM modelling
-interface. The motivation for the package and some of its primary
-objectives are described in detail by [Clark & Wells
-2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974)
-(published in *Methods in Ecology and Evolution*). An introduction to
-the package and some worked examples are shown in this seminar:
-<a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
-target="_blank">Ecological Forecasting with Dynamic Generalized Additive
-Models</a>.
+The goal of `mvgam` is to fit Bayesian (Dynamic) Generalized Additive
+Models. This package constructs State-Space models that can include
+highly flexible nonlinear predictor effects for both process and
+observation components by leveraging functionalities from the impressive
+<a href="https://paulbuerkner.com/brms/"
+target="_blank"><code>brms</code></a> and
+<a href="https://cran.r-project.org/web/packages/mgcv/index.html"
+target="_blank"><code>mgcv</code></a> packages. This allows `mvgam` to
+fit a wide range of models, including hierarchical ecological models
+such as N-mixture or Joint Species Distribution models, as well as
+univariate and multivariate time series models with imperfect detection.
+The original motivation for the package is described in <a
+href="https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974"
+target="_blank">Clark &amp; Wells 2022</a> (published in *Methods in
+Ecology and Evolution*), with additional inspiration on the use of
+Bayesian probabilistic modelling coming from
+<a href="https://betanalpha.github.io/writing/" target="_blank">Michael
+Betancourt</a>,
+<a href="https://www.bu.edu/earth/profiles/michael-dietze/"
+target="_blank">Michael Dietze</a> and
+<a href="https://www.durham.ac.uk/staff/sarah-e-heaps/"
+target="_blank">Sarah Heaps</a>, among many others.
 
 ## Installation
 
@@ -103,10 +112,10 @@ alt="Simulating and analysing multivariate time series with Dynamic Generalized 
 time series with Dynamic Generalized Additive Models</figcaption>
 </figure>
 
-Fit a DGAM to these series that uses a hierarchical cyclic seasonal
-smooth term to capture variation in seasonality among series. The model
-also includes series-specific latent Gaussian Processes with squared
-exponential covariance functions to capture temporal dynamics
+Fit a State-Space GAM to these series that uses a hierarchical cyclic
+seasonal smooth term to capture variation in seasonality among series.
+The model also includes series-specific latent Gaussian Processes with
+squared exponential covariance functions to capture temporal dynamics
 
 ``` r
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
