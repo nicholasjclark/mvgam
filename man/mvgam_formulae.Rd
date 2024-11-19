@@ -31,7 +31,8 @@ monotonically increasing (using \code{s(x, bs = 'moi')})
 or decreasing splines (using \code{s(x, bs = 'mod')};
 see \code{\link{smooth.construct.moi.smooth.spec}} for
 details), as well as
-Gaussian Process functions using \code{\link[brms]{gp}},
+Gaussian Process functions using \code{\link[brms]{gp}} and offsets using
+\code{\link[stats]{offset}}
 can be added to the right hand side (and \code{.} is not supported in \code{mvgam} formulae).
 \cr
 \cr

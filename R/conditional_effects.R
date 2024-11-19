@@ -98,8 +98,8 @@
 conditional_effects.mvgam = function(x,
                                      effects = NULL,
                                      type = 'response',
-                                     points = TRUE,
-                                     rug = TRUE,
+                                     points = FALSE,
+                                     rug = FALSE,
                                      ...){
 
   use_def_effects <- is.null(effects)

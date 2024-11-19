@@ -31,31 +31,28 @@ function. Only used if \code{summary} is \code{TRUE}.}
 }
 \value{
 If \code{summary = TRUE}, a \code{list} with the following components:
-\itemize{
-\item{cor, cor_lower, cor_upper}{: A set of \eqn{p \times p} correlation matrices,
+\item{cor, cor_lower, cor_upper}{A set of \eqn{p \times p} correlation matrices,
 containing either the posterior median or mean estimate, plus lower and upper limits
 of the corresponding credible intervals supplied to \code{probs}}
-\item{sig_cor}{: A \eqn{p \times p} correlation matrix containing only those correlations whose credible
+\item{sig_cor}{A \eqn{p \times p} correlation matrix containing only those correlations whose credible
 interval does not contain zero. All other correlations are set to zero}
-\item{prec, prec_lower, prec_upper}{: A set of \eqn{p \times p} precision matrices,
+\item{prec, prec_lower, prec_upper}{A set of \eqn{p \times p} precision matrices,
 containing either the posterior median or mean estimate, plus lower and upper limits
 of the corresponding credible intervals supplied to \code{probs}}
-\item{sig_prec}{: A \eqn{p \times p} precision matrix containing only those precisions whose credible
+\item{sig_prec}{A \eqn{p \times p} precision matrix containing only those precisions whose credible
 interval does not contain zero. All other precisions are set to zero}
-\item{cov}{: A \eqn{p \times p} posterior median or mean covariance matrix}
-\item{trace}{: The median/mean point estimator of the trace (sum of the diagonal elements)
+\item{cov}{A \eqn{p \times p} posterior median or mean covariance matrix}
+\item{trace}{The median/mean point estimator of the trace (sum of the diagonal elements)
 of the residual covariance matrix \code{cov}}
-}
+
 If \code{summary = FALSE}, this function returns a \code{list} containing the following components:
-\itemize{
-\item{all_cormat}{: A \eqn{n_{draws} \times p \times p} \code{array} of posterior
+\item{all_cormat}{A \eqn{n_{draws} \times p \times p} \code{array} of posterior
 residual correlation matrix draws}
-\item{all_covmat}{: A \eqn{n_{draws} \times p \times p} \code{array} of posterior
+\item{all_covmat}{A \eqn{n_{draws} \times p \times p} \code{array} of posterior
 residual covariance matrix draws}
-\item{all_presmat}{: A \eqn{n_{draws} \times p \times p} \code{array} of posterior
+\item{all_presmat}{A \eqn{n_{draws} \times p \times p} \code{array} of posterior
 residual precision matrix draws}
-\item{all_trace}{: A \eqn{n_{draws}} \code{vector} of posterior covariance trace draws}
-}
+\item{all_trace}{A \eqn{n_{draws}} \code{vector} of posterior covariance trace draws}
 }
 \description{
 Compute residual correlation estimates from Joint Species Distribution

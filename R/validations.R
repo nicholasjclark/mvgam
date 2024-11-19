@@ -864,11 +864,43 @@ check_priorsim = function(prior_simulation, data_train, orig_y, formula){
 
 #'@noRd
 check_gp_terms = function(formula, data_train, family){
+
+  # Check for proper binomial specification
+  if(!missing(family)){
+    if(is.character(family)){
+      if(family == 'beta')
+        family <- betar()
+
+      family <- try(eval(parse(text = family)), silent = TRUE)
+
+      if(inherits(family, 'try-error'))
+        stop("family not recognized",
+             call. = FALSE)
+    }
+
+    if(is.function(family))
+      family <- family()
+
+    if(family$family %in% c('binomial', 'beta_binomial')){
+      # Check that response terms use the cbind() syntax
+      resp_terms <- as.character(terms(formula(formula))[[2]])
+      if(length(resp_terms) == 1){
+        stop('Binomial family requires cbind() syntax in the formula left-hand side',
+             call. = FALSE)
+      } else {
+        if(any(grepl('cbind', resp_terms))){
+        } else {
+          stop('Binomial family requires cbind() syntax in the formula left-hand side',
+               call. = FALSE)
+        }
+      }
+    }
+  }
+
   # Check for gp terms in the validated formula
   orig_formula <- gp_terms <- gp_details <- NULL
   if(any(grepl('gp(', attr(terms(formula), 'term.labels'), fixed = TRUE))){
 
-    # Check that there are no multidimensional gp terms
     formula <- interpret_mvgam(formula, N = max(data_train$time),
                                family = family)
     orig_formula <- formula
@@ -880,11 +912,11 @@ check_gp_terms = function(formula, data_train, family){
     gp_terms <- which_are_gp(formula)
 
     # Extract attributes
-    gp_details <- get_gp_attributes(formula)
+    gp_details <- get_gp_attributes(formula, data_train, family)
 
     # Replace with s() terms so the correct terms are included
     # in the model.frame
-    formula <- gp_to_s(formula)
+    formula <- gp_to_s(formula, data_train, family)
     if(!keep_intercept) formula <- update(formula, . ~ . - 1)
   }
 

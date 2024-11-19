@@ -1453,11 +1453,11 @@ forecast_trend = function(trend_model, use_lv, trend_pars,
         changepoint_ts <- sort(c(trend_pars$changepoints, t_change_new))
 
         # Generate a trend draw
-        draw <- piecewise_linear(t = 1:max(time),
-                                 deltas = deltas,
-                                 k = trend_pars$k_trend[x],
-                                 m = trend_pars$m_trend[x],
-                                 changepoint_ts = changepoint_ts)
+        draw <- suppressWarnings(piecewise_linear(t = 1:max(time),
+                                                  deltas = deltas,
+                                                  k = trend_pars$k_trend[x],
+                                                  m = trend_pars$m_trend[x],
+                                                  changepoint_ts = changepoint_ts))
 
         # Keep only the forecast horizon estimates
         tail(draw, max(time) - min(time))

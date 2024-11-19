@@ -41,12 +41,9 @@ update_priors = function(model_file,
       # can be correctly updated
       if(grepl('gp(', priors$prior[i], fixed = TRUE) |
          grepl('gp_trend', priors$prior[i], fixed = TRUE)){
-        lhs <- trimws(strsplit(priors$prior[i], "[~]")[[1]][1])
-        rhs <- trimws(strsplit(priors$prior[i], "[~]")[[1]][2])
-        lhs <- gsub('(', '_', lhs, fixed = TRUE)
-        lhs <- gsub(')', '_', lhs, fixed = TRUE)
-        lhs <- gsub(':', 'by', lhs, fixed = TRUE)
-        priors$prior[i] <- paste(lhs, '~', rhs)
+        priors$prior[i] <- paste(clean_gp_priorname(trimws(strsplit(priors$prior[i], "[~]")[[1]][1])),
+                                 '~',
+                                 trimws(strsplit(priors$prior[i], "[~]")[[1]][2]))
       }
 
       if(!any(grepl(paste(trimws(strsplit(priors$prior[i], "[~]")[[1]][1]), '~'),
@@ -295,14 +292,25 @@ adapt_brms_priors = function(priors,
                                 family = family,
                                 use_lv = use_lv,
                                 n_lv = n_lv,
-                                use_stan = TRUE,
                                 trend_model = trend_model,
                                 trend_map = trend_map,
-                                drift = drift,
                                 knots = knots)
+
+  if(any(grepl('_gp', priors$class, fixed = TRUE) &
+         (!is.na(priors$ub) | !is.na(priors$lb)))){
+    warning('bounds cannot currently be changed for gp parameters',
+            call. = FALSE)
+  }
 
   # Update using priors from the brmsprior object
   for(i in 1:NROW(priors)){
+
+    newclass <- ifelse(grepl('_gp(', priors$class[i], fixed = TRUE),
+                       clean_gp_priorname(priors$class[i]),
+                       priors$class[i])
+    newcoef <- ifelse(grepl('_gp(', priors$coef[i], fixed = TRUE),
+                      clean_gp_priorname(priors$coef[i]),
+                      priors$coef[i])
 
     if(any(grepl(paste0(priors$class[i], ' ~ '),
                  priors_df$prior, fixed = TRUE))){
@@ -310,7 +318,7 @@ adapt_brms_priors = function(priors,
       # Update the prior distribution
       priors_df$prior[grepl(paste0(priors$class[i], ' ~ '),
                             priors_df$prior, fixed = TRUE)] <-
-        paste0(priors$class[i], ' ~ ', priors$prior[i], ';')
+        paste0(newclass, ' ~ ', priors$prior[i], ';')
 
       # Now update bounds
       priors_df$new_lowerbound[grepl(paste0(priors$class[i], ' ~ '),
@@ -326,9 +334,9 @@ adapt_brms_priors = function(priors,
                         priors_df$prior, fixed = TRUE))){
 
       # Update the prior distribution
-      priors_df$prior[grepl(paste0(priors$class[i], ' ~ '),
+      priors_df$prior[grepl(paste0(priors$coef[i], ' ~ '),
                             priors_df$prior, fixed = TRUE)] <-
-        paste0(priors$coef[i], ' ~ ', priors$prior[i], ';')
+        paste0(newcoef, ' ~ ', priors$prior[i], ';')
 
       # Now update bounds
       priors_df$new_lowerbound[grepl(paste0(priors$coef[i], ' ~ '),
@@ -364,4 +372,21 @@ adapt_brms_priors = function(priors,
   }
 
   return(priors_df)
+}
+
+#'@noRd
+clean_gp_priorname = function(prior){
+  if(grepl('[', prior, fixed = TRUE)){
+    newlhs <- trimws(strsplit(prior, "\\[")[[1]][1])
+    if(grepl('[1][', prior, fixed = TRUE)){
+      index <- paste0('[1][', trimws(strsplit(prior, "\\[")[[1]][3]))
+    } else {
+      index <- '[1]'
+    }
+
+    out <- paste0(clean_gpnames(newlhs), index)
+  } else {
+    out <- clean_gpnames(prior)
+  }
+  out
 }

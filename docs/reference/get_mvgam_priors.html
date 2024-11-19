@@ -70,26 +70,27 @@ changed for a given <code>mvgam</code> model, as well listing their default dist
 <span>  <span class="va">formula</span>,</span>
 <span>  <span class="va">trend_formula</span>,</span>
 <span>  <span class="va">factor_formula</span>,</span>
-<span>  <span class="va">data</span>,</span>
-<span>  <span class="va">data_train</span>,</span>
-<span>  family <span class="op">=</span> <span class="st">"poisson"</span>,</span>
 <span>  <span class="va">knots</span>,</span>
 <span>  <span class="va">trend_knots</span>,</span>
+<span>  trend_model <span class="op">=</span> <span class="st">"None"</span>,</span>
+<span>  family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  <span class="va">data</span>,</span>
+<span>  unit <span class="op">=</span> <span class="va">time</span>,</span>
+<span>  species <span class="op">=</span> <span class="va">series</span>,</span>
 <span>  use_lv <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">n_lv</span>,</span>
-<span>  use_stan <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  trend_model <span class="op">=</span> <span class="st">"None"</span>,</span>
 <span>  <span class="va">trend_map</span>,</span>
-<span>  drift <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>formula</dt>
-<dd><p>A <code>character</code> string specifying the GAM observation model formula. These are exactly like the formula
+<dd><p>A <code>formula</code> object specifying the GAM observation model formula. These are exactly like the formula
 for a GLM except that smooth terms, <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, as well as time-varying
-<code><a href="dynamic.html">dynamic()</a></code> terms and nonparametric <code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp()</a></code> terms, can be added to the right hand side
+<code><a href="dynamic.html">dynamic()</a></code> terms, nonparametric <code><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp()</a></code> terms and offsets using <code><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset()</a></code>,
+can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors
 (or linear functionals of these). In <code><a href="mvgam_families.html">nmix()</a></code> family models, the <code>formula</code> is used to
 set up a linear predictor for the detection probability. Details of the formula syntax used by <span class="pkg">mvgam</span>
@@ -97,7 +98,7 @@ can be found in <code><a href="mvgam_formulae.html">mvgam_formulae</a></code></p
 
 
 <dt>trend_formula</dt>
-<dd><p>An optional <code>character</code> string specifying the GAM process model formula. If
+<dd><p>An optional <code>formula</code> object specifying the GAM process model formula. If
 supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
 separately from the observation model. Should not have a response variable specified on the left-hand side
 of the formula (i.e. a valid option would be <code>~ season + s(year)</code>). Also note that you should not use
@@ -116,55 +117,6 @@ Users are recommended to drop one of these using the <code>- 1</code> convention
 <a href="jsdgam.html">jsdgam</a></p></dd>
 
 
-<dt>data</dt>
-<dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable and covariates
-required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Most models should include columns:</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of levels should be identical
-to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))</p></li>
-<li><p><code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).
-For most dynamic trend types available in <code>mvgam</code> (see argument <code>trend_model</code>), time should be
-measured in discrete, regularly spaced intervals (i.e. <code>c(1, 2, 3, ...)</code>). However you can
-use irregularly spaced intervals if using <code>trend_model = CAR(1)</code>, though note that any
-temporal intervals that are exactly <code>0</code> will be adjusted to a very small number
-(<code>1e-12</code>) to prevent sampling errors. See an example of <code><a href="RW.html">CAR()</a></code> trends in <code><a href="RW.html">CAR</a></code></p></li>
-</ul><p>Note however that there are special cases where these identifiers are not needed. For
-example, models with hierarchical temporal correlation processes (e.g. <code>AR(gr = region, subgr = species)</code>)
-should NOT include a <code>series</code> identifier, as this will be constructed internally (see
-<code><a href="mvgam_trends.html">mvgam_trends</a></code> and <code><a href="RW.html">AR</a></code> for details). <code>mvgam</code> can also fit models that do not
-include a <code>time</code> variable if there are no temporal dynamic structures included (i.e. <code>trend_model = 'None'</code> or
-<code>trend_model = ZMVN()</code>). <code>data</code> should also include any other variables to be included in
-the linear predictor of <code>formula</code></p></dd>
-
-
-<dt>data_train</dt>
-<dd><p>Deprecated. Still works in place of <code>data</code> but users are recommended to use
-<code>data</code> instead for more seamless integration into <code>R</code> workflows</p></dd>
-
-
-<dt>family</dt>
-<dd><p><code>family</code> specifying the exponential observation family for the series. Currently supported
-families are:</p><ul><li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> for real-valued data</p></li>
-<li><p><code><a href="mvgam_families.html">betar()</a></code> for proportional data on <code>(0,1)</code></p></li>
-<li><p><code><a href="mvgam_families.html">lognormal()</a></code> for non-negative real-valued data</p></li>
-<li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
-<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
-<li><p><code><a href="mvgam_families.html">bernoulli()</a></code> for binary data</p></li>
-<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</p></li>
-<li><p><code><a href="mvgam_families.html">nb()</a></code> for overdispersed count data</p></li>
-<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> for count data with imperfect detection when the number of trials is known;
-note that the <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code> function must be used to bind the discrete observations and the discrete number
-of trials</p></li>
-<li><p><code><a href="mvgam_families.html">beta_binomial()</a></code> as for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> but allows for overdispersion</p></li>
-<li><p><code><a href="mvgam_families.html">nmix()</a></code> for count data with imperfect detection when the number of trials
-is unknown and should be modeled via a State-Space N-Mixture model.
-The latent states are Poisson, capturing the 'true' latent
-abundance, while the observation process is Binomial to account for
-imperfect detection.
-See <code><a href="mvgam_families.html">mvgam_families</a></code> for an example of how to use this family</p></li>
-</ul><p>Note that only <code><a href="mvgam_families.html">nb()</a></code> and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> are available if using <code>JAGS</code> as the backend.
-Default is <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>.
-See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
-
-
 <dt>knots</dt>
 <dd><p>An optional <code>list</code> containing user specified knot values to be used for basis construction.
 For most bases the user simply supplies the knots to be used, which must match up with the <code>k</code> value supplied
@@ -175,24 +127,6 @@ unless they share a covariate</p></dd>
 <dt>trend_knots</dt>
 <dd><p>As for <code>knots</code> above, this is an optional <code>list</code> of knot values for smooth
 functions within the <code>trend_formula</code></p></dd>
-
-
-<dt>use_lv</dt>
-<dd><p><code>logical</code>. If <code>TRUE</code>, use dynamic factors to estimate series'
-latent trends in a reduced dimension format. Only available for
-<code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="GP.html">GP()</a></code> trend models. Defaults to <code>FALSE</code></p></dd>
-
-
-<dt>n_lv</dt>
-<dd><p><code>integer</code> the number of latent dynamic factors to use if <code>use_lv == TRUE</code>.
-Cannot be <code>&gt; n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
-
-
-<dt>use_stan</dt>
-<dd><p>Logical. If <code>TRUE</code>, the model will be compiled and sampled using
-Hamiltonian Monte Carlo with a call to <code><a href="https://mc-stan.org/cmdstanr/reference/cmdstan_model.html" class="external-link">cmdstan_model</a></code> or
-a call to <code><a href="https://mc-stan.org/rstan/reference/stan.html" class="external-link">stan</a></code>. Note that
-there are many more options when using <code>Stan</code> vs <code>JAGS</code></p></dd>
 
 
 <dt>trend_model</dt>
@@ -215,6 +149,75 @@ to estimate hierarchical correlations if the data are structured among levels of
 a relevant grouping factor. See <a href="mvgam_trends.html">mvgam_trends</a> for more details and see <a href="ZMVN.html">ZMVN</a> for an example.</p></dd>
 
 
+<dt>family</dt>
+<dd><p><code>family</code> specifying the exponential observation family for the series. Currently supported
+families are:</p><ul><li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian()</a></code> for real-valued data</p></li>
+<li><p><code><a href="mvgam_families.html">betar()</a></code> for proportional data on <code>(0,1)</code></p></li>
+<li><p><code><a href="mvgam_families.html">lognormal()</a></code> for non-negative real-valued data</p></li>
+<li><p><code><a href="mvgam_families.html">student_t()</a></code> for real-valued data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">Gamma()</a></code> for non-negative real-valued data</p></li>
+<li><p><code><a href="mvgam_families.html">bernoulli()</a></code> for binary data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> for count data</p></li>
+<li><p><code><a href="mvgam_families.html">nb()</a></code> for overdispersed count data</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> for count data with imperfect detection when the number of trials is known;
+note that the <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code> function must be used to bind the discrete observations and the discrete number
+of trials</p></li>
+<li><p><code><a href="mvgam_families.html">beta_binomial()</a></code> as for <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> but allows for overdispersion</p></li>
+<li><p><code><a href="mvgam_families.html">nmix()</a></code> for count data with imperfect detection when the number of trials
+is unknown and should be modeled via a State-Space N-Mixture model.
+The latent states are Poisson, capturing the 'true' latent
+abundance, while the observation process is Binomial to account for
+imperfect detection.
+See <code><a href="mvgam_families.html">mvgam_families</a></code> for an example of how to use this family</p></li>
+</ul><p>Default is <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code>.
+See <code><a href="mvgam_families.html">mvgam_families</a></code> for more details</p></dd>
+
+
+<dt>data</dt>
+<dd><p>A <code>dataframe</code> or <code>list</code> containing the model response variable and covariates
+required by the GAM <code>formula</code> and optional <code>trend_formula</code>. Most models should include columns:</p><ul><li><p><code>series</code> (a <code>factor</code> index of the series IDs; the number of levels should be identical
+to the number of unique series labels (i.e. <code>n_series = length(levels(data$series))</code>))</p></li>
+<li><p><code>time</code> (<code>numeric</code> or <code>integer</code> index of the time point for each observation).
+For most dynamic trend types available in <code>mvgam</code> (see argument <code>trend_model</code>), time should be
+measured in discrete, regularly spaced intervals (i.e. <code>c(1, 2, 3, ...)</code>). However you can
+use irregularly spaced intervals if using <code>trend_model = CAR(1)</code>, though note that any
+temporal intervals that are exactly <code>0</code> will be adjusted to a very small number
+(<code>1e-12</code>) to prevent sampling errors. See an example of <code><a href="RW.html">CAR()</a></code> trends in <code><a href="RW.html">CAR</a></code></p></li>
+</ul><p>Note however that there are special cases where these identifiers are not needed. For
+example, models with hierarchical temporal correlation processes (e.g. <code>AR(gr = region, subgr = species)</code>)
+should NOT include a <code>series</code> identifier, as this will be constructed internally (see
+<code><a href="mvgam_trends.html">mvgam_trends</a></code> and <code><a href="RW.html">AR</a></code> for details). <code>mvgam</code> can also fit models that do not
+include a <code>time</code> variable if there are no temporal dynamic structures included (i.e. <code>trend_model = 'None'</code> or
+<code>trend_model = ZMVN()</code>). <code>data</code> should also include any other variables to be included in
+the linear predictor of <code>formula</code></p></dd>
+
+
+<dt>unit</dt>
+<dd><p>The unquoted name of the variable that represents the unit of analysis in <code>data</code> over
+which latent residuals should be correlated. This variable should be either a
+<code>numeric</code> or <code>integer</code> variable in the supplied <code>data</code>.
+Defaults to <code>time</code> to be consistent with other functionalities
+in <span class="pkg">mvgam</span>, though note that the data need not be time series in this case. See examples below
+for further details and explanations</p></dd>
+
+
+<dt>species</dt>
+<dd><p>The unquoted name of the <code>factor</code> variable that indexes
+the different response units in <code>data</code> (usually <code>'species'</code> in a JSDM).
+Defaults to <code>series</code> to be consistent with other <code>mvgam</code> models</p></dd>
+
+
+<dt>use_lv</dt>
+<dd><p><code>logical</code>. If <code>TRUE</code>, use dynamic factors to estimate series'
+latent trends in a reduced dimension format. Only available for
+<code><a href="RW.html">RW()</a></code>, <code><a href="RW.html">AR()</a></code> and <code><a href="GP.html">GP()</a></code> trend models. Defaults to <code>FALSE</code></p></dd>
+
+
+<dt>n_lv</dt>
+<dd><p><code>integer</code> the number of latent dynamic factors to use if <code>use_lv == TRUE</code>.
+Cannot be <code>&gt; n_series</code>. Defaults arbitrarily to <code>min(2, floor(n_series / 2))</code></p></dd>
+
+
 <dt>trend_map</dt>
 <dd><p>Optional <code>data.frame</code> specifying which series should depend on which latent
 trends. Useful for allowing multiple series to depend on the same latent trend process, but with
@@ -227,9 +230,8 @@ if this is supplied, the intercept parameter in the process model will NOT be au
 See examples for details</p></dd>
 
 
-<dt>drift</dt>
-<dd><p>Deprecated. If you wish to estimate drift parameters, include parametric fixed effects
-of 'time' in your formulae instead.</p></dd>
+<dt>...</dt>
+<dd><p>Not currently used</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -249,7 +251,7 @@ users can also modify the parameter bounds by modifying the <code>new_lowerbound
 This will be necessary if using restrictive distributions on some parameters, such as a Beta distribution
 for the trend sd parameters for example (Beta only has support on  <code>(0,1)</code>), so the upperbound cannot
 be above <code>1</code>. Another option is to make use of the prior modification functions in <code>brms</code>
-(i.e. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code>) to change prior distributions and bounds (just use the name of the parameter that
+(i.e. <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></code>) to change prior distributions and bounds (just use the name of the parameter that
 you'd like to change as the <code>class</code> argument; see examples below)</p>
     </div>
     <div class="section level2">
@@ -262,7 +264,7 @@ example)</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="mvgam.html">mvgam</a></code>, <code><a href="mvgam_formulae.html">mvgam_formulae</a></code>, <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code></p></div>
+    <div class="dont-index"><p><code><a href="mvgam.html">mvgam</a></code>, <code><a href="mvgam_formulae.html">mvgam_formulae</a></code>, <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></code></p></div>
     </div>
     <div class="section level2">
     <h2 id="author">Author<a class="anchor" aria-label="anchor" href="#author"></a></h2>
@@ -447,13 +449,13 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 6                    trend sd     sigma ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 7   inverse of NB dispsersion   phi_inv ~ student_t(3, 0, 0.1);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   example_change new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.65);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2      mu_raw ~ normal(0.92, 1);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.57);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4      ar1 ~ normal(-0.96, 0.9);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5       ar2 ~ normal(0.5, 0.48);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6     sigma ~ exponential(0.45);             NA             NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 7  phi_inv ~ normal(0.71, 0.14);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    lambda ~ exponential(0.13);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2  mu_raw ~ normal(-0.49, 0.25);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3 sigma_raw ~ exponential(0.38);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4     ar1 ~ normal(-0.64, 0.76);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5     ar2 ~ normal(-0.05, 0.86);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6      sigma ~ exponential(0.1);             NA             NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 7 phi_inv ~ normal(-0.74, 0.35);             NA             NA</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Make a few changes; first, change the population mean for the series-level</span></span></span>
 <span class="r-in"><span><span class="co"># random intercepts</span></span></span>
@@ -614,9 +616,9 @@ example)</p>
 <span class="r-in"><span><span class="co"># The same can be done using 'brms' functions; here we will also change the ar1 prior</span></span></span>
 <span class="r-in"><span><span class="co"># and put some bounds on the ar coefficients to enforce stationarity; we set the</span></span></span>
 <span class="r-in"><span><span class="co"># prior using the 'class' argument in all brms prior functions</span></span></span>
-<span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">mu_raw</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">ar1</span>, lb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, ub <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">ar2</span>, lb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, ub <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">mu_raw</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">ar1</span>, lb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, ub <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">ar2</span>, lb <span class="op">=</span> <span class="op">-</span><span class="fl">1</span>, ub <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">brmsprior</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             prior  class coef group resp dpar nlpar   lb   ub source</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  normal(0.2, 0.5) mu_raw                            &lt;NA&gt; &lt;NA&gt;   user</span>
@@ -1031,8 +1033,8 @@ example)</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Likewise using 'brms' utilities (note that you can use</span></span></span>
 <span class="r-in"><span><span class="co"># Intercept rather than `(Intercept)`) to change priors on the intercept</span></span></span>
-<span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">cov</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>              <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">brmsprior</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0.2</span>, <span class="fl">0.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">cov</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.25</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">brmsprior</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             prior     class coef group resp dpar nlpar   lb   ub source</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  normal(0.2, 0.5)       cov                            &lt;NA&gt; &lt;NA&gt;   user</span>
@@ -1145,7 +1147,7 @@ example)</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Gu &amp; Wahba 4 term additive model</span>
 <span class="r-in"><span><span class="va">dat</span><span class="op">$</span><span class="va">time</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">NROW</a></span><span class="op">(</span><span class="va">dat</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x0</span> <span class="op">+</span> <span class="va">x1</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x2</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">x3</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>            priors <span class="op">=</span> <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.75</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'b'</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>            priors <span class="op">=</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">0</span>, <span class="fl">0.75</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'b'</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            data <span class="op">=</span> <span class="va">dat</span>,</span></span>
 <span class="r-in"><span>            family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">gaussian</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>            run_model <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>

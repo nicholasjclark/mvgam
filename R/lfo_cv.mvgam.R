@@ -70,7 +70,8 @@
 #'                newdata = dat$data_test,
 #'                burnin = 300,
 #'                samples = 300,
-#'                chains = 2)
+#'                chains = 2,
+#'                silent = 2)
 #'
 #'# Fit a less appropriate model
 #'mod_rw <- mvgam(y ~ s(season, bs = 'cc', k = 6),
@@ -80,7 +81,8 @@
 #'               newdata = dat$data_test,
 #'               burnin = 300,
 #'               samples = 300,
-#'               chains = 2)
+#'               chains = 2,
+#'               silent = 2)
 #'
 #'# Compare Discrete Ranked Probability Scores for the testing period
 #'fc_ar2 <- forecast(mod_ar2)
@@ -96,10 +98,12 @@
 #'# for estimating model parameters
 #'lfo_ar2 <- lfo_cv(mod_ar2,
 #'                  min_t = 40,
-#'                  fc_horizon = 3)
+#'                  fc_horizon = 3,
+#'                  silent = 2)
 #'lfo_rw <- lfo_cv(mod_rw,
 #'                 min_t = 40,
-#'                 fc_horizon = 3)
+#'                 fc_horizon = 3,
+#'                 silent = 2)
 #'
 #'# Plot Pareto-K values and ELPD estimates
 #'plot(lfo_ar2)
@@ -186,11 +190,11 @@ lfo_cv.mvgam = function(object,
   }
 
   fit_past <- update(object,
-                    data = data_splits$data_train,
-                    newdata = data_splits$data_test,
-                    lfo = TRUE,
-                    noncentred = noncentred,
-                    silent = silent)
+                     data = data_splits$data_train,
+                     newdata = data_splits$data_test,
+                     lfo = TRUE,
+                     noncentred = noncentred,
+                     silent = silent)
 
   # Calculate log likelihoods of forecast observations for the next
   # fc_horizon ahead observations
@@ -265,10 +269,10 @@ lfo_cv.mvgam = function(object,
       approx_elpds[i + 1] <- log_sum_exp(lw + sum_rows(loglik_past[,fc_indices]))
     }
   }
-  return(structure(list(elpds = approx_elpds[(min_t + 1):N],
+  return(structure(list(elpds = approx_elpds[(min_t + 1):(N - fc_horizon)],
                         sum_ELPD = sum(approx_elpds, na.rm = TRUE),
-                        pareto_ks = ks,
-                        eval_timepoints = (min_t + 1):N,
+                        pareto_ks = ks[-1],
+                        eval_timepoints = (min_t + 1):(N - fc_horizon),
                         pareto_k_threshold = pareto_k_threshold),
                    class = 'mvgam_lfo'))
 }

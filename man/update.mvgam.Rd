@@ -11,14 +11,14 @@
   trend_formula,
   knots,
   trend_knots,
+  trend_model,
+  family,
+  share_obs_params,
   data,
   newdata,
-  trend_model,
   trend_map,
   use_lv,
   n_lv,
-  family,
-  share_obs_params,
   priors,
   chains,
   burnin,
@@ -57,7 +57,7 @@
 updates such as removal of specific terms with \code{- term}. When updating, the entire formula needs
 to be supplied}
 
-\item{trend_formula}{An optional \code{character} string specifying the GAM process model formula. If
+\item{trend_formula}{An optional \code{formula} object specifying the GAM process model formula. If
 supplied, a linear predictor will be modelled for the latent trends to capture process model evolution
 separately from the observation model. Should not have a response variable specified on the left-hand side
 of the formula (i.e. a valid option would be \code{~ season + s(year)}). Also note that you should not use
@@ -77,6 +77,58 @@ unless they share a covariate}
 
 \item{trend_knots}{As for \code{knots} above, this is an optional \code{list} of knot values for smooth
 functions within the \code{trend_formula}}
+
+\item{trend_model}{\code{character} or  \code{function} specifying the time series dynamics for the latent trend. Options are:
+\itemize{
+\item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
+and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
+\item \code{ZMVN} or \code{ZMVN()} (Zero-Mean Multivariate Normal; only available in \code{Stan})
+\item \code{'RW'} or \code{RW()}
+\item \code{'AR1'} or \code{AR(p = 1)}
+\item \code{'AR2'} or \code{AR(p = 2)}
+\item \code{'AR3'} or \code{AR(p = 3)}
+\item \code{'CAR1'} or \code{CAR(p = 1)}
+\item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
+\item \verb{'PWlogistic}, \code{'PWlinear'} or \code{PW()} (only available in \code{Stan})
+\item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
+only available in \code{Stan})}
+
+For all trend types apart from \code{ZMVN()}, \code{GP()}, \code{CAR()} and \code{PW()}, moving average and/or correlated
+process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
+multivariate Random Walk if \code{n_series > 1}). It is also possible for many multivariate trends
+to estimate hierarchical correlations if the data are structured among levels of
+a relevant grouping factor. See \link{mvgam_trends} for more details and see \link{ZMVN} for an example.}
+
+\item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
+families are:
+\itemize{
+\item\code{gaussian()} for real-valued data
+\item\code{betar()} for proportional data on \verb{(0,1)}
+\item\code{lognormal()} for non-negative real-valued data
+\item\code{student_t()} for real-valued data
+\item\code{Gamma()} for non-negative real-valued data
+\item\code{bernoulli()} for binary data
+\item\code{poisson()} for count data
+\item\code{nb()} for overdispersed count data
+\item\code{binomial()} for count data with imperfect detection when the number of trials is known;
+note that the \code{cbind()} function must be used to bind the discrete observations and the discrete number
+of trials
+\item\code{beta_binomial()} as for \code{binomial()} but allows for overdispersion
+\item\code{nmix()} for count data with imperfect detection when the number of trials
+is unknown and should be modeled via a State-Space N-Mixture model.
+The latent states are Poisson, capturing the 'true' latent
+abundance, while the observation process is Binomial to account for
+imperfect detection.
+See \code{\link{mvgam_families}} for an example of how to use this family}
+Default is \code{poisson()}.
+See \code{\link{mvgam_families}} for more details}
+
+\item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family}
+has additional family-specific observation parameters (e.g. variance components in
+\code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or \code{betar()}),
+these parameters will be shared across all outcome variables. This is handy if you have multiple
+outcomes (time series in most \code{mvgam} models) that you believe share some properties,
+such as being from the same species over different spatial units. Default is \code{FALSE}.}
 
 \item{data}{A \code{dataframe} or \code{list} containing the model response variable and covariates
 required by the GAM \code{formula} and optional \code{trend_formula}. Most models should include columns:
@@ -103,27 +155,6 @@ as in \code{data}. If included, the
 observations in variable \code{y} will be set to \code{NA} when fitting the model so that posterior
 simulations can be obtained}
 
-\item{trend_model}{\code{character} or  \code{function} specifying the time series dynamics for the latent trend. Options are:
-\itemize{
-\item \code{None} (no latent trend component; i.e. the GAM component is all that contributes to the linear predictor,
-and the observation process is the only source of error; similarly to what is estimated by \code{\link[mgcv]{gam}})
-\item \code{ZMVN} or \code{ZMVN()} (Zero-Mean Multivariate Normal; only available in \code{Stan})
-\item \code{'RW'} or \code{RW()}
-\item \code{'AR1'} or \code{AR(p = 1)}
-\item \code{'AR2'} or \code{AR(p = 2)}
-\item \code{'AR3'} or \code{AR(p = 3)}
-\item \code{'CAR1'} or \code{CAR(p = 1)}
-\item \code{'VAR1'}  or \code{VAR()}(only available in \code{Stan})
-\item \verb{'PWlogistic}, \code{'PWlinear'} or \code{PW()} (only available in \code{Stan})
-\item \code{'GP'} or \code{GP()} (Gaussian Process with squared exponential kernel;
-only available in \code{Stan})}
-
-For all trend types apart from \code{ZMVN()}, \code{GP()}, \code{CAR()} and \code{PW()}, moving average and/or correlated
-process error terms can also be estimated (for example, \code{RW(cor = TRUE)} will set up a
-multivariate Random Walk if \code{n_series > 1}). It is also possible for many multivariate trends
-to estimate hierarchical correlations if the data are structured among levels of
-a relevant grouping factor. See \link{mvgam_trends} for more details and see \link{ZMVN} for an example.}
-
 \item{trend_map}{Optional \code{data.frame} specifying which series should depend on which latent
 trends. Useful for allowing multiple series to depend on the same latent trend process, but with
 different observation processes. If supplied, a latent factor model is set up by setting
@@ -141,40 +172,8 @@ latent trends in a reduced dimension format. Only available for
 \item{n_lv}{\code{integer} the number of latent dynamic factors to use if \code{use_lv == TRUE}.
 Cannot be \code{> n_series}. Defaults arbitrarily to \code{min(2, floor(n_series / 2))}}
 
-\item{family}{\code{family} specifying the exponential observation family for the series. Currently supported
-families are:
-\itemize{
-\item\code{gaussian()} for real-valued data
-\item\code{betar()} for proportional data on \verb{(0,1)}
-\item\code{lognormal()} for non-negative real-valued data
-\item\code{student_t()} for real-valued data
-\item\code{Gamma()} for non-negative real-valued data
-\item\code{bernoulli()} for binary data
-\item\code{poisson()} for count data
-\item\code{nb()} for overdispersed count data
-\item\code{binomial()} for count data with imperfect detection when the number of trials is known;
-note that the \code{cbind()} function must be used to bind the discrete observations and the discrete number
-of trials
-\item\code{beta_binomial()} as for \code{binomial()} but allows for overdispersion
-\item\code{nmix()} for count data with imperfect detection when the number of trials
-is unknown and should be modeled via a State-Space N-Mixture model.
-The latent states are Poisson, capturing the 'true' latent
-abundance, while the observation process is Binomial to account for
-imperfect detection.
-See \code{\link{mvgam_families}} for an example of how to use this family}
-Note that only \code{nb()} and \code{poisson()} are available if using \code{JAGS} as the backend.
-Default is \code{poisson()}.
-See \code{\link{mvgam_families}} for more details}
-
-\item{share_obs_params}{\code{logical}. If \code{TRUE} and the \code{family}
-has additional family-specific observation parameters (e.g. variance components in
-\code{student_t()} or \code{gaussian()}, or dispersion parameters in \code{nb()} or \code{betar()}),
-these parameters will be shared across all outcome variables. This is handy if you have multiple
-outcomes (time series in most \code{mvgam} models) that you believe share some properties,
-such as being from the same species over different spatial units. Default is \code{FALSE}.}
-
 \item{priors}{An optional \code{data.frame} with prior
-definitions (in JAGS or Stan syntax) or, preferentially, If using Stan, a vector containing
+definitions or, preferentially, a vector containing
 objects of class \code{brmsprior} (see. \code{\link[brms]{prior}} for details).
 See \link{get_mvgam_priors} and Details' for more information on changing default prior distributions}
 

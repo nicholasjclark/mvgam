@@ -10,7 +10,7 @@ always_allow_html: true
 ## mvgam
 **M**ulti**V**ariate (Dynamic) **G**eneralized **A**ddivite **M**odels
 
-The goal of `mvgam` is to use a Bayesian framework to estimate parameters of Dynamic Generalized Additive Models (DGAMs) for time series with dynamic trend components. The package provides an interface to fit Bayesian DGAMs using `Stan` as the backend. The formula syntax is based on that of the package `mgcv` to provide a familiar GAM modelling interface. The motivation for the package and some of its primary objectives are described in detail by [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974) (published in *Methods in Ecology and Evolution*). An introduction to the package and some worked examples are shown in this seminar: [Ecological Forecasting with Dynamic Generalized Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ){target="_blank"}.
+The goal of `mvgam` is to fit Bayesian (Dynamic) Generalized Additive Models. This package constructs State-Space models that can include highly flexible nonlinear predictor effects for both process and observation components by leveraging functionalities from the impressive [`brms`](https://paulbuerkner.com/brms/){target="_blank"} and [`mgcv`](https://cran.r-project.org/web/packages/mgcv/index.html){target="_blank"} packages. This allows `mvgam` to fit a wide range of models, including hierarchical ecological models such as N-mixture or Joint Species Distribution models, as well as univariate and multivariate time series models with imperfect detection. The original motivation for the package is described in [Clark & Wells 2022](https://besjournals.onlinelibrary.wiley.com/doi/10.1111/2041-210X.13974){target="_blank"} (published in *Methods in Ecology and Evolution*), with additional inspiration on the use of Bayesian probabilistic modelling coming from [Michael Betancourt](https://betanalpha.github.io/writing/){target="_blank"}, [Michael Dietze](https://www.bu.edu/earth/profiles/michael-dietze/){target="_blank"} and [Sarah Heaps](https://www.durham.ac.uk/staff/sarah-e-heaps/){target="_blank"}, among many others.
   
 ## Installation
 Install the stable version from CRAN using: `install.packages('mvgam')`, or install the development version from `GitHub` using:
@@ -58,7 +58,7 @@ plot_mvgam_series(data = data$data_train, series = 'all')
 ```
 ![Simulating and analysing multivariate time series with Dynamic Generalized Additive Models](man/figures/README-beta_sim-1.png)
 
-Fit a DGAM to these series that uses a hierarchical cyclic seasonal smooth term to capture variation in seasonality among series. The model also includes series-specific latent Gaussian Processes with squared exponential covariance functions to capture temporal dynamics
+Fit a State-Space GAM to these series that uses a hierarchical cyclic seasonal smooth term to capture variation in seasonality among series. The model also includes series-specific latent Gaussian Processes with squared exponential covariance functions to capture temporal dynamics
 ```{r, eval = FALSE}
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 7) +
                s(season, by = series, m = 1, k = 5),
@@ -96,4 +96,5 @@ A number of case studies have been compiled to highlight how GAMs and DGAMs can 
 The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals.
 
 ## Interested in contributing?
-I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au)
+I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au). Other contributions are also very welcome, but please see [The Contributor Instructions](https://github.com/nicholasjclark/mvgam/blob/master/.github/CONTRIBUTING.md) for general guidelines. Note that
+by participating in this project you agree to abide by the terms of its [Contributor Code of Conduct](https://dplyr.tidyverse.org/CODE_OF_CONDUCT).

@@ -12,7 +12,7 @@ eval_mvgam(
   n_samples = 5000,
   eval_timepoint = 3,
   fc_horizon = 3,
-  n_cores = 2,
+  n_cores = 1,
   score = "drps",
   log = FALSE,
   weights
@@ -24,7 +24,7 @@ roll_eval_mvgam(
   evaluation_seq,
   n_samples = 5000,
   fc_horizon = 3,
-  n_cores = 2,
+  n_cores = 1,
   score = "drps",
   log = FALSE,
   weights
@@ -36,7 +36,7 @@ compare_mvgams(
   n_samples = 1000,
   fc_horizon = 3,
   n_evaluations = 10,
-  n_cores = 2,
+  n_cores = 1,
   score = "drps",
   log = FALSE,
   weights
@@ -53,7 +53,7 @@ set of outcome data}
 
 \item{fc_horizon}{\code{integer} specifying the length of the forecast horizon for evaluating forecasts}
 
-\item{n_cores}{\code{integer} specifying number of cores for generating particle forecasts in parallel}
+\item{n_cores}{Deprecated. Parallel processing is no longer supported}
 
 \item{score}{\code{character} specifying the type of ranked probability score to use for evaluation. Options are:
 \code{variogram}, \code{drps} or \code{crps}}

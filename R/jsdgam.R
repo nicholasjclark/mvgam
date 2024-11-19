@@ -9,13 +9,13 @@
 #'
 #'@inheritParams mvgam
 #'@inheritParams ZMVN
-#'@param formula A \code{character} string specifying the GAM observation model formula. These are exactly like the formula
+#'@param formula A \code{formula} object specifying the GAM observation model formula. These are exactly like the formula
 #'for a GLM except that smooth terms, `s()`, `te()`, `ti()`, `t2()`, as well as time-varying
-#'`dynamic()` terms and nonparametric `gp()` terms, can be added to the right hand side
+#'`dynamic()` terms, nonparametric `gp()` terms and offsets using `offset()`, can be added to the right hand side
 #'to specify that the linear predictor depends on smooth functions of predictors
 #'(or linear functionals of these). Details of the formula syntax used by \pkg{mvgam}
 #'can be found in \code{\link{mvgam_formulae}}
-#'@param factor_formula A \code{character} string specifying the linear predictor
+#'@param factor_formula A \code{formula} object specifying the linear predictor
 #'effects for the latent factors. Use `by = trend` within calls to functional terms
 #'(i.e. `s()`, `te()`, `ti()`, `t2()`, `dynamic()`, or `gp()`) to ensure that each factor
 #'captures a different axis of variation. See the example below as an illustration
@@ -47,7 +47,7 @@
 #' Defaults to `series` to be consistent with other `mvgam` models
 #'@param n_lv \code{integer} the number of latent factors to use for modelling
 #'residual associations.
-#'Cannot be `< n_species`. Defaults arbitrarily to `1`
+#'Cannot be `> n_species`. Defaults arbitrarily to `2`
 #'@param threads \code{integer} Experimental option to use multithreading for within-chain
 #'parallelisation in \code{Stan}. We recommend its use only if you are experienced with
 #'\code{Stan}'s `reduce_sum` function and have a slow running model that cannot be sped
@@ -198,41 +198,51 @@
 #' ggplot(dat, aes(x = lat, y = lon, col = log(count + 1))) +
 #'   geom_point(size = 2.25) +
 #'   facet_wrap(~ species, scales = 'free') +
+#'   scale_color_viridis_c() +
 #'   theme_classic()
 #'
-#' # Inspect default priors for a joint species model with spatial factors
+#' # Inspect default priors for a joint species model with three spatial factors
 #' priors <- get_mvgam_priors(formula = count ~
-#'                             # Environmental model includes species-level intercepts
-#'                             # and random slopes for a linear effect of temperature
-#'                             species +
+#'                             # Environmental model includes random slopes for
+#'                             # a linear effect of temperature
 #'                             s(species, bs = 're', by = temperature),
 #'
 #'                           # Each factor estimates a different nonlinear spatial process, using
 #'                           # 'by = trend' as in other mvgam State-Space models
-#'                           factor_formula = ~ te(lat, lon, k = 5, by = trend) - 1,
+#'                           factor_formula = ~ gp(lat, lon, k = 6, by = trend) - 1,
+#'                           n_lv = 3,
 #'
-#'                           # The data
+#'                           # The data and grouping variables
 #'                           data = dat,
+#'                           unit = site,
+#'                           species = species,
 #'
 #'                           # Poisson observations
 #'                           family = poisson())
 #' head(priors)
 #'
 #' # Fit a JSDM that estimates hierarchical temperature responses
-#' # and that uses four latent spatial factors
+#' # and that uses three latent spatial factors
 #' mod <- jsdgam(formula = count ~
-#'                 # Environmental model includes species-level intercepts
-#'                 # and random slopes for a linear effect of temperature
-#'                 species +
+#'                 # Environmental model includes random slopes for a
+#'                 # linear effect of temperature
 #'                 s(species, bs = 're', by = temperature),
 #'
 #'               # Each factor estimates a different nonlinear spatial process, using
 #'               # 'by = trend' as in other mvgam State-Space models
-#'               factor_formula = ~ te(lat, lon, k = 5, by = trend) - 1,
-#'               n_lv = 4,
+#'               factor_formula = ~ gp(lat, lon, k = 6, by = trend) - 1,
+#'               n_lv = 3,
 #'
-#'               # Change default priors for fixed effect betas to standard normal
-#'               priors = prior(std_normal(), class = b),
+#'               # Change default priors for fixed random effect variances and
+#'               # factor P marginal deviations to standard normal
+#'               priors = c(prior(std_normal(),
+#'                                class = sigma_raw),
+#'                          prior(std_normal(),
+#'                                class = `alpha_gp_trend(lat, lon):trendtrend1`),
+#'                          prior(std_normal(),
+#'                                class = `alpha_gp_trend(lat, lon):trendtrend2`),
+#'                          prior(std_normal(),
+#'                                class = `alpha_gp_trend(lat, lon):trendtrend3`)),
 #'
 #'               # The data and the grouping variables
 #'               data = dat,
@@ -274,7 +284,7 @@
 #' image(post_cors$cor)
 #'
 #' # Posterior predictive checks and ELPD-LOO can ascertain model fit
-#' pp_check(mod, type = "ecdf_overlay_grouped",
+#' pp_check(mod, type = "pit_ecdf_grouped",
 #'          group = "species", ndraws = 100)
 #' loo(mod)
 #'
@@ -296,6 +306,7 @@
 #' ggplot(newdata, aes(x = lat, y = lon, col = log_count)) +
 #'   geom_point(size = 1.5) +
 #'   facet_wrap(~ species, scales = 'free') +
+#'   scale_color_viridis_c() +
 #'   theme_classic()
 #'}
 #'@export
@@ -310,7 +321,11 @@ jsdgam = function(formula,
                   species = series,
                   share_obs_params = FALSE,
                   priors,
-                  n_lv = 1,
+                  n_lv = 2,
+                  backend = getOption("brms.backend", "cmdstanr"),
+                  algorithm = getOption("brms.algorithm", "sampling"),
+                  control = list(max_treedepth = 10,
+                                 adapt_delta = 0.8),
                   chains = 4,
                   burnin = 500,
                   samples = 500,
@@ -318,10 +333,6 @@ jsdgam = function(formula,
                   parallel = TRUE,
                   threads = 1,
                   silent = 1,
-                  max_treedepth = 12,
-                  adapt_delta = 0.85,
-                  backend = getOption("brms.backend", "cmdstanr"),
-                  algorithm = getOption("brms.algorithm", "sampling"),
                   run_model = TRUE,
                   return_model_data = FALSE,
                   ...){
@@ -373,7 +384,7 @@ jsdgam = function(formula,
   model_file[grep('int<lower=0> n_lv; // number of dynamic factors',
                   model_file, fixed = TRUE)] <- paste0(
                     'int<lower=0> n_lv; // number of dynamic factors\n',
-                    'int<lower=0> M; // number of nonzero factor loadings'
+                    'int<lower=0> M; // number of nonzero lower-triangular factor loadings'
                   )
   model_file <- readLines(textConnection(model_file), n = -1)
 
@@ -385,8 +396,10 @@ jsdgam = function(formula,
   model_file[grep("matrix[n, n_lv] LV_raw;",
                   model_file, fixed = TRUE)] <- paste0(
                     "matrix[n, n_lv] LV_raw;\n\n",
-                    "// factor lower triangle loading coefficients\n",
-                    "vector[M] L;")
+                    "// factor lower triangle loadings\n",
+                    "vector[M] L_lower;\n",
+                    "// factor diagonal loadings\n",
+                    "vector<lower=0>[n_lv] L_diag;")
   model_file <- readLines(textConnection(model_file), n = -1)
 
   # Update transformed parameters
@@ -413,17 +426,19 @@ jsdgam = function(formula,
                     "trend_mus = X_trend * b_trend;\n\n",
                     "// constraints allow identifiability of loadings\n",
                     "{\n",
-                    "int index;\n",
-                    "index = 0;\n",
-                    "for (j in 1 : n_lv) {\n",
-                    "for (i in j : n_series) {\n",
-                    "index = index + 1;\n",
-                    "lv_coefs[i, j] = L[index];\n",
+                    "int idx;\n",
+                    "idx = 0;\n",
+                    "for(j in 1 : n_lv) lv_coefs[j, j] = L_diag[j];\n",
+                    "for(j in 1 : n_lv) {\n",
+                    "for(k in (j + 1) : n_series) {\n",
+                    "idx = idx + 1;\n",
+                    "lv_coefs[k, j] = L_lower[idx];\n",
                     "}\n",
                     "}\n",
                     "}\n\n",
                     "// raw latent factors (with linear predictors)\n",
-                    "for (j in 1 : n_lv) {\n",                                                                                                       "for (i in 1 : n) {\n",
+                    "for (j in 1 : n_lv) {\n",
+                    "for (i in 1 : n) {\n",
                     "LV[i, j] = trend_mus[ytimes_trend[i, j]] + LV_raw[i, j];\n",
                     "}\n}\n")
 
@@ -437,8 +452,9 @@ jsdgam = function(formula,
   model_file <- model_file[-sigma_prior]
   model_file[grep("// priors for latent state SD parameters",
                   model_file, fixed = TRUE)] <- paste0(
-                    "// priors for factor loading coefficients\n",
-                    "L ~ std_normal();")
+                    "// priors for factors and loading coefficients\n",
+                    "L_lower ~ student_t(3, 0, 1);\n",
+                    "L_diag ~ student_t(3, 0, 1);")
   model_file <- readLines(textConnection(model_file), n = -1)
 
   # Update generated quantities
@@ -460,7 +476,7 @@ jsdgam = function(formula,
 
   # Add M to model_data
   n_series <- NCOL(model_data$ytimes)
-  model_data$M <- n_lv * (n_series - n_lv) + n_lv * (n_lv - 1) / 2 + n_lv
+  model_data$M <- n_lv * (n_series - n_lv) + n_lv * (n_lv - 1) / 2
 
   #### Autoformat the Stan code ####
   if(requireNamespace('cmdstanr', quietly = TRUE) & backend == 'cmdstanr'){
@@ -529,8 +545,8 @@ jsdgam = function(formula,
                                             chains = chains,
                                             parallel = parallel,
                                             silent = silent,
-                                            max_treedepth = max_treedepth,
-                                            adapt_delta = adapt_delta,
+                                            max_treedepth = control$max_treedepth,
+                                            adapt_delta = control$adapt_delta,
                                             threads = threads,
                                             burnin = burnin,
                                             samples = samples,
@@ -548,8 +564,8 @@ jsdgam = function(formula,
                                          chains = chains,
                                          parallel = parallel,
                                          silent = silent,
-                                         max_treedepth = max_treedepth,
-                                         adapt_delta = adapt_delta,
+                                         max_treedepth = control$max_treedepth,
+                                         adapt_delta = control$adapt_delta,
                                          threads = threads,
                                          burnin = burnin,
                                          samples = samples,
@@ -626,8 +642,8 @@ jsdgam = function(formula,
                           fit_engine = 'stan',
                           backend = backend,
                           algorithm = algorithm,
-                          max_treedepth = max_treedepth,
-                          adapt_delta = adapt_delta),
+                          max_treedepth = control$max_treedepth,
+                          adapt_delta = control$adapt_delta),
                      class = c('mvgam', 'jsdgam'))
   }
 

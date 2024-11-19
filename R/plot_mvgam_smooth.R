@@ -168,13 +168,16 @@ plot_mvgam_smooth = function(object,
   if(length(unlist(strsplit(smooth, ','))) >= 2L){
 
     # Use default mgcv plotting for bivariate smooths as it is quicker
+    object2$mgcv_model <- relabel_gps(object2$mgcv_model)
     if(inherits(object2$mgcv_model$smooth[[smooth_int]], 'tprs.smooth') |
        inherits(object2$mgcv_model$smooth[[smooth_int]], 't2smooth') |
        inherits(object2$mgcv_model$smooth[[smooth_int]], 'tensor.smooth')){
-      suppressWarnings(plot(object2$mgcv_model, select = smooth_int,
+      suppressWarnings(plot(object2$mgcv_model,
+                            select = smooth_int,
                             residuals = residuals,
                             scheme = 2,
-                            main = '', too.far = 0,
+                            main = '',
+                            too.far = 0,
                             contour.col = 'black',
                             hcolors = hcl.colors(25,
                                                  palette = 'Reds 2'),
@@ -183,7 +186,8 @@ plot_mvgam_smooth = function(object,
       box(col = 'white')
       box(bty = 'l', lwd = 2)
     } else {
-      suppressWarnings(plot(object2$mgcv_model, select = smooth_int,
+      suppressWarnings(plot(object2$mgcv_model,
+                            select = smooth_int,
                             residuals = residuals,
                             scheme = 2,
                             main = '', too.far = 0,
@@ -317,9 +321,8 @@ plot_mvgam_smooth = function(object,
 
       if(gp_term){
         object2$mgcv_model$smooth[[smooth_int]]$label <-
-          gsub('s(', 'gp(',
-               object2$mgcv_model$smooth[[smooth_int]]$label,
-               fixed = TRUE)
+          gsub('s\\(|ti\\(', 'gp(',
+               object2$mgcv_model$smooth[[smooth_int]]$label)
         # Check if this is a factor by variable
         is_fac <- is.factor(object2$obs_data[[object2$mgcv_model$smooth[[smooth_int]]$by]])
 

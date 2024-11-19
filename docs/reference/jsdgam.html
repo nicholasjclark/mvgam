@@ -90,7 +90,10 @@ observation model can also be highly flexible (including all smooth, GP and othe
 <span>  species <span class="op">=</span> <span class="va">series</span>,</span>
 <span>  share_obs_params <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">priors</span>,</span>
-<span>  n_lv <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>  n_lv <span class="op">=</span> <span class="fl">2</span>,</span>
+<span>  backend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">"brms.backend"</span>, <span class="st">"cmdstanr"</span><span class="op">)</span>,</span>
+<span>  algorithm <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">"brms.algorithm"</span>, <span class="st">"sampling"</span><span class="op">)</span>,</span>
+<span>  control <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>max_treedepth <span class="op">=</span> <span class="fl">10</span>, adapt_delta <span class="op">=</span> <span class="fl">0.8</span><span class="op">)</span>,</span>
 <span>  chains <span class="op">=</span> <span class="fl">4</span>,</span>
 <span>  burnin <span class="op">=</span> <span class="fl">500</span>,</span>
 <span>  samples <span class="op">=</span> <span class="fl">500</span>,</span>
@@ -98,10 +101,6 @@ observation model can also be highly flexible (including all smooth, GP and othe
 <span>  parallel <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  threads <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  silent <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>  max_treedepth <span class="op">=</span> <span class="fl">12</span>,</span>
-<span>  adapt_delta <span class="op">=</span> <span class="fl">0.85</span>,</span>
-<span>  backend <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">"brms.backend"</span>, <span class="st">"cmdstanr"</span><span class="op">)</span>,</span>
-<span>  algorithm <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/options.html" class="external-link">getOption</a></span><span class="op">(</span><span class="st">"brms.algorithm"</span>, <span class="st">"sampling"</span><span class="op">)</span>,</span>
 <span>  run_model <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  return_model_data <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">...</span></span>
@@ -111,18 +110,18 @@ observation model can also be highly flexible (including all smooth, GP and othe
     <div class="section level2">
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
     <dl><dt>formula</dt>
-<dd><p>A <code>character</code> string specifying the GAM observation model formula. These are exactly like the formula
+<dd><p>A <code>formula</code> object specifying the GAM observation model formula. These are exactly like the formula
 for a GLM except that smooth terms, <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, as well as time-varying
-<code><a href="dynamic.html">dynamic()</a></code> terms and nonparametric <code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp()</a></code> terms, can be added to the right hand side
+<code><a href="dynamic.html">dynamic()</a></code> terms, nonparametric <code><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp()</a></code> terms and offsets using <code><a href="https://rdrr.io/r/stats/offset.html" class="external-link">offset()</a></code>, can be added to the right hand side
 to specify that the linear predictor depends on smooth functions of predictors
 (or linear functionals of these). Details of the formula syntax used by <span class="pkg">mvgam</span>
 can be found in <code><a href="mvgam_formulae.html">mvgam_formulae</a></code></p></dd>
 
 
 <dt>factor_formula</dt>
-<dd><p>A <code>character</code> string specifying the linear predictor
+<dd><p>A <code>formula</code> object specifying the linear predictor
 effects for the latent factors. Use <code>by = trend</code> within calls to functional terms
-(i.e. <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, <code><a href="dynamic.html">dynamic()</a></code>, or <code><a href="https://paul-buerkner.github.io/brms/reference/gp.html" class="external-link">gp()</a></code>) to ensure that each factor
+(i.e. <code><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">ti()</a></code>, <code><a href="https://rdrr.io/pkg/mgcv/man/t2.html" class="external-link">t2()</a></code>, <code><a href="dynamic.html">dynamic()</a></code>, or <code><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp()</a></code>) to ensure that each factor
 captures a different axis of variation. See the example below as an illustration</p></dd>
 
 
@@ -197,14 +196,42 @@ such as being from the same species over different spatial units. Default is <co
 <dt>priors</dt>
 <dd><p>An optional <code>data.frame</code> with prior
 definitions (in Stan syntax) or, preferentially, a vector containing
-objects of class <code>brmsprior</code> (see. <code><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></code> for details).
+objects of class <code>brmsprior</code> (see. <code><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></code> for details).
 See <a href="get_mvgam_priors.html">get_mvgam_priors</a> and for more information on changing default prior distributions</p></dd>
 
 
 <dt>n_lv</dt>
 <dd><p><code>integer</code> the number of latent factors to use for modelling
 residual associations.
-Cannot be <code>&lt; n_species</code>. Defaults arbitrarily to <code>1</code></p></dd>
+Cannot be <code>&gt; n_species</code>. Defaults arbitrarily to <code>2</code></p></dd>
+
+
+<dt>backend</dt>
+<dd><p>Character string naming the package to use as the backend for fitting
+the Stan model. Options are "cmdstanr" (the default) or "rstan". Can be set globally
+for the current R session via the <code>"brms.backend"</code> option (see <code><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></code>). Details on
+the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
+https://mc-stan.org/cmdstanr/, respectively</p></dd>
+
+
+<dt>algorithm</dt>
+<dd><p>Character string naming the estimation approach to use.
+Options are <code>"sampling"</code> for MCMC (the default), <code>"meanfield"</code> for
+variational inference with factorized normal distributions,
+<code>"fullrank"</code> for variational inference with a multivariate normal
+distribution, <code>"laplace"</code> for a Laplace approximation (only available
+when using cmdstanr as the backend) or <code>"pathfinder"</code> for the pathfinder
+algorithm (only currently available when using cmdstanr as the backend).
+Can be set globally for the current <span style="R">R</span> session via the
+<code>"brms.algorithm"</code> option (see <code><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></code>). Limited testing
+suggests that <code>"meanfield"</code> performs best out of the non-MCMC approximations for
+dynamic GAMs, possibly because of the difficulties estimating covariances among the
+many spline parameters and latent trend parameters. But rigorous testing has not
+been carried out</p></dd>
+
+
+<dt>control</dt>
+<dd><p>A named <code>list</code> for controlling the sampler's behaviour. Currently only accepts settings for</p></dd>
 
 
 <dt>chains</dt>
@@ -248,46 +275,6 @@ messages of compiler and sampler are suppressed. If <code>2</code>, even more me
 actual sampling progress is still printed. Set <code>refresh = 0</code> to turn this off as well. If using
 <code>backend = "rstan"</code> you can also set open_progress = FALSE to prevent opening additional
 progress bars.</p></dd>
-
-
-<dt>max_treedepth</dt>
-<dd><p>positive integer placing a cap on the number of simulation steps evaluated during each iteration when
-<code>use_stan == TRUE</code>. Default is <code>12</code>. Increasing this value can sometimes help with exploration of complex
-posterior geometries, but it is rarely fruitful to go above a <code>max_treedepth</code> of <code>14</code></p></dd>
-
-
-<dt>adapt_delta</dt>
-<dd><p>positive numeric between <code>0</code> and <code>1</code> defining the target average proposal acceptance probability
-during Stan's adaptation period, if <code>use_stan == TRUE</code>. Default is <code>0.8</code>. In general you should not need to change adapt_delta
-unless you see a warning message about divergent transitions, in which case you can increase adapt_delta from the default
-to a value closer to <code>1</code> (e.g. from <code>0.95</code> to <code>0.99</code>, or from <code>0.99</code> to <code>0.999</code>, etc).
-The step size used by the numerical integrator is a function of <code>adapt_delta</code> in that increasing
-<code>adapt_delta</code> will result in a smaller step size and fewer divergences. Increasing <code>adapt_delta</code> will
-typically result in a slower sampler, but it will always lead to a more robust sampler</p></dd>
-
-
-<dt>backend</dt>
-<dd><p>Character string naming the package to use as the backend for fitting
-the Stan model (if <code>use_stan = TRUE</code>). Options are "cmdstanr" (the default) or "rstan". Can be set globally
-for the current R session via the <code>"brms.backend"</code> option (see <code><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></code>). Details on
-the rstan and cmdstanr packages are available at https://mc-stan.org/rstan/ and
-https://mc-stan.org/cmdstanr/, respectively</p></dd>
-
-
-<dt>algorithm</dt>
-<dd><p>Character string naming the estimation approach to use.
-Options are <code>"sampling"</code> for MCMC (the default), <code>"meanfield"</code> for
-variational inference with factorized normal distributions,
-<code>"fullrank"</code> for variational inference with a multivariate normal
-distribution, <code>"laplace"</code> for a Laplace approximation (only available
-when using cmdstanr as the backend) or <code>"pathfinder"</code> for the pathfinder
-algorithm (only currently available when using cmdstanr as the backend).
-Can be set globally for the current <span style="R">R</span> session via the
-<code>"brms.algorithm"</code> option (see <code><a href="https://rdrr.io/r/base/options.html" class="external-link">options</a></code>). Limited testing
-suggests that <code>"meanfield"</code> performs best out of the non-MCMC approximations for
-dynamic GAMs, possibly because of the difficulties estimating covariances among the
-many spline parameters and latent trend parameters. But rigorous testing has not
-been carried out</p></dd>
 
 
 <dt>run_model</dt>
@@ -466,63 +453,90 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">dat</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">lat</span>, y <span class="op">=</span> <span class="va">lon</span>, col <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="va">count</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>size <span class="op">=</span> <span class="fl">2.25</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">species</span>, scales <span class="op">=</span> <span class="st">'free'</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_viridis.html" class="external-link">scale_color_viridis_c</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="jsdgam-2.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># Inspect default priors for a joint species model with spatial factors</span></span></span>
+<span class="r-in"><span><span class="co"># Inspect default priors for a joint species model with three spatial factors</span></span></span>
 <span class="r-in"><span><span class="va">priors</span> <span class="op">&lt;-</span> <span class="fu"><a href="get_mvgam_priors.html">get_mvgam_priors</a></span><span class="op">(</span>formula <span class="op">=</span> <span class="va">count</span> <span class="op">~</span></span></span>
-<span class="r-in"><span>                            <span class="co"># Environmental model includes species-level intercepts</span></span></span>
-<span class="r-in"><span>                            <span class="co"># and random slopes for a linear effect of temperature</span></span></span>
-<span class="r-in"><span>                            <span class="va">species</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>                            <span class="co"># Environmental model includes random slopes for</span></span></span>
+<span class="r-in"><span>                            <span class="co"># a linear effect of temperature</span></span></span>
 <span class="r-in"><span>                            <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">species</span>, bs <span class="op">=</span> <span class="st">'re'</span>, by <span class="op">=</span> <span class="va">temperature</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>                          <span class="co"># Each factor estimates a different nonlinear spatial process, using</span></span></span>
 <span class="r-in"><span>                          <span class="co"># 'by = trend' as in other mvgam State-Space models</span></span></span>
-<span class="r-in"><span>                          factor_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te</a></span><span class="op">(</span><span class="va">lat</span>, <span class="va">lon</span>, k <span class="op">=</span> <span class="fl">5</span>, by <span class="op">=</span> <span class="va">trend</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>                          factor_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp</a></span><span class="op">(</span><span class="va">lat</span>, <span class="va">lon</span>, k <span class="op">=</span> <span class="fl">6</span>, by <span class="op">=</span> <span class="va">trend</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>                          n_lv <span class="op">=</span> <span class="fl">3</span>,</span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span>                          <span class="co"># The data</span></span></span>
+<span class="r-in"><span>                          <span class="co"># The data and grouping variables</span></span></span>
 <span class="r-in"><span>                          data <span class="op">=</span> <span class="va">dat</span>,</span></span>
+<span class="r-in"><span>                          unit <span class="op">=</span> <span class="va">site</span>,</span></span>
+<span class="r-in"><span>                          species <span class="op">=</span> <span class="va">species</span>,</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>                          <span class="co"># Poisson observations</span></span></span>
 <span class="r-in"><span>                          family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>gp effects in mvgam cannot yet handle autogrouping</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> resetting all instances of 'gr = TRUE' to 'gr = FALSE'</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span style="color: #555555;">This warning is displayed once per session.</span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">priors</span><span class="op">)</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         param_name param_length                    param_info</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1      (Intercept)            1                   (Intercept)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 speciesspecies_2            1 speciesspecies_2 fixed effect</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 speciesspecies_3            1 speciesspecies_3 fixed effect</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 speciesspecies_4            1 speciesspecies_4 fixed effect</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 speciesspecies_5            1 speciesspecies_5 fixed effect</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 speciesspecies_6            1 speciesspecies_6 fixed effect</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                                    prior                   example_change</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1  (Intercept) ~ student_t(3, 2.1, 2.5);      (Intercept) ~ normal(0, 1);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2 speciesspecies_2 ~ student_t(3, 0, 2); speciesspecies_2 ~ normal(0, 1);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3 speciesspecies_3 ~ student_t(3, 0, 2); speciesspecies_3 ~ normal(0, 1);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 speciesspecies_4 ~ student_t(3, 0, 2); speciesspecies_4 ~ normal(0, 1);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 speciesspecies_5 ~ student_t(3, 0, 2); speciesspecies_5 ~ normal(0, 1);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 speciesspecies_6 ~ student_t(3, 0, 2); speciesspecies_6 ~ normal(0, 1);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   new_lowerbound new_upperbound</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 1           &lt;NA&gt;           &lt;NA&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 2           &lt;NA&gt;           &lt;NA&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 3           &lt;NA&gt;           &lt;NA&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4           &lt;NA&gt;           &lt;NA&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5           &lt;NA&gt;           &lt;NA&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6           &lt;NA&gt;           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                            param_name param_length</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1                                         (Intercept)            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2                                   vector[1] mu_raw;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3                       vector&lt;lower=0&gt;[1] sigma_raw;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 real&lt;lower=0&gt; alpha_gp_trend(lat, lon):trendtrend1;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 real&lt;lower=0&gt; alpha_gp_trend(lat, lon):trendtrend2;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 real&lt;lower=0&gt; alpha_gp_trend(lat, lon):trendtrend3;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                    param_info</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1                                 (Intercept)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2             s(species):temperature pop mean</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3               s(species):temperature pop sd</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 gp(lat, lon):trendtrend1 marginal deviation</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 gp(lat, lon):trendtrend2 marginal deviation</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 gp(lat, lon):trendtrend3 marginal deviation</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                                          prior</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1                        (Intercept) ~ student_t(3, 2.1, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2                                       mu_raw ~ std_normal();</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3                            sigma_raw ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 alpha_gp_trend(lat, lon):trendtrend1 ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 alpha_gp_trend(lat, lon):trendtrend2 ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 alpha_gp_trend(lat, lon):trendtrend3 ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                                            example_change new_lowerbound</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1                             (Intercept) ~ normal(0, 1);           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2                            mu_raw ~ normal(0.65, 0.15);           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3                          sigma_raw ~ exponential(0.27);           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 alpha_gp_trend(lat, lon):trendtrend1 ~ normal(0, 0.86);           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 alpha_gp_trend(lat, lon):trendtrend2 ~ normal(0, 0.84);           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 alpha_gp_trend(lat, lon):trendtrend3 ~ normal(0, 0.78);           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   new_upperbound</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 3           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6           &lt;NA&gt;</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Fit a JSDM that estimates hierarchical temperature responses</span></span></span>
-<span class="r-in"><span><span class="co"># and that uses four latent spatial factors</span></span></span>
+<span class="r-in"><span><span class="co"># and that uses three latent spatial factors</span></span></span>
 <span class="r-in"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu">jsdgam</span><span class="op">(</span>formula <span class="op">=</span> <span class="va">count</span> <span class="op">~</span></span></span>
-<span class="r-in"><span>                <span class="co"># Environmental model includes species-level intercepts</span></span></span>
-<span class="r-in"><span>                <span class="co"># and random slopes for a linear effect of temperature</span></span></span>
-<span class="r-in"><span>                <span class="va">species</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>                <span class="co"># Environmental model includes random slopes for a</span></span></span>
+<span class="r-in"><span>                <span class="co"># linear effect of temperature</span></span></span>
 <span class="r-in"><span>                <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">species</span>, bs <span class="op">=</span> <span class="st">'re'</span>, by <span class="op">=</span> <span class="va">temperature</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>              <span class="co"># Each factor estimates a different nonlinear spatial process, using</span></span></span>
 <span class="r-in"><span>              <span class="co"># 'by = trend' as in other mvgam State-Space models</span></span></span>
-<span class="r-in"><span>              factor_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/te.html" class="external-link">te</a></span><span class="op">(</span><span class="va">lat</span>, <span class="va">lon</span>, k <span class="op">=</span> <span class="fl">5</span>, by <span class="op">=</span> <span class="va">trend</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>              n_lv <span class="op">=</span> <span class="fl">4</span>,</span></span>
+<span class="r-in"><span>              factor_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp</a></span><span class="op">(</span><span class="va">lat</span>, <span class="va">lon</span>, k <span class="op">=</span> <span class="fl">6</span>, by <span class="op">=</span> <span class="va">trend</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>              n_lv <span class="op">=</span> <span class="fl">3</span>,</span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span>              <span class="co"># Change default priors for fixed effect betas to standard normal</span></span></span>
-<span class="r-in"><span>              priors <span class="op">=</span> <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">b</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>              <span class="co"># Change default priors for fixed random effect variances and</span></span></span>
+<span class="r-in"><span>              <span class="co"># factor P marginal deviations to standard normal</span></span></span>
+<span class="r-in"><span>              priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                               class <span class="op">=</span> <span class="va">sigma_raw</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                         <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                               class <span class="op">=</span> <span class="va">`alpha_gp_trend(lat, lon):trendtrend1`</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                         <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                               class <span class="op">=</span> <span class="va">`alpha_gp_trend(lat, lon):trendtrend2`</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                         <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                               class <span class="op">=</span> <span class="va">`alpha_gp_trend(lat, lon):trendtrend3`</span><span class="op">)</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>              <span class="co"># The data and the grouping variables</span></span></span>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span>,</span></span>
@@ -562,52 +576,52 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span><span class="co"># Look at lower and upper credible interval estimates for</span></span></span>
 <span class="r-in"><span><span class="co"># some of the estimated correlations</span></span></span>
 <span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>            species_1   species_2  species_3 species_4  species_5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_1 1.00000000  0.09346475  0.6393271  0.547931  0.1366726</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 0.09346475  1.00000000 -0.3318063 -0.413929 -0.2074599</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_3 0.63932709 -0.33180627  1.0000000  0.682426  0.1883235</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_4 0.54793102 -0.41392901  0.6824260  1.000000 -0.3718930</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 0.13667259 -0.20745989  0.1883235 -0.371893  1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>            species_1  species_2   species_3  species_4   species_5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.7336280  0.72991602  0.7861474 -0.24696228</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.7336280  1.0000000  0.15420441  0.3813268 -0.47995732</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.7299160  0.1542044  1.00000000  0.8908844 -0.03924676</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.7861474  0.3813268  0.89088435  1.0000000 -0.44731327</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.2469623 -0.4799573 -0.03924676 -0.4473133  1.00000000</span>
 <span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor_upper</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>           species_1   species_2 species_3   species_4 species_5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_1 1.0000000 0.525394676 0.9352867 0.893813412 0.6375748</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 0.5253947 1.000000000 0.2078931 0.004141424 0.1750635</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_3 0.9352867 0.207893140 1.0000000 0.908985880 0.6385363</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_4 0.8938134 0.004141424 0.9089859 1.000000000 0.1948296</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 0.6375748 0.175063548 0.6385363 0.194829567 1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>           species_1  species_2 species_3  species_4  species_5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1 1.0000000  0.9242392 0.9566867  0.9575828  0.1509028</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 0.9242392  1.0000000 0.5199946  0.7191710 -0.1730502</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3 0.9566867  0.5199946 1.0000000  0.9774616  0.3136909</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4 0.9575828  0.7191710 0.9774616  1.0000000 -0.1076519</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 0.1509028 -0.1730502 0.3136909 -0.1076519  1.0000000</span>
 <span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor_lower</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>            species_1  species_2  species_3  species_4  species_5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000 -0.4361362  0.2168760  0.1650564 -0.2549159</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 -0.4361362  1.0000000 -0.7445722 -0.7369653 -0.6293579</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.2168760 -0.7445722  1.0000000  0.2784607 -0.2226831</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.1650564 -0.7369653  0.2784607  1.0000000 -0.7276900</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.2549159 -0.6293579 -0.2226831 -0.7276900  1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.4226772  0.4168132  0.4720316 -0.6018739</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.4226772  1.0000000 -0.2345903 -0.0158343 -0.7385235</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.4168132 -0.2345903  1.0000000  0.7304959 -0.3965220</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.4720316 -0.0158343  0.7304959  1.0000000 -0.7197583</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.6018739 -0.7385235 -0.3965220 -0.7197583  1.0000000</span>
 <span class="r-in"><span><span class="co"># A quick and dirty plot of the posterior median correlations</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/image.html" class="external-link">image</a></span><span class="op">(</span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="jsdgam-7.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Posterior predictive checks and ELPD-LOO can ascertain model fit</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"ecdf_overlay_grouped"</span>,</span></span>
+<span class="r-in"><span><span class="fu"><a href="pp_check.mvgam.html">pp_check</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">"pit_ecdf_grouped"</span>,</span></span>
 <span class="r-in"><span>         group <span class="op">=</span> <span class="st">"species"</span>, ndraws <span class="op">=</span> <span class="fl">100</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="jsdgam-8.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span></span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 600 log-likelihood matrix</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 600 log-likelihood matrix.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate   SE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo  -1953.6 42.3</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo       367.6 25.2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> looic      3907.1 84.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate    SE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo  -2190.8  51.4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo       421.9  27.1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> looic      4381.6 102.8</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Monte Carlo SE of elpd_loo is NA.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE of elpd_loo is NA.</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.0, 1.6]).</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Pareto k diagnostic values:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>                          Count Pct.    Min. n_eff</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.5]   (good)     279   46.5%   10        </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  (0.5, 0.7]   (ok)       174   29.0%   2         </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.7, 1]   (bad)      118   19.7%   1         </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    (1, Inf)   (very bad)  29    4.8%   1         </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>                           Count Pct.    Min. ESS</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     438   73.0%   1       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)      132   22.0%   &lt;NA&gt;    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad)  30    5.0%   &lt;NA&gt;    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Forecast log(counts) for entire region (site value doesn't matter as long</span></span></span>
@@ -628,6 +642,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">newdata</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">lat</span>, y <span class="op">=</span> <span class="va">lon</span>, col <span class="op">=</span> <span class="va">log_count</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>size <span class="op">=</span> <span class="fl">1.5</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">species</span>, scales <span class="op">=</span> <span class="st">'free'</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_viridis.html" class="external-link">scale_color_viridis_c</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="jsdgam-9.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
