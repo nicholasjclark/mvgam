@@ -1,7 +1,6 @@
 #' Generic GAM setup function
 #' @importFrom stats na.fail
 #' @noRd
-#'
 mvgam_setup <- function(formula,
                         knots,
                         family = gaussian(),
@@ -58,12 +57,18 @@ jagam_setup <- function(ss_gam, formula, data_train, family,
     # it from the model and data structures later
     data_train$fakery <- rnorm(length(data_train$y))
     form_fake <- update.formula(formula, ~ . + s(fakery, k = 3))
-    fakery_names <- names(suppressWarnings(mgcv::gam(form_fake,
-                                                     data = data_train,
-                                                     family = family_to_mgcvfam(family),
-                                                     drop.unused.levels = FALSE,
-                                                     control = list(maxit = 1),
-                                                     method = 'REML'))$coefficients)
+
+    fakery_names <- names(mvgam_setup(formula = form_fake,
+                                       family = family_to_mgcvfam(family),
+                                       dat = data_train,
+                                       drop.unused.levels = FALSE)$coefficients)
+
+    # fakery_names <- names(suppressWarnings(mgcv::gam(form_fake,
+    #                                                  data = data_train,
+    #                                                  family = family_to_mgcvfam(family),
+    #                                                  drop.unused.levels = FALSE,
+    #                                                  control = list(maxit = 1),
+    #                                                  method = 'REML'))$coefficients)
     xcols_drop <- grep('s(fakery', fakery_names, fixed = TRUE)
 
     if(!missing(knots)){
@@ -216,22 +221,22 @@ init_gam <- function(formula,
   rm(dl)
 
   G <- gam_setup(gp,pterms=pterms,
-                        data=mf,knots=knots,sp=sp,
-                        H=NULL,absorb.cons=centred,sparse.cons=FALSE,select=TRUE,
-                        idLinksBases=TRUE,scale.penalty=control$scalePenalty,
-                        diagonal.penalty=diagonalize)
+                 data=mf,knots=knots,sp=sp,
+                 H=NULL,absorb.cons=centred,sparse.cons=FALSE,select=TRUE,
+                 idLinksBases=TRUE,scale.penalty=control$scalePenalty,
+                 diagonal.penalty=diagonalize)
   G$model <- mf;G$terms <- terms;G$family <- family;G$call <- cl
   G$var.summary <- var.summary
 
   lambda <- initial_spg(G$X,
-                               G$y,
-                               G$w,
-                               family,
-                               G$S,
-                               G$rank,
-                               G$off,
-                               offset=G$offset,
-                               L=G$L)
+                        G$y,
+                        G$w,
+                        family,
+                        G$S,
+                        G$rank,
+                        G$off,
+                        offset=G$offset,
+                        L=G$L)
   jags.ini <- list()
   lam <- if (is.null(G$L)) lambda else G$L%*%lambda
   #jin <- mgcv:::jini(G,lam)
@@ -260,11 +265,11 @@ init_gam <- function(formula,
 #'@importFrom methods cbind2
 #' @noRd
 gam_setup <- function(formula, pterms, data = stop("No data supplied to gam_setup"),
-                       knots = NULL, sp = NULL, min.sp = NULL, H = NULL, absorb.cons = TRUE,
-                       sparse.cons = 0, select = FALSE, idLinksBases = TRUE, scale.penalty = TRUE,
-                       paraPen = NULL, gamm.call = FALSE, drop.intercept = FALSE,
-                       diagonal.penalty = FALSE, apply.by = TRUE, list.call = FALSE,
-                       modCon = 0){
+                      knots = NULL, sp = NULL, min.sp = NULL, H = NULL, absorb.cons = TRUE,
+                      sparse.cons = 0, select = FALSE, idLinksBases = TRUE, scale.penalty = TRUE,
+                      paraPen = NULL, gamm.call = FALSE, drop.intercept = FALSE,
+                      diagonal.penalty = FALSE, apply.by = TRUE, list.call = FALSE,
+                      modCon = 0){
   if (inherits(formula, "split.gam.formula"))
     split <- formula
   else if (inherits(formula, "formula"))
@@ -344,7 +349,7 @@ gam_setup <- function(formula, pterms, data = stop("No data supplied to gam_setu
         id.list[[id]]$data <- list()
         term <- split$smooth.spec[[i]]$term
         for (j in 1:length(term)) id.list[[id]]$data[[j]] <- mgcv::get.var(term[j],
-                                                                     data, vecMat = FALSE)
+                                                                           data, vecMat = FALSE)
       }
     }
   }
@@ -357,18 +362,18 @@ gam_setup <- function(formula, pterms, data = stop("No data supplied to gam_setu
       id <- split$smooth.spec[[i]]$id
       if (is.null(id) || !idLinksBases) {
         sml <- mgcv::smoothCon(split$smooth.spec[[i]], data,
-                         knots, absorb.cons, scale.penalty = scale.penalty,
-                         null.space.penalty = select, sparse.cons = sparse.cons,
-                         diagonal.penalty = diagonal.penalty, apply.by = apply.by,
-                         modCon = modCon)
+                               knots, absorb.cons, scale.penalty = scale.penalty,
+                               null.space.penalty = select, sparse.cons = sparse.cons,
+                               diagonal.penalty = diagonal.penalty, apply.by = apply.by,
+                               modCon = modCon)
       }
       else {
         names(id.list[[id]]$data) <- split$smooth.spec[[i]]$term
         sml <- mgcv::smoothCon(split$smooth.spec[[i]], id.list[[id]]$data,
-                         knots, absorb.cons, n = nrow(data), dataX = data,
-                         scale.penalty = scale.penalty, null.space.penalty = select,
-                         sparse.cons = sparse.cons, diagonal.penalty = diagonal.penalty,
-                         apply.by = apply.by, modCon = modCon)
+                               knots, absorb.cons, n = nrow(data), dataX = data,
+                               scale.penalty = scale.penalty, null.space.penalty = select,
+                               sparse.cons = sparse.cons, diagonal.penalty = diagonal.penalty,
+                               apply.by = apply.by, modCon = modCon)
       }
       ind <- 1:length(sml)
       sm[ind + newm] <- sml[ind]
@@ -844,9 +849,11 @@ variable_summary <- function(pf, dl, n){
         }
         else {
           x <- as.numeric(x)
-          x <- c(min(x, na.rm = TRUE), as.numeric(quantile(x,
-                                                           probs = 0.5, type = 3, na.rm = TRUE)), max(x,
-                                                                                                      na.rm = TRUE))
+          x <- c(min(x, na.rm = TRUE),
+                 as.numeric(quantile(x,
+                                     probs = 0.5, type = 3, na.rm = TRUE)),
+                 max(x,
+                     na.rm = TRUE))
         }
       }
       vs[[v.name[i]]] <- x
@@ -857,8 +864,8 @@ variable_summary <- function(pf, dl, n){
 #' @importFrom stats lm
 #' @noRd
 initial_spg <- function(x, y, weights, family, S, rank, off, offset = NULL,
-                         L = NULL, lsp0 = NULL, type = 1, start = NULL, mustart = NULL,
-                         etastart = NULL, E = NULL, ...){
+                        L = NULL, lsp0 = NULL, type = 1, start = NULL, mustart = NULL,
+                        etastart = NULL, E = NULL, ...){
   if (length(S) == 0)
     return(rep(0, 0))
   nobs <- nrow(x)
@@ -890,10 +897,12 @@ initial_spg <- function(x, y, weights, family, S, rank, off, offset = NULL,
       dlb <- dlb[ind]/pc[ind]
       dS <- dS[ind]
       rm <- max(length(dS)/rank[i], 1)
-      while (sqrt(mean(dlb/(dlb + lami * dS * rm)) * mean(dlb)/mean(dlb +
-                                                                    lami * dS * rm)) > 0.4) lami <- lami * 5
-      while (sqrt(mean(dlb/(dlb + lami * dS * rm)) * mean(dlb)/mean(dlb +
-                                                                    lami * dS * rm)) < 0.4) lami <- lami/5
+      while (sqrt(mean(dlb/(dlb + lami * dS * rm)) *
+                  mean(dlb)/mean(dlb +
+                                 lami * dS * rm)) > 0.4) lami <- lami * 5
+      while (sqrt(mean(dlb/(dlb + lami * dS * rm)) *
+                  mean(dlb)/mean(dlb +
+                                 lami * dS * rm)) < 0.4) lami <- lami/5
       lambda[i] <- lami
     }
   }
@@ -913,7 +922,8 @@ initial_spg <- function(x, y, weights, family, S, rank, off, offset = NULL,
       if (any(w < 0))
         w <- 0.5 * as.numeric(Ddo$EDmu2 * mu.eta2)
     }
-    else w <- as.numeric(weights * family$mu.eta(family$linkfun(mustart))^2/family$variance(mustart))
+    else w <- as.numeric(weights *
+                           family$mu.eta(family$linkfun(mustart))^2/family$variance(mustart))
     w <- sqrt(w)
     if (type == 1) {
       lambda <- mgcv::initial.sp(w * x, S, off)
