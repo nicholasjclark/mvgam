@@ -26,7 +26,9 @@ Imports:
     purrr,
     dplyr,
     magrittr,
-    rlang
+    rlang,
+    generics,
+    tibble (>= 3.0.0)
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
@@ -51,9 +53,8 @@ Suggests:
     usethis,
     testthat
 Enhances:
-    gratia (>= 0.9.0), 
-    tibble (>= 3.0.0),
-    tidyr 
+    gratia (>= 0.9.0),
+    tidyr
 Additional_repositories: https://mc-stan.org/r-packages/
 LinkingTo: Rcpp, RcppArmadillo
 VignetteBuilder: knitr
