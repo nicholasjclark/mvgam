@@ -22,19 +22,26 @@
 #'   deviation or median absolute deviation depending on argument
 #'   \code{robust}). The remaining columns starting with \code{Q} contain
 #'   quantile estimates as specified via argument \code{probs}.
+#'
+#' @seealso \code{\link{augment.mvgam}}
+#' @author Nicholas J Clark
 #' @examples
 #' \donttest{
 #' # Simulate some data and fit a model
-#' simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+#' simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 #' mod <- mvgam(y ~ s(season, bs = 'cc'),
 #'              trend_model = AR(),
 #'              noncentred = TRUE,
 #'              data = simdat$data_train,
-#'              chains = 2)
+#'              chains = 2,
+#'              silent = 2)
 #'
-#'# Extract posterior residuals
-#'resids <- residuals(mod)
-#'str(resids)
+#' # Extract posterior residuals
+#' resids <- residuals(mod)
+#' str(resids)
+#'
+#' # Or add them directly to the observed data, along with fitted values
+#' augment(mod, robust = FALSE, probs = c(0.25, 0.75))
 #'}
 #' @export
 residuals.mvgam <- function(object,
@@ -70,8 +77,9 @@ residuals.mvgam <- function(object,
     }
 
     out <- cbind(estimates, errors, Qlower, Qupper)
-    colnames(out) <- c('Estimate', 'Est.Error', paste0('Q', 100*min(probs)),
-                       paste0('Q', 100*max(probs)))
+    colnames(out) <- c('Estimate', 'Est.Error',
+                       paste0('Q', 100 * min(probs)),
+                       paste0('Q', 100 * max(probs)))
   } else {
     out <- resid_matrix
   }

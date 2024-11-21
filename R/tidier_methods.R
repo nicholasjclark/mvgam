@@ -5,7 +5,7 @@ generics::augment
 #' Augment an mvgam object's data
 #'
 #' Add fits and residuals to the data, implementing the generic `augment` from
-#' the package {broom}.
+#' the package \pkg{broom}.
 #'
 #' A `list` is returned if `class(x$obs_data) == 'list'`, otherwise a `tibble` is
 #' returned, but the contents of either object is the same.
@@ -26,6 +26,7 @@ generics::augment
 #'   * The fitted backcasts, along with their variability and credible bounds.
 #'   * The residuals, along with their variability and credible bounds.
 #'
+#' @seealso \code{\link{residuals.mvgam}}, \code{\link{fitted.mvgam}}
 #' @examples
 #' \dontrun{
 #' set.seed(0)
@@ -35,11 +36,15 @@ generics::augment
 #'                  trend_model = AR(p = 1),
 #'                  prop_missing = 0.1,
 #'                  prop_trend = 0.6)
+#'
 #' mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
 #'               data = dat$data_train,
 #'               trend_model = AR(),
 #'               family = poisson(),
-#'               noncentred = TRUE)
+#'               noncentred = TRUE,
+#'               chains = 2,
+#'               silent = 2)
+#'
 #' augment(mod1, robust = TRUE, probs = c(0.25, 0.75))
 #' }
 #'
@@ -50,7 +55,7 @@ augment.mvgam <- function(x,
                           probs = c(0.025, 0.975),
                           ...) {
   obs_data <- x$obs_data
-  obs_data$.observed = obs_data$y
+  obs_data$.observed <- obs_data$y
   obs_data <- purrr::discard_at(obs_data, c("index..orig..order", "index..time..index"))
 
   resids <- residuals(x, robust = robust, probs = probs) %>%

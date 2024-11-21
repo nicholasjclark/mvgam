@@ -379,6 +379,9 @@
 #' resids <- residuals(mod1)
 #' str(resids)
 #'
+#' # Fitted values and residuals can also be added to training data
+#' augment(mod1)
+#'
 #' # Compute the forecast using covariate information in data_test
 #' fc <- forecast(mod1, newdata = dat$data_test)
 #' str(fc)

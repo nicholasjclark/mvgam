@@ -50,15 +50,25 @@ in the residuals
 \examples{
 \donttest{
 # Simulate some data and fit a model
-simdat <- sim_mvgam(n_series = 1, trend_model = 'AR1')
+simdat <- sim_mvgam(n_series = 1, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc'),
              trend_model = AR(),
              noncentred = TRUE,
              data = simdat$data_train,
-             chains = 2)
+             chains = 2,
+             silent = 2)
 
 # Extract posterior residuals
 resids <- residuals(mod)
 str(resids)
+
+# Or add them directly to the observed data, along with fitted values
+augment(mod, robust = FALSE, probs = c(0.25, 0.75))
 }
+}
+\seealso{
+\code{\link{augment}}
+}
+\author{
+Nicholas J Clark
 }

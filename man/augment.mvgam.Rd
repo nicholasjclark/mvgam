@@ -29,7 +29,7 @@ A \code{list} or \code{tibble} (see details) combining:
 }
 \description{
 Add fits and residuals to the data, implementing the generic \code{augment} from
-the package {broom}.
+the package \pkg{broom}.
 }
 \details{
 A \code{list} is returned if \code{class(x$obs_data) == 'list'}, otherwise a \code{tibble} is
@@ -47,12 +47,19 @@ dat <- sim_mvgam(T = 80,
                  trend_model = AR(p = 1),
                  prop_missing = 0.1,
                  prop_trend = 0.6)
+
 mod1 <- mvgam(formula = y ~ s(season, bs = 'cc', k = 6),
               data = dat$data_train,
               trend_model = AR(),
               family = poisson(),
-              noncentred = TRUE)
+              noncentred = TRUE,
+              chains = 2,
+              silent = 2)
+
 augment(mod1, robust = TRUE, probs = c(0.25, 0.75))
 }
 
+}
+\seealso{
+\code{\link{residuals.mvgam}}, \code{\link{fitted.mvgam}}
 }

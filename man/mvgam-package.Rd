@@ -21,5 +21,10 @@ Useful links:
 \author{
 \strong{Maintainer}: Nicholas J Clark \email{nicholas.j.clark1214@gmail.com} (\href{https://orcid.org/0000-0001-7131-3301}{ORCID})
 
+Other contributors:
+\itemize{
+  \item Scott Pease (broom enhancements) [contributor]
+}
+
 }
 \keyword{internal}
