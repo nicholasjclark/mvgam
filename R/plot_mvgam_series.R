@@ -295,8 +295,11 @@ plot_mvgam_series = function(object,
       ggplot2::ggplot(ggplot2::aes(x = lag, y = 0, yend = acf)) +
       ggplot2::geom_hline(yintercept = c(-1, 1) * qnorm((1 + 0.95) / 2) / sqrt(acf_y$n.used),
                           linetype = "dashed") +
+      ggplot2::geom_hline(yintercept = 0,
+                          colour = c_dark,
+                          linewidth = 0.25) +
       ggplot2::geom_segment(colour = "#8F2727",
-                            linewidth = 0.75) +
+                            linewidth = 1) +
       ggplot2::labs(title = "ACF",
                     x = "Lag",
                     y = "Autocorrelation") +

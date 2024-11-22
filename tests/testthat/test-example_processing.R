@@ -368,15 +368,17 @@ test_that("evaluate() functions working", {
 test_that("lfo_cv() working", {
   lfs <- SW(lfo_cv(mvgam:::mvgam_example1,
                    min_t = 27,
-                   fc_horizon = 1))
+                   fc_horizon = 1,
+                   silent = 2))
   expect_true(inherits(lfs, 'mvgam_lfo'))
-  expect_no_error(plot(lfs))
+  expect_ggplot(plot(lfs))
 
   lfs <- SW(lfo_cv(mvgam:::mvgam_example5,
                    min_t = 27,
-                   fc_horizon = 1))
+                   fc_horizon = 1,
+                   silent = 2))
   expect_true(inherits(lfs, 'mvgam_lfo'))
-  expect_no_error(plot(lfs))
+  expect_ggplot(plot(lfs))
 })
 
 test_that("forecast() works correctly", {

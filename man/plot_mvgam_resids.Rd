@@ -4,7 +4,7 @@
 \alias{plot_mvgam_resids}
 \title{Residual diagnostics for a fitted mvgam object}
 \usage{
-plot_mvgam_resids(object, series = 1, newdata, data_test)
+plot_mvgam_resids(object, series = 1, newdata)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
@@ -20,22 +20,35 @@ However if no \code{newdata} was supplied to the original model call, an assumpt
 the \code{newdata} supplied here comes sequentially after the data supplied as \code{data} in
 the original model (i.e. we assume there is no time gap between the last
 observation of series 1 in \code{data_train} and the first observation for series 1 in \code{newdata}).}
-
-\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
-\code{newdata} instead for more seamless integration into \code{R} workflows}
 }
 \value{
-A series of base \code{R} plots
+A series of facetted ggplot object
 }
 \description{
 This function takes a fitted \code{mvgam} object and returns various residual diagnostic plots
 }
 \details{
-A total of four base \code{R} plots are generated to examine Dunn-Smyth residuals for
-the specified series. Plots include a residuals vs fitted values plot,
+A total of four ggplot plots are generated to examine posterior median
+Dunn-Smyth residuals for the specified series. Plots include a residuals vs fitted values plot,
 a Q-Q plot, and two plots to check for any remaining temporal autocorrelation in the residuals.
-Note, all plots use posterior medians of fitted values / residuals, so uncertainty is not represented.
+Note, all plots use only posterior medians of fitted values / residuals, so uncertainty is not represented.
+}
+\examples{
+\donttest{
+simdat <- sim_mvgam(n_series = 3, trend_model = AR())
+mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
+            trend_model = AR(),
+            noncentred = TRUE,
+            data = simdat$data_train,
+            chains = 2)
+
+# Plot Dunn Smyth residuals for some series
+plot_mvgam_resids(mod)
+plot_mvgam_resids(mod, series = 2)
+}
 }
 \author{
 Nicholas J Clark
+
+Nicholas J Clark and Matthijs Hollanders
 }

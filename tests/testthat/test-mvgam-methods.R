@@ -250,7 +250,12 @@ test_that("hindcast has reasonable outputs", {
                  which(mvgam:::mvgam_example2$obs_data$series == 'series_1')])
 })
 
-test_that("plot_mvgam_series reasonable outputs", {
+test_that("plot_mvgam_resids gives reasonable outputs", {
+  expect_ggplot(plot_mvgam_resids(mvgam:::mvgam_example2))
+  expect_ggplot(plot_mvgam_resids(mvgam:::mvgam_example5))
+})
+
+test_that("plot_mvgam_series gives reasonable outputs", {
   simdat <- sim_mvgam()
   expect_ggplot(plot_mvgam_series(data = simdat$data_train,
                                   newdata = simdat$data_test))
@@ -293,8 +298,8 @@ test_that("plot_mvgam_series reasonable outputs", {
                                   series = 'all'))
 
   # And for mvgam objects
-  expect_ggplot(plot_mvgam_series(object = mvgam:::mvgam_example1,
-                                  series = 1))
+  expect_no_error(plot_mvgam_series(object = mvgam:::mvgam_example1,
+                                    series = 1))
   expect_ggplot(plot(mvgam:::mvgam_example1, type = 'series'))
 })
 
