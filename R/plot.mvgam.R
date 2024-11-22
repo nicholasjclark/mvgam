@@ -126,8 +126,7 @@ plot.mvgam = function(x, type = 'residuals',
   }
 
   if(type == 'residuals'){
-    suppressWarnings(plot(plot_mvgam_resids(object, series = series,
-                                            newdata = data_test, ...)))
+    print(plot_mvgam_resids(object, series = series, ...))
   }
 
   if(type == 'factors'){

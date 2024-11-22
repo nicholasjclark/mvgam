@@ -4,22 +4,12 @@
 \alias{plot_mvgam_resids}
 \title{Residual diagnostics for a fitted mvgam object}
 \usage{
-plot_mvgam_resids(object, series = 1, newdata)
+plot_mvgam_resids(object, series = 1)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
-
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series', 'y', and 'time'
-in addition to any other variables included in the linear predictor of \code{formula}. If included, the
-covariate information in \code{newdata} will be used to generate forecasts from the fitted model equations. If
-this same \code{newdata} was originally included in the call to \code{mvgam}, then forecasts have already been
-produced by the generative model and these will simply be extracted and used to calculate residuals.
-However if no \code{newdata} was supplied to the original model call, an assumption is made that
-the \code{newdata} supplied here comes sequentially after the data supplied as \code{data} in
-the original model (i.e. we assume there is no time gap between the last
-observation of series 1 in \code{data_train} and the first observation for series 1 in \code{newdata}).}
 }
 \value{
 A series of facetted ggplot object
@@ -28,19 +18,21 @@ A series of facetted ggplot object
 This function takes a fitted \code{mvgam} object and returns various residual diagnostic plots
 }
 \details{
-A total of four ggplot plots are generated to examine posterior median
+A total of four ggplot plots are generated to examine posterior
 Dunn-Smyth residuals for the specified series. Plots include a residuals vs fitted values plot,
 a Q-Q plot, and two plots to check for any remaining temporal autocorrelation in the residuals.
-Note, all plots use only posterior medians of fitted values / residuals, so uncertainty is not represented.
+Note, all plots use only report statistics from a sample of up to 20 posterior
+draws (to save computational time), so uncertainty in these relationships may not be adequately represented.
 }
 \examples{
-\donttest{
+\dontrun{
 simdat <- sim_mvgam(n_series = 3, trend_model = AR())
 mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
             trend_model = AR(),
             noncentred = TRUE,
             data = simdat$data_train,
-            chains = 2)
+            chains = 2,
+            silent = 2)
 
 # Plot Dunn Smyth residuals for some series
 plot_mvgam_resids(mod)
