@@ -27,16 +27,16 @@ test_that("series_to_mvgam working", {
 })
 
 test_that("stancode and standata working properly", {
-   simdat <- sim_mvgam()
-   mod <- mvgam(y ~ s(season) +
-                  s(time, by = series),
-                family = poisson(),
-                data = simdat$data_train,
-                run_model = FALSE)
+  simdat <- sim_mvgam()
+  mod <- mvgam(y ~ s(season) +
+                 s(time, by = series),
+               family = poisson(),
+               data = simdat$data_train,
+               run_model = FALSE)
 
-   expect_character(stancode(mod))
+  expect_character(stancode(mod))
 
-   expect_list(standata(mod))
+  expect_list(standata(mod))
 })
 
 # Skip remaining time-consuming tests on CRAN
@@ -72,17 +72,17 @@ test_that("mcmc diagnostics working properly", {
 test_that("compute_edf working properly", {
   mod <- mvgam:::mvgam_example1
   expect_no_error(capture_output(mvgam:::compute_edf(mod$mgcv_model,
-                                   mod,
-                                   'rho',
-                                   'sigma_raw',
-                                   conservative = FALSE)))
+                                                     mod,
+                                                     'rho',
+                                                     'sigma_raw',
+                                                     conservative = FALSE)))
 
   mod <- mvgam:::mvgam_example4
   expect_no_error(capture_output(mvgam:::compute_edf(mod$trend_mgcv_model,
-                                      mod,
-                                      'rho_trend',
-                                      'sigma_raw_trend',
-                                      conservative = TRUE)))
+                                                     mod,
+                                                     'rho_trend',
+                                                     'sigma_raw_trend',
+                                                     conservative = TRUE)))
 })
 
 test_that("conditional_effects works properly", {
@@ -113,23 +113,23 @@ test_that("mcmc_plot works properly", {
   expect_ggplot(mcmc_plot(mvgam:::mvgam_example4))
   expect_no_error(SW(pairs(mvgam:::mvgam_example1)))
   expect_no_error(SW(pairs(mvgam:::mvgam_example4,
-        variable = c('sigma'), regex = TRUE)))
+                           variable = c('sigma'), regex = TRUE)))
 })
 
 test_that("pp_check and ppc work properly", {
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example1))))
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example1,
-                         newdata = mvgam:::mvgam_example1$obs_data[1:10, ]))))
+                               newdata = mvgam:::mvgam_example1$obs_data[1:10, ]))))
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example2, "stat", ndraws = 5))))
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example3, "error_binned"))))
   pp <- SW(SM(pp_check(object = mvgam:::mvgam_example4,
-                 type = "ribbon_grouped",
-                 group = "series",
-                 x = "season")))
+                       type = "ribbon_grouped",
+                       group = "series",
+                       x = "season")))
   expect_ggplot(pp)
   pp <- SW(SM(pp_check(mvgam:::mvgam_example2, type = "violin_grouped",
-                 group = "season",
-                 newdata = mvgam:::mvgam_example2$obs_data[1:10, ])))
+                       group = "season",
+                       newdata = mvgam:::mvgam_example2$obs_data[1:10, ])))
   expect_ggplot(pp)
   expect_ggplot(SW(SM(pp_check(mvgam:::mvgam_example4, prefix = "ppd"))))
 
@@ -252,18 +252,18 @@ test_that("hindcast has reasonable outputs", {
 
 test_that("plot_mvgam_series reasonable outputs", {
   simdat <- sim_mvgam()
-  expect_no_error(plot_mvgam_series(data = simdat$data_train,
-                                    newdata = simdat$data_test))
-  expect_no_error(plot_mvgam_series(data = simdat$data_train,
-                                    newdata = simdat$data_test,
-                                    series = 'all'))
-  expect_no_error(plot_mvgam_series(data = simdat$data_train,
-                                    newdata = simdat$data_test,
-                                    lines = FALSE))
-  expect_no_error(plot_mvgam_series(data = simdat$data_train,
-                                    newdata = simdat$data_test,
-                                    lines = FALSE,
-                                    series = 'all'))
+  expect_ggplot(plot_mvgam_series(data = simdat$data_train,
+                                  newdata = simdat$data_test))
+  expect_ggplot(plot_mvgam_series(data = simdat$data_train,
+                                  newdata = simdat$data_test,
+                                  series = 'all'))
+  expect_ggplot(plot_mvgam_series(data = simdat$data_train,
+                                  newdata = simdat$data_test,
+                                  lines = FALSE))
+  expect_ggplot(plot_mvgam_series(data = simdat$data_train,
+                                  newdata = simdat$data_test,
+                                  lines = FALSE,
+                                  series = 'all'))
 
   # Should also work for list data
   dat_train <- list()
@@ -278,19 +278,24 @@ test_that("plot_mvgam_series reasonable outputs", {
   }
   names(dat_test) <- colnames(simdat$data_test)
 
-  expect_no_error(plot_mvgam_series(data = dat_train))
-  expect_no_error(plot_mvgam_series(data = dat_train,
-                                    newdata = dat_test))
-  expect_no_error(plot_mvgam_series(data = dat_train,
-                                    newdata = dat_test,
-                                    series = 'all'))
-  expect_no_error(plot_mvgam_series(data = dat_train,
-                                    newdata = dat_test,
-                                    lines = FALSE))
-  expect_no_error(plot_mvgam_series(data = dat_train,
-                                    newdata = dat_test,
-                                    lines = FALSE,
-                                    series = 'all'))
+  expect_ggplot(plot_mvgam_series(data = dat_train))
+  expect_ggplot(plot_mvgam_series(data = dat_train,
+                                  newdata = dat_test))
+  expect_ggplot(plot_mvgam_series(data = dat_train,
+                                  newdata = dat_test,
+                                  series = 'all'))
+  expect_ggplot(plot_mvgam_series(data = dat_train,
+                                  newdata = dat_test,
+                                  lines = FALSE))
+  expect_ggplot(plot_mvgam_series(data = dat_train,
+                                  newdata = dat_test,
+                                  lines = FALSE,
+                                  series = 'all'))
+
+  # And for mvgam objects
+  expect_ggplot(plot_mvgam_series(object = mvgam:::mvgam_example1,
+                                  series = 1))
+  expect_ggplot(plot(mvgam:::mvgam_example1, type = 'series'))
 })
 
 test_that("forecast and ensemble have reasonable outputs", {

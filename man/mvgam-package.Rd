@@ -24,6 +24,7 @@ Useful links:
 Other contributors:
 \itemize{
   \item Scott Pease (broom enhancements) [contributor]
+  \item Matthijs Hollanders (ggplot visualizations) [contributor]
 }
 
 }

@@ -22,4 +22,4 @@ utils::globalVariables(c("y", "year", "smooth_vals", "smooth_num",
                          "total_evd", "smooth_label", "by_variable",
                          "gr", "tot_subgrs", "subgr", "lambda",
                          "level", "sim_hilbert_gp", "trend_model",
-                         "jags_path"))
+                         "jags_path", "x"))

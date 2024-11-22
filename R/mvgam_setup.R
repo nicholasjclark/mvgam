@@ -1142,7 +1142,7 @@ jagam <- function(formula,
         n.sp <- n.sp + 1
         #cat("  for (i in ",b0,":",b1,") { b[i] ~ dnorm(0, lambda[",n.sp,"]) }\n",file=file,append=TRUE,sep="")
         #b0 <- b1 + 1
-        cat("  for (i in ",compress.iseq((b0:b1)[D]),") { b[i] ~ dnorm(0, lambda[",n.sp,"]) }\n",file=file,append=TRUE,sep="")
+        cat("  for (i in ",compress_iseq((b0:b1)[D]),") { b[i] ~ dnorm(0, lambda[",n.sp,"]) }\n",file=file,append=TRUE,sep="")
       }
     } else { ## inseperable - requires the penalty matrices to be supplied to JAGS...
       b0 <- G$smooth[[i]]$first.para; b1 <- G$smooth[[i]]$last.para
@@ -1415,6 +1415,79 @@ gam_setup.list <- function(formula,
 
   G
 }
+
+
+#' Takes a set of non-negative integers and returns minimal code for generating it
+#'
+#' This function is derived from \code{mgcv:::compress.iseq}
+#'
+#' @author Simon N Wood with modifications by Nicholas Clark
+#' @noRd
+compress_iseq <- function(x) {
+  x1 <- sort(x)
+  br <- diff(x1)!=1 ## TRUE at sequence breaks
+  txt <- paste(x1[c(TRUE, br)], x1[c(br, TRUE)], sep = ":") ## subsequences
+  txt1 <- paste(x1[c(TRUE, br)]) ## subseq starts
+  ii <- x1[c(TRUE, br)] == x1[c(br, TRUE)] ## index start and end equal
+  txt[ii] <- txt1[ii] ## replace length on sequences with integers
+  paste("c(", paste(txt, collapse = ","),")", sep = "")
+}
+
+#' Returns a vector dind of columns of X to drop for identifiability
+#'
+#' This function is derived from \code{mgcv:::olid}
+#'
+#' @author Simon N Wood with modifications by Nicholas Clark
+#' @noRd
+olid <- function(X, nsdf, pstart, flpi, lpi) {
+  nlp <- length(lpi) ## number of linear predictors
+  n <- nrow(X)
+  nf <- length(nsdf) ## number of formulae blocks
+  Xp <- matrix(0 ,n * nlp, sum(nsdf))
+  start <- 1
+  ii <- 1:n
+  tind <- rep(0,0) ## complete index of all parametric columns in X
+  ## create a block matrix, Xp, with the same identifiability properties as
+  ## unpenalized part of model...
+  for (i in 1:nf) {
+    stop <- start - 1 + nsdf[i]
+    if (stop>=start) {
+      ind <- pstart[i] + 1:nsdf[i] - 1
+      for (k in flpi[[i]]) {
+        Xp[ii+(k-1)*n, start:stop] <- X[,ind]
+      }
+      tind <- c(tind,ind)
+      start <- start + nsdf[i]
+    }
+  }
+  ## rank deficiency of Xp will reveal number of redundant parametric
+  ## terms, and a pivoted QR will reveal which to drop to restore
+  ## full rank...
+  qrx <- qr(Xp, LAPACK=TRUE,tol=0.0) ## unidentifiable columns get pivoted to final cols
+  r <- mgcv::Rrank(qr.R(qrx)) ## get rank from R factor of pivoted QR
+  if (r == ncol(Xp)) { ## full rank, all fine, drop nothing
+    dind <- rep(0,0)
+  } else { ## reduced rank, drop some columns
+    dind <- tind[sort(qrx$pivot[(r+1):ncol(X)],decreasing=TRUE)] ## columns to drop
+    ## now we need to adjust nsdf, pstart and lpi
+    for (d in dind) { ## working down through drop indices
+      ## following commented out code is useful should it ever prove necessary to
+      ## adjust pstart and nsdf, but at present these are only used in prediction,
+      ## and it is cleaner to leave them unchanged, and simply drop using dind during prediction.
+      #k <- if (d>=pstart[nf]) nlp else which(d >= pstart[1:(nf-1)] & d < pstart[2:nf])
+      #nsdf[k] <- nsdf[k] - 1 ## one less unpenalized column in this block
+      #if (k<nf) pstart[(k+1):nf] <-  pstart[(k+1):nf] - 1 ## later block starts move down 1
+      for (i in 1:nlp) {
+        k <- which(d == lpi[[i]])
+        if (length(k)>0) lpi[[i]] <- lpi[[i]][-k] ## drop row
+        k <- which(lpi[[i]]>d)
+        if (length(k)>0) lpi[[i]][k] <- lpi[[i]][k] - 1 ## close up
+      }
+    } ## end of drop index loop
+  }
+  list(dind=dind,lpi=lpi) ##,pstart=pstart,nsdf=nsdf)
+}
+
 
 #' Write linear predictor section of a jagam file
 #'

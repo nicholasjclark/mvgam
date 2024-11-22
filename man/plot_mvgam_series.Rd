@@ -7,9 +7,7 @@
 plot_mvgam_series(
   object,
   data,
-  data_train,
   newdata,
-  data_test,
   y = "y",
   lines = TRUE,
   series = 1,
@@ -18,28 +16,22 @@ plot_mvgam_series(
 )
 }
 \arguments{
-\item{object}{Optional \code{list} object returned from \code{mvgam}. Either \code{object} or \code{data_train}
+\item{object}{Optional \code{list} object returned from \code{mvgam}. Either \code{object} or \code{data}
 must be supplied.}
 
-\item{data}{Optional \code{dataframe} or \code{list} of training data containing at least 'series' and 'time'.
+\item{data}{Optional \code{data.frame} or \code{list} of training data containing at least 'series' and 'time'.
 Use this argument if training data have been gathered in the correct format for \code{mvgam} modelling
 but no model has yet been fitted.}
 
-\item{data_train}{Deprecated. Still works in place of \code{data} but users are recommended to use
-\code{data} instead for more seamless integration into \code{R} workflows}
-
-\item{newdata}{Optional \code{dataframe} or \code{list} of test data containing at least 'series' and 'time'
+\item{newdata}{Optional \code{data.frame} or \code{list} of test data containing at least 'series' and 'time'
 for the forecast horizon, in addition to any other variables included in the linear predictor of \code{formula}. If
 included, the observed values in the test data are compared to the model's forecast distribution for exploring
 biases in model predictions.}
 
-\item{data_test}{Deprecated. Still works in place of \code{newdata} but users are recommended to use
-\code{newdata} instead for more seamless integration into \code{R} workflows}
-
 \item{y}{Character. What is the name of the outcome variable in the supplied data? Defaults to
 \code{'y'}}
 
-\item{lines}{Logical. If \code{TRUE}, line plots are used for visualising time series. If
+\item{lines}{Logical. If \code{TRUE}, line plots are used for visualizing time series. If
 \code{FALSE}, points are used.}
 
 \item{series}{Either a \code{integer} specifying which series in the set is to be plotted or
@@ -50,17 +42,17 @@ a the histogram. Default is to use the number of bins returned by a call to \cod
 
 \item{log_scale}{\code{logical}. If \code{series == 'all'}, this flag is used to control whether
 the time series plot is shown on the log scale (using \code{log(Y + 1)}). This can be useful when
-visualising many series that may have different observed ranges. Default is \code{FALSE}}
+visualizing many series that may have different observed ranges. Default is \code{FALSE}}
 }
 \value{
-A set of base \code{R} graphics plots. If \code{series} is an integer, the plots will
+A set of ggplot objects. If \code{series} is an integer, the plots will
 show observed time series, autocorrelation and
 cumulative distribution functions, and a histogram for the series. If \code{series == 'all'},
 a set of observed time series plots is returned in which all series are shown on each plot but
 only a single focal series is highlighted, with all remaining series shown as faint gray lines.
 }
 \description{
-This function takes either a fitted \code{mvgam} object or a \code{data_train} object
+This function takes either a fitted \code{mvgam} object or a \code{data.frame} object
 and produces plots of observed time series, ACF, CDF and histograms for exploratory data analysis
 }
 \examples{
@@ -77,5 +69,5 @@ sim_data <- sim_mvgam(family = nb(), trend_model = RW(),
 plot_mvgam_series(data = sim_data$data_train, series = 'all')
 }
 \author{
-Nicholas J Clark
+Nicholas J Clark and Matthijs Hollanders
 }

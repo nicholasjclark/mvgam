@@ -67,7 +67,7 @@ augment(mod, robust = FALSE, probs = c(0.25, 0.75))
 }
 }
 \seealso{
-\code{\link{augment}}
+\code{\link{augment.mvgam}}
 }
 \author{
 Nicholas J Clark

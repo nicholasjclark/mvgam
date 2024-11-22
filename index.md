@@ -92,10 +92,11 @@ over a set of seasonal series with independent Gaussian Process dynamic
 trends:
 
 ``` r
+set.seed(100)
 data <- sim_mvgam(family = betar(),
                   T = 80,
                   trend_model = GP(),
-                  trend_rel = 0.5, 
+                  prop_trend = 0.5, 
                   seasonality = 'shared')
 ```
 
@@ -105,12 +106,7 @@ Plot the series to see how they evolve over time
 plot_mvgam_series(data = data$data_train, series = 'all')
 ```
 
-<figure>
-<img src="man/figures/README-beta_sim-1.png"
-alt="Simulating and analysing multivariate time series with Dynamic Generalized Additive Models" />
-<figcaption aria-hidden="true">Simulating and analysing multivariate
-time series with Dynamic Generalized Additive Models</figcaption>
-</figure>
+![](index_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 Fit a State-Space GAM to these series that uses a hierarchical cyclic
 seasonal smooth term to capture variation in seasonality among series.

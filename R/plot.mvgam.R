@@ -112,7 +112,7 @@ plot.mvgam = function(x, type = 'residuals',
 
   # Other errors and warnings will propagate from individual functions below
   if(type == 'series'){
-    plot_mvgam_series(object, series = series, data_test = data_test, ...)
+    print(plot_mvgam_series(object, series = series, newdata = data_test, ...))
   }
 
   if(type == 're'){
