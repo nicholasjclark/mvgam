@@ -145,15 +145,15 @@ Dynamic Generalized Additive Models</figcaption>
 
 Various `S3` functions can be used to inspect parameter estimates, plot
 smooth functions and residuals, and evaluate models through posterior
-predictive checks or forecast comparisons. Please see the package
-documentation for more detailed examples.
+predictive checks or forecast comparisons. Please see [the package
+documentation](https://nicholasjclark.github.io/mvgam/reference/index.html)
+for more detailed examples.
 
 ## Vignettes
 
-You can set `build_vignettes = TRUE` when installing with either
-`devtools::install_github` or `remotes::install_github`, but be aware
-this will slow down the installation drastically. Instead, you can
-always access the vignette htmls online at
+You can set `build_vignettes = TRUE` when installing but be aware this
+will slow down the installation drastically. Instead, you can always
+access the vignette htmls online at
 <https://nicholasjclark.github.io/mvgam/articles/>
 
 ## Other resources
@@ -179,10 +179,9 @@ DGAMs can be useful for working with time series data:
   target="_blank">Incorporating time-varying seasonality in forecast
   models</a>
 
-The package can also be used to generate all necessary data structures,
-initial value functions and modelling code necessary to fit DGAMs using
-`Stan`. This can be helpful if users wish to make changes to the model
-to better suit their own bespoke research / analysis goals.
+Please also feel free to use the [`mvgam` Discussion
+Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for
+or post other discussion topics related to the package.
 
 ## Interested in contributing?
 

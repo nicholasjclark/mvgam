@@ -43,7 +43,9 @@ A series of [vignettes cover data formatting, forecasting and several extended c
 * [How to interpret and report nonlinear effects from Generalized Additive Models](https://ecogambler.netlify.app/blog/interpreting-gams/){target="_blank"}
 * [Phylogenetic smoothing using `mgcv`](https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/){target="_blank"}
 * [Incorporating time-varying seasonality in forecast models](https://ecogambler.netlify.app/blog/time-varying-seasonality/){target="_blank"}
-  
+
+Please also feel free to use the [`mvgam` Discussion Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for or post other discussion topics related to the package.
+
 ## Installation
 Install the stable version from `CRAN` using: `install.packages('mvgam')`, or install the development version from `GitHub` using:
 `devtools::install_github("nicholasjclark/mvgam")`. Note that to condition models on observed data, `Stan` must be installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
@@ -62,14 +64,14 @@ As `mvgam` acts as an interface to `Stan`, please additionally cite:
 > Carpenter B., Gelman A., Hoffman M. D., Lee D., Goodrich B., Betancourt M., Brubaker M., Guo J., Li P., and Riddell A. (2017). Stan: A probabilistic programming language. *Journal of Statistical Software*. 76(1). DOI: https://doi.org/10.18637/jss.v076.i01
 
 `mvgam` relies on several other `R` packages and, of course, on `R` itself. To
-find out how to cite R and its packages, use the `citation` function. There are
+find out how to cite `R` and its packages, use the `citation()` function. There are
 some features of `mvgam` which specifically rely on certain packages. The most important of these is the generation of data necessary to estimate smoothing splines, which rely on `mgcv` and `splines2`. The `rstan` and `cmdstanr` packages together with `Rcpp` makes `Stan` conveniently accessible in `R`. If you use some of these features, please also consider citing the related packages.
 
 ## Cheatsheet
 [![`mvgam` usage cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
 
-## Introducing `mvgam` for fitting Generalized Additive Models to time series
-We can explore the model’s primary functions using a dataset that is available with all `R` installations. Load the `lynx` data and plot the series as well as its autocorrelation function
+## Introducing `mvgam` for fitting Dynamic Generalized Additive Models
+We can explore the package’s primary functions using a dataset that is available with all `R` installations. Load the `lynx` data and plot the series as well as its autocorrelation function
 ```{r include = FALSE}
 library(mvgam)
 library(ggplot2); theme_set(theme_bw())
@@ -205,10 +207,10 @@ plot_mvgam_trend(lynx_mvgam, newdata = lynx_test, derivatives = TRUE)
 A key aspect of ecological forecasting is to understand [how different components of a model contribute to forecast uncertainty](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/eap.1589){target="_blank"}. We can estimate relative contributions to forecast uncertainty for the GAM component and the latent trend component using `mvgam`
 ```{r, fig.alt = "Decomposing uncertainty contributions to forecasts in mvgam in R"}
 plot_mvgam_uncertainty(lynx_mvgam, newdata = lynx_test, legend_position = 'none')
-text(1, 0.2, cex = 1.5, label="GAM component", 
-     pos = 4, col="white", family = 'serif')
-text(1, 0.8, cex = 1.5, label="Trend component", 
-     pos = 4, col="#7C0000", family = 'serif')
+text(1, 0.2, cex = 1.5, label = "GAM component", 
+     pos = 4, col = "white", family = 'serif')
+text(1, 0.8, cex = 1.5, label = "Trend component", 
+     pos = 4, col = "#7C0000", family = 'serif')
 ```
 
 Both components contribute to forecast uncertainty. Diagnostics of the model can also be performed using `mvgam`. Have a look at the model's residuals, which are posterior empirical quantiles of Dunn-Smyth randomised quantile residuals so should follow approximate normality. We are primarily looking for a lack of autocorrelation, which would suggest our AR1 model is appropriate for the latent trend
@@ -283,7 +285,7 @@ for(i in 1:3){
 }
 ```
 
-There are many more extended uses of `mvgam`, including the ability to fit hierarchical State-Space GAMs that include dynamic coefficient models, dynamic factors and Vector Autoregressive processes. See the [package documentation](https://nicholasjclark.github.io/mvgam/){target="_blank"} for more details. The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The [Stan Discourse](https://discourse.mc-stan.org/){target="_blank"} is a helpful place to troubleshoot.
+There are many more extended uses of `mvgam`, including the ability to fit hierarchical State-Space GAMs that include dynamic and spatially varying coefficient models, dynamic factors and Vector Autoregressive processes. See the [package documentation](https://nicholasjclark.github.io/mvgam/){target="_blank"} for more details. The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals. The [Stan Discourse](https://discourse.mc-stan.org/){target="_blank"} is a helpful place to troubleshoot.
 
 ## License
 This project is licensed under an `MIT` open source license

@@ -78,10 +78,10 @@ for(i in 1:3){
 
 ![Forecasting multivariate time series with Dynamic Generalized Additive Models](man/figures/README-beta_fc-1.png)
 
-Various `S3` functions can be used to inspect parameter estimates, plot smooth functions and residuals, and evaluate models through posterior predictive checks or forecast comparisons. Please see the package documentation for more detailed examples.
+Various `S3` functions can be used to inspect parameter estimates, plot smooth functions and residuals, and evaluate models through posterior predictive checks or forecast comparisons. Please see [the package documentation](https://nicholasjclark.github.io/mvgam/reference/index.html) for more detailed examples.
 
 ## Vignettes
-You can set `build_vignettes = TRUE` when installing with either `devtools::install_github` or `remotes::install_github`, but be aware this will slow down the installation drastically. Instead, you can always access the vignette htmls online at [https://nicholasjclark.github.io/mvgam/articles/](https://nicholasjclark.github.io/mvgam/articles/)
+You can set `build_vignettes = TRUE` when installing but be aware this will slow down the installation drastically. Instead, you can always access the vignette htmls online at [https://nicholasjclark.github.io/mvgam/articles/](https://nicholasjclark.github.io/mvgam/articles/)
 
 ## Other resources
 A number of case studies have been compiled to highlight how GAMs and DGAMs can be useful for working with time series data:
@@ -93,7 +93,7 @@ A number of case studies have been compiled to highlight how GAMs and DGAMs can 
 * [Distributed lags (and hierarchical distributed lags) using mgcv and mvgam](https://ecogambler.netlify.app/blog/distributed-lags-mgcv/){target="_blank"}
 * [Incorporating time-varying seasonality in forecast models](https://ecogambler.netlify.app/blog/time-varying-seasonality/){target="_blank"}
   
-The package can also be used to generate all necessary data structures, initial value functions and modelling code necessary to fit DGAMs using `Stan`. This can be helpful if users wish to make changes to the model to better suit their own bespoke research / analysis goals.
+Please also feel free to use the [`mvgam` Discussion Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for or post other discussion topics related to the package.
 
 ## Interested in contributing?
 I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au). Other contributions are also very welcome, but please see [The Contributor Instructions](https://github.com/nicholasjclark/mvgam/blob/master/.github/CONTRIBUTING.md) for general guidelines. Note that

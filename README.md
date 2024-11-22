@@ -67,6 +67,10 @@ been compiled:
   target="_blank">Incorporating time-varying seasonality in forecast
   models</a>
 
+Please also feel free to use the [`mvgam` Discussion
+Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for
+or post other discussion topics related to the package.
+
 ## Installation
 
 Install the stable version from `CRAN` using:
@@ -108,22 +112,23 @@ As `mvgam` acts as an interface to `Stan`, please additionally cite:
 > Software*. 76(1). DOI: <https://doi.org/10.18637/jss.v076.i01>
 
 `mvgam` relies on several other `R` packages and, of course, on `R`
-itself. To find out how to cite R and its packages, use the `citation`
-function. There are some features of `mvgam` which specifically rely on
-certain packages. The most important of these is the generation of data
-necessary to estimate smoothing splines, which rely on `mgcv` and
-`splines2`. The `rstan` and `cmdstanr` packages together with `Rcpp`
-makes `Stan` conveniently accessible in `R`. If you use some of these
-features, please also consider citing the related packages.
+itself. To find out how to cite `R` and its packages, use the
+`citation()` function. There are some features of `mvgam` which
+specifically rely on certain packages. The most important of these is
+the generation of data necessary to estimate smoothing splines, which
+rely on `mgcv` and `splines2`. The `rstan` and `cmdstanr` packages
+together with `Rcpp` makes `Stan` conveniently accessible in `R`. If you
+use some of these features, please also consider citing the related
+packages.
 
 ## Cheatsheet
 
 [![`mvgam` usage
 cheatsheet](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.png)](https://github.com/nicholasjclark/mvgam/raw/master/misc/mvgam_cheatsheet.pdf)
 
-## Introducing `mvgam` for fitting Generalized Additive Models to time series
+## Introducing `mvgam` for fitting Dynamic Generalized Additive Models
 
-We can explore the model’s primary functions using a dataset that is
+We can explore the package’s primary functions using a dataset that is
 available with all `R` installations. Load the `lynx` data and plot the
 series as well as its autocorrelation function
 
@@ -238,37 +243,37 @@ summary(lynx_mvgam)
 #> 
 #> GAM coefficient (beta) estimates:
 #>                2.5%   50%  97.5% Rhat n_eff
-#> (Intercept)   6.400  6.60  6.900    1   942
-#> s(season).1  -0.640 -0.13  0.400    1  1123
-#> s(season).2   0.710  1.30  1.900    1   998
-#> s(season).3   1.300  1.90  2.500    1   912
-#> s(season).4  -0.045  0.52  1.200    1   856
-#> s(season).5  -1.300 -0.70 -0.034    1   933
-#> s(season).6  -1.200 -0.54  0.150    1  1147
-#> s(season).7   0.062  0.73  1.500    1   928
-#> s(season).8   0.610  1.40  2.100    1  1016
-#> s(season).9  -0.370  0.21  0.820    1   936
-#> s(season).10 -1.400 -0.87 -0.360    1  1117
+#> (Intercept)   6.400  6.60  6.900 1.00   788
+#> s(season).1  -0.600 -0.13  0.380 1.00  1208
+#> s(season).2   0.740  1.30  2.000 1.01   772
+#> s(season).3   1.200  1.90  2.500 1.00   908
+#> s(season).4  -0.062  0.54  1.100 1.00  1262
+#> s(season).5  -1.300 -0.71 -0.062 1.00   910
+#> s(season).6  -1.300 -0.55  0.085 1.00   670
+#> s(season).7   0.047  0.71  1.400 1.01   970
+#> s(season).8   0.640  1.40  2.100 1.00   821
+#> s(season).9  -0.360  0.23  0.810 1.00   995
+#> s(season).10 -1.400 -0.86 -0.370 1.00  1184
 #> 
 #> Approximate significance of GAM smooths:
-#>           edf Ref.df Chi.sq p-value    
-#> s(season) 9.9     10   64.4 1.7e-05 ***
+#>            edf Ref.df Chi.sq p-value    
+#> s(season) 9.96     10   50.6  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend parameter AR estimates:
 #>          2.5%  50% 97.5% Rhat n_eff
-#> ar1[1]   0.60 0.83  0.98 1.01   643
-#> sigma[1] 0.39 0.48  0.62 1.00   821
+#> ar1[1]   0.59 0.83  0.98    1   711
+#> sigma[1] 0.39 0.48  0.61    1   724
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
 #> 0 of 2000 iterations ended with a divergence (0%)
-#> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
+#> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Nov 12 10:11:54 AM 2024.
+#> Samples were drawn using NUTS(diag_e) at Fri Nov 22 12:05:29 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -373,6 +378,7 @@ partial effects of smooths on the link scale
 ``` r
 require(gratia)
 #> Loading required package: gratia
+#> Warning: package 'gratia' was built under R version 4.2.3
 #> 
 #> Attaching package: 'gratia'
 #> The following object is masked from 'package:mvgam':
@@ -409,7 +415,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample DRPS:
-    #> 2384.82381825
+    #> 2474.07104475
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -430,10 +436,10 @@ component using `mvgam`
 
 ``` r
 plot_mvgam_uncertainty(lynx_mvgam, newdata = lynx_test, legend_position = 'none')
-text(1, 0.2, cex = 1.5, label="GAM component", 
-     pos = 4, col="white", family = 'serif')
-text(1, 0.8, cex = 1.5, label="Trend component", 
-     pos = 4, col="#7C0000", family = 'serif')
+text(1, 0.2, cex = 1.5, label = "GAM component", 
+     pos = 4, col = "white", family = 'serif')
+text(1, 0.8, cex = 1.5, label = "Trend component", 
+     pos = 4, col = "#7C0000", family = 'serif')
 ```
 
 <img src="man/figures/README-unnamed-chunk-23-1.png" alt="Decomposing uncertainty contributions to forecasts in mvgam in R" width="60%" style="display: block; margin: auto;" />
@@ -533,42 +539,42 @@ summary(mod, include_betas = FALSE)
 #> 
 #> 
 #> Observation precision parameter estimates:
-#>        2.5% 50% 97.5% Rhat n_eff
-#> phi[1]  5.4 8.3    12    1  1248
-#> phi[2]  5.7 8.6    13    1  1312
-#> phi[3]  5.6 8.5    12    1  1724
+#>        2.5%  50% 97.5% Rhat n_eff
+#> phi[1]  7.8 12.0  17.0    1  2422
+#> phi[2]  5.6  8.5  13.0    1  1701
+#> phi[3]  4.2  6.0   8.5    1  1694
 #> 
 #> GAM coefficient (beta) estimates:
-#>             2.5%  50% 97.5% Rhat n_eff
-#> (Intercept) -0.2 0.19  0.46 1.01   566
+#>              2.5%  50% 97.5% Rhat n_eff
+#> (Intercept) 0.096 0.46   0.7 1.01   543
 #> 
 #> Approximate significance of GAM smooths:
-#>                            edf Ref.df Chi.sq p-value    
-#> s(season)                3.872      5  29.63 1.6e-05 ***
-#> s(season):seriesseries_1 0.615      4   0.77    0.98    
-#> s(season):seriesseries_2 1.012      4   0.30    0.99    
-#> s(season):seriesseries_3 1.106      4   1.54    0.81    
+#>                            edf Ref.df Chi.sq p-value  
+#> s(season)                4.338      5   6.27   0.069 .
+#> s(season):seriesseries_1 1.838      4   5.15   0.139  
+#> s(season):seriesseries_2 3.288      4   1.57   0.356  
+#> s(season):seriesseries_3 0.804      4   5.42   0.506  
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend marginal deviation (alpha) and length scale (rho) estimates:
-#>              2.5%  50% 97.5% Rhat n_eff
-#> alpha_gp[1] 0.051 0.41  0.92 1.01   525
-#> alpha_gp[2] 0.360 0.72  1.20 1.00   946
-#> alpha_gp[3] 0.150 0.46  1.00 1.00   659
-#> rho_gp[1]   1.100 3.80 15.00 1.01   370
-#> rho_gp[2]   1.900 7.80 37.00 1.01   365
-#> rho_gp[3]   1.400 5.10 21.00 1.00   645
+#>              2.5%   50% 97.5% Rhat n_eff
+#> alpha_gp[1] 0.140  0.39  0.81 1.00  1028
+#> alpha_gp[2] 0.550  0.92  1.50 1.00  1151
+#> alpha_gp[3] 0.047  0.39  0.93 1.00   829
+#> rho_gp[1]   1.100  3.80 11.00 1.00  1622
+#> rho_gp[2]   3.200 13.00 32.00 1.01   296
+#> rho_gp[3]   1.200  4.90 23.00 1.00   817
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
-#> 12 of 2000 iterations ended with a divergence (0.6%)
+#> 7 of 2000 iterations ended with a divergence (0.35%)
 #>  *Try running with larger adapt_delta to remove the divergences
-#> 0 of 2000 iterations saturated the maximum tree depth of 12 (0%)
+#> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Nov 12 10:12:39 AM 2024.
+#> Samples were drawn using NUTS(diag_e) at Fri Nov 22 12:06:48 PM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -586,9 +592,9 @@ for(i in 1:3){
 <img src="man/figures/README-beta_fc-1.png" width="60%" style="display: block; margin: auto;" />
 
 There are many more extended uses of `mvgam`, including the ability to
-fit hierarchical State-Space GAMs that include dynamic coefficient
-models, dynamic factors and Vector Autoregressive processes. See the
-<a href="https://nicholasjclark.github.io/mvgam/"
+fit hierarchical State-Space GAMs that include dynamic and spatially
+varying coefficient models, dynamic factors and Vector Autoregressive
+processes. See the <a href="https://nicholasjclark.github.io/mvgam/"
 target="_blank">package documentation</a> for more details. The package
 can also be used to generate all necessary data structures, initial
 value functions and modelling code necessary to fit DGAMs using `Stan`.
