@@ -298,9 +298,9 @@ test_that("plot_mvgam_series gives reasonable outputs", {
                                   series = 'all'))
 
   # And for mvgam objects
-  expect_no_error(plot_mvgam_series(object = mvgam:::mvgam_example1,
+  expect_ggplot(plot_mvgam_series(object = mvgam:::mvgam_example1,
                                     series = 1))
-  expect_ggplot(plot(mvgam:::mvgam_example1, type = 'series'))
+  expect_no_error(plot(mvgam:::mvgam_example1, type = 'series'))
 })
 
 test_that("forecast and ensemble have reasonable outputs", {
