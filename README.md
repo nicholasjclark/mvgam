@@ -69,7 +69,10 @@ been compiled:
 
 Please also feel free to use the [`mvgam` Discussion
 Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for
-or post other discussion topics related to the package.
+or post other discussion topics related to the package, and do check out
+the [`mvgam`
+changelog](https://nicholasjclark.github.io/mvgam/news/index.html) for
+any updates about recent upgrades that the package has incorporated.
 
 ## Installation
 
@@ -242,29 +245,29 @@ summary(lynx_mvgam)
 #> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                 2.5%   50%  97.5% Rhat n_eff
-#> (Intercept)   6.4000  6.60  6.900 1.01   722
-#> s(season).1  -0.6500 -0.14  0.360 1.00  1143
-#> s(season).2   0.6800  1.30  1.900 1.01   693
-#> s(season).3   1.3000  1.90  2.600 1.00   725
-#> s(season).4  -0.0730  0.54  1.100 1.00   978
-#> s(season).5  -1.3000 -0.70 -0.140 1.00   997
-#> s(season).6  -1.2000 -0.57  0.097 1.00   894
-#> s(season).7   0.0071  0.72  1.300 1.00   974
-#> s(season).8   0.6200  1.40  2.100 1.00   903
-#> s(season).9  -0.3500  0.22  0.850 1.00   758
-#> s(season).10 -1.4000 -0.85 -0.330 1.00   911
+#>                2.5%   50%  97.5% Rhat n_eff
+#> (Intercept)   6.400  6.60  6.900    1   830
+#> s(season).1  -0.620 -0.13  0.390    1  1000
+#> s(season).2   0.750  1.30  1.900    1  1053
+#> s(season).3   1.300  1.90  2.500    1   826
+#> s(season).4  -0.110  0.54  1.100    1   898
+#> s(season).5  -1.300 -0.68 -0.077    1   878
+#> s(season).6  -1.200 -0.54  0.120    1   988
+#> s(season).7  -0.022  0.72  1.400    1  1057
+#> s(season).8   0.640  1.40  2.100    1   795
+#> s(season).9  -0.360  0.23  0.820    1   808
+#> s(season).10 -1.400 -0.88 -0.350    1  1073
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value    
-#> s(season) 9.96     10   51.8  <2e-16 ***
+#> s(season) 9.97     10   48.9  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend parameter AR estimates:
 #>          2.5%  50% 97.5% Rhat n_eff
-#> ar1[1]   0.59 0.82  0.98    1   705
-#> sigma[1] 0.38 0.48  0.60    1   576
+#> ar1[1]   0.60 0.82  0.97    1   592
+#> sigma[1] 0.38 0.48  0.60    1   596
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
@@ -273,7 +276,7 @@ summary(lynx_mvgam)
 #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Fri Nov 22 6:47:36 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Mon Nov 25 9:36:12 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -414,8 +417,8 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
-    #> Out of sample CRPS:
-    #> 2351.96370025
+    #> Out of sample DRPS:
+    #> 2395.89857175
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -574,7 +577,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Fri Nov 22 6:48:56 PM 2024.
+#> Samples were drawn using NUTS(diag_e) at Mon Nov 25 9:37:32 AM 2024.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)

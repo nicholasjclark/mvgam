@@ -132,17 +132,17 @@
 </ul>
 <p>See <code>??mvgam_families</code> for more information. Below is a simple example for simulating and modelling proportional data with <code>Beta</code> observations over a set of seasonal series with independent Gaussian Process dynamic trends:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">100</span><span class="op">)</span></span>
+<span><span class="va">data</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sim_mvgam.html">sim_mvgam</a></span><span class="op">(</span>family <span class="op">=</span> <span class="fu"><a href="reference/mvgam_families.html">betar</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>                  T <span class="op">=</span> <span class="fl">80</span>,</span>
 <span>                  trend_model <span class="op">=</span> <span class="fu"><a href="reference/GP.html">GP</a></span><span class="op">(</span><span class="op">)</span>,</span>
-<span>                  trend_rel <span class="op">=</span> <span class="fl">0.5</span>, </span>
+<span>                  prop_trend <span class="op">=</span> <span class="fl">0.5</span>, </span>
 <span>                  seasonality <span class="op">=</span> <span class="st">'shared'</span><span class="op">)</span></span></code></pre></div>
 <p>Plot the series to see how they evolve over time</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></code></pre></div>
-<figure><img src="reference/figures/README-beta_sim-1.png" alt="Simulating and analysing multivariate time series with Dynamic Generalized Additive Models"><figcaption aria-hidden="true">
-Simulating and analysing multivariate time series with Dynamic Generalized Additive Models
-</figcaption></figure><p>Fit a State-Space GAM to these series that uses a hierarchical cyclic seasonal smooth term to capture variation in seasonality among series. The model also includes series-specific latent Gaussian Processes with squared exponential covariance functions to capture temporal dynamics</p>
+<p><img src="index_files/figure-gfm/unnamed-chunk-4-1.png"><!-- --></p>
+<p>Fit a State-Space GAM to these series that uses a hierarchical cyclic seasonal smooth term to capture variation in seasonality among series. The model also includes series-specific latent Gaussian Processes with squared exponential covariance functions to capture temporal dynamics</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">7</span><span class="op">)</span> <span class="op">+</span></span>
 <span>               <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, m <span class="op">=</span> <span class="fl">1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span>

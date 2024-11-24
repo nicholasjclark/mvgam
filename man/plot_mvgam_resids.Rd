@@ -4,12 +4,18 @@
 \alias{plot_mvgam_resids}
 \title{Residual diagnostics for a fitted mvgam object}
 \usage{
-plot_mvgam_resids(object, series = 1)
+plot_mvgam_resids(object, series = 1, n_draws = 100L, n_points = 1000L)
 }
 \arguments{
 \item{object}{\code{list} object returned from \code{mvgam}. See \code{\link[=mvgam]{mvgam()}}}
 
 \item{series}{\code{integer} specifying which series in the set is to be plotted}
+
+\item{n_draws}{\code{integer} specifying the number of posterior residual draws
+to use for calculating uncertainty in the "ACF" and "pACF" frames. Default is \code{100}}
+
+\item{n_points}{\code{integer} specifying the maximum number of points to show in the
+"Resids vs Fitted" and "Normal Q-Q Plot" frames. Default is \code{1000}}
 }
 \value{
 A series of facetted ggplot object
@@ -21,7 +27,7 @@ This function takes a fitted \code{mvgam} object and returns various residual di
 A total of four ggplot plots are generated to examine posterior
 Dunn-Smyth residuals for the specified series. Plots include a residuals vs fitted values plot,
 a Q-Q plot, and two plots to check for any remaining temporal autocorrelation in the residuals.
-Note, all plots use only report statistics from a sample of up to 20 posterior
+Note, all plots only report statistics from a sample of up to 100 posterior
 draws (to save computational time), so uncertainty in these relationships may not be adequately represented.
 }
 \examples{

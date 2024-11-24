@@ -63,7 +63,7 @@
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">plot_mvgam_resids</span><span class="op">(</span><span class="va">object</span>, series <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">plot_mvgam_resids</span><span class="op">(</span><span class="va">object</span>, series <span class="op">=</span> <span class="fl">1</span>, n_draws <span class="op">=</span> <span class="fl">100L</span>, n_points <span class="op">=</span> <span class="fl">1000L</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -74,6 +74,16 @@
 
 <dt>series</dt>
 <dd><p><code>integer</code> specifying which series in the set is to be plotted</p></dd>
+
+
+<dt>n_draws</dt>
+<dd><p><code>integer</code> specifying the number of posterior residual draws
+to use for calculating uncertainty in the "ACF" and "pACF" frames. Default is <code>100</code></p></dd>
+
+
+<dt>n_points</dt>
+<dd><p><code>integer</code> specifying the maximum number of points to show in the
+"Resids vs Fitted" and "Normal Q-Q Plot" frames. Default is <code>1000</code></p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -87,7 +97,7 @@
     <p>A total of four ggplot plots are generated to examine posterior
 Dunn-Smyth residuals for the specified series. Plots include a residuals vs fitted values plot,
 a Q-Q plot, and two plots to check for any remaining temporal autocorrelation in the residuals.
-Note, all plots use only report statistics from a sample of up to 20 posterior
+Note, all plots only report statistics from a sample of up to 100 posterior
 draws (to save computational time), so uncertainty in these relationships may not be adequately represented.</p>
     </div>
     <div class="section level2">

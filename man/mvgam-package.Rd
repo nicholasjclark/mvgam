@@ -23,8 +23,8 @@ Useful links:
 
 Other contributors:
 \itemize{
-  \item Scott Pease (broom enhancements) [contributor]
-  \item Matthijs Hollanders (ggplot visualizations) [contributor]
+  \item Scott Pease (\href{https://orcid.org/0009-0006-8977-9285}{ORCID}) (broom enhancements) [contributor]
+  \item Matthijs Hollanders (\href{https://orcid.org/0000-0003-0796-1018}{ORCID}) (ggplot visualizations) [contributor]
 }
 
 }

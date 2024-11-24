@@ -44,7 +44,7 @@ A series of [vignettes cover data formatting, forecasting and several extended c
 * [Phylogenetic smoothing using `mgcv`](https://ecogambler.netlify.app/blog/phylogenetic-smooths-mgcv/){target="_blank"}
 * [Incorporating time-varying seasonality in forecast models](https://ecogambler.netlify.app/blog/time-varying-seasonality/){target="_blank"}
 
-Please also feel free to use the [`mvgam` Discussion Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for or post other discussion topics related to the package.
+Please also feel free to use the [`mvgam` Discussion Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for or post other discussion topics related to the package, and do check out the [`mvgam` changelog](https://nicholasjclark.github.io/mvgam/news/index.html) for any updates about recent upgrades that the package has incorporated.
 
 ## Installation
 Install the stable version from `CRAN` using: `install.packages('mvgam')`, or install the development version from `GitHub` using:
