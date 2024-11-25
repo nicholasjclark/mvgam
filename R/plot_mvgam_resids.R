@@ -130,6 +130,7 @@ plot_mvgam_resids = function(object,
                   ymidhigh = quantile(acf, probs = 0.75),
                   yqhigh = quantile(acf, probs = 0.8),
                   yhigh = quantile(acf, probs = 0.95)) %>%
+    dplyr::select(-acf) %>%
     dplyr::distinct()
   acf_plot <- ggplot2::ggplot(acf_stats,
                               ggplot2::aes(x = lag)) +
@@ -172,6 +173,7 @@ plot_mvgam_resids = function(object,
                   ymidhigh = quantile(pacf, probs = 0.75),
                   yqhigh = quantile(pacf, probs = 0.8),
                   yhigh = quantile(pacf, probs = 0.95)) %>%
+    dplyr::select(-pacf) %>%
     dplyr::distinct()
 
   pacf_plot <- ggplot2::ggplot(pacf_stats,
