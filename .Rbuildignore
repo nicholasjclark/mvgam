@@ -5,6 +5,7 @@
 ^LICENSE\.md$
 ^_pkgdown\.yml$
 ^docs$
+^index_files$
 ^doc$
 ^misc$
 ^pkgdown$
