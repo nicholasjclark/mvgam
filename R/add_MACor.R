@@ -23,7 +23,7 @@ add_MaCor = function(model_file,
   if(trend_char == 'ZMVN'){
 
     # Update transformed data
-    if(any(grepl('vector<lower=0>[n_lv] sigma;',
+    if(any(grepl('[n_lv] sigma;',
                  model_file, fixed = TRUE))){
 
     } else {
@@ -42,11 +42,13 @@ add_MaCor = function(model_file,
     model_file <- readLines(textConnection(model_file), n = -1)
 
     # Update parameters block
-    if(any(grepl('vector<lower=0>[n_lv] sigma;',
+    if(any(grepl('[n_lv] sigma;',
                  model_file, fixed = TRUE))){
-      model_file[grep('vector<lower=0>[n_lv] sigma;',
+      model_file[grep('[n_lv] sigma;',
                       model_file, fixed = TRUE)] <-
-        paste0('vector<lower=0>[n_lv] sigma;\n\n',
+        paste0(model_file[grep('[n_lv] sigma;',
+                               model_file, fixed = TRUE)],
+               '\n\n',
                '// correlated latent residuals\n',
                'array[n] vector[n_lv] LV_raw;\n',
                'cholesky_factor_corr[n_lv] L_Omega;')
@@ -75,7 +77,7 @@ add_MaCor = function(model_file,
     model_file <- readLines(textConnection(model_file), n = -1)
 
     # Update transformed parameters block
-    if(any(grepl('vector<lower=0>[n_lv] sigma;',
+    if(any(grepl('[n_lv] sigma;',
                  model_file, fixed = TRUE))){
       model_file[grep('transformed parameters {',
                       model_file, fixed = TRUE)] <-
@@ -121,7 +123,7 @@ add_MaCor = function(model_file,
     model_file <- readLines(textConnection(model_file), n = -1)
 
     # Update model block
-    if(any(grepl('vector<lower=0>[n_lv] sigma;',
+    if(any(grepl('[n_lv] sigma;',
                  model_file, fixed = TRUE))){
 
       starts <- grep("LV[1, j] ~ normal(trend_mus[ytimes_trend[1, j]], sigma[j]);",
@@ -154,7 +156,7 @@ add_MaCor = function(model_file,
     model_file <- readLines(textConnection(model_file), n = -1)
 
     # Update generated quantities
-    if(any(grepl('vector<lower=0>[n_lv] sigma;',
+    if(any(grepl('[n_lv] sigma;',
                  model_file, fixed = TRUE))){
       model_file[grep('// posterior predictions',
                       model_file,
@@ -182,7 +184,7 @@ add_MaCor = function(model_file,
     }
 
     # Update transformed data
-      if(any(grepl('vector<lower=0>[n_lv] sigma;',
+      if(any(grepl('[n_lv] sigma;',
                    model_file, fixed = TRUE))){
         if(any(grepl('transformed data {', model_file, fixed = TRUE))){
           model_file[grep('transformed data {', model_file, fixed = TRUE)] <-
@@ -211,13 +213,15 @@ add_MaCor = function(model_file,
       model_file <- readLines(textConnection(model_file), n = -1)
 
     # Update parameters block
-    if(any(grepl('vector<lower=0>[n_lv] sigma;',
+    if(any(grepl('[n_lv] sigma;',
                  model_file, fixed = TRUE))){
 
       if(add_cor){
-        model_file[grep('vector<lower=0>[n_lv] sigma;',
+        model_file[grep('[n_lv] sigma;',
                         model_file, fixed = TRUE)] <-
-          paste0('vector<lower=0>[n_lv] sigma;\n',
+          paste0(model_file[grep('[n_lv] sigma;',
+                                 model_file, fixed = TRUE)],
+                 '\n',
                  'cholesky_factor_corr[n_lv] L_Omega;')
       }
 
@@ -277,7 +281,7 @@ add_MaCor = function(model_file,
     model_file <- readLines(textConnection(model_file), n = -1)
 
     # Update transformed parameters
-    if(any(grepl('vector<lower=0>[n_lv] sigma;',
+    if(any(grepl('[n_lv] sigma;',
                  model_file, fixed = TRUE))){
       model_file[grep('matrix[n, n_series] trend;',
                       model_file, fixed = TRUE)] <-
@@ -863,7 +867,7 @@ add_MaCor = function(model_file,
     model_file <- readLines(textConnection(model_file), n = -1)
 
     # Update model block
-    if(any(grepl('vector<lower=0>[n_lv] sigma;',
+    if(any(grepl('[n_lv] sigma;',
                  model_file, fixed = TRUE))){
       if(any(grepl('LV[1, j] ~ normal',
                         model_file, fixed = TRUE))){
@@ -1601,9 +1605,11 @@ add_MaCor = function(model_file,
                                          model_file, fixed = TRUE)]
           model_file <- model_file[-grep("array[n] vector[n_lv] LV_raw;" ,
                                          model_file, fixed = TRUE)]
-          model_file[grep("vector<lower=0>[n_lv] sigma;",
+          model_file[grep("[n_lv] sigma;",
                           model_file, fixed = TRUE)] <-
-            paste0('vector<lower=0>[n_lv] sigma;\n',
+            paste0(model_file[grep("[n_lv] sigma;",
+                                             model_file, fixed = TRUE)],
+                   '\n',
                    '\n\n',
                    '// correlation params and correlated errors per group\n',
                    'cholesky_factor_corr[n_subgroups] L_Omega_global;\n',
@@ -1768,9 +1774,11 @@ add_MaCor = function(model_file,
                                          model_file, fixed = TRUE)]
           model_file <- model_file[-grep("vector[n_lv] error[n];",
                                          model_file, fixed = TRUE)]
-          model_file[grep("vector<lower=0>[n_lv] sigma;",
+          model_file[grep("[n_lv] sigma;",
                           model_file, fixed = TRUE)] <-
-            paste0('vector<lower=0>[n_lv] sigma;\n',
+            paste0(model_file[grep("[n_lv] sigma;",
+                                   model_file, fixed = TRUE)],
+                   '\n',
                    '\n\n',
                    '// correlation params and dynamic error parameters per group\n',
                    'cholesky_factor_corr[n_subgroups] L_Omega_global;\n',
