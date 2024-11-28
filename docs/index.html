@@ -141,8 +141,9 @@
 <p>Plot the series to see how they evolve over time</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/plot_mvgam_series.html">plot_mvgam_series</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">data_train</span>, series <span class="op">=</span> <span class="st">'all'</span><span class="op">)</span></span></code></pre></div>
-<p><img src="index_files/figure-gfm/unnamed-chunk-4-1.png"><!-- --></p>
-<p>Fit a State-Space GAM to these series that uses a hierarchical cyclic seasonal smooth term to capture variation in seasonality among series. The model also includes series-specific latent Gaussian Processes with squared exponential covariance functions to capture temporal dynamics</p>
+<figure><img src="reference/figures/README-beta_sim-1.png" alt="Visualizing multivariate proportional time series using the mvgam R package #rstats"><figcaption aria-hidden="true">
+Visualizing multivariate proportional time series using the mvgam R package #rstats
+</figcaption></figure><p>Fit a State-Space GAM to these series that uses a hierarchical cyclic seasonal smooth term to capture variation in seasonality among series. The model also includes series-specific latent Gaussian Processes with squared exponential covariance functions to capture temporal dynamics</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/mvgam.html">mvgam</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, bs <span class="op">=</span> <span class="st">'cc'</span>, k <span class="op">=</span> <span class="fl">7</span><span class="op">)</span> <span class="op">+</span></span>
 <span>               <span class="fu"><a href="https://rdrr.io/pkg/mgcv/man/s.html" class="external-link">s</a></span><span class="op">(</span><span class="va">season</span>, by <span class="op">=</span> <span class="va">series</span>, m <span class="op">=</span> <span class="fl">1</span>, k <span class="op">=</span> <span class="fl">5</span><span class="op">)</span>,</span>
@@ -177,7 +178,7 @@ Forecasting multivariate time series with Dynamic Generalized Additive Models
 <li><a href="https://ecogambler.netlify.app/blog/distributed-lags-mgcv/" target="_blank" class="external-link">Distributed lags (and hierarchical distributed lags) using mgcv and mvgam</a></li>
 <li><a href="https://ecogambler.netlify.app/blog/time-varying-seasonality/" target="_blank" class="external-link">Incorporating time-varying seasonality in forecast models</a></li>
 </ul>
-<p>Please also feel free to use the <a href="https://github.com/nicholasjclark/mvgam/discussions" class="external-link"><code>mvgam</code> Discussion Board</a> to hunt for or post other discussion topics related to the package.</p>
+<p>Please also feel free to use the <a href="https://github.com/nicholasjclark/mvgam/discussions" class="external-link"><code>mvgam</code> Discussion Board</a> to hunt for or post other discussion topics related to the package, and do check out the <a href="https://nicholasjclark.github.io/mvgam/news/index.html"><code>mvgam</code> changelog</a> for any updates about recent upgrades that the package has incorporated.</p>
 </div>
 <div class="section level2">
 <h2 id="interested-in-contributing">Interested in contributing?<a class="anchor" aria-label="anchor" href="#interested-in-contributing"></a>

@@ -54,10 +54,11 @@ data <- sim_mvgam(family = betar(),
 ```
 
 Plot the series to see how they evolve over time
-```{r}
+```{r, eval = FALSE}
 plot_mvgam_series(data = data$data_train, series = 'all')
 ```
 
+![Visualizing multivariate proportional time series using the mvgam R  package #rstats](man/figures/README-beta_sim-1.png)
 
 Fit a State-Space GAM to these series that uses a hierarchical cyclic seasonal smooth term to capture variation in seasonality among series. The model also includes series-specific latent Gaussian Processes with squared exponential covariance functions to capture temporal dynamics
 ```{r, eval = FALSE}
@@ -94,7 +95,7 @@ A number of case studies have been compiled to highlight how GAMs and DGAMs can 
 * [Distributed lags (and hierarchical distributed lags) using mgcv and mvgam](https://ecogambler.netlify.app/blog/distributed-lags-mgcv/){target="_blank"}
 * [Incorporating time-varying seasonality in forecast models](https://ecogambler.netlify.app/blog/time-varying-seasonality/){target="_blank"}
   
-Please also feel free to use the [`mvgam` Discussion Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for or post other discussion topics related to the package.
+Please also feel free to use the [`mvgam` Discussion Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for or post other discussion topics related to the package, and do check out the [`mvgam` changelog](https://nicholasjclark.github.io/mvgam/news/index.html) for any updates about recent upgrades that the package has incorporated.
 
 ## Interested in contributing?
 I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au). Other contributions are also very welcome, but please see [The Contributor Instructions](https://github.com/nicholasjclark/mvgam/blob/master/.github/CONTRIBUTING.md) for general guidelines. Note that

@@ -106,7 +106,12 @@ Plot the series to see how they evolve over time
 plot_mvgam_series(data = data$data_train, series = 'all')
 ```
 
-![](index_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+<figure>
+<img src="man/figures/README-beta_sim-1.png"
+alt="Visualizing multivariate proportional time series using the mvgam R package #rstats" />
+<figcaption aria-hidden="true">Visualizing multivariate proportional
+time series using the mvgam R package #rstats</figcaption>
+</figure>
 
 Fit a State-Space GAM to these series that uses a hierarchical cyclic
 seasonal smooth term to capture variation in seasonality among series.
@@ -177,7 +182,10 @@ DGAMs can be useful for working with time series data:
 
 Please also feel free to use the [`mvgam` Discussion
 Board](https://github.com/nicholasjclark/mvgam/discussions) to hunt for
-or post other discussion topics related to the package.
+or post other discussion topics related to the package, and do check out
+the [`mvgam`
+changelog](https://nicholasjclark.github.io/mvgam/news/index.html) for
+any updates about recent upgrades that the package has incorporated.
 
 ## Interested in contributing?
 
