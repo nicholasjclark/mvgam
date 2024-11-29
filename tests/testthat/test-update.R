@@ -6,6 +6,7 @@ test_that("update() working correctly", {
   # Can update trend_model
   mod <- update(mvgam:::mvgam_example1,
                 trend_model = AR(p = 2),
+                control = list(max_treedepth = 11),
                 run_model = FALSE)
   expect_true(inherits(mod, 'mvgam_prefit'))
   expect_true(attr(mod$model_data, 'trend_model') == 'AR2')

@@ -300,7 +300,7 @@ test_that("plot_mvgam_series gives reasonable outputs", {
   # And for mvgam objects
   expect_ggplot(plot_mvgam_series(object = mvgam:::mvgam_example1,
                                     series = 1))
-  expect_no_error(plot(mvgam:::mvgam_example1, type = 'series'))
+  expect_no_error(SW(plot(mvgam:::mvgam_example1, type = 'series')))
 })
 
 test_that("forecast and ensemble have reasonable outputs", {

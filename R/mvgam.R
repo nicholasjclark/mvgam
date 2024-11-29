@@ -659,6 +659,7 @@ mvgam = function(formula,
     dots$adapt_delta <- NULL
   } else {
     adapt_delta <- control$adapt_delta
+    if(is.null(adapt_delta)) adapt_delta  <- 0.8
   }
 
   if('max_treedepth' %in% names(dots)){
@@ -667,6 +668,7 @@ mvgam = function(formula,
     dots$max_treedepth <- NULL
   } else {
     max_treedepth <- control$max_treedepth
+    if(is.null(max_treedepth)) max_treedepth  <- 10
   }
 
   # Validate trend_model
