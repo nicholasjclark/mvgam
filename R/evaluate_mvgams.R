@@ -274,7 +274,7 @@ eval_mvgam = function(object,
     })
 
     # Calculate score and interval coverage per series
-    if(object$family %in% c('poisson', 'negative binomial')){
+    if(object$family %in% c('poisson', 'negative binomial', 'binomial', 'beta_binomial')){
       series_score <- lapply(seq_len(n_series), function(series){
         DRPS <- data.frame(drps_mcmc_object(as.vector(as.matrix(series_truths[[series]])),
                                               series_fcs[[series]],
@@ -615,7 +615,7 @@ crps_edf <- function(y, dat, w = NULL) {
   sapply(y, f)
 }
 
-# Calculate out of sample CRPS
+# Compute CRPS
 # code borrowed from scoringRules: https://github.com/FK83/scoringRules/blob/master/R/scores_sample_univ.R
 #' @noRd
 crps_score <- function(truth, fc, method = "edf", w = NULL,
@@ -642,7 +642,7 @@ crps_score <- function(truth, fc, method = "edf", w = NULL,
 }
 
 
-# Calculate out of sample DRPS
+# Compute DRPS
 #' @noRd
 drps_score <- function(truth, fc, interval_width = 0.9,
                        log = FALSE){
@@ -668,7 +668,7 @@ drps_score <- function(truth, fc, interval_width = 0.9,
   return(c(score, in_interval))
 }
 
-# Calculate out of sample scaled interval score
+# Compute the scaled interval score
 #' @noRd
 sis_score <- function(truth, fc, interval_width = 0.9,
                        log = FALSE){
@@ -697,6 +697,20 @@ sis_score <- function(truth, fc, interval_width = 0.9,
   return(c(score, in_interval))
 }
 
+# Compute the Brier score
+#' @noRd
+brier_score <- function(truth,
+                        fc,
+                        interval_width = 0.9){
+
+  score <- (truth - fc) ^ 2
+  score <- sum(score) / length(score)
+
+  # Cannot evaluate coverage for binary truths
+  in_interval <- NA
+  return(c(score, in_interval))
+}
+
 #' Compute the multivariate energy score
 #' @noRd
 energy_score <- function(truth, fc, log = FALSE) {
@@ -712,24 +726,6 @@ energy_score <- function(truth, fc, log = FALSE) {
   }
   es <- scoringRules::es_sample(y = truth, dat = fc)
   return(es)
-}
-
-#' Wrapper to calculate energy score on all observations in fc_horizon
-#' @noRd
-energy_mcmc_object <- function(truths, fcs, log = FALSE,
-                                  weights){
-  fc_horizon <- length(fcs[[1]][1,])
-  fcs_per_horizon <- lapply(seq_len(fc_horizon), function(horizon){
-    do.call(rbind, lapply(seq_along(fcs), function(fc){
-      fcs[[fc]][,horizon]
-    }))
-  })
-
-  unlist(lapply(seq_len(fc_horizon), function(horizon){
-    energy_score(truth = truths[,horizon],
-                 fc = fcs_per_horizon[[horizon]],
-                 log = log)
-  }))
 }
 
 #' Compute the variogram score, using the median pairwise difference
@@ -768,6 +764,45 @@ variogram_score = function(truth, fc, log = FALSE, weights){
   # comparison twice
   score <- sum(out) / 2
 
+}
+
+#' Compute the energy score on all observations in fc_horizon
+#' @noRd
+energy_mcmc_object <- function(truths, fcs, log = FALSE,
+                                  weights){
+  fc_horizon <- length(fcs[[1]][1,])
+  fcs_per_horizon <- lapply(seq_len(fc_horizon), function(horizon){
+    do.call(rbind, lapply(seq_along(fcs), function(fc){
+      fcs[[fc]][,horizon]
+    }))
+  })
+
+  unlist(lapply(seq_len(fc_horizon), function(horizon){
+    energy_score(truth = truths[,horizon],
+                 fc = fcs_per_horizon[[horizon]],
+                 log = log)
+  }))
+}
+
+#' Compute the Brier score on all observations in fc_horizon
+#' @noRd
+brier_mcmc_object <- function(truth,
+                              fc,
+                              log = FALSE,
+                              weights){
+
+  indices_keep <- which(!is.na(truth))
+  if(length(indices_keep) == 0){
+    scores = data.frame('brier' = rep(NA, length(truth)),
+                        'interval' = rep(NA, length(truth)))
+  } else {
+    scores <- matrix(NA, nrow = length(truth), ncol = 2)
+    for(i in indices_keep){
+      scores[i,] <- mvgam:::brier_score(truth = as.vector(truth)[i],
+                                fc = fc[,i])
+    }
+  }
+  scores
 }
 
 #' Wrapper to calculate variogram score on all observations in fc_horizon

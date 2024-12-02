@@ -125,6 +125,16 @@ test_that("binomial() post-processing works", {
   expect_true(inherits(fc, 'mvgam_forecast'))
   expect_no_error(plot(fc))
   expect_no_error(plot(fc, realisations = TRUE))
+  expect_list(score(fc, score = 'drps'))
+  expect_error(
+    score(fc, score = 'brier'),
+    'cannot evaluate brier scores unless probability predictions are supplied. Use "type == expected" when forecasting instead'
+  )
+  fc <- forecast(mod, newdata = dat_test, type = 'expected')
+  expect_error(
+    score(fc, score = 'brier'),
+    'brier score only applicable for Bernoulli forecasts'
+  )
 
   expect_no_error(SW(plot(mod, type = 'smooths', trend_effects = TRUE)))
   expect_no_error(plot(mod, type = 'smooths',

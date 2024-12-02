@@ -23,14 +23,16 @@ score(object, ...)
 \item{score}{\code{character} specifying the type of proper scoring rule to use for evaluation. Options are:
 \code{sis} (i.e. the Scaled Interval Score), \code{energy}, \code{variogram}, \code{elpd}
 (i.e. the Expected log pointwise Predictive Density),
-\code{drps} (i.e. the Discrete Rank Probability Score) or \code{crps} (the Continuous Rank Probability Score).
+\code{drps} (i.e. the Discrete Rank Probability Score), \code{crps} (the Continuous Rank Probability Score)
+or \code{brier} (the latter of which is only applicable for \code{bernoulli} models.
 Note that when choosing \code{elpd}, the supplied object must have forecasts on the \code{link} scale so that
-expectations can be calculated prior to scoring. For all other scores, forecasts should be supplied
+expectations can be calculated prior to scoring. If choosing \code{brier}, the object must have forecasts
+on the \code{expected} scale (i.e. probability predictions). For all other scores, forecasts should be supplied
 on the \code{response} scale (i.e. posterior predictions)}
 
 \item{log}{\code{logical}. Should the forecasts and truths be logged prior to scoring?
 This is often appropriate for comparing
-performance of models when series vary in their observation ranges}
+performance of models when series vary in their observation ranges. Ignored if \code{score = 'brier'}}
 
 \item{weights}{optional \code{vector} of weights (where \code{length(weights) == n_series})
 for weighting pairwise correlations when evaluating the variogram score for multivariate
@@ -38,7 +40,8 @@ forecasts. Useful for down-weighting series that have larger magnitude observati
 are of less interest when forecasting. Ignored if \code{score != 'variogram'}}
 
 \item{interval_width}{proportional value on \verb{[0.05,0.95]} defining the forecast interval
-for calculating coverage and, if \code{score = 'sis'}, for calculating the interval score}
+for calculating coverage and, if \code{score = 'sis'}, for calculating the interval score.
+Ignored if \code{score = 'brier'}}
 
 \item{n_cores}{\code{integer} specifying number of cores for calculating scores in parallel}
 
@@ -46,10 +49,10 @@ for calculating coverage and, if \code{score = 'sis'}, for calculating the inter
 }
 \value{
 a \code{list} containing scores and interval coverages per forecast horizon.
-If \code{score \%in\% c('drps', 'crps', 'elpd')},
+If \code{score \%in\% c('drps', 'crps', 'elpd', 'brier')},
 the list will also contain return the sum of all series-level scores per horizon. If
 \code{score \%in\% c('energy','variogram')}, no series-level scores are computed and the only score returned
-will be for all series. For all scores apart from \code{elpd}, the \code{in_interval} column in each series-level
+will be for all series. For all scores apart from \code{elpd} and \code{brier}, the \code{in_interval} column in each series-level
 slot is a binary indicator of whether or not the true value was within the forecast's corresponding
 posterior empirical quantiles. Intervals are not calculated when using \code{elpd} because forecasts
 will only contain the linear predictors
@@ -70,9 +73,27 @@ mod <- mvgam(y ~ 1,
 
 # Extract forecasts into a 'mvgam_forecast' object
 fc <- forecast(mod)
+plot(fc)
 
 # Compute Discrete Rank Probability Scores and 0.90 interval coverages
 fc_scores <- score(fc, score = 'drps')
+str(fc_scores)
+
+# An example using binary data
+data <- sim_mvgam(family = bernoulli())
+mod <- mvgam(y ~ s(season, bs = 'cc', k = 6),
+            trend_model = AR(),
+            data = data$data_train,
+            newdata = data$data_test,
+            family = bernoulli(),
+            chains = 2)
+
+# Extract forecasts on the expectation (probability) scale
+fc <- forecast(mod, type = 'expected')
+plot(fc)
+
+# Compute Brier scores
+fc_scores <- score(fc, score = 'brier')
 str(fc_scores)
 }
 }

@@ -416,7 +416,8 @@ plot_mvgam_fc = function(object, series = 1, newdata, data_test,
       score <- NULL
       message('No non-missing values in data_test$y; cannot calculate forecast score')
     } else {
-      if(object$family %in% c('poisson', 'negative binomial', 'tweedie')){
+      if(object$family %in% c('poisson', 'negative binomial', 'tweedie',
+                              'binomial', 'beta_binomial')){
         if(max(fc, na.rm = TRUE) > 50000){
           score <- sum(crps_mcmc_object(as.vector(truth),
                                         fc)[,1], na.rm = TRUE)
@@ -683,7 +684,7 @@ plot.mvgam_forecast = function(x, series = 1,
     }
   }
 
-  if(type == 'response'){
+  if(type == 'response' || c(type == 'expected' & object$family == 'bernoulli')){
     # Plot training and testing points
     points(c(object$train_observations[[s_name]],
              object$test_observations[[s_name]]), pch = 16, col = "white", cex = 0.8)
@@ -698,7 +699,8 @@ plot.mvgam_forecast = function(x, series = 1,
       score <- NULL
       message(paste0('No non-missing values in test_observations; cannot calculate forecast score\n'))
     } else {
-      if(object$family %in% c('poisson', 'negative binomial', 'tweedie')){
+      if(object$family %in% c('poisson', 'negative binomial', 'tweedie',
+                              'binomial', 'beta_binomial')){
         if(max(fc, na.rm = TRUE) > 50000){
           score <- sum(crps_mcmc_object(as.vector(truth),
                                         fc)[,1], na.rm = TRUE)
@@ -709,7 +711,12 @@ plot.mvgam_forecast = function(x, series = 1,
           message(paste0('Out of sample DRPS:\n', score))
         }
 
-      } else {
+      } else if(object$family == 'bernoulli'){
+        score <- sum(brier_mcmc_object(as.vector(truth),
+                                      fc)[,1], na.rm = TRUE)
+        message(paste0('Out of sample Brier:\n', score))
+
+        } else {
         score <- sum(crps_mcmc_object(as.vector(truth),
                                       fc)[,1], na.rm = TRUE)
         message(paste0('Out of sample CRPS:\n', score))
