@@ -778,6 +778,10 @@ summary.mvgam = function(object,
     }
   }
 
+  mod_name <- as.character(match.call()$object)
+  cat(paste0('\nUse how_to_cite(',
+             mod_name,
+             ') to get started describing this model'))
 }
 
 #' @rdname summary.mvgam
