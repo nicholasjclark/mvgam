@@ -1,7 +1,7 @@
 # mvgam 1.1.4 (development version; not yet on CRAN)
 ## New functionalities
 * Improved various plotting functions by returning `ggplot` objects in place of base plots (thanks to @mhollanders #38)
-* Added the brier score (`score = 'brier'`) as an option in `score.mvgam_forecast()` for scoring forecasts of binary variables when using `family = bernoulli()`
+* Added the brier score (`score = 'brier'`) as an option in `score.mvgam_forecast()` for scoring forecasts of binary variables when using `family = bernoulli()` (#80)
 * Added `augment()` function to add residuals and fitted values to an mvgam object's observed data (thanks to @swpease #83)
 * Added support for approximate `gp()` effects with more than one covariate and with different kernel functions (#79) 
 * Added function `jsdgam()` to estimate Joint Species Distribution Models in which both the latent factors and the observation model components can include any of mvgam's complex linear predictor effects. Also added a function `residual_cor()` to compute residual correlation, covariance and precision matrices from `jsdgam` models. See `?mvgam::jsdgam` and `?mvgam::residual_cor` for details
