@@ -1,5 +1,6 @@
 # mvgam 1.1.4 (development version; not yet on CRAN)
 ## New functionalities
+* Added the `how_to_cite.mvgam()` function to generate a scaffold methods description of fitted models, which can hopefully make it easier for users to fully describe their programming environment 
 * Improved various plotting functions by returning `ggplot` objects in place of base plots (thanks to @mhollanders #38)
 * Added the brier score (`score = 'brier'`) as an option in `score.mvgam_forecast()` for scoring forecasts of binary variables when using `family = bernoulli()` (#80)
 * Added `augment()` function to add residuals and fitted values to an mvgam object's observed data (thanks to @swpease #83)

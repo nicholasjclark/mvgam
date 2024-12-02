@@ -3,7 +3,7 @@
 \name{how_to_cite.mvgam}
 \alias{how_to_cite.mvgam}
 \alias{how_to_cite}
-\title{Generate a brief methods description text for mvgam models}
+\title{Generate a methods description for mvgam models}
 \usage{
 how_to_cite(object, ...)
 
@@ -17,11 +17,11 @@ or \code{\link[=jsdgam]{jsdgam()}}}
 }
 \value{
 An object of class \code{how_to_cite} containing a text description of the
-methods as well as lists of primary and additional references
+methods as well as lists of both primary and additional references
 }
 \description{
-Create fully referenced methods description, along with a useful list of references,
-for fitted \code{mvgam}
+Create a brief but fully referenced methods description, along with a useful list of references,
+for fitted \code{mvgam} and \code{jsdgam} models
 }
 \details{
 This function uses the model's structure to come up with a very basic
@@ -31,10 +31,10 @@ text returned by this function to be a completely adequate methods section, it i
 meant to get you started.
 }
 \examples{
-\donttest{
+\dontrun{
 # Simulate 4 time series with hierarchical seasonality
 # and a VAR(1) dynamic process
-set.seed(111)
+set.seed(0)
 simdat <- sim_mvgam(seasonality = 'hierarchical',
                     trend_model = VAR(cor = TRUE),
                     family = gaussian())
@@ -44,7 +44,6 @@ mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 6),
               data = simdat$data_train,
               family = gaussian(),
               trend_model = VAR(cor = TRUE),
-              noncentred = TRUE,
               chains = 2)
 how_to_cite(mod1)
 
@@ -57,6 +56,13 @@ mod2 <- mvgam(y ~ gp(x2, k = 12),
               family = gaussian(),
               chains = 2)
 how_to_cite(mod2)
+
+# Repeat using meanfield variational inference
+mod3 <- mvgam(y ~ gp(x2, k = 12),
+              data = dat,
+              family = gaussian(),
+              algorithm = 'meanfield')
+how_to_cite(mod3)
 }
 }
 \seealso{

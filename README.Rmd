@@ -217,6 +217,41 @@ Both components contribute to forecast uncertainty. Diagnostics of the model can
 plot(lynx_mvgam, type = 'residuals')
 ```
 
+We can use the `how_to_cite()` function to generate a scaffold for describing the model and sampling details in scientific communications
+```{r}
+description <- how_to_cite(lynx_mvgam)
+```
+
+```{r, eval = FALSE}
+description
+```
+
+```{r, echo=FALSE}
+str_break = function(x, width = 90L) {
+  n = nchar(x)
+  if (n <= width) return(x)
+  n1 = seq(1L, n, by = width)
+  n2 = seq(width, n, by = width)
+  if (n %% width != 0) n2 = c(n2, n)
+  substring(x, n1, n2)
+}
+cat('Methods text skeleton\n')
+cat(str_break(description$methods_text), sep = '\n')
+```
+
+```{r echo=FALSE}
+cat('\nPrimary references\n')
+for(i in seq_along(description$citations)){
+  message(description$citations[[i]])
+  message()
+}
+cat('\nOther useful references\n')
+for(i in seq_along(description$other_citations)){
+  message(description$other_citations[[i]])
+  message()
+}
+```
+
 ## Extended observation families
 `mvgam` was originally designed to analyse and forecast non-negative integer-valued data. These data are traditionally challenging to analyse with existing time-series analysis packages. But further development of `mvgam` has resulted in support for a growing number of observation families. Currently, the package can handle data for the following:  
   

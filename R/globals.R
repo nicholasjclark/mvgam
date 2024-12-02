@@ -24,4 +24,5 @@ utils::globalVariables(c("y", "year", "smooth_vals", "smooth_num",
                          "level", "sim_hilbert_gp", "trend_model",
                          "jags_path", "x", "elpds", "pareto_ks",
                          "value", "threshold", "colour", "resids",
-                         "c_dark", "eval_timepoints"))
+                         "c_dark", "eval_timepoints", "yqlow",
+                         "ymidlow", "ymidhigh", "yqhigh", "preds"))
