@@ -798,7 +798,7 @@ brier_mcmc_object <- function(truth,
   } else {
     scores <- matrix(NA, nrow = length(truth), ncol = 2)
     for(i in indices_keep){
-      scores[i,] <- mvgam:::brier_score(truth = as.vector(truth)[i],
+      scores[i,] <- brier_score(truth = as.vector(truth)[i],
                                 fc = fc[,i])
     }
   }
