@@ -227,7 +227,7 @@ description
 ```
 
 ```{r, echo=FALSE}
-str_break = function(x, width = 105L) {
+str_break = function(x, width = 90L) {
   n = nchar(x)
   if (n <= width) return(x)
   n1 = seq(1L, n, by = width)

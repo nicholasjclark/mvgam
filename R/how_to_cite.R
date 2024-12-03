@@ -81,12 +81,12 @@ how_to_cite.mvgam <- function(object, ...){
     "; Clark & Wells, 2023) to construct, fit and interrogate the model.",
     " mvgam fits Bayesian State-Space models that can include flexible",
     " predictor effects in both the process and observation components",
-    " by incorporating functionalities from the brms (Bürkner 2017),",
+    " by incorporating functionalities from the brms (Burkner 2017),",
     " mgcv (Wood 2017) and splines2 (Wang & Yan, 2023) packages."
   )
 
   citations[[1]] <- "Clark, NJ and Wells K (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. Methods in Ecology and Evolution, 14, 771-784. doi.org/10.1111/2041-210X.13974"
-  citations[[2]] <- "Bürkner, PC (2017). brms: An R Package for Bayesian Multilevel Models Using Stan. Journal of Statistical Software, 80(1), 1-28. doi:10.18637/jss.v080.i01"
+  citations[[2]] <- "Burkner, PC (2017). brms: An R Package for Bayesian Multilevel Models Using Stan. Journal of Statistical Software, 80(1), 1-28. doi:10.18637/jss.v080.i01"
   citations[[3]] <- "Wood, SN (2017). Generalized Additive Models: An Introduction with R (2nd edition). Chapman and Hall/CRC."
   citations[[4]] <- "Wang W and Yan J (2021). Shape-Restricted Regression Splines with R Package splines2. Journal of Data Science, 19(3), 498-517. doi:10.6339/21-JDS1020 <https://doi.org/10.6339/21-JDS1020>."
 
@@ -121,7 +121,7 @@ how_to_cite.mvgam <- function(object, ...){
     )
     citations <- append(
       citations,
-      list("Riutort-Mayol, G, Bürkner, PC, Andersen, MR, Solin, A and Vehtari, A (2023). Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic programming. Statistics and Computing 33, 1. https://doi.org/10.1007/s11222-022-10167-2")
+      list("Riutort-Mayol, G, Burkner, PC, Andersen, MR, Solin, A and Vehtari, A (2023). Practical Hilbert space approximate Bayesian Gaussian processes for probabilistic programming. Statistics and Computing 33, 1. https://doi.org/10.1007/s11222-022-10167-2")
     )
   }
 
@@ -141,12 +141,12 @@ how_to_cite.mvgam <- function(object, ...){
       cmdstanr::cmdstan_version(),
       "; Carpenter et al. 2017, Stan Development Team ",
       current_year,
-      "), specifically through the cmdstanr interface (Gabry & Češnovar, 2021)."
+      "), specifically through the cmdstanr interface (Gabry & Cesnovar, 2021)."
     )
     citations <- append(
       citations,
       list(paste0(
-        "Gabry J, Češnovar R, Johnson A, and Bronder S (",
+        "Gabry J, Cesnovar R, Johnson A, and Bronder S (",
         current_year,
         "). cmdstanr: R Interface to 'CmdStan'. https://mc-stan.org/cmdstanr/, https://discourse.mc-stan.org."
       )
@@ -189,7 +189,7 @@ how_to_cite.mvgam <- function(object, ...){
     )
     citations <- append(
       citations,
-      list("Vehtari A, Gelman A, Simpson D, Carpenter B, and Bürkner P (2021). “Rank-normalization, folding, and localization: An improved Rhat for assessing convergence of MCMC (with discussion).” Bayesian Analysis 16(2) 667-718. https://doi.org/10.1214/20-BA1221.")
+      list("Vehtari A, Gelman A, Simpson D, Carpenter B, and Burkner P (2021). Rank-normalization, folding, and localization: An improved Rhat for assessing convergence of MCMC (with discussion). Bayesian Analysis 16(2) 667-718. https://doi.org/10.1214/20-BA1221.")
     )
   }
 
@@ -231,7 +231,7 @@ how_to_cite.mvgam <- function(object, ...){
 
     citations <- append(
       citations,
-      list("Zhang, L, Carpenter, B, Gelman, A, and Vehtari, A (2022). Pathfinder: parallel Quasi-Newton variational inference. Journal of Machine Learning Research 23(306), 1–49. http://jmlr.org/papers/v23/21-0889.html.")
+      list("Zhang, L, Carpenter, B, Gelman, A, and Vehtari, A (2022). Pathfinder: parallel Quasi-Newton variational inference. Journal of Machine Learning Research 23(306), 1-49. http://jmlr.org/papers/v23/21-0889.html.")
     )
   }
   # Append texts
@@ -240,9 +240,9 @@ how_to_cite.mvgam <- function(object, ...){
   # List of additional, possibly very useful references
   other_citations <- vector(mode = 'list')
   other_citations[[1]] <- "Arel-Bundock V (2024). marginaleffects: Predictions, Comparisons, Slopes, Marginal Means, and Hypothesis Tests. R package version 0.19.0.4, https://marginaleffects.com/."
-  other_citations[[2]] <- "Gabry J, Simpson D, Vehtari A, Betancourt M, and Gelman A (2019). “Visualization in Bayesian workflow.” Journal of the Royal Statatistical Society A, 182, 389-402. doi:10.1111/rssa.12378."
+  other_citations[[2]] <- "Gabry J, Simpson D, Vehtari A, Betancourt M, and Gelman A (2019). Visualization in Bayesian workflow. Journal of the Royal Statatistical Society A, 182, 389-402. doi:10.1111/rssa.12378."
   other_citations[[3]] <- "Vehtari A, Gelman A, and Gabry J (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing, 27, 1413-1432. doi:10.1007/s11222-016-9696-4."
-  other_citations[[4]] <- "Bürkner, PC, Gabry, J, and Vehtari, A. (2020). Approximate leave-future-out cross-validation for Bayesian time series models. Journal of Statistical Computation and Simulation, 90(14), 2499–2523. https://doi.org/10.1080/00949655.2020.1783262"
+  other_citations[[4]] <- "Burkner, PC, Gabry, J, and Vehtari, A. (2020). Approximate leave-future-out cross-validation for Bayesian time series models. Journal of Statistical Computation and Simulation, 90(14), 2499-2523. https://doi.org/10.1080/00949655.2020.1783262"
 
   out <- structure(
     list(
