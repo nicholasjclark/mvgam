@@ -239,7 +239,7 @@ how_to_cite.mvgam <- function(object, ...){
 
   # List of additional, possibly very useful references
   other_citations <- vector(mode = 'list')
-  other_citations[[1]] <- "Arel-Bundock V (2024). marginaleffects: Predictions, Comparisons, Slopes, Marginal Means, and Hypothesis Tests. R package version 0.19.0.4, https://marginaleffects.com/."
+  other_citations[[1]] <- "Arel-Bundock, V, Greifer, N, and Heiss, A (2024). How to interpret statistical models using marginaleffects for R and Python. Journal of Statistical Software, 111(9), 1–32. https://doi.org/10.18637/jss.v111.i09"
   other_citations[[2]] <- "Gabry J, Simpson D, Vehtari A, Betancourt M, and Gelman A (2019). Visualization in Bayesian workflow. Journal of the Royal Statatistical Society A, 182, 389-402. doi:10.1111/rssa.12378."
   other_citations[[3]] <- "Vehtari A, Gelman A, and Gabry J (2017). Practical Bayesian model evaluation using leave-one-out cross-validation and WAIC. Statistics and Computing, 27, 1413-1432. doi:10.1007/s11222-016-9696-4."
   other_citations[[4]] <- "Burkner, PC, Gabry, J, and Vehtari, A. (2020). Approximate leave-future-out cross-validation for Bayesian time series models. Journal of Statistical Computation and Simulation, 90(14), 2499-2523. https://doi.org/10.1080/00949655.2020.1783262"

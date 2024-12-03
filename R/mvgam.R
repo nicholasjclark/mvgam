@@ -132,6 +132,7 @@
 #'should depend on. The `series` column should have a single unique entry for each series in the
 #'data (names should perfectly match factor levels of the `series` variable in `data`). Note that
 #'if this is supplied, the intercept parameter in the process model will NOT be automatically suppressed.
+#'Not yet supported for models in wich the latent factors evolve in continuous time (`CAR()`).
 #'See examples for details
 #'@param noncentred \code{logical} Use the non-centred parameterisation for autoregressive
 #'trend models? Setting to `TRUE` will reparameterise the model to avoid possible

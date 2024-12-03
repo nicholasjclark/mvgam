@@ -666,11 +666,11 @@ validate_trendmap = function(trend_map,
          call. = FALSE)
   }
 
-  # No point in trend mapping if trend model is 'None'
-  # if(trend_model == 'None'){
-  #   stop('cannot set up latent trends when "trend_model = None"',
-  #        call. = FALSE)
-  # }
+  # Cannot yet map observations to trends that evolve as CAR1
+  if(trend_model == 'CAR1'){
+    stop('cannot yet use trend mapping for CAR1 dynamics',
+         call. = FALSE)
+  }
 
   # trend_map must have an entry for each unique time series
   if(!all(sort(trend_map$series) == sort(unique(data_train$series)))){

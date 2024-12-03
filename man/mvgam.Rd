@@ -174,6 +174,7 @@ different observation processes. If supplied, a latent factor model is set up by
 should depend on. The \code{series} column should have a single unique entry for each series in the
 data (names should perfectly match factor levels of the \code{series} variable in \code{data}). Note that
 if this is supplied, the intercept parameter in the process model will NOT be automatically suppressed.
+Not yet supported for models in wich the latent factors evolve in continuous time (\code{CAR()}).
 See examples for details}
 
 \item{priors}{An optional \code{data.frame} with prior
