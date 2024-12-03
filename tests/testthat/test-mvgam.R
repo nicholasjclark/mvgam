@@ -401,7 +401,6 @@ test_that("prior_only works", {
                          mod$model_file, fixed = TRUE)))
   expect_true(!any(grepl('flat_ys ~ ',
                          mod$model_file, fixed = TRUE)))
-
   mod <- mvgam(y ~ 1,
                trend_formula = ~ s(season) + s(trend, bs = 're'),
                trend_model = CAR(),
@@ -415,6 +414,20 @@ test_that("prior_only works", {
                          mod$model_file, fixed = TRUE)))
   expect_true(!any(grepl('flat_ys ~ ',
                          mod$model_file, fixed = TRUE)))
+
+  # trend_map not yet allowed for CAR1 dynamics
+  trend_map <- data.frame(series = unique(gaus_data$data_train$series),
+                          trend = c(1, 1, 2))
+  expect_error(mvgam(y ~ 1,
+                     trend_formula = ~ s(season) + s(trend, bs = 're'),
+                     trend_model = CAR(),
+                     trend_map = trend_map,
+                     data = gaus_data$data_train,
+                     prior_simulation = TRUE,
+                     family = gaussian(),
+                     threads = 2,
+                     run_model = FALSE),
+               'cannot yet use trend mapping for CAR1 dynamics')
 
   mod <- mvgam(y ~ s(season),
                trend_model = AR(p = 3),

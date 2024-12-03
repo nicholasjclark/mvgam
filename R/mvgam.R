@@ -683,6 +683,12 @@ mvgam = function(formula,
                                       drift = drift,
                                       noncentred = noncentred)
 
+  # Cannot yet map observations to trends that evolve as CAR1
+  if(trend_model == 'CAR1' & !missing(trend_map)){
+    stop('cannot yet use trend mapping for CAR1 dynamics',
+         call. = FALSE)
+  }
+
   # Ensure series and time variables are present
   data_train <- validate_series_time(data_train, name = 'data',
                                      trend_model = orig_trend_model)
