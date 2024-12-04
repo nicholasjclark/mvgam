@@ -104,7 +104,7 @@ how_to_cite.mvgam <- function(object, ...){
                         'VARMA1,1cor')){
     specials_text <- c(
       specials_text,
-      " To encourage stability and prevent forecast variance from increasing indefinitely, we enforced stationarity of the Vector Autoregressive process following methods described in Heaps (2023)."
+      " To encourage stability and prevent forecast variance from increasing indefinitely, we enforced stationarity of the Vector Autoregressive process following methods described by Heaps (2023)."
     )
     citations <- append(
       citations,
@@ -117,7 +117,7 @@ how_to_cite.mvgam <- function(object, ...){
      !is.null(attr(object$trend_mgcv_model, 'gp_att_table'))){
     specials_text <- c(
       specials_text,
-      " Gaussian Process functional effects were estimated using a low-rank Hilbert space approximation following methods described in Riutort-Mayol et al. (2023)."
+      " Gaussian Process functional effects were estimated using a low-rank Hilbert space approximation following methods described by Riutort-Mayol et al. (2023)."
     )
     citations <- append(
       citations,
