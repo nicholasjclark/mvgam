@@ -279,7 +279,7 @@ test_that("unidimensional gp for process models working properly", {
 test_that("multidimensional gp for process models working properly", {
   mod <- mvgam(y ~ s(series, bs = 're'),
                trend_formula = ~
-                 gp(time, season, k = 10),
+                 gp(time, season, k = 10, iso = FALSE),
                data = beta_data$data_train,
                family = betar(),
                trend_model = AR(),
@@ -290,6 +290,15 @@ test_that("multidimensional gp for process models working properly", {
                         mod$model_file, fixed = TRUE)))
 
   expect_true(any(grepl("b_trend[b_trend_idx_gp_timeby_season_] = sqrt(spd_gp_exp_quad(",
+                        mod$model_file, fixed = TRUE)))
+
+  expect_true(any(grepl("array[1] vector<lower=0>[2] rho_gp_trend_timeby_season_;",
+                        mod$model_file, fixed = TRUE)))
+
+  expect_true(any(grepl("rho_gp_trend_timeby_season_[1][1] ~ inv_gamma",
+                        mod$model_file, fixed = TRUE)))
+
+  expect_true(any(grepl("rho_gp_trend_timeby_season_[1][2] ~ inv_gamma",
                         mod$model_file, fixed = TRUE)))
 
   # Gp data structures should be in the model_data
