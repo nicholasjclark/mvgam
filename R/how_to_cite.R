@@ -88,7 +88,7 @@ how_to_cite.mvgam <- function(object, ...){
   citations[[1]] <- "Clark, NJ and Wells K (2022). Dynamic Generalized Additive Models (DGAMs) for forecasting discrete ecological time series. Methods in Ecology and Evolution, 14, 771-784. doi.org/10.1111/2041-210X.13974"
   citations[[2]] <- "Burkner, PC (2017). brms: An R Package for Bayesian Multilevel Models Using Stan. Journal of Statistical Software, 80(1), 1-28. doi:10.18637/jss.v080.i01"
   citations[[3]] <- "Wood, SN (2017). Generalized Additive Models: An Introduction with R (2nd edition). Chapman and Hall/CRC."
-  citations[[4]] <- "Wang W and Yan J (2021). Shape-Restricted Regression Splines with R Package splines2. Journal of Data Science, 19(3), 498-517. doi:10.6339/21-JDS1020 <https://doi.org/10.6339/21-JDS1020>."
+  citations[[4]] <- "Wang W and Yan J (2021). Shape-Restricted Regression Splines with R Package splines2. Journal of Data Science, 19(3), 498-517. doi:10.6339/21-JDS1020 https://doi.org/10.6339/21-JDS1020."
 
   # Any specials; first check whether this model used a VAR / VARMA process
   specials_text <- NULL
@@ -104,7 +104,7 @@ how_to_cite.mvgam <- function(object, ...){
                         'VARMA1,1cor')){
     specials_text <- c(
       specials_text,
-      " To encourage stability and prevent forecast variance from increasing indefinitely, we enforced stationarity of the Vector Autoregressive process following methods described in Heaps (2023)."
+      " To encourage stability and prevent forecast variance from increasing indefinitely, we enforced stationarity of the Vector Autoregressive process following methods described by Heaps (2023)."
     )
     citations <- append(
       citations,
@@ -117,7 +117,7 @@ how_to_cite.mvgam <- function(object, ...){
      !is.null(attr(object$trend_mgcv_model, 'gp_att_table'))){
     specials_text <- c(
       specials_text,
-      " Gaussian Process functional effects were estimated using a low-rank Hilbert space approximation following methods described in Riutort-Mayol et al. (2023)."
+      " Gaussian Process functional effects were estimated using a low-rank Hilbert space approximation following methods described by Riutort-Mayol et al. (2023)."
     )
     citations <- append(
       citations,
