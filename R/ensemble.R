@@ -114,7 +114,14 @@ ensemble.mvgam_forecast <- function(object, ..., ndraws = 5000){
     x[sampinds, ]
   }
 
-  # Create evenly weighted ensemble forecasts
+  # Create evenly weighted ensemble hindcasts and forecasts
+  ens_hcs <- lapply(seq_len(n_series), function(series){
+    all_hcs <- do.call(rbind,
+                       lapply(models,
+                              function(x) x$hindcasts[[series]]))
+    subsamp(all_hcs, ndraws)
+  })
+
   ens_fcs <- lapply(seq_len(n_series), function(series){
     all_fcs <- do.call(rbind,
                        lapply(models,
@@ -125,16 +132,11 @@ ensemble.mvgam_forecast <- function(object, ..., ndraws = 5000){
   # Initiate the ensemble forecast object
   ens_fc <- models[[1]]
 
-  # Add in forecasts
-  ens_fc$forecasts <- ens_fcs
-  names(ens_fc$forecasts) <- names(models[[1]]$forecasts)
-
-  # Ensure hindcasts have same number of samples
-  ens_hcs <- lapply(seq_len(n_series), function(series){
-    subsamp(ens_fc$hindcasts[[series]], ndraws)
-  })
+  # Add in hindcasts and forecasts
   ens_fc$hindcasts <- ens_hcs
+  ens_fc$forecasts <- ens_fcs
   names(ens_fc$hindcasts) <- names(models[[1]]$hindcasts)
+  names(ens_fc$forecasts) <- names(models[[1]]$forecasts)
 
   # Return
   return(ens_fc)
