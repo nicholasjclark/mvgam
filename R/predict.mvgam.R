@@ -505,9 +505,9 @@ terms_preds = function(object, newdata, summary = TRUE,
                           series = 'all',
                           mgcv_model = object$trend_mgcv_model)
     betas <- mcmc_chains(object$model_output, 'b_trend')
-    effect_names <- colnames(predict(object$trend_mgcv_model,
-                                         type = 'terms',
-                                         se.fit = FALSE))
+    effect_names <- colnames(predict(relabel_gps(object$trend_mgcv_model),
+                                     type = 'terms',
+                                     se.fit = FALSE))
     effect_names <- gsub('series', 'trend',
                          effect_names, fixed = TRUE)
     coef_names <- names(coef(object$trend_mgcv_model))
@@ -517,9 +517,9 @@ terms_preds = function(object, newdata, summary = TRUE,
     Xp <- obs_Xp_matrix(newdata = newdata,
                         mgcv_model = object$mgcv_model)
     betas <- mcmc_chains(object$model_output, 'b')
-    effect_names <- colnames(predict(object$mgcv_model,
-                                         type = 'terms',
-                                         se.fit = FALSE))
+    effect_names <- colnames(predict(relabel_gps(object$mgcv_model),
+                                     type = 'terms',
+                                     se.fit = FALSE))
     coef_names <- names(coef(object$mgcv_model))
   }
 
