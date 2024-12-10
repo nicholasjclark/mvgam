@@ -108,7 +108,7 @@ ensemble.mvgam_forecast <- function(object, ..., ndraws = 5000){
     if(NROW(x) < nsamps){
       sampinds <- sample(1:NROW(x), nsamps, replace = TRUE)
     } else {
-      sampinds <- 1:nsamps
+      sampinds <- sample(1:NROW(x), nsamps, replace = FALSE)
     }
 
     x[sampinds, ]
