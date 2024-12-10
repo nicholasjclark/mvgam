@@ -147,6 +147,8 @@ make_gp_additions = function(gp_details,
                       k = k_gps[[x]],
                       def_rho = gp_details$def_rho[x],
                       def_rho_2 = gp_details$def_rho_2[x],
+                      def_rho_3 = gp_details$def_rho_3[x],
+                      def_rho_4 = gp_details$def_rho_4[x],
                       def_alpha = gp_details$def_alpha[x],
                       eigenvalues = eigenvals[[x]])
 
@@ -525,14 +527,20 @@ get_gp_attributes = function(formula, data, family = gaussian()){
       def_alpha <- 'student_t(3, 0, 2.5);'
     }
     if(length(def_rho) > 1L){
+      def_rho_1 <- def_rho[1]
       def_rho_2 <- def_rho[2]
-      def_rho <- def_rho[1]
-      out <- data.frame(def_rho = def_rho,
+      out <- data.frame(def_rho = def_rho_1,
                         def_rho_2 = def_rho_2,
-                            def_alpha = def_alpha)
+                        def_rho_3 = NA,
+                        def_rho_4 = NA,
+                        def_alpha = def_alpha)
+      if(length(def_rho) > 2L) out$def_rho_3 <- def_rho[3]
+      if(length(def_rho) > 3L) out$def_rho_4 <- def_rho[4]
     } else {
       out <- data.frame(def_rho = def_rho,
                         def_rho_2 = NA,
+                        def_rho_3 = NA,
+                        def_rho_4 = NA,
                         def_alpha = def_alpha)
     }
     out
@@ -566,7 +574,9 @@ get_gp_attributes = function(formula, data, family = gaussian()){
                         level = NA,
                         def_alpha = gp_def_priors$def_alpha,
                         def_rho = gp_def_priors$def_rho,
-                        def_rho_2 = gp_def_priors$def_rho_2)
+                        def_rho_2 = gp_def_priors$def_rho_2,
+                        def_rho_3 = gp_def_priors$def_rho_3,
+                        def_rho_4 = gp_def_priors$def_rho_4)
   attr(ret_dat, 'gp_formula') <- gp_formula
 
   # Return as a data.frame
@@ -605,6 +615,10 @@ add_gp_model_file = function(model_file, model_data,
                        use.names = FALSE)
   rho_2_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_rho_2'),
                        use.names = FALSE)
+  rho_3_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_rho_3'),
+                         use.names = FALSE)
+  rho_4_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_rho_4'),
+                         use.names = FALSE)
   alpha_priors <- unlist(purrr::map(gp_additions$gp_att_table, 'def_alpha'),
                          use.names = FALSE)
 
@@ -631,6 +645,11 @@ add_gp_model_file = function(model_file, model_data,
   gp_names_clean <- clean_gpnames(gp_names)
   s_to_remove <- list()
   for(i in seq_along(gp_names)){
+    i_rho_priors <- c(rho_priors[i],
+                      rho_2_priors[i],
+                      rho_3_priors[i],
+                      rho_4_priors[i])
+    i_rho_priors <- i_rho_priors[!is.na(i_rho_priors)]
     s_name <- gsub(' ', '', orig_names[i])
     to_replace <- grep(paste0('// prior for ', s_name, '...'),
                        model_file, fixed = TRUE) + 1
@@ -664,7 +683,7 @@ add_gp_model_file = function(model_file, model_data,
              if(gp_isos[i]){
                rho_priors[i]
              } else {
-               c(rho_priors[i], rho_2_priors[i])
+               i_rho_priors
              },
              ';\n'),
              collapse = '\n'

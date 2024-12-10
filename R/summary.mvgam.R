@@ -916,6 +916,8 @@ gp_param_summary = function(object,
                      use.names = FALSE)
   gp_isos <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'iso'),
                     use.names = FALSE)
+  gp_dims <- unlist(purrr::map(attr(mgcv_model, 'gp_att_table'), 'dim'),
+                    use.names = FALSE)
 
   # Create full list of rho parameter names
   full_names <- vector(mode = 'list', length = length(gp_names))
@@ -925,7 +927,7 @@ gp_param_summary = function(object,
     } else {
       full_names[[i]] <- paste0(gp_names[i],
                                 '[',
-                                1:2,
+                                1:gp_dims[i],
                                 ']')
     }
   }

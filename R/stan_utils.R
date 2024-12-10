@@ -2780,12 +2780,29 @@ add_trend_predictors = function(trend_formula,
       }
     }
 
+    all_gp_prior_lines = function(model_file,
+                                  prior_line,
+                                  max_break = 10){
+      last <- prior_line + max_break
+      for(i in prior_line:(prior_line + max_break)){
+        if(!grepl('b_raw[', model_file[i],
+                  fixed = TRUE)){
+        } else {
+          last <- i
+          break
+        }
+      }
+      (prior_line + 1) : last
+    }
+
     if(any(grepl('// prior for gp', trend_model_file))){
-      starts <- grep('// prior for gp', trend_model_file, fixed = TRUE) + 1
+      starts <- grep('// prior for gp', trend_model_file, fixed = TRUE)
       ends <- grep('// prior for gp', trend_model_file, fixed = TRUE) + 4
       for(i in seq_along(starts)){
         spline_coef_lines <- c(spline_coef_lines,
-                               paste(trend_model_file[starts[i]:ends[i]],
+                               paste(trend_model_file[all_gp_prior_lines(trend_model_file,
+                                                                         starts[i],
+                                                                         max_break = 10)],
                                      collapse = '\n'))
       }
     }
