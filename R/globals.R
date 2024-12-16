@@ -26,4 +26,4 @@ utils::globalVariables(c("y", "year", "smooth_vals", "smooth_num",
                          "value", "threshold", "colour", "resids",
                          "c_dark", "eval_timepoints", "yqlow",
                          "ymidlow", "ymidhigh", "yqhigh", "preds",
-                         "yhigh", "ylow"))
+                         "yhigh", "ylow", "weight", "orig_weight"))

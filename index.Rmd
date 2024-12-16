@@ -86,8 +86,9 @@ Various `S3` functions can be used to inspect parameter estimates, plot smooth f
 You can set `build_vignettes = TRUE` when installing but be aware this will slow down the installation drastically. Instead, you can always access the vignette htmls online at [https://nicholasjclark.github.io/mvgam/articles/](https://nicholasjclark.github.io/mvgam/articles/)
 
 ## Other resources
-A number of case studies have been compiled to highlight how GAMs and DGAMs can be useful for working with time series data:
+A number of case studies and step-by-step webinars have been compiled to highlight how GAMs and DGAMs can be useful for analysing multivariate data:
   
+* [Time series in R and Stan using the `mvgam` package](https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3){target="_blank"}
 * [Ecological Forecasting with Dynamic Generalized Additive Models](https://www.youtube.com/watch?v=0zZopLlomsQ){target="_blank"}
 * [State-Space Vector Autoregressions in `mvgam`](https://ecogambler.netlify.app/blog/vector-autoregressions/){target="_blank"}
 * [How to interpret and report nonlinear effects from Generalized Additive Models](https://ecogambler.netlify.app/blog/interpreting-gams/){target="_blank"}

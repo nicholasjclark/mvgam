@@ -338,3 +338,41 @@ test_that("forecast and ensemble have reasonable outputs", {
   # ndraws must be positive integer
   expect_error(ensemble(fc, fc2, ndraws = 0))
 })
+
+test_that("ensemble gives equal pooling", {
+  set.seed(1234)
+  mvgam_examp_dat <- sim_mvgam(family = gaussian(),
+                               T = 40,
+                               prop_missing = 0.1)
+  newdat <- mvgam_examp_dat$data_test
+  fc <- forecast(object = mvgam:::mvgam_example4,
+                 newdata = newdat)
+  fc2 <- forecast(object = mvgam:::mvgam_example3,
+                  newdata = newdat)
+
+  # Replace casts with dummy data
+  fc$hindcasts = lapply(fc$hindcasts,
+                        \(series_hcs) matrix(4, 1, ncol(series_hcs)))
+  fc2$hindcasts = lapply(fc2$hindcasts,
+                         \(series_hcs) matrix(5, 10, ncol(series_hcs)))
+  fc$forecasts = lapply(fc$forecasts,
+                        \(series_fcs) matrix(1, 1, ncol(series_fcs)))
+  fc2$forecasts = lapply(fc2$forecasts,
+                         \(series_fcs) matrix(2, 10, ncol(series_fcs)))
+
+  n_draws <- 500
+  fc_ens <- ensemble(fc, fc2, ndraws = n_draws)
+
+  # Expect that roughly 50% of hindcasts should be a 4 and 50% a 5
+  four_props <- unlist(lapply(seq_along(fc_ens$hindcasts), function(x){
+    length(which(fc_ens$hindcasts[[x]] == 4)) / length(fc_ens$hindcasts[[x]])
+  }), use.names = FALSE)
+  expect_equal(four_props, rep(0.5, 3),  tolerance = 0.025)
+
+  # Expect that roughly 50% of forecasts should be a 1 and 50% a 2
+  two_props <- unlist(lapply(seq_along(fc_ens$hindcasts), function(x){
+    length(which(fc_ens$forecasts[[x]] == 2)) / length(fc_ens$forecasts[[x]])
+  }), use.names = FALSE)
+  expect_equal(two_props, rep(0.5, 3), tolerance = 0.025)
+})
+

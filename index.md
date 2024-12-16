@@ -159,9 +159,14 @@ access the vignette htmls online at
 
 ## Other resources
 
-A number of case studies have been compiled to highlight how GAMs and
-DGAMs can be useful for working with time series data:
+A number of case studies and step-by-step webinars have been compiled to
+highlight how GAMs and DGAMs can be useful for analysing multivariate
+data:
 
+- <a
+  href="https://www.youtube.com/playlist?list=PLzFHNoUxkCvsFIg6zqogylUfPpaxau_a3"
+  target="_blank">Time series in R and Stan using the <code>mvgam</code>
+  package</a>
 - <a href="https://www.youtube.com/watch?v=0zZopLlomsQ"
   target="_blank">Ecological Forecasting with Dynamic Generalized Additive
   Models</a>
