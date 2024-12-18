@@ -231,11 +231,20 @@ predict.mvgam = function(object,
         lv_coefs <- mcmc_chains(object$model_output, 'lv_coefs')
         n_draws <- dim(mcmc_chains(object$model_output, 'b'))[1]
         series_ind <- as.numeric(newdata$series)
-        all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
-                                                    function(row) Xp %*% row +
-                                                      attr(Xp, 'model.offset')))))
-        attr(all_linpreds, 'model.offset') <- 0
+
         trend_predictions_raw <- lapply(1:object$n_lv, function(x){
+          # Linear predictor matrix for the latent process models
+          Xp <- trend_Xp_matrix(newdata = newdata,
+                                trend_map = data.frame(
+                                  trend = x,
+                                  series = unique(object$trend_map$series)
+                                  ),
+                                series = 'all',
+                                mgcv_model = object$trend_mgcv_model)
+          all_linpreds <- as.matrix(as.vector(t(apply(as.matrix(betas), 1,
+                                                      function(row) Xp %*% row +
+                                                        attr(Xp, 'model.offset')))))
+          attr(all_linpreds, 'model.offset') <- 0
           pred_vec <- mvgam_predict(family = 'gaussian',
                                     Xp = all_linpreds,
                                     type = 'response',
