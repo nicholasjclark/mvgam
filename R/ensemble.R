@@ -102,31 +102,56 @@ ensemble.mvgam_forecast <- function(object, ..., ndraws = 5000){
   # End of checks; now proceed with ensembling
   n_series <- length(models[[1]]$series_names)
 
-  # Function to random sample rows of a matrix with
-  # replacement (in case some forecasts contain fewer draws than others)
-  subsamp <- function(x, nsamps){
-    if(NROW(x) < nsamps){
-      sampinds <- sample(1:NROW(x), nsamps, replace = TRUE)
-    } else {
-      sampinds <- sample(1:NROW(x), nsamps, replace = FALSE)
-    }
+  # Calculate total number of forecast draws to sample from for each model
+  n_mod_draws <- lapply(seq_len(n_models), function(x){
+    NROW(models[[x]]$forecasts[[1]])
+  })
 
-    x[sampinds, ]
-  }
+  # Calculate model weights (only option at the moment is even weighting,
+  # but this may be relaxed in future)
+  mod_weights <- data.frame(mod = paste0('mod', 1:n_models),
+                            orig_weight = 1 / n_models,
+                            ndraws = unlist(n_mod_draws,
+                                            use.names = FALSE)) %>%
+    # Adjust weights by the number of draws available per
+    # forecast, ensuring that models with fewer draws aren't
+    # under-represented in the final weighted ensemble
+    dplyr::mutate(weight = (orig_weight / ndraws) * 100) %>%
+    dplyr::mutate(mod = as.factor(mod)) %>%
+    dplyr::select(mod, weight)
 
-  # Create evenly weighted ensemble hindcasts and forecasts
+  # Create draw indices
+  mod_inds <- as.factor(unlist(lapply(seq_len(n_models), function(x){
+    rep(paste0('mod', x), NROW(models[[x]]$forecasts[[1]]))
+  }), use.names = FALSE))
+  all_draw_inds <- 1:sum(unlist(n_mod_draws,
+                                use.names = FALSE))
+  mod_inds_draws <- split(all_draw_inds, mod_inds)
+
+  # Add model-specific weights to the draw indices
+  draw_weights <- data.frame(draw = all_draw_inds,
+                             mod = mod_inds) %>%
+    dplyr::left_join(mod_weights, by = 'mod')
+
+  # Perform multinomial sampling using draw-specific weights
+  fc_draws <- sample(all_draw_inds,
+                     size = ndraws,
+                     replace = max(all_draw_inds) < ndraws,
+                     prob = draw_weights$weight)
+
+  # Create weighted ensemble hindcasts and forecasts
   ens_hcs <- lapply(seq_len(n_series), function(series){
     all_hcs <- do.call(rbind,
                        lapply(models,
                               function(x) x$hindcasts[[series]]))
-    subsamp(all_hcs, ndraws)
+    all_hcs[fc_draws, ]
   })
 
   ens_fcs <- lapply(seq_len(n_series), function(series){
     all_fcs <- do.call(rbind,
                        lapply(models,
                               function(x) x$forecasts[[series]]))
-    subsamp(all_fcs, ndraws)
+    all_fcs[fc_draws, ]
   })
 
   # Initiate the ensemble forecast object
