@@ -311,7 +311,7 @@ ggplot(dat, aes(x = count)) +
   geom_histogram() +
   facet_wrap(~ species, scales = 'free')
 
-ggplot(dat, aes(x = lat, y = lon, col = log(count + 1))) +
+ggplot(dat, aes(x = lon, y = lat, col = log(count + 1))) +
   geom_point(size = 2.25) +
   facet_wrap(~ species, scales = 'free') +
   scale_color_viridis_c() +
@@ -325,7 +325,7 @@ priors <- get_mvgam_priors(formula = count ~
 
                           # Each factor estimates a different nonlinear spatial process, using
                           # 'by = trend' as in other mvgam State-Space models
-                          factor_formula = ~ gp(lat, lon, k = 6, by = trend) - 1,
+                          factor_formula = ~ gp(lon, lat, k = 6, by = trend) - 1,
                           n_lv = 3,
 
                           # The data and grouping variables
@@ -346,7 +346,7 @@ mod <- jsdgam(formula = count ~
 
               # Each factor estimates a different nonlinear spatial process, using
               # 'by = trend' as in other mvgam State-Space models
-              factor_formula = ~ gp(lat, lon, k = 6, by = trend) - 1,
+              factor_formula = ~ gp(lon, lat, k = 6, by = trend) - 1,
               n_lv = 3,
 
               # Change default priors for fixed random effect variances and
@@ -354,11 +354,11 @@ mod <- jsdgam(formula = count ~
               priors = c(prior(std_normal(),
                                class = sigma_raw),
                          prior(std_normal(),
-                               class = `alpha_gp_trend(lat, lon):trendtrend1`),
+                               class = `alpha_gp_trend(lon, lat):trendtrend1`),
                          prior(std_normal(),
-                               class = `alpha_gp_trend(lat, lon):trendtrend2`),
+                               class = `alpha_gp_trend(lon, lat):trendtrend2`),
                          prior(std_normal(),
-                               class = `alpha_gp_trend(lat, lon):trendtrend3`)),
+                               class = `alpha_gp_trend(lon, lat):trendtrend3`)),
 
               # The data and the grouping variables
               data = dat,
@@ -417,7 +417,7 @@ preds <- predict(mod, newdata = newdata)
 
 # Plot the median log(count) predictions on a grid
 newdata$log_count <- preds[,1]
-ggplot(newdata, aes(x = lat, y = lon, col = log_count)) +
+ggplot(newdata, aes(x = lon, y = lat, col = log_count)) +
   geom_point(size = 1.5) +
   facet_wrap(~ species, scales = 'free') +
   scale_color_viridis_c() +

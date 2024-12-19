@@ -450,7 +450,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</span>
 <span class="r-plt img"><img src="jsdgam-1.png" alt="" width="700" height="433"></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">dat</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">lat</span>, y <span class="op">=</span> <span class="va">lon</span>, col <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="va">count</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">dat</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">lon</span>, y <span class="op">=</span> <span class="va">lat</span>, col <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">log</a></span><span class="op">(</span><span class="va">count</span> <span class="op">+</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>size <span class="op">=</span> <span class="fl">2.25</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">species</span>, scales <span class="op">=</span> <span class="st">'free'</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_viridis.html" class="external-link">scale_color_viridis_c</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
@@ -465,7 +465,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>                          <span class="co"># Each factor estimates a different nonlinear spatial process, using</span></span></span>
 <span class="r-in"><span>                          <span class="co"># 'by = trend' as in other mvgam State-Space models</span></span></span>
-<span class="r-in"><span>                          factor_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp</a></span><span class="op">(</span><span class="va">lat</span>, <span class="va">lon</span>, k <span class="op">=</span> <span class="fl">6</span>, by <span class="op">=</span> <span class="va">trend</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>                          factor_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp</a></span><span class="op">(</span><span class="va">lon</span>, <span class="va">lat</span>, k <span class="op">=</span> <span class="fl">6</span>, by <span class="op">=</span> <span class="va">trend</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
 <span class="r-in"><span>                          n_lv <span class="op">=</span> <span class="fl">3</span>,</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>                          <span class="co"># The data and grouping variables</span></span></span>
@@ -483,30 +483,30 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1                                         (Intercept)            1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2                                   vector[1] mu_raw;            1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 3                       vector&lt;lower=0&gt;[1] sigma_raw;            1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 real&lt;lower=0&gt; alpha_gp_trend(lat, lon):trendtrend1;            1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 real&lt;lower=0&gt; alpha_gp_trend(lat, lon):trendtrend2;            1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 real&lt;lower=0&gt; alpha_gp_trend(lat, lon):trendtrend3;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 real&lt;lower=0&gt; alpha_gp_trend(lon, lat):trendtrend1;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 real&lt;lower=0&gt; alpha_gp_trend(lon, lat):trendtrend2;            1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 real&lt;lower=0&gt; alpha_gp_trend(lon, lat):trendtrend3;            1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                    param_info</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1                                 (Intercept)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2             s(species):temperature pop mean</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 3               s(species):temperature pop sd</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 gp(lat, lon):trendtrend1 marginal deviation</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 gp(lat, lon):trendtrend2 marginal deviation</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 gp(lat, lon):trendtrend3 marginal deviation</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 gp(lon, lat):trendtrend1 marginal deviation</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 gp(lon, lat):trendtrend2 marginal deviation</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 gp(lon, lat):trendtrend3 marginal deviation</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                                          prior</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1                        (Intercept) ~ student_t(3, 2.1, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2                                       mu_raw ~ std_normal();</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 3                            sigma_raw ~ student_t(3, 0, 2.5);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 alpha_gp_trend(lat, lon):trendtrend1 ~ student_t(3, 0, 2.5);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 alpha_gp_trend(lat, lon):trendtrend2 ~ student_t(3, 0, 2.5);</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 alpha_gp_trend(lat, lon):trendtrend3 ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 alpha_gp_trend(lon, lat):trendtrend1 ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 alpha_gp_trend(lon, lat):trendtrend2 ~ student_t(3, 0, 2.5);</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 alpha_gp_trend(lon, lat):trendtrend3 ~ student_t(3, 0, 2.5);</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                                            example_change new_lowerbound</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1                             (Intercept) ~ normal(0, 1);           &lt;NA&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2                            mu_raw ~ normal(0.65, 0.15);           &lt;NA&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 3                          sigma_raw ~ exponential(0.27);           &lt;NA&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 4 alpha_gp_trend(lat, lon):trendtrend1 ~ normal(0, 0.86);           &lt;NA&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 5 alpha_gp_trend(lat, lon):trendtrend2 ~ normal(0, 0.84);           &lt;NA&gt;</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> 6 alpha_gp_trend(lat, lon):trendtrend3 ~ normal(0, 0.78);           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 4 alpha_gp_trend(lon, lat):trendtrend1 ~ normal(0, 0.86);           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 5 alpha_gp_trend(lon, lat):trendtrend2 ~ normal(0, 0.84);           &lt;NA&gt;</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 6 alpha_gp_trend(lon, lat):trendtrend3 ~ normal(0, 0.78);           &lt;NA&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   new_upperbound</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1           &lt;NA&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 2           &lt;NA&gt;</span>
@@ -524,7 +524,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>              <span class="co"># Each factor estimates a different nonlinear spatial process, using</span></span></span>
 <span class="r-in"><span>              <span class="co"># 'by = trend' as in other mvgam State-Space models</span></span></span>
-<span class="r-in"><span>              factor_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp</a></span><span class="op">(</span><span class="va">lat</span>, <span class="va">lon</span>, k <span class="op">=</span> <span class="fl">6</span>, by <span class="op">=</span> <span class="va">trend</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
+<span class="r-in"><span>              factor_formula <span class="op">=</span> <span class="op">~</span> <span class="fu"><a href="https://paulbuerkner.com/brms/reference/gp.html" class="external-link">gp</a></span><span class="op">(</span><span class="va">lon</span>, <span class="va">lat</span>, k <span class="op">=</span> <span class="fl">6</span>, by <span class="op">=</span> <span class="va">trend</span><span class="op">)</span> <span class="op">-</span> <span class="fl">1</span>,</span></span>
 <span class="r-in"><span>              n_lv <span class="op">=</span> <span class="fl">3</span>,</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>              <span class="co"># Change default priors for fixed random effect variances and</span></span></span>
@@ -532,11 +532,11 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span>              priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                               class <span class="op">=</span> <span class="va">sigma_raw</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                         <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                               class <span class="op">=</span> <span class="va">`alpha_gp_trend(lat, lon):trendtrend1`</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                               class <span class="op">=</span> <span class="va">`alpha_gp_trend(lon, lat):trendtrend1`</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                         <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                               class <span class="op">=</span> <span class="va">`alpha_gp_trend(lat, lon):trendtrend2`</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                               class <span class="op">=</span> <span class="va">`alpha_gp_trend(lon, lat):trendtrend2`</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>                         <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>,</span></span>
-<span class="r-in"><span>                               class <span class="op">=</span> <span class="va">`alpha_gp_trend(lat, lon):trendtrend3`</span><span class="op">)</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>                               class <span class="op">=</span> <span class="va">`alpha_gp_trend(lon, lat):trendtrend3`</span><span class="op">)</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span>              <span class="co"># The data and the grouping variables</span></span></span>
 <span class="r-in"><span>              data <span class="op">=</span> <span class="va">dat</span>,</span></span>
@@ -547,6 +547,19 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span>              family <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson</a></span><span class="op">(</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>              chains <span class="op">=</span> <span class="fl">2</span>,</span></span>
 <span class="r-in"><span>              silent <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> In file included from stan/lib/stan_math/stan/math/prim/prob/von_mises_lccdf.hpp:5,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob/von_mises_ccdf_log.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim/prob.hpp:359,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/prim.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math/rev.hpp:16,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/lib/stan_math/stan/math.hpp:19,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from stan/src/stan/model/model_header.hpp:4,</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>                  from C:/Users/uqnclar2/AppData/Local/Temp/RtmpwbtRRG/model-2c78394a3e74.hpp:2:</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp: In function 'stan::return_type_t&lt;T_x, T_sigma, T_l&gt; stan::math::von_mises_cdf(const T_x&amp;, const T_mu&amp;, const T_k&amp;)':</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: '-Wmisleading-indentation' is disabled from this point onwards, since column-tracking was disabled due to the size of the code/headers</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>   194 |       if (cdf_n &lt; 0.0)</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span>       | </span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> stan/lib/stan_math/stan/math/prim/prob/von_mises_cdf.hpp:194: note: adding '-flarge-source-files' will allow for more column-tracking support, at the expense of compilation time and memory</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot species-level intercept estimates</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span></span>
@@ -577,25 +590,25 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span><span class="co"># some of the estimated correlations</span></span></span>
 <span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>            species_1  species_2   species_3  species_4   species_5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.7336280  0.72991602  0.7861474 -0.24696228</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.7336280  1.0000000  0.15420441  0.3813268 -0.47995732</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.7299160  0.1542044  1.00000000  0.8908844 -0.03924676</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.7861474  0.3813268  0.89088435  1.0000000 -0.44731327</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.2469623 -0.4799573 -0.03924676 -0.4473133  1.00000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.7606789  0.70196887  0.7628489 -0.25099259</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.7606789  1.0000000  0.18720736  0.4210261 -0.49124204</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.7019689  0.1872074  1.00000000  0.8902954 -0.06361541</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.7628489  0.4210261  0.89029541  1.0000000 -0.47114518</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.2509926 -0.4912420 -0.06361541 -0.4711452  1.00000000</span>
 <span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor_upper</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>           species_1  species_2 species_3  species_4  species_5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_1 1.0000000  0.9242392 0.9566867  0.9575828  0.1509028</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 0.9242392  1.0000000 0.5199946  0.7191710 -0.1730502</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_3 0.9566867  0.5199946 1.0000000  0.9774616  0.3136909</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_4 0.9575828  0.7191710 0.9774616  1.0000000 -0.1076519</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 0.1509028 -0.1730502 0.3136909 -0.1076519  1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1 1.0000000  0.9596571 0.9345862  0.9434505  0.1851578</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2 0.9596571  1.0000000 0.5336101  0.7186475 -0.1905583</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3 0.9345862  0.5336101 1.0000000  0.9751394  0.2694864</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4 0.9434505  0.7186475 0.9751394  1.0000000 -0.1440963</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 0.1851578 -0.1905583 0.2694864 -0.1440963  1.0000000</span>
 <span class="r-in"><span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor_lower</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>            species_1  species_2  species_3  species_4  species_5</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.4226772  0.4168132  0.4720316 -0.6018739</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.4226772  1.0000000 -0.2345903 -0.0158343 -0.7385235</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.4168132 -0.2345903  1.0000000  0.7304959 -0.3965220</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.4720316 -0.0158343  0.7304959  1.0000000 -0.7197583</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.6018739 -0.7385235 -0.3965220 -0.7197583  1.0000000</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_1  1.0000000  0.4727149  0.2516898  0.3537814 -0.6142443</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_2  0.4727149  1.0000000 -0.1914547  0.0542295 -0.7282459</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_3  0.2516898 -0.1914547  1.0000000  0.7389518 -0.3915772</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_4  0.3537814  0.0542295  0.7389518  1.0000000 -0.7116399</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> species_5 -0.6142443 -0.7282459 -0.3915772 -0.7116399  1.0000000</span>
 <span class="r-in"><span><span class="co"># A quick and dirty plot of the posterior median correlations</span></span></span>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/graphics/image.html" class="external-link">image</a></span><span class="op">(</span><span class="va">post_cors</span><span class="op">$</span><span class="va">cor</span><span class="op">)</span></span></span>
 <span class="r-plt img"><img src="jsdgam-7.png" alt="" width="700" height="433"></span>
@@ -610,17 +623,17 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Computed from 1000 by 600 log-likelihood matrix.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>          Estimate    SE</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo  -2190.8  51.4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo       421.9  27.1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> looic      4381.6 102.8</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> elpd_loo  -2189.4  50.5</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> p_loo       421.9  26.3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> looic      4378.8 100.9</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> ------</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> MCSE of elpd_loo is NA.</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> MCSE and ESS estimates assume MCMC draws (r_eff in [0.0, 1.6]).</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Pareto k diagnostic values:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                           Count Pct.    Min. ESS</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     438   73.0%   1       </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)      132   22.0%   &lt;NA&gt;    </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (-Inf, 0.67]   (good)     441   73.5%   1       </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    (0.67, 1]   (bad)      129   21.5%   &lt;NA&gt;    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     (1, Inf)   (very bad)  30    5.0%   &lt;NA&gt;    </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> See help('pareto-k-diagnostic') for details.</span>
 <span class="r-in"><span></span></span>
@@ -639,7 +652,7 @@ Trends in Ecology &amp; Evolution 30:12, 766-779.</p>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Plot the median log(count) predictions on a grid</span></span></span>
 <span class="r-in"><span><span class="va">newdata</span><span class="op">$</span><span class="va">log_count</span> <span class="op">&lt;-</span> <span class="va">preds</span><span class="op">[</span>,<span class="fl">1</span><span class="op">]</span></span></span>
-<span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">newdata</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">lat</span>, y <span class="op">=</span> <span class="va">lon</span>, col <span class="op">=</span> <span class="va">log_count</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">newdata</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">lon</span>, y <span class="op">=</span> <span class="va">lat</span>, col <span class="op">=</span> <span class="va">log_count</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span>size <span class="op">=</span> <span class="fl">1.5</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/facet_wrap.html" class="external-link">facet_wrap</a></span><span class="op">(</span><span class="op">~</span> <span class="va">species</span>, scales <span class="op">=</span> <span class="st">'free'</span><span class="op">)</span> <span class="op">+</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_viridis.html" class="external-link">scale_color_viridis_c</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span></span>
