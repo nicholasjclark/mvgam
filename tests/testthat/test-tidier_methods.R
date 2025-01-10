@@ -1,5 +1,33 @@
 context("tidier methods")
 
+# `tidy()` tests
+test_that("`tidy()` snapshot value of `mvgam_example1`", {
+  local_edition(3)
+  expect_snapshot_value(tidy.mvgam(mvgam_example1), style = "json2")
+})
+
+test_that("`tidy()` snapshot value of `mvgam_example2`", {
+  local_edition(3)
+  expect_snapshot_value(tidy.mvgam(mvgam_example2), style = "json2")
+})
+
+test_that("`tidy()` snapshot value of `mvgam_example3`", {
+  local_edition(3)
+  expect_snapshot_value(tidy.mvgam(mvgam_example3), style = "json2")
+})
+
+test_that("`tidy()` snapshot value of `mvgam_example4`", {
+  local_edition(3)
+  expect_snapshot_value(tidy.mvgam(mvgam_example4), style = "json2")
+})
+
+test_that("`tidy()` snapshot value of `mvgam_example5`", {
+  local_edition(3)
+  expect_snapshot_value(tidy.mvgam(mvgam_example5), style = "json2")
+})
+
+
+# `augment()` tests
 test_that("augment doesn't error", {
   expect_no_error(augment(mvgam:::mvgam_example1))
   expect_no_error(augment(mvgam:::mvgam_example5))
