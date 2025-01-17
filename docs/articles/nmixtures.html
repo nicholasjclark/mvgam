@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/v4-shims.min.css" integrity="sha256-wZjR52fzng1pJHwx4aV2AO3yyTOXrcDW7jBpJtTwVxw=" crossorigin="anonymous">
 <!-- bootstrap-toc --><script src="https://cdn.jsdelivr.net/gh/afeld/bootstrap-toc@v1.0.1/dist/bootstrap-toc.min.js" integrity="sha256-4veVQbu7//Lk5TSmc7YV48MxtMy98e26cf5MrgZYnwo=" crossorigin="anonymous"></script><!-- headroom.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/headroom.min.js" integrity="sha256-AsUX4SJE1+yuDu5+mAVzJbuYNPHj/WroHuZ8Ir/CkE0=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/headroom/0.11.0/jQuery.headroom.min.js" integrity="sha256-ZX/yNShbjqsohH1k95liqY9Gd8uOiE1S4vZc+9KQ1K4=" crossorigin="anonymous"></script><!-- clipboard.js --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><!-- search --><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/autocomplete.js/0.38.0/autocomplete.jquery.min.js" integrity="sha512-GU9ayf+66Xx2TmpxqJpliWbT5PiGYxpaG8rfnBEk1LL8l1KGkRShhngwdXK1UgqhAzWpZHSiYPc09/NwDQIGyg==" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/mark.min.js" integrity="sha512-5CYOlHXGh6QpOFA/TeTylKLWfB3ftPsde7AnmhuitiTX4K5SqCLBeKro6sPS8ilsz1Q4NRx3v8Ko2IBiszzdww==" crossorigin="anonymous"></script><!-- pkgdown --><script src="../pkgdown.js"></script><meta property="og:title" content="N-mixtures in mvgam">
 <meta property="og:description" content="mvgam">
+<meta property="og:image" content="https://nicholasjclark.github.io/mvgam/logo.png">
 <!-- mathjax --><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js" integrity="sha256-nvJJv9wWKEm88qvoQl9ekL2J+k/RWIsaSScxxlsrv8k=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/config/TeX-AMS-MML_HTMLorMML.js" integrity="sha256-84DKXVJXs0/F8OTMzX4UR909+jtl4G7SPypPavF+GfA=" crossorigin="anonymous"></script><!--[if lt IE 9]>
 <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
 <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
@@ -26,7 +27,7 @@
     
     <a class="navbar-brand me-2" href="../index.html">mvgam</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.4</small>
 
     
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -77,11 +78,11 @@
 
 <div class="row">
   <main id="main" class="col-md-9"><div class="page-header">
-      <img src="" class="logo" alt=""><h1>N-mixtures in mvgam</h1>
+      <img src="../logo.png" class="logo" alt=""><h1>N-mixtures in mvgam</h1>
                         <h4 data-toc-skip class="author">Nicholas J
 Clark</h4>
             
-            <h4 data-toc-skip class="date">2024-09-03</h4>
+            <h4 data-toc-skip class="date">2025-01-17</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/nicholasjclark/mvgam/blob/HEAD/vignettes/nmixtures.Rmd" class="external-link"><code>vignettes/nmixtures.Rmd</code></a></small>
       <div class="d-none name"><code>nmixtures.Rmd</code></div>
@@ -309,8 +310,8 @@ Bayesian inference</p>
 <span>  data <span class="op">=</span> <span class="va">testdat</span>,</span>
 <span>  </span>
 <span>  <span class="co"># priors can be set in the usual way</span></span>
-<span>  priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">b</span><span class="op">)</span>,</span>
-<span>             <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept_trend</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">b</span><span class="op">)</span>,</span>
+<span>             <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">normal</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">1.5</span><span class="op">)</span>, class <span class="op">=</span> <span class="va">Intercept_trend</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  samples <span class="op">=</span> <span class="fl">1000</span><span class="op">)</span></span></code></pre></div>
 <p>View the automatically-generated <code>Stan</code> code to get a
 sense of how the marginalization over latent N works</p>
@@ -439,21 +440,31 @@ sense of how the marginalization over latent N works</p>
 <span><span class="co">#&gt;       // all log_lambdas are identical because they represent site*time</span></span>
 <span><span class="co">#&gt;       // covariates; so just use the first measurement</span></span>
 <span><span class="co">#&gt;       real log_lambda = flat_trends[K_inds[k, 1]];</span></span>
-<span><span class="co">#&gt;       vector[N_max[k] - Y_max[k] + 1] terms;</span></span>
-<span><span class="co">#&gt;       int l = 0;</span></span>
 <span><span class="co">#&gt;       </span></span>
-<span><span class="co">#&gt;       // marginalize over latent abundance</span></span>
-<span><span class="co">#&gt;       for (Ni in Y_max[k] : N_max[k]) {</span></span>
-<span><span class="co">#&gt;         l = l + 1;</span></span>
-<span><span class="co">#&gt;         // factor for poisson prob of latent Ni; compute</span></span>
-<span><span class="co">#&gt;         </span></span>
-<span><span class="co">#&gt;         // only once per sampling window</span></span>
-<span><span class="co">#&gt;         terms[l] = poisson_log_lpmf(Ni | log_lambda)</span></span>
-<span><span class="co">#&gt;                    + // for each replicate observation, binomial prob observed is</span></span>
-<span><span class="co">#&gt;                    // computed in a vectorized statement</span></span>
-<span><span class="co">#&gt;                    binomial_logit_lpmf(flat_ys[K_inds[k, K_starts[k] : K_stops[k]]] | Ni, flat_ps[K_inds[k, K_starts[k] : K_stops[k]]]);</span></span>
+<span><span class="co">#&gt;       // logit-scale detection probilities for the replicate observations</span></span>
+<span><span class="co">#&gt;       vector[size(K_inds[k, K_starts[k] : K_stops[k]])] logit_p = to_vector(flat_ps[K_inds[k, K_starts[k] : K_stops[k]]]);</span></span>
+<span><span class="co">#&gt;       </span></span>
+<span><span class="co">#&gt;       // K values and observed counts for these replicates</span></span>
+<span><span class="co">#&gt;       int K_max = N_max[k];</span></span>
+<span><span class="co">#&gt;       int K_min = Y_max[k];</span></span>
+<span><span class="co">#&gt;       array[size(K_inds[k, K_starts[k] : K_stops[k]])] int N_obs = flat_ys[K_inds[k, K_starts[k] : K_stops[k]]];</span></span>
+<span><span class="co">#&gt;       int possible_N = K_max - K_min;</span></span>
+<span><span class="co">#&gt;       </span></span>
+<span><span class="co">#&gt;       // marginalize over possible latent counts analytically</span></span>
+<span><span class="co">#&gt;       real ff = exp(log_lambda) * prod(1 - inv_logit(logit_p));</span></span>
+<span><span class="co">#&gt;       real prob_n = 1;</span></span>
+<span><span class="co">#&gt;       for (i in 1 : possible_N) {</span></span>
+<span><span class="co">#&gt;         real N = K_max - i + 1;</span></span>
+<span><span class="co">#&gt;         real k_obs = 1;</span></span>
+<span><span class="co">#&gt;         for (j in 1 : size(N_obs)) {</span></span>
+<span><span class="co">#&gt;           k_obs *= N / (N - N_obs[j]);</span></span>
+<span><span class="co">#&gt;         }</span></span>
+<span><span class="co">#&gt;         prob_n = 1 + prob_n * ff * k_obs / N;</span></span>
 <span><span class="co">#&gt;       }</span></span>
-<span><span class="co">#&gt;       target += log_sum_exp(terms);</span></span>
+<span><span class="co">#&gt;       </span></span>
+<span><span class="co">#&gt;       // add log(pr_n) to prob(K_min)</span></span>
+<span><span class="co">#&gt;       target += poisson_log_lpmf(K_min | log_lambda)</span></span>
+<span><span class="co">#&gt;                 + binomial_logit_lpmf(N_obs | K_min, logit_p) + log(prob_n);</span></span>
 <span><span class="co">#&gt;     }</span></span>
 <span><span class="co">#&gt;   }</span></span>
 <span><span class="co">#&gt; }</span></span>
@@ -497,59 +508,60 @@ nicely</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;              2.5%   50% 97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; speciessp_1 -0.29 0.710  1.40    1  1582</span></span>
-<span><span class="co">#&gt; speciessp_2 -1.20 0.012  0.89    1  2164</span></span>
+<span><span class="co">#&gt; speciessp_1 -0.28 0.710  1.40    1  2060</span></span>
+<span><span class="co">#&gt; speciessp_2 -1.20 0.014  0.89    1  1892</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM process model coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;                               2.5%     50%  97.5% Rhat n_eff</span></span>
-<span><span class="co">#&gt; (Intercept)_trend            2.700  3.0000  3.400    1  1397</span></span>
-<span><span class="co">#&gt; speciessp_2_trend           -1.200 -0.6200  0.140    1  1532</span></span>
-<span><span class="co">#&gt; s(time):trendtrend1.1_trend -0.078  0.0160  0.210    1   760</span></span>
-<span><span class="co">#&gt; s(time):trendtrend1.2_trend -0.240  0.0043  0.260    1  2660</span></span>
-<span><span class="co">#&gt; s(time):trendtrend1.3_trend -0.460 -0.2500 -0.038    1  1621</span></span>
-<span><span class="co">#&gt; s(time):trendtrend2.1_trend -0.210 -0.0140  0.082    1   915</span></span>
-<span><span class="co">#&gt; s(time):trendtrend2.2_trend -0.190  0.0280  0.410    1  1079</span></span>
-<span><span class="co">#&gt; s(time):trendtrend2.3_trend  0.061  0.3300  0.630    1  2273</span></span>
+<span><span class="co">#&gt; (Intercept)_trend            2.700  3.0000  3.500 1.00  1824</span></span>
+<span><span class="co">#&gt; speciessp_2_trend           -1.200 -0.6200  0.160 1.00  1483</span></span>
+<span><span class="co">#&gt; s(time):trendtrend1.1_trend -0.080  0.0160  0.220 1.00  1030</span></span>
+<span><span class="co">#&gt; s(time):trendtrend1.2_trend -0.240  0.0078  0.280 1.00  2105</span></span>
+<span><span class="co">#&gt; s(time):trendtrend1.3_trend -0.470 -0.2500 -0.036 1.00  2200</span></span>
+<span><span class="co">#&gt; s(time):trendtrend2.1_trend -0.270 -0.0140  0.085 1.01   509</span></span>
+<span><span class="co">#&gt; s(time):trendtrend2.2_trend -0.200  0.0290  0.500 1.00   859</span></span>
+<span><span class="co">#&gt; s(time):trendtrend2.3_trend  0.028  0.3300  0.630 1.00  2317</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">#&gt;                        edf Ref.df Chi.sq p-value</span></span>
-<span><span class="co">#&gt; s(time):seriestrend1 1.042      3   1.69    0.83</span></span>
-<span><span class="co">#&gt; s(time):seriestrend2 0.937      3   4.33    0.86</span></span>
+<span><span class="co">#&gt;                       edf Ref.df Chi.sq p-value</span></span>
+<span><span class="co">#&gt; s(time):seriestrend1 1.13      3   1.10    0.74</span></span>
+<span><span class="co">#&gt; s(time):seriestrend2 1.07      3   3.17    0.59</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Stan MCMC diagnostics:</span></span>
 <span><span class="co">#&gt; n_eff / iter looks reasonable for all parameters</span></span>
 <span><span class="co">#&gt; Rhat looks reasonable for all parameters</span></span>
 <span><span class="co">#&gt; 0 of 4000 iterations ended with a divergence (0%)</span></span>
-<span><span class="co">#&gt; 0 of 4000 iterations saturated the maximum tree depth of 12 (0%)</span></span>
+<span><span class="co">#&gt; 0 of 4000 iterations saturated the maximum tree depth of 10 (0%)</span></span>
 <span><span class="co">#&gt; E-FMI indicated no pathological behavior</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Tue Sep 03 2:43:46 PM 2024.</span></span>
+<span><span class="co">#&gt; Samples were drawn using NUTS(diag_e) at Fri Jan 17 4:09:01 PM 2025.</span></span>
 <span><span class="co">#&gt; For each parameter, n_eff is a crude measure of effective sample size,</span></span>
 <span><span class="co">#&gt; and Rhat is the potential scale reduction factor on split MCMC chains</span></span>
-<span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span></code></pre></div>
+<span><span class="co">#&gt; (at convergence, Rhat = 1)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Use how_to_cite(mod) to get started describing this model</span></span></code></pre></div>
 <p><code><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo()</a></code> functionality works just as it does for all
 <code>mvgam</code> models to aid in model comparison / selection (though
 note that Pareto K values often give warnings for mixture models so
 these may not be too helpful)</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://mc-stan.org/loo/reference/loo.html" class="external-link">loo</a></span><span class="op">(</span><span class="va">mod</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Computed from 4000 by 60 log-likelihood matrix</span></span>
+<span><span class="co">#&gt; Computed from 4000 by 60 log-likelihood matrix.</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;          Estimate   SE</span></span>
-<span><span class="co">#&gt; elpd_loo   -225.7 13.2</span></span>
-<span><span class="co">#&gt; p_loo        79.1 12.2</span></span>
-<span><span class="co">#&gt; looic       451.5 26.5</span></span>
+<span><span class="co">#&gt; elpd_loo   -233.5 14.9</span></span>
+<span><span class="co">#&gt; p_loo        86.8 14.0</span></span>
+<span><span class="co">#&gt; looic       467.1 29.8</span></span>
 <span><span class="co">#&gt; ------</span></span>
-<span><span class="co">#&gt; Monte Carlo SE of elpd_loo is NA.</span></span>
+<span><span class="co">#&gt; MCSE of elpd_loo is NA.</span></span>
+<span><span class="co">#&gt; MCSE and ESS estimates assume MCMC draws (r_eff in [0.3, 1.1]).</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Pareto k diagnostic values:</span></span>
-<span><span class="co">#&gt;                          Count Pct.    Min. n_eff</span></span>
-<span><span class="co">#&gt; (-Inf, 0.5]   (good)     25    41.7%   1649      </span></span>
-<span><span class="co">#&gt;  (0.5, 0.7]   (ok)        4     6.7%   579       </span></span>
-<span><span class="co">#&gt;    (0.7, 1]   (bad)       6    10.0%   17        </span></span>
-<span><span class="co">#&gt;    (1, Inf)   (very bad) 25    41.7%   2         </span></span>
+<span><span class="co">#&gt;                          Count Pct.    Min. ESS</span></span>
+<span><span class="co">#&gt; (-Inf, 0.7]   (good)     30    50.0%   679     </span></span>
+<span><span class="co">#&gt;    (0.7, 1]   (bad)      13    21.7%   &lt;NA&gt;    </span></span>
+<span><span class="co">#&gt;    (1, Inf)   (very bad) 17    28.3%   &lt;NA&gt;    </span></span>
 <span><span class="co">#&gt; See help('pareto-k-diagnostic') for details.</span></span></code></pre></div>
 <p>Plot the estimated smooths of time from each species’ latent
 abundance process (on the log scale)</p>
@@ -569,12 +581,12 @@ For example, here are the estimated detection probabilities per species,
 which show that the model has done a nice job of estimating these
 parameters:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span>
+<code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, condition <span class="op">=</span> <span class="st">'species'</span>,</span>
 <span>                 type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/lims.html" class="external-link">ylim</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html" class="external-link">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu">ylim</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0</span>, <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu">theme_classic</span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu">theme</span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">'none'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-12-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>A common goal in N-mixture modelling is to estimate the true latent
 abundance. The model has automatically generated predictions for the
@@ -617,18 +629,18 @@ can extract these and produce decent plots using a small function</p>
 <span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">time</span>, <span class="va">obs</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="va">observations</span></span>
 <span>  </span>
 <span>  <span class="co"># Plot</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html" class="external-link">ggplot</a></span><span class="op">(</span><span class="va">pred_quantiles</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, group <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_ribbon.html" class="external-link">geom_ribbon</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>ymin <span class="op">=</span> <span class="va">X5.</span>, ymax <span class="op">=</span> <span class="va">X95.</span><span class="op">)</span>, fill <span class="op">=</span> <span class="st">"#DCBCBC"</span><span class="op">)</span> <span class="op">+</span> </span>
-<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_ribbon.html" class="external-link">geom_ribbon</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>ymin <span class="op">=</span> <span class="va">X30.</span>, ymax <span class="op">=</span> <span class="va">X70.</span><span class="op">)</span>, fill <span class="op">=</span> <span class="st">"#B97C7C"</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_path.html" class="external-link">geom_line</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">truth</span><span class="op">)</span>,</span>
+<span>  <span class="fu">ggplot</span><span class="op">(</span><span class="va">pred_quantiles</span>, <span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, group <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
+<span>    <span class="fu">geom_ribbon</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>ymin <span class="op">=</span> <span class="va">X5.</span>, ymax <span class="op">=</span> <span class="va">X95.</span><span class="op">)</span>, fill <span class="op">=</span> <span class="st">"#DCBCBC"</span><span class="op">)</span> <span class="op">+</span> </span>
+<span>    <span class="fu">geom_ribbon</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>ymin <span class="op">=</span> <span class="va">X30.</span>, ymax <span class="op">=</span> <span class="va">X70.</span><span class="op">)</span>, fill <span class="op">=</span> <span class="st">"#B97C7C"</span><span class="op">)</span> <span class="op">+</span></span>
+<span>    <span class="fu">geom_line</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">truth</span><span class="op">)</span>,</span>
 <span>              colour <span class="op">=</span> <span class="st">'black'</span>, linewidth <span class="op">=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html" class="external-link">geom_point</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">truth</span><span class="op">)</span>,</span>
+<span>    <span class="fu">geom_point</span><span class="op">(</span><span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">truth</span><span class="op">)</span>,</span>
 <span>               shape <span class="op">=</span> <span class="fl">21</span>, colour <span class="op">=</span> <span class="st">'white'</span>, fill <span class="op">=</span> <span class="st">'black'</span>,</span>
 <span>               size <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_jitter.html" class="external-link">geom_jitter</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">observations</span>, <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html" class="external-link">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">obs</span><span class="op">)</span>,</span>
+<span>    <span class="fu">geom_jitter</span><span class="op">(</span>data <span class="op">=</span> <span class="va">observations</span>, <span class="fu">aes</span><span class="op">(</span>x <span class="op">=</span> <span class="va">time</span>, y <span class="op">=</span> <span class="va">obs</span><span class="op">)</span>,</span>
 <span>                width <span class="op">=</span> <span class="fl">0.06</span>, </span>
 <span>                shape <span class="op">=</span> <span class="fl">21</span>, fill <span class="op">=</span> <span class="st">'darkred'</span>, colour <span class="op">=</span> <span class="st">'white'</span>, size <span class="op">=</span> <span class="fl">2.5</span><span class="op">)</span> <span class="op">+</span></span>
-<span>    <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>y <span class="op">=</span> <span class="st">'Latent abundance (N)'</span>,</span>
+<span>    <span class="fu">labs</span><span class="op">(</span>y <span class="op">=</span> <span class="st">'Latent abundance (N)'</span>,</span>
 <span>         x <span class="op">=</span> <span class="st">'Time'</span>,</span>
 <span>         title <span class="op">=</span> <span class="va">species</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
@@ -650,7 +662,7 @@ the true temporal variation and magnitudes in abundance</p>
 <h2 id="example-2-a-larger-survey-with-possible-nonlinear-effects">Example 2: a larger survey with possible nonlinear effects<a class="anchor" aria-label="anchor" href="#example-2-a-larger-survey-with-possible-nonlinear-effects"></a>
 </h2>
 <p>Now for another example with a larger dataset. We will use data from
-<a href="https://www.jeffdoser.com/files/spabundance-web/articles/nmixturemodels" target="_blank" class="external-link">Jeff Doser’s simulation example from the wonderful
+<a href="https://doserlab.com/files/spabundance-web/articles/nmixturemodels" target="_blank" class="external-link">Jeff Doser’s simulation example from the wonderful
 <code>spAbundance</code> package</a>. The simulated data include one
 continuous site-level covariate, one factor site-level covariate and two
 continuous sample-level covariates. This example will allow us to
@@ -710,8 +722,8 @@ site, though some observations are missing</p>
 <span><span class="co">#&gt; $ y         <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1, NA, NA, NA, 2, 2, NA, 1, NA, NA, 0, 1, 0, 0, 0, 0, NA, NA…</span></span>
 <span><span class="co">#&gt; $ abund_cov <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -0.3734384, -0.3734384, -0.3734384, 0.7064305, 0.7064305, 0.…</span></span>
 <span><span class="co">#&gt; $ abund_fac <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> 3, 3, 3, 4, 4, 4, 9, 9, 9, 2, 2, 2, 3, 3, 3, 2, 2, 2, 1, 1, …</span></span>
-<span><span class="co">#&gt; $ det_cov   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -1.2827999, -0.9044467, -1.7369637, -3.0537476, 0.1954809, 0…</span></span>
-<span><span class="co">#&gt; $ det_cov2  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.03047314, -0.08574977, -2.06259523, -0.69356429, 1.0455536…</span></span>
+<span><span class="co">#&gt; $ det_cov   <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> -1.2827999, 1.1770575, -1.3636225, -0.2922343, 0.1954809, 0.…</span></span>
+<span><span class="co">#&gt; $ det_cov2  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 2.03047314, 0.01556041, 0.05861094, 0.90822039, 1.04555361, …</span></span>
 <span><span class="co">#&gt; $ replicate <span style="color: #949494; font-style: italic;">&lt;int&gt;</span> 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, …</span></span>
 <span><span class="co">#&gt; $ site      <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> site1, site1, site1, site2, site2, site2, site3, site3, site…</span></span>
 <span><span class="co">#&gt; $ species   <span style="color: #949494; font-style: italic;">&lt;fct&gt;</span> sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, sp_1, …</span></span>
@@ -719,13 +731,13 @@ site, though some observations are missing</p>
 <span><span class="co">#&gt; $ time      <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, …</span></span>
 <span><span class="co">#&gt; $ cap       <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, …</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">mod_data</span><span class="op">)</span></span>
-<span><span class="co">#&gt;    y  abund_cov abund_fac    det_cov    det_cov2 replicate  site species</span></span>
-<span><span class="co">#&gt; 1  1 -0.3734384         3 -1.2827999  2.03047314         1 site1    sp_1</span></span>
-<span><span class="co">#&gt; 2 NA -0.3734384         3 -0.9044467 -0.08574977         2 site1    sp_1</span></span>
-<span><span class="co">#&gt; 3 NA -0.3734384         3 -1.7369637 -2.06259523         3 site1    sp_1</span></span>
-<span><span class="co">#&gt; 4 NA  0.7064305         4 -3.0537476 -0.69356429         1 site2    sp_1</span></span>
-<span><span class="co">#&gt; 5  2  0.7064305         4  0.1954809  1.04555361         2 site2    sp_1</span></span>
-<span><span class="co">#&gt; 6  2  0.7064305         4  0.9673034  1.91971178         3 site2    sp_1</span></span>
+<span><span class="co">#&gt;    y  abund_cov abund_fac    det_cov   det_cov2 replicate  site species</span></span>
+<span><span class="co">#&gt; 1  1 -0.3734384         3 -1.2827999 2.03047314         1 site1    sp_1</span></span>
+<span><span class="co">#&gt; 2 NA -0.3734384         3  1.1770575 0.01556041         2 site1    sp_1</span></span>
+<span><span class="co">#&gt; 3 NA -0.3734384         3 -1.3636225 0.05861094         3 site1    sp_1</span></span>
+<span><span class="co">#&gt; 4 NA  0.7064305         4 -0.2922343 0.90822039         1 site2    sp_1</span></span>
+<span><span class="co">#&gt; 5  2  0.7064305         4  0.1954809 1.04555361         2 site2    sp_1</span></span>
+<span><span class="co">#&gt; 6  2  0.7064305         4  0.9673034 1.91971178         3 site2    sp_1</span></span>
 <span><span class="co">#&gt;         series time cap</span></span>
 <span><span class="co">#&gt; 1 site1_sp_1_1    1  33</span></span>
 <span><span class="co">#&gt; 2 site1_sp_1_2    1  33</span></span>
@@ -765,8 +777,8 @@ will use penalized splines for each of the continuous covariate effects
 to detect possible nonlinear associations. We also showcase how
 <code>mvgam</code> can make use of the different approximation
 algorithms available in <code>Stan</code> by using the meanfield
-variational Bayes approximator (this reduces computation time to around
-12 seconds for this example)</p>
+variational Bayes approximator (this reduces computation time from
+around 90 seconds to around 12 seconds for this example)</p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mod</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mvgam.html">mvgam</a></span><span class="op">(</span></span>
 <span>  <span class="co"># effects of covariates on detection probability;</span></span>
@@ -787,10 +799,10 @@ variational Bayes approximator (this reduces computation time to around
 <span>  data <span class="op">=</span> <span class="va">mod_data</span>,</span>
 <span>  </span>
 <span>  <span class="co"># standard normal priors on key regression parameters</span></span>
-<span>  priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'b'</span><span class="op">)</span>,</span>
-<span>             <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'Intercept'</span><span class="op">)</span>,</span>
-<span>             <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'Intercept_trend'</span><span class="op">)</span>,</span>
-<span>             <span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'sigma_raw_trend'</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  priors <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'b'</span><span class="op">)</span>,</span>
+<span>             <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'Intercept'</span><span class="op">)</span>,</span>
+<span>             <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'Intercept_trend'</span><span class="op">)</span>,</span>
+<span>             <span class="fu"><a href="https://paulbuerkner.com/brms/reference/set_prior.html" class="external-link">prior</a></span><span class="op">(</span><span class="fu">std_normal</span><span class="op">(</span><span class="op">)</span>, class <span class="op">=</span> <span class="st">'sigma_raw_trend'</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>  </span>
 <span>  <span class="co"># use Stan's variational inference for quicker results</span></span>
 <span>  algorithm <span class="op">=</span> <span class="st">'meanfield'</span>,</span>
@@ -836,49 +848,49 @@ model</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM observation model coefficient (beta) estimates:</span></span>
 <span><span class="co">#&gt;              2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">#&gt; (Intercept) 0.066 0.38  0.68  NaN   NaN</span></span>
+<span><span class="co">#&gt; (Intercept) 0.022 0.33  0.63  NaN   NaN</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM observation smooths:</span></span>
 <span><span class="co">#&gt;              edf Ref.df Chi.sq p-value    </span></span>
-<span><span class="co">#&gt; s(det_cov)  1.20      2    155 1.8e-05 ***</span></span>
-<span><span class="co">#&gt; s(det_cov2) 1.05      2    606 &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; s(det_cov)  1.17      2    113 0.00063 ***</span></span>
+<span><span class="co">#&gt; s(det_cov2) 1.84      2    572 &lt; 2e-16 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM process model coefficient (beta) estimates:</span></span>
-<span><span class="co">#&gt;                   2.5%  50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">#&gt; (Intercept)_trend 0.14 0.28  0.42  NaN   NaN</span></span>
+<span><span class="co">#&gt;                    2.5%   50%  97.5% Rhat n.eff</span></span>
+<span><span class="co">#&gt; (Intercept)_trend -0.33 -0.18 -0.028  NaN   NaN</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; GAM process model group-level estimates:</span></span>
 <span><span class="co">#&gt;                           2.5%   50% 97.5% Rhat n.eff</span></span>
-<span><span class="co">#&gt; mean(s(abund_fac))_trend -0.65 -0.52 -0.37  NaN   NaN</span></span>
-<span><span class="co">#&gt; sd(s(abund_fac))_trend    0.28  0.41  0.64  NaN   NaN</span></span>
+<span><span class="co">#&gt; mean(s(abund_fac))_trend -0.11 0.037  0.19  NaN   NaN</span></span>
+<span><span class="co">#&gt; sd(s(abund_fac))_trend    0.27 0.400  0.59  NaN   NaN</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Approximate significance of GAM process smooths:</span></span>
-<span><span class="co">#&gt;               edf Ref.df Chi.sq p-value    </span></span>
-<span><span class="co">#&gt; s(abund_cov) 1.08      2   1.13 0.21268    </span></span>
-<span><span class="co">#&gt; s(abund_fac) 8.84     10  30.62 0.00034 ***</span></span>
-<span><span class="co">#&gt; ---</span></span>
-<span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
+<span><span class="co">#&gt;               edf Ref.df Chi.sq p-value</span></span>
+<span><span class="co">#&gt; s(abund_cov) 1.21      2   1.35    0.37</span></span>
+<span><span class="co">#&gt; s(abund_fac) 8.84     10  12.23    0.19</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Posterior approximation used: no diagnostics to compute</span></span></code></pre></div>
+<span><span class="co">#&gt; Posterior approximation used: no diagnostics to compute</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Use how_to_cite(mod) to get started describing this model</span></span></code></pre></div>
 <p>Again we can make use of <code>marginaleffects</code> support for
 interrogating the model through targeted predictions. First, we can
 inspect the estimated average detection probability</p>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/predictions.html" class="external-link">avg_predictions</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/predictions.html" class="external-link">avg_predictions</a></span><span class="op">(</span><span class="va">mod</span>, type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt;  Estimate 2.5 % 97.5 %</span></span>
-<span><span class="co">#&gt;     0.576 0.512  0.634</span></span>
+<span><span class="co">#&gt;     0.568 0.504   0.63</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Columns: estimate, conf.low, conf.high </span></span>
 <span><span class="co">#&gt; Type:  detection</span></span></code></pre></div>
 <p>Next investigate estimated effects of covariates on latent abundance
-using the <code><a href="https://paul-buerkner.github.io/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects()</a></code> function and specifying
+using the <code><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects()</a></code> function and specifying
 <code>type = 'link'</code>; this will return plots on the expectation
 scale</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">abund_plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>,</span>
+<code class="sourceCode R"><span><span class="va">abund_plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>,</span>
 <span>                                        type <span class="op">=</span> <span class="st">'link'</span>,</span>
 <span>                                        effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'abund_cov'</span>,</span>
 <span>                                                    <span class="st">'abund_fac'</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -887,18 +899,18 @@ scale</p>
 abundance</p>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">abund_plots</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Expected latent abundance'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Expected latent abundance'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-24-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>The effect of the factor covariate on expected latent abundance,
 estimated as a hierarchical random effect</p>
 <div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">abund_plots</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Expected latent abundance'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Expected latent abundance'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-25-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>Now we can investigate estimated effects of covariates on detection
 probability using <code>type = 'detection'</code></p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">det_plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="https://paul-buerkner.github.io/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>,</span>
+<code class="sourceCode R"><span><span class="va">det_plots</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="fu"><a href="https://paulbuerkner.com/brms/reference/conditional_effects.brmsfit.html" class="external-link">conditional_effects</a></span><span class="op">(</span><span class="va">mod</span>,</span>
 <span>                                      type <span class="op">=</span> <span class="st">'detection'</span>,</span>
 <span>                                      effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'det_cov'</span>,</span>
 <span>                                                  <span class="st">'det_cov2'</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -909,11 +921,11 @@ significances). But inspecting conditional effects of each covariate on
 the probability scale is more intuitive and useful</p>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">det_plots</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-27-1.png" width="60%" style="display: block; margin: auto;"></p>
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">det_plots</span><span class="op">[[</span><span class="fl">2</span><span class="op">]</span><span class="op">]</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-27-2.png" width="60%" style="display: block; margin: auto;"></p>
 <p>More targeted predictions are also easy with
 <code>marginaleffects</code> support. For example, we can ask: How does
@@ -922,13 +934,13 @@ covariates?</p>
 <div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fivenum_round</span> <span class="op">=</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/fivenum.html" class="external-link">fivenum</a></span><span class="op">(</span><span class="va">x</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, </span>
-<span>                 newdata <span class="op">=</span> <span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/marginaleffects/man/datagrid.html" class="external-link">datagrid</a></span><span class="op">(</span>det_cov <span class="op">=</span> <span class="va">unique</span>,</span>
+<span><span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/plot_predictions.html" class="external-link">plot_predictions</a></span><span class="op">(</span><span class="va">mod</span>, </span>
+<span>                 newdata <span class="op">=</span> <span class="fu">marginaleffects</span><span class="fu">::</span><span class="fu"><a href="https://marginaleffects.com/man/r/datagrid.html" class="external-link">datagrid</a></span><span class="op">(</span>det_cov <span class="op">=</span> <span class="va">unique</span>,</span>
 <span>                                    det_cov2 <span class="op">=</span> <span class="va">fivenum_round</span><span class="op">)</span>,</span>
 <span>                 by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">'det_cov'</span>, <span class="st">'det_cov2'</span><span class="op">)</span>,</span>
 <span>                 type <span class="op">=</span> <span class="st">'detection'</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggtheme.html" class="external-link">theme_classic</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">ylab</a></span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
+<span>  <span class="fu">theme_classic</span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
+<span>  <span class="fu">ylab</span><span class="op">(</span><span class="st">'Pr(detection)'</span><span class="op">)</span></span></code></pre></div>
 <p><img src="nmixtures_files/figure-html/unnamed-chunk-28-1.png" width="60%" style="display: block; margin: auto;"></p>
 <p>The model has found support for some important covariate effects, but
 of course we’d want to interrogate how well the model predicts and think
@@ -945,7 +957,7 @@ N-mixture models for ecological population dynamics investigations:</p>
 of Spatial Autocorrelation and Imperfect Detection on Species
 Distribution Models.</a>” <em>Methods in Ecology and Evolution</em> 9
 (2018): 1614–25.</p>
-<p>Kéry, Marc, and Royle Andrew J. “<a href="https://www.sciencedirect.com/book/9780128237687/applied-hierarchical-modeling-in-ecology-analysis-of-distribution-abundance-and-species-richness-in-r-and-bugs" class="external-link">Applied
+<p>Kéry, Marc, and Royle Andrew J. “<a href="https://shop.elsevier.com/books/applied-hierarchical-modeling-in-ecology-analysis-of-distribution-abundance-and-species-richness-in-r-and-bugs/kery/978-0-12-809585-0" class="external-link">Applied
 hierarchical modeling in ecology: Analysis of distribution, abundance
 and species richness in R and BUGS: Volume 2: Dynamic and advanced
 models</a>”. London, UK: Academic Press (2020).</p>
