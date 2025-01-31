@@ -274,10 +274,56 @@ tidy.mvgam <- function(x, probs = c(0.025, 0.5, 0.975), ...) {
   }
   # END trend random effects
 
-  # OUTPUT --------
+  # Cleanup output --------
   # TODO: might need to put this prior to every bind_rows to avoid rowname dups.
   out <- tibble::rownames_to_column(out, "parameter")
+
+  # Split Sigma in case of hierarchical residual correlations
+  alpha_cor_matches <- grep("alpha_cor", out$parameter, fixed = TRUE)
+  if (length(alpha_cor_matches) > 0) {
+    out <- split_hier_Sigma(object, out)
+  }
+  # END Cleanup output
+
   out
+}
+
+
+#' Helper function to split apart Sigma into its constituent sub-matrixes in
+#' the case of a hierarchical latent process.
+#'
+#' The default MCMC output has dummy parameters filling out Sigma to make it
+#' an nxn matrix. This removes those, and renames the remaining sub-matrixes
+#' to align with the `gr` and `subgr` sizes from `mvgam()`'s `trend_model` argument.
+#'
+#' @param object An object of class `mvgam`.
+#' @param params `tibble` The parameters that are going to be returned by
+#'   `tidy.mvgam()`. Assumed that the columns match what `tidy.mvgam()` will return.
+#'   Specifically, that there is a "parameter" column.
+#' @returns `tibble` The `params`, but with the Sigma parameters split up by `gr`.
+#' @noRd
+split_hier_Sigma <- function(object, params) {
+  params_nonSigma <- dplyr::filter(params, !grepl("^Sigma", parameter))
+  params_Sigma <- dplyr::filter(params, grepl("^Sigma", parameter))
+
+  gr <- object$trend_model$gr
+  subgr <- object$trend_model$subgr
+  gr_levels <- levels(object$obs_data[[gr]])
+  subgr_levels <- levels(object$obs_data[[subgr]])
+  n_gr <- length(gr_levels)
+  n_subgr <- length(subgr_levels)
+
+  # anything besides the dummy params should have non-zero sd
+  params_Sigma <- dplyr::filter(params_Sigma, mean != 0, sd != 0)
+  index_strs <- sub("Sigma", "", params_Sigma$parameter)[1:(n_subgr ** 2)]
+
+  # new names
+  new_names <- paste0("Sigma_",
+                     rep(seq_len(n_gr), each = n_subgr ** 2),
+                     index_strs)
+  params_Sigma["parameter"] <- new_names
+
+  dplyr::bind_rows(params_nonSigma, params_Sigma)
 }
 
 

@@ -26,6 +26,10 @@ test_that("`tidy()` snapshot value of `mvgam_example5`", {
   expect_snapshot_value(tidy.mvgam(mvgam_example5), style = "json2")
 })
 
+test_that("`tidy()` snapshot value of `mvgam_example6`", {
+  local_edition(3)
+  expect_snapshot_value(tidy.mvgam(mvgam_example6), style = "json2")
+})
 
 # `augment()` tests
 test_that("augment doesn't error", {
