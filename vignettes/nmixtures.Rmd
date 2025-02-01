@@ -368,7 +368,7 @@ trend_map %>%
   head(12)
 ```
 
-Now we are ready to fit a model using `mvgam()`. Here we will use penalized splines for each of the continuous covariate effects to detect possible nonlinear associations. We also showcase how `mvgam` can make use of the different approximation algorithms available in `Stan` by using the meanfield variational Bayes approximator (this reduces computation time to around 12 seconds for this example)
+Now we are ready to fit a model using `mvgam()`. Here we will use penalized splines for each of the continuous covariate effects to detect possible nonlinear associations. We also showcase how `mvgam` can make use of the different approximation algorithms available in `Stan` by using the meanfield variational Bayes approximator (this reduces computation time from around 90 seconds to around 12 seconds for this example)
 ```{r include = FALSE, results='hide'}
 mod <- mvgam(
   # effects of covariates on detection probability;
