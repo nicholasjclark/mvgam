@@ -9,8 +9,8 @@ test_that("data_grid gives expected output structure", {
                       mu = 1.5)
 
   out <- SW(mvgam:::data_grid(season = unique,
-                      year = mean,
-                      newdata = simdat$data_test))
+                              year = mean,
+                              newdata = simdat$data_test))
   expect_true(all(out$year == mean(simdat$data_test$year)))
 
   myfunc = function(x){
@@ -23,9 +23,10 @@ test_that("data_grid gives expected output structure", {
 
   # A list example
   out <- mvgam:::data_grid(season = fivenum,
-                   year = mean,
-                   newdata = mvgam:::mvgam_example5$obs_data)
-  expect_true(all.equal(names(out), names(mvgam:::mvgam_example5$obs_data)))
+                           year = mean,
+                           newdata = mvgam:::mvgam_example5$obs_data)
+  expect_true(all.equal(names(out),
+                        names(mvgam:::mvgam_example5$obs_data)))
   expect_true(all(out$year == mean(mvgam:::mvgam_example5$obs_data$year)))
 })
 
@@ -44,31 +45,85 @@ test_that("get_data gives expected output structure", {
 })
 
 test_that("get_predict gives expected output structure", {
-  preds <- marginaleffects::get_predict(mvgam:::mvgam_example4)
-  expect_equal(NROW(preds), NROW(mvgam:::mvgam_example4$obs_data))
+  preds <- marginaleffects::get_predict(
+    mvgam:::mvgam_example4,
+    newdata = mvgam:::mvgam_example4$obs_data
+  )
+  expect_equal(NROW(preds),
+               NROW(mvgam:::mvgam_example4$obs_data))
 
-  preds <- marginaleffects::get_predict(mvgam:::mvgam_example2)
+  preds <- marginaleffects::get_predict(
+    mvgam:::mvgam_example2,
+    newdata = mvgam:::mvgam_example2$obs_data
+  )
   expect_equal(NROW(preds), NROW(mvgam:::mvgam_example2$obs_data))
 })
 
 test_that("averages give expected output structures", {
-  ems <- marginaleffects::avg_predictions(mvgam:::mvgam_example3)
+  ems <- marginaleffects::avg_predictions(
+    mvgam:::mvgam_example3
+  )
   expect_equal(NROW(ems), 1)
-  expect_true(all(c("estimate", "conf.low", "conf.high") %in% colnames(ems)))
+  expect_true(all(c("estimate",
+                    "conf.low",
+                    "conf.high") %in% colnames(ems)))
 
-  ems <- marginaleffects::avg_predictions(mvgam:::mvgam_example4,
-                                          variables = list(season = c(1, 6, 12)))
+  ems <- marginaleffects::avg_predictions(
+    mvgam:::mvgam_example4,
+    variables = list(season = c(1, 6, 12))
+  )
   expect_equal(NROW(ems), 3)
   expect_true(all(c("season", "estimate",
                     "conf.low", "conf.high") %in% colnames(ems)))
 
-  ems <- marginaleffects::avg_predictions(mvgam:::mvgam_example5,
-                                          variables = list(season = c(1, 6, 12)))
+  ems <- marginaleffects::avg_predictions(
+    mvgam:::mvgam_example5,
+    variables = list(season = c(1, 6, 12))
+  )
   expect_equal(NROW(ems), 3)
   expect_true(all(c("season", "estimate",
                     "conf.low", "conf.high") %in% colnames(ems)))
 
-  ems <- marginaleffects::predictions(mvgam:::mvgam_example2, by = 'series')
-  expect_equal(NROW(ems), nlevels(mvgam:::mvgam_example3$obs_data$series))
+  ems <- marginaleffects::predictions(
+    mvgam:::mvgam_example2,
+    by = 'series'
+  )
+  expect_equal(NROW(ems),
+               nlevels(mvgam:::mvgam_example3$obs_data$series))
 })
 
+test_that("comparisons give expected output structures", {
+  cmp <- marginaleffects::comparisons(
+    mvgam:::mvgam_example2,
+    variables = 'series',
+    by = 'time'
+  )
+  expect_equal(levels(as.factor(cmp$contrast)),
+               c("series_2 - series_1",
+                 "series_3 - series_1"))
+
+  cmp <- marginaleffects::comparisons(
+    mvgam:::mvgam_example2,
+    variables = list(series = 'pairwise'),
+    by = 'time'
+  )
+  expect_equal(levels(as.factor(cmp$contrast)),
+               c("series_2 - series_1",
+                 "series_3 - series_1",
+                 "series_3 - series_2"))
+
+  cmp <- marginaleffects::comparisons(
+    mvgam:::mvgam_example2,
+    newdata = marginaleffects::datagrid(time = c(1, 6, 9),
+                                        series = unique),
+    variables = list(series = 'pairwise'),
+    by = 'time'
+  )
+  expect_equal(levels(as.factor(cmp$contrast)),
+               c("series_2 - series_1",
+                 "series_3 - series_1",
+                 "series_3 - series_2"))
+  expect_equal(NROW(cmp), 9)
+  expect_equal(unique(cmp$time),
+               c(1, 6, 9))
+})

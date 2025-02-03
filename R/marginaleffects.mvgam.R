@@ -126,9 +126,16 @@ get_predict.mvgam <- function(model, newdata,
                    process_error = process_error,
                    summary = FALSE,
                    ...)
-  out <- data.frame(
-    rowid = seq_len(NCOL(preds)),
-    estimate = apply(preds, 2, median))
+  if("rowid" %in% colnames(newdata)){
+    out <- data.frame(
+      rowid = newdata[["rowid"]],
+      estimate = apply(preds, 2, median))
+  } else {
+    out <- data.frame(
+      rowid = seq_len(NCOL(preds)),
+      estimate = apply(preds, 2, median))
+  }
+
 
   attr(out, "posterior_draws") <- t(preds)
   return(out)

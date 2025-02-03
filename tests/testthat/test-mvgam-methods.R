@@ -230,7 +230,9 @@ test_that("get_predict has reasonable outputs", {
   gaus_preds <- predict(mvgam:::mvgam_example1, type = 'link',
                         process_error = FALSE,
                         summary = FALSE)
-  meffects_preds <- get_predict(mvgam:::mvgam_example1, type = 'link')
+  meffects_preds <- get_predict(mvgam:::mvgam_example1,
+                                newdata = mvgam:::mvgam_example1$obs_data,
+                                type = 'link')
   expect_true(NROW(meffects_preds) == NCOL(gaus_preds))
   expect_true(identical(meffects_preds$estimate,
                         apply(gaus_preds, 2, median)))

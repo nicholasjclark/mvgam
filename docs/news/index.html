@@ -78,7 +78,8 @@
 </ul></div>
 <div class="section level3">
 <h3 id="bug-fixes-1-1-4">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-1-1-4"></a></h3>
-<ul><li>Updates to ensure <code>ensemble</code> provides appropriate weighting of forecast draws (<a href="https://github.com/nicholasjclark/mvgam/issues/98" class="external-link">#98</a>)</li>
+<ul><li>Bug fix to ensure <code><a href="https://marginaleffects.com/man/r/comparisons.html" class="external-link">marginaleffects::comparisons</a></code> functions appropriately recognise internal <code>rowid</code> variables</li>
+<li>Updates to ensure <code>ensemble</code> provides appropriate weighting of forecast draws (<a href="https://github.com/nicholasjclark/mvgam/issues/98" class="external-link">#98</a>)</li>
 <li>Not necessarily a “bug fix”, but this update removes several dependencies to lighten installation and improve efficiency of the workflow (<a href="https://github.com/nicholasjclark/mvgam/issues/93" class="external-link">#93</a>)</li>
 <li>Fixed a minor bug in the way <code>trend_map</code> recognises levels of the <code>series</code> factor</li>
 <li>Bug fix to ensure <code>lfo_cv</code> recognises the actual times in <code>time</code>, just in case the user supplies data that doesn’t start at <code>t = 1</code>. Also updated documentation to better reflect this</li>

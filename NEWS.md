@@ -15,6 +15,7 @@
 * Arguments `use_stan`, `jags_path`, `data_train`, `data_test`, `adapt_delta`, `max_treedepth` and `drift` have been removed from primary functions to streamline documentation and reflect the package's mission to deprecate 'JAGS' as a suitable backend. Both `adapt_delta` and `max_treedepth` should now be supplied in a named `list()` to the new argument `control`
 
 ## Bug fixes
+* Bug fix to ensure `marginaleffects::comparisons` functions appropriately recognise internal `rowid` variables
 * Updates to ensure `ensemble` provides appropriate weighting of forecast draws (#98)
 * Not necessarily a "bug fix", but this update removes several dependencies to lighten installation and improve efficiency of the workflow (#93)
 * Fixed a minor bug in the way `trend_map` recognises levels of the `series` factor
