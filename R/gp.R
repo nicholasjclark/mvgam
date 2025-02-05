@@ -79,6 +79,10 @@ make_gp_additions = function(gp_details,
                               'series',
                               'time',
                               terms_needed)
+
+  brms_fake_df <- brms_fake_df %>%
+    dplyr::arrange(time, series)
+
   if(!is.null(newdata)){
     brms_fake_df_new <- data.frame(.fake_gp_y = rnorm(length(newdata[[1]])),
                                    series = newdata$series,
@@ -90,11 +94,13 @@ make_gp_additions = function(gp_details,
                                     'series',
                                     'time',
                                     terms_needed)
+
+    brms_fake_df_new <- brms_fake_df_new %>%
+      dplyr::arrange(time, series)
+
     brms_fake_df <- rbind(brms_fake_df,
                           brms_fake_df_new)
   }
-  brms_fake_df <- brms_fake_df %>%
-    dplyr::arrange(time, series)
 
   # Build the gp formula to pass to the mock brms
   gp_formula <- reformulate(attr(terms(attr(gp_details, 'gp_formula')),

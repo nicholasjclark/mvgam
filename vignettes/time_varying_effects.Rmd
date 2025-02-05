@@ -103,7 +103,7 @@ Inspect the model summary, which shows how the `dynamic()` wrapper was used to c
 summary(mod, include_betas = FALSE)
 ```
 
-Because this model used a spline with a `gp` basis, it's smooths can be visualised just like any other `gam`. We can plot the estimates for the in-sample and out-of-sample periods to see how the Gaussian Process function produces sensible smooth forecasts. Here we supply the full dataset to the `newdata` argument in `plot_mvgam_smooth` to inspect posterior forecasts of the time-varying smooth function. Overlay the true simulated function to see that the model has adequately estimated it's dynamics in both the training and testing data partitions
+Because this model used a spline with a `gp` basis, it's smooths can be visualised just like any other `gam`. We can plot the estimates for the in-sample and out-of-sample periods to see how the Gaussian Process function produces sensible smooth forecasts. Here we supply the full dataset to the `newdata` argument in `plot_mvgam_smooth()` to inspect posterior forecasts of the time-varying smooth function. Overlay the true simulated function to see that the model has adequately estimated it's dynamics in both the training and testing data partitions
 ```{r}
 plot_mvgam_smooth(mod, smooth = 1, newdata = data)
 abline(v = 190, lty = 'dashed', lwd = 2)
@@ -111,7 +111,7 @@ lines(beta_temp, lwd = 2.5, col = 'white')
 lines(beta_temp, lwd = 2)
 ```
 
-We can also use `plot_predictions` from the `marginaleffects` package to visualise the time-varying coefficient for what the effect would be estimated to be at different values of $temperature$:
+We can also use `plot_predictions()` from the `marginaleffects` package to visualise the time-varying coefficient for what the effect would be estimated to be at different values of $temperature$:
 ```{r}
 require(marginaleffects)
 range_round = function(x){
@@ -130,7 +130,7 @@ fc <- forecast(mod, newdata = data_test)
 plot(fc)
 ```
 
-The syntax is very similar if we wish to estimate the parameters of the underlying Gaussian Process, this time using a Hilbert space approximation. We simply omit the `rho` argument in `dynamic` to make this happen. This will set up a call similar to `gp(time, by = 'temp', c = 5/4, k = 40)`.
+The syntax is very similar if we wish to estimate the parameters of the underlying Gaussian Process, this time using a Hilbert space approximation. We simply omit the `rho` argument in `dynamic()` to make this happen. This will set up a call similar to `gp(time, by = 'temp', c = 5/4, k = 40)`.
 ```{r include=FALSE}
 mod <- mvgam(out ~ dynamic(temp, k = 40),
              family = gaussian(),
@@ -234,7 +234,7 @@ mod1 <- mvgam(formula = survival ~ 1,
               priors = prior(normal(-3.5, 0.5), class = Intercept),
               family = betar(),
               data = model_data,
-              adapt_delta = 0.99,
+              control = list(adapt_delta = 0.99),
               silent = 2)
 ```
 
