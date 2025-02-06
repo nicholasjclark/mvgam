@@ -5,12 +5,36 @@
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    style="overflow:hidden"
    id="svg81"
    version="1.1"
    overflow="hidden"
    height="324.50705"
-   width="945.35211">
+   width="945.35211"
+   sodipodi:docname="SS_model.svg"
+   inkscape:version="0.92.4 (5da689c313, 2019-01-14)">
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1920"
+     inkscape:window-height="1017"
+     id="namedview42"
+     showgrid="false"
+     inkscape:zoom="1.6994161"
+     inkscape:cx="479.39366"
+     inkscape:cy="157.21783"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg81" />
   <metadata
      id="metadata85">
     <rdf:RDF>
@@ -19,7 +43,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -45,8 +69,9 @@
      d="m 850.01408,120.495 0.175,53.401 -3,0.01 -0.175,-53.401 z m 3.17,51.891 -4.47,9.015 -4.529,-8.986 z"
      id="path13" />
   <path
-     d="m 801.11408,71 -34.1,9e-5 v 3 l 34.1,-9e-5 z m -32.6,-2.99992 -9,4.500025 9,4.499975 z"
-     id="path15" />
+     d="m 753.51408,71 34.1,9e-5 v 3 l -34.1,-9e-5 z m 32.6,-2.99992 9,4.500025 -9,4.499975 z"
+     id="path15"
+     inkscape:connector-curvature="0" />
   <path
      d="m 367.51408,71 h 26.9 v 3 h -26.9 z m 25.4,-3 9,4.5 -9,4.5 z"
      id="path17" />

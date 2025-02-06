@@ -83,25 +83,6 @@ make_gp_additions = function(gp_details,
   brms_fake_df <- brms_fake_df %>%
     dplyr::arrange(time, series)
 
-  if(!is.null(newdata)){
-    brms_fake_df_new <- data.frame(.fake_gp_y = rnorm(length(newdata[[1]])),
-                                   series = newdata$series,
-                                   time = newdata$index..time..index)
-    for(i in seq_along(terms_needed)){
-      brms_fake_df_new <- cbind(brms_fake_df_new, newdata[[terms_needed[i]]])
-    }
-    colnames(brms_fake_df_new) <- c('.fake_gp_y',
-                                    'series',
-                                    'time',
-                                    terms_needed)
-
-    brms_fake_df_new <- brms_fake_df_new %>%
-      dplyr::arrange(time, series)
-
-    brms_fake_df <- rbind(brms_fake_df,
-                          brms_fake_df_new)
-  }
-
   # Build the gp formula to pass to the mock brms
   gp_formula <- reformulate(attr(terms(attr(gp_details, 'gp_formula')),
                                  'term.labels'),
@@ -122,6 +103,39 @@ make_gp_additions = function(gp_details,
 
   # Eigenvalues  (l_gp in mvgam stancode)
   eigenvals <- eigenval_list(brms_mock_data)
+
+  # If newdata supplied, compute the eigenfunctions for these out of
+  # sample data points
+  if(!is.null(newdata)){
+    brms_fake_df_new <- data.frame(.fake_gp_y = rnorm(length(newdata[[1]])),
+                                   series = newdata$series,
+                                   time = newdata$index..time..index)
+    for(i in seq_along(terms_needed)){
+      brms_fake_df_new <- cbind(brms_fake_df_new,
+                                newdata[[terms_needed[i]]])
+    }
+    colnames(brms_fake_df_new) <- c('.fake_gp_y',
+                                    'series',
+                                    'time',
+                                    terms_needed)
+
+    brms_fake_df_new <- brms_fake_df_new %>%
+      dplyr::arrange(time, series)
+
+    # Compute eigenfunctions for these new data and bind to the
+    # training data eigenfunctions
+    brms_mock_data_new <- brms::standata(brms_mock,
+                                         newdata = brms_fake_df_new ,
+                                         internal = TRUE)
+    eigenfuncs_new <- eigenfunc_list(stan_data = brms_mock_data_new,
+                                     mock_df = brms_fake_df_new,
+                                     by = gp_details$by,
+                                     level = gp_details$level)
+    for(i in seq_along(eigenfuncs)){
+      eigenfuncs[[i]] <- rbind(eigenfuncs[[i]],
+                               eigenfuncs_new[[i]])
+    }
+  }
 
   # Numbers of basis functions (k_gp in mvgam stancode)
   k_gps <- lapply(eigenvals, function(x) NROW(x))
