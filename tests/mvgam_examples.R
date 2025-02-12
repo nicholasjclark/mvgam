@@ -1,7 +1,8 @@
 # Small mvgam examples for testing post-fitting functions such as
 # predict, forecast, hindcast etc...
 testthat::skip_on_cran()
-set.seed(1234)
+SEED = 1234
+set.seed(SEED)
 library(mvgam)
 mvgam_examp_dat <- list(data_train =
                           structure(list(y = c(-0.317295790188251, 0.220334092025582,
@@ -151,7 +152,8 @@ mvgam_example1 <- mvgam(y ~ s(season, k = 5),
                         burnin = 300,
                         samples = 30,
                         chains = 1,
-                        backend = 'rstan')
+                        backend = 'rstan',
+                        seed = SEED)
 
 # Univariate process with trend_formula, trend_map and correlated process errors
 trend_map <- data.frame(series = unique(mvgam_examp_dat$data_train$series),
@@ -165,7 +167,8 @@ mvgam_example2 <- mvgam(y ~ 1,
                         burnin = 300,
                         samples = 30,
                         chains = 1,
-                        backend = 'rstan')
+                        backend = 'rstan',
+                        seed = SEED)
 
 # Multivariate process without trend_formula
 mvgam_example3 <- mvgam(y ~ s(season, k = 5),
@@ -175,7 +178,8 @@ mvgam_example3 <- mvgam(y ~ s(season, k = 5),
                         burnin = 300,
                         samples = 30,
                         chains = 1,
-                        backend = 'rstan')
+                        backend = 'rstan',
+                        seed = SEED)
 
 # Multivariate process with trend_formula and moving averages
 mvgam_example4 <- mvgam(y ~ series,
@@ -186,7 +190,8 @@ mvgam_example4 <- mvgam(y ~ series,
                         burnin = 300,
                         samples = 30,
                         chains = 1,
-                        backend = 'rstan')
+                        backend = 'rstan',
+                        seed = SEED)
 
 # GP dynamic factors (use list format to ensure it works in tests)
 list_data <- list()
@@ -203,7 +208,42 @@ mvgam_example5 <- mvgam(y ~ series + s(season, k = 5),
                         burnin = 300,
                         samples = 30,
                         chains = 1,
-                        backend = 'rstan')
+                        backend = 'rstan',
+                        seed = SEED)
+
+
+# Hierarchical dynamics example adapted from RW documentation example.
+# The difference is that this uses 4 species rather than 3.
+simdat1 <- sim_mvgam(trend_model = VAR(cor = TRUE),
+                     prop_trend = 0.95,
+                     n_series = 4,
+                     mu = c(1, 2, 3, 4))
+simdat2 <- sim_mvgam(trend_model = VAR(cor = TRUE),
+                     prop_trend = 0.95,
+                     n_series = 4,
+                     mu = c(1, 2, 3, 4))
+simdat3 <- sim_mvgam(trend_model = VAR(cor = TRUE),
+                     prop_trend = 0.95,
+                     n_series = 4,
+                     mu = c(1, 2, 3, 4))
+
+simdat_all <- rbind(simdat1$data_train %>%
+                      dplyr::mutate(region = 'qld'),
+                    simdat2$data_train %>%
+                      dplyr::mutate(region = 'nsw'),
+                    simdat3$data_train %>%
+                      dplyr::mutate(region = 'vic')) %>%
+  dplyr::mutate(species = gsub('series', 'species', series),
+                species = as.factor(species),
+                region = as.factor(region)) %>%
+  dplyr::arrange(series, time) %>%
+  dplyr::select(-series)
+
+mvgam_example6 <- mvgam(formula = y ~ species,
+                        trend_model = AR(gr = region, subgr = species),
+                        data = simdat_all,
+                        backend = 'rstan',
+                        seed = SEED)
 
 # Save examples as internal data
 usethis::use_data(
@@ -213,6 +253,7 @@ usethis::use_data(
   mvgam_example3,
   mvgam_example4,
   mvgam_example5,
+  mvgam_example6,
   internal = TRUE,
   overwrite = TRUE
 )

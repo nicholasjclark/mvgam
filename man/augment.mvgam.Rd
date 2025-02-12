@@ -62,4 +62,8 @@ augment(mod1, robust = TRUE, probs = c(0.25, 0.75))
 }
 \seealso{
 \code{\link{residuals.mvgam}}, \code{\link{fitted.mvgam}}
+
+Other tidiers: 
+\code{\link{tidy.mvgam}()}
 }
+\concept{tidiers}
