@@ -1,4 +1,4 @@
-#'@title Calculate randomized quantile residuals for mvgam objects
+#'@title Calculate randomized quantile residuals for 'mvgam' objects
 #'@name add_residuals.mvgam
 #'@param object \code{list} object returned from \code{mvgam}. See [mvgam()]
 #'@param ... unused

@@ -2,7 +2,7 @@
 #' @export
 generics::augment
 
-#' Augment an mvgam object's data
+#' Augment an 'mvgam' object's data
 #'
 #' Add fits and residuals to the data, implementing the generic `augment` from
 #' the package \pkg{broom}.

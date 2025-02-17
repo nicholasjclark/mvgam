@@ -86,13 +86,15 @@ arguments.}
 \item \code{newdata = datagrid(cyl = c(4, 6))}: \code{cyl} variable equal to 4 and 6 and other regressors fixed at their means or modes.
 \item See the Examples section and the \code{\link[marginaleffects:datagrid]{datagrid()}} documentation.
 }
+\item \code{\link[=subset]{subset()}} call with a single argument to select a subset of the dataset used to fit the model, ex: \code{newdata = subset(treatment == 1)}
+\item \code{\link[dplyr:filter]{dplyr::filter()}} call with a single argument to select a subset of the dataset used to fit the model, ex: \code{newdata = filter(treatment == 1)}
 \item string:
 \itemize{
-\item "mean": Marginal Effects at the Mean. Slopes when each predictor is held at its mean or mode.
-\item "median": Marginal Effects at the Median. Slopes when each predictor is held at its median or mode.
-\item "marginalmeans": Marginal Effects at Marginal Means. See Details section below.
-\item "tukey": Marginal Effects at Tukey's 5 numbers.
-\item "grid": Marginal Effects on a grid of representative numbers (Tukey's 5 numbers and unique values of categorical predictors).
+\item "mean": Slopes evaluated when each predictor is held at its mean or mode.
+\item "median": Slopes evaluated when each predictor is held at its median or mode.
+\item "balanced": Slopes evaluated on a balanced grid with every combination of categories and numeric variables held at their means.
+\item "tukey": Slopes evaluated at Tukey's 5 numbers.
+\item "grid": Slopes evaluated on a grid of representative numbers (Tukey's 5 numbers and unique values of categorical predictors).
 }
 }}
 
@@ -131,16 +133,29 @@ that have no missing data in the variables used for model fitting.}
 effects (\code{"random"}) or both (\code{"all"}) be returned? Only applies to mixed
 or gee models.}
 
-\item{component}{Should all predictor variables, predictor variables for the
-conditional model, the zero-inflated part of the model, the dispersion
-term or the instrumental variables be returned? Applies to models
-with zero-inflated and/or dispersion formula, or to models with instrumental
-variable (so called fixed-effects regressions). May be abbreviated. Note that the
-\emph{conditional} component is also called \emph{count} or \emph{mean}
-component, depending on the model.}
+\item{component}{Which type of parameters to return, such as parameters for
+the conditional model, the zero-inflated part of the model, the dispersion
+term, the instrumental variables or marginal effects be returned? Applies to
+models with zero-inflated and/or dispersion formula, or to models with
+instrumental variables (so called fixed-effects regressions), or models with
+marginal effects (from \strong{mfx}). See details in section \emph{Model Components}
+.May be abbreviated. Note that the \emph{conditional} component also refers to the
+\emph{count} or \emph{mean} component - names may differ, depending on the modeling
+package. There are three convenient shortcuts (not applicable to \emph{all} model
+classes):
+\itemize{
+\item \code{component = "all"} returns all possible parameters.
+\item If \code{component = "location"}, location parameters such as \code{conditional},
+\code{zero_inflated}, \code{smooth_terms}, or \code{instruments} are returned (everything
+that are fixed or random effects - depending on the \code{effects} argument -
+but no auxiliary parameters).
+\item For \code{component = "distributional"} (or \code{"auxiliary"}), components like
+\code{sigma}, \code{dispersion}, \code{beta} or \code{precision} (and other auxiliary
+parameters) are returned.
+}}
 
-\item{flatten}{Logical, if \code{TRUE}, the values are returned
-as character vector, not as list. Duplicated values are removed.}
+\item{flatten}{Logical, if \code{TRUE}, the values are returned as character
+vector, not as list. Duplicated values are removed.}
 }
 \value{
 Objects suitable for internal 'marginaleffects' functions to proceed.

@@ -2,7 +2,7 @@
 % Please edit documentation in R/posterior_epred.mvgam.R
 \name{fitted.mvgam}
 \alias{fitted.mvgam}
-\title{Expected Values of the Posterior Predictive Distribution}
+\title{Expected values of the posterior predictive distribution for 'mvgam' objects}
 \usage{
 \method{fitted}{mvgam}(
   object,

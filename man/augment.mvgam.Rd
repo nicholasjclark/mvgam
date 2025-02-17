@@ -2,7 +2,7 @@
 % Please edit documentation in R/tidier_methods.R
 \name{augment.mvgam}
 \alias{augment.mvgam}
-\title{Augment an mvgam object's data}
+\title{Augment an 'mvgam' object's data}
 \usage{
 \method{augment}{mvgam}(x, robust = FALSE, probs = c(0.025, 0.975), ...)
 }

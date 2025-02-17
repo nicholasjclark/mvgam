@@ -1,4 +1,4 @@
-#' Draws from the Expected Value of the Posterior Predictive Distribution
+#' Draws from the expected value of the posterior predictive distribution for 'mvgam' objects
 #'
 #' Compute posterior draws of the expected value of the posterior predictive
 #' distribution (i.e. the conditional expectation).
@@ -78,7 +78,7 @@ posterior_epred.mvgam = function(object,
   return(out)
 }
 
-#' Posterior Draws of the Linear Predictor
+#' Posterior draws of the linear predictor for 'mvgam' objects
 #'
 #' Compute posterior draws of the linear predictor, that is draws before
 #' applying any link functions or other transformations. Can be performed for
@@ -154,7 +154,7 @@ posterior_linpred.mvgam = function(object,
   return(out)
 }
 
-#' Draws from the Posterior Predictive Distribution
+#' Draws from the posterior predictive distribution for 'mvgam' objects
 #'
 #' Compute posterior draws of the posterior predictive distribution. Can be
 #' performed for the data used to fit the model (posterior predictive checks) or
@@ -238,7 +238,7 @@ rstantools::posterior_epred
 rstantools::posterior_linpred
 
 
-#' Expected Values of the Posterior Predictive Distribution
+#' Expected values of the posterior predictive distribution for 'mvgam' objects
 #'
 #' This method extracts posterior estimates of the fitted values
 #' (i.e. the actual predictions, included estimates for any trend states,

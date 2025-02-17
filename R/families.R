@@ -1,4 +1,4 @@
-#' Supported mvgam families
+#' Supported \pkg{mvgam} families
 #' @importFrom stats make.link dgamma pgamma rgamma qnorm plnorm runif pbeta dlnorm dpois
 #' @importFrom stats pnorm ppois plogis gaussian poisson Gamma dnbinom rnbinom dnorm dbeta
 #' @importFrom stats binomial rbinom pbinom dbinom qbinom qlogis

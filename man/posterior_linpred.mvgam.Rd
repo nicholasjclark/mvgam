@@ -2,7 +2,7 @@
 % Please edit documentation in R/posterior_epred.mvgam.R
 \name{posterior_linpred.mvgam}
 \alias{posterior_linpred.mvgam}
-\title{Posterior Draws of the Linear Predictor}
+\title{Posterior draws of the linear predictor for 'mvgam' objects}
 \usage{
 \method{posterior_linpred}{mvgam}(
   object,

@@ -11,7 +11,7 @@
 \alias{bernoulli}
 \alias{beta_binomial}
 \alias{nmix}
-\title{Supported mvgam families}
+\title{Supported \pkg{mvgam} families}
 \usage{
 tweedie(link = "log")
 
@@ -41,7 +41,7 @@ be changed}
 Objects of class \code{family}
 }
 \description{
-Supported mvgam families
+Supported \pkg{mvgam} families
 }
 \details{
 \code{mvgam} currently supports the following standard observation families:
