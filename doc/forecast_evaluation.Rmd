@@ -40,9 +40,10 @@ The purpose of this vignette is to show how the `mvgam` package can be used to p
 ## Simulating discrete time series
 We begin by simulating some data to show how forecasts are computed and evaluated in `mvgam`. The `sim_mvgam()` function can be used to simulate series that come from a variety of response distributions as well as seasonal patterns and/or dynamic temporal patterns. Here we simulate a collection of three time count-valued series. These series all share the same seasonal pattern but have different temporal dynamics. By setting `trend_model = GP()` and `prop_trend = 0.75`, we are generating time series that have smooth underlying temporal trends (evolving as Gaussian Processes with squared exponential kernel) and moderate seasonal patterns. The observations are Poisson-distributed and we allow 10% of observations to be missing.
 ```{r}
-set.seed(2345)
+set.seed(1)
 simdat <- sim_mvgam(T = 100, 
                     n_series = 3, 
+                    mu = 2,
                     trend_model = GP(),
                     prop_trend = 0.75,
                     family = poisson(),
@@ -71,10 +72,11 @@ plot_mvgam_series(data = simdat$data_train,
 The first model we will fit uses a shared cyclic spline to capture the repeated seasonality, as well as series-specific splines of time to capture the long-term dynamics. We allow the temporal splines to be fairly complex so they can capture as much of the temporal variation as possible:
 ```{r include=FALSE}
 mod1 <- mvgam(y ~ s(season, bs = 'cc', k = 8) + 
-                s(time, by = series, bs = 'cr', k = 20),
+                s(time, by = series, k = 20),
               knots = list(season = c(0.5, 12.5)),
               trend_model = 'None',
-              data = simdat$data_train)
+              data = simdat$data_train,
+              newdata = simdat$data_test)
 ```
 
 ```{r eval=FALSE}
@@ -96,50 +98,49 @@ And we can plot the conditional effects of the splines (on the link scale) to se
 conditional_effects(mod1, type = 'link')
 ```
 
-### Modelling dynamics with GPs
-Before showing how to produce and evaluate forecasts, we will fit a second model to these data so the two models can be compared. This model is equivalent to the above, except we now use Gaussian Processes to model series-specific dynamics. This makes use of the `gp()` function from `brms`, which can fit Hilbert space approximate GPs. See `?brms::gp` for more details.
-```{r include=FALSE}
-mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) + 
-                gp(time, by = series, c = 5/4, k = 20,
-                   scale = FALSE),
-              knots = list(season = c(0.5, 12.5)),
-              trend_model = 'None',
+### Modelling dynamics with a correlated AR1
+Before showing how to produce and evaluate forecasts, we will fit a second model to these data so the two models can be compared. This model is equivalent to the above, except we now use a correlated AR(1) process to model series-specific dynamics. See `?AR` for more details.
+```{r include=FALSE, message=FALSE}
+mod2 <- mvgam(y ~ 1,
+              trend_formula = ~ s(season, bs = 'cc', k = 8) - 1,
+              trend_knots = list(season = c(0.5, 12.5)),
+              trend_model = AR(cor = TRUE),
+              noncentred = TRUE,
               data = simdat$data_train,
-              adapt_delta = 0.98,
-              silent = 2)
+              silent = 1)
 ```
 
 ```{r eval=FALSE}
-mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) + 
-                gp(time, by = series, c = 5/4, k = 20,
-                   scale = FALSE),
-              knots = list(season = c(0.5, 12.5)),
-              trend_model = 'None',
+mod2 <- mvgam(y ~ 1,
+              trend_formula = ~ s(season, bs = 'cc', k = 8) - 1,
+              trend_knots = list(season = c(0.5, 12.5)),
+              trend_model = AR(cor = TRUE),
+              noncentred = TRUE,
               data = simdat$data_train,
-              silent = 2)
+              silent = 1)
 ```
 
-The summary for this model now contains information on the GP parameters for each time series:
+The summary for this model now contains information on the autoregressive and process error parameters for each time series:
 ```{r}
 summary(mod2, include_betas = FALSE)
 ```
 
-We can plot the posteriors for these parameters, and for any other parameter for that matter, using `bayesplot` routines. First the marginal deviation ($\alpha$) parameters:
+We can plot the posteriors for these parameters, and for any other parameter for that matter, using `bayesplot` routines. First the autoregressive parameters:
 ```{r, fig.alt = "Summarising latent Gaussian Process parameters in mvgam"}
-mcmc_plot(mod2, variable = c('alpha_gp'), regex = TRUE, type = 'areas')
+mcmc_plot(mod2, variable = 'ar', regex = TRUE, type = 'areas')
 ```
 
-And now the length scale ($\rho$) parameters:
+And now the variance ($\sigma$) parameters:
 ```{r, fig.alt = "Summarising latent Gaussian Process parameters in mvgam"}
-mcmc_plot(mod2, variable = c('rho_gp'), regex = TRUE, type = 'areas')
+mcmc_plot(mod2, variable = 'sigma', regex = TRUE, type = 'areas')
 ```
 
-We can again plot the nonlinear effects:
+We can again plot the conditional seasonal effect:
 ```{r, fig.alt = "Plotting latent Gaussian Process effects in mvgam and marginaleffects"}
 conditional_effects(mod2, type = 'link')
 ```
 
-The estimates for the temporal trends are fairly similar for the two models, but below we will see if they produce similar forecasts
+The estimates for the seasonal component are fairly similar for the two models, but below we will see if they produce similar forecasts
 
 ## Forecasting with the `forecast()` function
 Probabilistic forecasts can be computed in two main ways in `mvgam`. The first is to take a model that was fit only to training data (as we did above in the two example models) and produce temporal predictions from the posterior predictive distribution by feeding `newdata` to the `forecast()` function. It is crucial that any `newdata` fed to the `forecast()` function follows on sequentially from the data that was used to fit the model (this is not internally checked by the package because it might be a headache to do so when data are not supplied in a specific time-order). When calling the `forecast()` function, you have the option to generate different kinds of predictions (i.e. predicting on the link scale, response scale or to produce expectations; see `?forecast.mvgam` for details). We will use the default and produce forecasts on the response scale, which is the most common way to evaluate forecast distributions
@@ -167,23 +168,22 @@ Clearly the two models do not produce equivalent forecasts. We will come back to
 ## Forecasting with `newdata` in `mvgam()`
 The second way we can produce forecasts in `mvgam` is to feed the testing data directly to the `mvgam()` function as `newdata`. This will include the testing data as missing observations so that they are automatically predicted from the posterior predictive distribution using the `generated quantities` block in `Stan`. As an example, we can refit `mod2` but include the testing data for automatic forecasts:
 ```{r include=FALSE}
-mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) + 
-                gp(time, by = series, c = 5/4, k = 20,
-                   scale = FALSE),
-              knots = list(season = c(0.5, 12.5)),
-              trend_model = 'None',
+mod2 <- mvgam(y ~ 1,
+              trend_formula = ~ s(season, bs = 'cc', k = 8) - 1,
+              trend_knots = list(season = c(0.5, 12.5)),
+              trend_model = AR(cor = TRUE),
+              noncentred = TRUE,
               data = simdat$data_train,
               newdata = simdat$data_test,
-              adapt_delta = 0.98,
               silent = 2)
 ```
 
 ```{r eval=FALSE}
-mod2 <- mvgam(y ~ s(season, bs = 'cc', k = 8) + 
-                gp(time, by = series, c = 5/4, k = 20,
-                   scale = FALSE),
-              knots = list(season = c(0.5, 12.5)),
-              trend_model = 'None',
+mod2 <- mvgam(y ~ 1,
+              trend_formula = ~ s(season, bs = 'cc', k = 8) - 1,
+              trend_knots = list(season = c(0.5, 12.5)),
+              trend_model = AR(cor = TRUE),
+              noncentred = TRUE,
               data = simdat$data_train,
               newdata = simdat$data_test,
               silent = 2)
@@ -230,7 +230,7 @@ The returned object still provides information on interval coverage for each ind
 energy_mod2$all_series
 ```
 
-You can use your score(s) of choice to compare different models. For example, we can compute and plot the difference in CRPS scores for each series in data. Here, a negative value means the Gaussian Process model (`mod2`) is better, while a positive value means the spline model (`mod1`) is better.
+You can use your score(s) of choice to compare different models. For example, we can compute and plot the difference in CRPS scores for each series in data. Here, a negative value means the AR(1) model (`mod2`) is better, while a positive value means the spline model (`mod1`) is better.
 ```{r}
 crps_mod1 <- score(fc_mod1, score = 'crps')
 crps_mod2 <- score(fc_mod2, score = 'crps')
@@ -242,10 +242,14 @@ plot(diff_scores, pch = 16, cex = 1.25, col = 'darkred',
               max(abs(diff_scores), na.rm = TRUE)),
      bty = 'l',
      xlab = 'Forecast horizon',
-     ylab = expression(CRPS[GP]~-~CRPS[spline]))
+     ylab = expression(CRPS[AR1]~-~CRPS[spline]))
 abline(h = 0, lty = 'dashed', lwd = 2)
-gp_better <- length(which(diff_scores < 0))
-title(main = paste0('GP better in ', gp_better, ' of 25 evaluations',
+ar1_better <- length(which(diff_scores < 0))
+title(main = paste0('AR(1) better in ', 
+                    ar1_better, 
+                    ' of ', 
+                    length(diff_scores), 
+                    ' evaluations',
                     '\nMean difference = ', 
                     round(mean(diff_scores, na.rm = TRUE), 2)))
 
@@ -257,10 +261,14 @@ plot(diff_scores, pch = 16, cex = 1.25, col = 'darkred',
               max(abs(diff_scores), na.rm = TRUE)),
      bty = 'l',
      xlab = 'Forecast horizon',
-     ylab = expression(CRPS[GP]~-~CRPS[spline]))
+     ylab = expression(CRPS[AR1]~-~CRPS[spline]))
 abline(h = 0, lty = 'dashed', lwd = 2)
-gp_better <- length(which(diff_scores < 0))
-title(main = paste0('GP better in ', gp_better, ' of 25 evaluations',
+ar1_better <- length(which(diff_scores < 0))
+title(main = paste0('AR(1) better in ', 
+                    ar1_better, 
+                    ' of ', 
+                    length(diff_scores), 
+                    ' evaluations',
                     '\nMean difference = ', 
                     round(mean(diff_scores, na.rm = TRUE), 2)))
 
@@ -271,16 +279,20 @@ plot(diff_scores, pch = 16, cex = 1.25, col = 'darkred',
               max(abs(diff_scores), na.rm = TRUE)),
      bty = 'l',
      xlab = 'Forecast horizon',
-     ylab = expression(CRPS[GP]~-~CRPS[spline]))
+     ylab = expression(CRPS[AR1]~-~CRPS[spline]))
 abline(h = 0, lty = 'dashed', lwd = 2)
-gp_better <- length(which(diff_scores < 0))
-title(main = paste0('GP better in ', gp_better, ' of 25 evaluations',
+ar1_better <- length(which(diff_scores < 0))
+title(main = paste0('AR(1) better in ', 
+                    ar1_better, 
+                    ' of ', 
+                    length(diff_scores), 
+                    ' evaluations',
                     '\nMean difference = ', 
                     round(mean(diff_scores, na.rm = TRUE), 2)))
 
 ```
 
-The GP model consistently gives better forecasts, and the difference between scores grows quickly as the forecast horizon increases. This is not unexpected given the way that splines linearly extrapolate outside the range of training data
+The correlated AR(1) model consistently gives better forecasts, and the difference between scores tends to grow as the forecast horizon increases. This is not unexpected given the way that splines linearly extrapolate outside the range of training data
 
 ## Further reading
 The following papers and resources offer useful material about Bayesian forecasting and proper scoring rules:
@@ -292,4 +304,4 @@ Gneiting, Tilmann, and Adrian E. Raftery. [Strictly proper scoring rules, predic
 Simonis, Juniper L., Ethan P. White, and SK Morgan Ernest. [Evaluating probabilistic ecological forecasts](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/ecy.3431) *Ecology* 102.8 (2021) e03431.
 
 ## Interested in contributing?
-I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au)
+I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please see [this small list of opportunities on my website](https://ecogambler.netlify.app/opportunities/) and do reach out if you are interested (n.clark'at'uq.edu.au)

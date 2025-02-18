@@ -1,10 +1,10 @@
-## Version 1.1.3
+## Version 1.1.4
 
 ## Summary of changes
-This version brings a few efficiency updates and added functionality to enhance the user interface. There are no major structural changes or modifications that would break pre-existing workflows
+This version brings efficiency updates and added functionality to enhance the user interface. There are no major structural changes or modifications that would break pre-existing workflows
 
 ## Test environments
-* Windows install: R 4.3.1
+* Windows install: R 4.4.2
 * win-builder: R-devel
 * win-builder: R-release
 * ubuntu-latest: R-release

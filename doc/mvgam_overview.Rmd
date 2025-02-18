@@ -43,8 +43,8 @@ The purpose of this vignette is to give a general overview of the `mvgam` packag
 $$for~i~in~1:N_{series}~...$$
 $$for~t~in~1:N_{timepoints}~...$$
 
-$$g^{-1}(\tilde{\boldsymbol{y}}_{i,t})=\alpha_{i}+\sum\limits_{j=1}^J\boldsymbol{s}_{i,j,t}\boldsymbol{x}_{j,t}+\boldsymbol{z}_{i,t}\,,$$
-Here $\alpha$ are the unknown intercepts, the $\boldsymbol{s}$'s are unknown smooth functions of covariates ($\boldsymbol{x}$'s), which can potentially vary among the response series, and $\boldsymbol{z}$ are dynamic latent processes. Each smooth function $\boldsymbol{s_j}$ is composed of basis expansions whose coefficients, which must be estimated, control the functional relationship between $\boldsymbol{x}_{j}$ and $g^{-1}(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity. A larger set of basis functions allows greater flexibility. For more information on GAMs and how they can smooth through data, see [this blogpost on how to interpret nonlinear effects from Generalized Additive Models](https://ecogambler.netlify.app/blog/interpreting-gams/){target="_blank"}.
+$$g^{-1}(\tilde{\boldsymbol{y}}_{i,t})=\alpha_{i}+\sum\limits_{j=1}^J\boldsymbol{s}_{i,j,t}\boldsymbol{x}_{j,t}+\boldsymbol{Z}\boldsymbol{z}_{k,t}\,,$$
+Here $\alpha$ are the unknown intercepts, the $\boldsymbol{s}$'s are unknown smooth functions of covariates ($\boldsymbol{x}$'s), which can potentially vary among the response series, and $\boldsymbol{z}$ are dynamic latent processes. Each smooth function $\boldsymbol{s_j}$ is composed of basis expansions whose coefficients, which must be estimated, control the functional relationship between $\boldsymbol{x}_{j}$ and $g^{-1}(\tilde{\boldsymbol{y}})$. The size of the basis expansion limits the smooth’s potential complexity. A larger set of basis functions allows greater flexibility. For more information on GAMs and how they can smooth through data, see [this blogpost on how to interpret nonlinear effects from Generalized Additive Models](https://ecogambler.netlify.app/blog/interpreting-gams/){target="_blank"}. Latent processes are captured with $\boldsymbol{Z}\boldsymbol{z}_{i,t}$, where $\boldsymbol{Z}$ is an $i~by~k$ matrix of loading coefficients (which can be fixed or a combination of fixed and freely estimated parameters) and $\boldsymbol{z}_{k,t}$ are a set of $K$ latent factors that can also include their own GAM linear predictors (see the [State-Space models vignette](https://nicholasjclark.github.io/mvgam/articles/trend_formulas.html)), the [N-mixtures vignette](https://nicholasjclark.github.io/mvgam/articles/nmixtures.html) and the example in [`jsdgam`](https://nicholasjclark.github.io/mvgam/reference/jsdgam.html) to get an idea of how flexible these processes can be.
   
 Several advantages of GAMs are that they can model a diversity of response families, including discrete distributions (i.e. Poisson, Negative Binomial, Gamma) that accommodate common ecological features such as zero-inflation or overdispersion, and that they can be formulated to include hierarchical smoothing for multivariate responses. `mvgam` supports a number of different observation families, which are summarized below:
 
@@ -67,7 +67,15 @@ Several advantages of GAMs are that they can model a diversity of response famil
 For all supported observation families, any extra parameters that need to be estimated (i.e. the $\sigma$ in a Gaussian model or the $\phi$ in a Negative Binomial model) are by default estimated independently for each series. However, users can opt to force all series to share extra observation parameters using `share_obs_params = TRUE` in `mvgam()`. Note that default link functions cannot currently be changed.
 
 ## Supported temporal dynamic processes
-The dynamic processes can take a wide variety of forms, some of which can be multivariate to allow the different time series to interact or be correlated. When using the `mvgam()` function, the user chooses between different process models with the `trend_model` argument. Available process models are described in detail below.
+As stated above, the latent processes can take a wide variety of forms, some of which can be multivariate to allow the different observational variables to interact or be correlated. When using the `mvgam()` function, the user chooses between different process models with the `trend_model` argument. Available process models are described in detail below.
+
+### Correlated multivariate processes
+If more than one observational unit (usually referred to as 'series') is included in `data` $(N_{series} > 1)$, use `trend_model = ZMVN()` to set up a model where the outcomes for different observational units may be correlated according to:
+
+\begin{align*}
+z_{t} & \sim \text{MVNormal}(0, \Sigma) \end{align*}
+
+The covariance matrix $\Sigma$ will capture potentially correlated process errors. It is parameterised using a Cholesky factorization, which requires priors on the series-level variances $\sigma$ and on the strength of correlations using `Stan`'s `lkj_corr_cholesky` distribution. Note that this `trend_model` does not assume that measurements occur over *time*, as users can specify what variable in the `data` represents the unit of analysis (i.e. outcomes could be counts of different *species* across different *sites* or *regions*, for example; see [`?ZMVN()](https://nicholasjclark.github.io/mvgam/reference/ZMVN.html) for guidelines).
 
 ### Independent Random Walks
 Use `trend_model = 'RW'` or `trend_model = RW()` to set up a model where each series in `data` has independent latent temporal dynamics of the form:
@@ -114,6 +122,15 @@ Where $A$ is an $N_{series} * N_{series}$ matrix of autoregressive coefficients 
 Note that for all VAR models, stationarity of the process is enforced with a structured prior distribution that is described in detail in [Heaps 2022](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648)
   
 Heaps, Sarah E. "[Enforcing stationarity through the prior in vector autoregressions.](https://www.tandfonline.com/doi/full/10.1080/10618600.2022.2079648)" *Journal of Computational and Graphical Statistics* 32.1 (2023): 74-83.
+
+### Hierarchical processes
+Several of the above-mentioned `trend_model` options can be modified to account for grouping structures in `data` by setting up hierarchical latent processes. If an optional grouping variable (`gr`; which must be a `factor` in the supplied `data`) exists, users can model hierarchical residual correlation structures. where the residual correlations for a specific level of `gr` are modelled hierarchically:
+
+\begin{align*}
+\Omega_{group} & = \alpha_{cor}\Omega_{global} + (1 - \alpha_{cor})\Omega_{group, local} \end{align*}
+
+
+where $\Omega_{global}$ is a *global* correlation matrix, $\Omega_{group, local}$ is a *local deviation* correlation matrix and $\alpha_{cor}$ is a weighting parameter controlling how strongly the local correlation matrix $\Omega_{group}$ (i.e. the derived correlation matrix that will be used for each level of the grouping factor `gr`) is shrunk towards the global correlation matrix $\Omega_{global}$  (larger values of $\alpha_{cor}$ indicate a greater degree of shrinkage, i.e. a greater degree of partial pooling). This option is valuable for many types of designs where the same observational units (i.e. *financial assets* or *species*, for example) are measured in different strata (i.e. *regions*, *countries* or *experimental units*, for example). Currently hierarchical correlations can be included for `AR()`, `VAR()` or `ZMVN()` `trend_model` options.
 
 ### Gaussian Processes
 The final option for modelling temporal dynamics is to use a Gaussian Process with squared exponential kernel. These are set up independently for each series (there is currently no multivariate GP option), using `trend_model = 'GP'`. The dynamics for each latent process are modelled as:
@@ -557,4 +574,4 @@ sum(score_mod4$PP$score, na.rm = TRUE) - sum(score_mod3$PP$score, na.rm = TRUE)
 A strongly negative value here suggests the score for the dynamic model (model 4) is much smaller than the score for the model with a smooth function of time (model 3)
 
 ## Interested in contributing?
-I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please reach out if you are interested (n.clark'at'uq.edu.au)
+I'm actively seeking PhD students and other researchers to work in the areas of ecological forecasting, multivariate model evaluation and development of `mvgam`. Please see [this small list of opportunities on my website](https://ecogambler.netlify.app/opportunities/) and do reach out if you are interested (n.clark'at'uq.edu.au)
