@@ -51,7 +51,7 @@ Please also feel free to use the [`mvgam` Discussion Board](https://github.com/n
 Install the stable version from `CRAN` using: `install.packages('mvgam')`, or install the development version from `GitHub` using:
 `devtools::install_github("nicholasjclark/mvgam")`. Note that to condition models on observed data, `Stan` must be installed (along with either `rstan` and/or `cmdstanr`). Please refer to installation links for `Stan` with `rstan` [here](https://mc-stan.org/users/interfaces/rstan){target="_blank"}, or for `Stan` with `cmdstandr` [here](https://mc-stan.org/cmdstanr/){target="_blank"}.
 
-We highly recommend you use `Cmdstan` through the `cmdstanr` interface. This is because `Cmdstan` is easier to install, is more up to date with new features, and uses less memory than `rstan`. See [this documentation from the `Cmdstan` team for more information](http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan){target="_blank"}. 
+We highly recommend you use `Cmdstan` through the `cmdstanr` interface. This is because `Cmdstan` is easier to install, is more up to date with new features, and uses less memory than `rstan`. See [this documentation from the `Cmdstan` team for more information](https://mc-stan.org/cmdstanr/articles/cmdstanr.html){target="_blank"}. 
 
 ## Citing `mvgam` and related software
 When using any software please make sure to appropriately acknowledge the hard work that developers and maintainers put into making these packages available. Citations are currently the best way to formally acknowledge this work, so we highly encourage you to cite any packages that you rely on for your research.

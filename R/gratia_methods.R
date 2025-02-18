@@ -155,8 +155,6 @@
 #' \donttest{
 #' # Fit a simple GAM and draw partial effects of smooths using gratia
 #' set.seed(0)
-#' library(ggplot2); theme_set(theme_bw())
-#' library(gratia)
 #' dat <- mgcv::gamSim(1, n = 200, scale = 2)
 #' mod <- mvgam(y ~ s(x1, bs = 'moi') +
 #'               te(x0, x2),
@@ -166,7 +164,7 @@
 #'              silent = 2)
 #'
 #' if(require("gratia")){
-#'  draw(mod)
+#'  gratia::draw(mod)
 #' }
 #'
 #'}

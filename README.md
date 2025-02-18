@@ -93,8 +93,8 @@ target="_blank">here</a>, or for `Stan` with `cmdstandr`
 
 We highly recommend you use `Cmdstan` through the `cmdstanr` interface.
 This is because `Cmdstan` is easier to install, is more up to date with
-new features, and uses less memory than `rstan`. See <a
-href="http://mc-stan.org/cmdstanr/articles/cmdstanr.html#comparison-with-rstan"
+new features, and uses less memory than `rstan`. See
+<a href="https://mc-stan.org/cmdstanr/articles/cmdstanr.html"
 target="_blank">this documentation from the <code>Cmdstan</code> team
 for more information</a>.
 
@@ -250,39 +250,39 @@ summary(lynx_mvgam)
 #> 
 #> 
 #> GAM coefficient (beta) estimates:
-#>                2.5%   50%  97.5% Rhat n_eff
-#> (Intercept)   6.400  6.60  6.900 1.01   879
-#> s(season).1  -0.650 -0.14  0.400 1.00  1197
-#> s(season).2   0.730  1.30  2.000 1.00  1057
-#> s(season).3   1.300  1.90  2.500 1.00   986
-#> s(season).4  -0.110  0.55  1.200 1.00  1042
-#> s(season).5  -1.300 -0.71 -0.064 1.00   991
-#> s(season).6  -1.200 -0.57  0.120 1.00   788
-#> s(season).7   0.065  0.73  1.400 1.00  1274
-#> s(season).8   0.630  1.40  2.000 1.00  1091
-#> s(season).9  -0.360  0.21  0.850 1.00   803
-#> s(season).10 -1.400 -0.88 -0.390 1.00  1135
+#>                2.5%   50% 97.5% Rhat n_eff
+#> (Intercept)   6.400  6.60  6.90 1.01   745
+#> s(season).1  -0.650 -0.14  0.36 1.00   957
+#> s(season).2   0.720  1.30  1.90 1.01   830
+#> s(season).3   1.200  1.90  2.50 1.00   803
+#> s(season).4  -0.064  0.54  1.10 1.00   976
+#> s(season).5  -1.300 -0.68 -0.05 1.00  1012
+#> s(season).6  -1.200 -0.56  0.13 1.00  1086
+#> s(season).7   0.040  0.71  1.40 1.00  1001
+#> s(season).8   0.580  1.30  2.10 1.00   792
+#> s(season).9  -0.370  0.22  0.83 1.00   729
+#> s(season).10 -1.400 -0.85 -0.34 1.00   792
 #> 
 #> Approximate significance of GAM smooths:
 #>            edf Ref.df Chi.sq p-value    
-#> s(season) 9.97     10   50.1  <2e-16 ***
+#> s(season) 9.94     10   54.4  <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
 #> Latent trend parameter AR estimates:
 #>          2.5%  50% 97.5% Rhat n_eff
-#> ar1[1]   0.59 0.83  0.98    1   744
-#> sigma[1] 0.38 0.48  0.61    1   853
+#> ar1[1]   0.60 0.82  0.97    1   807
+#> sigma[1] 0.39 0.48  0.61    1   847
 #> 
 #> Stan MCMC diagnostics:
 #> n_eff / iter looks reasonable for all parameters
 #> Rhat looks reasonable for all parameters
 #> 0 of 2000 iterations ended with a divergence (0%)
-#> 12 of 2000 iterations saturated the maximum tree depth of 10 (0.6%)
+#> 1 of 2000 iterations saturated the maximum tree depth of 10 (0.05%)
 #>  *Run with max_treedepth set to a larger value to avoid saturation
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Feb 18 9:41:04 AM 2025.
+#> Samples were drawn using NUTS(diag_e) at Tue Feb 18 3:14:04 PM 2025.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
@@ -426,7 +426,7 @@ plot(lynx_mvgam, type = 'forecast', newdata = lynx_test)
 <img src="man/figures/README-unnamed-chunk-21-1.png" alt="Plotting forecast distributions using mvgam in R" width="60%" style="display: block; margin: auto;" />
 
     #> Out of sample DRPS:
-    #> 2475.4706345
+    #> 2360.4045065
 
 And the estimated latent trend component, again using the more flexible
 `plot_mvgam_...()` option to show first derivatives of the estimated
@@ -624,7 +624,7 @@ summary(mod, include_betas = FALSE)
 #> 0 of 2000 iterations saturated the maximum tree depth of 10 (0%)
 #> E-FMI indicated no pathological behavior
 #> 
-#> Samples were drawn using NUTS(diag_e) at Tue Feb 18 9:42:22 AM 2025.
+#> Samples were drawn using NUTS(diag_e) at Tue Feb 18 3:15:47 PM 2025.
 #> For each parameter, n_eff is a crude measure of effective sample size,
 #> and Rhat is the potential scale reduction factor on split MCMC chains
 #> (at convergence, Rhat = 1)
