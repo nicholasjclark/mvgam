@@ -62,11 +62,11 @@
 #'@examples
 #'\donttest{
 #'# Simulate from a Poisson-AR2 model with a seasonal smooth
-#'set.seed(100)
+#'set.seed(1)
 #'dat <- sim_mvgam(T = 75,
 #'                 n_series = 1,
 #'                 prop_trend = 0.75,
-#'                 trend_model = 'AR2',
+#'                 trend_model = AR(p = 2),
 #'                 family = poisson())
 #'
 #'
@@ -80,7 +80,7 @@
 #'                 silent = 2)
 #'
 #'# Fit a less appropriate model
-#'mod_rw <- mvgam(y ~ s(season, bs = 'cc'),
+#'mod_rw <- mvgam(y ~ 1,
 #'                trend_model = RW(),
 #'                family = poisson(),
 #'                data = dat$data_train,
