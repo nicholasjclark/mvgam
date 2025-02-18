@@ -165,7 +165,10 @@
 #'              chains = 2,
 #'              silent = 2)
 #'
-#' draw(mod)
+#' if(require("gratia")){
+#'  draw(mod)
+#' }
+#'
 #'}
 
 NULL

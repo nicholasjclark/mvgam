@@ -282,7 +282,10 @@ mod <- mvgam(y ~ s(x1, bs = 'moi') +
              chains = 2,
              silent = 2)
 
-draw(mod)
+if(require("gratia")){
+ draw(mod)
+}
+
 }
 }
 \author{

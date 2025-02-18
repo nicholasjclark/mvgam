@@ -56,7 +56,8 @@ augment.mvgam <- function(x,
                           ...) {
   obs_data <- x$obs_data
   obs_data$.observed <- obs_data$y
-  obs_data <- purrr::discard_at(obs_data, c("index..orig..order", "index..time..index"))
+  obs_data <- purrr::discard_at(obs_data,
+                                c("index..orig..order", "index..time..index"))
 
   resids <- residuals(x, robust = robust, probs = probs) %>%
     tibble::as_tibble()
@@ -64,8 +65,14 @@ augment.mvgam <- function(x,
     tibble::as_tibble()
   hc_fits <- fits %>%
     dplyr::slice_head(n = NROW(resids))  # fits can include fcs
-  colnames(resids) <- c(".resid", ".resid.variability", ".resid.cred.low", ".resid.cred.high")
-  colnames(hc_fits) <- c(".fitted", ".fit.variability", ".fit.cred.low", ".fit.cred.high")
+  colnames(resids) <- c(".resid",
+                        ".resid.variability",
+                        ".resid.cred.low",
+                        ".resid.cred.high")
+  colnames(hc_fits) <- c(".fitted",
+                         ".fit.variability",
+                         ".fit.cred.low",
+                         ".fit.cred.high")
 
   augmented <- c(obs_data, hc_fits, resids)  # coerces to list
   if (!identical(class(x$obs_data), "list")) {  # data.frame
