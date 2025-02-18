@@ -24,10 +24,10 @@ test_that("data_grid gives expected output structure", {
   # A list example
   out <- mvgam:::data_grid(season = fivenum,
                            year = mean,
-                           newdata = mvgam:::mvgam_example5$obs_data)
+                           newdata = mvgam:::mvgam_example4$obs_data)
   expect_true(all.equal(names(out),
-                        names(mvgam:::mvgam_example5$obs_data)))
-  expect_true(all(out$year == mean(mvgam:::mvgam_example5$obs_data$year)))
+                        names(mvgam:::mvgam_example4$obs_data)))
+  expect_true(all(out$year == mean(mvgam:::mvgam_example4$obs_data$year)))
 })
 
 test_that("get_data gives expected output structure", {
@@ -50,7 +50,7 @@ test_that("get_predict gives expected output structure", {
     newdata = mvgam:::mvgam_example4$obs_data
   )
   expect_equal(NROW(preds),
-               NROW(mvgam:::mvgam_example4$obs_data))
+               length(mvgam:::mvgam_example4$obs_data$y))
 
   preds <- marginaleffects::get_predict(
     mvgam:::mvgam_example2,
@@ -77,7 +77,7 @@ test_that("averages give expected output structures", {
                     "conf.low", "conf.high") %in% colnames(ems)))
 
   ems <- marginaleffects::avg_predictions(
-    mvgam:::mvgam_example5,
+    mvgam:::mvgam_example4,
     variables = list(season = c(1, 6, 12))
   )
   expect_equal(NROW(ems), 3)
@@ -99,8 +99,7 @@ test_that("comparisons give expected output structures", {
     by = 'time'
   )
   expect_equal(levels(as.factor(cmp$contrast)),
-               c("series_2 - series_1",
-                 "series_3 - series_1"))
+               c("series_2 - series_1"))
 
   cmp <- marginaleffects::comparisons(
     mvgam:::mvgam_example2,
@@ -108,9 +107,7 @@ test_that("comparisons give expected output structures", {
     by = 'time'
   )
   expect_equal(levels(as.factor(cmp$contrast)),
-               c("series_2 - series_1",
-                 "series_3 - series_1",
-                 "series_3 - series_2"))
+               c("series_2 - series_1"))
 
   cmp <- marginaleffects::comparisons(
     mvgam:::mvgam_example2,
@@ -120,10 +117,8 @@ test_that("comparisons give expected output structures", {
     by = 'time'
   )
   expect_equal(levels(as.factor(cmp$contrast)),
-               c("series_2 - series_1",
-                 "series_3 - series_1",
-                 "series_3 - series_2"))
-  expect_equal(NROW(cmp), 9)
+               c("series_2 - series_1"))
+  expect_equal(NROW(cmp), 3)
   expect_equal(unique(cmp$time),
                c(1, 6, 9))
 })

@@ -734,12 +734,12 @@ test_that("parametric effect priors correctly incorporated in models", {
                family = gaussian(),
                run_model = FALSE)
 
-  expect_true(any(grepl('// prior for seriesseries_3:x1...',
+  expect_true(any(grepl('// prior for seriesseries_2:x1...',
                         mod$model_file, fixed = TRUE)))
   expect_true(any(grepl('// prior for (Intercept)...',
                         mod$model_file, fixed = TRUE)))
 
-  para_names <- paste0(paste0('// prior for seriesseries_', 1:3,
+  para_names <- paste0(paste0('// prior for seriesseries_', 1:2,
                               paste0(':x', 1:3, '...')))
   for(i in seq_along(para_names)){
     expect_true(any(grepl(para_names[i],
@@ -764,12 +764,12 @@ test_that("parametric effect priors correctly incorporated in models", {
                family = gaussian(),
                run_model = FALSE)
 
-  expect_true(any(grepl('// prior for seriesseries_3:x1...',
+  expect_true(any(grepl('// prior for seriesseries_2:x1...',
                         mod$model_file, fixed = TRUE)))
   expect_true(any(grepl('// prior for (Intercept)...',
                         mod$model_file, fixed = TRUE)))
 
-  para_names <- paste0(paste0('// prior for seriesseries_', 1:3,
+  para_names <- paste0(paste0('// prior for seriesseries_', 1:2,
                               paste0(':x', 1:3, '...')))
   for(i in seq_along(para_names)){
     expect_true(any(grepl(para_names[i],
@@ -792,13 +792,14 @@ test_that("parametric effect priors correctly incorporated in models", {
                  trend:x2 + trend:x3,
                trend_model = RW(),
                data = mod_data$data_train,
+               noncentred = TRUE,
                family = gaussian(),
                run_model = FALSE)
 
   expect_true(any(grepl('// prior for (Intercept)...',
                         mod$model_file, fixed = TRUE)))
 
-  para_names <- paste0(paste0('// prior for trendtrend', 1:3,
+  para_names <- paste0(paste0('// prior for trendtrend', 1:2,
                               paste0(':x', 1:3, '_trend...')))
   for(i in seq_along(para_names)){
     expect_true(any(grepl(para_names[i],
@@ -822,13 +823,12 @@ test_that("parametric effect priors correctly incorporated in models", {
                trend_model = VAR(ma = TRUE),
                data = mod_data$data_train,
                family = gaussian(),
-               run_model = FALSE,
-               autoformat = F)
+               run_model = FALSE)
 
   expect_true(any(grepl('// prior for (Intercept)...',
                         mod$model_file, fixed = TRUE)))
 
-  para_names <- paste0(paste0('// prior for trendtrend', 1:3,
+  para_names <- paste0(paste0('// prior for trendtrend', 1:2,
                               paste0(':x', 1:3, '_trend...')))
   for(i in seq_along(para_names)){
     expect_true(any(grepl(para_names[i],
