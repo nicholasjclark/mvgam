@@ -128,7 +128,8 @@ dynamic GAMs, possibly because of the difficulties estimating covariances among 
 many spline parameters and latent trend parameters. But rigorous testing has not
 been carried out}
 
-\item{control}{A named \code{list} for controlling the sampler's behaviour. Currently only accepts settings for}
+\item{control}{A named \code{list} for controlling the sampler's behaviour. Valid elements include
+\code{max_treedepth}, \code{adapt_delta} and \code{init}}
 
 \item{chains}{\code{integer} specifying the number of parallel chains for the model. Ignored
 if \code{algorithm \%in\% c('meanfield', 'fullrank', 'pathfinder', 'laplace')}}

@@ -611,6 +611,26 @@ jsdgam = function(formula,
     attr(trim_data, 'trend_model') <- 'None'
     attr(trim_data, 'prepped_trend_model') <- prepped_trend
 
+    # Extract sampler arguments
+    dots <- list(...)
+    if('adapt_delta' %in% names(dots)){
+      message('argument "adapt_delta" should be supplied as an element in "control"')
+      adapt_delta <- dots$adapt_delta
+      dots$adapt_delta <- NULL
+    } else {
+      adapt_delta <- control$adapt_delta
+      if(is.null(adapt_delta)) adapt_delta  <- 0.8
+    }
+
+    if('max_treedepth' %in% names(dots)){
+      message('argument "max_treedepth" should be supplied as an element in "control"')
+      max_treedepth <- dots$max_treedepth
+      dots$max_treedepth <- NULL
+    } else {
+      max_treedepth <- control$max_treedepth
+      if(is.null(max_treedepth)) max_treedepth  <- 10
+    }
+
     out <- structure(list(call = mod$call,
                           trend_call = factor_formula,
                           family = mod$family,
@@ -642,8 +662,8 @@ jsdgam = function(formula,
                           fit_engine = 'stan',
                           backend = backend,
                           algorithm = algorithm,
-                          max_treedepth = control$max_treedepth,
-                          adapt_delta = control$adapt_delta),
+                          max_treedepth = max_treedepth,
+                          adapt_delta = adapt_delta),
                      class = c('mvgam', 'jsdgam'))
   }
 

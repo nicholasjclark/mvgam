@@ -198,7 +198,8 @@
 #' @param save_all_pars \code{Logical} flag to indicate if draws from all
 #'   variables defined in Stan's \code{parameters} block should be saved
 #'   (default is \code{FALSE}).
-#'@param control A named `list` for controlling the sampler's behaviour. Currently only accepts settings for
+#'@param control A named `list` for controlling the sampler's behaviour. Valid elements include
+#'`max_treedepth`, `adapt_delta` and `init`
 #'@param silent Verbosity level between `0` and `2`. If `1` (the default), most of the informational
 #'messages of compiler and sampler are suppressed. If `2`, even more messages are suppressed. The
 #'actual sampling progress is still printed. Set `refresh = 0` to turn this off as well. If using

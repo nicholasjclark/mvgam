@@ -41,14 +41,22 @@ model.frame.mvgam = function(formula, trend_effects = FALSE, ...){
     }
 
     # Any other required variables, needed for grouped models
-    if(!inherits(attr(formula$model_data, 'trend_model'), 'mvgam_trend')){
+    if(!inherits(attr(formula$model_data, 'trend_model'), 'mvgam_trend') &
+       !inherits(formula$trend_model, 'mvgam_trend')){
       trend_model <- list(trend_model = attr(formula$model_data, 'trend_model'),
                           unit = 'time',
                           gr = 'NA',
                           subgr = 'series')
-    } else {
+    }
+
+    if(inherits(attr(formula$model_data, 'trend_model'), 'mvgam_trend')){
       trend_model <- attr(formula$model_data, 'trend_model')
     }
+
+    if(inherits(formula$trend_model, 'mvgam_trend')){
+      trend_model <- formula$trend_model
+    }
+
     other_vars <- c(trend_model$unit,
                     trend_model$gr,
                     trend_model$subgr)

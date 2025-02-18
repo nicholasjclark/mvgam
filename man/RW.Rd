@@ -173,10 +173,7 @@ mod <- mvgam(formula = y ~ species,
 summary(mod)
 conditional_effects(mod, type = 'link')
 
-# Inspect posterior estimates for process error and the
-# correlation weighting parameter
-mcmc_plot(mod, variable = 'Sigma', regex = TRUE,
-         type = 'hist')
+# Inspect posterior estimates for the correlation weighting parameter
 mcmc_plot(mod, variable = 'alpha_cor', type = 'hist')
 }
 }
